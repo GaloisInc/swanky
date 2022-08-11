@@ -5,8 +5,8 @@
 // See LICENSE for licensing information.
 
 use crate::{
-    errors::TwopacError, wire::WireLabel, BinaryWire, Evaluator as Ev, Fancy, FancyBinary,
-    FancyInput, FancyReveal,
+    errors::TwopacError, wire::WireLabel, AllWire, ArithmeticWire, Evaluator as Ev, Fancy,
+    FancyArithmetic, FancyBinary, FancyInput, FancyReveal, WireMod2,
 };
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
@@ -107,25 +107,39 @@ fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
     })
 }
 
-impl<C: AbstractChannel, RNG, OT, Wire: WireLabel + BinaryWire> FancyBinary
-    for Evaluator<C, RNG, OT, Wire>
-{
+impl<C: AbstractChannel, RNG, OT> FancyBinary for Evaluator<C, RNG, OT, WireMod2> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.evaluator.and(x, y).map_err(Self::Error::from)
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.evaluator.xor(x, y).map_err(Self::Error::from)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.evaluator.negate(x).map_err(Self::Error::from)
+    }
 }
 
-impl<C: AbstractChannel, RNG, OT, Wire: WireLabel> Fancy for Evaluator<C, RNG, OT, Wire> {
-    type Item = Wire;
-    type Error = TwopacError;
-
-    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
-        self.evaluator.constant(x, q).map_err(Self::Error::from)
+impl<C: AbstractChannel, RNG, OT> FancyBinary for Evaluator<C, RNG, OT, AllWire> {
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.evaluator.and(x, y).map_err(Self::Error::from)
     }
 
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.evaluator.xor(x, y).map_err(Self::Error::from)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.evaluator.negate(x).map_err(Self::Error::from)
+    }
+}
+
+impl<C: AbstractChannel, RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
+    for Evaluator<C, RNG, OT, Wire>
+{
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.evaluator.add(&x, &y).map_err(Self::Error::from)
-    }
-
-    fn negate(&mut self, x: &Wire) -> Result<Self::Item, Self::Error> {
-        self.evaluator.negate(&x).map_err(Self::Error::from)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
@@ -142,6 +156,15 @@ impl<C: AbstractChannel, RNG, OT, Wire: WireLabel> Fancy for Evaluator<C, RNG, O
 
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.evaluator.proj(&x, q, tt).map_err(Self::Error::from)
+    }
+}
+
+impl<C: AbstractChannel, RNG, OT, Wire: WireLabel> Fancy for Evaluator<C, RNG, OT, Wire> {
+    type Item = Wire;
+    type Error = TwopacError;
+
+    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
+        self.evaluator.constant(x, q).map_err(Self::Error::from)
     }
 
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, Self::Error> {

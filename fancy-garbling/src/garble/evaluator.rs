@@ -7,13 +7,14 @@
 use std::marker::PhantomData;
 
 use crate::{
+    check_binary,
     errors::{EvaluatorError, FancyError},
     fancy::{Fancy, FancyReveal},
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
-    BinaryWire, FancyBinary,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
 };
-use scuttlebutt::AbstractChannel;
+use scuttlebutt::{AbstractChannel, Block};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -56,10 +57,57 @@ impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
         let block = self.channel.read_block()?;
         Ok(Wire::from_block(block, modulus))
     }
+
+    /// Evaluates an 'and' gate given two inputs wires and two half-gates from the garbler.
+    ///
+    /// Outputs C = A & B
+    ///
+    /// Used internally as a subroutine to implement 'and' gates for `FancyBinary`.
+    fn evaluate_and_gate(
+        &mut self,
+        A: &WireMod2,
+        B: &WireMod2,
+        gate0: &Block,
+        gate1: &Block,
+    ) -> WireMod2 {
+        let gate_num = self.current_gate();
+        let g = tweak2(gate_num as u64, 0);
+
+        // garbler's half gate
+        let L = if A.color() == 0 {
+            A.hashback(g, 2)
+        } else {
+            let ct_left = gate0;
+            WireMod2::from_block(*ct_left ^ A.hash(g), 2)
+        };
+
+        // evaluator's half gate
+        let R = if B.color() == 0 {
+            B.hashback(g, 2)
+        } else {
+            let ct_right = gate1;
+            WireMod2::from_block(*ct_right ^ B.hash(g), 2)
+        };
+
+        let res = L.plus_mov(&R.plus_mov(&A.cmul(B.color())));
+        res
+    }
 }
-impl<C: AbstractChannel, Wire: WireLabel + BinaryWire> FancyBinary for Evaluator<C, Wire> {
+
+impl<C: AbstractChannel> FancyBinary for Evaluator<C, WireMod2> {
+    /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
         Ok(x.clone())
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        Ok(x.plus(y))
+    }
+
+    fn and(&mut self, A: &Self::Item, B: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let gate0 = self.channel.read_block()?;
+        let gate1 = self.channel.read_block()?;
+        Ok(self.evaluate_and_gate(A, B, &gate0, &gate1))
     }
 }
 
@@ -72,24 +120,38 @@ impl<C: AbstractChannel, Wire: WireLabel> FancyReveal for Evaluator<C, Wire> {
     }
 }
 
-impl<C: AbstractChannel, Wire: WireLabel> Fancy for Evaluator<C, Wire> {
-    type Item = Wire;
-    type Error = EvaluatorError;
-
+impl<C: AbstractChannel> FancyBinary for Evaluator<C, AllWire> {
+    /// Overriding `negate` to be a noop: entirely handled on garbler's end
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
-        if x.modulus() != 2 {
-            return Err(Self::Error::from(FancyError::InvalidArgMod {
-                got: x.modulus(),
-                needed: 2,
-            }));
-        }
+        check_binary!(x);
+
         Ok(x.clone())
     }
 
-    fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
-        self.read_wire(q)
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        check_binary!(x);
+        check_binary!(y);
+
+        self.add(x, y)
     }
 
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        if let (AllWire::Mod2(ref A), AllWire::Mod2(ref B)) = (x, y) {
+            let gate0 = self.channel.read_block()?;
+            let gate1 = self.channel.read_block()?;
+            return Ok(AllWire::Mod2(self.evaluate_and_gate(A, B, &gate0, &gate1)));
+        }
+
+        // If we got here, one of the wires isn't binary
+        check_binary!(x);
+        check_binary!(y);
+
+        // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
+        unreachable!()
+    }
+}
+
+impl<C: AbstractChannel, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<C, Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, EvaluatorError> {
         if x.modulus() != y.modulus() {
             return Err(EvaluatorError::FancyError(FancyError::UnequalModuli));
@@ -170,6 +232,15 @@ impl<C: AbstractChannel, Wire: WireLabel> Fancy for Evaluator<C, Wire> {
             let ct = gate[x.color() as usize - 1];
             Ok(Wire::from_block(ct ^ x.hash(t), q))
         }
+    }
+}
+
+impl<C: AbstractChannel, Wire: WireLabel> Fancy for Evaluator<C, Wire> {
+    type Item = Wire;
+    type Error = EvaluatorError;
+
+    fn constant(&mut self, _: u16, q: u16) -> Result<Wire, EvaluatorError> {
+        self.read_wire(q)
     }
 
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {

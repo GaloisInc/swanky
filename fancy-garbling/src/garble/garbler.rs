@@ -5,10 +5,11 @@
 // See LICENSE for licensing information.
 
 use crate::{
+    check_binary,
     errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
     util::{output_tweak, tweak, tweak2, RngExt},
-    BinaryWire, FancyBinary, WireLabel,
+    AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
 };
 use rand::{CryptoRng, RngCore};
 use scuttlebutt::{AbstractChannel, Block};
@@ -140,6 +141,60 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
         let (gbs, evs) = self.encode_many_wires(&xs, &ms)?;
         Ok((BinaryBundle::new(gbs), BinaryBundle::new(evs)))
     }
+
+    /// Garbles an 'and' gate given two input wires and the delta.
+    ///
+    /// Outputs a tuple consisting of the two gates (that should be transfered to the evaluator)
+    /// and the next wire label for the garbler.
+    ///
+    /// Used internally as a subroutine to implement 'and' gates for `FancyBinary`.
+    fn garble_and_gate(
+        &mut self,
+        A: &WireMod2,
+        B: &WireMod2,
+        delta: &WireMod2,
+    ) -> (Block, Block, WireMod2) {
+        let q = A.modulus();
+        let D = delta;
+        let gate_num = self.current_gate();
+
+        let r = B.color(); // secret value known only to the garbler (ev knows r+b)
+
+        let g = tweak2(gate_num as u64, 0);
+
+        // X = H(A+aD) + arD such that a + A.color == 0
+        let alpha = A.color(); // alpha = -A.color
+        let X = A
+            .plus(&D.cmul(alpha))
+            .hashback(g, q)
+            .plus_mov(&D.cmul(alpha * r % q));
+
+        // Y = H(B + bD) + (b + r)A such that b + B.color == 0
+        let beta = (q - B.color()) % q;
+        let Y = B.plus(&D.cmul(beta)).hashback(g, q);
+
+        // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
+        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
+        let precomp = &[X.as_block(), X.plus(&D).as_block()];
+
+        let gate0 = if A.color() == 1 {
+            A.hash(g) ^ precomp[0]
+        } else {
+            A.plus(&D).hash(g) ^ precomp[r as usize]
+        };
+
+        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
+        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
+        let precomp = &[Y.as_block(), Y.plus(&A).as_block()];
+
+        let gate1 = if B.color() == 1 {
+            B.hash(g) ^ precomp[r as usize]
+        } else {
+            B.plus(&D).hash(g) ^ precomp[((1 + r) % 2) as usize]
+        };
+
+        (gate0, gate1, X.plus_mov(&Y))
+    }
 }
 
 impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal
@@ -155,47 +210,71 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> FancyReveal
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + BinaryWire> FancyBinary
-    for Garbler<C, RNG, Wire>
-{
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RNG, WireMod2> {
+    fn and(&mut self, A: &Self::Item, B: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let delta = self.delta(2);
+        let (gate0, gate1, C) = self.garble_and_gate(A, B, &delta);
+        self.channel.write_block(&gate0)?;
+        self.channel.write_block(&gate1)?;
+        Ok(C)
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        Ok(x.plus(y))
+    }
+
     /// We can negate by having garbler xor wire with Delta
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
         let delta = self.delta(2);
-        FancyBinary::xor(self, &delta, x)
+        self.xor(&delta, x)
     }
 }
 
-impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
-    for Garbler<C, RNG, Wire>
-{
-    type Item = Wire;
-    type Error = GarblerError;
-
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyBinary for Garbler<C, RNG, AllWire> {
     /// We can negate by having garbler xor wire with Delta
     ///
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
-        if x.modulus() != 2 {
-            return Err(Self::Error::from(FancyError::InvalidArgMod {
-                got: x.modulus(),
-                needed: 2,
-            }));
-        }
+        check_binary!(x);
+
         let delta = self.delta(2);
         self.xor(&delta, x)
     }
 
-    fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
-        let zero = Wire::rand(&mut self.rng, q);
-        let wire = zero.plus(&self.delta(q).cmul_eq(x));
-        self.send_wire(&wire)?;
-        Ok(zero)
+    /// Xor is just addition
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        check_binary!(x);
+        check_binary!(y);
+
+        self.add(x, y)
     }
 
+    /// Use binary and_gate
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        if let (AllWire::Mod2(ref A), AllWire::Mod2(ref B), AllWire::Mod2(ref delta)) =
+            (x, y, self.delta(2))
+        {
+            let (gate0, gate1, C) = self.garble_and_gate(A, B, delta);
+            self.channel.write_block(&gate0)?;
+            self.channel.write_block(&gate1)?;
+            return Ok(AllWire::Mod2(C));
+        }
+        // If we got here, one of the wires isn't binary
+        check_binary!(x);
+        check_binary!(y);
+
+        // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
+        unreachable!()
+    }
+}
+
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
+    for Garbler<C, RNG, Wire>
+{
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Wire, GarblerError> {
         if x.modulus() != y.modulus() {
             return Err(GarblerError::FancyError(FancyError::UnequalModuli));
@@ -276,7 +355,6 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
             .plus_mov(&A.cmul((beta + r) % q));
 
         let mut precomp = Vec::with_capacity(q as usize);
-
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
         //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
         let mut X_ = X.clone();
@@ -379,6 +457,20 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
             self.channel.write_block(block)?;
         }
         Ok(C)
+    }
+}
+
+impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
+    for Garbler<C, RNG, Wire>
+{
+    type Item = Wire;
+    type Error = GarblerError;
+
+    fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
+        let zero = Wire::rand(&mut self.rng, q);
+        let wire = zero.plus(&self.delta(q).cmul_eq(x));
+        self.send_wire(&wire)?;
+        Ok(zero)
     }
 
     fn output(&mut self, X: &Wire) -> Result<Option<u16>, GarblerError> {

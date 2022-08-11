@@ -8,9 +8,9 @@ use crate::{
     errors::FancyError,
     fancy::{
         bundle::{Bundle, BundleGadgets},
-        Fancy, HasModulus,
+        HasModulus,
     },
-    util,
+    util, FancyBinary,
 };
 use itertools::Itertools;
 use std::ops::{Deref, DerefMut};
@@ -52,10 +52,10 @@ impl<W: Clone + HasModulus> From<Bundle<W>> for BinaryBundle<W> {
     }
 }
 
-impl<F: Fancy> BinaryGadgets for F {}
+impl<F: FancyBinary> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
-pub trait BinaryGadgets: Fancy + BundleGadgets {
+pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     /// Create a constant bundle using base 2 inputs.
     fn bin_constant_bundle(
         &mut self,
@@ -90,7 +90,12 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.add_bundles(&x, &y).map(BinaryBundle)
+        x.wires()
+            .iter()
+            .zip(y.wires().iter())
+            .map(|(x, y)| self.xor(x, y))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(BinaryBundle::new)
     }
 
     /// And the bits of two bundles together pairwise.
@@ -99,7 +104,12 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         x: &BinaryBundle<Self::Item>,
         y: &BinaryBundle<Self::Item>,
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        self.mul_bundles(&x, &y).map(BinaryBundle)
+        x.wires()
+            .iter()
+            .zip(y.wires().iter())
+            .map(|(x, y)| self.and(x, y))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(BinaryBundle::new)
     }
 
     /// Or the bits of two bundles together pairwise.
@@ -157,7 +167,8 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
             c = res.1;
             bs.push(z);
         }
-        z = self.add_many(&[
+        // xor instead of add
+        z = self.xor_many(&[
             xwires.last().unwrap().clone(),
             ywires.last().unwrap().clone(),
             c,
@@ -254,7 +265,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
             acc.pop();
             acc.insert(0, x.clone());
             let (res, cout) = self.bin_addition(&acc, &ys_neg)?;
-            acc = self.multiplex(&cout, &acc, &res).map(BinaryBundle)?;
+            acc = self.bin_multiplex(&cout, &acc, &res)?;
             qs.push(cout);
         }
         qs.reverse(); // Switch back to little-endian
@@ -312,6 +323,21 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
             .map(BinaryBundle::new)
     }
 
+    /// Multiplex gadget for binary bundles
+    fn bin_multiplex(
+        &mut self,
+        b: &Self::Item,
+        x: &BinaryBundle<Self::Item>,
+        y: &BinaryBundle<Self::Item>,
+    ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
+        x.wires()
+            .iter()
+            .zip(y.wires().iter())
+            .map(|(xwire, ywire)| self.mux(b, xwire, ywire))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(BinaryBundle::new)
+    }
+
     /// Write the constant in binary and that gives you the shift amounts, Eg.. 7x is 4x+2x+x.
     fn bin_cmul(
         &mut self,
@@ -337,7 +363,7 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
         let sign = x.wires().last().unwrap();
         let negated = self.bin_twos_complement(x)?;
-        self.multiplex(&sign, x, &negated).map(BinaryBundle)
+        self.bin_multiplex(&sign, x, &negated)
     }
 
     /// Returns 1 if `x < y` (signed version)
@@ -429,9 +455,9 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
                     .iter()
                     .zip(y.wires().iter())
                     .map(|(x, y)| {
-                        let xp = self.mul(x, &neg)?;
-                        let yp = self.mul(y, &pos)?;
-                        self.add(&xp, &yp)
+                        let xp = self.and(x, &neg)?;
+                        let yp = self.and(y, &pos)?;
+                        self.xor(&xp, &yp)
                     })
                     .collect::<Result<Vec<Self::Item>, Self::Error>>()
                     .map(BinaryBundle::new)
@@ -508,5 +534,25 @@ pub trait BinaryGadgets: Fancy + BundleGadgets {
         }
 
         Ok(BinaryBundle::new(wires))
+    }
+    /// Compute `x == y` for binary bundles.
+    fn bin_eq_bundles(
+        &mut self,
+        x: &BinaryBundle<Self::Item>,
+        y: &BinaryBundle<Self::Item>,
+    ) -> Result<Self::Item, Self::Error> {
+        // compute (x^y == 0) for each residue
+        let zs = x
+            .wires()
+            .iter()
+            .zip_eq(y.wires().iter())
+            .map(|(x, y)| {
+                let xy = self.xor(x, y)?;
+                self.negate(&xy)
+            })
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()?;
+        // and_many will return 1 only if all outputs of xnor are 1
+        // indicating equality
+        self.and_many(&zs)
     }
 }

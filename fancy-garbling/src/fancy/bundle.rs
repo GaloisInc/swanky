@@ -7,6 +7,7 @@
 use crate::{
     errors::FancyError,
     fancy::{Fancy, HasModulus},
+    FancyArithmetic, FancyBinary,
 };
 use itertools::Itertools;
 use std::ops::Index;
@@ -102,49 +103,12 @@ impl<W: Clone + HasModulus> Index<usize> for Bundle<W> {
 }
 
 impl<F: Fancy> BundleGadgets for F {}
+impl<F: FancyArithmetic> ArithmeticBundleGadgets for F {}
+impl<F: FancyBinary> BinaryBundleGadgets for F {}
 
-/// Extension trait for Fancy which provides Bundle constructions which are not
-/// necessarily CRT nor binary-based.
-pub trait BundleGadgets: Fancy {
-    /// Creates a bundle of constant wires using moduli `ps`.
-    fn constant_bundle(
-        &mut self,
-        xs: &[u16],
-        ps: &[u16],
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
-        xs.iter()
-            .zip(ps.iter())
-            .map(|(&x, &p)| self.constant(x, p))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle)
-    }
-
-    /// Output the wires that make up a bundle.
-    fn output_bundle(&mut self, x: &Bundle<Self::Item>) -> Result<Option<Vec<u16>>, Self::Error> {
-        let ws = x.wires();
-        let mut outputs = Vec::with_capacity(ws.len());
-        for w in ws.iter() {
-            outputs.push(self.output(w)?);
-        }
-        Ok(outputs.into_iter().collect())
-    }
-
-    /// Output a slice of bundles.
-    fn output_bundles(
-        &mut self,
-        xs: &[Bundle<Self::Item>],
-    ) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
-        let mut zs = Vec::with_capacity(xs.len());
-        for x in xs.iter() {
-            let z = self.output_bundle(x)?;
-            zs.push(z);
-        }
-        Ok(zs.into_iter().collect())
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // gadgets which are neither CRT or binary
-
+/// Arithmetic operations on wire bundles, extending the capability of `FancyArithmetic` operating
+/// on individual wires.
+pub trait ArithmeticBundleGadgets: FancyArithmetic {
     /// Add two wire bundles pairwise, zipping addition.
     ///
     /// In CRT this is plain addition. In binary this is xor.
@@ -350,21 +314,6 @@ pub trait BundleGadgets: Fancy {
             .map_or(Ok(digit_sum.clone()), |d| self.add(&digit_sum, &d))
     }
 
-    /// If b=0 then return x, else return y.
-    fn multiplex(
-        &mut self,
-        b: &Self::Item,
-        x: &Bundle<Self::Item>,
-        y: &Bundle<Self::Item>,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
-        x.wires()
-            .iter()
-            .zip(y.wires().iter())
-            .map(|(xwire, ywire)| self.mux(b, xwire, ywire))
-            .collect::<Result<Vec<Self::Item>, Self::Error>>()
-            .map(Bundle)
-    }
-
     /// If b=0 then return 0, else return x.
     fn mask(
         &mut self,
@@ -376,37 +325,6 @@ pub trait BundleGadgets: Fancy {
             .map(|xwire| self.mul(xwire, b))
             .collect::<Result<Vec<Self::Item>, Self::Error>>()
             .map(Bundle)
-    }
-
-    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
-    /// residue. Maintains the length of the input.
-    fn shift(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        n: usize,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
-        let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus())?;
-        for _ in 0..n {
-            ws.pop();
-            ws.insert(0, zero.clone());
-        }
-        Ok(Bundle(ws))
-    }
-
-    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
-    /// residue. Output is extended with n elements.
-    fn shift_extend(
-        &mut self,
-        x: &Bundle<Self::Item>,
-        n: usize,
-    ) -> Result<Bundle<Self::Item>, Self::Error> {
-        let mut ws = x.wires().to_vec();
-        let zero = self.constant(0, ws.last().unwrap().modulus())?;
-        for _ in 0..n {
-            ws.insert(0, zero.clone());
-        }
-        Ok(Bundle(ws))
     }
 
     /// Compute `x == y`. Returns a wire encoding the result mod 2.
@@ -437,5 +355,98 @@ pub trait BundleGadgets: Fancy {
         let mut tab = vec![0; b + 1];
         tab[b] = 1;
         self.proj(&z, 2, Some(tab))
+    }
+}
+
+/// Binary operations on wire bundles, extending the capability of `FancyBinary` operating
+/// on individual wires.
+pub trait BinaryBundleGadgets: FancyBinary {
+    /// If b=0 then return x, else return y.
+    fn multiplex(
+        &mut self,
+        b: &Self::Item,
+        x: &Bundle<Self::Item>,
+        y: &Bundle<Self::Item>,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        x.wires()
+            .iter()
+            .zip(y.wires().iter())
+            .map(|(xwire, ywire)| self.mux(b, xwire, ywire))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(Bundle)
+    }
+}
+
+/// Extension trait for Fancy which provides Bundle constructions which are not
+/// necessarily CRT nor binary-based.
+pub trait BundleGadgets: Fancy {
+    /// Creates a bundle of constant wires using moduli `ps`.
+    fn constant_bundle(
+        &mut self,
+        xs: &[u16],
+        ps: &[u16],
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        xs.iter()
+            .zip(ps.iter())
+            .map(|(&x, &p)| self.constant(x, p))
+            .collect::<Result<Vec<Self::Item>, Self::Error>>()
+            .map(Bundle)
+    }
+
+    /// Output the wires that make up a bundle.
+    fn output_bundle(&mut self, x: &Bundle<Self::Item>) -> Result<Option<Vec<u16>>, Self::Error> {
+        let ws = x.wires();
+        let mut outputs = Vec::with_capacity(ws.len());
+        for w in ws.iter() {
+            outputs.push(self.output(w)?);
+        }
+        Ok(outputs.into_iter().collect())
+    }
+
+    /// Output a slice of bundles.
+    fn output_bundles(
+        &mut self,
+        xs: &[Bundle<Self::Item>],
+    ) -> Result<Option<Vec<Vec<u16>>>, Self::Error> {
+        let mut zs = Vec::with_capacity(xs.len());
+        for x in xs.iter() {
+            let z = self.output_bundle(x)?;
+            zs.push(z);
+        }
+        Ok(zs.into_iter().collect())
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // gadgets which are neither CRT or binary
+
+    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
+    /// residue. Maintains the length of the input.
+    fn shift(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        n: usize,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        let mut ws = x.wires().to_vec();
+        let zero = self.constant(0, ws.last().unwrap().modulus())?;
+        for _ in 0..n {
+            ws.pop();
+            ws.insert(0, zero.clone());
+        }
+        Ok(Bundle(ws))
+    }
+
+    /// Shift residues, replacing them with zeros in the modulus of the least signifigant
+    /// residue. Output is extended with n elements.
+    fn shift_extend(
+        &mut self,
+        x: &Bundle<Self::Item>,
+        n: usize,
+    ) -> Result<Bundle<Self::Item>, Self::Error> {
+        let mut ws = x.wires().to_vec();
+        let zero = self.constant(0, ws.last().unwrap().modulus())?;
+        for _ in 0..n {
+            ws.insert(0, zero.clone());
+        }
+        Ok(Bundle(ws))
     }
 }

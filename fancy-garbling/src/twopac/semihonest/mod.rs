@@ -16,14 +16,21 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use crate::{
-        circuit::Circuit, dummy::Dummy, util::RngExt, AllWire, CrtBundle, CrtGadgets, Fancy,
-        FancyInput, WireMod2,
+        circuit::{eval_plain, BinaryCircuit, CircuitInfo, EvaluableCircuit},
+        dummy::Dummy,
+        util::RngExt,
+        AllWire, CrtBundle, CrtGadgets, FancyArithmetic, FancyBinary, FancyInput, WireLabel,
+        WireMod2,
     };
     use itertools::Itertools;
     use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
     use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
 
-    fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<Option<u16>, F::Error> {
+    fn addition<F: FancyArithmetic>(
+        f: &mut F,
+        a: &F::Item,
+        b: &F::Item,
+    ) -> Result<Option<u16>, F::Error> {
         let c = f.add(&a, &b)?;
         f.output(&c)
     }
@@ -56,7 +63,10 @@ mod tests {
         }
     }
 
-    fn relu<F: Fancy>(b: &mut F, xs: &[CrtBundle<F::Item>]) -> Option<Vec<u128>> {
+    fn relu<F: FancyArithmetic + FancyBinary>(
+        b: &mut F,
+        xs: &[CrtBundle<F::Item>],
+    ) -> Option<Vec<u128>> {
         let mut outputs = Vec::new();
         for x in xs.iter() {
             let q = x.composite_modulus();
@@ -103,10 +113,19 @@ mod tests {
         let result = relu(&mut ev, &xs).unwrap();
         assert_eq!(target, result);
     }
-    #[test]
-    fn test_aes() {
-        let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
 
+    type GB<Wire> = Garbler<UnixChannel, AesRng, ChouOrlandiSender, Wire>;
+    type EV<Wire> = Evaluator<UnixChannel, AesRng, ChouOrlandiReceiver, Wire>;
+
+    fn test_circuit<CIRC, Wire: WireLabel>(circ: CIRC)
+    where
+        CIRC: EvaluableCircuit<Dummy>
+            + EvaluableCircuit<GB<Wire>>
+            + EvaluableCircuit<EV<Wire>>
+            + CircuitInfo
+            + Send
+            + 'static,
+    {
         circ.print_info().unwrap();
 
         let circ_ = circ.clone();
@@ -114,56 +133,33 @@ mod tests {
         let handle = std::thread::spawn(move || {
             let rng = AesRng::new();
             let mut gb =
-                Garbler::<UnixChannel, AesRng, ChouOrlandiSender, AllWire>::new(sender, rng)
-                    .unwrap();
+                Garbler::<UnixChannel, AesRng, ChouOrlandiSender, Wire>::new(sender, rng).unwrap();
             let xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
             let ys = gb.receive_many(&vec![2; 128]).unwrap();
             circ_.eval(&mut gb, &xs, &ys).unwrap();
         });
         let rng = AesRng::new();
         let mut ev =
-            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver, AllWire>::new(receiver, rng)
+            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver, Wire>::new(receiver, rng)
                 .unwrap();
         let xs = ev.receive_many(&vec![2; 128]).unwrap();
         let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
         let out = circ.eval(&mut ev, &xs, &ys).unwrap().unwrap();
         handle.join().unwrap();
 
-        let target = circ
-            .eval_plain(&vec![0_u16; 128], &vec![0_u16; 128])
-            .unwrap();
+        let target = eval_plain(&circ, &vec![0_u16; 128], &vec![0_u16; 128]).unwrap();
         assert_eq!(out, target);
     }
 
     #[test]
+    fn test_aes_arithmetic() {
+        let circ = BinaryCircuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        test_circuit::<_, AllWire>(circ);
+    }
+
+    #[test]
     fn test_aes_binary() {
-        let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
-
-        circ.print_info().unwrap();
-
-        let circ_ = circ.clone();
-        let (sender, receiver) = unix_channel_pair();
-        let handle = std::thread::spawn(move || {
-            let rng = AesRng::new();
-            let mut gb =
-                Garbler::<UnixChannel, AesRng, ChouOrlandiSender, WireMod2>::new(sender, rng)
-                    .unwrap();
-            let xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
-            let ys = gb.receive_many(&vec![2; 128]).unwrap();
-            circ_.eval(&mut gb, &xs, &ys).unwrap();
-        });
-        let rng = AesRng::new();
-        let mut ev =
-            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver, WireMod2>::new(receiver, rng)
-                .unwrap();
-        let xs = ev.receive_many(&vec![2; 128]).unwrap();
-        let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
-        let out = circ.eval(&mut ev, &xs, &ys).unwrap().unwrap();
-        handle.join().unwrap();
-
-        let target = circ
-            .eval_plain(&vec![0_u16; 128], &vec![0_u16; 128])
-            .unwrap();
-        assert_eq!(out, target);
+        let circ = BinaryCircuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        test_circuit::<_, WireMod2>(circ);
     }
 }
