@@ -7,7 +7,7 @@
 //! This is the implementation of field conversion
 
 use super::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
-use crate::errors::Error;
+use crate::{errors::Error, svole::wykw::LpnParams};
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
@@ -161,9 +161,11 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
-        let a = FComProver::init(channel, rng)?;
-        let b = FComProver::init(channel, rng)?;
+        let a = FComProver::init(channel, rng, lpn_setup, lpn_extend)?;
+        let b = FComProver::init(channel, rng, lpn_setup, lpn_extend)?;
         Ok(Self {
             fcom_f2: a,
             fcom: b,
@@ -819,9 +821,11 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
-        let a = FComVerifier::init(channel, rng)?;
-        let b = FComVerifier::init(channel, rng)?;
+        let a = FComVerifier::init(channel, rng, lpn_setup, lpn_extend)?;
+        let b = FComVerifier::init(channel, rng, lpn_setup, lpn_extend)?;
         Ok(Self {
             fcom_f2: a,
             fcom: b,
@@ -1464,6 +1468,7 @@ mod tests {
         bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ProverConv,
         VerifierConv,
     };
+    use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::{
         field::{F61p, FiniteField, F2},
         AesRng, Channel,
@@ -1485,7 +1490,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv =
+                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let mut res = Vec::new();
             for _ in 0..count {
@@ -1520,7 +1527,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv =
+            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let mut res = Vec::new();
         for _ in 0..count {
@@ -1579,7 +1588,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv =
+                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &x).unwrap();
             let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &y).unwrap();
@@ -1622,7 +1633,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv =
+            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
         let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
@@ -1675,7 +1688,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv =
+                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let dabits = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
             let _ = fconv.fdabit(&mut channel, &mut rng, &dabits).unwrap();
@@ -1685,7 +1700,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv =
+            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let dabits_mac = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
         let _ = fconv.fdabit(&mut channel, &mut rng, &dabits_mac).unwrap();
@@ -1703,7 +1720,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = ProverConv::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fconv =
+                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             for n in 1..nb_edabits {
                 let edabits = fconv
@@ -1728,7 +1747,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = VerifierConv::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fconv =
+            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let mut res = Vec::new();
         for n in 1..nb_edabits {

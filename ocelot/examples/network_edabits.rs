@@ -6,6 +6,7 @@
 
 use clap::{App, Arg};
 use ocelot::edabits::{ProverConv, VerifierConv};
+use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::fs;
 use std::io::Write;
@@ -95,7 +96,9 @@ fn run(
                 let mut rng = AesRng::new();
 
                 let start = Instant::now();
-                let mut fconv = Verifier::init(&mut channel, &mut rng).unwrap();
+                let mut fconv =
+                    Verifier::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM)
+                        .unwrap();
                 let end = start.elapsed();
                 println!("Verifier time (init): {:?}", end);
                 file.write_all(format!("init={:?}, ", end).as_bytes())?;
@@ -202,7 +205,8 @@ fn run(
 
         let mut rng = AesRng::new();
         let start = Instant::now();
-        let mut fconv = Prover::init(&mut channel, &mut rng).unwrap();
+        let mut fconv =
+            Prover::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
         println!("Prover time (init): {:?}", start.elapsed());
 
         let start = Instant::now();

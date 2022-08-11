@@ -8,6 +8,7 @@
 
 // TODO: criterion might not be the best choice for larger benchmarks.
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use ocelot::svole::{
     wykw::{Receiver, Sender},
     SVoleReceiver, SVoleSender,
@@ -38,13 +39,14 @@ fn svole_init<
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        VSender::init(&mut channel, &mut rng).unwrap()
+        VSender::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap()
     });
     let mut rng = AesRng::new();
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let vole_receiver = VReceiver::init(&mut channel, &mut rng).unwrap();
+    let vole_receiver =
+        VReceiver::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
     let vole_sender = handle.join().unwrap();
     let vole_sender = Arc::new(Mutex::new(vole_sender));
     let vole_receiver = Arc::new(Mutex::new(vole_receiver));
@@ -117,12 +119,16 @@ fn bench_svole_init<VSender: SVoleSender + Sync + Send + 'static, VReceiver: SVo
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        black_box(VSender::init(&mut channel, &mut rng).unwrap())
+        black_box(
+            VSender::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap(),
+        )
     });
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    black_box(VReceiver::init(&mut channel, &mut rng).unwrap());
+    black_box(
+        VReceiver::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap(),
+    );
     handle.join().unwrap();
 }
 

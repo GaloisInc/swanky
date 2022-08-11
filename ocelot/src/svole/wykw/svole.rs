@@ -26,8 +26,11 @@ use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious,
 // This differs from what is done in the WYKW paper, but based on personal
 // communication with one of the authors, is what is used in the implementation.
 
+/// Type for LPN parameters used internally in the setup phase and the extend phase of the
+/// protocol. LPN parameters are provided during the initialization of the protocol so that
+/// the extension produces small, medium or large number of values.
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct LpnParams {
+pub struct LpnParams {
     /// Hamming weight `t` of the error vector `e` used in the LPN assumption.
     weight: usize,
     /// Number of columns `n` in the LPN matrix.
@@ -43,38 +46,43 @@ struct LpnParams {
 //     rows: 1_220,
 // };
 
-/* Small LPN parameters */
-/*
-const LPN_SETUP_PARAMS: LpnParams = LpnParams {
+/// Small LPN parameters for setup phase.
+pub const LPN_SETUP_SMALL: LpnParams = LpnParams {
     weight: 600,
     cols: 9_600, // cols / weight = 16
     rows: 1_220,
 };
-const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
+/// Small LPN parameters for extend phase.
+pub const LPN_EXTEND_SMALL: LpnParams = LpnParams {
     weight: 2_600,
     cols: 166_400, // cols / weight = 64
     rows: 5_060,
 };
-*/
 
-// LPN parameters for setup phase.
-const LPN_SETUP_PARAMS: LpnParams = LpnParams {
+/// Medium LPN parameters for setup phase.
+pub const LPN_SETUP_MEDIUM: LpnParams = LpnParams {
+    weight: 2_600,
+    cols: 166_400, // cols / weight = 64
+    rows: 5_060,
+};
+/// Medium LPN parameters for extend phase.
+pub const LPN_EXTEND_MEDIUM: LpnParams = LpnParams {
+    weight: 4_965,
+    cols: 10_168_320, // cols / weight = 2_048
+    rows: 158_000,
+};
+
+/// Large LPN parameters for setup phase.
+pub const LPN_SETUP_LARGE: LpnParams = LpnParams {
     rows: 19_870,
     cols: 642_048,
     weight: 2_508,
-    // weight: 2_600,
-    // cols: 166_400, // cols / weight = 64
-    // rows: 5_060,
 };
-
-// LPN parameters for extend phase.
-const LPN_EXTEND_PARAMS: LpnParams = LpnParams {
+/// Large LPN parameters for extend phase.
+pub const LPN_EXTEND_LARGE: LpnParams = LpnParams {
     rows: 589_760,
     cols: 10_805_248,
     weight: 1_319,
-    // weight: 4_965,
-    // cols: 10_168_320, // cols / weight = 2_048
-    // rows: 158_000,
 };
 
 // Constant `d` representing a `d`-local linear code, meaning that each column
@@ -104,6 +112,8 @@ fn lpn_mtx_indices<FE: FiniteField>(
 
 /// Subfield VOLE sender.
 pub struct Sender<FE: FiniteField> {
+    lpn_setup: LpnParams,
+    lpn_extend: LpnParams,
     spsvole: SpsSender<FE>,
     base_voles: Vec<(FE::PrimeField, FE)>,
     // Shared RNG with the receiver for generating the LPN matrix.
@@ -185,23 +195,27 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
         let pows: Powers<FE> = Default::default();
         let mut base_sender = BaseSender::<FE, NoSpecialization>::init(channel, pows.clone(), rng)?;
         let base_voles_setup =
-            base_sender.send(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
+            base_sender.send(channel, compute_num_saved::<FE>(lpn_setup), rng)?;
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
         let mut sender = Self {
+            lpn_setup,
+            lpn_extend,
             spsvole,
             base_voles: base_voles_setup,
             lpn_rng,
         };
 
         let mut base_voles_setup = Vec::new();
-        sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
+        sender.send_internal(channel, sender.lpn_setup, 0, rng, &mut base_voles_setup)?;
         sender.base_voles = base_voles_setup;
         // let mut base_voles_extend = Vec::new();
         // sender.send_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
@@ -217,8 +231,8 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
     ) -> Result<(), Error> {
         self.send_internal(
             channel,
-            LPN_EXTEND_PARAMS,
-            compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
+            self.lpn_extend,
+            compute_num_saved::<FE>(self.lpn_extend),
             rng,
             output,
         )
@@ -232,8 +246,8 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         let mut base_voles = Vec::new();
         self.send_internal(
             channel,
-            LPN_SETUP_PARAMS,
-            compute_num_saved::<FE>(LPN_SETUP_PARAMS),
+            self.lpn_setup,
+            compute_num_saved::<FE>(self.lpn_setup),
             rng,
             &mut base_voles,
         )?;
@@ -247,12 +261,14 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         // )?;
         // base_voles.extend(extras.into_iter());
 
-        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
-        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
+        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
+        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         let lpn_rng = self.lpn_rng.fork();
         Ok(Self {
+            lpn_setup: self.lpn_setup,
+            lpn_extend: self.lpn_extend,
             spsvole,
             base_voles,
             lpn_rng,
@@ -262,6 +278,8 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
 
 /// Subfield VOLE receiver.
 pub struct Receiver<FE: FiniteField> {
+    lpn_setup: LpnParams,
+    lpn_extend: LpnParams,
     spsvole: SpsReceiver<FE>,
     delta: FE,
     base_voles: Vec<FE>,
@@ -334,24 +352,28 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
         let pows: Powers<FE> = Default::default();
         let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
         let base_voles_setup =
-            base_receiver.receive(channel, compute_num_saved::<FE>(LPN_SETUP_PARAMS), rng)?;
+            base_receiver.receive(channel, compute_num_saved::<FE>(lpn_setup), rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
         let mut receiver = Self {
+            lpn_setup,
+            lpn_extend,
             spsvole,
             delta,
             base_voles: base_voles_setup,
             lpn_rng,
         };
         let mut base_voles_setup = Vec::new();
-        receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_setup)?;
+        receiver.receive_internal(channel, lpn_setup, 0, rng, &mut base_voles_setup)?;
         receiver.base_voles = base_voles_setup;
         // let mut base_voles_extend = Vec::new();
         // receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
@@ -371,8 +393,8 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
     ) -> Result<(), Error> {
         self.receive_internal(
             channel,
-            LPN_EXTEND_PARAMS,
-            compute_num_saved::<FE>(LPN_EXTEND_PARAMS),
+            self.lpn_extend,
+            compute_num_saved::<FE>(self.lpn_extend),
             rng,
             output,
         )
@@ -386,8 +408,8 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         let mut base_voles = Vec::new();
         self.receive_internal(
             channel,
-            LPN_SETUP_PARAMS,
-            compute_num_saved::<FE>(LPN_SETUP_PARAMS),
+            self.lpn_setup,
+            compute_num_saved::<FE>(self.lpn_setup),
             rng,
             &mut base_voles,
         )?;
@@ -401,12 +423,14 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         // )?;
         // base_voles.extend(extras.into_iter());
 
-        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
-        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(LPN_EXTEND_PARAMS));
+        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
+        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         let lpn_rng = self.lpn_rng.fork();
         Ok(Self {
+            lpn_setup: self.lpn_setup,
+            lpn_extend: self.lpn_extend,
             spsvole,
             delta: self.delta,
             base_voles,
@@ -422,7 +446,7 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Receiver, SVoleReceiver, SVoleSender, Sender};
+    use super::{Receiver, SVoleReceiver, SVoleSender, Sender, LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::field::Gf40;
     use scuttlebutt::{
         field::{F128p, F61p, FiniteField as FF, Gf128},
@@ -440,7 +464,8 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole = Sender::init(&mut channel, &mut rng).unwrap();
+            let mut vole =
+                Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
             let mut out = Vec::new();
             vole.send(&mut channel, &mut rng, &mut out).unwrap();
             out
@@ -449,7 +474,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole = Receiver::init(&mut channel, &mut rng).unwrap();
+        let mut vole =
+            Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
         let mut vs = Vec::new();
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let uws = handle.join().unwrap();
@@ -470,7 +496,8 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut vole = Sender::init(&mut channel, &mut rng).unwrap();
+            let mut vole =
+                Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
             let mut uws = Vec::new();
             vole.send(&mut channel, &mut rng, &mut uws).unwrap();
             let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
@@ -487,7 +514,8 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole = Receiver::init(&mut channel, &mut rng).unwrap();
+        let mut vole =
+            Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
         let mut vs = Vec::new();
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
