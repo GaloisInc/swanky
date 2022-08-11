@@ -5,7 +5,7 @@ use scuttlebutt::field::FiniteField;
 use scuttlebutt::AesRng;
 use simple_arith_circuit::Circuit;
 
-/// The inferno proof.
+/// The inferno proof. `N` denotes the number of parties in each MPC execution.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Proof<F: FiniteField, const N: usize> {
     #[serde(bound = "")] // Needed due to https://github.com/rust-lang/rust/issues/41617
@@ -15,8 +15,10 @@ pub struct Proof<F: FiniteField, const N: usize> {
 impl<F: FiniteField, const N: usize> Proof<F, N> {
     /// Construct a proof for `circuit` with `witness`, using the provided compression factor and number of repetitions.
     ///
+    /// # Panics
+    ///
     /// `witness` must be of length equal to the number of inputs to `circuit`, and `circuit` must only
-    /// contain one output wire.
+    /// contain one output wire, otherwise this method panics.
     pub fn prove(
         circuit: &Circuit<F::PrimeField>,
         witness: &[F::PrimeField],
@@ -50,7 +52,9 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
 
     /// Verify that the proof on `circuit` is valid, for the given compression factor and number of repetitions.
     ///
-    /// `circuit` must contain only one output wire.
+    /// # Panics
+    ///
+    /// `circuit` must contain only one output wire, otherwise this method panics.
     pub fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
