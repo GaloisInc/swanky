@@ -40,11 +40,11 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
                 let mut prover =
                     ProverSingle::new(circuit, witness, compression_factor, nrounds, rng);
                 let proof = prover.run(&cache);
-                log::info!("Proof #{} time: {} ms", i + 1, time_.elapsed().as_millis());
+                log::info!("Proof #{} time: {:?}", i + 1, time_.elapsed());
                 proof
             })
             .collect();
-        log::info!("Proof time: {} ms", time.elapsed().as_millis());
+        log::info!("Proof time: {:?}", time.elapsed());
         Self { proofs }
     }
 
@@ -76,15 +76,11 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
                     return false;
                 }
                 log::debug!("Verifying proof #{} succeeded.", i + 1);
-                log::info!(
-                    "Proof #{} verification time: {} ms",
-                    i + 1,
-                    time_.elapsed().as_millis()
-                );
+                log::info!("Proof #{} verification time: {:?}", i + 1, time_.elapsed());
                 true
             })
             .all(|r| r);
-        log::info!("Verification time: {} ms", time.elapsed().as_millis());
+        log::info!("Verification time: {:?}", time.elapsed());
         result
     }
 }
