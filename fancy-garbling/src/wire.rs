@@ -30,10 +30,8 @@ pub enum AllWire {
     ModN(WireModQ),
 }
 
-/// Trait indicating a binary wire
-///
-/// Required for FancyBinary
-pub trait BinaryWire: Clone {}
+/// Marker trait indicating an arithmetic wire
+pub trait ArithmeticWire: Clone {}
 
 /// Trait implementing a wire that can be used for secure computation
 /// via garbled circuits
@@ -133,9 +131,9 @@ pub trait WireLabel: Clone + HasModulus {
     }
 }
 
+/// Representation of a `mod-2` wire.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-/// Representation of a `mod-2` wire.
 pub struct WireMod2 {
     /// A 128-bit value.
     val: Block,
@@ -280,8 +278,6 @@ impl HasModulus for AllWire {
         }
     }
 }
-
-impl BinaryWire for WireMod2 {}
 
 impl WireLabel for AllWire {
     fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
@@ -780,6 +776,10 @@ fn _unrank(inp: u128, q: u16) -> Vec<u16> {
     }
     ds
 }
+
+impl ArithmeticWire for WireMod3 {}
+impl ArithmeticWire for WireModQ {}
+impl ArithmeticWire for AllWire {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests

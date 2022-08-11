@@ -5,7 +5,7 @@
 // See LICENSE for licensing information.
 
 use fancy_garbling::{
-    circuit::Circuit,
+    circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
     twopac::semihonest::{Evaluator, Garbler},
     FancyInput, WireMod2,
 };

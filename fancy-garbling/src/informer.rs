@@ -6,7 +6,10 @@
 
 //! `Informer` runs a fancy computation and learns information from it.
 
-use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
+use crate::{
+    fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
+    FancyArithmetic, FancyBinary,
+};
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -245,16 +248,33 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Erro
     }
 }
 
-impl<F: Fancy> Fancy for Informer<F> {
-    type Item = F::Item;
-    type Error = F::Error;
-
-    fn constant(&mut self, val: u16, q: u16) -> Result<Self::Item, Self::Error> {
-        self.stats.constants.insert((val, q));
-        self.update_moduli(q);
-        self.underlying.constant(val, q)
+impl<F: FancyBinary> FancyBinary for Informer<F> {
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let result = self.underlying.xor(x, y)?;
+        self.stats.nadds += 1;
+        self.update_moduli(x.modulus());
+        Ok(result)
     }
 
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let result = self.underlying.and(x, y)?;
+        self.stats.nmuls += 1;
+        self.stats.nciphertexts += 2;
+        self.update_moduli(x.modulus());
+        Ok(result)
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        let result = self.underlying.negate(x)?;
+
+        // Technically only the garbler adds: noop for the evaluator
+        self.stats.nadds += 1;
+        self.update_moduli(x.modulus());
+        Ok(result)
+    }
+}
+
+impl<F: FancyArithmetic> FancyArithmetic for Informer<F> {
     // In general, for the below, we first check to see if the result succeeds before
     // updating the stats. That way we can avoid checking multiple times that, e.g.
     // the moduli are equal.
@@ -306,6 +326,17 @@ impl<F: Fancy> Fancy for Informer<F> {
         self.stats.nciphertexts += x.modulus() as usize - 1;
         self.update_moduli(q);
         Ok(result)
+    }
+}
+
+impl<F: Fancy> Fancy for Informer<F> {
+    type Item = F::Item;
+    type Error = F::Error;
+
+    fn constant(&mut self, val: u16, q: u16) -> Result<Self::Item, Self::Error> {
+        self.stats.constants.insert((val, q));
+        self.update_moduli(q);
+        self.underlying.constant(val, q)
     }
 
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {

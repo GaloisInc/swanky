@@ -5,8 +5,8 @@
 // See LICENSE for licensing information.
 
 use crate::{
-    errors::TwopacError, wire::WireLabel, BinaryWire, Fancy, FancyBinary, FancyInput, FancyReveal,
-    Garbler as Gb,
+    errors::TwopacError, wire::WireLabel, AllWire, ArithmeticWire, Fancy, FancyArithmetic,
+    FancyBinary, FancyInput, FancyReveal, Garbler as Gb, WireMod2,
 };
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -124,27 +124,39 @@ impl<
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel + BinaryWire> FancyBinary
-    for Garbler<C, RNG, OT, Wire>
-{
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<C, RNG, OT, WireMod2> {
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.garbler.negate(x).map_err(Self::Error::from)
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.garbler.xor(x, y).map_err(Self::Error::from)
+    }
+
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.garbler.and(x, y).map_err(Self::Error::from)
+    }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyBinary for Garbler<C, RNG, OT, AllWire> {
+    fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.garbler.negate(x).map_err(Self::Error::from)
+    }
+
+    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.garbler.xor(x, y).map_err(Self::Error::from)
+    }
+
+    fn and(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+        self.garbler.and(x, y).map_err(Self::Error::from)
+    }
+}
+
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     for Garbler<C, RNG, OT, Wire>
 {
-    type Item = Wire;
-    type Error = TwopacError;
-
-    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
-        self.garbler.constant(x, q).map_err(Self::Error::from)
-    }
-
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
         self.garbler.add(x, y).map_err(Self::Error::from)
-    }
-
-    fn negate(&mut self, x: &Wire) -> Result<Self::Item, Self::Error> {
-        self.garbler.negate(x).map_err(Self::Error::from)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
@@ -161,6 +173,17 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy
 
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.garbler.proj(x, q, tt).map_err(Self::Error::from)
+    }
+}
+
+impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT, Wire: WireLabel> Fancy
+    for Garbler<C, RNG, OT, Wire>
+{
+    type Item = Wire;
+    type Error = TwopacError;
+
+    fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error> {
+        self.garbler.constant(x, q).map_err(Self::Error::from)
     }
 
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
