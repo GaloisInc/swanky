@@ -15,4 +15,7 @@ mod spsvole;
 mod svole;
 mod utils;
 
-pub use svole::{Receiver, Sender};
+pub use svole::{
+    LpnParams, Receiver, Sender, LPN_EXTEND_LARGE, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL,
+    LPN_SETUP_LARGE, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
+};

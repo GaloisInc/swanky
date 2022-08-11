@@ -4,6 +4,7 @@
 // Copyright © 2020 Galois, Inc.
 // See LICENSE for licensing information.
 
+use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use ocelot::svole::{
     wykw::{Receiver, Sender},
     SVoleReceiver, SVoleSender,
@@ -95,7 +96,8 @@ fn run() {
         let mut channel =
             OurTrackChannel::new(sender.try_clone().unwrap(), sender.try_clone().unwrap());
         let start = Instant::now();
-        let mut vole = VSender::init(&mut channel, &mut rng).unwrap();
+        let mut vole =
+            VSender::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let mut count = 0;
@@ -120,7 +122,8 @@ fn run() {
     let mut channel =
         OurTrackChannel::new(receiver.try_clone().unwrap(), receiver.try_clone().unwrap());
     let start = Instant::now();
-    let mut vole = VReceiver::init(&mut channel, &mut rng).unwrap();
+    let mut vole =
+        VReceiver::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
     println!("Receive time (init): {:?}", start.elapsed());
     println!(
         "Send communication (init): {:.2} Mbits",

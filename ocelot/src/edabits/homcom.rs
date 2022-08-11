@@ -10,7 +10,7 @@
 //! Quicksilver.  These functionalities are required for the edabits
 //! conversion protocol.
 use crate::errors::Error;
-use crate::svole::wykw::{Receiver, Sender};
+use crate::svole::wykw::{LpnParams, Receiver, Sender};
 use crate::svole::{SVoleReceiver, SVoleSender};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -70,9 +70,11 @@ impl<FE: FiniteField> FComProver<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
         Ok(Self {
-            svole_sender: Sender::init(channel, rng)?,
+            svole_sender: Sender::init(channel, rng, lpn_setup, lpn_extend)?,
             voles: Vec::new(),
         })
     }
@@ -318,8 +320,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
-        let recv = Receiver::init(channel, rng)?;
+        let recv = Receiver::init(channel, rng, lpn_setup, lpn_extend)?;
         Ok(Self {
             delta: recv.delta(),
             svole_receiver: recv,
@@ -578,8 +582,8 @@ impl<FE: FiniteField> FComVerifier<FE> {
 
 #[cfg(test)]
 mod tests {
-
     use super::{FComProver, FComVerifier, MacProver};
+    use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::{
         field::{F61p, FiniteField, Gf40},
         AbstractChannel, AesRng, Channel,
@@ -597,7 +601,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComProver::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom =
+                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let mut v = Vec::with_capacity(count);
             for _ in 0..count {
@@ -610,7 +616,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComVerifier::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom =
+            FComVerifier::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
         let mut v = Vec::with_capacity(count);
         for _ in 0..count {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
@@ -634,7 +642,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComProver::<F61p>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom =
+                FComProver::<F61p>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -654,7 +664,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComVerifier::<F61p>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom =
+            FComVerifier::<F61p>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
@@ -685,7 +697,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComProver::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom =
+                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -709,7 +723,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComVerifier::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom =
+            FComVerifier::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
@@ -734,7 +750,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FComProver::<FE>::init(&mut channel, &mut rng).unwrap();
+            let mut fcom =
+                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -771,7 +789,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FComVerifier::<FE>::init(&mut channel, &mut rng).unwrap();
+        let mut fcom =
+            FComVerifier::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {

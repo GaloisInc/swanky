@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 use ocelot::edabits::{ProverConv, VerifierConv};
+use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{channel::track_unix_channel_pair, field::F61p, AesRng};
 use std::time::Instant;
 
@@ -27,7 +28,8 @@ fn run() {
         }
         let mut rng = AesRng::new();
         let start = Instant::now();
-        let mut fconv_sender = Prover::init(&mut sender, &mut rng).unwrap();
+        let mut fconv_sender =
+            Prover::init(&mut sender, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let edabits = fconv_sender
@@ -56,7 +58,8 @@ fn run() {
     }
     let mut rng = AesRng::new();
     let start = Instant::now();
-    let mut fconv_receiver = Verifier::init(&mut receiver, &mut rng).unwrap();
+    let mut fconv_receiver =
+        Verifier::init(&mut receiver, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
     println!("Receive time (init): {:?}", start.elapsed());
     println!(
         "Send communication (init): {:.2} Mb",

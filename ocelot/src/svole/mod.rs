@@ -14,6 +14,7 @@
 pub mod wykw;
 
 use crate::errors::Error;
+use crate::svole::wykw::LpnParams;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{field::FiniteField as FF, AbstractChannel};
 
@@ -28,6 +29,8 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error>;
     /// Generates sVOLEs.
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -55,6 +58,8 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Self, Error>;
     /// Returns delta.
     fn delta(&self) -> Self::Msg;
