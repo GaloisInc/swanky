@@ -257,7 +257,7 @@ macro_rules! call_with_big_finite_fields {
         $f::<$crate::field::F128p>($($arg),*);
         $f::<$crate::field::F61p>($($arg),*);
         $f::<$crate::field::F64b>($($arg),*);
-        $f::<$crate::field::Gf128>($($arg),*);
+        $f::<$crate::field::F128b>($($arg),*);
         $f::<$crate::field::Gf40>($($arg),*);
         $f::<$crate::field::Gf45>($($arg),*);
         $f::<$crate::field::F56b>($($arg),*);
@@ -480,8 +480,8 @@ pub use f128p::F128p;
 mod f2;
 pub use f2::F2;
 
-mod gf_2_128;
-pub use gf_2_128::Gf128;
+mod f128b;
+pub use f128b::F128b;
 
 mod f64b;
 pub use f64b::F64b;

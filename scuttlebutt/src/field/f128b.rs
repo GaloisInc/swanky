@@ -11,28 +11,28 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 /// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^7 + x^2 + x + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 // We use a u128 since Rust will pass it in registers, unlike a __m128i
-pub struct Gf128(pub(crate) u128);
+pub struct F128b(pub(crate) u128);
 
-impl ConstantTimeEq for Gf128 {
+impl ConstantTimeEq for F128b {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
-impl ConditionallySelectable for Gf128 {
+impl ConditionallySelectable for F128b {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Gf128(u128::conditional_select(&a.0, &b.0, choice))
+        F128b(u128::conditional_select(&a.0, &b.0, choice))
     }
 }
 
-impl<'a> AddAssign<&'a Gf128> for Gf128 {
+impl<'a> AddAssign<&'a F128b> for F128b {
     #[inline]
-    fn add_assign(&mut self, rhs: &'a Gf128) {
+    fn add_assign(&mut self, rhs: &'a F128b) {
         self.0 ^= rhs.0;
     }
 }
-impl<'a> SubAssign<&'a Gf128> for Gf128 {
+impl<'a> SubAssign<&'a F128b> for F128b {
     #[inline]
-    fn sub_assign(&mut self, rhs: &'a Gf128) {
+    fn sub_assign(&mut self, rhs: &'a F128b) {
         // The additive inverse of GF(2^128) is the identity
         *self += rhs;
     }
@@ -115,7 +115,7 @@ mod multiply {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::field::{polynomial::Polynomial, FiniteField, Gf128, F2};
+        use crate::field::{polynomial::Polynomial, F128b, FiniteField, F2};
         use proptest::prelude::*;
 
         fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
@@ -135,7 +135,7 @@ mod multiply {
         }
 
         fn poly_from_128(x: u128) -> Polynomial<F2> {
-            crate::field::test_utils::make_polynomial(&Gf128(x).to_polynomial_coefficients())
+            crate::field::test_utils::make_polynomial(&F128b(x).to_polynomial_coefficients())
         }
 
         proptest! {
@@ -159,7 +159,7 @@ mod multiply {
             remainder: &Polynomial<F2>,
         ) {
             let mut tmp = quotient.clone();
-            tmp *= &Gf128::reduce_multiplication_over();
+            tmp *= &F128b::reduce_multiplication_over();
             tmp += remainder;
             assert_eq!(poly, &tmp);
         }
@@ -174,7 +174,7 @@ mod multiply {
             fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
                 let poly = poly_from_upper_and_lower_128(upper, lower);
                 let reduced = reduce(upper, lower);
-                let (poly_quotient, poly_reduced) = poly.divmod(&Gf128::reduce_multiplication_over());
+                let (poly_quotient, poly_reduced) = poly.divmod(&F128b::reduce_multiplication_over());
                 assert_div_mod(&poly, &poly_quotient, &poly_reduced);
                 assert_eq!(poly_from_128(reduced), poly_reduced);
             }
@@ -182,15 +182,15 @@ mod multiply {
     }
 }
 
-impl<'a> MulAssign<&'a Gf128> for Gf128 {
+impl<'a> MulAssign<&'a F128b> for F128b {
     #[inline]
-    fn mul_assign(&mut self, rhs: &'a Gf128) {
+    fn mul_assign(&mut self, rhs: &'a F128b) {
         let (upper, lower) = multiply::mul_wide(self.0, rhs.0);
         self.0 = multiply::reduce(upper, lower);
     }
 }
 
-impl FiniteField for Gf128 {
+impl FiniteField for F128b {
     type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
     type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U16;
@@ -199,7 +199,7 @@ impl FiniteField for Gf128 {
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError> {
-        Ok(Gf128(u128::from_le_bytes(*bytes.as_ref())))
+        Ok(F128b(u128::from_le_bytes(*bytes.as_ref())))
     }
 
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
@@ -217,11 +217,11 @@ impl FiniteField for Gf128 {
             out <<= 1;
             out |= u128::from(u8::from(*x));
         }
-        Gf128(out)
+        F128b(out)
     }
 
     fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        Gf128(u128::from_le_bytes(*x))
+        F128b(u128::from_le_bytes(*x))
     }
 
     fn to_polynomial_coefficients(
@@ -248,7 +248,7 @@ impl FiniteField for Gf128 {
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         let mut bytes = [0; 16];
         rng.fill_bytes(&mut bytes[..]);
-        Gf128(u128::from_le_bytes(bytes))
+        F128b(u128::from_le_bytes(bytes))
     }
 
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
@@ -258,10 +258,10 @@ impl FiniteField for Gf128 {
     }
 
     // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc
-    const GENERATOR: Self = Gf128(2);
+    const GENERATOR: Self = F128b(2);
 
-    const ZERO: Self = Gf128(0);
-    const ONE: Self = Gf128(1);
+    const ZERO: Self = F128b(0);
+    const ONE: Self = F128b(1);
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
@@ -275,27 +275,27 @@ impl FiniteField for Gf128 {
     }
 }
 
-impl IsSubfieldOf<Gf128> for F2 {
-    fn multiply_by_superfield(&self, x: Gf128) -> Gf128 {
+impl IsSubfieldOf<F128b> for F2 {
+    fn multiply_by_superfield(&self, x: F128b) -> F128b {
         x.multiply_by_prime_subfield(*self)
     }
-    fn lift_into_superfield(&self) -> Gf128 {
-        Gf128::ONE.multiply_by_prime_subfield(*self)
+    fn lift_into_superfield(&self) -> F128b {
+        F128b::ONE.multiply_by_prime_subfield(*self)
     }
 }
 
-field_ops!(Gf128);
+field_ops!(F128b);
 
 #[cfg(test)]
-test_field!(test_gf128, Gf128);
+test_field!(test_gf128, F128b);
 
 #[test]
 fn test_generator() {
     let n = u128::MAX;
     let prime_factors: Vec<u128> = vec![67280421310721, 274177, 6700417, 641, 65537, 257, 17, 5, 3];
-    let x = Gf128::GENERATOR;
+    let x = F128b::GENERATOR;
     for p in prime_factors.iter() {
         let p = *p;
-        assert_ne!(Gf128::ONE, x.pow(n / p));
+        assert_ne!(F128b::ONE, x.pow(n / p));
     }
 }
