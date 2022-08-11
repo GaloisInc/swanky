@@ -34,7 +34,7 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
                         (rng, circuit, witness)
                     },
                     |(rng, circuit, witness)| {
-                        let proof = Proof::<F, N>::new(&circuit, &witness, k, t, rng);
+                        let proof = Proof::<F, N>::prove(&circuit, &witness, k, t, rng);
                         black_box(proof);
                     },
                     BatchSize::SmallInput,
@@ -51,7 +51,7 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
                                 F::PrimeField,
                                 AesRng,
                             >(input_size, circuit_size, &mut rng);
-                        let proof = Proof::<F, N>::new(&circuit, &witness, k, t, &mut rng);
+                        let proof = Proof::<F, N>::prove(&circuit, &witness, k, t, &mut rng);
                         (circuit, proof)
                     },
                     |(circuit, proof)| {

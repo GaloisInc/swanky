@@ -50,7 +50,7 @@ fn prover<F: FiniteField>(args: Args) {
 
     log::info!("Running prover: N = {N}, K = {K}, T = {T}");
     let time = std::time::Instant::now();
-    let proof = Proof::<F, N>::new(&circuit, &witness, K, T, &mut rng);
+    let proof = Proof::<F, N>::prove(&circuit, &witness, K, T, &mut rng);
     let prover_time = time.elapsed().as_millis();
 
     log::info!("Serializing proof");

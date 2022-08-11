@@ -17,7 +17,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
     ///
     /// `witness` must be of length equal to the number of inputs to `circuit`, and `circuit` must only
     /// contain one output wire.
-    pub fn new(
+    pub fn prove(
         circuit: &Circuit<F::PrimeField>,
         witness: &[F::PrimeField],
         compression_factor: usize,
@@ -116,7 +116,7 @@ mod tests {
                 fn serialize_bincode(seed in any_seed()) {
                     let mut rng = AesRng::from_seed(seed);
                     let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(10, 100, &mut rng);
-                    let proof = Proof::<$field, N>::new(&circuit, &witness, K, T, &mut rng);
+                    let proof = Proof::<$field, N>::prove(&circuit, &witness, K, T, &mut rng);
                     let serialized = bincode::serialize(&proof).unwrap();
                     let proof: Proof<$field, N> = bincode::deserialize(&serialized).unwrap();
                     assert_eq!(proof.verify(&circuit, K, T), true);

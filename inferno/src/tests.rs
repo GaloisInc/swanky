@@ -15,7 +15,7 @@ fn test<F: FiniteField>(
     witness: Vec<F::PrimeField>,
     rng: &mut AesRng,
 ) {
-    let proof = Proof::<F, N>::new(&circuit, &witness, K, T, rng);
+    let proof = Proof::<F, N>::prove(&circuit, &witness, K, T, rng);
     let res = proof.verify(&circuit, K, T);
     assert_eq!(res, true);
 }
