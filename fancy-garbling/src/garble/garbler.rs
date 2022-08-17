@@ -178,9 +178,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
 
         let (newA, idx) = if A.color() == 1 { (A, 0) } else { (&AD, r) };
 
-        let (hashA, hashB, hashX, hashY) = match hash_wires([newA, B, &X1, &Y1], g) {
-            [a, b, c, d] => (a, b, c, d),
-        };
+        let [hashA, hashB, hashX, hashY] = hash_wires([newA, B, &X1, &Y1], g);
 
         let X = WireMod2::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
         let Y = WireMod2::hash_to_mod(hashY, q);
@@ -347,9 +345,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
         let beta = (qb - B.color()) % qb;
         let Y1 = B.plus(&Db.cmul(beta));
 
-        let (hashX, hashY) = match hash_wires([&X1, &Y1], g) {
-            [a, b] => (a, b),
-        };
+        let [hashX, hashY] = hash_wires([&X1, &Y1], g);
 
         let X = Wire::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
         let Y = Wire::hash_to_mod(hashY, q).plus_mov(&A.cmul((beta + r) % q));

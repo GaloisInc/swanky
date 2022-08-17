@@ -74,9 +74,7 @@ impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
-        let (hashA, hashB) = match hash_wires([A, B], g) {
-            [a, b] => (a, b),
-        };
+        let [hashA, hashB] = hash_wires([A, B], g);
 
         // garbler's half gate
         let L = if A.color() == 0 {
@@ -193,9 +191,7 @@ impl<C: AbstractChannel, Wire: WireLabel + ArithmeticWire> FancyArithmetic for E
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
-        let (hashA, hashB) = match hash_wires([A, B], g) {
-            [a, b] => (a, b),
-        };
+        let [hashA, hashB] = hash_wires([A, B], g);
 
         // garbler's half gate
         let L = if A.color() == 0 {
