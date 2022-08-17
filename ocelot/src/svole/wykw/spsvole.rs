@@ -373,7 +373,7 @@ mod test {
     use generic_array::typenum::Unsigned;
     use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F61p, FiniteField as FF, Gf128},
+        field::{F128b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{
@@ -427,7 +427,7 @@ mod test {
         let cols = 10_805_248;
         let weight = 1_319;
 
-        test_spsvole_::<Gf128>(cols, weight);
+        test_spsvole_::<F128b>(cols, weight);
     }
 
     #[test]
