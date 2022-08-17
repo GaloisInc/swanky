@@ -1,10 +1,7 @@
+use humidor::ligero::noninteractive;
 use rand::SeedableRng;
 use scuttlebutt::AesRng;
-
-extern crate humidor;
-
-use humidor::circuit::Circuit;
-use humidor::ligero::noninteractive;
+use simple_arith_circuit::Circuit;
 
 type Hash = sha2::Sha256;
 type Field = scuttlebutt::field::F2_19x3_26;
@@ -25,20 +22,19 @@ fn main() {
     println!("---");
 
     let mut rng = AesRng::from_entropy();
-    let (mut ckt, inp): (Circuit<Field>, _) =
-        humidor::circuitgen::random_ckt_zero(&mut rng, input_size, circuit_size);
-    ckt.shared = 0..shared_size;
+    let (ckt, inp): (Circuit<Field>, _) =
+        simple_arith_circuit::circuitgen::random_zero_circuit(input_size, circuit_size, &mut rng);
 
     let mut prover_time = std::time::Duration::new(0, 0);
     let mut verifier_time = std::time::Duration::new(0, 0);
 
     let t = std::time::Instant::now();
-    let mut p = Prover::new(&mut rng, &ckt, &inp);
+    let mut p = Prover::new(&mut rng, &ckt, &inp, Some(0..shared_size));
     prover_time += t.elapsed();
     println!("Prover setup time: {:?}", t.elapsed());
 
     let t = std::time::Instant::now();
-    let mut v = Verifier::new(&ckt);
+    let mut v = Verifier::new(&ckt, Some(0..shared_size));
     verifier_time += t.elapsed();
     println!("Verifier setup time: {:?}", t.elapsed());
 

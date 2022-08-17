@@ -66,6 +66,8 @@
 //
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
+use std::ops::Range;
+
 use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
@@ -80,10 +82,10 @@ type HashOutput<T> = digest::Output<T>;
 #[cfg(test)]
 use proptest::{collection::vec as pvec, prelude::*, *};
 
-use crate::circuit::{Circuit, Op};
 use crate::merkle;
 use crate::params::Params;
 use crate::util::*;
+use simple_arith_circuit::{Circuit, Op};
 
 /// This is a marker trait consolidating the traits needed for a Ligero field.
 /// In addition, it supplies a field-size, to be used in parameter selection.
@@ -125,8 +127,10 @@ struct Public<Field> {
 impl<Field: FieldForLigero> Public<Field> {
     /// Create the public component of a Ligero proof. The circuit to check and
     /// the witness and shared-witness size are contained in the `c` argument.
+    /// `shared` denotes wire indices that are shared between the constructed proof
+    /// and an external proof system.
     #[allow(non_snake_case)]
-    fn new(c: &Circuit<Field>) -> Self {
+    fn new(c: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
         // By the SZ Lemma, Pr[p(x) = q(x)] for monomials p and q and uniform x
         // chosen independently of p and q is 1/|F|, so one linear check should
         // give us 1/|F| soundness.
@@ -138,7 +142,7 @@ impl<Field: FieldForLigero> Public<Field> {
         let num_shared_checks = 1;
 
         let params = Params::new(
-            c.size() +          /* circuit size + witness size */
+            c.nwires() +          /* circuit size + witness size */
             1 +                 /* for the final zero check */
             num_shared_checks, /* shared-witness mask size */
         );
@@ -152,8 +156,8 @@ impl<Field: FieldForLigero> Public<Field> {
         let mut Padd = TriMat::with_capacity((ml, ml), 3 * ml); // Padd * w = 0
         let mut badd = Array1::zeros(ml);
 
-        for (s, op) in c.ops.iter().enumerate() {
-            let k = s + c.inp_size;
+        for (s, op) in c.iter().enumerate() {
+            let k = s + c.ninputs();
             match *op {
                 Op::Add(i, j) => {
                     // Padd[k][i]*w[i] + Padd[k][j]*w[j] + Padd[k][k]*w[k] = 0
@@ -173,16 +177,20 @@ impl<Field: FieldForLigero> Public<Field> {
                     Padd.add_triplet(k, j, -Field::ONE);
                     Padd.add_triplet(k, k, -Field::ONE);
                 }
-                Op::Div(i, j) => {
-                    // Px[k][j]*w[j] * Py[k][k]*w[k] + -1 * Pz[k][i]*w[i] = 0
-                    Px.add_triplet(k, j, Field::ONE);
-                    Py.add_triplet(k, k, Field::ONE);
-                    Pz.add_triplet(k, i, Field::ONE);
-                }
-                Op::LdI(f) => {
+                // Op::Div(i, j) => {
+                //     // Px[k][j]*w[j] * Py[k][k]*w[k] + -1 * Pz[k][i]*w[i] = 0
+                //     Px.add_triplet(k, j, Field::ONE);
+                //     Py.add_triplet(k, k, Field::ONE);
+                //     Pz.add_triplet(k, i, Field::ONE);
+                // }
+                Op::Constant(f) => {
                     // Padd[k][k] * w[k] = badd[k]
                     Padd.add_triplet(k, k, Field::ONE);
                     badd[k] = f;
+                }
+                Op::Copy(i) => {
+                    Padd.add_triplet(k, i, Field::ONE);
+                    Padd.add_triplet(k, k, -Field::ONE);
                 }
             }
         }
@@ -195,12 +203,12 @@ impl<Field: FieldForLigero> Public<Field> {
         // It's unclear to me how to do this without adding extra gates. So
         // instead, we add a constraint directly asserting the last wire in
         // the extended witness to be zero.
-        Padd.add_triplet(c.size(), c.size() - 1, Field::ONE);
+        Padd.add_triplet(c.nwires(), c.nwires() - 1, Field::ONE);
 
         Public {
             params,
-            shared: c.shared.clone(),
-            shared_mask: c.size() + 1..c.size() + 1 + num_shared_checks,
+            shared: shared.unwrap_or(0..0),
+            shared_mask: c.nwires() + 1..c.nwires() + 1 + num_shared_checks,
 
             Px: Px.to_csr(),
             Py: Py.to_csr(),
@@ -296,27 +304,34 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
     /// The `mask` should be a committed vector of random elements the same size
     /// as the shared portion of the witness. If there is no shared witness, it
     /// should be an empty vector.
-    fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Circuit<Field>, inp: &[Field]) -> Self {
-        debug_assert_eq!(c.inp_size, inp.len());
+    fn new<R: Rng + CryptoRng>(
+        rng: &mut R,
+        c: &Circuit<Field>,
+        inp: &[Field],
+        shared: Option<Range<usize>>,
+    ) -> Self {
+        debug_assert_eq!(c.ninputs(), inp.len());
 
-        let public = Public::new(&c);
+        let public = Public::new(&c, shared);
 
-        let ext_witness = Array1::from_shape_vec(c.size(), c.eval(&inp)).unwrap();
+        let mut ext_witness = Vec::new();
+        c.eval(&inp, &mut ext_witness);
+        let ext_witness = Array1::from_shape_vec(c.nwires(), ext_witness).unwrap();
         let mask_range = public.shared_mask.clone();
         let mask = Array1::from_shape_fn(mask_range.len(), |_| Field::random(rng));
 
         let ml = public.params.m * public.params.l;
 
         let mut w = Array1::zeros(ml);
-        w.slice_mut(ndarray::s![0..c.size()]).assign(&ext_witness);
+        w.slice_mut(ndarray::s![0..c.nwires()]).assign(&ext_witness);
         w.slice_mut(ndarray::s![mask_range]).assign(&mask);
 
         let mut x = Array1::zeros(ml);
         let mut y = Array1::zeros(ml);
         let mut z = Array1::zeros(ml);
 
-        for (s, op) in c.ops.iter().enumerate() {
-            let k = s + c.inp_size;
+        for (s, op) in c.iter().enumerate() {
+            let k = s + c.ninputs();
             match *op {
                 Op::Mul(i, j) => {
                     // x[k] * y[k] + -1 * z[k] = 0
@@ -325,13 +340,13 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
                     z[k] = w[k];
                     debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
                 }
-                Op::Div(i, j) => {
-                    // x[k] * y[k] + -1 * z[k] = 0
-                    x[k] = w[j];
-                    y[k] = w[k];
-                    z[k] = w[i];
-                    debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
-                }
+                // Op::Div(i, j) => {
+                //     // x[k] * y[k] + -1 * z[k] = 0
+                //     x[k] = w[j];
+                //     y[k] = w[k];
+                //     z[k] = w[i];
+                //     debug_assert_eq!(x[k] * y[k] - z[k], Field::ZERO);
+                // }
                 _ => { /* x[k] = y[k] = z[k] = 0 */ }
             }
         }
@@ -383,13 +398,13 @@ impl Arbitrary for Secret<TestField, TestHash> {
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with((w, c): Self::Parameters) -> Self::Strategy {
         (
-            crate::circuitgen::arb_ckt(w, c),
+            simple_arith_circuit::circuitgen::arbitrary_circuit(w, c),
             pvec(arb_test_field(), w),
             proptest::array::uniform16(0u8..),
         )
             .prop_map(|(ckt, inp, seed)| {
                 let mut rng = AesRng::from_seed(Block::from(seed));
-                Secret::new(&mut rng, &ckt, &inp)
+                Secret::new(&mut rng, &ckt, &inp, None)
             })
             .boxed()
     }
@@ -421,33 +436,38 @@ proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_false(
-        (c,i) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|c| {
+        (c,i) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|c| {
             (Just(c), pvec(arb_test_field(), 20))
         }),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let s = Secret::<_, TestHash>::new(&mut rng, &c, &i);
-        let output = *c.eval(&i).last().unwrap();
+        let s = Secret::<_, TestHash>::new(&mut rng, &c, &i, None);
+        let mut wires = Vec::new();
+        let output = c.eval(&i, &mut wires)[0];
 
         prop_assert_eq!(
             output == TestField::ZERO,
             &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
         );
     }
+}
 
+#[cfg(test)]
+proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_false_with_shared(
-        (c, i) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|c| {
-            (Just(Circuit {shared: 0..10, ..c}), pvec(arb_test_field(), 20))
+        (c, i) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|c| {
+            (Just(c), pvec(arb_test_field(), 20))
         }),
         rshared_vec in pvec(arb_test_field(), 1 * 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i);
-        let output = *c.eval(&i).last().unwrap();
+        let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, Some(0..10));
+        let mut wires = Vec::new();
+        let output = c.eval(&i, &mut wires)[0];
 
         let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
         let qshared = make_qshared(&s.w, &s.public.shared, &s.public.shared_mask, &rshared);
@@ -458,35 +478,43 @@ proptest! {
             &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
         );
     }
+}
 
+#[cfg(test)]
+proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_true(
-        (c, i) in crate::circuitgen::arb_ckt_zero(20, 50),
+        (c, i) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i);
-        let output = *c.eval(&i).last().unwrap();
+        let s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, None);
+        let mut wires = Vec::new();
+        let output = c.eval(&i, &mut wires)[0];
 
         prop_assert_eq!(
             output == TestField::ZERO,
             &s.public.Padd.to_csr::<usize>() * &s.w == s.public.badd
         );
     }
+}
 
+#[cfg(test)]
+proptest! {
     #[test]
     #[allow(non_snake_case)]
     fn test_Padd_true_with_shared(
-        (c, i) in crate::circuitgen::arb_ckt_zero(20, 50).prop_flat_map(|(c,i)| {
-            (Just(Circuit {shared: 0..10, ..c}), Just(i))
+        (c, i) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit(20, 50).prop_flat_map(|(c,i)| {
+            (Just(c), Just(i))
         }),
         rshared_vec in pvec(arb_test_field(), 1 * 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
-        let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i);
-        let output = *c.eval(&i).last().unwrap();
+        let mut s: Secret<_, sha2::Sha256> = Secret::new(&mut rng, &c, &i, Some(0..10));
+        let mut wires = Vec::new();
+        let output = c.eval(&i, &mut wires)[0];
 
         let rshared = Array2::from_shape_vec((1,10), rshared_vec).unwrap();
         let qshared = make_qshared(&s.w, &s.public.shared, &s.public.shared_mask, &rshared);
@@ -940,9 +968,14 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
-        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Circuit<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<R: Rng + CryptoRng>(
+            rng: &mut R,
+            c: &Circuit<Field>,
+            w: &Vec<Field>,
+            shared: Option<Range<usize>>,
+        ) -> Self {
             Self {
-                secret: Secret::new(rng, c, w),
+                secret: Secret::new(rng, c, w, shared),
             }
         }
 
@@ -1123,11 +1156,11 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a new verifier from a circuit.
-        pub fn new(c: &Circuit<Field>) -> Self {
+        pub fn new(c: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
             Self {
                 phantom: std::marker::PhantomData,
 
-                public: Public::new(&c),
+                public: Public::new(&c, shared),
                 r0: None,
                 r1: None,
                 r2: None,
@@ -1210,10 +1243,10 @@ pub mod interactive {
     #[test]
     fn test_small() {
         let mut rng = AesRng::from_entropy();
-        let (ckt, w) = crate::circuitgen::test_ckt_zero::<TestField>();
+        let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
-        let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-        let mut v = Verifier::new(&ckt);
+        let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
+        let mut v = Verifier::new(&ckt, None);
 
         let r0 = p.round0();
         let r1 = v.round1(&mut rng, r0);
@@ -1228,17 +1261,17 @@ pub mod interactive {
     proptest! {
         #[test]
         fn test_false(
-            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
-                let w = pvec(arb_test_field(), ckt.inp_size);
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|ckt| {
+                let w = pvec(arb_test_field(), ckt.ninputs());
                 (Just(ckt), w)
             }),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
-
-            let output = *ckt.eval(&w).last().unwrap();
-            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut wires = Vec::new();
+            let output = ckt.eval(&w, &mut wires)[0];
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
+            let mut v = Verifier::new(&ckt, None);
 
             let r0 = p.round0();
             let r1 = v.round1(&mut rng, r0);
@@ -1248,16 +1281,19 @@ pub mod interactive {
 
             prop_assert_eq!(v.verify(r4), output == TestField::ZERO);
         }
+    }
 
+    #[cfg(test)]
+    proptest! {
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50),
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
+            let mut v = Verifier::new(&ckt, None);
 
             let r0 = p.round0();
             let r1 = v.round1(&mut rng, r0);
@@ -1267,20 +1303,23 @@ pub mod interactive {
 
             prop_assert!(v.verify(r4));
         }
+    }
 
+    #[cfg(test)]
+    proptest! {
         #[test]
         fn test_shared_false(
-            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
-                let w = pvec(arb_test_field(), ckt.inp_size);
-                (Just(Circuit {shared: 0..10, ..ckt}), w)
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|ckt| {
+                let w = pvec(arb_test_field(), ckt.ninputs());
+                (Just(ckt), w)
             }),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
-
-            let output = *ckt.eval(&w).last().unwrap();
-            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut wires = Vec::new();
+            let output = ckt.eval(&w, &mut wires)[0];
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
+            let mut v = Verifier::new(&ckt, Some(0..10));
 
             let r0 = p.round0();
             let r1 = v.round1(&mut rng, r0);
@@ -1290,17 +1329,19 @@ pub mod interactive {
 
             prop_assert_eq!(v.verify(r4), output == TestField::ZERO);
         }
+    }
 
+    #[cfg(test)]
+    proptest! {
         #[test]
         fn test_shared_true(
-            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50)
-                .prop_flat_map(|(ckt, w)| (Just(Circuit {shared: 0..10, ..ckt}), Just(w))),
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit(20, 50)
+                .prop_flat_map(|(ckt, w)| (Just(ckt), Just(w))),
             seed: [u8;16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
-
-            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut p = Prover::<TestField, TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
+            let mut v = Verifier::new(&ckt, Some(0..10));
 
             let r0 = p.round0();
             let r1 = v.round1(&mut rng, r0);
@@ -1413,19 +1454,21 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create a non-interactive prover from a circuit and witness.
-        pub fn new<R: Rng + CryptoRng>(rng: &mut R, c: &Circuit<Field>, w: &Vec<Field>) -> Self {
+        pub fn new<R: Rng + CryptoRng>(
+            rng: &mut R,
+            circuit: &Circuit<Field>,
+            witness: &Vec<Field>,
+            shared: Option<Range<usize>>,
+        ) -> Self {
             let mut hash = H::new();
-            let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
-            c.ops.iter().for_each(|op| {
-                op.append_bytes(&mut bytes);
-            });
+            let bytes = bincode::serialize(&circuit).unwrap(); // XXX: unwrap
             hash.update(&bytes);
 
             let ckt_hash = hash.finalize();
 
             Self {
                 ckt_hash,
-                ip: interactive::Prover::new(rng, c, w),
+                ip: interactive::Prover::new(rng, circuit, witness, shared),
             }
         }
 
@@ -1503,12 +1546,9 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Verifier<Field, H> {
         /// Create a verifier out of a circuit.
-        pub fn new(ckt: &Circuit<Field>) -> Self {
+        pub fn new(circuit: &Circuit<Field>, shared: Option<Range<usize>>) -> Self {
             let mut hash = H::new();
-            let mut bytes = Vec::with_capacity(Op::<Field>::OPCODE_SIZE);
-            ckt.ops.iter().for_each(|op| {
-                op.append_bytes(&mut bytes);
-            });
+            let bytes = bincode::serialize(circuit).unwrap(); // XXX: unwrap
             hash.update(&bytes);
 
             let ckt_hash = hash.finalize();
@@ -1517,7 +1557,7 @@ pub mod noninteractive {
                 ckt_hash,
                 phantom: std::marker::PhantomData,
 
-                public: Public::new(ckt),
+                public: Public::new(circuit, shared),
             }
         }
 
@@ -1573,10 +1613,10 @@ pub mod noninteractive {
     #[test]
     fn test_small() {
         let mut rng = AesRng::from_entropy();
-        let (ckt, w) = crate::circuitgen::test_ckt_zero::<TestField>();
+        let (ckt, w) = simple_arith_circuit::circuitgen::simple_test_circuit::<TestField>();
 
-        let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-        let mut v = Verifier::new(&ckt);
+        let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
+        let mut v = Verifier::new(&ckt, None);
 
         let proof = p.make_proof();
         assert!(v.verify(proof))
@@ -1586,51 +1626,57 @@ pub mod noninteractive {
     proptest! {
         #[test]
         fn test_false(
-            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
-                let w = pvec(arb_test_field(), ckt.inp_size);
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|ckt| {
+                let w = pvec(arb_test_field(), ckt.ninputs());
                 (Just(ckt), w)
             }),
             seed: [u8; 16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
-
-            let output = *ckt.eval(&w).last().unwrap();
-            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut wires = Vec::new();
+            let output = ckt.eval(&w, &mut wires)[0];
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
+            let mut v = Verifier::new(&ckt, None);
 
             let proof = p.make_proof();
             prop_assert_eq!(v.verify(proof), output == TestField::ZERO);
         }
+    }
 
+    #[cfg(test)]
+    proptest! {
         #[test]
         fn test_true(
-            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50),
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50),
             seed: [u8; 16],
         ) {
             let mut rng = AesRng::from_seed(Block::from(seed));
 
-            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut p = Prover::<_, TestHash>::new(&mut rng, &ckt, &w, None);
+            let mut v = Verifier::new(&ckt, None);
 
             let proof = p.make_proof();
             prop_assert!(v.verify(proof))
         }
+    }
 
+    #[cfg(test)]
+    proptest! {
         #[test]
         fn test_shared_false(
-            (ckt, w) in crate::circuitgen::arb_ckt(20, 50).prop_flat_map(|ckt| {
-                let w = pvec(arb_test_field(), ckt.inp_size);
-                (Just(Circuit {shared: 0..10, ..ckt}), w)
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|ckt| {
+                let w = pvec(arb_test_field(), ckt.ninputs());
+                (Just(ckt), w)
             }),
             seed: [u8; 16],
         ) {
             use sha2::Sha256;
 
             let mut rng = AesRng::from_seed(Block::from(seed));
-
-            let output = *ckt.eval(&w).last().unwrap();
-            let mut p = <Prover<_, Sha256>>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut wires = Vec::new();
+            let output = ckt.eval(&w, &mut wires)[0];
+            let mut p = <Prover<_, Sha256>>::new(&mut rng, &ckt, &w, Some(0..10));
+            let mut v = Verifier::new(&ckt, Some(0..10));
 
             let mut hash = Sha256::new();
             p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
@@ -1647,17 +1693,16 @@ pub mod noninteractive {
 
         #[test]
         fn test_shared_true(
-            (ckt, w) in crate::circuitgen::arb_ckt_zero(20, 50).prop_flat_map(|(ckt,w)| {
-                (Just(Circuit {shared: 0..10, ..ckt}), Just(w))
+            (ckt, w) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit::<TestField>(20, 50).prop_flat_map(|(ckt,w)| {
+                (Just(ckt), Just(w))
             }),
             seed: [u8; 16],
         ) {
             use sha2::Sha256;
 
             let mut rng = AesRng::from_seed(Block::from(seed));
-
-            let mut p = Prover::<_,TestHash>::new(&mut rng, &ckt, &w);
-            let mut v = Verifier::new(&ckt);
+            let mut p = Prover::<_,TestHash>::new(&mut rng, &ckt, &w, Some(0..10));
+            let mut v = Verifier::new(&ckt, Some(0..10));
 
             let mut hash = Sha256::new();
             p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
