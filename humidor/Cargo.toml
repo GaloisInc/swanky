@@ -20,14 +20,17 @@ doctest = false
 merkle-cbt = "0.3.2"
 sprs = "0.11.0"
 ndarray = "0.15.4"
-num-traits = "0.2.14"
+num-traits = "0.2.15"
 rand = "0.8.5"
 subtle = "2.4.1"
 scuttlebutt = { path = "../scuttlebutt" }
 generic-array = "0.14.5"
 digest = "0.10.3"
+simple-arith-circuit = { path = "../simple-arith-circuit", features = ["serde"] }
+bincode = "1.3.3"
 
 [dev-dependencies]
+simple-arith-circuit = { path = "../simple-arith-circuit", features = ["proptest"] }
 proptest = "1.0.0"
 criterion = "0.3.5"
 sha2 = "0.10.2"

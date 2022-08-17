@@ -1,12 +1,10 @@
 use core::time::Duration;
 use criterion::{criterion_group, criterion_main};
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
+use humidor::ligero::noninteractive;
 use rand::SeedableRng;
 use scuttlebutt::AesRng;
-
-use humidor::circuit::Circuit;
-use humidor::circuitgen::random_ckt_zero;
-use humidor::ligero::noninteractive;
+use simple_arith_circuit::circuitgen::random_zero_circuit;
 
 type Hash = sha2::Sha256;
 type Field = scuttlebutt::field::F2_19x3_26;
@@ -27,21 +25,15 @@ pub fn bench_random_circuit_by_circuit_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let mut rng = AesRng::from_entropy();
+                    let mut rng = AesRng::from_seed(Default::default());
 
-                    let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
+                    let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
-                    (
-                        rng,
-                        Circuit {
-                            shared: 0..shared_size,
-                            ..ckt
-                        },
-                        w,
-                    )
+                    (rng, ckt, w)
                 },
                 |(rng, ckt, w)| {
-                    let mut p: Prover = noninteractive::Prover::new(rng, ckt, w);
+                    let mut p: Prover =
+                        noninteractive::Prover::new(rng, ckt, w, Some(0..shared_size));
                     p.make_proof();
                 },
                 BatchSize::SmallInput,
@@ -51,18 +43,17 @@ pub fn bench_random_circuit_by_circuit_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Verifier", size), &size, |b, _| {
             b.iter_batched(
                 || {
-                    let mut rng = AesRng::from_entropy();
+                    let mut rng = AesRng::from_seed(Default::default());
 
-                    let (mut ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
-                    ckt.shared = 0..shared_size;
+                    let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
-                    let mut p: Prover = Prover::new(&mut rng, &ckt, &w);
+                    let mut p: Prover = Prover::new(&mut rng, &ckt, &w, Some(0..shared_size));
                     let proof = p.make_proof();
 
                     (ckt, proof)
                 },
                 |(ckt, proof)| {
-                    let mut v: Verifier = Verifier::new(&ckt);
+                    let mut v: Verifier = Verifier::new(&ckt, Some(0..shared_size));
                     v.verify(proof);
                 },
                 BatchSize::SmallInput,
@@ -85,21 +76,15 @@ pub fn bench_random_circuit_by_shared_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Prover", size), &size, |b, _| {
             b.iter_batched_ref(
                 || {
-                    let mut rng = AesRng::from_entropy();
+                    let mut rng = AesRng::from_seed(Default::default());
 
-                    let (ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
+                    let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
-                    (
-                        rng,
-                        Circuit {
-                            shared: 0..shared_size,
-                            ..ckt
-                        },
-                        w,
-                    )
+                    (rng, ckt, w)
                 },
                 |(rng, ckt, w)| {
-                    let mut p: Prover = noninteractive::Prover::new(rng, ckt, w);
+                    let mut p: Prover =
+                        noninteractive::Prover::new(rng, ckt, w, Some(0..shared_size));
                     p.make_proof();
                 },
                 BatchSize::SmallInput,
@@ -109,18 +94,17 @@ pub fn bench_random_circuit_by_shared_size(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Verifier", size), &size, |b, _| {
             b.iter_batched(
                 || {
-                    let mut rng = AesRng::from_entropy();
+                    let mut rng = AesRng::from_seed(Default::default());
 
-                    let (mut ckt, w) = random_ckt_zero(&mut rng, input_size, circuit_size);
-                    ckt.shared = 0..shared_size;
+                    let (ckt, w) = random_zero_circuit(input_size, circuit_size, &mut rng);
 
-                    let mut p: Prover = Prover::new(&mut rng, &ckt, &w);
+                    let mut p: Prover = Prover::new(&mut rng, &ckt, &w, Some(0..shared_size));
                     let proof = p.make_proof();
 
                     (ckt, proof)
                 },
                 |(ckt, proof)| {
-                    let mut v: Verifier = Verifier::new(&ckt);
+                    let mut v: Verifier = Verifier::new(&ckt, Some(0..shared_size));
                     v.verify(proof);
                 },
                 BatchSize::SmallInput,

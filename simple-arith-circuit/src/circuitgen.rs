@@ -171,6 +171,13 @@ fn any_fe<F: FiniteField>() -> BoxedStrategy<F> {
 }
 
 #[cfg(any(feature = "proptest", test))]
+fn arb_ix(min: Index, max: Index) -> impl Strategy<Value = Index> {
+    debug_assert!(max - min > 0);
+    let s = max - min;
+    (0..s).prop_map(move |a| min + a)
+}
+
+#[cfg(any(feature = "proptest", test))]
 fn arb_ix_pair(min: Index, max: Index) -> impl Strategy<Value = (Index, Index)> {
     debug_assert!(max - min > 1);
 
@@ -184,8 +191,8 @@ fn arb_op<F: PrimeFiniteField>(wire_min: Index, wire_max: Index) -> impl Strateg
         arb_ix_pair(wire_min, wire_max).prop_map(|(i, j)| Op::Add(i, j)),
         arb_ix_pair(wire_min, wire_max).prop_map(|(i, j)| Op::Mul(i, j)),
         arb_ix_pair(wire_min, wire_max).prop_map(|(i, j)| Op::Sub(i, j)),
-        // Division omitted to avoid accidental division by zero
-        // any::<u64>().prop_map(|f| Op::LdI(Field::from(f as u128))),
+        arb_ix(wire_min, wire_max).prop_map(|i| Op::Copy(i)),
+        any_fe::<F>().prop_map(|f| Op::Constant(f)),
     ]
 }
 
