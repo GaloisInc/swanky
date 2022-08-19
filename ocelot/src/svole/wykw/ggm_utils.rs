@@ -206,9 +206,8 @@ mod tests {
     use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
     use proptest::prelude::*;
     use rand::Rng;
-    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F128b, F128p, F61p, FiniteField, F2},
+        field::{F128b, F128p, F40b, F61p, FiniteField, F2},
         utils::unpack_bits,
     };
 
@@ -281,7 +280,7 @@ mod tests {
         (fp, F128p, NoSpecialization),
         (f61p, F61p, NoSpecialization),
         (f2, F2, NoSpecialization),
-        (gf128, F128b, NoSpecialization),
-        (gf40, Gf40, NoSpecialization),
+        (f128b, F128b, NoSpecialization),
+        (f40b, F40b, NoSpecialization),
     );
 }

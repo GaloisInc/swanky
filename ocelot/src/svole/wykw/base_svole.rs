@@ -128,9 +128,8 @@ impl<FE: FF> Receiver<FE> {
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
     use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
-    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F128b, F128p, F61p, FiniteField as FF},
+        field::{F128b, F128p, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{
@@ -169,7 +168,7 @@ mod tests {
         test_base_svole::<F128p, NoSpecialization>(len);
         test_base_svole::<F128b, NoSpecialization>(len);
         test_base_svole::<F61p, NoSpecialization>(len);
-        test_base_svole::<Gf40, NoSpecialization>(len);
+        test_base_svole::<F40b, NoSpecialization>(len);
     }
 
     #[test]

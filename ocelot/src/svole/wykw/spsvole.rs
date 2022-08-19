@@ -371,9 +371,8 @@ mod test {
         SpsReceiver, SpsSender,
     };
     use generic_array::typenum::Unsigned;
-    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F128b, F61p, FiniteField as FF},
+        field::{F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{
@@ -443,6 +442,6 @@ mod test {
         let cols = 10_805_248;
         let weight = 1_319;
 
-        test_spsvole_::<Gf40>(cols, weight);
+        test_spsvole_::<F40b>(cols, weight);
     }
 }

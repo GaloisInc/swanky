@@ -11,7 +11,7 @@ use crate::{errors::Error, svole::wykw::LpnParams};
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
-    field::{FiniteField, Gf40, F2},
+    field::{F40b, FiniteField, F2},
     AbstractChannel, AesRng, Block, SyncChannel,
 };
 use std::io::{BufReader, BufWriter};
@@ -22,7 +22,7 @@ use subtle::{ConditionallySelectable, ConstantTimeEq};
 /// EdabitsProver struct
 #[derive(Clone)]
 pub struct EdabitsProver<FE: FiniteField> {
-    bits: Vec<MacProver<Gf40>>,
+    bits: Vec<MacProver<F40b>>,
     value: MacProver<FE>,
 }
 
@@ -41,7 +41,7 @@ fn copy_edabits_prover<FE: FiniteField>(edabits: &EdabitsProver<FE>) -> EdabitsP
 /// EdabitsVerifier struct
 #[derive(Clone)]
 pub struct EdabitsVerifier<FE: FiniteField> {
-    bits: Vec<MacVerifier<Gf40>>,
+    bits: Vec<MacVerifier<F40b>>,
     value: MacVerifier<FE>,
 }
 
@@ -60,14 +60,14 @@ fn copy_edabits_verifier<FE: FiniteField>(edabits: &EdabitsVerifier<FE>) -> Edab
 /// DabitProver struct
 #[derive(Clone)]
 struct DabitProver<FE: FiniteField> {
-    bit: MacProver<Gf40>,
+    bit: MacProver<F40b>,
     value: MacProver<FE>,
 }
 
 /// DabitVerifier struct
 #[derive(Clone)]
 struct DabitVerifier<FE: FiniteField> {
-    bit: MacVerifier<Gf40>,
+    bit: MacVerifier<F40b>,
     value: MacVerifier<FE>,
 }
 
@@ -150,7 +150,7 @@ fn check_parameters<FE: FiniteField>(n: usize, gamma: usize) -> Result<(), Error
 
 /// Prover for the edabits conversion protocol
 pub struct ProverConv<FE: FiniteField> {
-    fcom_f2: FComProver<Gf40>,
+    fcom_f2: FComProver<F40b>,
     fcom: FComProver<FE>,
 }
 
@@ -187,8 +187,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         &mut self,
         channel: &mut C,
         r_batch: &[DabitProver<FE>],
-        x_batch: &[MacProver<Gf40>],
-        c_batch: &mut Vec<MacProver<Gf40>>,
+        x_batch: &[MacProver<F40b>],
+        c_batch: &mut Vec<MacProver<F40b>>,
         x_m_batch: &mut Vec<MacProver<FE>>,
     ) -> Result<(), Error> {
         let n = r_batch.len();
@@ -230,8 +230,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         rng: &mut RNG,
         x_batch: &[EdabitsProver<FE>],
         y_batch: &[EdabitsProver<FE>],
-        random_triples: &[(MacProver<Gf40>, MacProver<Gf40>, MacProver<Gf40>)],
-    ) -> Result<Vec<(Vec<MacProver<Gf40>>, MacProver<Gf40>)>, Error> {
+        random_triples: &[(MacProver<F40b>, MacProver<F40b>, MacProver<F40b>)],
+    ) -> Result<Vec<(Vec<MacProver<F40b>>, MacProver<F40b>)>, Error> {
         let num = x_batch.len();
         if num != y_batch.len() {
             return Err(Error::Other(
@@ -395,7 +395,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize,
-        out: &mut Vec<(MacProver<Gf40>, MacProver<Gf40>, MacProver<Gf40>)>,
+        out: &mut Vec<(MacProver<F40b>, MacProver<F40b>, MacProver<F40b>)>,
     ) -> Result<(), Error> {
         let mut pairs = Vec::with_capacity(num);
         let mut zs = Vec::with_capacity(num);
@@ -602,9 +602,9 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         edabits_vector: &[EdabitsProver<FE>],
         r: &[EdabitsProver<FE>],
         dabits: &[DabitProver<FE>],
-        convert_bit_2_field_aux: &mut Vec<MacProver<Gf40>>,
+        convert_bit_2_field_aux: &mut Vec<MacProver<F40b>>,
         e_m_batch: &mut Vec<MacProver<FE>>,
-        random_triples: &[(MacProver<Gf40>, MacProver<Gf40>, MacProver<Gf40>)],
+        random_triples: &[(MacProver<F40b>, MacProver<F40b>, MacProver<F40b>)],
     ) -> Result<(), Error> {
         let n = edabits_vector.len();
         let nb_bits = edabits_vector[0].bits.len();
@@ -810,7 +810,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 
 /// Verifier for the edabits conversion protocol
 pub struct VerifierConv<FE: FiniteField> {
-    fcom_f2: FComVerifier<Gf40>,
+    fcom_f2: FComVerifier<F40b>,
     fcom: FComVerifier<FE>,
 }
 
@@ -847,8 +847,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         &mut self,
         channel: &mut C,
         r_batch: &[DabitVerifier<FE>],
-        x_batch: &[MacVerifier<Gf40>],
-        r_mac_plus_x_mac: &mut Vec<MacVerifier<Gf40>>,
+        x_batch: &[MacVerifier<F40b>],
+        r_mac_plus_x_mac: &mut Vec<MacVerifier<F40b>>,
         c_batch: &mut Vec<F2>,
         x_m_batch: &mut Vec<MacVerifier<FE>>,
     ) -> Result<(), Error> {
@@ -887,8 +887,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         rng: &mut RNG,
         x_batch: &[EdabitsVerifier<FE>],
         y_batch: &[EdabitsVerifier<FE>],
-        random_triples: &[(MacVerifier<Gf40>, MacVerifier<Gf40>, MacVerifier<Gf40>)],
-    ) -> Result<Vec<(Vec<MacVerifier<Gf40>>, MacVerifier<Gf40>)>, Error> {
+        random_triples: &[(MacVerifier<F40b>, MacVerifier<F40b>, MacVerifier<F40b>)],
+    ) -> Result<Vec<(Vec<MacVerifier<F40b>>, MacVerifier<F40b>)>, Error> {
         let num = x_batch.len();
         if num != y_batch.len() {
             return Err(Error::Other(
@@ -1017,7 +1017,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         channel: &mut C,
         rng: &mut RNG,
         num: usize,
-        out: &mut Vec<(MacVerifier<Gf40>, MacVerifier<Gf40>, MacVerifier<Gf40>)>,
+        out: &mut Vec<(MacVerifier<F40b>, MacVerifier<F40b>, MacVerifier<F40b>)>,
     ) -> Result<(), Error> {
         let mut pairs = Vec::with_capacity(num);
         for _ in 0..num {
@@ -1170,11 +1170,11 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         edabits_vector_mac: &[EdabitsVerifier<FE>],
         r_mac: &[EdabitsVerifier<FE>],
         dabits_mac: &[DabitVerifier<FE>],
-        convert_bit_2_field_aux1: &mut Vec<MacVerifier<Gf40>>,
+        convert_bit_2_field_aux1: &mut Vec<MacVerifier<F40b>>,
         convert_bit_2_field_aux2: &mut Vec<F2>,
         e_m_batch: &mut Vec<MacVerifier<FE>>,
         ei_batch: &mut Vec<F2>,
-        random_triples: &[(MacVerifier<Gf40>, MacVerifier<Gf40>, MacVerifier<Gf40>)],
+        random_triples: &[(MacVerifier<F40b>, MacVerifier<F40b>, MacVerifier<F40b>)],
     ) -> Result<bool, Error> {
         let n = edabits_vector_mac.len();
         let nb_bits = edabits_vector_mac[0].bits.len();
