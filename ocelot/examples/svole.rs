@@ -9,7 +9,7 @@ use ocelot::svole::{
     wykw::{Receiver, Sender},
     SVoleReceiver, SVoleSender,
 };
-use scuttlebutt::{field::Gf40, AbstractChannel, AesRng};
+use scuttlebutt::{field::F40b, AbstractChannel, AesRng};
 use std::io::{Read, Write};
 use std::{
     io::{BufReader, BufWriter},
@@ -79,8 +79,8 @@ impl<S: Read + Write> AbstractChannel for OurTrackChannel<S> {
     }
 }
 
-type VSender = Sender<Gf40>;
-type VReceiver = Receiver<Gf40>;
+type VSender = Sender<F40b>;
+type VReceiver = Receiver<F40b>;
 
 // <FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>
 fn run() {

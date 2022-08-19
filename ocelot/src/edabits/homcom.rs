@@ -585,7 +585,7 @@ mod tests {
     use super::{FComProver, FComVerifier, MacProver};
     use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::{
-        field::{F61p, FiniteField, Gf40},
+        field::{F40b, F61p, FiniteField},
         AbstractChannel, AesRng, Channel,
     };
     use std::{
@@ -832,7 +832,7 @@ mod tests {
 
     #[test]
     fn test_fcom_multiplication_check_gf40() {
-        let _t = test_fcom_multiplication::<Gf40>();
+        let _t = test_fcom_multiplication::<F40b>();
     }
 
     #[test]

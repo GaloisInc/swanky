@@ -258,8 +258,8 @@ macro_rules! call_with_big_finite_fields {
         $f::<$crate::field::F61p>($($arg),*);
         $f::<$crate::field::F64b>($($arg),*);
         $f::<$crate::field::F128b>($($arg),*);
-        $f::<$crate::field::Gf40>($($arg),*);
-        $f::<$crate::field::Gf45>($($arg),*);
+        $f::<$crate::field::F40b>($($arg),*);
+        $f::<$crate::field::F45b>($($arg),*);
         $f::<$crate::field::F56b>($($arg),*);
         $f::<$crate::field::F63b>($($arg),*);
     }};
@@ -487,8 +487,7 @@ mod f64b;
 pub use f64b::F64b;
 
 mod small_binary_fields;
-// TODO: expose all these fields under the F..b naming style
-pub use small_binary_fields::{F40b as Gf40, F45b as Gf45, F56b, F63b, SmallBinaryField};
+pub use small_binary_fields::{F40b, F45b, F56b, F63b, SmallBinaryField};
 
 mod f61p;
 pub use f61p::F61p;

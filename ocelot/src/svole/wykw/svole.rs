@@ -447,9 +447,8 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 #[cfg(test)]
 mod tests {
     use super::{Receiver, SVoleReceiver, SVoleSender, Sender, LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-    use scuttlebutt::field::Gf40;
     use scuttlebutt::{
-        field::{F128b, F128p, F61p, FiniteField as FF},
+        field::{F128b, F128p, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{
@@ -551,8 +550,8 @@ mod tests {
     }
 
     #[test]
-    fn test_lpn_svole_gf40() {
-        test_lpn_svole_::<Gf40, Sender<Gf40>, Receiver<Gf40>>();
+    fn test_lpn_svole_f40b() {
+        test_lpn_svole_::<F40b, Sender<F40b>, Receiver<F40b>>();
     }
 
     #[test]
@@ -561,7 +560,7 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_svole_gf40() {
-        test_duplicate_svole_::<Gf40, Sender<Gf40>, Receiver<Gf40>>();
+    fn test_duplicate_svole_f40b() {
+        test_duplicate_svole_::<F40b, Sender<F40b>, Receiver<F40b>>();
     }
 }

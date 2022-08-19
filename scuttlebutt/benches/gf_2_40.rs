@@ -1,21 +1,21 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use scuttlebutt::{
-    field::{FiniteField, Gf40},
+    field::{F40b, FiniteField},
     AesRng,
 };
 
 fn gf_2_40_add(c: &mut Criterion) {
     c.bench_function("gf_2_40_add", |b| {
-        let x = Gf40::random(&mut rand::thread_rng());
-        let y = Gf40::random(&mut rand::thread_rng());
+        let x = F40b::random(&mut rand::thread_rng());
+        let y = F40b::random(&mut rand::thread_rng());
         b.iter(|| criterion::black_box(criterion::black_box(x) + criterion::black_box(y)));
     });
 }
 
 fn gf_2_40_mul(c: &mut Criterion) {
     c.bench_function("gf_2_40_mul", |b| {
-        let x = Gf40::random(&mut rand::thread_rng());
-        let y = Gf40::random(&mut rand::thread_rng());
+        let x = F40b::random(&mut rand::thread_rng());
+        let y = F40b::random(&mut rand::thread_rng());
         b.iter(|| criterion::black_box(criterion::black_box(x) * criterion::black_box(y)));
     });
 }
@@ -23,13 +23,13 @@ fn gf_2_40_mul(c: &mut Criterion) {
 fn gf_2_40_rand(c: &mut Criterion) {
     c.bench_function("gf_2_40_rand", |b| {
         let mut rng = AesRng::new();
-        b.iter(|| criterion::black_box(Gf40::random(&mut rng)));
+        b.iter(|| criterion::black_box(F40b::random(&mut rng)));
     });
 }
 
 fn gf_2_40_inverse(c: &mut Criterion) {
     c.bench_function("gf_2_40_inverse", |b| {
-        let x = Gf40::random(&mut rand::thread_rng());
+        let x = F40b::random(&mut rand::thread_rng());
         b.iter(|| criterion::black_box(criterion::black_box(x).inverse()));
     });
 }
