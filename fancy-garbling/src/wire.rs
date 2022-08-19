@@ -10,6 +10,7 @@
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
+use subtle::ConditionallySelectable;
 use vectoreyes::array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize};
 
 #[cfg(feature = "serde")]
@@ -154,6 +155,15 @@ pub trait WireLabel: Clone + HasModulus {
 pub struct WireMod2 {
     /// A 128-bit value.
     val: Block,
+}
+
+impl ConditionallySelectable for WireMod2 {
+    fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
+        WireMod2::from_block(
+            Block::conditional_select(&a.as_block(), &b.as_block(), choice),
+            2,
+        )
+    }
 }
 
 /// Intermediate struct to deserialize WireMod3 to

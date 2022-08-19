@@ -17,6 +17,7 @@ use scuttlebutt::{AbstractChannel, Block};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use subtle::ConditionallySelectable;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<C, RNG, Wire> {
@@ -174,20 +175,21 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
         let AD = A.plus(&D);
         let BD = B.plus(&D);
 
-        let B = if B.color() == 1 { B } else { &BD };
+        // idx is always boolean for binary gates, so it can be represented as a `u8`
+        let a_selector = (A.color() as u8).into();
+        let b_selector = (B.color() as u8).into();
 
-        let (newA, idx) = if A.color() == 1 { (A, 0) } else { (&AD, r) };
+        let B = WireMod2::conditional_select(&BD, &B, b_selector);
+        let newA = WireMod2::conditional_select(&AD, A, a_selector);
+        let idx = u8::conditional_select(&(r as u8), &0u8, a_selector);
 
-        let [hashA, hashB, hashX, hashY] = hash_wires([newA, B, &X1, &Y1], g);
+        let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
 
         let X = WireMod2::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
         let Y = WireMod2::hash_to_mod(hashY, q);
 
-        // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
-        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
-        let precomp = &[X.as_block(), X.plus(&D).as_block()];
-
-        let gate0 = hashA ^ precomp[idx as usize];
+        let gate0 =
+            hashA ^ Block::conditional_select(&X.as_block(), &X.plus(&D).as_block(), idx.into());
         let gate1 = hashB ^ Y.plus(&A).as_block();
 
         (gate0, gate1, X.plus_mov(&Y))

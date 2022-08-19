@@ -16,6 +16,7 @@ use crate::{
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
 };
 use scuttlebutt::{AbstractChannel, Block};
+use subtle::ConditionallySelectable;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -77,20 +78,16 @@ impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
         let [hashA, hashB] = hash_wires([A, B], g);
 
         // garbler's half gate
-        let L = if A.color() == 0 {
-            WireMod2::hash_to_mod(hashA, 2)
-        } else {
-            let ct_left = gate0;
-            WireMod2::from_block(*ct_left ^ hashA, 2)
-        };
+        let L = WireMod2::from_block(
+            Block::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
+            2,
+        );
 
         // evaluator's half gate
-        let R = if B.color() == 0 {
-            WireMod2::hash_to_mod(hashB, 2)
-        } else {
-            let ct_right = gate1;
-            WireMod2::from_block(*ct_right ^ hashB, 2)
-        };
+        let R = WireMod2::from_block(
+            Block::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
+            2,
+        );
 
         let res = L.plus_mov(&R.plus_mov(&A.cmul(B.color())));
         res

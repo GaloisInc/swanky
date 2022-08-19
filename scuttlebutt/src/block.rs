@@ -11,6 +11,7 @@ use crate::Aes256;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
 use std::hash::Hash;
+use subtle::ConditionallySelectable;
 use vectoreyes::{SimdBase, SimdBase8, U64x2, U8x16};
 
 // TODO: it might make sense to eliminate this type, in favor of using vectoreyes natively.
@@ -117,6 +118,12 @@ impl std::fmt::Display for Block {
             write!(f, "{:02X}", byte)?;
         }
         Ok(())
+    }
+}
+
+impl ConditionallySelectable for Block {
+    fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
+        Block(U8x16::conditional_select(&a.0, &b.0, choice))
     }
 }
 
