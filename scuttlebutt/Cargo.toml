@@ -73,25 +73,5 @@ name = "rand_aes"
 harness = false
 
 [[bench]]
-name = "prime_field"
-harness = false
-
-[[bench]]
-name = "gf_2_128"
-harness = false
-
-[[bench]]
-name = "f61p"
-harness = false
-
-[[bench]]
-name = "gf_2_45"
-harness = false
-
-[[bench]]
-name = "gf_2_40"
-harness = false
-
-[[bench]]
-name = "f2_19x3_26"
+name = "finite_fields"
 harness = false
