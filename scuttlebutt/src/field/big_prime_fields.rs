@@ -214,11 +214,18 @@ macro_rules! big_prime_field {
                     let modulus: BigUint = $modulus.parse().unwrap();
                     assert_eq!(<$num_bits as Unsigned>::U64, modulus.bits());
                 }
+                // Test that `$limbs` is correct given the modulus.
+                #[test]
+                fn test_limbs() {
+                    let modulus: BigUint = $modulus.parse().unwrap();
+                    let modulus_times_two: BigUint = modulus * 2u64;
+                    assert_eq!($limbs, (modulus_times_two.bits() as f64 / 64f64).ceil() as u64);
+                }
                 // Test that `$actual_limbs` is correct given the modulus.
                 #[test]
                 fn test_actual_limbs() {
                     let modulus: BigUint = $modulus.parse().unwrap();
-                    assert_eq!($actual_limbs, modulus.bits() / 64);
+                    assert_eq!($actual_limbs, (modulus.bits() as f64 / 64f64).ceil() as u64);
                 }
                 // Test that the `TryFrom` implementation is correct.
                 proptest! {
