@@ -64,6 +64,13 @@ finite_field_benchmarks!(f45b, scuttlebutt::field::F45b,);
 finite_field_benchmarks!(f56b, scuttlebutt::field::F56b,);
 finite_field_benchmarks!(f63b, scuttlebutt::field::F63b,);
 
+#[cfg(feature = "big-fields")]
+finite_field_benchmarks!(f384p, scuttlebutt::field::F384p,);
+#[cfg(feature = "big-fields")]
+finite_field_benchmarks!(f384q, scuttlebutt::field::F384q,);
+
+// XXX: Is there a better way to do this?
+#[cfg(not(feature = "big-fields"))]
 criterion::criterion_main!(
     f2_19x3_26::f2_19x3_26,
     f2::f2,
@@ -75,4 +82,19 @@ criterion::criterion_main!(
     f45b::f45b,
     f56b::f56b,
     f63b::f63b,
+);
+#[cfg(feature = "big-fields")]
+criterion::criterion_main!(
+    f2_19x3_26::f2_19x3_26,
+    f2::f2,
+    f61p::f61p,
+    f64b::f64b,
+    f128b::f128b,
+    f128p::f128p,
+    f40b::f40b,
+    f45b::f45b,
+    f56b::f56b,
+    f63b::f63b,
+    f384p::f384p,
+    f384q::f384q,
 );

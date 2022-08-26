@@ -11,6 +11,7 @@ edition = "2021"
 publish = false
 
 [features]
+big-fields = ["ff", "rand_chacha"]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
 serde = []
@@ -19,6 +20,7 @@ serde = []
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4", optional = true }
 rand = "0.8.5"
 rand_core = "0.6.3"
+rand_chacha = { version = "0.3.1", optional = true }
 serde = { version = "1.0.136" }
 sha2 = "0.10.2"
 subtle = "2.4.1"
@@ -30,6 +32,7 @@ bytemuck = { version = "1.8.0", features = ["derive"] }
 vectoreyes = { path = "../vectoreyes" }
 ndarray = "0.15.4"
 num-traits = "0.2.14"
+ff = { git = "https://github.com/GaloisInc/ff", rev = "cf8924ac", features = ["derive"], optional = true }
 
 
 [dev-dependencies]
