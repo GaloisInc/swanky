@@ -92,7 +92,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 sum += two.multiply_by_prime_subfield(w0);
-                channel.write_fe(w0 - w1 - *input)?;
+                channel.write_fe(&(w0 - w1 - *input))?;
             }
             w += sum * *pow;
         }
