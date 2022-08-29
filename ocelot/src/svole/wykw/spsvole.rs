@@ -51,7 +51,7 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, E
     let mut com = [0u8; 32];
     channel.read_bytes(&mut com)?;
 
-    channel.write_fe(x)?;
+    channel.write_fe(&x)?;
     channel.flush()?;
 
     let mut seed = [0u8; 32];
@@ -88,7 +88,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     }
 
     channel.write_bytes(&seed)?;
-    channel.write_fe(y)?;
+    channel.write_fe(&y)?;
     channel.flush()?;
 
     Ok(x == y)
@@ -141,7 +141,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         for (a, _) in base_uws.iter().copied() {
             let beta = FE::PrimeField::random_nonzero(&mut rng);
             let a_prime = beta - a;
-            channel.write_fe(a_prime)?;
+            channel.write_fe(&a_prime)?;
             betas.push(beta);
         }
         let distribution = Uniform::from(0..n);
@@ -215,7 +215,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             .iter()
             .zip(x_stars.iter().zip(base_xzs.iter().copied()))
         {
-            channel.write_fe(*x_star - x)?;
+            channel.write_fe(&(*x_star - x))?;
             va -= *pows * z;
         }
         channel.write_block(&seed)?;
@@ -301,7 +301,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         self.ot.send(channel, &keys, rng)?;
         for (i, gamma) in gammas.into_iter().enumerate() {
             let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
-            channel.write_fe(d)?;
+            channel.write_fe(&d)?;
         }
         channel.flush()?;
 

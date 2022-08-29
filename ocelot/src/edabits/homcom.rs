@@ -137,7 +137,7 @@ impl<FE: FiniteField> FComProver<FE> {
             let r = self.random(channel, rng)?;
             let y = x[i] - r.0;
             out.push(r.1);
-            channel.write_fe::<FE::PrimeField>(y)?;
+            channel.write_fe::<FE::PrimeField>(&y)?;
         }
         Ok(())
     }
@@ -185,7 +185,7 @@ impl<FE: FiniteField> FComProver<FE> {
             let chi = FE::random(&mut rng);
             m += chi * *x_mac;
         }
-        channel.write_fe::<FE>(m)?;
+        channel.write_fe::<FE>(&m)?;
         channel.flush()?;
         Ok(())
     }
@@ -197,7 +197,7 @@ impl<FE: FiniteField> FComProver<FE> {
     ) -> Result<(), Error> {
         let mut hasher = blake3::Hasher::new();
         for MacProver(x, _) in batch.iter() {
-            channel.write_fe::<FE::PrimeField>(*x)?;
+            channel.write_fe::<FE::PrimeField>(x)?;
             hasher.update(&x.to_bytes());
         }
 
@@ -209,7 +209,7 @@ impl<FE: FiniteField> FComProver<FE> {
             let chi = FE::random(&mut rng);
             m += chi * *x_mac;
         }
-        channel.write_fe::<FE>(m)?;
+        channel.write_fe::<FE>(&m)?;
         channel.flush()?;
 
         Ok(())
@@ -252,8 +252,8 @@ impl<FE: FiniteField> FComProver<FE> {
         let u = sum_a0 + mask_mac;
         let v = sum_a1 + mask;
 
-        channel.write_fe(u)?;
-        channel.write_fe(v)?;
+        channel.write_fe(&u)?;
+        channel.write_fe(&v)?;
         channel.flush()?;
 
         Ok(())
@@ -495,7 +495,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         triples: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
     ) -> Result<(), Error> {
         let chi = FE::random(rng);
-        channel.write_fe::<FE>(chi)?;
+        channel.write_fe::<FE>(&chi)?;
         channel.flush()?;
 
         let mut sum_b = FE::ZERO;
@@ -650,7 +650,7 @@ mod tests {
             for _ in 0..count {
                 let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
                 let cst = F61p::random(&mut rng);
-                channel.write_fe::<F61p>(cst).unwrap();
+                channel.write_fe::<F61p>(&cst).unwrap();
                 channel.flush().unwrap();
                 let m = fcom.affine_mult_cst(cst, MacProver(x, x_mac));
                 v.push(m);

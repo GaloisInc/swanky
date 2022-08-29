@@ -71,8 +71,8 @@ impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
             z += chi * w;
             x += chi.multiply_by_prime_subfield(u);
         }
-        channel.write_fe(x)?;
-        channel.write_fe(z)?;
+        channel.write_fe(&x)?;
+        channel.write_fe(&z)?;
         Ok(uws)
     }
 }

@@ -215,7 +215,7 @@ pub trait AbstractChannel {
     }
 
     /// Write a `Field element` to the channel.
-    fn write_fe<FE: FiniteField>(&mut self, x: FE) -> Result<()> {
+    fn write_fe<FE: FiniteField>(&mut self, x: &FE) -> Result<()> {
         self.write_bytes(&x.to_bytes())?;
         Ok(())
     }
