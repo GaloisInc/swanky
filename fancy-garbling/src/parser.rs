@@ -45,8 +45,9 @@ fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> 
 
 impl BinaryCircuit {
     /// Generates a new `Circuit` from file `filename`. The file must follow the
-    /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>,
-    /// otherwise a `CircuitParserError` is returned.
+    /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/old-circuits.html>,
+    /// (Bristol Format---the OLD format---not Bristol Fashion---the NEW format) otherwise
+    /// a `CircuitParserError` is returned.
     pub fn parse(filename: &str) -> Result<Self, Error> {
         let f = File::open(filename)?;
         let mut reader = BufReader::new(f);

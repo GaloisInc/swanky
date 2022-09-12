@@ -1,0 +1,32 @@
+Unit test: one-bit full-adder
+Taking the first three and last two bits of the result vector yields the following table:
+  A   B   Ci  Co  S
+  0   0   0   0   0
+  0   0   1   0   1
+  0   1   0   0   1
+  0   1   1   1   0
+  1   0   0   0   1
+  1   0   1   1   0
+  1   1   0   1   0
+  1   1   1   1   1
+Ref: https://en.wikipedia.org/wiki/Adder_(electronics)
+
+ # = wire name (zero-index)
+ [#] = gate name (one-index)
+ A, B = addends
+ S = augend
+ Ci = carry in
+ Co = carry out
+
+   A ------+--| [1]
+      0    |  |XOR-------+--| [8]
+   B ---+-----|    3     |  |XOR----------------------------- S
+      1 |  |      +---+-----|    10
+   Ci ------------+   |  |
+      2 |  |          |  +--| [3]    [4]
+        |  |          |     |AND----INV---+
+        |  |          +-----|    5       6+---| [6]    [7]
+        |  |                                  |AND----INV---- Co
+        |  +----------------| [2]    [5]  +---|    8      9
+        |                   |AND----INV---+
+        +-------------------|    4       7

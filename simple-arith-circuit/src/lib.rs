@@ -8,6 +8,7 @@
 pub mod builder;
 mod circuit;
 pub mod circuitgen;
+pub mod reader;
 #[cfg(feature = "serde")]
 mod serialization;
 
