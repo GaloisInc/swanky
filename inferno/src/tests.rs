@@ -4,7 +4,6 @@ use scuttlebutt::field::{F61p, F64b, FiniteField, F2};
 use scuttlebutt::{AesRng, Block};
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
-// use simple_logger::SimpleLogger;
 
 const N: usize = 16;
 const K: usize = 8;
@@ -71,30 +70,22 @@ test_circuits!(test_circuits_f64b, F64b);
 
 #[test]
 fn test_bristol() {
-    // SimpleLogger::new().init().unwrap();
-    let mut rng = AesRng::new();
+    let mut rng = AesRng::default();
     let base =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../simple-arith-circuit/circuits/bristol");
-    let circuits = [
-        "zero_equal.txt",
-        "neg64.txt",
-        "adder64.txt",
-        "sub64.txt",
-        "mult64.txt",
-        "udivide64.txt",
-        "mult2_64.txt",
-        "divide64.txt",
-        "aes_128.txt",
-        "aes_192.txt",
-        "aes_256.txt",
-        "sha256.txt",
-        "Keccak_f.txt",
-        "sha512.txt",
-    ];
-    for circuit in circuits {
-        eprintln!("Circuit = {circuit}");
+    for entry in base.read_dir().expect("directory should exist") {
+        let circuit = entry.unwrap().path();
+        // Skip files that don't look like bristol fashion circuits.
+        if let Some(extension) = circuit.extension() {
+            if extension != "txt" {
+                continue;
+            }
+        } else {
+            continue;
+        }
+        eprintln!("Circuit = {:?}", circuit);
         let time = std::time::Instant::now();
-        let circuit = Circuit::read_bristol_fashion(&base.join(circuit), None).unwrap();
+        let circuit = Circuit::read_bristol_fashion(&circuit, None).unwrap();
         eprintln!("Reading time: {} ms", time.elapsed().as_millis());
         let witness: Vec<F2> = (0..circuit.ninputs())
             .map(|_| F2::random(&mut rng))
