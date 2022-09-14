@@ -1,8 +1,5 @@
-use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, SamplingMode,
-};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use inferno::Proof;
-use rand::SeedableRng;
 use scuttlebutt::field::{F61p, F64b, FiniteField};
 use scuttlebutt::AesRng;
 use std::time::Duration;
@@ -14,7 +11,6 @@ const MAX: usize = 14;
 
 fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
     let mut group = c.benchmark_group(group);
-    group.sampling_mode(SamplingMode::Flat);
     for size in (MIN..=MAX).map(|p| 2usize.pow(p as u32)) {
         let input_size = 256;
         let circuit_size = size + 2;
@@ -24,7 +20,7 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
             group.bench_with_input(BenchmarkId::new(title, size), &size, |b, _| {
                 b.iter_batched_ref(
                     || {
-                        let mut rng = AesRng::from_entropy();
+                        let mut rng = AesRng::default();
 
                         let (circuit, witness) =
                             simple_arith_circuit::circuitgen::mul_zero_circuit::<
@@ -44,7 +40,7 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
             group.bench_with_input(BenchmarkId::new(title, size), &size, |b, _| {
                 b.iter_batched_ref(
                     || {
-                        let mut rng = AesRng::from_entropy();
+                        let mut rng = AesRng::default();
 
                         let (circuit, witness) =
                             simple_arith_circuit::circuitgen::mul_zero_circuit::<

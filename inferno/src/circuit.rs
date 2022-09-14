@@ -1,4 +1,4 @@
-use crate::secretsharing::{AbstractSharing, SecretSharing, Sharing};
+use crate::secretsharing::{CorrectionSharing, LinearSharing, SecretSharing};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::{Circuit, Op};
@@ -16,9 +16,9 @@ pub trait CircuitEvaluator<F: FiniteField, const N: usize> {
 
     fn eval_trace(
         &self,
-        inputs: &[Sharing<F, N>],
-        mults: &[Sharing<F, N>],
-    ) -> (Vec<Sharing<F, N>>, Vec<Sharing<F, N>>);
+        inputs: &[CorrectionSharing<F, N>],
+        mults: &[CorrectionSharing<F, N>],
+    ) -> (Vec<CorrectionSharing<F, N>>, Vec<CorrectionSharing<F, N>>);
 }
 
 impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
@@ -72,9 +72,9 @@ impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
     /// gate outputs. The output is sharings of the _inputs_ to the multiplication gates.
     fn eval_trace(
         &self,
-        inputs: &[Sharing<F, N>],
-        mults: &[Sharing<F, N>],
-    ) -> (Vec<Sharing<F, N>>, Vec<Sharing<F, N>>) {
+        inputs: &[CorrectionSharing<F, N>],
+        mults: &[CorrectionSharing<F, N>],
+    ) -> (Vec<CorrectionSharing<F, N>>, Vec<CorrectionSharing<F, N>>) {
         assert_eq!(inputs.len(), self.ninputs());
         assert_eq!(mults.len(), self.nmuls());
 
@@ -101,7 +101,7 @@ impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
                     index += 1;
                     z
                 }
-                Op::Constant(f) => Sharing::new_non_random(f),
+                Op::Constant(f) => CorrectionSharing::new_non_random(f),
                 Op::Copy(n) => circuit[n],
             };
             circuit.push(res);

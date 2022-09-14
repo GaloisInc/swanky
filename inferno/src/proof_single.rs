@@ -2,7 +2,7 @@
 use crate::{
     cache::Cache,
     circuit::CircuitEvaluator,
-    secretsharing::{AbstractSharing, SecretSharing, Sharing},
+    secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
 use blake3::{Hash, Hasher, OutputReader};
 use rand::{Rng, SeedableRng};
@@ -64,13 +64,13 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
 pub struct OutputShares<F: FiniteField, const N: usize> {
     // TODO: We can make these serialize smaller by doing a manual vector serialization.
     #[serde(bound = "")]
-    fs: Vec<Sharing<F, N>>,
+    fs: Vec<CorrectionSharing<F, N>>,
     #[serde(bound = "")]
-    gs: Vec<Sharing<F, N>>,
+    gs: Vec<CorrectionSharing<F, N>>,
     #[serde(bound = "")]
-    h: Sharing<F, N>,
+    h: CorrectionSharing<F, N>,
     #[serde(bound = "")]
-    output: Sharing<F::PrimeField, N>,
+    output: CorrectionSharing<F::PrimeField, N>,
 }
 
 impl<F: FiniteField, const N: usize> OutputShares<F, N> {
@@ -104,7 +104,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     }
 
     // Verify that the shares in `round` are valid for all parties except the party matching index `id`.
-    fn verify_shares(&self, round: Round<Sharing<F, N>>, id: usize) -> bool {
+    fn verify_shares(&self, round: Round<CorrectionSharing<F, N>>, id: usize) -> bool {
         assert!(id < N);
         for (f, f_) in self.fs.iter().zip(round.xs.iter()) {
             if !f.check_equality(f_, id) {
@@ -139,9 +139,9 @@ pub struct OpenedParties<F: FiniteField, const N: usize> {
     #[serde(bound = "", with = "serde_vec")]
     mults: Vec<F::PrimeField>,
     #[serde(bound = "")]
-    hs: Vec<Vec<Sharing<F, N>>>,
+    hs: Vec<Vec<CorrectionSharing<F, N>>>,
     #[serde(bound = "")]
-    rands: Vec<(Sharing<F, N>, Sharing<F, N>)>,
+    rands: Vec<(CorrectionSharing<F, N>, CorrectionSharing<F, N>)>,
 }
 
 impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
@@ -164,16 +164,20 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
             .unwrap();
         let mut hashers = Hashers::<N>::new();
         // Reconstruct the witness from the correction values and rng seeds.
-        let witness: Vec<Sharing<F::PrimeField, N>> = self
+        let witness: Vec<CorrectionSharing<F::PrimeField, N>> = self
             .witness
             .iter()
-            .map(|correction| Sharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs))
+            .map(|correction| {
+                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
+            })
             .collect();
         // Reconstruct the multiplication values from the correction values and rng seeds.
-        let mults: Vec<Sharing<F::PrimeField, N>> = self
+        let mults: Vec<CorrectionSharing<F::PrimeField, N>> = self
             .mults
             .iter()
-            .map(|correction| Sharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs))
+            .map(|correction| {
+                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
+            })
             .collect();
         hashers.hash_round0(&witness, &mults);
         let c = hashers.extract_challenge(Some((unopened.id, Hash::from(unopened.commitments[0]))));
@@ -513,7 +517,7 @@ impl<F: FiniteField, const N: usize> ProverSingle<F, N> {
 }
 
 // This round is shared between the prover and verifier, hence why it exists as a standalone function.
-fn round1<S: AbstractSharing<F, N>, F: FiniteField, const N: usize>(
+fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
     round0: &Round<S::SelfWithPrimeField>,
     mults: &[S::SelfWithPrimeField],
     challenge: F,
@@ -543,7 +547,7 @@ fn round1<S: AbstractSharing<F, N>, F: FiniteField, const N: usize>(
 }
 
 // This round is shared between the prover and verifier, hence why it exists as a standalone function.
-fn round_compress_finish<S: AbstractSharing<F, N>, F: FiniteField, const N: usize>(
+fn round_compress_finish<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
     input: &Round<S>,
     rands: &[(S, S)],
     hs: &[S],
@@ -745,11 +749,11 @@ impl<const N: usize> Hashers<N> {
     }
 
     #[inline]
-    pub fn hash_sharing<S: AbstractSharing<F, N>, F: FiniteField>(&mut self, share: &S) {
+    pub fn hash_sharing<S: LinearSharing<F, N>, F: FiniteField>(&mut self, share: &S) {
         share.hash(&mut self.0)
     }
 
-    pub fn hash_round0<S: AbstractSharing<F, N>, F: FiniteField>(&mut self, ws: &[S], zs: &[S]) {
+    pub fn hash_round0<S: LinearSharing<F, N>, F: FiniteField>(&mut self, ws: &[S], zs: &[S]) {
         for w in ws.iter() {
             self.hash_sharing(w);
         }
@@ -758,7 +762,7 @@ impl<const N: usize> Hashers<N> {
         }
     }
 
-    fn hash_round<S: AbstractSharing<F, N>, F: FiniteField>(&mut self, hs: &[S]) {
+    fn hash_round<S: LinearSharing<F, N>, F: FiniteField>(&mut self, hs: &[S]) {
         for h in hs.iter() {
             h.hash(&mut self.0);
         }

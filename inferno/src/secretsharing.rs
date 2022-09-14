@@ -4,7 +4,9 @@ use scuttlebutt::field::polynomial::{lagrange_denominator, lagrange_numerator};
 use scuttlebutt::field::serialization::{FiniteFieldDeserializer, FiniteFieldSerializer};
 use scuttlebutt::field::{FiniteField, IsSubfieldOf};
 
-pub trait AbstractSharing<F: FiniteField, const N: usize>:
+/// This trait defines an `N`-party linear secret sharing scheme
+/// over finite field `F`.
+pub trait LinearSharing<F: FiniteField, const N: usize>:
     'static
     + Default
     + Sized
@@ -15,12 +17,14 @@ pub trait AbstractSharing<F: FiniteField, const N: usize>:
     + std::ops::Mul<F, Output = Self>
     + std::ops::AddAssign<Self>
 {
-    type SelfWithPrimeField;
-
+    /// The type denoting a sharing of `F::PrimeField`.
+    type SelfWithPrimeField: LinearSharing<F::PrimeField, N>;
+    /// Generate a new sharing of `secret`, where each share is generated
+    /// using it's corresponding RNG provided in `rngs`.
     fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self;
-
+    /// Generate a _non-random_ sharing of `secret`.
     fn new_non_random(secret: F) -> Self;
-
+    /// Hash each individual share into its associated `Hasher`.
     fn hash(&self, hashers: &mut [Hasher]);
 
     fn lift_into_superfield(x: &Self::SelfWithPrimeField) -> Self;
@@ -55,7 +59,7 @@ impl<F: FiniteField> LagrangeEvaluator<F> {
 
     /// Evaluate the Lagrange polynomial using the pre-computed polynomial.
     #[inline]
-    pub fn eval_with_basis_polynomial<S: AbstractSharing<F, N>, const N: usize>(
+    pub fn eval_with_basis_polynomial<S: LinearSharing<F, N>, const N: usize>(
         &self,
         coefficients: &[S],
         polynomial: &[F],
@@ -68,15 +72,16 @@ impl<F: FiniteField> LagrangeEvaluator<F> {
     }
 }
 
-/// A sharing which does not contain its underlying secret.
+/// A sharing with a separate correction value which, when all summed together, equals the
+/// underlying secret.
 #[derive(Debug, Clone, Copy, Hash)]
-pub struct Sharing<F: FiniteField, const N: usize> {
+pub struct CorrectionSharing<F: FiniteField, const N: usize> {
     shares: [F; N],
     correction: F,
 }
 
-impl<F: FiniteField, const N: usize> AbstractSharing<F, N> for Sharing<F, N> {
-    type SelfWithPrimeField = Sharing<F::PrimeField, N>;
+impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F, N> {
+    type SelfWithPrimeField = CorrectionSharing<F::PrimeField, N>;
 
     #[inline]
     fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self {
@@ -125,7 +130,7 @@ impl<F: FiniteField, const N: usize> AbstractSharing<F, N> for Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> Sharing<F, N> {
+impl<F: FiniteField, const N: usize> CorrectionSharing<F, N> {
     pub fn check_equality(&self, other: &Self, id: usize) -> bool {
         assert!(id < N);
         for i in 0..N {
@@ -152,7 +157,7 @@ impl<F: FiniteField, const N: usize> Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> std::ops::Add for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> std::ops::Add for CorrectionSharing<F, N> {
     type Output = Self;
 
     #[inline]
@@ -168,7 +173,7 @@ impl<F: FiniteField, const N: usize> std::ops::Add for Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> std::ops::Sub for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> std::ops::Sub for CorrectionSharing<F, N> {
     type Output = Self;
 
     #[inline]
@@ -184,7 +189,7 @@ impl<F: FiniteField, const N: usize> std::ops::Sub for Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> std::ops::AddAssign for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> std::ops::AddAssign for CorrectionSharing<F, N> {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         for i in 0..N {
@@ -194,7 +199,7 @@ impl<F: FiniteField, const N: usize> std::ops::AddAssign for Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> std::ops::Mul<F> for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> std::ops::Mul<F> for CorrectionSharing<F, N> {
     type Output = Self;
 
     #[inline]
@@ -206,7 +211,7 @@ impl<F: FiniteField, const N: usize> std::ops::Mul<F> for Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> Default for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> Default for CorrectionSharing<F, N> {
     fn default() -> Self {
         Self {
             shares: [F::ZERO; N],
@@ -215,7 +220,7 @@ impl<F: FiniteField, const N: usize> Default for Sharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> serde::Serialize for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> serde::Serialize for CorrectionSharing<F, N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::Error;
         use serde::ser::SerializeTupleStruct;
@@ -238,7 +243,7 @@ impl<F: FiniteField, const N: usize> serde::Serialize for Sharing<F, N> {
     }
 }
 
-impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Sharing<F, N> {
+impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for CorrectionSharing<F, N> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -248,7 +253,7 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Sharing<F,
         }
 
         impl<'de, F: FiniteField, const N: usize> serde::de::Visitor<'de> for MyVisitor<F, N> {
-            type Value = Sharing<F, N>;
+            type Value = CorrectionSharing<F, N>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(
@@ -278,7 +283,7 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Sharing<F,
                 let mut cursor = std::io::Cursor::new(&bytes);
                 let mut de = F::Deserializer::new(&mut cursor).map_err(|e| Error::custom(e))?;
 
-                let mut shares = Sharing::<F, N>::default();
+                let mut shares = CorrectionSharing::<F, N>::default();
                 for (_i, share) in shares.shares.iter_mut().enumerate() {
                     *share = de.read(&mut cursor).map_err(|e| Error::custom(e))?;
                 }
@@ -297,20 +302,20 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Sharing<F,
     }
 }
 
-/// A sharing along with its secret.
+/// A `CorrectionSharing` along with its secret.
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct SecretSharing<F: FiniteField, const N: usize> {
-    shares: Sharing<F, N>,
+    shares: CorrectionSharing<F, N>,
     secret: F,
 }
 
-impl<F: FiniteField, const N: usize> AbstractSharing<F, N> for SecretSharing<F, N> {
+impl<F: FiniteField, const N: usize> LinearSharing<F, N> for SecretSharing<F, N> {
     type SelfWithPrimeField = SecretSharing<F::PrimeField, N>;
 
     #[inline]
     fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self {
         Self {
-            shares: Sharing::new(secret, rngs),
+            shares: CorrectionSharing::new(secret, rngs),
             secret,
         }
     }
@@ -318,7 +323,7 @@ impl<F: FiniteField, const N: usize> AbstractSharing<F, N> for SecretSharing<F, 
     #[inline]
     fn new_non_random(secret: F) -> Self {
         Self {
-            shares: Sharing::new_non_random(secret),
+            shares: CorrectionSharing::new_non_random(secret),
             secret,
         }
     }
@@ -331,7 +336,7 @@ impl<F: FiniteField, const N: usize> AbstractSharing<F, N> for SecretSharing<F, 
     #[inline]
     fn lift_into_superfield(x: &SecretSharing<F::PrimeField, N>) -> Self {
         Self {
-            shares: Sharing::lift_into_superfield(&x.shares),
+            shares: CorrectionSharing::lift_into_superfield(&x.shares),
             secret: x.secret.lift_into_superfield(),
         }
     }
@@ -339,7 +344,7 @@ impl<F: FiniteField, const N: usize> AbstractSharing<F, N> for SecretSharing<F, 
     #[inline]
     fn multiply_by_superfield(x: &Self::SelfWithPrimeField, y: F) -> Self {
         Self {
-            shares: Sharing::multiply_by_superfield(&x.shares, y),
+            shares: CorrectionSharing::multiply_by_superfield(&x.shares, y),
             secret: y.multiply_by_prime_subfield(x.secret),
         }
     }
@@ -355,7 +360,7 @@ impl<F: FiniteField, const N: usize> SecretSharing<F, N> {
             secret += *share;
         }
         Self {
-            shares: Sharing {
+            shares: CorrectionSharing {
                 shares,
                 correction: F::ZERO,
             },
@@ -374,15 +379,11 @@ impl<F: FiniteField, const N: usize> SecretSharing<F, N> {
     }
 
     #[inline]
-    pub fn extract(&self, id: usize) -> Sharing<F, N> {
+    pub fn extract(&self, id: usize) -> CorrectionSharing<F, N> {
         debug_assert!(id < N);
-        let mut arr = [F::ZERO; N];
-        for i in 0..N {
-            if i != id {
-                arr[i] = self.shares.shares[i];
-            }
-        }
-        Sharing {
+        let mut arr = self.shares.shares;
+        arr[id] = F::ZERO;
+        CorrectionSharing {
             shares: arr,
             correction: self.shares.correction,
         }
@@ -390,11 +391,10 @@ impl<F: FiniteField, const N: usize> SecretSharing<F, N> {
 
     #[inline]
     pub fn dot(xs: &[Self], ys: &[Self]) -> F {
-        let mut sum = F::ZERO;
-        for (x, y) in xs.iter().zip(ys.iter()) {
-            sum += x.secret * y.secret
-        }
-        sum
+        xs.iter()
+            .zip(ys.iter())
+            .map(|(x, y)| x.secret * y.secret)
+            .sum::<F>()
     }
 }
 
@@ -451,7 +451,7 @@ impl<F: FiniteField, const N: usize> Default for SecretSharing<F, N> {
     }
 }
 
-impl<F: FiniteField, const N: usize> From<SecretSharing<F, N>> for Sharing<F, N> {
+impl<F: FiniteField, const N: usize> From<SecretSharing<F, N>> for CorrectionSharing<F, N> {
     fn from(s: SecretSharing<F, N>) -> Self {
         s.shares
     }
@@ -551,9 +551,9 @@ mod tests {
                         .collect::<Vec<AesRng>>()
                         .try_into()
                         .unwrap();
-                    let sharing = Sharing::<$field, N>::new(a, &mut rngs);
+                    let sharing = CorrectionSharing::<$field, N>::new(a, &mut rngs);
                     let ser = serde_json::to_string(&sharing).unwrap();
-                    let sharing_: Sharing<$field, N> = serde_json::from_str(&ser).unwrap();
+                    let sharing_: CorrectionSharing<$field, N> = serde_json::from_str(&ser).unwrap();
                     for (a, b) in sharing.shares.iter().zip(sharing_.shares.iter()) {
                         assert_eq!(a, b);
                     }
@@ -569,9 +569,9 @@ mod tests {
                         .collect::<Vec<AesRng>>()
                         .try_into()
                         .unwrap();
-                    let sharing = Sharing::<$field, N>::new(a, &mut rngs);
+                    let sharing = CorrectionSharing::<$field, N>::new(a, &mut rngs);
                     let ser = bincode::serialize(&sharing).unwrap();
-                    let sharing_: Sharing<$field, N> = bincode::deserialize(&ser).unwrap();
+                    let sharing_: CorrectionSharing<$field, N> = bincode::deserialize(&ser).unwrap();
                     for (a, b) in sharing.shares.iter().zip(sharing_.shares.iter()) {
                         assert_eq!(a, b);
                     }
@@ -584,9 +584,9 @@ mod tests {
                     let mut rng = AesRng::from_seed(seed);
                     let mut rngs: [AesRng; N] = (0..N)
                     .map(|_| rng.fork()).collect::<Vec<AesRng>>().try_into().unwrap();
-                    let vec: Vec<Sharing<$field, N>> = (0..100).map(|_| Sharing::<$field, N>::new(a, &mut rngs)).collect();
+                    let vec: Vec<CorrectionSharing<$field, N>> = (0..100).map(|_| CorrectionSharing::<$field, N>::new(a, &mut rngs)).collect();
                     let ser = bincode::serialize(&vec).unwrap();
-                    let vec_: Vec<Sharing<$field, N>> = bincode::deserialize(&ser).unwrap();
+                    let vec_: Vec<CorrectionSharing<$field, N>> = bincode::deserialize(&ser).unwrap();
                     for (a, b) in vec.iter().zip(vec_.iter()) {
                         for (x, y) in a.shares.iter().zip(b.shares.iter()) {
                             assert_eq!(x, y);
