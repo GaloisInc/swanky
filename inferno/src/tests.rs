@@ -16,7 +16,7 @@ fn test<F: FiniteField>(
 ) {
     let proof = Proof::<F, N>::prove(&circuit, &witness, K, T, rng);
     let res = proof.verify(&circuit, K, T);
-    assert_eq!(res, true);
+    assert!(res.is_ok());
 }
 
 fn any_seed() -> impl Strategy<Value = Block> {

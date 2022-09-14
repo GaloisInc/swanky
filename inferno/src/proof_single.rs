@@ -4,6 +4,7 @@ use crate::{
     circuit::CircuitEvaluator,
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
+use anyhow::anyhow;
 use blake3::{Hash, Hasher, OutputReader};
 use rand::{Rng, SeedableRng};
 use scuttlebutt::field::serialization::serde_vec;
@@ -43,15 +44,14 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         cache: &Cache<F>,
-    ) -> bool {
-        self.output.verify()
-            && self.shares.verify(
-                circuit,
-                &self.output,
-                &self.unopened,
-                compression_factor,
-                cache,
-            )
+    ) -> anyhow::Result<()> {
+        self.output.verify().and(self.shares.verify(
+            circuit,
+            &self.output,
+            &self.unopened,
+            compression_factor,
+            cache,
+        ))
     }
 }
 
@@ -88,43 +88,42 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     // Verify that the prover output is valid. This involes the following checks:
     // 1. The `output` shares reconstruct to `1`.
     // 2. The `fs` and `gs` shares dot product to `h`.
-    pub fn verify(&self) -> bool {
+    pub fn verify(&self) -> anyhow::Result<()> {
         let output = self.output.reconstruct();
         if output != F::PrimeField::ZERO {
-            log::error!("Verify failed: Output not equal to zero");
-            return false;
+            return Err(anyhow!("Output not equal to zero"));
         }
         let mut sum = F::ZERO;
         for (f, g) in self.fs.iter().zip(self.gs.iter()) {
             sum += f.reconstruct() * g.reconstruct();
         }
         if sum != self.h.reconstruct() {
-            log::error!("Verify failed: Dot product not equal to `h`");
-            return false;
+            return Err(anyhow!("Dot product not equal to `h`"));
         }
-        true
+        Ok(())
     }
 
     // Verify that the shares in `round` are valid for all parties except the party matching index `id`.
-    fn verify_shares(&self, round: Round<CorrectionSharing<F, N>>, id: usize) -> bool {
+    fn verify_shares(
+        &self,
+        round: Round<CorrectionSharing<F, N>>,
+        id: usize,
+    ) -> anyhow::Result<()> {
         assert!(id < N);
         for (f, f_) in self.fs.iter().zip(round.xs.iter()) {
             if !f.check_equality(f_, id) {
-                log::debug!("Verify failed: `f` shares not equal");
-                return false;
+                return Err(anyhow!("`f` shares not equal"));
             }
         }
         for (g, g_) in self.gs.iter().zip(round.ys.iter()) {
             if !g.check_equality(g_, id) {
-                log::debug!("Verify failed: `g` shares not equal");
-                return false;
+                return Err(anyhow!("`g` shares not equal"));
             }
         }
         if !self.h.check_equality(&round.z.unwrap(), id) {
-            log::debug!("Verify failed: `h` shares not equal");
-            return false;
+            return Err(anyhow!("`h` shares not equal"));
         }
-        true
+        Ok(())
     }
 }
 
@@ -157,7 +156,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
         unopened: &UnopenedParty,
         compression_factor: usize,
         cache: &Cache<F>,
-    ) -> bool {
+    ) -> anyhow::Result<()> {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
         let mut rngs: [AesRng; N] = self
             .seeds
@@ -233,7 +232,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
         let id = hashers.extract_unopened_party(Some((unopened.id, Hash::from(unopened.trace))), N);
         log::debug!("Party ID: {id}");
         if id != unopened.id {
-            return false;
+            return Err(anyhow!("Incorrect party ID encountered"));
         }
         // Now check that `round` was computed correctly.
         output.verify_shares(round, id)
@@ -805,7 +804,7 @@ mod tests {
                     let serialized = bincode::serialize(&proof).unwrap();
                     let proof: ProofSingle<$field, N> = bincode::deserialize(&serialized).unwrap();
                     let cache = crate::cache::Cache::new(&circuit, K, false);
-                    assert_eq!(proof.verify(&circuit, K, &cache), true);
+                    assert!(proof.verify(&circuit, K, &cache).is_ok());
                 }
                 }
             }

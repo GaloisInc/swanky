@@ -74,7 +74,7 @@ fn prover<F: FiniteField>(args: Args) {
     if !args.prover_only {
         log::info!("Running verifier");
         let result = proof.verify(&circuit, K, T);
-        if result {
+        if result.is_ok() {
             println!("Verifier succeeded!");
         } else {
             println!("Verifier failed?!");
@@ -101,7 +101,7 @@ fn verifier<F: FiniteField>(filename: &Path) {
 
     log::info!("Running verifier");
     let result = proof.verify(&circuit, K, T);
-    if result {
+    if result.is_ok() {
         println!("Verifier succeeded!");
     } else {
         println!("Verifier failed?!");

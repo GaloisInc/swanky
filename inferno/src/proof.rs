@@ -1,5 +1,6 @@
 use crate::cache::Cache;
 use crate::proof_single::{ProofSingle, ProverSingle};
+use anyhow::anyhow;
 use rayon::prelude::*;
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::AesRng;
@@ -60,32 +61,34 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         repetitions: usize,
-    ) -> bool {
+    ) -> anyhow::Result<()> {
         assert_eq!(circuit.noutputs(), 1);
         let time = std::time::Instant::now();
         let cache = Cache::new(circuit, compression_factor, false);
         if self.proofs.len() != repetitions {
-            log::debug!("Verify failed: Invalid number of repetitions");
-            return false;
+            return Err(anyhow!("Invalid number of repetitions"));
         }
-        let result = self
+        let results: Vec<anyhow::Result<()>> = self
             .proofs
             .par_iter()
             .enumerate()
             .map(|(i, proof)| {
                 let time_ = std::time::Instant::now();
                 log::debug!("Checking proof #{}", i + 1);
-                if !proof.verify(circuit, compression_factor, &cache) {
-                    log::debug!("Verifying proof #{} failed!", i + 1);
-                    return false;
+                if let Err(e) = proof.verify(circuit, compression_factor, &cache) {
+                    return Err(anyhow!("Proof #{} failed: {}", i + 1, e));
                 }
                 log::debug!("Verifying proof #{} succeeded.", i + 1);
                 log::info!("Proof #{} verification time: {:?}", i + 1, time_.elapsed());
-                true
+                Ok(())
             })
-            .all(|r| r);
+            .collect();
         log::info!("Verification time: {:?}", time.elapsed());
-        result
+        if let Some(err) = results.into_iter().find_map(|r| r.err()) {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -119,7 +122,7 @@ mod tests {
                     let proof = Proof::<$field, N>::prove(&circuit, &witness, K, T, &mut rng);
                     let serialized = bincode::serialize(&proof).unwrap();
                     let proof: Proof<$field, N> = bincode::deserialize(&serialized).unwrap();
-                    assert_eq!(proof.verify(&circuit, K, T), true);
+                    assert!(proof.verify(&circuit, K, T).is_ok());
                 }
                 }
             }
