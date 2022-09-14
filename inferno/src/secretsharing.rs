@@ -25,7 +25,7 @@ pub trait LinearSharing<F: FiniteField, const N: usize>:
     /// Generate a _non-random_ sharing of `secret`.
     fn new_non_random(secret: F) -> Self;
     /// Hash each individual share into its associated `Hasher`.
-    fn hash(&self, hashers: &mut [Hasher]);
+    fn hash(&self, hashers: &mut [Hasher; N]);
 
     fn lift_into_superfield(x: &Self::SelfWithPrimeField) -> Self;
 
@@ -107,7 +107,7 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F
     }
 
     #[inline]
-    fn hash(&self, hashers: &mut [Hasher]) {
+    fn hash(&self, hashers: &mut [Hasher; N]) {
         for (h, s) in hashers.iter_mut().zip(self.shares) {
             h.update(&s.to_bytes());
         }
@@ -329,7 +329,7 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for SecretSharing<F, N>
     }
 
     #[inline]
-    fn hash(&self, hashers: &mut [Hasher]) {
+    fn hash(&self, hashers: &mut [Hasher; N]) {
         self.shares.hash(hashers)
     }
 

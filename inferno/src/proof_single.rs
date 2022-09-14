@@ -13,10 +13,12 @@ use simple_arith_circuit::Circuit;
 
 // The output of each compression round.
 struct Round<F> {
-    pub xs: Vec<F>,
-    pub ys: Vec<F>,
+    xs: Vec<F>,
+    ys: Vec<F>,
     // The dot product of `xs` and `ys`, when we need it.
-    pub z: Option<F>,
+    // The value is `None` when starting a compression round,
+    // and `Some` when ending a compression round.
+    z: Option<F>,
 }
 
 /// The proof for a single execution of the protocol. This contains:
@@ -131,6 +133,8 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
 pub struct OpenedParties<F: FiniteField, const N: usize> {
     // The RNG seeds used for each party, with the seed of the unopened party
     // zero-ed out.
+    // XXX: This is a `Vec<u128>` instead of a `[u128; N]` because deriving
+    // `Deserialize` on `[u812; N]` is problematic.
     seeds: Vec<u128>,
     // The correction values for the witness
     #[serde(bound = "", with = "serde_vec")]
