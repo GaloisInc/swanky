@@ -8,6 +8,7 @@ use crate::{
     check_binary,
     errors::{FancyError, GarblerError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyReveal},
+    hash_wires,
     util::{output_tweak, tweak, tweak2, RngExt},
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireLabel, WireMod2,
 };
@@ -16,6 +17,7 @@ use scuttlebutt::{AbstractChannel, Block};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use subtle::ConditionallySelectable;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<C, RNG, Wire> {
@@ -164,34 +166,31 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = A.color(); // alpha = -A.color
-        let X = A
-            .plus(&D.cmul(alpha))
-            .hashback(g, q)
-            .plus_mov(&D.cmul(alpha * r % q));
+        let X1 = A.plus(&D.cmul(alpha));
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (q - B.color()) % q;
-        let Y = B.plus(&D.cmul(beta)).hashback(g, q);
+        let Y1 = B.plus(&D.cmul(beta));
 
-        // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
-        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
-        let precomp = &[X.as_block(), X.plus(&D).as_block()];
+        let AD = A.plus(&D);
+        let BD = B.plus(&D);
 
-        let gate0 = if A.color() == 1 {
-            A.hash(g) ^ precomp[0]
-        } else {
-            A.plus(&D).hash(g) ^ precomp[r as usize]
-        };
+        // idx is always boolean for binary gates, so it can be represented as a `u8`
+        let a_selector = (A.color() as u8).into();
+        let b_selector = (B.color() as u8).into();
 
-        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
-        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
-        let precomp = &[Y.as_block(), Y.plus(&A).as_block()];
+        let B = WireMod2::conditional_select(&BD, &B, b_selector);
+        let newA = WireMod2::conditional_select(&AD, A, a_selector);
+        let idx = u8::conditional_select(&(r as u8), &0u8, a_selector);
 
-        let gate1 = if B.color() == 1 {
-            B.hash(g) ^ precomp[r as usize]
-        } else {
-            B.plus(&D).hash(g) ^ precomp[((1 + r) % 2) as usize]
-        };
+        let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
+
+        let X = WireMod2::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
+        let Y = WireMod2::hash_to_mod(hashY, q);
+
+        let gate0 =
+            hashA ^ Block::conditional_select(&X.as_block(), &X.plus(&D).as_block(), idx.into());
+        let gate1 = hashB ^ Y.plus(&A).as_block();
 
         (gate0, gate1, X.plus_mov(&Y))
     }
@@ -342,17 +341,16 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
 
         // X = H(A+aD) + arD such that a + A.color == 0
         let alpha = (q - A.color()) % q; // alpha = -A.color
-        let X = A
-            .plus(&D.cmul(alpha))
-            .hashback(g, q)
-            .plus_mov(&D.cmul(alpha * r % q));
+        let X1 = A.plus(&D.cmul(alpha));
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
         let beta = (qb - B.color()) % qb;
-        let Y = B
-            .plus(&Db.cmul(beta))
-            .hashback(g, q)
-            .plus_mov(&A.cmul((beta + r) % q));
+        let Y1 = B.plus(&Db.cmul(beta));
+
+        let [hashX, hashY] = hash_wires([&X1, &Y1], g);
+
+        let X = Wire::hash_to_mod(hashX, q).plus_mov(&D.cmul(alpha * r % q));
+        let Y = Wire::hash_to_mod(hashY, q).plus_mov(&A.cmul((beta + r) % q));
 
         let mut precomp = Vec::with_capacity(q as usize);
         // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
@@ -364,6 +362,9 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
             precomp.push(X_.as_block());
         }
 
+        // We can vectorize the hashes here too, but then we need to precompute all `q` sums of A
+        // with delta [A, A + D, A + D + D, etc.]
+        // Would probably need another alloc which isn't great
         let mut A_ = A.clone();
         for a in 0..q {
             if a > 0 {
@@ -387,6 +388,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
             precomp.push(Y_.as_block());
         }
 
+        // Same note about vectorization as A
         let mut B_ = B.clone();
         for b in 0..qb {
             if b > 0 {

@@ -29,11 +29,11 @@ fn bench_aes_encrypt(c: &mut Criterion) {
 }
 
 fn bench_aes_encrypt8(c: &mut Criterion) {
-    c.bench_function("Aes128::encrypt8", |b| {
+    c.bench_function("Aes128::encrypt_blocks<8>", |b| {
         let aes = Aes128::new(rand::random::<Block>());
         let blocks = rand::random::<[Block; 8]>();
         b.iter(|| {
-            let c = aes.encrypt8(black_box(blocks));
+            let c = aes.encrypt_blocks(black_box(blocks));
             black_box(c)
         });
     });

@@ -10,11 +10,13 @@ use crate::{
     check_binary,
     errors::{EvaluatorError, FancyError},
     fancy::{Fancy, FancyReveal},
+    hash_wires,
     util::{output_tweak, tweak, tweak2},
     wire::WireLabel,
     AllWire, ArithmeticWire, FancyArithmetic, FancyBinary, HasModulus, WireMod2,
 };
 use scuttlebutt::{AbstractChannel, Block};
+use subtle::ConditionallySelectable;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -73,21 +75,19 @@ impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
+        let [hashA, hashB] = hash_wires([A, B], g);
+
         // garbler's half gate
-        let L = if A.color() == 0 {
-            A.hashback(g, 2)
-        } else {
-            let ct_left = gate0;
-            WireMod2::from_block(*ct_left ^ A.hash(g), 2)
-        };
+        let L = WireMod2::from_block(
+            Block::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
+            2,
+        );
 
         // evaluator's half gate
-        let R = if B.color() == 0 {
-            B.hashback(g, 2)
-        } else {
-            let ct_right = gate1;
-            WireMod2::from_block(*ct_right ^ B.hash(g), 2)
-        };
+        let R = WireMod2::from_block(
+            Block::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
+            2,
+        );
 
         let res = L.plus_mov(&R.plus_mov(&A.cmul(B.color())));
         res
@@ -188,23 +188,26 @@ impl<C: AbstractChannel, Wire: WireLabel + ArithmeticWire> FancyArithmetic for E
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
+        let [hashA, hashB] = hash_wires([A, B], g);
+
         // garbler's half gate
         let L = if A.color() == 0 {
-            A.hashback(g, q)
+            Wire::hash_to_mod(hashA, q)
         } else {
             let ct_left = gate[A.color() as usize - 1];
-            Wire::from_block(ct_left ^ A.hash(g), q)
+            Wire::from_block(ct_left ^ hashA, q)
         };
 
         // evaluator's half gate
         let R = if B.color() == 0 {
-            B.hashback(g, q)
+            Wire::hash_to_mod(hashB, q)
         } else {
             let ct_right = gate[(q + B.color()) as usize - 2];
-            Wire::from_block(ct_right ^ B.hash(g), q)
+            Wire::from_block(ct_right ^ hashB, q)
         };
 
         // hack for unequal mods
+        // TODO: Batch this with original hash if unequal.
         let new_b_color = if unequal {
             let minitable = *gate.last().unwrap();
             let ct = u128::from(minitable) >> (B.color() * 16);

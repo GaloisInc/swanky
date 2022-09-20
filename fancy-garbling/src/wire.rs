@@ -10,6 +10,8 @@
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
+use subtle::ConditionallySelectable;
+use vectoreyes::array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize};
 
 #[cfg(feature = "serde")]
 use crate::errors::{ModQDeserializationError, WireDeserializationError};
@@ -28,6 +30,15 @@ pub enum AllWire {
 
     /// Modulo q Wire: 3 < q < 2^16
     ModN(WireModQ),
+}
+
+/// Batch hashing of wires
+pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: Block) -> [Block; Q]
+where
+    ArrayUnrolledOps: UnrollableArraySize<Q>,
+{
+    let batch = wires.array_map(|x| x.as_block());
+    AES_HASH.tccr_hash_many(tweak, batch)
 }
 
 /// Marker trait indicating an arithmetic wire
@@ -67,10 +78,17 @@ pub trait WireLabel: Clone + HasModulus {
     /// Get a random wire `mod q`.
     fn rand<R: CryptoRng + RngCore>(rng: &mut R, q: u16) -> Self;
 
+    /// Subroutine of hashback that converts the hash block into a valid wire of the given
+    /// modulus. Also useful when batching hashes ahead of time for later conversion.
+    fn hash_to_mod(hash: Block, q: u16) -> Self;
+
     /// Compute the hash of this wire, converting the result back to a wire.
     ///
     /// Uses fixed-key AES.
-    fn hashback(&self, tweak: Block, q: u16) -> Self;
+    fn hashback(&self, tweak: Block, q: u16) -> Self {
+        let hash = self.hash(tweak);
+        Self::hash_to_mod(hash, q)
+    }
 
     /// Negate all the digits `mod q`, consuming it for chained computations.
     fn negate_mov(mut self) -> Self {
@@ -137,6 +155,15 @@ pub trait WireLabel: Clone + HasModulus {
 pub struct WireMod2 {
     /// A 128-bit value.
     val: Block,
+}
+
+impl ConditionallySelectable for WireMod2 {
+    fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
+        WireMod2::from_block(
+            Block::conditional_select(&a.as_block(), &b.as_block(), choice),
+            2,
+        )
+    }
 }
 
 /// Intermediate struct to deserialize WireMod3 to
@@ -384,12 +411,11 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn hashback(&self, tweak: Block, q: u16) -> Self {
-        let block = self.hash(tweak);
+    fn hash_to_mod(hash: Block, q: u16) -> Self {
         if q == 3 {
-            AllWire::Mod3(WireMod3::encode_block_mod3(block))
+            AllWire::Mod3(WireMod3::encode_block_mod3(hash))
         } else {
-            Self::from_block(block, q)
+            Self::from_block(hash, q)
         }
     }
 }
@@ -475,12 +501,11 @@ impl WireLabel for WireMod2 {
         Self { val: rng.gen() }
     }
 
-    fn hashback(&self, tweak: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: Block, q: u16) -> Self {
         if q != 2 {
-            panic!("[WireMod2::hashback] Expected modulo 2. Got {}", q);
+            panic!("[WireMod2::hash_to_mod] Expected modulo 2. Got {}", q);
         }
-        let block = self.hash(tweak);
-        Self::from_block(block, q)
+        Self::from_block(hash, q)
     }
 }
 
@@ -580,12 +605,11 @@ impl WireLabel for WireMod3 {
         Self { lsb, msb }
     }
 
-    fn hashback(&self, tweak: Block, q: u16) -> Self {
+    fn hash_to_mod(hash: Block, q: u16) -> Self {
         if q != 3 {
-            panic!("[WireMod3::hashback] Expected mod 3. Got mod {}", q)
+            panic!("[WireMod3::hash_to_mod] Expected mod 3. Got mod {}", q)
         }
-        let block = self.hash(tweak);
-        Self::encode_block_mod3(block)
+        Self::encode_block_mod3(hash)
     }
 }
 
@@ -698,12 +722,15 @@ impl WireLabel for WireModQ {
             .collect();
         Self { q, ds }
     }
-    fn hashback(&self, tweak: Block, q: u16) -> Self {
+
+    fn hash_to_mod(hash: Block, q: u16) -> Self {
         if q < 2 {
-            panic!("[WireModQ::hashback] Modulus must be at least 2. Got {}", q);
+            panic!(
+                "[WireModQ::hash_to_mod] Modulus must be at least 2. Got {}",
+                q
+            );
         }
-        let block = self.hash(tweak);
-        Self::from_block(block, q)
+        Self::from_block(hash, q)
     }
 }
 

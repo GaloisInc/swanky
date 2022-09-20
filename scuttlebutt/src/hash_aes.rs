@@ -8,7 +8,10 @@
 //! based on fixed-key AES.
 
 use crate::{Aes128, Block, FIXED_KEY_AES128};
-use vectoreyes::{SimdBase8, U8x16};
+use vectoreyes::{
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
+    SimdBase8, U8x16,
+};
 
 /// AES-based correlation-robust hash function.
 ///
@@ -61,5 +64,22 @@ impl AesHash {
         let t = y ^ i;
         let z = self.aes.encrypt(t);
         y ^ z
+    }
+
+    /// Batch tweakable circular correlation robust hash function
+    pub fn tccr_hash_many<const Q: usize>(&self, i: Block, xs: [Block; Q]) -> [Block; Q]
+    where
+        ArrayUnrolledOps: UnrollableArraySize<Q>,
+    {
+        let y = self.aes.encrypt_blocks(xs);
+        let t = y.array_map(
+            #[inline(always)]
+            |x| x ^ i,
+        );
+        let z = self.aes.encrypt_blocks(t);
+        y.array_zip(z).array_map(
+            #[inline(always)]
+            |(a, b)| a ^ b,
+        )
     }
 }
