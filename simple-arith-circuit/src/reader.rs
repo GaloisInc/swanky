@@ -27,6 +27,21 @@ pub enum Error {
     IoError(std::io::Error),
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Error::ParseIntError(e) => format!("Integer parsing error: {e}"),
+                Error::IoError(e) => format!("I/O error: {e}"),
+            }
+        )
+    }
+}
+
+impl std::error::Error for Error {}
+
 impl From<std::num::ParseIntError> for Error {
     fn from(e: std::num::ParseIntError) -> Self {
         Error::ParseIntError(e)
