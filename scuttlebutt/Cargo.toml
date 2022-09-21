@@ -32,7 +32,7 @@ bytemuck = { version = "1.8.0", features = ["derive"] }
 vectoreyes = { path = "../vectoreyes" }
 ndarray = "0.15.4"
 num-traits = "0.2.14"
-ff = { git = "https://github.com/GaloisInc/ff", rev = "cf8924ac", features = ["derive"], optional = true }
+ff = { git = "https://github.com/GaloisInc/ff", rev = "81afd509", features = ["derive"], optional = true }
 
 
 [dev-dependencies]
