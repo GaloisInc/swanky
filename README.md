@@ -1,23 +1,48 @@
-# **swanky**: A suite of rust libraries for secure multi-party computation
+# `swanky`: A suite of rust libraries for secure computation
 
-**swanky** provides a suite of rust libraries for doing secure multi-party
-computation (MPC).
+`swanky` provides a suite of rust libraries for doing secure computation.
 
-* **fancy-garbling**: Boolean and arithmetic garbled circuits.
-  * **twopac**: Two-party garbled-circuit-based secure computation.
-* **humidor**: Implementation of the Ligero zero knowledge proof system.
-* **keyed_arena**: Bump allocator which allows for random access to its allocations.
-* **ocelot**: Oblivious transfer and oblivious PRFs.
-* **popsicle**: Private-set intersection.
-* **scuttlebutt**: Core MPC-related primitives used by various **swanky** libraries.
-* **simple-arith-circuit**: Simple flat arithmetic circuit representation.
+* `fancy-garbling`: Boolean and arithmetic garbled circuits.
+  * `twopac`: Two-party garbled-circuit-based secure computation.
+* `humidor`: Implementation of the Ligero zero knowledge proof system.
+* `keyed_arena`: Bump allocator which allows for random access to its allocations.
+* `ocelot`: Oblivious transfer and oblivious PRFs.
+* `popsicle`: Private-set intersection.
+* `scuttlebutt`: Core primitives used by other `swanky` crates.
+* `simple-arith-circuit`: Simple flat arithmetic circuit representation.
 
-# A Note on Security
+# A note on security
 
-**swanky** is currently considered **prototype** software. Do not deploy it in
+`swanky` is currently considered **prototype** software. Do not deploy it in
 production, or trust it with sensitive data.
 
-# Generating Documentation
+# Using `swanky` in your project
+
+To use a `swanky` crate in your project, add the following line to the
+`[dependencies]` entry in `Cargo.toml`:
+```
+<crate-name> = { git = "https://github.com/GaloisInc/swanky", rev = "xxxxxx" }
+```
+where `<crate-name>` is one of the crates listed above and `rev` is the
+particular revision to use.
+
+Note: As `swanky` is currently considered prototype software, it is best to pin
+a particular revision of `swanky`, as there is no guarantee that future versions
+of `swanky` will maintain backwards compatibility.
+
+# Citing `swanky`
+
+If you use `swanky` in your academic paper, please cite it as follows:
+```
+@misc{swanky,
+    author = {{Galois, Inc.}},
+    title = {{swanky}: A suite of rust libraries for secure computation},
+    howpublished = {\url{https://github.com/GaloisInc/swanky}},
+    year = 2019,
+}
+```
+
+# Generating documentation
 
 To generate documentation, please use `etc/rustdoc.py` in lieu of `cargo doc`.
 
@@ -25,22 +50,27 @@ To generate documentation, please use `etc/rustdoc.py` in lieu of `cargo doc`.
 
 MIT License
 
+# Contact
+
+You can contact the `swanky` team at `swanky@galois.com`.
+
 # Contributors
 
-- Brent Carmer <bcarmer@galois.com>
-- Ben Hamlin <hamlinb@galois.com>
-- Alex J. Malozemoff <amaloz@galois.com>
-- Benoit Razet <benoit.razet@galois.com>
-- Marc Rosen <marc@galois.com>
+- Brent Carmer
+- Ben Hamlin
+- Alex J. Malozemoff
+- Benoit Razet
+- Marc Rosen
 
 # Acknowledgments
 
-This material is based upon work supported by the ARO and DARPA under Contract
-No. W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No.
-N66001-15-C-4070.
+This material is based upon work supported in part by ARO, SSC Pacific, IARPA
+and DARPA under Contract Nos. W911NF-15-C-0227, N66001-15-C-4070,
+2019-1902070006, and HR001120C0085.
 
 Any opinions, findings and conclusions or recommendations expressed in this
 material are those of the author(s) and do not necessarily reflect the views of
-the ARO, SSC Pacific, and DARPA.
+the ARO, SSC Pacific, IARPA and DARPA. Distribution Statement ``A'' (Approved
+for Public Release, Distribution Unlimited).
 
 Copyright © 2019 Galois, Inc.
