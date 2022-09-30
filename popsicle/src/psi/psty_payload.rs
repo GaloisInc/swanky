@@ -40,7 +40,8 @@ use crate::{
 };
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    BinaryBundle, Bundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire,
+    AllWire, ArithmeticBundleGadgets, BinaryBundle, Bundle, CrtBundle, CrtGadgets, Fancy,
+    FancyBinary, FancyInput,
 };
 
 use itertools::Itertools;
@@ -136,7 +137,8 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+                .unwrap();
 
         let (mut state, nbins, _, _) = self.bucketize_data(table, payloads, channel, rng)?;
 
@@ -169,7 +171,8 @@ impl Sender {
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+                .unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let (state, _nbins, _nmegabins, megasize) =
@@ -224,15 +227,10 @@ impl Sender {
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<
-        (
-            CrtBundle<fancy_garbling::Wire>,
-            CrtBundle<fancy_garbling::Wire>,
-        ),
-        Error,
-    > {
+    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+                .unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
@@ -276,14 +274,15 @@ impl Sender {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
-        aggregates: Vec<Vec<Wire>>,
-        sum_of_weights: Vec<Vec<Wire>>,
+        aggregates: Vec<Vec<AllWire>>,
+        sum_of_weights: Vec<Vec<AllWire>>,
         path_deltas: &str,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error> {
         let mut gb =
-            Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen())).unwrap();
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))
+                .unwrap();
         let _ = gb.load_deltas(path_deltas);
 
         let mut acc = CrtBundle::new(aggregates[0].clone());
@@ -392,8 +391,17 @@ impl SenderState {
     /// Encodes circuit inputs before passing them to GC
     pub fn encode_circuit_inputs<C, RNG>(
         &mut self,
-        gb: &mut Garbler<C, RNG, OtSender>,
-    ) -> Result<(Vec<Wire>, Vec<Wire>, Vec<Wire>, Vec<Wire>, Vec<Wire>), Error>
+        gb: &mut Garbler<C, RNG, OtSender, AllWire>,
+    ) -> Result<
+        (
+            Vec<AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+        ),
+        Error,
+    >
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -433,14 +441,8 @@ impl SenderState {
     /// Encode inputs & compute weighted aggregates circuit
     pub fn build_and_compute_circuit<C, RNG>(
         &mut self,
-        gb: &mut Garbler<C, RNG, OtSender>,
-    ) -> Result<
-        (
-            CrtBundle<fancy_garbling::Wire>,
-            CrtBundle<fancy_garbling::Wire>,
-        ),
-        Error,
-    >
+        gb: &mut Garbler<C, RNG, OtSender, AllWire>,
+    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -483,9 +485,11 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<u128, Error> {
-        let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))
-                .unwrap();
+        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+        )
+        .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let (table, payload) = self.bucketize_data(table, payloads, channel, rng)?;
@@ -527,9 +531,11 @@ impl Receiver {
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<u128, Error> {
-        let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))
-                .unwrap();
+        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+        )
+        .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
 
         let (table, payload, _) =
@@ -563,16 +569,12 @@ impl Receiver {
         payload: Vec<Vec<Block512>>,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<
-        (
-            CrtBundle<fancy_garbling::Wire>,
-            CrtBundle<fancy_garbling::Wire>,
-        ),
-        Error,
-    > {
-        let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))
-                .unwrap();
+    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error> {
+        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+        )
+        .unwrap();
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let q = fancy_garbling::util::product(&qs);
 
@@ -613,14 +615,16 @@ impl Receiver {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
-        aggregates: Vec<Vec<Wire>>,
-        sum_of_weights: Vec<Vec<Wire>>,
+        aggregates: Vec<Vec<AllWire>>,
+        sum_of_weights: Vec<Vec<AllWire>>,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<u128, Error> {
-        let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))
-                .unwrap();
+        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+        )
+        .unwrap();
 
         let qs = &fancy_garbling::util::PRIMES[..PAYLOAD_PRIME_SIZE_EXPANDED];
         let _q = fancy_garbling::util::product(&qs);
@@ -757,8 +761,17 @@ impl ReceiverState {
     /// Encodes circuit inputs before passing them to GC
     pub fn encode_circuit_inputs<C, RNG>(
         &mut self,
-        ev: &mut Evaluator<C, RNG, OtReceiver>,
-    ) -> Result<(Vec<Wire>, Vec<Wire>, Vec<Wire>, Vec<Wire>, Vec<Wire>), Error>
+        ev: &mut Evaluator<C, RNG, OtReceiver, AllWire>,
+    ) -> Result<
+        (
+            Vec<AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+        ),
+        Error,
+    >
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
@@ -794,15 +807,9 @@ impl ReceiverState {
     /// Encode inputs & compute weighted aggregates circuit
     pub fn build_and_compute_circuit<C, RNG>(
         &mut self,
-        ev: &mut Evaluator<C, RNG, OtReceiver>,
+        ev: &mut Evaluator<C, RNG, OtReceiver, AllWire>,
         channel: &mut C,
-    ) -> Result<
-        (
-            CrtBundle<fancy_garbling::Wire>,
-            CrtBundle<fancy_garbling::Wire>,
-        ),
-        Error,
-    >
+    ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
@@ -874,7 +881,9 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 /// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
-fn fancy_compute_payload_aggregate<F: fancy_garbling::FancyReveal + Fancy>(
+fn fancy_compute_payload_aggregate<
+    F: fancy_garbling::FancyReveal + Fancy + ArithmeticBundleGadgets + FancyBinary,
+>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -1168,7 +1177,7 @@ mod tests {
         );
 
         let qs = fancy_garbling::util::primes_with_width(65);
-        let deltas = generate_deltas(&qs);
+        let deltas = generate_deltas::<AllWire>(&qs);
         let deltas_json = serde_json::to_string(&deltas).unwrap();
 
         let path_delta = "./.deltas.txt".to_owned();
