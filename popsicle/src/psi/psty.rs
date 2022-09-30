@@ -10,7 +10,8 @@
 use crate::{cuckoo::CuckooHash, errors::Error, utils};
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    BinaryBundle, BundleGadgets, CrtBundle, CrtGadgets, Fancy, FancyInput, Wire,
+    AllWire, ArithmeticBundleGadgets, BinaryBundle, CrtBundle, CrtGadgets, Fancy, FancyBinary,
+    FancyInput,
 };
 use itertools::Itertools;
 use ocelot::{
@@ -119,12 +120,20 @@ impl SenderState {
         &self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(Garbler<C, RNG, OtSender>, Vec<Wire>, Vec<Wire>), Error>
+    ) -> Result<
+        (
+            Garbler<C, RNG, OtSender, AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+        ),
+        Error,
+    >
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb = Garbler::<C, RNG, OtSender>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+        let mut gb =
+            Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods)?;
@@ -233,7 +242,14 @@ impl ReceiverState {
         &self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(Evaluator<C, RNG, OtReceiver>, Vec<Wire>, Vec<Wire>), Error>
+    ) -> Result<
+        (
+            Evaluator<C, RNG, OtReceiver, AllWire>,
+            Vec<AllWire>,
+            Vec<AllWire>,
+        ),
+        Error,
+    >
     where
         C: AbstractChannel,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
@@ -241,8 +257,10 @@ impl ReceiverState {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
-        let mut ev =
-            Evaluator::<C, RNG, OtReceiver>::new(channel.clone(), RNG::from_seed(rng.gen()))?;
+        let mut ev = Evaluator::<C, RNG, OtReceiver, AllWire>::new(
+            channel.clone(),
+            RNG::from_seed(rng.gen()),
+        )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
         let sender_inputs = ev.receive_many(&mods)?;
@@ -348,7 +366,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
-fn fancy_compute_intersection<F: Fancy>(
+fn fancy_compute_intersection<F: Fancy + ArithmeticBundleGadgets>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -368,7 +386,7 @@ fn fancy_compute_intersection<F: Fancy>(
 
 /// Fancy function to compute the cardinaility and return CRT value containing the result
 /// along with the moduli of that value.
-fn fancy_compute_cardinality<F: Fancy>(
+fn fancy_compute_cardinality<F: Fancy + ArithmeticBundleGadgets + FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
