@@ -23,13 +23,6 @@ And the following oblivious (programmable) PRF protocols:
 It also exposes various traits for implementing your very own OT or OPRF
 protocol.
 
-**`ocelot` should be considered unstable with potential API changes until
-version 1.0 is released**
-
-# Documentation
-
-The documentation can be found here: <https://galoisinc.github.io/swanky/ocelot/>
-
 # Performance
 
 `ocelot` seems to be close in performance with the latest and greatest OT
@@ -61,33 +54,9 @@ All results use unix streams and were run on a 2.7 GHz machine with 16 GB RAM,
 with the sender and receiver run on different threads (see `benches/ot.rs` for
 details), using the `nightly` feature (see below).
 
-# Building
+# Features
 
-Use `cargo build` to build, `cargo test` to run the test suite, and `cargo
-bench` to benchmark the various protocols.
-
-`ocelot` also supports the following features:
+`ocelot` supports the following features:
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
-
 * `unstable`: Enable unstable components of `ocelot`.
-
-# License
-
-MIT License
-
-# Authors
-
-- Alex J. Malozemoff <amaloz@galois.com>
-
-# Acknowledgments
-
-This material is based upon work supported by the ARO and DARPA under Contract
-No. W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No.
-N66001-15-C-4070.
-
-Any opinions, findings and conclusions or recommendations expressed in this
-material are those of the author(s) and do not necessarily reflect the views of
-the ARO, SSC Pacific, and DARPA.
-
-Copyright © 2019 Galois, Inc.
