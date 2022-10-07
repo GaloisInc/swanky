@@ -8,8 +8,9 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::util::generate_deltas;
+use fancy_garbling::AllWire;
 use popsicle::psty_payload::{Receiver, Sender};
-use scuttlebutt::{AesRng, Block512, Channel, TcpChannel};
+use scuttlebutt::{AesRng, Block512, Channel, SymChannel};
 
 use rand::{CryptoRng, Rng};
 
@@ -111,7 +112,7 @@ fn bench_psty_payload_large(
     megasize: usize,
 ) -> () {
     let qs = fancy_garbling::util::primes_with_width(65);
-    let deltas = generate_deltas(&qs);
+    let deltas = generate_deltas::<AllWire>(&qs);
     let deltas_json = serde_json::to_string(&deltas).unwrap();
 
     let path_delta = "./deltas.txt".to_owned();
@@ -123,7 +124,7 @@ fn bench_psty_payload_large(
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
-                    let mut channel = TcpChannel::new(stream);
+                    let mut channel = SymChannel::new(stream);
                     let mut rng = AesRng::new();
 
                     let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
@@ -149,7 +150,7 @@ fn bench_psty_payload_large(
 
     match TcpStream::connect("127.0.0.1:3000") {
         Ok(stream) => {
-            let mut channel = TcpChannel::new(stream);
+            let mut channel = SymChannel::new(stream);
             let mut rng = AesRng::new();
             let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
@@ -224,7 +225,7 @@ fn bench_psi(c: &mut Criterion) {
 
 criterion_group! {
     name = psi;
-    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(2);
+    config = Criterion::default().warm_up_time(Duration::from_millis(100)).sample_size(10);
     targets = bench_psi
 }
 
