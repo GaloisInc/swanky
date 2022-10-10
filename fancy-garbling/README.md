@@ -43,57 +43,8 @@ functions. A full circuit representation is not necessary to construct, analyze,
 in memory. See the [API docs](https://galoisinc.github.io/swanky/fancy_garbling) for
 details.
 
-**`fancy-garbling` should be considered unstable and under active development
-(and research!)**
+# Features
 
-# API Documentation
-
-[The documentation can be found here](https://galoisinc.github.io/swanky/fancy_garbling)
-
-# Building
-
-`fancy-garbling` requires at least `rustc 1.31.0`.
-
-* `cargo build`: Build `fancy-garbling`
-* `cargo test`: Run the tests
-* `cargo bench`: Run the benchmarks
-
-`fancy-garbling` also supports the following features:
+`fancy-garbling` supports the following features:
 
 * `nightly`: Use nightly features from `rust` and the underlying libraries.
-
-# Using `fancy-garbling` in your project
-
-To use `fancy-garbling` in your project, add the following line to the
-`[dependencies]` entry in `Cargo.toml`:
-
-```
-fancy_garbling = { git = "https://github.com/GaloisInc/swanky/fancy-garbling" }
-```
-
-# License
-
-MIT License
-
-# Authors
-
-- Brent Carmer <bcarmer@galois.com>
-
-# Acknowledgments
-
-This research is based upon work supported in part by the Office of the Director of
-National Intelligence (ODNI), Intelligence Advanced Research Projects Activity (IARPA) via
-Contract No. 2019-1902070006. The views and conclusions contained herein are those of the
-authors and should not be interpreted as necessarily representing the official policies,
-either express or implied, of ODNI, IARPA, or the U.S. Government. The U.S. Government is
-authorized to reproduce and distribute reprints for governmental purposes notwithstanding
-any copyright annotation therein.
-
-This material is also based upon work supported by the ARO and DARPA under Contract No.
-W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No. N66001-15-C-4070.
-
-Any opinions, findings and conclusions or recommendations expressed in this material are
-those of the author(s) and do not necessarily reflect the views of the ARO, SSC Pacific,
-and DARPA.
-
-Copyright © 2019-2020 Galois, Inc.
