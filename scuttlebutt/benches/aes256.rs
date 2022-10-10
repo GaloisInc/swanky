@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use scuttlebutt::{Aes256, Block};
 

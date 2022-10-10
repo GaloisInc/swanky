@@ -1,7 +1,3 @@
-// This file is part of `humidor`.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Parameters for threshold secret sharing in Ligero. This includes
 //! parameter-specific
 

@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Module containing `PmrGadgets`, which are the PMR-based gadgets for `Fancy`. These
 //! are mostly used internally in CRT gadgets.
 

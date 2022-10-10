@@ -1,10 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-//
-
 //! Low-level operations on wire-labels, the basic building block of garbled circuits.
 
 use crate::{fancy::HasModulus, util};

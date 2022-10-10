@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Module containing `CrtGadgets`, which are the CRT-based gadgets for `Fancy`.
 
 use super::{bundle::ArithmeticBundleGadgets, HasModulus};

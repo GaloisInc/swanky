@@ -1,7 +1,3 @@
-// This file is part of `humidor`.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Helper functions for generating Merkle trees and proofs. Note that this
 //! library is just a thin wrapper around the `merkle_cbt` library.
 

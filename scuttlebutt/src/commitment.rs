@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! A trait defining a Commitment Scheme and an implementation in the random
 //! oracle model using SHA256.
 //!

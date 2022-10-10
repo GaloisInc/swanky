@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2020 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Subfield vector oblivious linear evaluation benchmarks using `criterion`.
 
 // TODO: criterion might not be the best choice for larger benchmarks.

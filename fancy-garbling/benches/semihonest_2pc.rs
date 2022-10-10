@@ -1,8 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `twopac`. Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Benchmarks for semi-honest 2PC using `fancy-garbling`.
 
 use criterion::{criterion_group, criterion_main, Criterion};

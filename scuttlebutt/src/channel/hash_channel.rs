@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 use crate::{AbstractChannel, Channel};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Result, Write};

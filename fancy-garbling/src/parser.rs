@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of fancy-garbling.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Functions for parsing and running a circuit file based on the format given
 //! here: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 

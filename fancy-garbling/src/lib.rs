@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2018 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! `fancy-garbling` provides boolean and arithmetic garbling capabilities.
 #![cfg_attr(feature = "nightly", feature(test))]
 #![deny(clippy::all)]

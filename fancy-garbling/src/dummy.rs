@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Dummy implementation of `Fancy`.
 //!
 //! Useful for evaluating the circuits produced by `Fancy` without actually
