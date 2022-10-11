@@ -247,6 +247,34 @@ impl std::fmt::Display for BytesDeserializationCannotFail {
 }
 impl std::error::Error for BytesDeserializationCannotFail {}
 
+macro_rules! num_traits_zero_and_one {
+    ($f: ident) => {
+        impl num_traits::Zero for $f {
+            #[inline]
+            fn zero() -> Self {
+                <$f as crate::field::FiniteField>::ZERO
+            }
+            #[inline]
+            fn is_zero(&self) -> bool {
+                *self == <$f as crate::field::FiniteField>::ZERO
+            }
+        }
+
+        impl num_traits::One for $f {
+            #[inline]
+            fn one() -> Self {
+                <$f as crate::field::FiniteField>::ONE
+            }
+            #[inline]
+            fn is_one(&self) -> bool {
+                *self == <$f as crate::field::FiniteField>::ONE
+            }
+        }
+    };
+}
+// So we can use the macro within another macro.
+pub(crate) use num_traits_zero_and_one;
+
 #[cfg(test)]
 #[macro_use]
 mod test_utils;
@@ -444,6 +472,7 @@ macro_rules! field_ops {
         assign_op!(SubAssign, sub_assign, $f);
         assign_op!(MulAssign, mul_assign, $f);
         assign_op!(DivAssign, div_assign, $f);
+        num_traits_zero_and_one!($f);
 
         impl std::ops::Neg for $f {
             type Output = $f;

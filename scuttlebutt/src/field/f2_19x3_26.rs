@@ -149,28 +149,6 @@ impl FieldForFFT<3> for F2_19x3_26 {
 
 impl ndarray::ScalarOperand for F2_19x3_26 {}
 
-impl num_traits::Zero for F2_19x3_26 {
-    #[inline]
-    fn zero() -> Self {
-        <F2_19x3_26 as crate::field::FiniteField>::ZERO
-    }
-    #[inline]
-    fn is_zero(&self) -> bool {
-        *self == Self::zero()
-    }
-}
-
-impl num_traits::One for F2_19x3_26 {
-    #[inline]
-    fn one() -> Self {
-        <F2_19x3_26 as crate::field::FiniteField>::ONE
-    }
-    #[inline]
-    fn is_one(&self) -> bool {
-        *self == Self::one()
-    }
-}
-
 impl std::ops::Rem<F2_19x3_26> for F2_19x3_26 {
     type Output = Self;
     #[inline]
