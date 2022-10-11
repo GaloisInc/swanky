@@ -274,3 +274,17 @@ big_prime_field!(
     num_bytes = generic_array::typenum::U48,
     num_bits = generic_array::typenum::U384,
 );
+
+big_prime_field!(
+    /// The finite field over the prime
+    /// $`P = 2^{256} - 2^{224} + 2^{192} + 2^{96} - 1
+    ///     = 115792089210356248762697446949407573530086143415290314195533631308867097853951`$.
+    F256p,
+    f256p,
+    modulus = "115792089210356248762697446949407573530086143415290314195533631308867097853951",
+    generator = "6",
+    limbs = 5,
+    actual_limbs = 4,
+    num_bytes = generic_array::typenum::U32,
+    num_bits = generic_array::typenum::U256,
+);
