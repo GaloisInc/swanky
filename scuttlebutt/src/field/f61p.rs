@@ -90,8 +90,7 @@ impl FiniteField for F61p {
         F61p(reduce(rng.next_u64() as u128))
     }
 
-    // TODO: this generator might be wrong.
-    const GENERATOR: Self = F61p(5);
+    const GENERATOR: Self = F61p(37);
     const ZERO: Self = F61p(0);
     const ONE: Self = F61p(1);
 
@@ -199,11 +198,6 @@ proptest! {
     fn test_reduce(x in 0u128..((1 << (2 * 61))-1)) {
         assert_eq!(u128::from(reduce(x)), x % u128::from(MODULUS));
     }
-}
-
-#[test]
-fn test_generator() {
-    assert_eq!(F61p::GENERATOR.pow(u128::from(MODULUS) - 1), F61p::ONE);
 }
 
 #[test]
