@@ -498,7 +498,7 @@ pub use f2_19x3_26::F2_19x3_26;
 #[cfg(feature = "big-fields")]
 mod big_prime_fields;
 #[cfg(feature = "big-fields")]
-pub use big_prime_fields::{F384p, F384q};
+pub use big_prime_fields::{F256p, F384p, F384q};
 
 pub mod serialization;
 

@@ -65,6 +65,8 @@ finite_field_benchmarks!(f56b, scuttlebutt::field::F56b,);
 finite_field_benchmarks!(f63b, scuttlebutt::field::F63b,);
 
 #[cfg(feature = "big-fields")]
+finite_field_benchmarks!(f256p, scuttlebutt::field::F256p,);
+#[cfg(feature = "big-fields")]
 finite_field_benchmarks!(f384p, scuttlebutt::field::F384p,);
 #[cfg(feature = "big-fields")]
 finite_field_benchmarks!(f384q, scuttlebutt::field::F384q,);
@@ -95,6 +97,7 @@ criterion::criterion_main!(
     f45b::f45b,
     f56b::f56b,
     f63b::f63b,
+    f256p::f256p,
     f384p::f384p,
     f384q::f384q,
 );
