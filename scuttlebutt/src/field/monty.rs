@@ -1,7 +1,3 @@
-// This file is part of `scuttlebutt`.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Generic 64-bit Montgomery arithmetic for prime fields.
 
 use generic_array::{typenum, ArrayLength, GenericArray};

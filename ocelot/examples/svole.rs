@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2020 Galois, Inc.
-// See LICENSE for licensing information.
-
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use ocelot::svole::{
     wykw::{Receiver, Sender},

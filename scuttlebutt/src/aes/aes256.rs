@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 use crate::Block;
 use vectoreyes::{array_utils::ArrayUnrolledExt, Aes256EncryptOnly, AesBlockCipher, U8x16, U8x32};
 

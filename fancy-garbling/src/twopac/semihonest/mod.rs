@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of twopac.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Implementation of semi-honest two-party computation.
 
 mod evaluator;

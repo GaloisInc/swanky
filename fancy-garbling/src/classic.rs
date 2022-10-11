@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Provides objects and functions for statically garbling and evaluating a
 //! circuit without streaming.
 

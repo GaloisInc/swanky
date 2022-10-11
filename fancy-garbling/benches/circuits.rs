@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of fancy-garbling.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Benchmark code of garbling / evaluating using Nigel's circuits.
 
 use criterion::{criterion_group, criterion_main, Criterion};

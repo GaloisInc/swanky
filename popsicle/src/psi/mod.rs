@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `popsicle`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 pub mod kmprt;
 
 #[cfg(feature = "psty")]

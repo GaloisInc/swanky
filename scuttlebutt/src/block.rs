@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Defines a block as a 128-bit value, and implements block-related functions.
 
 #[cfg(feature = "curve25519-dalek")]

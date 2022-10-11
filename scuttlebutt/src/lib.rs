@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `scuttlebutt`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 #![allow(clippy::many_single_char_names)]
 #![deny(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(test))]

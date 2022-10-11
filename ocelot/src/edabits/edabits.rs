@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! This is the implementation of field conversion
 
 use super::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};

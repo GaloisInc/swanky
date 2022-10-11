@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Implementation of the hash-based multi-use OPPRF of Kolesnikov, Matania,
 //! Pinkas, Rosulek, and Trieu (cf. <https://eprint.iacr.org/2017/799>).
 

@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Oblivious transfer traits + instantiations.
 //!
 //! This module provides traits for standard oblivious transfer (OT), correlated

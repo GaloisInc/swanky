@@ -1,7 +1,3 @@
-// This file is part of `scuttlebutt`.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 use crate::field::monty::{monty_from_u128, monty_to_u128, Monty};
 use crate::field::{fft::FieldForFFT, PrimeFiniteField};
 use crate::{implement_finite_field_for_monty, monty_from_lit};

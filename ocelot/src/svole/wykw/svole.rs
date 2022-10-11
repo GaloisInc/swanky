@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2020 Galois, Inc.
-// See LICENSE for licensing information.
-
 use super::{
     base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
     spsvole::{SpsReceiver, SpsSender},

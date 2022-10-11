@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `popsicle`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Util mostly in support of cuckoo hashing.
 
 use rand::{CryptoRng, Rng};

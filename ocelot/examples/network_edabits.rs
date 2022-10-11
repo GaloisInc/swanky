@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2020 Galois, Inc.
-// See LICENSE for licensing information.
-
 use clap::{App, Arg};
 use ocelot::edabits::{ProverConv, VerifierConv};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};

@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of twopac.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 use crate::{
     errors::TwopacError, wire::WireLabel, AllWire, ArithmeticWire, Fancy, FancyArithmetic,
     FancyBinary, FancyInput, FancyReveal, Garbler as Gb, WireMod2,

@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Implementation of the Naor-Pinkas oblivious transfer protocol (cf.
 //! <https://dl.acm.org/citation.cfm?id=365502>).
 //!

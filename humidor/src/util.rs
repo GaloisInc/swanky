@@ -1,7 +1,3 @@
-// This file is part of `humidor`.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! Utility functions for Ligero
 
 use ndarray::{Array1, ArrayView1};

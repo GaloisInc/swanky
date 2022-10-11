@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of `fancy-garbling`.
-// Copyright © 2019 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! The `Fancy` trait represents the kinds of computations possible in `fancy-garbling`.
 //!
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and

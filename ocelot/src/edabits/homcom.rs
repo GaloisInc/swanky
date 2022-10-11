@@ -1,9 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ocelot.
-// Copyright © 2021 Galois, Inc.
-// See LICENSE for licensing information.
-
 //! This is the implementation of an homomorphic commitment
 //! functionality.  It includes `random`, `input`, affine operations,
 //! `check_zero`, `open` and `check_multiply` a la Wolverine or
