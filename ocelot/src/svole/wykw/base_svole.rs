@@ -123,7 +123,7 @@ mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
     use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
     use scuttlebutt::{
-        field::{F128b, F128p, F40b, F61p, FiniteField as FF},
+        field::{F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{
@@ -159,7 +159,6 @@ mod tests {
     }
 
     fn test_base_vole_setup_params_all_fields(len: usize) {
-        test_base_svole::<F128p, NoSpecialization>(len);
         test_base_svole::<F128b, NoSpecialization>(len);
         test_base_svole::<F61p, NoSpecialization>(len);
         test_base_svole::<F40b, NoSpecialization>(len);

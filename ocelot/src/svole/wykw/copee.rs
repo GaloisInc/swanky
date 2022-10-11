@@ -154,7 +154,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
 mod tests {
     use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
     use scuttlebutt::{
-        field::{F128b, F128p, F61p, FiniteField as FF, F2},
+        field::{F128b, F61p, FiniteField as FF, F2},
         AesRng, Channel,
     };
     use std::{
@@ -196,7 +196,6 @@ mod tests {
 
     #[test]
     fn test_copee() {
-        test_copee_::<F128p>(128);
         test_copee_::<F128b>(128);
         test_copee_::<F2>(128);
         test_copee_::<F61p>(128);

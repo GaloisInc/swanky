@@ -9,7 +9,7 @@ use ocelot::svole::{
 };
 
 use scuttlebutt::{
-    field::{F128b, F128p, F61p},
+    field::{F128b, F61p},
     AesRng, Channel,
 };
 use std::{
@@ -79,15 +79,6 @@ fn bench_svole<
     handle.join().unwrap();
 }
 
-fn bench_svole_fp(c: &mut Criterion) {
-    c.bench_function("svole::extend::F128p", move |bench| {
-        let (vole_sender, vole_receiver) = svole_init();
-        bench.iter(move || {
-            bench_svole::<Sender<F128p>, Receiver<F128p>>(&vole_sender, &vole_receiver);
-        })
-    });
-}
-
 fn bench_svole_gf128(c: &mut Criterion) {
     c.bench_function("svole::extend::Gf128", move |bench| {
         let (vole_sender, vole_receiver) = svole_init();
@@ -134,14 +125,6 @@ fn bench_svole_init_gf128(c: &mut Criterion) {
     });
 }
 
-fn bench_svole_init_fp(c: &mut Criterion) {
-    c.bench_function("svole::init::F128p", move |bench| {
-        bench.iter(move || {
-            bench_svole_init::<Sender<F128p>, Receiver<F128p>>();
-        });
-    });
-}
-
 fn bench_svole_init_f61p(c: &mut Criterion) {
     c.bench_function("svole::init::F61p", move |bench| {
         bench.iter(move || {
@@ -182,7 +165,5 @@ criterion_group! {
         bench_svole_f61p,
         bench_svole_gf128,
         //bench_ggm,
-        bench_svole_fp,
-        bench_svole_init_fp
 }
 criterion_main!(svole);

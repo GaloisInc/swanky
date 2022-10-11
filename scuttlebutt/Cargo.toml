@@ -24,8 +24,6 @@ rand_chacha = { version = "0.3.1", optional = true }
 serde = { version = "1.0.136" }
 sha2 = "0.10.2"
 subtle = "2.4.1"
-primitive-types = "0.11.1"
-uint = "0.9.3"
 generic-array = "0.14.5"
 smallvec = "1.8.0"
 bytemuck = { version = "1.8.0", features = ["derive"] }

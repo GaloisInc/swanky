@@ -282,7 +282,6 @@ mod test_utils;
 #[cfg(test)]
 macro_rules! call_with_big_finite_fields {
     ($f:ident $(, $arg:expr)* $(,)?) => {{
-        $f::<$crate::field::F128p>($($arg),*);
         $f::<$crate::field::F61p>($($arg),*);
         $f::<$crate::field::F64b>($($arg),*);
         $f::<$crate::field::F128b>($($arg),*);
@@ -290,6 +289,12 @@ macro_rules! call_with_big_finite_fields {
         $f::<$crate::field::F45b>($($arg),*);
         $f::<$crate::field::F56b>($($arg),*);
         $f::<$crate::field::F63b>($($arg),*);
+        #[cfg(feature = "big-fields")]
+        $f::<$crate::field::F128p>($($arg),*);
+        #[cfg(feature = "big-fields")]
+        $f::<$crate::field::F384p>($($arg),*);
+        #[cfg(feature = "big-fields")]
+        $f::<$crate::field::F384q>($($arg),*);
     }};
 }
 
@@ -503,9 +508,6 @@ pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
     out
 }
 
-mod f128p;
-pub use f128p::F128p;
-
 mod f2;
 pub use f2::F2;
 
@@ -527,7 +529,7 @@ pub use f2_19x3_26::F2_19x3_26;
 #[cfg(feature = "big-fields")]
 mod big_prime_fields;
 #[cfg(feature = "big-fields")]
-pub use big_prime_fields::{F256p, F384p, F384q};
+pub use big_prime_fields::{F128p, F256p, F384p, F384q};
 
 pub mod serialization;
 
