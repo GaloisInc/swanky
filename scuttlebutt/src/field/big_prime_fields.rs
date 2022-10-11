@@ -277,6 +277,19 @@ big_prime_field!(
 
 big_prime_field!(
     /// The finite field over the prime
+    /// $`P = 2^{128} - 159`$.
+    F128p,
+    f128p,
+    modulus = "340282366920938463463374607431768211297",
+    generator = "5",
+    limbs = 3,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U16,
+    num_bits = generic_array::typenum::U128,
+);
+
+big_prime_field!(
+    /// The finite field over the prime
     /// $`P = 2^{256} - 2^{224} + 2^{192} + 2^{96} - 1
     ///     = 115792089210356248762697446949407573530086143415290314195533631308867097853951`$.
     F256p,

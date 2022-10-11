@@ -57,13 +57,14 @@ finite_field_benchmarks!(f2, scuttlebutt::field::F2,);
 finite_field_benchmarks!(f61p, scuttlebutt::field::F61p,);
 finite_field_benchmarks!(f64b, scuttlebutt::field::F64b,);
 finite_field_benchmarks!(f128b, scuttlebutt::field::F128b,);
-finite_field_benchmarks!(f128p, scuttlebutt::field::F128p,);
 
 finite_field_benchmarks!(f40b, scuttlebutt::field::F40b,);
 finite_field_benchmarks!(f45b, scuttlebutt::field::F45b,);
 finite_field_benchmarks!(f56b, scuttlebutt::field::F56b,);
 finite_field_benchmarks!(f63b, scuttlebutt::field::F63b,);
 
+#[cfg(feature = "big-fields")]
+finite_field_benchmarks!(f128p, scuttlebutt::field::F128pp,);
 #[cfg(feature = "big-fields")]
 finite_field_benchmarks!(f256p, scuttlebutt::field::F256p,);
 #[cfg(feature = "big-fields")]
@@ -79,7 +80,6 @@ criterion::criterion_main!(
     f61p::f61p,
     f64b::f64b,
     f128b::f128b,
-    f128p::f128p,
     f40b::f40b,
     f45b::f45b,
     f56b::f56b,
@@ -97,6 +97,7 @@ criterion::criterion_main!(
     f45b::f45b,
     f56b::f56b,
     f63b::f63b,
+    f128p::f128p,
     f256p::f256p,
     f384p::f384p,
     f384q::f384q,

@@ -201,7 +201,7 @@ mod tests {
     use proptest::prelude::*;
     use rand::Rng;
     use scuttlebutt::{
-        field::{F128b, F128p, F40b, F61p, FiniteField, F2},
+        field::{F128b, F40b, F61p, FiniteField, F2},
         utils::unpack_bits,
     };
 
@@ -271,7 +271,6 @@ mod tests {
         };
     }
     test_ggm!(
-        (fp, F128p, NoSpecialization),
         (f61p, F61p, NoSpecialization),
         (f2, F2, NoSpecialization),
         (f128b, F128b, NoSpecialization),
