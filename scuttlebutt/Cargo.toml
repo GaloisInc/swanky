@@ -31,7 +31,7 @@ smallvec = "1.8.0"
 bytemuck = { version = "1.8.0", features = ["derive"] }
 vectoreyes = { path = "../vectoreyes" }
 ndarray = "0.15.4"
-num-traits = "0.2.14"
+num-traits = "0.2.15"
 ff = { git = "https://github.com/GaloisInc/ff", rev = "81afd509", features = ["derive"], optional = true }
 
 

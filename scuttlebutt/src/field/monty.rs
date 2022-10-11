@@ -483,6 +483,8 @@ macro_rules! implement_finite_field_for_monty {
             }
         }
         $crate::field::finite_field_serde_implementation!($monty);
+
+        $crate::field::num_traits_zero_and_one!($monty);
     };
 }
 
