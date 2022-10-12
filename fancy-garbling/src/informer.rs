@@ -226,8 +226,7 @@ impl<F: Fancy + FancyInput<Item = <F as Fancy>::Item, Error = <F as Fancy>::Erro
         self.stats
             .garbler_input_moduli
             .extend(moduli.iter().cloned());
-        let values = vec![0; moduli.len()];
-        self.underlying.encode_many(&values, moduli)
+        self.underlying.receive_many(moduli)
     }
 
     fn encode_many(

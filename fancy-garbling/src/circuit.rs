@@ -257,12 +257,12 @@ impl<C: EvaluableCircuit<Informer<Dummy>>> CircuitInfo for C {
         let gb = self
             .get_garbler_input_refs()
             .iter()
-            .map(|r| informer.receive(r.modulus()))
+            .map(|r| informer.encode(0, r.modulus()))
             .collect::<Result<Vec<DummyVal>, DummyError>>()?;
         let ev = self
             .get_evaluator_input_refs()
             .iter()
-            .map(|r| informer.receive(r.modulus()))
+            .map(|r| informer.encode(0, r.modulus()))
             .collect::<Result<Vec<DummyVal>, DummyError>>()?;
 
         let _outputs = self.eval(&mut informer, &gb, &ev)?;
