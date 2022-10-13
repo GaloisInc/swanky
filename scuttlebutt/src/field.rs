@@ -526,10 +526,10 @@ pub use f61p::F61p;
 mod f2_19x3_26;
 pub use f2_19x3_26::F2_19x3_26;
 
-#[cfg(feature = "big-fields")]
-mod big_prime_fields;
-#[cfg(feature = "big-fields")]
-pub use big_prime_fields::{F128p, F256p, F384p, F384q};
+#[cfg(feature = "ff")]
+mod prime_field_using_ff;
+#[cfg(feature = "ff")]
+pub use prime_field_using_ff::{F128p, F256p, F384p, F384q, Fbls12381, Fbn254};
 
 pub mod serialization;
 

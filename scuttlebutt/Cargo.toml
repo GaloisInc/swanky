@@ -11,7 +11,7 @@ edition = "2021"
 publish = false
 
 [features]
-big-fields = ["ff", "rand_chacha"]
+ff = ["dep:ff", "rand_chacha"]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
 serde = []
