@@ -1,4 +1,4 @@
-// This macro constructs a large (i.e., > 128 bit) prime finite field using the `ff` library.
+// This macro constructs a prime finite field using the `ff` library.
 // * $name: The name of the field.
 // * $mod_name: The name of the module.
 // * $modulus: The prime modulus, given as a string.
@@ -10,7 +10,7 @@
 //    overflows `[u64; $actual_limbs]`.
 // * $num_bytes: The number of bytes required to store `$modulus`, given as a `generic_array::typenum`.
 // * $num_bits: The number of bits required to store `$modulus`, given as a `generic_array::typenum`.
-macro_rules! big_prime_field {
+macro_rules! prime_field_using_ff {
     (
         $(#[$m: meta])*
         $name: ident,
@@ -248,7 +248,7 @@ macro_rules! big_prime_field {
     }
 }
 
-big_prime_field!(
+prime_field_using_ff!(
     /// The finite field over the prime
     /// $`P = 2^{384} - 2^{128} - 2^{96} + 2^{32} - 1
     ///     = 39402006196394479212279040100143613805079739270465446667948293404245721771496870329047266088258938001861606973112319`$.
@@ -262,7 +262,7 @@ big_prime_field!(
     num_bits = generic_array::typenum::U384,
 );
 
-big_prime_field!(
+prime_field_using_ff!(
     /// The finite field over the prime
     /// $`Q = 39402006196394479212279040100143613805079739270465446667946905279627659399113263569398956308152294913554433653942643`$.
     F384q,
@@ -275,7 +275,7 @@ big_prime_field!(
     num_bits = generic_array::typenum::U384,
 );
 
-big_prime_field!(
+prime_field_using_ff!(
     /// The finite field over the prime
     /// $`P = 2^{128} - 159`$.
     F128p,
@@ -288,7 +288,7 @@ big_prime_field!(
     num_bits = generic_array::typenum::U128,
 );
 
-big_prime_field!(
+prime_field_using_ff!(
     /// The finite field over the prime
     /// $`P = 2^{256} - 2^{224} + 2^{192} + 2^{96} - 1
     ///     = 115792089210356248762697446949407573530086143415290314195533631308867097853951`$.
@@ -300,4 +300,28 @@ big_prime_field!(
     actual_limbs = 4,
     num_bytes = generic_array::typenum::U32,
     num_bits = generic_array::typenum::U256,
+);
+
+prime_field_using_ff!(
+    /// The BLS12-381 finite field.
+    Fbls12381,
+    fbls12381,
+    modulus = "52435875175126190479447740508185965837690552500527637822603658699938581184513",
+    generator = "7",
+    limbs = 4,
+    actual_limbs = 4,
+    num_bytes = generic_array::typenum::U32,
+    num_bits = generic_array::typenum::U255,
+);
+
+prime_field_using_ff!(
+    /// The BN-254 finite field.
+    Fbn254,
+    fbn254,
+    modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+    generator = "5",
+    limbs = 4,
+    actual_limbs = 4,
+    num_bytes = generic_array::typenum::U32,
+    num_bits = generic_array::typenum::U254,
 );
