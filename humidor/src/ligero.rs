@@ -62,16 +62,17 @@
 //
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
-use std::ops::Range;
-
 use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, Axis};
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::FiniteField;
+#[cfg(test)]
+use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::{AesRng, Block};
 use sprs::{CsMat, TriMat};
+use std::ops::Range;
 
 type HashOutput<T> = digest::Output<T>;
 
@@ -405,6 +406,9 @@ impl Arbitrary for Secret<TestField, TestHash> {
             .boxed()
     }
 }
+
+#[cfg(test)]
+use scuttlebutt::ring::FiniteRing;
 
 #[cfg(test)]
 proptest! {

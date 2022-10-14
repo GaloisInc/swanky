@@ -13,7 +13,9 @@ use rand::{
     distributions::{Distribution, Uniform},
     CryptoRng, Rng, SeedableRng,
 };
-use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block, Malicious, SemiHonest};
+use scuttlebutt::{
+    field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng, Block, Malicious, SemiHonest,
+};
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.

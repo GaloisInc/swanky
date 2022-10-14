@@ -1,70 +1,11 @@
 //! This module defines finite fields.
 
-use crate::field::polynomial::Polynomial;
+use crate::{field::polynomial::Polynomial, ring::FiniteRing};
 use generic_array::{ArrayLength, GenericArray};
-use rand_core::RngCore;
-use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    fmt::Debug,
-    hash::Hash,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-};
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use std::ops::{Div, DivAssign};
 
-/// Types that implement this trait are finite field elements.
-pub trait FiniteField:
-    'static
-    + Send
-    + Sync
-    + Hash
-    + Debug
-    + PartialEq
-    + Eq
-    + Default
-    + Sized
-    + ConstantTimeEq
-    + ConditionallySelectable
-    + Clone
-    + Copy
-    + AddAssign<Self>
-    + SubAssign<Self>
-    + MulAssign<Self>
-    + DivAssign<Self>
-    + Add<Self, Output = Self>
-    + Sub<Self, Output = Self>
-    + Mul<Self, Output = Self>
-    + Div<Self, Output = Self>
-    + Neg<Output = Self>
-    + std::iter::Sum
-    + std::iter::Product
-    + Serialize
-    + DeserializeOwned
-{
-    // TODO: make these GATs over the Read/Write type once GATs are stabilized
-    /// A way to serialize field elements of this type.
-    ///
-    /// See [`serialization`] for more info.
-    type Serializer: serialization::FiniteFieldSerializer<Self>;
-    /// A way to deserialize field elements of this type.
-    ///
-    /// See [`serialization`] for more info.
-    type Deserializer: serialization::FiniteFieldDeserializer<Self>;
-    /// The number of bytes in the byte representation for this field element.
-    type ByteReprLen: ArrayLength<u8>;
-    /// The error that can result from trying to decode an invalid byte sequence.
-    type FromBytesError: std::error::Error + Send + Sync + 'static;
-    /// Deserialize a field element from a byte array.
-    ///
-    /// NOTE: for security purposes, this function will accept exactly one byte sequence for each
-    /// field element.
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError>;
-    /// Serialize a field element into a byte array.
-    ///
-    /// Consider using [`Self::Serializer`] if you need to serialize several field elements.
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
-
+/// Types that implement this trait are finite fields.
+pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// The prime-order subfield of the finite field.
     type PrimeField: PrimeFiniteField + IsSubfieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
@@ -85,25 +26,10 @@ pub trait FiniteField:
     /// A fused "lift from prime subfield and then multiply" operation. This operation can be much
     /// faster than manually lifting and then multiplying.
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self;
-    /// Construct a field element from the given uniformly chosen random bytes.
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self;
-    /// Generate a random field element.
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self;
-    /// Generate a random non-zero field element.
-    fn random_nonzero<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-        loop {
-            let out = Self::random(rng);
-            if out != Self::ZERO {
-                return out;
-            }
-        }
-    }
+
     /// The generator for the multiplicative group.
     const GENERATOR: Self;
-    /// The additive identity element.
-    const ZERO: Self;
-    /// The multiplicative identity element.
-    const ONE: Self;
+
     /// The number of bits in the bit decomposition of any element of this finite field.
     ///
     /// This number should be equal to (for the field $`\textsf{GF}(p^r)`$):
@@ -115,7 +41,7 @@ pub trait FiniteField:
     type NumberOfBitsInBitDecomposition: ArrayLength<bool> + ArrayLength<F2>;
     /// Decompose the given field element into bits.
     ///
-    /// This bit decompostion should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
+    /// This bit decomposition should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
     ///
     /// Let $`p`$ be a positive prime. Let $`r`$ be a positive integer.
     /// Let $`m=\lceil\log_2 p\rceil`$, the number of bits needed to represent $`p`$.
@@ -145,60 +71,6 @@ pub trait FiniteField:
     /// # Panics
     /// This function will panic if `*self == Self::zero()`
     fn inverse(&self) -> Self;
-
-    /// Compute `self` to the power of `n`.
-    /// # Constant-Time
-    /// This function will execute in constant-time, regardless of `n`'s value.
-    fn pow(&self, n: u128) -> Self {
-        self.pow_bounded(n, 128)
-    }
-
-    /// Compute `self` to the power of `n`, where `n` is guaranteed to be `<= 2^bound`.
-    /// # Constant-Time
-    /// This function is constant time in `n`, but _not_ constant time in `bound`.
-    #[inline]
-    fn pow_bounded(&self, n: u128, bound: u16) -> Self {
-        debug_assert!(bound <= 128);
-        debug_assert_eq!(
-            // Avoid overflow panic if `bound == 128`
-            if bound != 128 { n >> bound } else { 0 },
-            0
-        );
-        let mut r0 = Self::ONE;
-        let mut r1 = *self;
-        for i in (0..bound).rev() {
-            // This is equivalent to the following code, but constant-time:
-            /*if n & (1 << i) == 0 {
-                r1.mul_assign(r0);
-                r0.mul_assign(r0);
-            } else {
-                r0.mul_assign(r1);
-                r1.mul_assign(r1);
-            }*/
-            let bit_is_high = Choice::from((n & (1 << i) != 0) as u8);
-            let operand = Self::conditional_select(&r0, &r1, bit_is_high);
-            r0 *= operand;
-            r1 *= operand;
-        }
-        r0
-    }
-
-    /// Compute `self` to the power of `n`, **in non-constant time**.
-    fn pow_var_time(&self, n: u128) -> Self {
-        let mut acc = Self::ONE;
-        let mut b = *self;
-        let mut n = n;
-
-        while n != 0 {
-            if n & 0b1 == 0b1 {
-                acc = b * acc;
-            }
-            b = b * b;
-            n >>= 1;
-        }
-
-        acc
-    }
 }
 
 // TODO: so that we can break things into crates more easily, turn this into IsSuperfieldOf
@@ -252,22 +124,22 @@ macro_rules! num_traits_zero_and_one {
         impl num_traits::Zero for $f {
             #[inline]
             fn zero() -> Self {
-                <$f as crate::field::FiniteField>::ZERO
+                <$f as crate::field::FiniteRing>::ZERO
             }
             #[inline]
             fn is_zero(&self) -> bool {
-                *self == <$f as crate::field::FiniteField>::ZERO
+                *self == <$f as crate::field::FiniteRing>::ZERO
             }
         }
 
         impl num_traits::One for $f {
             #[inline]
             fn one() -> Self {
-                <$f as crate::field::FiniteField>::ONE
+                <$f as crate::field::FiniteRing>::ONE
             }
             #[inline]
             fn is_one(&self) -> bool {
-                *self == <$f as crate::field::FiniteField>::ONE
+                *self == <$f as crate::field::FiniteRing>::ONE
             }
         }
     };
@@ -289,11 +161,11 @@ macro_rules! call_with_big_finite_fields {
         $f::<$crate::field::F45b>($($arg),*);
         $f::<$crate::field::F56b>($($arg),*);
         $f::<$crate::field::F63b>($($arg),*);
-        #[cfg(feature = "big-fields")]
+        #[cfg(feature = "ff")]
         $f::<$crate::field::F128p>($($arg),*);
-        #[cfg(feature = "big-fields")]
+        #[cfg(feature = "ff")]
         $f::<$crate::field::F384p>($($arg),*);
-        #[cfg(feature = "big-fields")]
+        #[cfg(feature = "ff")]
         $f::<$crate::field::F384q>($($arg),*);
     }};
 }
@@ -368,132 +240,18 @@ macro_rules! binop {
     };
 }
 
-macro_rules! finite_field_serde_implementation {
-    ($f:ident) => {
-        impl serde::Serialize for $f {
-            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                let bytes = <Self as $crate::field::FiniteField>::to_bytes(&self);
-                serializer.serialize_bytes(&bytes)
-            }
-        }
-
-        impl<'de> serde::Deserialize<'de> for $f {
-            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                struct FieldVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
-                    type Value = $f;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        use generic_array::typenum::Unsigned;
-                        write!(
-                            formatter,
-                            "a field element {} ({} bytes)",
-                            std::any::type_name::<Self>(),
-                            <$f as $crate::field::FiniteField>::ByteReprLen::USIZE
-                        )
-                    }
-
-                    fn visit_borrowed_bytes<E: serde::de::Error>(
-                        self,
-                        v: &'de [u8],
-                    ) -> Result<Self::Value, E> {
-                        use generic_array::typenum::Unsigned;
-                        if v.len() != <$f as $crate::field::FiniteField>::ByteReprLen::USIZE {
-                            return Err(E::invalid_length(v.len(), &self));
-                        }
-                        let bytes = generic_array::GenericArray::from_slice(v);
-                        <$f as $crate::field::FiniteField>::from_bytes(&bytes)
-                            .map_err(serde::de::Error::custom)
-                    }
-
-                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-                    where
-                        A: serde::de::SeqAccess<'de>,
-                    {
-                        use serde::de::Error;
-                        let mut bytes = generic_array::GenericArray::<
-                            u8,
-                            <$f as $crate::field::FiniteField>::ByteReprLen,
-                        >::default();
-                        for (i, byte) in bytes.iter_mut().enumerate() {
-                            *byte = match seq.next_element()? {
-                                Some(e) => e,
-                                None => return Err(A::Error::invalid_length(i + 1, &self)),
-                            };
-                        }
-                        if let Some(_) = seq.next_element::<u8>()? {
-                            return Err(A::Error::invalid_length(bytes.len() + 1, &self));
-                        }
-                        <$f as $crate::field::FiniteField>::from_bytes(&bytes)
-                            .map_err(serde::de::Error::custom)
-                    }
-                }
-
-                deserializer.deserialize_bytes(FieldVisitor)
-            }
-        }
-    };
-}
-// So we can use the macro within another macro.
-pub(crate) use finite_field_serde_implementation;
-
 macro_rules! field_ops {
-    ($f:ident) => {
-        impl std::iter::Sum for $f {
-            fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-                iter.fold($f::ZERO, std::ops::Add::add)
-            }
-        }
+    ($f:ident $($tt:tt)*) => {
+        crate::ring::ring_ops!($f $($tt)*);
 
-        field_ops!($f, SUM_ALREADY_DEFINED);
-    };
-
-    // Compared to the previous pattern, `Sum` is missing and assumed
-    // to be implemented by the field directly
-    ( $f:ident, SUM_ALREADY_DEFINED) => {
-        impl PartialEq for $f {
-            fn eq(&self, other: &Self) -> bool {
-                self.ct_eq(other).into()
-            }
-        }
-
-        impl Default for $f {
-            fn default() -> Self {
-                Self::ZERO
-            }
-        }
-
-        impl std::iter::Product for $f {
-            fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-                iter.fold($f::ONE, std::ops::Mul::mul)
-            }
-        }
-        binop!(Add, add, std::ops::AddAssign::add_assign, $f);
-        binop!(Sub, sub, std::ops::SubAssign::sub_assign, $f);
-        binop!(Mul, mul, std::ops::MulAssign::mul_assign, $f);
         binop!(Div, div, std::ops::DivAssign::div_assign, $f);
-        assign_op!(AddAssign, add_assign, $f);
-        assign_op!(SubAssign, sub_assign, $f);
-        assign_op!(MulAssign, mul_assign, $f);
         assign_op!(DivAssign, div_assign, $f);
-        num_traits_zero_and_one!($f);
-
-        impl std::ops::Neg for $f {
-            type Output = $f;
-
-            fn neg(self) -> Self::Output {
-                $f::ZERO - self
-            }
-        }
 
         impl<'a> std::ops::DivAssign<&'a $f> for $f {
             fn div_assign(&mut self, rhs: &Self) {
                 *self *= rhs.inverse();
             }
         }
-
-        finite_field_serde_implementation!($f);
     };
 }
 
@@ -530,8 +288,6 @@ pub use f2_19x3_26::F2_19x3_26;
 mod prime_field_using_ff;
 #[cfg(feature = "ff")]
 pub use prime_field_using_ff::{F128p, F256p, F384p, F384q, Fbls12381, Fbn254};
-
-pub mod serialization;
 
 pub mod polynomial;
 

@@ -149,7 +149,7 @@ impl std::ops::Rem<F2_19x3_26> for F2_19x3_26 {
     type Output = Self;
     #[inline]
     fn rem(self, _other: Self) -> Self {
-        <F2_19x3_26 as crate::field::FiniteField>::ZERO
+        <F2_19x3_26 as crate::ring::FiniteRing>::ZERO
     }
 }
 
@@ -161,4 +161,8 @@ impl num_traits::Num for F2_19x3_26 {
 }
 
 #[cfg(test)]
-test_field!(test_f2_19x3_26, F2_19x3_26);
+mod tests {
+    test_field!(test_field, crate::field::F2_19x3_26);
+    crate::ring::test_ring!(test_ring, crate::field::F2_19x3_26);
+    crate::serialization::test_serialization!(test_serialization, crate::field::F2_19x3_26);
+}

@@ -9,7 +9,7 @@ use crate::errors::Error;
 use crate::svole::wykw::specialization::FiniteFieldSpecialization;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::{field::FiniteField as FF, AbstractChannel, AesRng};
+use scuttlebutt::{field::FiniteField as FF, ring::FiniteRing, AbstractChannel, AesRng};
 use std::marker::PhantomData;
 
 pub(super) struct Sender<FE: FF, S: FiniteFieldSpecialization<FE>> {
@@ -65,8 +65,8 @@ impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
             z += chi * w;
             x += chi.multiply_by_prime_subfield(u);
         }
-        channel.write_fe(&x)?;
-        channel.write_fe(&z)?;
+        channel.write_serializable(&x)?;
+        channel.write_serializable(&z)?;
         Ok(uws)
     }
 }
@@ -105,8 +105,8 @@ impl<FE: FF> Receiver<FE> {
         }
         channel.write_block(&seed)?;
         channel.flush()?;
-        let x = channel.read_fe()?;
-        let z: FE = channel.read_fe()?;
+        let x = channel.read_serializable()?;
+        let z: FE = channel.read_serializable()?;
         let mut delta = self.copee.delta();
         delta *= x;
         delta += y;

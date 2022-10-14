@@ -6,6 +6,7 @@ macro_rules! finite_field_benchmarks {
         mod $name {
             use criterion::{black_box, criterion_group, Criterion};
             use scuttlebutt::field::FiniteField;
+            use scuttlebutt::ring::FiniteRing;
             use scuttlebutt::AesRng;
 
             fn add(c: &mut Criterion) {

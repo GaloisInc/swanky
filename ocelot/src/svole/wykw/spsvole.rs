@@ -17,6 +17,7 @@ use rand::{
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     field::FiniteField as FF,
+    ring::FiniteRing,
     utils::unpack_bits,
     AbstractChannel, AesRng, Block, Malicious,
 };
@@ -45,12 +46,12 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, E
     let mut com = [0u8; 32];
     channel.read_bytes(&mut com)?;
 
-    channel.write_fe(&x)?;
+    channel.write_serializable(&x)?;
     channel.flush()?;
 
     let mut seed = [0u8; 32];
     channel.read_bytes(&mut seed)?;
-    let y = channel.read_fe::<FE>()?;
+    let y = channel.read_serializable::<FE>()?;
 
     let mut commit = ShaCommitment::new(seed);
     commit.input(&y.to_bytes());
@@ -76,13 +77,13 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     channel.write_bytes(&com)?;
     channel.flush()?;
 
-    let x = channel.read_fe::<FE>()?;
+    let x = channel.read_serializable::<FE>()?;
     if x != y {
         return Err(Error::InvalidOpening);
     }
 
     channel.write_bytes(&seed)?;
-    channel.write_fe(&y)?;
+    channel.write_serializable(&y)?;
     channel.flush()?;
 
     Ok(x == y)
@@ -135,7 +136,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         for (a, _) in base_uws.iter().copied() {
             let beta = FE::PrimeField::random_nonzero(&mut rng);
             let a_prime = beta - a;
-            channel.write_fe(&a_prime)?;
+            channel.write_serializable(&a_prime)?;
             betas.push(beta);
         }
         let distribution = Uniform::from(0..n);
@@ -163,7 +164,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                 &self.ggm_seeds,
                 &mut result[i * n..(i + 1) * n],
             );
-            let d: FE = channel.read_fe()?;
+            let d: FE = channel.read_serializable()?;
             result[i * n + alpha] = (beta, w - (d + sum));
         }
 
@@ -209,7 +210,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             .iter()
             .zip(x_stars.iter().zip(base_xzs.iter().copied()))
         {
-            channel.write_fe(&(*x_star - x))?;
+            channel.write_serializable(&(*x_star - x))?;
             va -= *pows * z;
         }
         channel.write_block(&seed)?;
@@ -275,7 +276,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let mut gammas = Vec::with_capacity(t);
         let mut result = vec![FE::ZERO; n * t];
         for v in base_vs.iter() {
-            let a_prime = channel.read_fe::<FE::PrimeField>()?;
+            let a_prime = channel.read_serializable::<FE::PrimeField>()?;
             let gamma = *v - self.delta.multiply_by_prime_subfield(a_prime);
             gammas.push(gamma);
         }
@@ -295,7 +296,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         self.ot.send(channel, &keys, rng)?;
         for (i, gamma) in gammas.into_iter().enumerate() {
             let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
-            channel.write_fe(&d)?;
+            channel.write_serializable(&d)?;
         }
         channel.flush()?;
 
@@ -314,7 +315,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let r = FE::PolynomialFormNumCoefficients::to_usize();
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
-            *item = channel.read_fe()?;
+            *item = channel.read_serializable()?;
         }
         let y = self
             .pows

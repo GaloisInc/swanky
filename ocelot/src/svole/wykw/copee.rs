@@ -8,7 +8,9 @@ use crate::{
 };
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{field::FiniteField as FF, AbstractChannel, Aes128, Block, Malicious};
+use scuttlebutt::{
+    field::FiniteField as FF, ring::FiniteRing, AbstractChannel, Aes128, Block, Malicious,
+};
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
@@ -86,7 +88,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 sum += two.multiply_by_prime_subfield(w0);
-                channel.write_fe(&(w0 - w1 - *input))?;
+                channel.write_serializable(&(w0 - w1 - *input))?;
             }
             w += sum * *pow;
         }
@@ -137,7 +139,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let w = prf::<FE>(&self.aes_objs[j * self.nbits + k], pt);
-                let mut tau = channel.read_fe::<FE::PrimeField>()?;
+                let mut tau = channel.read_serializable::<FE::PrimeField>()?;
                 let choice = Choice::from(self.choices[j + k] as u8);
                 tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
@@ -155,6 +157,7 @@ mod tests {
     use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
     use scuttlebutt::{
         field::{F128b, F61p, FiniteField as FF, F2},
+        ring::FiniteRing,
         AesRng, Channel,
     };
     use std::{
@@ -162,7 +165,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_copee_<FE: FF + Send>(len: usize) {
+    fn test_copee_<FE: FF>(len: usize) {
         let mut rng = AesRng::new();
         let input = FE::PrimeField::random(&mut rng);
         let (sender, receiver) = UnixStream::pair().unwrap();

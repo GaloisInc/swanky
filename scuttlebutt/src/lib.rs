@@ -16,6 +16,9 @@ pub mod commitment;
 pub mod field;
 mod hash_aes;
 mod rand_aes;
+pub mod ring;
+#[macro_use]
+pub mod serialization;
 pub mod utils;
 
 pub use crate::{

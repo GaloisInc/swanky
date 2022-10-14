@@ -8,6 +8,8 @@ use crate::svole::wykw::{LpnParams, Receiver, Sender};
 use crate::svole::{SVoleReceiver, SVoleSender};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::ring::FiniteRing;
+use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::time::Instant;
 use subtle::{Choice, ConditionallySelectable};
@@ -131,7 +133,7 @@ impl<FE: FiniteField> FComProver<FE> {
             let r = self.random(channel, rng)?;
             let y = x[i] - r.0;
             out.push(r.1);
-            channel.write_fe::<FE::PrimeField>(&y)?;
+            channel.write_serializable::<FE::PrimeField>(&y)?;
         }
         Ok(())
     }
@@ -179,7 +181,7 @@ impl<FE: FiniteField> FComProver<FE> {
             let chi = FE::random(&mut rng);
             m += chi * *x_mac;
         }
-        channel.write_fe::<FE>(&m)?;
+        channel.write_serializable::<FE>(&m)?;
         channel.flush()?;
         Ok(())
     }
@@ -191,7 +193,7 @@ impl<FE: FiniteField> FComProver<FE> {
     ) -> Result<(), Error> {
         let mut hasher = blake3::Hasher::new();
         for MacProver(x, _) in batch.iter() {
-            channel.write_fe::<FE::PrimeField>(x)?;
+            channel.write_serializable::<FE::PrimeField>(x)?;
             hasher.update(&x.to_bytes());
         }
 
@@ -203,7 +205,7 @@ impl<FE: FiniteField> FComProver<FE> {
             let chi = FE::random(&mut rng);
             m += chi * *x_mac;
         }
-        channel.write_fe::<FE>(&m)?;
+        channel.write_serializable::<FE>(&m)?;
         channel.flush()?;
 
         Ok(())
@@ -218,7 +220,7 @@ impl<FE: FiniteField> FComProver<FE> {
         let mut sum_a0 = FE::ZERO;
         let mut sum_a1 = FE::ZERO;
 
-        let chi = channel.read_fe()?;
+        let chi = channel.read_serializable()?;
         let mut chi_power = chi;
 
         for (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) in triples.iter() {
@@ -246,8 +248,8 @@ impl<FE: FiniteField> FComProver<FE> {
         let u = sum_a0 + mask_mac;
         let v = sum_a1 + mask;
 
-        channel.write_fe(&u)?;
-        channel.write_fe(&v)?;
+        channel.write_serializable(&u)?;
+        channel.write_serializable(&v)?;
         channel.flush()?;
 
         Ok(())
@@ -388,7 +390,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
     ) -> Result<(), Error> {
         for _i in 0..num {
             let r = self.random(channel, rng)?;
-            let y = channel.read_fe::<FE::PrimeField>()?;
+            let y = channel.read_serializable::<FE::PrimeField>()?;
             out.push(MacVerifier(r.0 - self.delta.multiply_by_prime_subfield(y)));
         }
         Ok(())
@@ -440,7 +442,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             let chi = FE::random(&mut rng);
             key_chi += chi * *key;
         }
-        let m = channel.read_fe::<FE>()?;
+        let m = channel.read_serializable::<FE>()?;
 
         let b = key_chi == m;
         Ok(b)
@@ -455,7 +457,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         let mut hasher = blake3::Hasher::new();
         out.clear();
         for _ in 0..keys.len() {
-            let x = channel.read_fe::<FE::PrimeField>()?;
+            let x = channel.read_serializable::<FE::PrimeField>()?;
             out.push(x);
             hasher.update(&x.to_bytes());
         }
@@ -472,7 +474,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             key_chi += chi * key;
             x_chi += chi.multiply_by_prime_subfield(x);
         }
-        let m = channel.read_fe::<FE>()?;
+        let m = channel.read_serializable::<FE>()?;
 
         assert_eq!(out.len(), keys.len());
         if key_chi + self.delta * x_chi == m {
@@ -489,7 +491,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         triples: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
     ) -> Result<(), Error> {
         let chi = FE::random(rng);
-        channel.write_fe::<FE>(&chi)?;
+        channel.write_serializable::<FE>(&chi)?;
         channel.flush()?;
 
         let mut sum_b = FE::ZERO;
@@ -512,8 +514,8 @@ impl<FE: FiniteField> FComVerifier<FE> {
             mask_mac += v_m * x_i;
         }
 
-        let u = channel.read_fe::<FE>()?;
-        let v = channel.read_fe::<FE>()?;
+        let u = channel.read_serializable::<FE>()?;
+        let v = channel.read_serializable::<FE>()?;
 
         let b_plus = sum_b + mask_mac;
         if b_plus == (u + (-self.delta) * v) {
@@ -580,6 +582,7 @@ mod tests {
     use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::{
         field::{F40b, F61p, FiniteField},
+        ring::FiniteRing,
         AbstractChannel, AesRng, Channel,
     };
     use std::{
@@ -644,7 +647,7 @@ mod tests {
             for _ in 0..count {
                 let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
                 let cst = F61p::random(&mut rng);
-                channel.write_fe::<F61p>(&cst).unwrap();
+                channel.write_serializable::<F61p>(&cst).unwrap();
                 channel.flush().unwrap();
                 let m = fcom.affine_mult_cst(cst, MacProver(x, x_mac));
                 v.push(m);
@@ -665,7 +668,7 @@ mod tests {
         let mut v = Vec::new();
         for _ in 0..count {
             let x_mac = fcom.random(&mut channel, &mut rng).unwrap();
-            let cst = channel.read_fe().unwrap();
+            let cst = channel.read_serializable().unwrap();
             let m_mac = fcom.affine_mult_cst(cst, x_mac);
             v.push(m_mac);
             let a_mac = fcom.affine_add_cst(cst, x_mac);

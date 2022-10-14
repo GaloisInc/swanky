@@ -11,7 +11,7 @@ pub use track_channel::TrackChannel;
 #[cfg(unix)]
 pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
-use crate::{field::FiniteField, Block, Block512};
+use crate::{serialization::CanonicalSerialize, Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use generic_array::GenericArray;
@@ -197,19 +197,19 @@ pub trait AbstractChannel {
         Ok(pt)
     }
 
-    /// Read a `Field element` from the channel.
-    fn read_fe<FE: FiniteField>(&mut self) -> Result<FE> {
-        let mut buf = GenericArray::<u8, FE::ByteReprLen>::default();
+    /// Read a `CanonicalSerialize` object from the channel.
+    fn read_serializable<E: CanonicalSerialize>(&mut self) -> Result<E> {
+        let mut buf = GenericArray::<u8, E::ByteReprLen>::default();
         self.read_bytes(&mut buf[..])?;
-        let fe = match FE::from_bytes(&buf) {
+        let fe = match E::from_bytes(&buf) {
             Ok(fe) => fe,
             Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
         };
         Ok(fe)
     }
 
-    /// Write a `Field element` to the channel.
-    fn write_fe<FE: FiniteField>(&mut self, x: &FE) -> Result<()> {
+    /// Write a `CanonicalSerialize` object to the channel.
+    fn write_serializable<E: CanonicalSerialize>(&mut self, x: &E) -> Result<()> {
         self.write_bytes(&x.to_bytes())?;
         Ok(())
     }

@@ -1,11 +1,10 @@
-use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
+use crate::field::{polynomial::Polynomial, FiniteField, PrimeFiniteField};
+use crate::ring::FiniteRing;
+use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-
-#[cfg(test)]
-use proptest::prelude::*;
 
 /// A finite field over the Mersenne Prime 2^61 - 1
 #[derive(Clone, Copy, Eq, Debug, Hash)]
@@ -26,9 +25,29 @@ impl ConditionallySelectable for F61p {
         F61p(u64::conditional_select(&a.0, &b.0, choice))
     }
 }
-impl FiniteField for F61p {
-    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
-    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
+
+impl FiniteRing for F61p {
+    /// This has a 2^-61 probability of being a biased draw.
+    #[inline]
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        F61p(reduce(
+            u64::from_le_bytes(<[u8; 8]>::try_from(&x[0..8]).unwrap()) as u128,
+        ))
+    }
+
+    /// This has a 2^-61 probability of being a biased draw.
+    #[inline]
+    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        F61p(reduce(rng.next_u64() as u128))
+    }
+
+    const ZERO: Self = F61p(0);
+    const ONE: Self = F61p(1);
+}
+
+impl CanonicalSerialize for F61p {
+    type Serializer = crate::serialization::ByteElementSerializer<Self>;
+    type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BiggerThanModulus;
 
@@ -49,9 +68,13 @@ impl FiniteField for F61p {
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
         self.0.to_le_bytes().into()
     }
+}
 
+impl FiniteField for F61p {
     type PrimeField = Self;
     type PolynomialFormNumCoefficients = generic_array::typenum::U1;
+
+    const GENERATOR: Self = F61p(37);
 
     #[inline]
     fn from_polynomial_coefficients(
@@ -75,24 +98,6 @@ impl FiniteField for F61p {
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         self * pf
     }
-
-    /// This has a 2^-61 probability of being a biased draw.
-    #[inline]
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        F61p(reduce(
-            u64::from_le_bytes(<[u8; 8]>::try_from(&x[0..8]).unwrap()) as u128,
-        ))
-    }
-
-    /// This has a 2^-61 probability of being a biased draw.
-    #[inline]
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-        F61p(reduce(rng.next_u64() as u128))
-    }
-
-    const GENERATOR: Self = F61p(37);
-    const ZERO: Self = F61p(0);
-    const ONE: Self = F61p(1);
 
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U61;
 
@@ -190,19 +195,26 @@ impl PrimeFiniteField for F61p {}
 field_ops!(F61p, SUM_ALREADY_DEFINED);
 
 #[cfg(test)]
-test_field!(test_f61p, F61p);
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
 
-#[cfg(test)]
-proptest! {
-    #[test]
-    fn test_reduce(x in 0u128..((1 << (2 * 61))-1)) {
-        assert_eq!(u128::from(reduce(x)), x % u128::from(MODULUS));
+    test_field!(test_field, crate::field::F61p);
+    crate::ring::test_ring!(test_ring, crate::field::F61p);
+    crate::serialization::test_serialization!(test_serialization, crate::field::F61p);
+
+    #[cfg(test)]
+    proptest! {
+        #[test]
+        fn test_reduce(x in 0u128..((1 << (2 * 61))-1)) {
+            assert_eq!(u128::from(reduce(x)), x % u128::from(MODULUS));
+        }
     }
-}
 
-#[test]
-fn test_sum_overflow() {
-    let neg1 = F61p::ZERO - F61p::ONE;
-    let x = [neg1; 2];
-    assert_eq!(x.iter().map(|x| *x).sum::<F61p>(), neg1 + neg1);
+    #[test]
+    fn test_sum_overflow() {
+        let neg1 = F61p::ZERO - F61p::ONE;
+        let x = [neg1; 2];
+        assert_eq!(x.iter().map(|x| *x).sum::<F61p>(), neg1 + neg1);
+    }
 }

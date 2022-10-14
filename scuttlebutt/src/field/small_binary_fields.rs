@@ -1,4 +1,6 @@
-use super::{BiggerThanModulus, FiniteField, IsSubfieldOf, Polynomial, F2};
+use crate::field::{FiniteField, IsSubfieldOf, Polynomial, F2};
+use crate::ring::FiniteRing;
+use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
 use bytemuck::{TransparentWrapper, Zeroable};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::RngCore;
@@ -101,9 +103,9 @@ macro_rules! small_binary_field {
             }
         }
 
-        impl FiniteField for $name {
-            type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
-            type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
+        impl CanonicalSerialize for $name {
+            type Serializer = crate::serialization::ByteElementSerializer<Self>;
+            type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
             // ceil($num_bits / 8) = ($num_bits + 8 - 1) / 8 = ($num_bits + 7) / 8
             type ByteReprLen = <
                 <generic_array::typenum::U7 as std::ops::Add<$num_bits>>::Output as
@@ -136,8 +138,28 @@ macro_rules! small_binary_field {
                 GenericArray::from_slice(&self.0.to_le_bytes()[0..Self::ByteReprLen::USIZE]).clone()
             }
 
+        }
+
+        impl FiniteRing for $name {
+            #[inline]
+            fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+                Self::from_lower_bits(u128::from_le_bytes(*x) as u64)
+            }
+            #[inline]
+            fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+                Self::from_lower_bits(rng.next_u64())
+            }
+            const ZERO: Self = $name(0);
+            const ONE: Self = $name(1);
+        }
+
+        impl FiniteField for $name {
+
             type PrimeField = F2;
             type PolynomialFormNumCoefficients = $num_bits;
+
+            // This corresponds to the polynomial P(x) = x
+            const GENERATOR: Self = $name(0b10);
 
             fn from_polynomial_coefficients(
                 coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
@@ -150,10 +172,7 @@ macro_rules! small_binary_field {
                 $name(out)
             }
 
-            #[inline]
-            fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-                Self::from_lower_bits(u128::from_le_bytes(*x) as u64)
-            }
+
 
             fn to_polynomial_coefficients(
                 &self,
@@ -170,23 +189,11 @@ macro_rules! small_binary_field {
                 $modulus_fn()
             }
 
-            #[inline]
-            fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-                Self::from_lower_bits(rng.next_u64())
-            }
-
             type NumberOfBitsInBitDecomposition = $num_bits;
 
             fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
                 super::standard_bit_decomposition(u128::from(self.0))
             }
-
-            // This corresponds to the polynomial P(x) = x
-            const GENERATOR: Self = $name(0b10);
-
-            const ZERO: Self = $name(0);
-
-            const ONE: Self = $name(1);
 
             #[inline]
             fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
@@ -268,7 +275,9 @@ macro_rules! small_binary_field {
                     prop_assert_eq!(b_reduced, $name::reduce(b).0);
                 }
             }
-            test_field!(test_field, $name);
+            test_field!(test_field, crate::field::$name);
+            crate::ring::test_ring!(test_ring, crate::field::$name);
+            crate::serialization::test_serialization!(test_serialization, crate::field::$name);
         }
     };
 }

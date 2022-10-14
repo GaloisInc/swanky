@@ -23,7 +23,9 @@ macro_rules! prime_field_using_ff {
         num_bits = $num_bits: ty,
     ) => {
         mod $mod_name {
-            use crate::field::{BiggerThanModulus, FiniteField, Polynomial, PrimeFiniteField};
+            use crate::field::{FiniteField, Polynomial, PrimeFiniteField};
+            use crate::serialization::{CanonicalSerialize, BiggerThanModulus};
+            use crate::ring::FiniteRing;
             use ff::{Field, PrimeField};
             use generic_array::GenericArray;
             use rand_core::{RngCore, SeedableRng};
@@ -74,39 +76,12 @@ macro_rules! prime_field_using_ff {
                 }
             }
 
-            impl FiniteField for $name {
-                type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
-                type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
-
-                fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-                    Self {
-                        internal: Internal::random(rng),
-                    }
-                }
-
-                fn inverse(&self) -> Self {
-                    Self {
-                        internal: self.internal.invert().unwrap(),
-                    }
-                }
-
-                const ZERO: Self = Self {
-                    internal: Internal::ZERO,
-                };
-                const ONE: Self = Self {
-                    internal: Internal::ONE,
-                };
+            impl CanonicalSerialize for $name {
+                type Serializer = crate::serialization::ByteElementSerializer<Self>;
+                type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
 
                 type ByteReprLen = $num_bytes;
                 type FromBytesError = BiggerThanModulus;
-
-                fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-                    let mut seed = [0; 32];
-                    seed[0..16].copy_from_slice(x);
-                    // AES key scheduling is slower than ChaCha20
-                    // TODO: this is still quite slow.
-                    Self::random(&mut rand_chacha::ChaCha20Rng::from_seed(seed))
-                }
 
                 fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
                     let mut bytes = [0u8; $limbs * 8];
@@ -118,6 +93,37 @@ macro_rules! prime_field_using_ff {
                 fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
                     let repr = self.internal.to_repr();
                     *GenericArray::from_slice(&repr.0[0..$actual_limbs * 8])
+                }
+            }
+
+            impl FiniteRing for $name {
+                fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+                    Self {
+                        internal: Internal::random(rng),
+                    }
+                }
+
+                const ZERO: Self = Self {
+                    internal: Internal::ZERO,
+                };
+                const ONE: Self = Self {
+                    internal: Internal::ONE,
+                };
+
+                fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+                    let mut seed = [0; 32];
+                    seed[0..16].copy_from_slice(x);
+                    // AES key scheduling is slower than ChaCha20
+                    // TODO: this is still quite slow.
+                    Self::random(&mut rand_chacha::ChaCha20Rng::from_seed(seed))
+                }
+            }
+
+            impl FiniteField for $name {
+                fn inverse(&self) -> Self {
+                    Self {
+                        internal: self.internal.invert().unwrap(),
+                    }
                 }
 
                 const GENERATOR: Self = Self {
@@ -194,7 +200,12 @@ macro_rules! prime_field_using_ff {
             field_ops!($name);
 
             #[cfg(test)]
-            test_field!(test_field, $name);
+            test_field!(test_field, $crate::field::$name);
+            #[cfg(test)]
+            crate::ring::test_ring!(test_ring, $crate::field::$name);
+            #[cfg(test)]
+            crate::serialization::test_serialization!(test_serialization, $crate::field::$name);
+
 
             #[cfg(test)]
             mod tests {

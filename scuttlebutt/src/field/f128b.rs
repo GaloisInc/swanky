@@ -1,4 +1,8 @@
-use crate::field::{f2::F2, polynomial::Polynomial, FiniteField, IsSubfieldOf};
+use crate::{
+    field::{f2::F2, polynomial::Polynomial, FiniteField, IsSubfieldOf},
+    ring::FiniteRing,
+    serialization::CanonicalSerialize,
+};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use smallvec::smallvec;
@@ -190,11 +194,26 @@ impl<'a> MulAssign<&'a F128b> for F128b {
     }
 }
 
-impl FiniteField for F128b {
-    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
-    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
+impl FiniteRing for F128b {
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        F128b(u128::from_le_bytes(*x))
+    }
+
+    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        let mut bytes = [0; 16];
+        rng.fill_bytes(&mut bytes[..]);
+        F128b(u128::from_le_bytes(bytes))
+    }
+
+    const ZERO: Self = F128b(0);
+    const ONE: Self = F128b(1);
+}
+
+impl CanonicalSerialize for F128b {
+    type Serializer = crate::serialization::ByteElementSerializer<Self>;
+    type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U16;
-    type FromBytesError = super::BytesDeserializationCannotFail;
+    type FromBytesError = crate::serialization::BytesDeserializationCannotFail;
 
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
@@ -205,9 +224,13 @@ impl FiniteField for F128b {
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
         self.0.to_le_bytes().into()
     }
+}
 
+impl FiniteField for F128b {
     type PrimeField = F2;
     type PolynomialFormNumCoefficients = generic_array::typenum::U128;
+
+    const GENERATOR: Self = F128b(2);
 
     fn from_polynomial_coefficients(
         coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
@@ -218,10 +241,6 @@ impl FiniteField for F128b {
             out |= u128::from(u8::from(*x));
         }
         F128b(out)
-    }
-
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        F128b(u128::from_le_bytes(*x))
     }
 
     fn to_polynomial_coefficients(
@@ -245,23 +264,11 @@ impl FiniteField for F128b {
         }
     }
 
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-        let mut bytes = [0; 16];
-        rng.fill_bytes(&mut bytes[..]);
-        F128b(u128::from_le_bytes(bytes))
-    }
-
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
 
     fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
         super::standard_bit_decomposition(self.0)
     }
-
-    // See the conversation here: https://mattermost.galois.com/galwegians/pl/63smzhk9qbnrbbsb1hi6xpejmc
-    const GENERATOR: Self = F128b(2);
-
-    const ZERO: Self = F128b(0);
-    const ONE: Self = F128b(1);
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
@@ -287,7 +294,11 @@ impl IsSubfieldOf<F128b> for F2 {
 field_ops!(F128b);
 
 #[cfg(test)]
-test_field!(test_gf128, F128b);
+mod tests {
+    test_field!(test_field, crate::field::F128b);
+    crate::ring::test_ring!(test_ring, crate::field::F128b);
+    crate::serialization::test_serialization!(test_serialization, crate::field::F128b);
+}
 
 #[test]
 fn test_generator() {

@@ -3,7 +3,12 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::field::{polynomial::Polynomial, BiggerThanModulus, FiniteField, PrimeFiniteField};
+use crate::serialization::{SequenceDeserializer, SequenceSerializer};
+use crate::{
+    field::{polynomial::Polynomial, FiniteField, PrimeFiniteField},
+    ring::FiniteRing,
+    serialization::{BiggerThanModulus, CanonicalSerialize},
+};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use std::{
@@ -11,8 +16,6 @@ use std::{
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-
-use super::serialization::{FiniteFieldDeserializer, FiniteFieldSerializer};
 
 /// A field element in the prime-order finite field $\textsf{GF}(2).$
 #[derive(Debug, Eq, Clone, Copy, Hash, bytemuck::Zeroable)]
@@ -46,9 +49,7 @@ impl ConditionallySelectable for F2 {
     }
 }
 
-impl FiniteField for F2 {
-    type Serializer = F2BitSerializer;
-    type Deserializer = F2BitDeserializer;
+impl FiniteRing for F2 {
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
     fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         // Grab the LSBit from a 32-bit integer. Rand's boolean generation doesn't do this,
@@ -61,9 +62,18 @@ impl FiniteField for F2 {
     }
 
     const ZERO: Self = F2(0);
-
     const ONE: Self = F2(1);
 
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        let mut value = u128::from_le_bytes(*x);
+        value &= 1;
+        F2(value as u8)
+    }
+}
+
+impl CanonicalSerialize for F2 {
+    type Serializer = F2BitSerializer;
+    type Deserializer = F2BitDeserializer;
     type ByteReprLen = generic_array::typenum::U1;
     type FromBytesError = BiggerThanModulus;
 
@@ -75,22 +85,18 @@ impl FiniteField for F2 {
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
         u8::from(*self).to_le_bytes().into()
     }
+}
 
-    const GENERATOR: Self = F2(1);
-
+impl FiniteField for F2 {
     type PrimeField = Self;
     type PolynomialFormNumCoefficients = generic_array::typenum::U1;
+
+    const GENERATOR: Self = F2(1);
 
     fn from_polynomial_coefficients(
         coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
     ) -> Self {
         coeff[0]
-    }
-
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        let mut value = u128::from_le_bytes(*x);
-        value &= 1;
-        F2(value as u8)
     }
 
     fn to_polynomial_coefficients(
@@ -180,7 +186,7 @@ pub struct F2BitSerializer {
     current_word: u64,
     num_bits: usize,
 }
-impl FiniteFieldSerializer<F2> for F2BitSerializer {
+impl SequenceSerializer<F2> for F2BitSerializer {
     fn serialized_size(n: usize) -> usize {
         (n / 64 + (if n % 64 == 0 { 0 } else { 1 })) * 8
     }
@@ -221,7 +227,7 @@ pub struct F2BitDeserializer {
     current_word: u64,
     num_bits: usize,
 }
-impl FiniteFieldDeserializer<F2> for F2BitDeserializer {
+impl SequenceDeserializer<F2> for F2BitDeserializer {
     fn new<R: std::io::Read>(_dst: &mut R) -> std::io::Result<Self> {
         Ok(F2BitDeserializer {
             current_word: 0,
@@ -286,7 +292,9 @@ mod tests {
     test_binop!(test_sub, sub_assign);
     test_binop!(test_mul, mul_assign);
 
-    test_field!(test_f2, F2);
+    test_field!(test_field, crate::field::F2);
+    crate::ring::test_ring!(test_ring, crate::field::F2);
+    crate::serialization::test_serialization!(test_serialization, crate::field::F2);
 
     proptest! {
         #[test]
