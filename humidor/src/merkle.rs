@@ -56,7 +56,7 @@ pub struct Lemma<Field, H: CryptoDigest> {
 }
 
 #[allow(non_snake_case)]
-impl<Field: FiniteField + num_traits::Zero, H: CryptoDigest> Lemma<Field, H> {
+impl<Field: FiniteField, H: CryptoDigest> Lemma<Field, H> {
     /// Create a new proof based on a tree of interleaved-codeword columns.
     pub fn new(tree: &Tree<H>, U: ArrayView2<Field>, some_indices: &[usize]) -> Self {
         let some_indices_u32 = some_indices.iter().map(|&j| j as u32).collect::<Vec<u32>>();

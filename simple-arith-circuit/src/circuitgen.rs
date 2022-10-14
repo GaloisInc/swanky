@@ -6,6 +6,7 @@ use rand::{
     Rng,
 };
 use scuttlebutt::field::{FiniteField, F2};
+use scuttlebutt::ring::FiniteRing;
 
 fn rand_ix_pair(rng: &mut impl Rng, min: Index, max: Index) -> (Index, Index) {
     let s = max - min;

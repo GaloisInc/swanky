@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use subtle::ConstantTimeEq;
 
-use crate::field::BiggerThanModulus;
+use crate::serialization::BiggerThanModulus;
 
 #[cfg(test)]
 use proptest::{prelude::*, *};
@@ -412,15 +412,11 @@ macro_rules! implement_finite_field_for_monty {
                 $crate::field::monty::monty_mul_add(self, a, b)
             }
         }
-        impl $crate::field::FiniteField for $monty {
-            type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
-            type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
-            const ZERO: Self = Self(monty_from_lit!(0, Self::M));
-            const ONE: Self = Self(monty_from_lit!(1, Self::M));
-            const GENERATOR: Self = Self::G;
-
+        impl $crate::serialization::CanonicalSerialize for $monty {
+            type Serializer = crate::serialization::ByteElementSerializer<Self>;
+            type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
             type ByteReprLen = generic_array::typenum::U8;
-            type FromBytesError = $crate::field::BiggerThanModulus;
+            type FromBytesError = $crate::serialization::BiggerThanModulus;
 
             fn to_bytes(&self) -> generic_array::GenericArray<u8, Self::ByteReprLen> {
                 $crate::field::monty::monty_to_bytes(self)
@@ -431,6 +427,11 @@ macro_rules! implement_finite_field_for_monty {
             ) -> Result<Self, Self::FromBytesError> {
                 $crate::field::monty::monty_from_bytes(bytes)
             }
+        }
+
+        impl $crate::ring::FiniteRing for $monty {
+            const ZERO: Self = Self(monty_from_lit!(0, Self::M));
+            const ONE: Self = Self(monty_from_lit!(1, Self::M));
 
             fn from_uniform_bytes(bytes: &[u8; 16]) -> Self {
                 $crate::field::monty::monty_from_uniform_bytes(bytes)
@@ -439,6 +440,10 @@ macro_rules! implement_finite_field_for_monty {
             fn random<R: rand::Rng + ?Sized>(rng: &mut R) -> Self {
                 $crate::field::monty::monty_random(rng)
             }
+        }
+
+        impl $crate::field::FiniteField for $monty {
+            const GENERATOR: Self = Self::G;
 
             type PrimeField = Self;
             type PolynomialFormNumCoefficients = generic_array::typenum::U1;
@@ -482,7 +487,7 @@ macro_rules! implement_finite_field_for_monty {
                 ))
             }
         }
-        $crate::field::finite_field_serde_implementation!($monty);
+        $crate::serialization::serde_implementation!($monty);
 
         $crate::field::num_traits_zero_and_one!($monty);
     };
@@ -543,7 +548,12 @@ mod test {
 
     implement_finite_field_for_monty! {F11}
 
-    test_field!(test_f11, F11);
+    test_field!(test_f11_field, crate::field::monty::test::F11);
+    crate::ring::test_ring!(test_f11_ring, crate::field::monty::test::F11);
+    crate::serialization::test_serialization!(
+        test_f11_serialization,
+        crate::field::monty::test::F11
+    );
 
     proptest! {
         #[test]

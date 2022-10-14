@@ -1,6 +1,6 @@
-use crate::field::{
-    polynomial::Polynomial, BytesDeserializationCannotFail, FiniteField, IsSubfieldOf, F2,
-};
+use crate::field::{polynomial::Polynomial, FiniteField, IsSubfieldOf, F2};
+use crate::ring::FiniteRing;
+use crate::serialization::{BytesDeserializationCannotFail, CanonicalSerialize};
 use generic_array::GenericArray;
 use rand_core::RngCore;
 use smallvec::smallvec;
@@ -86,11 +86,11 @@ impl<'a> MulAssign<&'a F64b> for F64b {
     }
 }
 
-impl FiniteField for F64b {
+impl CanonicalSerialize for F64b {
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BytesDeserializationCannotFail;
-    type Serializer = crate::field::serialization::ByteFiniteFieldSerializer<Self>;
-    type Deserializer = crate::field::serialization::ByteFiniteFieldDeserializer<Self>;
+    type Serializer = crate::serialization::ByteElementSerializer<Self>;
+    type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
 
     #[inline]
     fn from_bytes(
@@ -102,7 +102,22 @@ impl FiniteField for F64b {
     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
         self.0.to_le_bytes().into()
     }
+}
 
+impl FiniteRing for F64b {
+    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
+        Self((u128::from_le_bytes(*x) & ((1 << 64) - 1)) as u64)
+    }
+
+    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        Self(rng.next_u64())
+    }
+
+    const ZERO: Self = Self(0);
+    const ONE: Self = Self(1);
+}
+
+impl FiniteField for F64b {
     type PrimeField = F2;
     type PolynomialFormNumCoefficients = generic_array::typenum::U64;
 
@@ -115,10 +130,6 @@ impl FiniteField for F64b {
             out |= u64::from(u8::from(*x));
         }
         Self(out)
-    }
-
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        Self((u128::from_le_bytes(*x) & ((1 << 64) - 1)) as u64)
     }
 
     fn to_polynomial_coefficients(
@@ -142,10 +153,6 @@ impl FiniteField for F64b {
         }
     }
 
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-        Self(rng.next_u64())
-    }
-
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U64;
 
     fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
@@ -153,8 +160,6 @@ impl FiniteField for F64b {
     }
 
     const GENERATOR: Self = Self(2);
-    const ZERO: Self = Self(0);
-    const ONE: Self = Self(1);
 
     fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
         Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
@@ -181,4 +186,8 @@ impl IsSubfieldOf<F64b> for F2 {
 field_ops!(F64b);
 
 #[cfg(test)]
-test_field!(test_gf64, F64b);
+mod tests {
+    test_field!(test_field, crate::field::F64b);
+    crate::ring::test_ring!(test_ring, crate::field::F64b);
+    crate::serialization::test_serialization!(test_serialization, crate::field::F64b);
+}

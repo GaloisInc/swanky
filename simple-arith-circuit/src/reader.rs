@@ -1,7 +1,8 @@
 //! This module implements a reader for "Bristol Fashion" circuit definition files.
 
 use crate::circuit::{Circuit, Index, Op};
-use scuttlebutt::field::{FiniteField, F2};
+use scuttlebutt::field::F2;
+use scuttlebutt::ring::FiniteRing;
 use std::{
     fs::File,
     io::{BufRead, BufReader},

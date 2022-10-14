@@ -202,6 +202,7 @@ mod tests {
     use rand::Rng;
     use scuttlebutt::{
         field::{F128b, F40b, F61p, FiniteField, F2},
+        ring::FiniteRing,
         utils::unpack_bits,
     };
 

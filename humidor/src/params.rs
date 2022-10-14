@@ -4,15 +4,14 @@
 // TODO: Eliminate excessive use of vectors in anonymous functions, function
 // return values, etc.
 
+use crate::ligero::FieldForLigero;
 use crate::threshold_secret_sharing::PackedSecretSharingGenerator;
+use crate::util::*;
 use ndarray::{concatenate, Array1, Array2, ArrayView1, ArrayView2, Axis, Zip};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::fft;
 use scuttlebutt::field::fft::FieldForFFT;
 use scuttlebutt::field::polynomial::Polynomial;
-
-use crate::ligero::FieldForLigero;
-use crate::util::*;
 
 /// Parameters for interleaved coding, based on the size of the circuit and
 /// input. Note that these variable names, although terse, correspond to those
@@ -485,7 +484,7 @@ impl<Field: FieldForLigero> Params<Field> {
 use {
     proptest::{collection::vec as pvec, prelude::*, *},
     rand::prelude::{SeedableRng, StdRng},
-    scuttlebutt::field::FiniteField,
+    scuttlebutt::ring::FiniteRing,
 };
 
 #[cfg(test)]
@@ -956,7 +955,6 @@ proptest! {
     #[test]
     fn test_random_zero_codeword(p in any::<Params<TestField>>()) {
         use rand::{SeedableRng, rngs::StdRng};
-        use scuttlebutt::field::FiniteField;
 
         let c = p.random_zero_codeword(&mut StdRng::from_entropy());
         let w = p.decode(c.view());

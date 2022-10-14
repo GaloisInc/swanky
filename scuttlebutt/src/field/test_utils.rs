@@ -1,52 +1,6 @@
 use crate::field::{polynomial::Polynomial, FiniteField};
 use generic_array::{ArrayLength, GenericArray};
 
-macro_rules! test_associativity {
-    ($name:ident, $any_fe:ident, $op:ident) => {
-        proptest! {
-            #[test]
-            fn $name(a in $any_fe(), b in $any_fe(), c in $any_fe()) {
-                assert_eq!(a.$op(b).$op(c), a.$op(b.$op(c)));
-            }
-        }
-    };
-}
-
-macro_rules! test_commutativity {
-    ($name:ident, $any_fe:ident, $op:ident) => {
-        proptest! {
-            #[test]
-            fn $name(a in $any_fe(), b in $any_fe()) {
-                assert_eq!(a.$op(b), b.$op(a));
-            }
-        }
-    };
-}
-
-macro_rules! test_identity {
-    ($name:ident, $any_fe:ident, $op:ident, $elem:expr) => {
-        proptest! {
-            #[test]
-            fn $name(a in $any_fe()) {
-                assert_eq!(a.$op($elem), a);
-            }
-        }
-    };
-}
-
-macro_rules! test_assign {
-    ($name:ident, $any_fe:ident, $op:ident, $assign_op:ident) => {
-        proptest! {
-            #[test]
-            fn $name(a in $any_fe(), b in $any_fe()) {
-                let mut out = a;
-                out.$assign_op(b);
-                assert_eq!(out, a.$op(b));
-            }
-        }
-    };
-}
-
 pub(crate) fn make_polynomial<FE: FiniteField>(x: impl AsRef<[FE]>) -> Polynomial<FE> {
     let x = x.as_ref();
     Polynomial {
@@ -69,133 +23,30 @@ pub(crate) fn make_polynomial_coefficients<FE: FiniteField, L: ArrayLength<FE>>(
 macro_rules! test_field {
     ($tests_name:ident, $f:ty) => {
         mod $tests_name {
-            use super::*;
             use generic_array::typenum::Unsigned;
-            use crate::field::{FiniteField};
+            use crate::ring::FiniteRing;
+            use crate::field::FiniteField;
             use crate::field::test_utils::{make_polynomial, make_polynomial_coefficients};
             #[allow(unused_imports)]
             use proptest::prelude::*;
-            use std::ops::{Add, Mul, Sub, AddAssign, MulAssign, SubAssign};
             fn any_fe() -> impl Strategy<Value=$f> {
                 any::<u128>().prop_map(|seed| {
-                    <$f as $crate::field::FiniteField>::from_uniform_bytes(&seed.to_le_bytes())
+                    <$f as $crate::field::FiniteRing>::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
             fn any_prime_fe() -> impl Strategy<Value=<$f as $crate::field::FiniteField>::PrimeField> {
                 any::<u128>().prop_map(|seed| {
-                    <<$f as $crate::field::FiniteField>::PrimeField as $crate::field::FiniteField>
+                    <<$f as $crate::field::FiniteField>::PrimeField as $crate::field::FiniteRing>
                         ::from_uniform_bytes(&seed.to_le_bytes())
                 })
             }
 
-            test_associativity!(additive_associativity, any_fe, add);
-            test_associativity!(multiplicative_associativity, any_fe, mul);
-
-            test_commutativity!(additive_commutativity, any_fe, add);
-            test_commutativity!(multiplicative_commutativity, any_fe, mul);
-
-            test_identity!(additive_identity, any_fe, add, <$f>::ZERO);
-            test_identity!(multiplicative_identity, any_fe, mul, <$f>::ONE);
-
-            test_assign!(add_assign, any_fe, add, add_assign);
-            test_assign!(sub_assign, any_fe, sub, sub_assign);
-            test_assign!(mul_assign, any_fe, mul, mul_assign);
-
-            proptest! {
-                #[test]
-                fn additive_inverse(a in any_fe()) {
-                    let b = -a;
-                    assert_eq!(a + b, <$f>::ZERO);
-                }
-            }
             proptest! {
                 #[test]
                 fn multiplicative_inverse(a in any_fe()) {
                     if a != <$f>::ZERO {
                         let b = a.inverse();
                         assert_eq!(a * b, <$f>::ONE);
-                    }
-                }
-            }
-            proptest! {
-                #[test]
-                fn sub_and_neg(a in any_fe(), b in any_fe()) {
-                    assert_eq!(a - b, a + (-b));
-                }
-            }
-            proptest! {
-                #[test]
-                fn distributive(a in any_fe(), b in any_fe(), c in any_fe()) {
-                    assert_eq!(a * (b + c), (a * b) + (a * c));
-                }
-            }
-            proptest! {
-                #[test]
-                fn sum(a in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {
-                    let mut r = <$f>::ZERO;
-                    for e in a.iter() {
-                        r += *e;
-                    }
-                    assert_eq!(a.iter().map(|x| *x).sum::<$f>(), r);
-                }
-            }
-            proptest! {
-                #[test]
-                fn to_and_from_bytes(a in any_fe()) {
-                    let buf = a.to_bytes();
-                    assert_eq!(a, <$f>::from_bytes(&buf).unwrap());
-                }
-            }
-            proptest! {
-                #[test]
-                fn serde_serialize_serde_json(a in any_fe()) {
-                    let ser = serde_json::to_string(&a).unwrap();
-                    let b: $f = serde_json::from_str(&ser).unwrap();
-                    assert_eq!(a, b);
-                }
-            }
-            proptest! {
-                #[test]
-                fn serde_serialize_bincode(a in any_fe()) {
-                    let ser = bincode::serialize(&a).unwrap();
-                    let b: $f = bincode::deserialize(&ser).unwrap();
-                    assert_eq!(a, b);
-                }
-            }
-            proptest! {
-                #[test]
-                fn serialize(xs in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {
-                    use crate::field::serialization::*;
-                    let mut buf = Vec::new();
-                    let mut cursor = std::io::Cursor::new(&mut buf);
-                    let mut serializer = <$f as FiniteField>::Serializer::new(&mut cursor).unwrap();
-                    for x in xs.iter().copied() {
-                        serializer.write(&mut cursor, x).unwrap();
-                    }
-                    serializer.finish(&mut cursor).unwrap();
-                    prop_assert_eq!(cursor.get_ref().len(), <$f as FiniteField>::Serializer::serialized_size(xs.len()));
-                    cursor.set_position(0);
-                    let mut deserializer = <$f as FiniteField>::Deserializer::new(&mut cursor).unwrap();
-                    for x in xs.into_iter() {
-                        prop_assert_eq!(x, deserializer.read(&mut cursor).unwrap());
-                    }
-                }
-            }
-            #[cfg(feature = "serde")]
-            proptest! {
-                #[test]
-                fn serde_serialize_vec(xs in proptest::collection::vec(any_fe(), proptest::collection::SizeRange::default())) {
-                    use crate::field::serialization::serde_vec;
-                    #[derive(serde::Serialize, serde::Deserialize)]
-                    struct Struct {
-                        #[serde(with = "serde_vec")]
-                        v: Vec<$f>
-                    }
-                    let xs = Struct {v: xs};
-                    let bytes = bincode::serialize(&xs).unwrap();
-                    let ys: Struct = bincode::deserialize(&bytes).unwrap();
-                    for (x, y) in xs.v.into_iter().zip(ys.v.into_iter()) {
-                        prop_assert_eq!(x, y);
                     }
                 }
             }
@@ -251,24 +102,6 @@ macro_rules! test_field {
                         <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
                         a.multiply_by_prime_subfield(b),
                     );
-                }
-            }
-
-            proptest! {
-                #[test]
-                fn true_equality_works(a in any_fe()) {
-                    prop_assert_eq!(a, a);
-                }
-            }
-
-            proptest! {
-                #[test]
-                fn false_equality_works(a in any_fe(), b in any_fe()) {
-                    if a == b {
-                        prop_assert_eq!(a.to_bytes(), b.to_bytes());
-                    } else {
-                        prop_assert_ne!(a.to_bytes(), b.to_bytes());
-                    }
                 }
             }
 

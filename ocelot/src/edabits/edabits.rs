@@ -6,6 +6,7 @@ use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
     field::{F40b, FiniteField, F2},
+    ring::FiniteRing,
     AbstractChannel, AesRng, Block, SyncChannel,
 };
 use std::io::{BufReader, BufWriter};
@@ -1463,6 +1464,7 @@ mod tests {
         VerifierConv,
     };
     use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{
         field::{F61p, FiniteField, F2},
         AesRng, Channel,
