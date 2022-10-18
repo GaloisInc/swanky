@@ -92,7 +92,7 @@ macro_rules! prime_field_using_ff {
             use crate::serialization::{CanonicalSerialize, BiggerThanModulus};
             use crate::ring::FiniteRing;
             use ff::{Field, PrimeField};
-            use generic_array::GenericArray;
+            use generic_array::{typenum::Unsigned, GenericArray};
             use rand_core::{RngCore, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
