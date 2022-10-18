@@ -6,19 +6,21 @@ use std::cmp::Eq;
 use std::fmt::Debug;
 
 use scuttlebutt::field::FiniteField;
+#[cfg(test)]
+use scuttlebutt::ring::FiniteRing;
 
 #[cfg(test)]
 use proptest::prelude::*;
 
 #[cfg(test)]
-pub type TestField = scuttlebutt::field::F2_19x3_26;
+pub type TestField = scuttlebutt::field::F2e19x3e26;
 #[cfg(test)]
 pub type TestHash = sha2::Sha256;
 
 #[cfg(test)]
 pub fn arb_test_field() -> BoxedStrategy<TestField> {
-    any::<u64>()
-        .prop_map(|f| TestField::from(f as u128))
+    any::<u128>()
+        .prop_map(|seed| TestField::from_uniform_bytes(&seed.to_le_bytes()))
         .boxed()
 }
 

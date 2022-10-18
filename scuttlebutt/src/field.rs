@@ -69,7 +69,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// Compute the multiplicative inverse of self.
     ///
     /// # Panics
-    /// This function will panic if `*self == Self::zero()`
+    /// This function will panic if `*self == Self::ZERO`
     fn inverse(&self) -> Self;
 }
 
@@ -97,55 +97,6 @@ pub trait PrimeFiniteField:
     + std::convert::TryFrom<u128>
 {
 }
-
-/// The error which occurs if the inputted value or bit pattern doesn't correspond to a field
-/// element.
-#[derive(Debug, Clone, Copy)]
-pub struct BiggerThanModulus;
-impl std::error::Error for BiggerThanModulus {}
-impl std::fmt::Display for BiggerThanModulus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-/// An error with no inhabitants, for when a field cannot fail to deserialize.
-#[derive(Clone, Copy, Debug)]
-pub enum BytesDeserializationCannotFail {}
-impl std::fmt::Display for BytesDeserializationCannotFail {
-    fn fmt(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
-        unreachable!("Self has no values that inhabit it")
-    }
-}
-impl std::error::Error for BytesDeserializationCannotFail {}
-
-macro_rules! num_traits_zero_and_one {
-    ($f: ident) => {
-        impl num_traits::Zero for $f {
-            #[inline]
-            fn zero() -> Self {
-                <$f as crate::field::FiniteRing>::ZERO
-            }
-            #[inline]
-            fn is_zero(&self) -> bool {
-                *self == <$f as crate::field::FiniteRing>::ZERO
-            }
-        }
-
-        impl num_traits::One for $f {
-            #[inline]
-            fn one() -> Self {
-                <$f as crate::field::FiniteRing>::ONE
-            }
-            #[inline]
-            fn is_one(&self) -> bool {
-                *self == <$f as crate::field::FiniteRing>::ONE
-            }
-        }
-    };
-}
-// So we can use the macro within another macro.
-pub(crate) use num_traits_zero_and_one;
 
 #[cfg(test)]
 #[macro_use]
@@ -281,16 +232,15 @@ pub use small_binary_fields::{F40b, F45b, F56b, F63b, SmallBinaryField};
 mod f61p;
 pub use f61p::F61p;
 
-mod f2_19x3_26;
-pub use f2_19x3_26::F2_19x3_26;
-
 #[cfg(feature = "ff")]
 mod prime_field_using_ff;
 #[cfg(feature = "ff")]
 pub use prime_field_using_ff::{F128p, F256p, F384p, F384q, Fbls12381, Fbn254};
+#[cfg(feature = "ff")]
+mod f2e19x3e26;
+#[cfg(feature = "ff")]
+pub use f2e19x3e26::F2e19x3e26;
 
 pub mod polynomial;
-
-mod monty;
 
 pub mod fft;
