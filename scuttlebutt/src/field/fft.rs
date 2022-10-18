@@ -18,7 +18,7 @@ use crate::field::FiniteField;
 /// FFT size, i.e., a field element `r_p`, such that `r_p^(N^p) = 1`, for a
 /// size-`3^p` FFT. The `PHI_EXP` constant is the exponent of the largest FFT
 /// size supported, and `root` should return the `N^p`th root of unity.
-pub trait FieldForFFT<const N: usize>: FiniteField + From<u128> {
+pub trait FieldForFFT<const N: usize>: FiniteField + TryFrom<u128> {
     /// Largest integer `p` such that `phi(MODULUS) = N^p * k` for integer `k`.
     const PHI_EXP: usize;
 
@@ -57,7 +57,9 @@ mod cooley_tukey {
     pub(super) fn fft2_inverse<Field: FieldForFFT<2>>(data: &mut [Field], omega: Field) {
         let omega_inv = omega.inverse();
         let len = data.len();
-        let len_inv = Field::from(len as u128).inverse();
+        let len_inv = Field::try_from(len as u128)
+            .unwrap_or_else(|_| unreachable!()) // data length should always be small enough
+            .inverse();
         fft2(data, omega_inv);
         for x in data {
             *x *= len_inv;
@@ -125,7 +127,9 @@ mod cooley_tukey {
     /// `data.len()`
     pub(super) fn fft3_inverse<Field: FieldForFFT<3>>(data: &mut [Field], omega: Field) {
         let omega_inv = omega.inverse();
-        let len_inv = Field::from(data.len() as u128).inverse();
+        let len_inv = Field::try_from(data.len() as u128)
+            .unwrap_or_else(|_| unreachable!()) // data length should always be small enough
+            .inverse();
         fft3(data, omega_inv);
         for x in data {
             *x = *x * len_inv;

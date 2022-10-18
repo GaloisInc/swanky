@@ -130,7 +130,7 @@ pub fn random_circuit<F: FiniteField, R: Rng>(
 
 /// Produce a simple test circuit, as well as an input that should cause it
 /// to output zero.
-pub fn simple_test_circuit<F: FiniteField + From<u128>>() -> (Circuit<F>, Vec<F>) {
+pub fn simple_test_circuit<F: PrimeFiniteField>() -> (Circuit<F>, Vec<F>) {
     let circuit = Circuit::new(
         4,
         1,
@@ -147,9 +147,9 @@ pub fn simple_test_circuit<F: FiniteField + From<u128>>() -> (Circuit<F>, Vec<F>
         ],
     );
     let (w, x, y) = (
-        F::try_from(5u128).unwrap(),
-        F::try_from(5u128).unwrap(),
-        F::try_from(5u128).unwrap(),
+        F::try_from(5u128).unwrap_or_else(|_| panic!("Field too small")),
+        F::try_from(5u128).unwrap_or_else(|_| panic!("Field too small")),
+        F::try_from(5u128).unwrap_or_else(|_| panic!("Field too small")),
     );
     let z = x * w + y * w;
     let inputs = vec![w, x, y, z];
@@ -244,7 +244,7 @@ mod tests {
     use rand::SeedableRng;
     use scuttlebutt::{AesRng, Block};
 
-    type TestField = scuttlebutt::field::F2_19x3_26;
+    type TestField = scuttlebutt::field::F2e19x3e26;
 
     fn any_seed() -> impl Strategy<Value = Block> {
         any::<u128>().prop_map(|seed| Block::from(seed))

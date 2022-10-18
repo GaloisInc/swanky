@@ -198,7 +198,7 @@ mod tests {
     use rand::prelude::*;
     use scuttlebutt::field::fft::FieldForFFT;
 
-    type TestField = scuttlebutt::field::F2_19x3_26;
+    type TestField = scuttlebutt::field::F2e19x3e26;
 
     #[test]
     fn test_share_reconstruct() {
@@ -223,7 +223,11 @@ mod tests {
 
         let secrets = (0..pss.secret_count as u64)
             .into_iter()
-            .map(|n| n.into())
+            .map(|n| {
+                (n as u128)
+                    .try_into()
+                    .unwrap_or_else(|_| panic!("Conversion failure"))
+            })
             .collect::<Vec<_>>();
         let shares = &pss.share(&secrets, &mut rng)[0..pss.reconstruct_limit()];
         let reconstructed =

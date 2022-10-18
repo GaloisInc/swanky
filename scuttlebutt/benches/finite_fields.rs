@@ -25,6 +25,21 @@ macro_rules! finite_field_benchmarks {
                 });
             }
 
+            fn div(c: &mut Criterion) {
+                c.bench_function(&format!("{}::div", stringify!($field)), |b| {
+                    let x = <$field>::random(&mut rand::thread_rng());
+                    let y = <$field>::random_nonzero(&mut rand::thread_rng());
+                    b.iter(|| black_box(black_box(x) / black_box(y)));
+                });
+            }
+
+            fn pow(c: &mut Criterion) {
+                c.bench_function(&format!("{}::pow32", stringify!($field)), |b| {
+                    let x = <$field>::random(&mut rand::thread_rng());
+                    b.iter(|| black_box(black_box(x).pow(black_box(32u128))));
+                });
+            }
+
             fn inverse(c: &mut Criterion) {
                 c.bench_function(&format!("{}::inverse", stringify!($field)), |b| {
                     let x = <$field>::random_nonzero(&mut rand::thread_rng());
@@ -48,12 +63,20 @@ macro_rules! finite_field_benchmarks {
                 });
             }
 
-            criterion_group!($name, add, mul, inverse, random, sum);
+            fn product(c: &mut Criterion) {
+                c.bench_function(&format!("{}::prod100", stringify!($field)), |b| {
+                    let x: Vec<_> = (0..100)
+                        .map(|_| <$field>::random(&mut rand::thread_rng()))
+                        .collect();
+                    b.iter(|| black_box(black_box(x.iter().copied()).product::<$field>()));
+                });
+            }
+
+            criterion_group!($name, add, mul, div, pow, inverse, random, sum, product);
         }
     };
 }
 
-finite_field_benchmarks!(f2_19x3_26, scuttlebutt::field::F2_19x3_26,);
 finite_field_benchmarks!(f2, scuttlebutt::field::F2,);
 finite_field_benchmarks!(f61p, scuttlebutt::field::F61p,);
 finite_field_benchmarks!(f64b, scuttlebutt::field::F64b,);
@@ -65,7 +88,9 @@ finite_field_benchmarks!(f56b, scuttlebutt::field::F56b,);
 finite_field_benchmarks!(f63b, scuttlebutt::field::F63b,);
 
 #[cfg(feature = "ff")]
-finite_field_benchmarks!(f128p, scuttlebutt::field::F128pp,);
+finite_field_benchmarks!(f2e19x3e26, scuttlebutt::field::F2e19x3e26,);
+#[cfg(feature = "ff")]
+finite_field_benchmarks!(f128p, scuttlebutt::field::F128p,);
 #[cfg(feature = "ff")]
 finite_field_benchmarks!(f256p, scuttlebutt::field::F256p,);
 #[cfg(feature = "ff")]
@@ -73,14 +98,13 @@ finite_field_benchmarks!(f384p, scuttlebutt::field::F384p,);
 #[cfg(feature = "ff")]
 finite_field_benchmarks!(f384q, scuttlebutt::field::F384q,);
 #[cfg(feature = "ff")]
-finite_field_benchmarks!(fbls12831, scuttlebutt::field::Fbls12381,);
+finite_field_benchmarks!(fbls12381, scuttlebutt::field::Fbls12381,);
 #[cfg(feature = "ff")]
-finite_field_benchmarks!(Fbn254, scuttlebutt::field::Fbn254,);
+finite_field_benchmarks!(fbn254, scuttlebutt::field::Fbn254,);
 
 // XXX: Is there a better way to do this?
 #[cfg(not(feature = "ff"))]
 criterion::criterion_main!(
-    f2_19x3_26::f2_19x3_26,
     f2::f2,
     f61p::f61p,
     f64b::f64b,
@@ -92,16 +116,16 @@ criterion::criterion_main!(
 );
 #[cfg(feature = "ff")]
 criterion::criterion_main!(
-    f2_19x3_26::f2_19x3_26,
     f2::f2,
     f61p::f61p,
     f64b::f64b,
     f128b::f128b,
-    f128p::f128p,
     f40b::f40b,
     f45b::f45b,
     f56b::f56b,
     f63b::f63b,
+    // `ff` specific fields
+    f2e19x3e26::f2e19x3e26,
     f128p::f128p,
     f256p::f256p,
     f384p::f384p,

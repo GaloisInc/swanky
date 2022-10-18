@@ -1,15 +1,78 @@
-// This macro constructs a prime finite field using the `ff` library.
-// * $name: The name of the field.
-// * $mod_name: The name of the module.
-// * $modulus: The prime modulus, given as a string.
-// * $generator: The mutliplicative generator, given as a string.
-// * $limb: The number of `u64`s required to fit values of size `$modulus * 2` (where the `* 2`
-//    requirement comes from the `ff` library).
-// * $actual_limbs: The number of `u64`s required to fit values of size `$modulus`. This'll
-//    generally be the same as `$limbs` except in certain edge cases where `$modulus * 2`
-//    overflows `[u64; $actual_limbs]`.
-// * $num_bytes: The number of bytes required to store `$modulus`, given as a `generic_array::typenum`.
-// * $num_bits: The number of bits required to store `$modulus`, given as a `generic_array::typenum`.
+/// If a field only contains one limb, we can do random number generation more
+/// efficiently than done in `ff` (by roughly 2x) by using `Uniform::from`.
+/// That's what this macro does: If no arguments are passed we use `ff`s `random`
+/// method, and if a modulus is passed we use `Uniform::from` instead.
+macro_rules! random_function_helper {
+    () => {
+        fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+            Self {
+                internal: Internal::random(rng),
+            }
+        }
+    };
+
+    ($modulus: expr) => {
+        fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+            use rand::distributions::{Distribution, Uniform};
+            Self {
+                internal: Internal([Uniform::from(0..$modulus).sample(rng)]),
+            }
+        }
+    };
+}
+pub(crate) use random_function_helper;
+
+/// Helper macro for `TryFrom<u128>` which is needed if there's only one limb.
+macro_rules! try_from_helper {
+    ($name: ident, $limbs: expr,) => {
+        impl TryFrom<u128> for $name {
+            type Error = BiggerThanModulus;
+
+            fn try_from(value: u128) -> Result<Self, Self::Error> {
+                let mut bytes = [0u8; $limbs * 8];
+                let value = value.to_le_bytes();
+                bytes[0..16].copy_from_slice(&value);
+                $name::from_bytes_array(bytes)
+            }
+        }
+    };
+    ($name: ident, $limbs: expr, $single_limb_modulus: expr) => {
+        impl TryFrom<u128> for $name {
+            type Error = BiggerThanModulus;
+
+            fn try_from(value: u128) -> Result<Self, Self::Error> {
+                if value > u64::MAX as u128 {
+                    // No values larger than a `u64` will work if there's
+                    // only one limb.
+                    return Err(BiggerThanModulus);
+                }
+                let mut bytes = [0u8; $limbs * 8];
+                // Because we check above that `value` fits in a `u64`, the
+                // below cast should be okay.
+                let value = (value as u64).to_le_bytes();
+                bytes[0..8].copy_from_slice(&value);
+                $name::from_bytes_array(bytes)
+            }
+        }
+    };
+}
+pub(crate) use try_from_helper;
+
+/// This macro constructs a prime finite field using the `ff` library.
+/// * `$name`: The name of the field.
+/// * `$mod_name`: The name of the module containing the field.
+/// * `$modulus`: The prime modulus, given as a string.
+/// * `$generator`: The multiplicative generator, given as a string.
+/// * `$limbs`: The number of `u64`s required to fit values of size `$modulus * 2` (where the `* 2`
+///    requirement comes from the `ff` library).
+/// * `$actual_limbs`: The number of `u64`s required to fit values of size `$modulus`. This'll
+///    generally be the same as `$limbs` except in certain edge cases where `$modulus * 2`
+///    overflows `[u64; $actual_limbs]`.
+/// * `$num_bytes`: The number of bytes required to store `$modulus`, given as a `generic_array::typenum`.
+/// * `$num_bits`: The number of bits required to store `$modulus`, given as a `generic_array::typenum`.
+/// * \[Optional\] `$single_limb_modulus`: If `$limbs` is one, then this can contain `$modulus`
+///    (given as an _integer_ not a string!) to enable faster random value generation.
+#[macro_export]
 macro_rules! prime_field_using_ff {
     (
         $(#[$m: meta])*
@@ -21,6 +84,7 @@ macro_rules! prime_field_using_ff {
         actual_limbs = $actual_limbs: expr,
         num_bytes = $num_bytes: ty,
         num_bits = $num_bits: ty,
+        $(single_limb_modulus = $single_limb_modulus: expr)?
     ) => {
         mod $mod_name {
             use crate::field::{FiniteField, Polynomial, PrimeFiniteField};
@@ -97,11 +161,7 @@ macro_rules! prime_field_using_ff {
             }
 
             impl FiniteRing for $name {
-                fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
-                    Self {
-                        internal: Internal::random(rng),
-                    }
-                }
+                $crate::field::prime_field_using_ff::random_function_helper!($($single_limb_modulus)?);
 
                 const ZERO: Self = Self {
                     internal: Internal::ZERO,
@@ -166,16 +226,7 @@ macro_rules! prime_field_using_ff {
                 }
             }
 
-            impl TryFrom<u128> for $name {
-                type Error = BiggerThanModulus;
-
-                fn try_from(value: u128) -> Result<Self, Self::Error> {
-                    let mut bytes = [0u8; $limbs * 8];
-                    let value = value.to_le_bytes();
-                    bytes[0..16].copy_from_slice(&value);
-                    $name::from_bytes_array(bytes)
-                }
-            }
+            $crate::field::prime_field_using_ff::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
 
             impl PrimeFiniteField for $name {}
 
@@ -205,7 +256,6 @@ macro_rules! prime_field_using_ff {
             crate::ring::test_ring!(test_ring, $crate::field::$name);
             #[cfg(test)]
             crate::serialization::test_serialization!(test_serialization, $crate::field::$name);
-
 
             #[cfg(test)]
             mod tests {
@@ -240,17 +290,27 @@ macro_rules! prime_field_using_ff {
                 }
                 // Test that the `TryFrom` implementation is correct.
                 proptest! {
+                    // Since `ff` fields can be as small as a single `u64`, we generate `u32`s.
                     #[test]
-                    fn test_try_from(a in proptest::num::u64::ANY, b in proptest::num::u64::ANY) {
+                    fn test_try_from(a in proptest::num::u32::ANY, b in proptest::num::u32::ANY) {
                         let a = a as u128;
                         let b = b as u128;
                         let c = a * b;
                         let aa = $name::try_from(a).unwrap();
                         let bb = $name::try_from(b).unwrap();
-                        let cc = $name::try_from(c).unwrap();
-                        assert_eq!(aa * bb, cc);
+                        match $name::try_from(c) {
+                            Ok(cc) => assert_eq!(aa * bb, cc),
+                            Err(_) => (),
+                        }
                     }
                 }
+                // Test that `$modulus` and `$single_limb_modulus` are the same.
+                $(
+                #[test]
+                fn test_single_limb_modulus() {
+                    let modulus: u64 = $modulus.parse().unwrap();
+                    assert_eq!(modulus, $single_limb_modulus);
+                })?
             }
 
         }

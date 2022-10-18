@@ -150,7 +150,28 @@ macro_rules! ring_ops {
         assign_op!(AddAssign, add_assign, $f);
         assign_op!(SubAssign, sub_assign, $f);
         assign_op!(MulAssign, mul_assign, $f);
-        num_traits_zero_and_one!($f);
+
+        impl num_traits::Zero for $f {
+            #[inline]
+            fn zero() -> Self {
+                <$f as crate::field::FiniteRing>::ZERO
+            }
+            #[inline]
+            fn is_zero(&self) -> bool {
+                *self == <$f as crate::field::FiniteRing>::ZERO
+            }
+        }
+
+        impl num_traits::One for $f {
+            #[inline]
+            fn one() -> Self {
+                <$f as crate::field::FiniteRing>::ONE
+            }
+            #[inline]
+            fn is_one(&self) -> bool {
+                *self == <$f as crate::field::FiniteRing>::ONE
+            }
+        }
 
         impl std::ops::Neg for $f {
             type Output = $f;

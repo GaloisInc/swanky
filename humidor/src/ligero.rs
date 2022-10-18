@@ -100,7 +100,7 @@ pub trait FieldForLigero:
     const FIELD_SIZE: usize;
 }
 
-impl FieldForLigero for scuttlebutt::field::F2_19x3_26 {
+impl FieldForLigero for scuttlebutt::field::F2e19x3e26 {
     const FIELD_SIZE: usize = <Self as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
 }
 

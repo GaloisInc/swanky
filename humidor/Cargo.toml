@@ -23,7 +23,7 @@ ndarray = "0.15.4"
 num-traits = "0.2.15"
 rand = "0.8.5"
 subtle = "2.4.1"
-scuttlebutt = { path = "../scuttlebutt" }
+scuttlebutt = { path = "../scuttlebutt", features = ["ff"] }
 generic-array = "0.14.5"
 digest = "0.10.3"
 simple-arith-circuit = { path = "../simple-arith-circuit", features = ["serde"] }

@@ -7,7 +7,7 @@ use scuttlebutt::AesRng;
 use simple_arith_circuit::circuitgen::random_zero_circuit;
 
 type Hash = sha2::Sha256;
-type Field = scuttlebutt::field::F2_19x3_26;
+type Field = scuttlebutt::field::F2e19x3e26;
 type Prover = noninteractive::Prover<Field, Hash>;
 type Verifier = noninteractive::Verifier<Field, Hash>;
 
