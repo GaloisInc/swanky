@@ -113,74 +113,12 @@ macro_rules! call_with_finite_field {
     }};
 }
 
-macro_rules! assign_op {
-    ($tr:ident, $op:ident, $f:ident) => {
-        impl std::ops::$tr<$f> for $f {
-            #[inline]
-            #[allow(unused_imports)]
-            fn $op(&mut self, rhs: $f) {
-                use std::ops::$tr;
-                self.$op(&rhs)
-            }
-        }
-    };
-}
-
-macro_rules! binop {
-    ($trait:ident, $name:ident, $assign:path, $f:ident) => {
-        impl std::ops::$trait<$f> for $f {
-            type Output = $f;
-
-            #[inline]
-            #[allow(unused_imports)]
-            fn $name(mut self, rhs: $f) -> Self::Output {
-                use std::ops::$trait;
-                $assign(&mut self, rhs);
-                self
-            }
-        }
-        impl<'a> std::ops::$trait<$f> for &'a $f {
-            type Output = $f;
-
-            #[inline]
-            #[allow(unused_imports)]
-            fn $name(self, rhs: $f) -> Self::Output {
-                use std::ops::$trait;
-                let mut this = self.clone();
-                $assign(&mut this, rhs);
-                this
-            }
-        }
-        impl<'a> std::ops::$trait<&'a $f> for $f {
-            type Output = $f;
-
-            #[inline]
-            #[allow(unused_imports)]
-            fn $name(mut self, rhs: &'a $f) -> Self::Output {
-                use std::ops::$trait;
-                $assign(&mut self, rhs);
-                self
-            }
-        }
-        impl<'a> std::ops::$trait<&'a $f> for &'a $f {
-            type Output = $f;
-
-            #[inline]
-            fn $name(self, rhs: &'a $f) -> Self::Output {
-                let mut this = self.clone();
-                $assign(&mut this, rhs);
-                this
-            }
-        }
-    };
-}
-
 macro_rules! field_ops {
     ($f:ident $($tt:tt)*) => {
         crate::ring::ring_ops!($f $($tt)*);
 
-        binop!(Div, div, std::ops::DivAssign::div_assign, $f);
-        assign_op!(DivAssign, div_assign, $f);
+        $crate::ops::binop!(Div, div, std::ops::DivAssign::div_assign, $f);
+        $crate::ops::assign_op!(DivAssign, div_assign, $f);
 
         impl<'a> std::ops::DivAssign<&'a $f> for $f {
             fn div_assign(&mut self, rhs: &Self) {

@@ -164,15 +164,15 @@ macro_rules! prime_field_using_ff {
                 type FromBytesError = BiggerThanModulus;
 
                 fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
-                    let mut bytes = [0u8; $limbs * 8];
-                    bytes[0..$actual_limbs * 8].copy_from_slice(buf.as_ref());
+                    let mut bytes = [0u8; <$num_bytes as Unsigned>::USIZE];
+                    bytes[0..<$num_bytes as Unsigned>::USIZE].copy_from_slice(buf.as_ref());
                     $name::from_bytes_array(bytes)
                 }
 
                 /// Return the canonical byte representation (byte representation of the reduced field element).
                 fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
                     let repr = self.internal.to_repr();
-                    *GenericArray::from_slice(&repr.0[0..$actual_limbs * 8])
+                    *GenericArray::from_slice(&repr.0[0..<$num_bytes as Unsigned>::USIZE])
                 }
             }
 

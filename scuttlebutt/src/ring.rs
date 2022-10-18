@@ -145,12 +145,12 @@ macro_rules! ring_ops {
                 iter.fold($f::ONE, std::ops::Mul::mul)
             }
         }
-        binop!(Add, add, std::ops::AddAssign::add_assign, $f);
-        binop!(Sub, sub, std::ops::SubAssign::sub_assign, $f);
-        binop!(Mul, mul, std::ops::MulAssign::mul_assign, $f);
-        assign_op!(AddAssign, add_assign, $f);
-        assign_op!(SubAssign, sub_assign, $f);
-        assign_op!(MulAssign, mul_assign, $f);
+        $crate::ops::binop!(Add, add, std::ops::AddAssign::add_assign, $f);
+        $crate::ops::binop!(Sub, sub, std::ops::SubAssign::sub_assign, $f);
+        $crate::ops::binop!(Mul, mul, std::ops::MulAssign::mul_assign, $f);
+        $crate::ops::assign_op!(AddAssign, add_assign, $f);
+        $crate::ops::assign_op!(SubAssign, sub_assign, $f);
+        $crate::ops::assign_op!(MulAssign, mul_assign, $f);
 
         impl num_traits::Zero for $f {
             #[inline]
