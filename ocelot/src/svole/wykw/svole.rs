@@ -324,10 +324,7 @@ impl<FE: FiniteField> Receiver<FE> {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
             let mut y = b;
 
-            y += indices
-                .iter()
-                .map(|(j, a)| *a * self.base_voles[*j])
-                .sum();
+            y += indices.iter().map(|(j, a)| *a * self.base_voles[*j]).sum();
 
             if i < num_saved {
                 base_voles.push(y);

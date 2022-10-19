@@ -409,8 +409,7 @@ mod test {
         let uws = handle.join().unwrap();
         for i in 0..weight {
             for j in 0..n {
-                let right =
-                    uws[i * n + j].0 * base.delta() + vs[i * n + j];
+                let right = uws[i * n + j].0 * base.delta() + vs[i * n + j];
                 assert_eq!(uws[i * n + j].1, right);
             }
         }
