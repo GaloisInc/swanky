@@ -635,7 +635,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             let MacProver(_, e_m_mac) = e_m_batch[i];
 
             // 6)d)
-            let e_prime_mac = c_plus_r_mac - e_m_mac.multiply_by_prime_subfield(power_two_nb_bits);
+            let e_prime_mac = c_plus_r_mac - power_two_nb_bits * e_m_mac;
             e_prime_mac_batch.push(e_prime_mac);
             ei_batch.extend(&e_batch[i].0);
         }
@@ -1214,7 +1214,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             let MacVerifier(e_m_mac) = e_m_batch[i];
 
             // 6)d)
-            let e_prime_mac = c_plus_r_mac - e_m_mac.multiply_by_prime_subfield(power_two_nb_bits);
+            let e_prime_mac = c_plus_r_mac - power_two_nb_bits * e_m_mac;
             e_prime_mac_batch.push(e_prime_mac);
 
             // 6)e)
@@ -1231,7 +1231,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             let sum =
                 convert_f2_to_field::<FE::PrimeField>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
             e_prime_minus_sum_batch.push(MacVerifier(
-                e_prime_mac_batch[i] + self.fcom.get_delta().multiply_by_prime_subfield(sum),
+                e_prime_mac_batch[i] + sum * self.fcom.get_delta(),
             ));
         }
         print!("CHECK_Z< ... ");

@@ -144,7 +144,7 @@ impl<FE: FiniteField> FComProver<FE> {
 
     #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
-        return MacProver(cst * x.0, (x.1).multiply_by_prime_subfield(cst));
+        return MacProver(cst * x.0, cst * (x.1));
     }
 
     #[inline]
@@ -222,10 +222,11 @@ impl<FE: FiniteField> FComProver<FE> {
         let chi = channel.read_serializable()?;
         let mut chi_power = chi;
 
-        for (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) in triples.iter() {
-            let a0 = *x_mac * *y_mac;
-            let a1 = x_mac.multiply_by_prime_subfield(*y) + y_mac.multiply_by_prime_subfield(*x)
-                - *z_mac;
+        for (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) in
+            triples.iter().copied()
+        {
+            let a0 = x_mac * y_mac;
+            let a1 = y * x_mac + x * y_mac - z_mac;
 
             sum_a0 += a0 * chi_power;
             sum_a1 += a1 * chi_power;
@@ -237,10 +238,10 @@ impl<FE: FiniteField> FComProver<FE> {
         let mut mask = FE::ZERO;
         let mut mask_mac = FE::ZERO;
 
-        for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
+        for i in 0..FE::Degree::USIZE {
             let MacProver(u, u_mac) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
-            mask += x_i.multiply_by_prime_subfield(u);
+            mask += u * x_i;
             mask_mac += u_mac * x_i;
         }
 
@@ -390,19 +391,19 @@ impl<FE: FiniteField> FComVerifier<FE> {
         for _i in 0..num {
             let r = self.random(channel, rng)?;
             let y = channel.read_serializable::<FE::PrimeField>()?;
-            out.push(MacVerifier(r.0 - self.delta.multiply_by_prime_subfield(y)));
+            out.push(MacVerifier(r.0 - y * self.delta));
         }
         Ok(())
     }
 
     #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
-        return MacVerifier(x_mac.0 - self.delta.multiply_by_prime_subfield(cst));
+        return MacVerifier(x_mac.0 - cst * self.delta);
     }
 
     #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
-        return MacVerifier(x_mac.0.multiply_by_prime_subfield(cst));
+        return MacVerifier(cst * x_mac.0);
     }
 
     #[inline]
@@ -471,7 +472,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             let x = out[i];
 
             key_chi += chi * key;
-            x_chi += chi.multiply_by_prime_subfield(x);
+            x_chi += x * chi;
         }
         let m = channel.read_serializable::<FE>()?;
 
@@ -507,7 +508,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
-        for i in 0..FE::PolynomialFormNumCoefficients::USIZE {
+        for i in 0..FE::Degree::USIZE {
             let MacVerifier(v_m) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
             mask_mac += v_m * x_i;

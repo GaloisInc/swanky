@@ -30,7 +30,7 @@ pub mod serde_index {
     }
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use crate::{circuitgen::random_circuit, Circuit};
     use proptest::prelude::*;
@@ -67,4 +67,4 @@ mod tests {
             }
         };
     }
-}
+}*/

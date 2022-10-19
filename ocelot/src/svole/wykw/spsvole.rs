@@ -125,7 +125,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             n
         );
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let total_len = base_voles.len();
         let base_uws = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
@@ -181,7 +181,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         base_xzs: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         // Generate `chi`s from seed and send seed to receiver at the end.
         let seed = rng.gen::<Block>();
         let mut rng_chi = AesRng::from_seed(seed);
@@ -268,7 +268,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let total_len = base_voles.len();
         let base_vs = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
@@ -277,7 +277,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let mut result = vec![FE::ZERO; n * t];
         for v in base_vs.iter() {
             let a_prime = channel.read_serializable::<FE::PrimeField>()?;
-            let gamma = *v - self.delta.multiply_by_prime_subfield(a_prime);
+            let gamma = *v - a_prime * self.delta;
             gammas.push(gamma);
         }
         let mut keys = Vec::with_capacity(t * nbits);
@@ -312,7 +312,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         y_stars: &[FE],
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
             *item = channel.read_serializable()?;
@@ -322,7 +322,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             .get()
             .iter()
             .zip(x_stars.into_iter().zip(y_stars.iter()))
-            .map(|(pow, (x, y))| (*y - self.delta.multiply_by_prime_subfield(x)) * *pow)
+            .map(|(pow, (x, y))| (*y - x * self.delta) * *pow)
             .sum();
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
@@ -376,7 +376,7 @@ mod test {
     };
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let n = cols / weight;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
@@ -410,7 +410,7 @@ mod test {
         for i in 0..weight {
             for j in 0..n {
                 let right =
-                    base.delta().multiply_by_prime_subfield(uws[i * n + j].0) + vs[i * n + j];
+                    uws[i * n + j].0 * base.delta() + vs[i * n + j];
                 assert_eq!(uws[i * n + j].1, right);
             }
         }
