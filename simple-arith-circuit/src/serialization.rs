@@ -67,7 +67,4 @@ mod tests {
             }
         };
     }
-
-    test_serialization!(test_serialization_f2, scuttlebutt::field::F2);
-    test_serialization!(test_serialization_f61p, scuttlebutt::field::F61p);
 }

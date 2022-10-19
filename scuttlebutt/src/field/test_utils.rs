@@ -27,6 +27,9 @@ macro_rules! test_field {
             use crate::ring::FiniteRing;
             use crate::field::FiniteField;
             use crate::field::test_utils::{make_polynomial, make_polynomial_coefficients};
+
+            $crate::ring::test_ring!(ring_tests, $f);
+
             #[allow(unused_imports)]
             use proptest::prelude::*;
             fn any_fe() -> impl Strategy<Value=$f> {
@@ -46,14 +49,14 @@ macro_rules! test_field {
                 fn multiplicative_inverse(a in any_fe()) {
                     if a != <$f>::ZERO {
                         let b = a.inverse();
-                        assert_eq!(a * b, <$f>::ONE);
+                        prop_assert_eq!(a * b, <$f>::ONE);
                     }
                 }
             }
             proptest! {
                 #[test]
                 fn polynomial_roundtrip(a in any_fe()) {
-                    assert_eq!(<$f>::from_polynomial_coefficients(a.to_polynomial_coefficients()), a);
+                    prop_assert_eq!(<$f>::from_polynomial_coefficients(a.to_polynomial_coefficients()), a);
                 }
             }
             proptest! {
@@ -61,7 +64,7 @@ macro_rules! test_field {
                 fn polynomial_add(a in any_fe(), b in any_fe()) {
                     let mut poly = make_polynomial(a.to_polynomial_coefficients());
                     poly += &make_polynomial(b.to_polynomial_coefficients());
-                    assert_eq!(<$f>::from_polynomial_coefficients(make_polynomial_coefficients(&poly)), a + b);
+                    prop_assert_eq!(<$f>::from_polynomial_coefficients(make_polynomial_coefficients(&poly)), a + b);
                 }
             }
 
@@ -75,10 +78,10 @@ macro_rules! test_field {
                 fn polynomial_mul(a in any_fe(), b in any_fe()) {
                     let mut poly = make_polynomial(a.to_polynomial_coefficients());
                     poly *= &make_polynomial(b.to_polynomial_coefficients());
-                    let (_, remainder) = poly.divmod(&<$f>::reduce_multiplication_over());
-                    assert_eq!(
+                    let (_, remainder) = poly.divmod(&<$f>::polynomial_modulus());
+                    prop_assert_eq!(
                         <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
-                        a * b,
+                        a * b
                     );
                 }
             }
@@ -86,9 +89,10 @@ macro_rules! test_field {
             proptest! {
                 #[test]
                 fn prime_field_lift_is_homomorphism(a in any_prime_fe(), b in any_prime_fe()) {
-                    let lift = <<$f as FiniteField>::PrimeField as crate::field::IsSubfieldOf<$f>>::lift_into_superfield;
-                    assert_eq!(lift(&a) + lift(&b), lift(&(a + b)));
-                    assert_eq!(lift(&a) * lift(&b), lift(&(a * b)));
+                    let lift: fn(<$f as FiniteField>::PrimeField) -> $f =
+                        <<$f as FiniteField>::PrimeField as Into<$f>>::into;
+                    prop_assert_eq!(lift(a) + lift(b), lift(a + b));
+                    prop_assert_eq!(lift(a) * lift(b), lift(a * b));
                 }
             }
 
@@ -97,10 +101,10 @@ macro_rules! test_field {
                 fn lifted_polynomial_mul(a in any_fe(), b in any_prime_fe()) {
                     let mut poly = make_polynomial(a.to_polynomial_coefficients());
                     poly *= &make_polynomial(b.to_polynomial_coefficients());
-                    let (_, remainder) = poly.divmod(&<$f>::reduce_multiplication_over());
-                    assert_eq!(
+                    let (_, remainder) = poly.divmod(&<$f>::polynomial_modulus());
+                    prop_assert_eq!(
                         <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
-                        a.multiply_by_prime_subfield(b),
+                        b * a
                     );
                 }
             }
@@ -122,7 +126,7 @@ macro_rules! test_field {
                     let decomp = x.bit_decomposition();
                     prop_assert_eq!(
                         decomp.len(),
-                        <$f as FiniteField>::PolynomialFormNumCoefficients::USIZE *
+                        <$f as FiniteField>::Degree::USIZE *
                             <<$f as FiniteField>::PrimeField as FiniteField>::NumberOfBitsInBitDecomposition::USIZE
                     );
                     let coeffs = x.to_polynomial_coefficients();

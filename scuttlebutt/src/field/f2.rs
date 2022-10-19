@@ -89,28 +89,20 @@ impl CanonicalSerialize for F2 {
 
 impl FiniteField for F2 {
     type PrimeField = Self;
-    type PolynomialFormNumCoefficients = generic_array::typenum::U1;
+    type Degree = generic_array::typenum::U1;
 
     const GENERATOR: Self = F2(1);
 
-    fn from_polynomial_coefficients(
-        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
-    ) -> Self {
+    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self {
         coeff[0]
     }
 
-    fn to_polynomial_coefficients(
-        &self,
-    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree> {
         GenericArray::from([*self])
     }
 
-    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+    fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         Polynomial::x()
-    }
-
-    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
-        self * pf
     }
 
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U1;
@@ -293,8 +285,6 @@ mod tests {
     test_binop!(test_mul, mul_assign);
 
     test_field!(test_field, crate::field::F2);
-    crate::ring::test_ring!(test_ring, crate::field::F2);
-    crate::serialization::test_serialization!(test_serialization, crate::field::F2);
 
     proptest! {
         #[test]

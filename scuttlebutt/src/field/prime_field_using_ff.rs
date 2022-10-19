@@ -191,26 +191,22 @@ macro_rules! prime_field_using_ff {
                 };
 
                 type PrimeField = Self;
-                type PolynomialFormNumCoefficients = generic_array::typenum::U1;
+                type Degree = generic_array::typenum::U1;
 
                 fn from_polynomial_coefficients(
-                    coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
+                    coeff: GenericArray<Self::PrimeField, Self::Degree>,
                 ) -> Self {
                     coeff[0]
                 }
 
                 fn to_polynomial_coefficients(
                     &self,
-                ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+                ) -> GenericArray<Self::PrimeField, Self::Degree> {
                     GenericArray::from([*self])
                 }
 
-                fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+                fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
                     Polynomial::x()
-                }
-
-                fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
-                    self * pf
                 }
 
                 type NumberOfBitsInBitDecomposition = $num_bits;
@@ -252,10 +248,6 @@ macro_rules! prime_field_using_ff {
 
             #[cfg(test)]
             test_field!(test_field, $crate::field::$name);
-            #[cfg(test)]
-            crate::ring::test_ring!(test_ring, $crate::field::$name);
-            #[cfg(test)]
-            crate::serialization::test_serialization!(test_serialization, $crate::field::$name);
 
             #[cfg(test)]
             mod tests {

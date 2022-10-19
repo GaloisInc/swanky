@@ -1,6 +1,6 @@
 use crate::{
-    field::{f2::F2, polynomial::Polynomial, FiniteField, IsSubfieldOf},
-    ring::FiniteRing,
+    field::{f2::F2, polynomial::Polynomial, FiniteField},
+    ring::{FiniteRing, IsSubRingOf},
     serialization::CanonicalSerialize,
 };
 use generic_array::GenericArray;
@@ -8,7 +8,7 @@ use rand_core::RngCore;
 use smallvec::smallvec;
 use std::{
     iter::FromIterator,
-    ops::{AddAssign, MulAssign, SubAssign},
+    ops::{AddAssign, Mul, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
@@ -163,7 +163,7 @@ mod multiply {
             remainder: &Polynomial<F2>,
         ) {
             let mut tmp = quotient.clone();
-            tmp *= &F128b::reduce_multiplication_over();
+            tmp *= &F128b::polynomial_modulus();
             tmp += remainder;
             assert_eq!(poly, &tmp);
         }
@@ -178,7 +178,7 @@ mod multiply {
             fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
                 let poly = poly_from_upper_and_lower_128(upper, lower);
                 let reduced = reduce(upper, lower);
-                let (poly_quotient, poly_reduced) = poly.divmod(&F128b::reduce_multiplication_over());
+                let (poly_quotient, poly_reduced) = poly.divmod(&F128b::polynomial_modulus());
                 assert_div_mod(&poly, &poly_quotient, &poly_reduced);
                 assert_eq!(poly_from_128(reduced), poly_reduced);
             }
@@ -228,13 +228,11 @@ impl CanonicalSerialize for F128b {
 
 impl FiniteField for F128b {
     type PrimeField = F2;
-    type PolynomialFormNumCoefficients = generic_array::typenum::U128;
+    type Degree = generic_array::typenum::U128;
 
     const GENERATOR: Self = F128b(2);
 
-    fn from_polynomial_coefficients(
-        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
-    ) -> Self {
+    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self {
         let mut out = 0;
         for x in coeff.iter().rev() {
             out <<= 1;
@@ -243,16 +241,14 @@ impl FiniteField for F128b {
         F128b(out)
     }
 
-    fn to_polynomial_coefficients(
-        &self,
-    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree> {
         let x = self.0;
         GenericArray::from_iter(
             (0..128).map(|shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()),
         )
     }
 
-    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+    fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         let mut coefficients = smallvec![F2::ZERO; 128];
         coefficients[128 - 1] = F2::ONE;
         coefficients[7 - 1] = F2::ONE;
@@ -270,10 +266,6 @@ impl FiniteField for F128b {
         super::standard_bit_decomposition(self.0)
     }
 
-    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
-        Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
-    }
-
     fn inverse(&self) -> Self {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
@@ -282,22 +274,27 @@ impl FiniteField for F128b {
     }
 }
 
-impl IsSubfieldOf<F128b> for F2 {
-    fn multiply_by_superfield(&self, x: F128b) -> F128b {
-        x.multiply_by_prime_subfield(*self)
-    }
-    fn lift_into_superfield(&self) -> F128b {
-        F128b::ONE.multiply_by_prime_subfield(*self)
+impl From<F2> for F128b {
+    #[inline]
+    fn from(x: F2) -> Self {
+        Self(x.0 as u128)
     }
 }
+impl Mul<F128b> for F2 {
+    type Output = F128b;
+    #[inline]
+    fn mul(self, x: F128b) -> F128b {
+        F128b::conditional_select(&F128b::ZERO, &x, self.ct_eq(&F2::ONE))
+    }
+}
+
+impl IsSubRingOf<F128b> for F2 {}
 
 field_ops!(F128b);
 
 #[cfg(test)]
 mod tests {
     test_field!(test_field, crate::field::F128b);
-    crate::ring::test_ring!(test_ring, crate::field::F128b);
-    crate::serialization::test_serialization!(test_serialization, crate::field::F128b);
 }
 
 #[test]

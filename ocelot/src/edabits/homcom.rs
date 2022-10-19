@@ -56,8 +56,7 @@ pub struct FComProver<FE: FiniteField> {
 }
 
 fn make_x_i<FE: FiniteField>(i: usize) -> FE {
-    let mut v: GenericArray<FE::PrimeField, FE::PolynomialFormNumCoefficients> =
-        GenericArray::default();
+    let mut v: GenericArray<FE::PrimeField, FE::Degree> = GenericArray::default();
     v[i] = FE::PrimeField::ONE;
     FE::from_polynomial_coefficients(v)
 }

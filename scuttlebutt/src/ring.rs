@@ -110,8 +110,9 @@ pub trait FiniteRing:
     }
 }
 
-/// Denotes that `Self` is a super-ring of `R`.
-pub trait IsSuperRingOf<R: FiniteRing>: FiniteRing + Mul<R> + MulAssign<R> + From<R> {}
+/// Indicates that `Self` is a sub ring of `R`.
+pub trait IsSubRingOf<R: FiniteRing>: FiniteRing + Mul<R, Output = R> + Into<R> {}
+impl<R: FiniteRing> IsSubRingOf<R> for R {}
 
 macro_rules! ring_ops {
     ($f:ident) => {
