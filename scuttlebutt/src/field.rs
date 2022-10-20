@@ -1,31 +1,25 @@
 //! This module defines finite fields.
 
-use crate::{field::polynomial::Polynomial, ring::FiniteRing};
+use crate::{
+    field::polynomial::Polynomial,
+    ring::{FiniteRing, IsSubRingOf},
+};
 use generic_array::{ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
 
 /// Types that implement this trait are finite fields.
 pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// The prime-order subfield of the finite field.
-    type PrimeField: PrimeFiniteField + IsSubfieldOf<Self>;
+    type PrimeField: PrimeFiniteField + IsSubFieldOf<Self>;
     /// When elements of this field are represented as a polynomial over the prime field,
     /// how many coefficients are needed?
-    // TODO: rename this to degree
-    type PolynomialFormNumCoefficients: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
+    type Degree: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
     /// Convert a polynomial over the prime field into a field element of the finite field.
-    fn from_polynomial_coefficients(
-        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
-    ) -> Self;
+    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self;
     /// Convert the field element into (coefficients of) a polynomial over the prime field.
-    fn to_polynomial_coefficients(
-        &self,
-    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>;
-    // TODO: rename this to polynomial_modulus
+    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree>;
     /// Multiplication over field elements should be reduced over this polynomial.
-    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField>;
-    /// A fused "lift from prime subfield and then multiply" operation. This operation can be much
-    /// faster than manually lifting and then multiplying.
-    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self;
+    fn polynomial_modulus() -> Polynomial<Self::PrimeField>;
 
     /// The generator for the multiplicative group.
     const GENERATOR: Self;
@@ -73,28 +67,18 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     fn inverse(&self) -> Self;
 }
 
-// TODO: so that we can break things into crates more easily, turn this into IsSuperfieldOf
-
-/// If `Self` implements `IsSubfieldOf<FE>`, then `Self` is a subfield of `FE`.
-pub trait IsSubfieldOf<FE: FiniteField>: FiniteField {
-    /// Homomorphically lift elements of `Self` into elements of `FE`.
-    fn lift_into_superfield(&self) -> FE;
-    /// Multiply self by the superfield element `x`
-    fn multiply_by_superfield(&self, x: FE) -> FE {
-        self.lift_into_superfield() * x
-    }
-}
-impl<FE: FiniteField> IsSubfieldOf<FE> for FE {
-    fn lift_into_superfield(&self) -> FE {
-        *self
-    }
-}
+/// Denotes that `Self` is a subfield of `FE`.
+///
+/// You should _not_ implement this field yourself. Instead, implement [`IsSubRingOf`].
+/// This trait is automatically implemented for all pairs of fields with an `IsSubRingOf`
+/// relationship
+pub trait IsSubFieldOf<FE: FiniteField>: FiniteField + IsSubRingOf<FE> {}
+impl<FE: FiniteField, FE2: FiniteField + IsSubRingOf<FE>> IsSubFieldOf<FE> for FE2 {}
 
 /// A `PrimeFiniteField` is a `FiniteField` with a prime modulus. In this case
 /// the field is isomorphic to integers modulo prime `p`.
 pub trait PrimeFiniteField:
-    FiniteField<PolynomialFormNumCoefficients = generic_array::typenum::U1, PrimeField = Self>
-    + std::convert::TryFrom<u128>
+    FiniteField<Degree = generic_array::typenum::U1, PrimeField = Self> + std::convert::TryFrom<u128>
 {
 }
 

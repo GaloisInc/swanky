@@ -55,7 +55,7 @@ impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
             let a = FE::PrimeField::random(&mut rng);
             let c = self.copee.send(channel, &a)?;
             z += c * *pow;
-            x += pow.multiply_by_prime_subfield(a);
+            x += a * *pow;
         }
         channel.flush()?;
         let seed = channel.read_block()?;
@@ -63,7 +63,7 @@ impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
         for (u, w) in uws.iter().copied().map(S::extract_sender_pair) {
             let chi = FE::random(&mut rng_chi);
             z += chi * w;
-            x += chi.multiply_by_prime_subfield(u);
+            x += u * chi;
         }
         channel.write_serializable(&x)?;
         channel.write_serializable(&z)?;
@@ -89,7 +89,7 @@ impl<FE: FF> Receiver<FE> {
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let mut v: Vec<FE> = vec![FE::ZERO; len];
         let seed = rng.gen();
         let mut rng_chi = AesRng::from_seed(seed);
@@ -152,7 +152,7 @@ mod tests {
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();
         for i in 0..len {
-            let mut right = delta.multiply_by_prime_subfield(S::extract_sender_pair(uw_s[i]).0);
+            let mut right = S::extract_sender_pair(uw_s[i]).0 * delta;
             right += vs[i];
             assert_eq!(S::extract_sender_pair(uw_s[i]).1, right);
         }

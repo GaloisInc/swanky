@@ -2,9 +2,9 @@ use generic_array::GenericArray;
 use scuttlebutt::field::FiniteField;
 
 /// Generates powers of `FE::GENERATOR`.
-fn gen_pows<FE: FiniteField>() -> GenericArray<FE, FE::PolynomialFormNumCoefficients> {
+fn gen_pows<FE: FiniteField>() -> GenericArray<FE, FE::Degree> {
     let mut acc = FE::ONE;
-    let mut pows: GenericArray<FE, FE::PolynomialFormNumCoefficients> = Default::default();
+    let mut pows: GenericArray<FE, FE::Degree> = Default::default();
     for item in pows.iter_mut() {
         *item = acc;
         acc *= FE::GENERATOR;
@@ -14,7 +14,7 @@ fn gen_pows<FE: FiniteField>() -> GenericArray<FE, FE::PolynomialFormNumCoeffici
 
 #[derive(Clone)]
 pub struct Powers<FE: FiniteField> {
-    powers: GenericArray<FE, FE::PolynomialFormNumCoefficients>,
+    powers: GenericArray<FE, FE::Degree>,
 }
 
 impl<FE: FiniteField> Default for Powers<FE> {
@@ -26,7 +26,7 @@ impl<FE: FiniteField> Default for Powers<FE> {
 }
 
 impl<FE: FiniteField> Powers<FE> {
-    pub fn get(&self) -> &GenericArray<FE, FE::PolynomialFormNumCoefficients> {
+    pub fn get(&self) -> &GenericArray<FE, FE::Degree> {
         &self.powers
     }
 }

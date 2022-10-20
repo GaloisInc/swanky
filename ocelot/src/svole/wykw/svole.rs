@@ -87,7 +87,7 @@ const LPN_PARAMS_D: usize = 10;
 
 // Computes the number of saved VOLEs we need for specific LPN parameters.
 fn compute_num_saved<FE: FiniteField>(params: LpnParams) -> usize {
-    params.rows + params.weight + FE::PolynomialFormNumCoefficients::to_usize()
+    params.rows + params.weight + FE::Degree::to_usize()
 }
 
 fn lpn_mtx_indices<FE: FiniteField>(
@@ -128,7 +128,7 @@ impl<FE: FiniteField> Sender<FE> {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + r;
@@ -168,7 +168,7 @@ impl<FE: FiniteField> Sender<FE> {
                 .sum();
             z += indices
                 .iter()
-                .map(|(j, a)| self.base_voles[*j].1.multiply_by_prime_subfield(*a))
+                .map(|(j, a)| *a * self.base_voles[*j].1)
                 .sum();
 
             if i < num_saved {
@@ -295,7 +295,7 @@ impl<FE: FiniteField> Receiver<FE> {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + r;
@@ -324,10 +324,7 @@ impl<FE: FiniteField> Receiver<FE> {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
             let mut y = b;
 
-            y += indices
-                .iter()
-                .map(|(j, a)| self.base_voles[*j].multiply_by_prime_subfield(*a))
-                .sum();
+            y += indices.iter().map(|(j, a)| *a * self.base_voles[*j]).sum();
 
             if i < num_saved {
                 base_voles.push(y);
@@ -475,7 +472,7 @@ mod tests {
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
-            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
+            let right = uws[i].0 * vole.delta() + vs[i];
             assert_eq!(uws[i].1, right);
         }
     }
@@ -524,7 +521,7 @@ mod tests {
 
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
-            let right = vole.delta().multiply_by_prime_subfield(uws[i].0) + vs[i];
+            let right = uws[i].0 * vole.delta() + vs[i];
             assert_eq!(uws[i].1, right);
         }
     }

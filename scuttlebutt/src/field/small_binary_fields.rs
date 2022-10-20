@@ -1,4 +1,4 @@
-use crate::field::{FiniteField, IsSubfieldOf, Polynomial, F2};
+use crate::field::{FiniteField, Polynomial, F2};
 use crate::ring::FiniteRing;
 use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
 use bytemuck::{TransparentWrapper, Zeroable};
@@ -28,8 +28,8 @@ pub unsafe trait SmallBinaryField:
 {
     /// Produce a field element of `Self` by zeroing the upper bits of `x`.
     fn from_lower_bits(x: u64) -> Self {
-        let out = x & (1 << Self::PolynomialFormNumCoefficients::U64) - 1;
-        debug_assert_eq!((out >> Self::PolynomialFormNumCoefficients::U64), 0);
+        let out = x & (1 << Self::Degree::U64) - 1;
+        debug_assert_eq!((out >> Self::Degree::U64), 0);
         Self::wrap(out)
     }
     /// Reduce the result of a single 128-bit carryless multiply of two `Self` values modulo
@@ -156,13 +156,13 @@ macro_rules! small_binary_field {
         impl FiniteField for $name {
 
             type PrimeField = F2;
-            type PolynomialFormNumCoefficients = $num_bits;
+            type Degree = $num_bits;
 
             // This corresponds to the polynomial P(x) = x
             const GENERATOR: Self = $name(0b10);
 
             fn from_polynomial_coefficients(
-                coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
+                coeff: GenericArray<Self::PrimeField, Self::Degree>,
             ) -> Self {
                 let mut out = 0;
                 for x in coeff.iter().rev() {
@@ -172,11 +172,9 @@ macro_rules! small_binary_field {
                 $name(out)
             }
 
-
-
             fn to_polynomial_coefficients(
                 &self,
-            ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+            ) -> GenericArray<Self::PrimeField, Self::Degree> {
                 let x = self.0;
                 GenericArray::from_iter(
                     (0..<$num_bits as Unsigned>::U64).map(
@@ -185,7 +183,7 @@ macro_rules! small_binary_field {
                 )
             }
 
-            fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+            fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
                 $modulus_fn()
             }
 
@@ -195,15 +193,6 @@ macro_rules! small_binary_field {
                 super::standard_bit_decomposition(u128::from(self.0))
             }
 
-            #[inline]
-            fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
-                // Equivalent to:
-                // Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
-                let new = (!((pf.0 as u64).wrapping_sub(1))) & self.0;
-                debug_assert!(new == 0 || new == self.0);
-                Self(new)
-            }
-
             fn inverse(&self) -> Self {
                 if *self == Self::ZERO {
                     panic!("Zero cannot be inverted");
@@ -211,13 +200,21 @@ macro_rules! small_binary_field {
                 self.pow_var_time((1 << <$num_bits as Unsigned>::U64) - 2)
             }
         }
-        impl IsSubfieldOf<$name> for F2 {
-            fn multiply_by_superfield(&self, x: $name) -> $name {
-                x.multiply_by_prime_subfield(*self)
+        impl crate::ring::IsSubRingOf<$name> for F2 {}
+        impl From<F2> for $name {
+            fn from(pf: F2) -> Self {
+                Self(pf.0.into())
             }
-            fn lift_into_superfield(&self) -> $name {
-                debug_assert!(self.0 <= 1);
-                $name(self.0 as u64)
+        }
+        impl std::ops::Mul<$name> for F2 {
+            type Output = $name;
+            #[inline]
+            fn mul(self, x: $name) -> $name {
+                // Equivalent to:
+                // Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
+                let new = (!((self.0 as u64).wrapping_sub(1))) & x.0;
+                debug_assert!(new == 0 || new == x.0);
+                $name(new)
             }
         }
 
@@ -276,8 +273,6 @@ macro_rules! small_binary_field {
                 }
             }
             test_field!(test_field, crate::field::$name);
-            crate::ring::test_ring!(test_ring, crate::field::$name);
-            crate::serialization::test_serialization!(test_serialization, crate::field::$name);
         }
     };
 }

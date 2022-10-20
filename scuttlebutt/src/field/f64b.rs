@@ -1,5 +1,5 @@
-use crate::field::{polynomial::Polynomial, FiniteField, IsSubfieldOf, F2};
-use crate::ring::FiniteRing;
+use crate::field::{polynomial::Polynomial, FiniteField, F2};
+use crate::ring::{FiniteRing, IsSubRingOf};
 use crate::serialization::{BytesDeserializationCannotFail, CanonicalSerialize};
 use generic_array::GenericArray;
 use rand_core::RngCore;
@@ -119,11 +119,9 @@ impl FiniteRing for F64b {
 
 impl FiniteField for F64b {
     type PrimeField = F2;
-    type PolynomialFormNumCoefficients = generic_array::typenum::U64;
+    type Degree = generic_array::typenum::U64;
 
-    fn from_polynomial_coefficients(
-        coeff: GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients>,
-    ) -> Self {
+    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self {
         let mut out = 0;
         for x in coeff.iter().rev() {
             out <<= 1;
@@ -132,16 +130,14 @@ impl FiniteField for F64b {
         Self(out)
     }
 
-    fn to_polynomial_coefficients(
-        &self,
-    ) -> GenericArray<Self::PrimeField, Self::PolynomialFormNumCoefficients> {
+    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree> {
         let x = self.0;
         GenericArray::from_iter(
             (0..64).map(|shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()),
         )
     }
 
-    fn reduce_multiplication_over() -> Polynomial<Self::PrimeField> {
+    fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         let mut coefficients = smallvec![F2::ZERO; 64];
         coefficients[64 - 1] = F2::ONE;
         coefficients[19 - 1] = F2::ONE;
@@ -161,10 +157,6 @@ impl FiniteField for F64b {
 
     const GENERATOR: Self = Self(2);
 
-    fn multiply_by_prime_subfield(&self, pf: Self::PrimeField) -> Self {
-        Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
-    }
-
     fn inverse(&self) -> Self {
         if *self == Self::ZERO {
             panic!("Zero cannot be inverted");
@@ -173,21 +165,27 @@ impl FiniteField for F64b {
     }
 }
 
-impl IsSubfieldOf<F64b> for F2 {
-    fn multiply_by_superfield(&self, x: F64b) -> F64b {
-        x.multiply_by_prime_subfield(*self)
-    }
+field_ops!(F64b);
 
-    fn lift_into_superfield(&self) -> F64b {
-        F64b(self.0 as u64)
+impl From<F2> for F64b {
+    fn from(pf: F2) -> Self {
+        Self(pf.0.into())
     }
 }
-
-field_ops!(F64b);
+impl std::ops::Mul<F64b> for F2 {
+    type Output = F64b;
+    #[inline]
+    fn mul(self, x: F64b) -> F64b {
+        // Equivalent to:
+        // Self::conditional_select(&Self::ZERO, &self, pf.ct_eq(&F2::ONE))
+        let new = (!((self.0 as u64).wrapping_sub(1))) & x.0;
+        debug_assert!(new == 0 || new == x.0);
+        F64b(new)
+    }
+}
+impl IsSubRingOf<F64b> for F2 {}
 
 #[cfg(test)]
 mod tests {
     test_field!(test_field, crate::field::F64b);
-    crate::ring::test_ring!(test_ring, crate::field::F64b);
-    crate::serialization::test_serialization!(test_serialization, crate::field::F64b);
 }

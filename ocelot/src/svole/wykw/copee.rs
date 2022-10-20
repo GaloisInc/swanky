@@ -51,7 +51,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng)?;
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
-        let r = FE::PolynomialFormNumCoefficients::to_usize();
+        let r = FE::Degree::to_usize();
         let keys = ot.send_random(channel, nbits * r, &mut rng)?;
         let aes_objs: Vec<(Aes128, Aes128)> = keys
             .iter()
@@ -87,7 +87,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
                 let (prf0, prf1) = &self.aes_objs[i * self.nbits + j];
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
-                sum += two.multiply_by_prime_subfield(w0);
+                sum += w0 * *two;
                 channel.write_serializable(&(w0 - w1 - *input))?;
             }
             w += sum * *pow;
@@ -143,7 +143,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
                 let choice = Choice::from(self.choices[j + k] as u8);
                 tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
-                sum += two.multiply_by_prime_subfield(v);
+                sum += v * *two;
             }
             res += sum * *pow;
         }
@@ -191,7 +191,7 @@ mod tests {
             .collect();
         let ws = handle.join().unwrap();
         for (w, v) in ws.iter().zip(vs.iter()) {
-            let mut delta = copee_receiver.delta().multiply_by_prime_subfield(input);
+            let mut delta = input * copee_receiver.delta();
             delta += *v;
             assert_eq!(*w, delta);
         }

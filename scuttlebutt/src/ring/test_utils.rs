@@ -58,6 +58,8 @@ macro_rules! test_ring {
                 any::<u128>().prop_map(|seed| <$f as $crate::field::FiniteRing>::from_uniform_bytes(&seed.to_le_bytes()))
             }
 
+            $crate::serialization::test_serialization!(serialization, $f);
+
             crate::test_associativity!(additive_associativity, any_element, add);
             crate::test_associativity!(multiplicative_associativity, any_element, mul);
 
