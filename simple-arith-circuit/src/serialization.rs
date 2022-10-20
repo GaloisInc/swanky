@@ -30,7 +30,7 @@ pub mod serde_index {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use crate::{circuitgen::random_circuit, Circuit};
     use proptest::prelude::*;
@@ -67,4 +67,7 @@ mod tests {
             }
         };
     }
-}*/
+
+    test_serialization!(test_serialization_f2, scuttlebutt::field::F2);
+    test_serialization!(test_serialization_f61p, scuttlebutt::field::F61p);
+}
