@@ -11,7 +11,7 @@ edition = "2021"
 publish = false
 
 [features]
-ff = ["dep:ff", "rand_chacha"]
+ff = ["dep:ff", "dep:ff_codegen", "rand_chacha"]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend"]
 unstable = []
 serde = []
@@ -30,8 +30,12 @@ bytemuck = { version = "1.8.0", features = ["derive"] }
 vectoreyes = { path = "../vectoreyes" }
 ndarray = "0.15.4"
 num-traits = "0.2.15"
-ff = { git = "https://github.com/GaloisInc/ff", rev = "81afd509", features = ["derive"], optional = true }
+ff = { git = "https://github.com/GaloisInc/ff", rev = "b8d8570f67d04cf5a8b82df3d6eb36aeb4732e92", features = [
+  "derive",
+], optional = true }
 
+[build-dependencies]
+ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "b8d8570f67d04cf5a8b82df3d6eb36aeb4732e92", optional = true }
 
 [dev-dependencies]
 criterion = "0.3.5"
