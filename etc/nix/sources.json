@@ -1,0 +1,26 @@
+{
+    "nixpkgs": {
+        "branch": "nixpkgs-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4f8287f3d597c73b0d706cfad028c2d51821f64d",
+        "sha256": "0vwi6qsrlz50cjvf61v41s53jixdql0kkpabm9ipvcrxm3ndmgxd",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/4f8287f3d597c73b0d706cfad028c2d51821f64d.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "rust-overlay": {
+        "branch": "master",
+        "description": "Pure and reproducible nix overlay of binary distributed rust toolchains",
+        "homepage": "",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "8ffc63427df1dc7e53fb96cb13b130028c258202",
+        "sha256": "0clzfjmlg7w1rsgbp84z9840xm69q7vq4haz587bmkqywlvn2gbq",
+        "type": "tarball",
+        "url": "https://github.com/oxalica/rust-overlay/archive/8ffc63427df1dc7e53fb96cb13b130028c258202.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}

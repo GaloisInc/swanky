@@ -1,120 +1,31 @@
 default:
-  image: "rust:latest"
+  tags: [docker-nix]
+  image: "debian/snapshot:stable-20221004"
   interruptible: true
+  before_script:
+    - mkdir -p -m 0755 /nix/var/log/nix/drvs
+    - mkdir -p -m 0755 /nix/var/nix/gcroots
+    - mkdir -p -m 0755 /nix/var/nix/profiles
+    - mkdir -p -m 0755 /nix/var/nix/temproots
+    - mkdir -p -m 0755 /nix/var/nix/userpool
+    - mkdir -p -m 1777 /nix/var/nix/gcroots/per-user
+    - mkdir -p -m 1777 /nix/var/nix/profiles/per-user
+    - mkdir -p -m 0755 /nix/var/nix/profiles/per-user/root
 
 variables:
   GIT_STRATEGY: clone
-  RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: 0
-  PROPTEST_CASES: 256
+  NIX_REMOTE: daemon
 
-before_script:
-  - apt-get update -yqq
-  - apt-get install -yqq --no-install-recommends build-essential git
-  - rustup toolchain add $toolchain
-  - rustup default $toolchain
-  - echo "$toolchain" > rust-toolchain
-
-stages:
-  - checkfmt
-  - test
-
-.any-changes:
+normal-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
+  script:
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py ci
 
-.vectoreyes-changes:
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: on_success
-      changes:
-        - "vectoreyes/*"
-        - "vectoreyes/**/*"
-
-.schedule:
+nightly-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
-
-.test:
-  stage: test
   script:
-    - |
-      if ! [[ -z "$force_haswell" ]]; then
-        cat > .cargo/config << EOF
-        [build]
-        # LLVM doesn't enable AES support on haswell by default since not all Haswell CPUs have AES-NI
-        rustflags = ["-C", "target-cpu=haswell", "-C", "target-feature=+aes", "--cfg", "vectoreyes_target_cpu=\"haswell\""]
-        rustdocflags = ["-C", "target-cpu=haswell", "-C", "target-feature=+aes", "--cfg", "vectoreyes_target_cpu=\"haswell\""]
-      EOF
-      fi
-    - cat .cargo/config
-    - rustc --version && cargo --version # Print version info for debugging
-    - cargo build --verbose --workspace --examples --tests --benches --features "$features"
-    - cargo build --verbose --workspace --all-targets --features "$features"
-    - cargo test --verbose --workspace --features "$features"
-
-checkfmt:rustfmt:
-  extends: [.any-changes]
-  stage: checkfmt
-  variables:
-    toolchain: stable
-  script:
-    - rustup component add rustfmt --toolchain $toolchain
-    - cargo fmt -- --check
-
-checkfmt:vectoreyes-generation:
-  stage: checkfmt
-  image: "nixos/nix:latest"
-  before_script: []
-  extends: [.vectoreyes-changes]
-  script:
-    - sha256sum $(find vectoreyes -type f) | sort > vectoreyes-pre-gen.sha256sum
-    - vectoreyes/src/codegen/format-python.sh
-    - vectoreyes/src/codegen/generate.py
-    # Only hash files that haven't been ignored.
-    - sha256sum $(find vectoreyes/ -type f | grep -v '\.dbm' | grep -v '__pycache__') | sort > vectoreyes-post-gen.sha256sum
-
-test-vectoreyes-scalar:
-  extends: [.vectoreyes-changes]
-  stage: test
-  variables:
-    toolchain: stable
-  script:
-      # Test vectoreyes in the scalar mode.
-    - rm -rf .cargo/config
-    - rustc --version && cargo --version # Print version info for debugging
-    - cargo build -p vectoreyes --all-targets --verbose
-    - cargo test -p vectoreyes --verbose
-
-test:stable:
-  extends: [.test, .any-changes]
-  stage: test
-  variables:
-    toolchain: stable
-    features: ""
-
-# Vectoreyes introduced several different configurations based on CPU.
-# On some CPUs, we say that the AES instruction latency is 4, on Haswell we say
-# it's 8. This number is exposed to users of vectoreyes. As a result, changing
-# this number could reveal bugs in libraries that use vectoreyes. The normal
-# stable test will run on the native CPU which (for our CI) will test the other
-# configuration.
-#
-# It's a good idea to keep this in mind when adding special constants for
-# different CPU microarchitectures.
-test:stable-haswell:
-  extends: [.test, .schedule]
-  stage: test
-  variables:
-    toolchain: stable
-    features: ""
-    force_haswell: "1"
-
-test:nightly:
-  extends: [.test, .any-changes, .schedule]
-  variables:
-    toolchain: nightly
-    features: curve25519-dalek serde nightly
-
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py ci --nightly
