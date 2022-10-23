@@ -130,6 +130,7 @@ pub fn random_circuit<F: FiniteField, R: Rng>(
 
 /// Produce a simple test circuit, as well as an input that should cause it
 /// to output zero.
+#[cfg(any(feature = "proptest", test))]
 pub fn simple_test_circuit<F: PrimeFiniteField>() -> (Circuit<F>, Vec<F>) {
     let circuit = Circuit::new(
         4,
