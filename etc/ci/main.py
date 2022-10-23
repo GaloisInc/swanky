@@ -126,6 +126,7 @@ def ci(nightly: bool = False):
     os.environ["CC"] = str(ROOT / "etc/ci/wrappers/cc.sh")
     os.environ["CXX"] = str(ROOT / "etc/ci/wrappers/cxx.sh")
     os.environ["CARGO_HOME"] = str(swanky_cache_dir / "cargo-home")
+    os.environ["SWANKY_CACHE_DIR"] = str(swanky_cache_dir)
     with gitlab_ci_section("Code Formatting"):
         pretty_check_call(
             ["cargo", "fmt", "--", "--check"],

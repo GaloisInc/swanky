@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 from collections import namedtuple
 from hashlib import sha256
 from pathlib import Path
+import os
+from uuid import uuid4
 
 from cgtypes import *
 
@@ -20,11 +22,14 @@ with lzma.open(INTEL_INTRINSICS_XML_XZ) as compressed_xml:
 # This is a compressed version of the March 2021 XML table from uops.info
 UOPS_INFO_XML_XZ = Path(__file__).resolve().parent / "uops.info-Mar2021.xml.xz"
 
-# NOTE: update version v every time the extraction algorithm changes to ensure that the cache never becomes stale.
-UOPS_INFO_DB = UOPS_INFO_XML_XZ.with_suffix(".v1.dbm")
+# NOTE: update version v every time the extraction algorithm changes to ensure that the cache
+# never becomes stale.
+SWANKY_CACHE_DIR = Path(os.environ.get("SWANKY_CACHE_DIR", str(UOPS_INFO_XML_XZ.parent)))
+UOPS_INFO_DB = SWANKY_CACHE_DIR / f"{sha256(UOPS_INFO_XML_XZ.read_bytes()).hexdigest()}.v1.dbm"
 if not UOPS_INFO_DB.exists():
     _Latency = namedtuple("_Latency", "value is_exact")
-    with dbm.open(str(UOPS_INFO_DB), "n") as db:
+    tmp = UOPS_INFO_DB / f"{uuid4()}.tmp.dbm"
+    with dbm.open(str(tmp), "n") as db:
         with lzma.open(str(UOPS_INFO_XML_XZ)) as compressed_xml:
             UOPS_XML = ET.parse(compressed_xml)
 
@@ -69,6 +74,7 @@ if not UOPS_INFO_DB.exists():
                     },
                 )
                 db[key] = json.dumps(data).encode("ascii")
+    tmp.rename(UOPS_INFO_DB)
 UOPS_INFO_DB = dbm.open(str(UOPS_INFO_DB))
 
 
