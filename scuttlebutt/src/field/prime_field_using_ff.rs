@@ -15,7 +15,7 @@ macro_rules! random_function_helper {
         fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
             use rand::distributions::{Distribution, Uniform};
             Self {
-                internal: Internal([Uniform::from(0..$modulus).sample(rng)]),
+                internal: internal::new_internal([Uniform::from(0..$modulus).sample(rng)]),
             }
         }
     };
@@ -59,6 +59,7 @@ macro_rules! try_from_helper {
 pub(crate) use try_from_helper;
 
 /// This macro constructs a prime finite field using the `ff` library.
+/// The modulus and generator should be listed, along with the name, in `build.rs`.
 /// * `$name`: The name of the field.
 /// * `$mod_name`: The name of the module containing the field.
 /// * `$modulus`: The prime modulus, given as a string.
@@ -97,21 +98,36 @@ macro_rules! prime_field_using_ff {
             use std::ops::{AddAssign, MulAssign, SubAssign};
             use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
+            #[allow(non_camel_case_types, unused_variables, unused_mut, dead_code)]
+            mod internal {
+                include!(concat!(env!("OUT_DIR"), "/ff-", stringify!($name) , ".rs"));
+                #[test]
+                fn build_file_matches_macro() {
+                    assert_eq!(MODULUS_STRING, $modulus);
+                    assert_eq!(GENERATOR_STRING, $generator);
+                    assert_eq!(std::mem::size_of::<Internal>() / std::mem::size_of::<u64>(), $limbs);
+                    assert_eq!(std::mem::size_of::<Internal>() % std::mem::size_of::<u64>(), 0);
+                }
+                #[inline]
+                pub(super) fn get_internal(internal: &Internal) -> &[u64; $limbs] {
+                    &internal.0
+                }
+                #[inline]
+                pub(super) fn new_internal(x: [u64; $limbs]) -> Internal {
+                    Internal(x)
+                }
+            }
+            use internal::{Internal, InternalRepr, get_internal};
+
             $(#[$m])*
             #[derive(Debug, Eq, Clone, Copy)]
             pub struct $name {
                 internal: Internal,
             }
 
-            #[derive(PrimeField)]
-            #[PrimeFieldModulus = $modulus]
-            #[PrimeFieldGenerator = $generator]
-            #[PrimeFieldReprEndianness = "little"]
-            struct Internal([u64; $limbs]);
-
             impl Hash for $name {
                 fn hash<H: Hasher>(&self, state: &mut H) {
-                    self.internal.0.hash(state)
+                    get_internal(&self.internal).hash(state)
                 }
             }
 
@@ -311,6 +327,7 @@ macro_rules! prime_field_using_ff {
     }
 }
 
+// The modulus and generator for these fields is specified in `build.rs`
 prime_field_using_ff!(
     /// The finite field over the prime
     /// $`P = 2^{384} - 2^{128} - 2^{96} + 2^{32} - 1
