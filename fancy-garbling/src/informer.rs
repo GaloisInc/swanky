@@ -101,7 +101,7 @@ impl std::fmt::Display for InformerStats {
     /// Print information about the fancy computation.
     ///
     /// For example, below is the output when run on `circuits/AES-non-expanded.txt`:
-    /// ```
+    /// ```text
     /// computation info:
     ///   garbler inputs:                  128 // comms cost: 16 Kb
     ///   evaluator inputs:                128 // comms cost: 48 Kb
