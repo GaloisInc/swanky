@@ -1,4 +1,4 @@
-with import ./pkgs.nix;
+with import ./pkgs.nix {};
 # We strip the whitespace from the rust-toolchain file.
 let rust-toolchain-version = builtins.head (builtins.match "([^\r\n]+)[\r\n]*" (builtins.readFile ../../rust-toolchain));
 in

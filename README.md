@@ -16,7 +16,17 @@
 `swanky` is currently considered **prototype** software. Do not deploy it in
 production, or trust it with sensitive data.
 
-# Using `swanky` in your project
+# Using `swanky`
+## Preferred Way
+The preferred way to use `swanky` is to fork this monorepo, and add your code
+your fork. This approach makes it easy for your code to inherit the
+configuration of the `swanky` repo.
+
+## Alternative Way
+It is also possible to use `swanky` as traditional Rust crates. The downside of
+this approach is that you won't automatically get the configuration of the
+`swanky` repo. `swanky` is _only_ tested against the pinned rust version in the
+repoistory and the pinned dependencey versions.
 
 To use a `swanky` crate in your project, add the following line to the
 `[dependencies]` entry in `Cargo.toml`:
@@ -29,6 +39,9 @@ particular revision to use.
 Note: As `swanky` is currently considered prototype software, it is best to pin
 a particular revision of `swanky`, as there is no guarantee that future versions
 of `swanky` will maintain backwards compatibility.
+
+It is also advisable to copy over swanky's `.cargo/config` file, and to enable
+LTO in your release builds (`lto = true` in your `Cargo.toml` file).
 
 # Citing `swanky`
 

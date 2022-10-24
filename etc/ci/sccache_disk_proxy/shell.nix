@@ -1,11 +1,11 @@
-with import ../nix/pkgs.nix;
+with import ../../nix/pkgs.nix {};
 let sccache_disk_proxy = buildGoModule {
   pname = "sccache_disk_proxy";
   version = "0.0.1";
-  src = ./sccache_disk_proxy;
+  src = ./.;
   vendorSha256 = "sha256-paCJiOD5J5I3N2TLdXlYR/WD69UyGaYALWIdsIxQkCs=";
 };
-mkShell {
+in mkShell {
   buildInputs = [
     (writeShellScriptBin "start_sccache" ''
       export SCCACHE_IDLE_TIMEOUT=0
@@ -15,17 +15,20 @@ mkShell {
       export AWS_ACCESS_KEY_ID=galois
       export AWS_SECRET_ACCESS_KEY=galoissecret
       tmp=$(mktemp -d)
-      function run_daemon() {
-          ${sccache_disk_proxy}/bin/sccache_disk_proxy --bind "$SCCACHE_ENDPOINT" --data "$SWANKY_CACHE_DIR/sccache" --ready "$tmp/ready" &
-      }
-
       mkfifo "$tmp/ready"
-      run_daemon &
+      function cleanup() {
+        ${sccache}/bin/sccache --stop-server
+        kill %1
+      }
+      trap cleanup EXIT
+      ${sccache_disk_proxy}/bin/sccache_disk_proxy --bind "$SCCACHE_ENDPOINT" --data "$SWANKY_CACHE_DIR/sccache" --ready "$tmp/ready" &
       # Wait for the server to start
       head -c 1 "$tmp/ready" > /dev/null
       rm "$tmp/ready"
       rmdir "$tmp"
       ${sccache}/bin/sccache --start-server
+      echo 1 > "$SCCACHE_READY_PATH"
+      read # wait for stdin to close
     '')
   ];
 }

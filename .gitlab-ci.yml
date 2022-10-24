@@ -15,17 +15,22 @@ default:
 variables:
   GIT_STRATEGY: clone
   NIX_REMOTE: daemon
+  SWANKY_CACHE_DIR: /var/lib/swanky-sccache/
 
 normal-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
   script:
-    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py ci
+    - pwd
+    - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py
 
 nightly-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
   script:
-    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py ci --nightly
+    - pwd
+    - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py --nightly

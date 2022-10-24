@@ -1,4 +1,4 @@
-with import ./pkgs.nix;
+with import ./pkgs.nix {};
 mkShell {
   buildInputs = [
     (import ./rust-toolchain.nix)

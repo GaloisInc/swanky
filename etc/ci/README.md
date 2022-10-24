@@ -29,3 +29,10 @@ The gitlab repo configuration contains a setting for the `DOCKER_AUTH_CONFIG` en
 containing credentials to access the Docker image. These credentials will be used by the gitlab
 runner to download the image.
 
+
+# How to use the cache
+When using the cache, it's important to remember that _multiple_ CI jobs might be using the cache at once.
+As a result, operations which manipulate the cache should be atomic.
+
+To make things easier, we never automatically expire entries in the CI cache.
+If the cache gets to big, follow the instructions above to manually purge it.
