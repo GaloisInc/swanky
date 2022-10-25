@@ -41,9 +41,7 @@ def pretty_check_call(args, help_on_failure: str = "", extra_env: Dict[str, str]
 def gitlab_ci_section(name: str):
     "While this context is active, render the output under a collapsable section"
     ident = uuid4()
-    sys.stdout.write(
-        f"\x1b[0Ksection_start:{int(time.time())}:{ident}\r\x1b[0K"
-    )
+    sys.stdout.write(f"\x1b[0Ksection_start:{int(time.time())}:{ident}\r\x1b[0K")
     typer.secho(name, underline=True, bold=True)
     sys.stdout.flush()
     try:
