@@ -646,6 +646,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
 mod tests {
     use super::{FComProver, FComVerifier, MacProver};
     use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use rand::SeedableRng;
     use scuttlebutt::{
         field::{F40b, F61p, FiniteField},
         ring::FiniteRing,
@@ -660,7 +661,7 @@ mod tests {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -675,7 +676,7 @@ mod tests {
             let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -701,7 +702,7 @@ mod tests {
         let count = 200;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -723,7 +724,7 @@ mod tests {
             let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -756,7 +757,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -782,7 +783,7 @@ mod tests {
                 .unwrap();
             (v, b)
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -809,7 +810,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -848,7 +849,7 @@ mod tests {
                 .unwrap();
             (v, b)
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -882,7 +883,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -920,7 +921,7 @@ mod tests {
                 }
             }
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
