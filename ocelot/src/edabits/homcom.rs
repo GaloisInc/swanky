@@ -878,6 +878,85 @@ mod tests {
         assert_eq!(b, bres);
     }
 
+    fn test_fcom_check_zero<FE: FiniteField>() -> () {
+        let count = 50;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fcom =
+                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
+
+            for n in 0..count {
+                // ZEROs
+                let mut v = Vec::new();
+                for _ in 0..n {
+                    let x = FE::PrimeField::ZERO;
+                    let xmac = fcom.input1(&mut channel, &mut rng, x).unwrap();
+                    v.push(MacProver(x, xmac));
+                }
+                channel.flush().unwrap();
+                let r = fcom.check_zero(&mut channel, v.as_slice());
+                if !(r.is_ok()) {
+                    assert!(false);
+                }
+            }
+
+            for n in 1..count {
+                // NON_ZERO
+                let mut v = Vec::new();
+                for _ in 0..n {
+                    let x = FE::PrimeField::random_nonzero(&mut rng);
+                    let xmac = fcom.input1(&mut channel, &mut rng, x).unwrap();
+                    v.push(MacProver(x, xmac));
+                }
+                channel.flush().unwrap();
+                let r = fcom.check_zero(&mut channel, v.as_slice());
+                if !(r.is_err()) {
+                    assert!(false);
+                }
+            }
+        });
+        let mut rng = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fcom =
+            FComVerifier::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
+
+        for n in 0..count {
+            // ZEROs
+            let mut v = Vec::new();
+            for _ in 0..n {
+                let xmac = fcom.input1(&mut channel, &mut rng).unwrap();
+                v.push(xmac);
+            }
+            let r = fcom.check_zero(&mut channel, &mut rng, &v);
+            if !(r.is_ok()) {
+                assert!(false);
+            }
+        }
+
+        for n in 1..count {
+            // non ZERO
+            let mut v = Vec::new();
+            for _ in 0..n {
+                let xmac = fcom.input1(&mut channel, &mut rng).unwrap();
+                v.push(xmac);
+            }
+            let r = fcom.check_zero(&mut channel, &mut rng, &v);
+            if !(r.is_err()) {
+                assert!(false);
+            }
+        }
+
+        handle.join().unwrap();
+    }
+
     #[test]
     fn test_fcom_random_f61p() {
         let _t = test_fcom_random::<F61p>();
@@ -901,5 +980,10 @@ mod tests {
     #[test]
     fn test_fcom_wolverine_f61p() {
         let _t = test_fcom_wolverine::<F61p>();
+    }
+
+    #[test]
+    fn test_fcom_check_zero_f61p() {
+        let _t = test_fcom_check_zero::<F61p>();
     }
 }
