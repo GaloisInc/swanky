@@ -3,3 +3,4 @@ mod edabits;
 mod homcom;
 
 pub use edabits::*;
+pub use homcom::*;
