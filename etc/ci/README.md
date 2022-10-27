@@ -35,4 +35,4 @@ When using the cache, it's important to remember that _multiple_ CI jobs might b
 As a result, operations which manipulate the cache should be atomic.
 
 To make things easier, we never automatically expire entries in the CI cache.
-If the cache gets to big, follow the instructions above to manually purge it.
+If the cache gets too big, follow the instructions above to manually purge it.
