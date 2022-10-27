@@ -21,6 +21,8 @@ pub mod ring;
 pub mod serialization;
 pub mod utils;
 
+pub(crate) mod ops;
+
 pub use crate::{
     aes::{
         aes128::{Aes128, FIXED_KEY_AES128},
