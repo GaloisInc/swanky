@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "diet-mac-and-cheese",
     "fancy-garbling",
     "fancy-garbling/base_conversion",
     "humidor",
