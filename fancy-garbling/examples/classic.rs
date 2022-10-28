@@ -15,26 +15,27 @@ fn main() {
 
     // TODO(interstellar) how to refactor into "1 party computation"; current code is splitted into "garbler inputs" and "evaluator input"
 
+    // IMPORTANT: LSB is on the left!
     for (ev_inputs, expected_result) in [
         (
             // 0
             vec![0; 32],
             // +1 = 1, no reminder
             vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1, 0,
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
             ],
         ),
         (
             // 1
             vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ],
             // +1 = 2, no reminder
             vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 0, 0,
+                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
             ],
         ),
         (
@@ -45,8 +46,8 @@ fn main() {
             ],
             // +1 = X+1, no reminder
             vec![
-                1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
-                1, 0, 1, 1, 0,
+                0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+                1, 0, 1, 0, 0,
             ],
         ),
         (
@@ -62,10 +63,11 @@ fn main() {
         let evaluator_inputs = &encoder.encode_evaluator_inputs(&ev_inputs);
 
         // TODO(interstellar) ???
-        let mut gb_inputs = vec![0u16; 32];
-        if let Some(last) = gb_inputs.last_mut() {
-            *last = 1;
-        }
+        // 1 (LSB is on the left!)
+        let gb_inputs = vec![
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ];
         let garbler_inputs = &encoder.encode_garbler_inputs(&gb_inputs);
 
         let res = garbled
