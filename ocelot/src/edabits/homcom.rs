@@ -14,13 +14,13 @@ use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::time::Instant;
 use subtle::{Choice, ConditionallySelectable};
 
-// The types `MacProver` and `MacVerifier` hold the data associated to
-// a MAC between a prover and a verifier, following SVOLE style
-// functionalities. The main property associated with the two types is
-// that, given a `MacProver(x, m)` and its corresponding
-// `MacVerifier(k)`, the following equation holds `m = k + delta x`,
-// for a global key `delta`, known only to the verifier.
-#[derive(Clone, Copy, Debug)]
+/// The types `MacProver` and `MacVerifier` hold the data associated to
+/// a MAC between a prover and a verifier, following SVOLE style
+/// functionalities. The main property associated with the two types is
+/// that, given a `MacProver(x, m)` and its corresponding
+/// `MacVerifier(k)`, the following equation holds `m = k + delta x`,
+/// for a global key `delta`, known only to the verifier.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MacProver<FE: FiniteField>(
     // value
     pub FE::PrimeField,
@@ -28,7 +28,8 @@ pub struct MacProver<FE: FiniteField>(
     pub FE,
 );
 
-#[derive(Clone, Copy, Debug)]
+/// `MacVerifier` type
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MacVerifier<FE: FiniteField>(
     // The verifier's key mac
     pub FE,
@@ -49,7 +50,7 @@ impl<FE: FiniteField> ConditionallySelectable for MacVerifier<FE> {
     }
 }
 
-// F_com protocol
+/// F_com protocol for the Prover
 pub struct FComProver<FE: FiniteField> {
     svole_sender: Sender<FE>,
     voles: Vec<(FE::PrimeField, FE)>,
@@ -62,6 +63,7 @@ fn make_x_i<FE: FiniteField>(i: usize) -> FE {
 }
 
 impl<FE: FiniteField> FComProver<FE> {
+    /// Initialize the functionality.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -74,6 +76,7 @@ impl<FE: FiniteField> FComProver<FE> {
         })
     }
 
+    /// Duplicate the functionality.
     pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -85,6 +88,7 @@ impl<FE: FiniteField> FComProver<FE> {
         })
     }
 
+    /// Returns a random mac.
     pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -108,6 +112,7 @@ impl<FE: FiniteField> FComProver<FE> {
         }
     }
 
+    /// Input a slice of values and returns a vector of its macs.
     pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -119,8 +124,7 @@ impl<FE: FiniteField> FComProver<FE> {
         Ok(out)
     }
 
-    /// lower level implementation of `input` with pre-defined out
-    /// vector
+    /// lower level implementation of `input` with pre-defined out vector.
     pub fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -137,16 +141,33 @@ impl<FE: FiniteField> FComProver<FE> {
         Ok(())
     }
 
+    /// Input a single value and returns its mac.
+    pub fn input1<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+        x: FE::PrimeField,
+    ) -> Result<FE, Error> {
+        let r = self.random(channel, rng)?;
+        let y = x - r.0;
+        channel.write_serializable::<FE::PrimeField>(&y)?;
+
+        Ok(r.1)
+    }
+
+    /// Add a constant to a Mac.
     #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
         return MacProver(cst + x.0, x.1);
     }
 
+    /// Multiply by a constant a Mac.
     #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
         return MacProver(cst * x.0, cst * (x.1));
     }
 
+    /// Add two Macs.
     #[inline]
     pub fn add(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
@@ -154,37 +175,48 @@ impl<FE: FiniteField> FComProver<FE> {
         return MacProver(a + b, a_mac + b_mac);
     }
 
+    /// Negative Mac.
     #[inline]
     pub fn neg(&self, a: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         return MacProver(-a, -a_mac);
     }
 
+    /// Subtraction of two Macs.
     #[inline]
-    pub fn minus(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
+    pub fn sub(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
         return MacProver(a - b, a_mac - b_mac);
     }
 
+    /// Check that a batch of Macs are zero.
     pub fn check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        x_mac_batch: Vec<FE>,
+        x_mac_batch: &[MacProver<FE>],
     ) -> Result<(), Error> {
         let seed = channel.read_block()?;
         let mut rng = AesRng::from_seed(seed);
 
         let mut m = FE::ZERO;
-        for x_mac in x_mac_batch.iter() {
+        let mut b = true;
+        for MacProver(x, x_mac) in x_mac_batch.iter() {
+            b = b && *x == FE::PrimeField::ZERO;
             let chi = FE::random(&mut rng);
             m += chi * *x_mac;
         }
         channel.write_serializable::<FE>(&m)?;
         channel.flush()?;
-        Ok(())
+
+        if b {
+            Ok(())
+        } else {
+            Err(Error::Other("check_zero failed".to_string()))
+        }
     }
 
+    /// Open Macs.
     pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -210,6 +242,7 @@ impl<FE: FiniteField> FComProver<FE> {
         Ok(())
     }
 
+    /// Quicksilver multiplication check.
     pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -255,6 +288,7 @@ impl<FE: FiniteField> FComProver<FE> {
         Ok(())
     }
 
+    /// Wolverine multiplication check.
     pub fn wolverine_check_multiply<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -291,21 +325,22 @@ impl<FE: FiniteField> FComProver<FE> {
             let d_y = self.affine_mult_cst(d, y);
 
             let mut w: MacProver<FE> = z;
-            w = self.minus(w, c);
+            w = self.sub(w, c);
             w = self.add(w, e_x);
             w = self.add(w, d_y);
             w = self.affine_add_cst(d_e, w);
 
             if w.0 != FE::PrimeField::ZERO {
-                return Err(Error::Other("SDFSDF".to_string()));
+                return Err(Error::Other("error in wolverine check".to_string()));
             }
-            to_check.push(w.1);
+            to_check.push(MacProver(w.0, w.1));
         }
-        self.check_zero(channel, to_check)?;
+        self.check_zero(channel, &to_check)?;
         Ok(())
     }
 }
 
+/// F_com protocol for the Verififier
 pub struct FComVerifier<FE: FiniteField> {
     delta: FE,
     svole_receiver: Receiver<FE>,
@@ -313,6 +348,7 @@ pub struct FComVerifier<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> FComVerifier<FE> {
+    /// Initialize the functionality.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -327,6 +363,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         })
     }
 
+    /// Duplicate the functionality.
     pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -339,11 +376,13 @@ impl<FE: FiniteField> FComVerifier<FE> {
         })
     }
 
+    /// Returns the delta Mac.
     #[inline]
     pub fn get_delta(&self) -> FE {
         self.delta
     }
 
+    /// Returns a random mac.
     pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -369,6 +408,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         }
     }
 
+    /// Input a number of values and returns the associated macs.
     pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -380,7 +420,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         Ok(out)
     }
 
-    /// lower level implementation of `input` for predefined  out vector
+    /// lower level implementation of `input` for predefined  out vector.
     pub fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -396,16 +436,31 @@ impl<FE: FiniteField> FComVerifier<FE> {
         Ok(())
     }
 
+    /// Input a single value and returns its associated Mac.
+    pub fn input1<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<MacVerifier<FE>, Error> {
+        let r = self.random(channel, rng)?;
+        let y = channel.read_serializable::<FE::PrimeField>()?;
+        let out = MacVerifier(r.0 - y * self.delta);
+        Ok(out)
+    }
+
+    /// Add a constant to a Mac.
     #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
         return MacVerifier(x_mac.0 - cst * self.delta);
     }
 
+    /// Multiply a Mac by a constant.
     #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
         return MacVerifier(cst * x_mac.0);
     }
 
+    /// Add two Macs.
     #[inline]
     pub fn add(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
@@ -413,25 +468,28 @@ impl<FE: FiniteField> FComVerifier<FE> {
         return MacVerifier(a_mac + b_mac);
     }
 
+    /// Negative of a Mac.
     #[inline]
     pub fn neg(&self, a: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
         return MacVerifier(-a_mac);
     }
 
+    /// Subtraction of two Macs.
     #[inline]
-    pub fn minus(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
+    pub fn sub(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
         let MacVerifier(b_mac) = b;
         return MacVerifier(a_mac - b_mac);
     }
 
+    /// Check that a batch of Macs are zero.
     pub fn check_zero<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         key_batch: &[MacVerifier<FE>],
-    ) -> Result<bool, Error> {
+    ) -> Result<(), Error> {
         let seed = rng.gen::<Block>();
         channel.write_block(&seed)?;
         channel.flush()?;
@@ -445,9 +503,15 @@ impl<FE: FiniteField> FComVerifier<FE> {
         let m = channel.read_serializable::<FE>()?;
 
         let b = key_chi == m;
-        Ok(b)
+
+        if b {
+            Ok(())
+        } else {
+            Err(Error::Other("check_zero failed".to_string()))
+        }
     }
 
+    /// Open Macs.
     pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -484,6 +548,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         }
     }
 
+    /// Quicksilver multiplication check.
     pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -526,6 +591,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         }
     }
 
+    /// Wolverine multiplication check
     pub fn wolverine_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -564,7 +630,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             let d_y = self.affine_mult_cst(d, y);
 
             let mut w: MacVerifier<FE> = z;
-            w = self.minus(w, c);
+            w = self.sub(w, c);
             w = self.add(w, e_x);
             w = self.add(w, d_y);
             w = self.affine_add_cst(d_e, w);
@@ -580,6 +646,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
 mod tests {
     use super::{FComProver, FComVerifier, MacProver};
     use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use rand::SeedableRng;
     use scuttlebutt::{
         field::{F40b, F61p, FiniteField},
         ring::FiniteRing,
@@ -594,7 +661,7 @@ mod tests {
         let count = 100;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -609,7 +676,7 @@ mod tests {
             let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -635,7 +702,7 @@ mod tests {
         let count = 200;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -657,7 +724,7 @@ mod tests {
             let _ = fcom.open(&mut channel, &v).unwrap();
             v
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -690,7 +757,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -716,7 +783,7 @@ mod tests {
                 .unwrap();
             (v, b)
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -743,7 +810,7 @@ mod tests {
         let count = 50;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
+            let mut rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -782,7 +849,7 @@ mod tests {
                 .unwrap();
             (v, b)
         });
-        let mut rng = AesRng::new();
+        let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -812,6 +879,85 @@ mod tests {
         assert_eq!(b, bres);
     }
 
+    fn test_fcom_check_zero<FE: FiniteField>() -> () {
+        let count = 50;
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::from_seed(Default::default());
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            let mut fcom =
+                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                    .unwrap();
+
+            for n in 0..count {
+                // ZEROs
+                let mut v = Vec::new();
+                for _ in 0..n {
+                    let x = FE::PrimeField::ZERO;
+                    let xmac = fcom.input1(&mut channel, &mut rng, x).unwrap();
+                    v.push(MacProver(x, xmac));
+                }
+                channel.flush().unwrap();
+                let r = fcom.check_zero(&mut channel, v.as_slice());
+                if !(r.is_ok()) {
+                    assert!(false);
+                }
+            }
+
+            for n in 1..count {
+                // NON_ZERO
+                let mut v = Vec::new();
+                for _ in 0..n {
+                    let x = FE::PrimeField::random_nonzero(&mut rng);
+                    let xmac = fcom.input1(&mut channel, &mut rng, x).unwrap();
+                    v.push(MacProver(x, xmac));
+                }
+                channel.flush().unwrap();
+                let r = fcom.check_zero(&mut channel, v.as_slice());
+                if !(r.is_err()) {
+                    assert!(false);
+                }
+            }
+        });
+        let mut rng = AesRng::from_seed(Default::default());
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+        let mut fcom =
+            FComVerifier::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .unwrap();
+
+        for n in 0..count {
+            // ZEROs
+            let mut v = Vec::new();
+            for _ in 0..n {
+                let xmac = fcom.input1(&mut channel, &mut rng).unwrap();
+                v.push(xmac);
+            }
+            let r = fcom.check_zero(&mut channel, &mut rng, &v);
+            if !(r.is_ok()) {
+                assert!(false);
+            }
+        }
+
+        for n in 1..count {
+            // non ZERO
+            let mut v = Vec::new();
+            for _ in 0..n {
+                let xmac = fcom.input1(&mut channel, &mut rng).unwrap();
+                v.push(xmac);
+            }
+            let r = fcom.check_zero(&mut channel, &mut rng, &v);
+            if !(r.is_err()) {
+                assert!(false);
+            }
+        }
+
+        handle.join().unwrap();
+    }
+
     #[test]
     fn test_fcom_random_f61p() {
         let _t = test_fcom_random::<F61p>();
@@ -835,5 +981,10 @@ mod tests {
     #[test]
     fn test_fcom_wolverine_f61p() {
         let _t = test_fcom_wolverine::<F61p>();
+    }
+
+    #[test]
+    fn test_fcom_check_zero_f61p() {
+        let _t = test_fcom_check_zero::<F61p>();
     }
 }

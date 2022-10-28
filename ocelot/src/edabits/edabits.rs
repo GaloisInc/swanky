@@ -69,17 +69,27 @@ struct DabitVerifier<FE: FiniteField> {
 const FDABIT_SECURITY_PARAMETER: usize = 38;
 
 /// bit to field element
-fn bit_to_fe<FE: FiniteField>(b: F2) -> FE {
+fn f2_to_fe<FE: FiniteField>(b: F2) -> FE {
     let choice = b.ct_eq(&F2::ZERO);
     FE::conditional_select(&FE::ONE, &FE::ZERO, choice)
 }
 
-fn convert_f2_to_field<FE: FiniteField>(v: &[F2]) -> FE {
+fn convert_bits_to_field<FE: FiniteField>(v: &[F2]) -> FE {
     let mut res = FE::ZERO;
 
     for b in v.iter().rev() {
         res += res; // double
-        res += bit_to_fe(*b);
+        res += f2_to_fe(*b);
+    }
+    res
+}
+
+fn convert_bits_to_field_mac<FE: FiniteField>(v: &[MacProver<F40b>]) -> FE {
+    let mut res = FE::ZERO;
+
+    for b in v.iter().rev() {
+        res += res; // double
+        res += f2_to_fe(b.0);
     }
     res
 }
@@ -199,7 +209,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         for i in 0..n {
             let MacProver(c, _) = c_batch[i];
 
-            let c_m = bit_to_fe::<FE::PrimeField>(c);
+            let c_m = f2_to_fe::<FE::PrimeField>(c);
 
             let choice = c.ct_eq(&F2::ONE);
             let beq = self
@@ -336,7 +346,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             for _ in 0..nb_bits {
                 bits.push(self.fcom_f2.random(channel, rng)?);
             }
-            let r_m: FE::PrimeField = convert_f2_to_field::<FE::PrimeField>(
+            let r_m: FE::PrimeField = convert_bits_to_field::<FE::PrimeField>(
                 bits.iter().map(|x| x.0).collect::<Vec<F2>>().as_slice(),
             );
             aux_bits.push(bits);
@@ -369,7 +379,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         for _ in 0..num {
             let b = self.fcom_f2.random(channel, rng)?;
             b_batch.push(b);
-            let b_m = bit_to_fe(b.0);
+            let b_m = f2_to_fe(b.0);
             b_m_batch.push(b_m);
         }
 
@@ -445,7 +455,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         for k in 0..s {
             for _ in 0..gamma {
                 let b: F2 = F2::random(rng);
-                let b_m = bit_to_fe(b);
+                let b_m = f2_to_fe(b);
                 c_m[k].push(b_m);
             }
         }
@@ -537,7 +547,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             let (mut r_prime, mut r_prime_mac) = (FE::PrimeField::ZERO, FE::ZERO);
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b = bit_to_fe(e[k][i]);
+                let b = f2_to_fe(e[k][i]);
                 let MacProver(tmp, tmp_mac) = self.fcom.affine_mult_cst(b, dabits[i].value);
                 debug_assert!(
                     ((b == FE::PrimeField::ONE) & (tmp == dabits[i].value.0))
@@ -622,30 +632,39 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         )?;
 
         // 6)a)
-        let mut e_prime_mac_batch = Vec::with_capacity(n);
+        let mut e_prime_batch = Vec::with_capacity(n);
         // 6)d)
         let mut ei_batch = Vec::with_capacity(n * nb_bits);
         for i in 0..n {
             // 6)a)
-            let MacProver(_c_m, c_m_mac) = edabits_vector[i].value;
-            let MacProver(_r_m, r_m_mac) = r[i].value;
-            let c_plus_r_mac = c_m_mac + r_m_mac;
+            let c_m = edabits_vector[i].value;
+            let r_m = r[i].value;
+            let c_plus_r = self.fcom.add(c_m, r_m);
 
             // 6)c) done earlier
-            let MacProver(_, e_m_mac) = e_m_batch[i];
+            let e_m = e_m_batch[i];
 
             // 6)d)
-            let e_prime_mac = c_plus_r_mac - power_two_nb_bits * e_m_mac;
-            e_prime_mac_batch.push(e_prime_mac);
+            let e_prime = self
+                .fcom
+                .add(c_plus_r, self.fcom.affine_mult_cst(-power_two_nb_bits, e_m));
+            e_prime_batch.push(e_prime);
             ei_batch.extend(&e_batch[i].0);
         }
 
         // 6)e)
-        let _ei = self.fcom_f2.open(channel, &ei_batch)?;
+        self.fcom_f2.open(channel, &ei_batch)?;
+
+        let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
+        for i in 0..n {
+            let sum = convert_bits_to_field_mac::<FE>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
+            e_prime_minus_sum_batch.push(self.fcom.affine_add_cst(-sum, e_prime_batch[i]));
+        }
 
         // Remark this is not necessary for the prover, bc cst addition dont show up in mac
         // let s = convert_f2_to_field(ei);
-        return self.fcom.check_zero(channel, e_prime_mac_batch);
+        self.fcom.check_zero(channel, &e_prime_minus_sum_batch)?;
+        Ok(())
     }
 
     /// conversion checking
@@ -697,7 +716,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             let idx = base + i;
             let a = &r[idx];
             self.fcom_f2.open(channel, &a.bits)?;
-            self.fcom.open(channel, &vec![a.value])?;
+            self.fcom.open(channel, &[a.value])?;
         }
 
         // step 5) b):
@@ -707,7 +726,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
                 let (x, y, z) = random_triples[base + i];
                 let _res = self.fcom_f2.open(channel, &[x, y])?;
                 let v = self.fcom_f2.affine_add_cst(-(x.0 * y.0), z);
-                self.fcom_f2.check_zero(channel, vec![v.1])?;
+                self.fcom_f2.check_zero(channel, &[v])?;
             }
         }
 
@@ -795,7 +814,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             }
 
             for handle in handles {
-                let _ = handle.join().unwrap().unwrap();
+                handle.join().unwrap().unwrap();
             }
         }
 
@@ -860,7 +879,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         for i in 0..n {
             let c = c_batch[i];
 
-            let c_m = bit_to_fe::<FE::PrimeField>(c);
+            let c_m = f2_to_fe::<FE::PrimeField>(c);
 
             let choice = c.ct_eq(&F2::ONE);
             let beq = self
@@ -1117,7 +1136,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             let mut r_prime_mac = FE::ZERO;
             for i in 0..n {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b = bit_to_fe(e[k][i]);
+                let b = f2_to_fe(e[k][i]);
                 let MacVerifier(tmp_mac) = self.fcom.affine_mult_cst(b, dabits_mac[i].value);
                 r_prime_mac += tmp_mac;
             }
@@ -1170,7 +1189,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         e_m_batch: &mut Vec<MacVerifier<FE>>,
         ei_batch: &mut Vec<F2>,
         random_triples: &[(MacVerifier<F40b>, MacVerifier<F40b>, MacVerifier<F40b>)],
-    ) -> Result<bool, Error> {
+    ) -> Result<(), Error> {
         let n = edabits_vector_mac.len();
         let nb_bits = edabits_vector_mac[0].bits.len();
         let power_two_nb_bits = power_two::<FE::PrimeField>(nb_bits);
@@ -1206,16 +1225,18 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         let mut ei_mac_batch = Vec::with_capacity(n * nb_bits);
         for i in 0..n {
             // 6)a)
-            let MacVerifier(c_m_mac) = edabits_vector_mac[i].value;
-            let MacVerifier(r_m_mac) = r_mac[i].value;
-            let c_plus_r_mac = c_m_mac + r_m_mac;
+            let c_m = edabits_vector_mac[i].value;
+            let r_m = r_mac[i].value;
+            let c_plus_r = self.fcom.add(c_m, r_m);
 
             // 6)c) done earlier
-            let MacVerifier(e_m_mac) = e_m_batch[i];
+            let e_m = e_m_batch[i];
 
             // 6)d)
-            let e_prime_mac = c_plus_r_mac - power_two_nb_bits * e_m_mac;
-            e_prime_mac_batch.push(e_prime_mac);
+            let e_prime = self
+                .fcom
+                .add(c_plus_r, self.fcom.affine_mult_cst(-power_two_nb_bits, e_m));
+            e_prime_mac_batch.push(e_prime);
 
             // 6)e)
             ei_mac_batch.extend(&e_batch[i].0);
@@ -1229,19 +1250,16 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
         for i in 0..n {
             let sum =
-                convert_f2_to_field::<FE::PrimeField>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
-            e_prime_minus_sum_batch.push(MacVerifier(
-                e_prime_mac_batch[i] + sum * self.fcom.get_delta(),
-            ));
+                convert_bits_to_field::<FE::PrimeField>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
+            e_prime_minus_sum_batch.push(self.fcom.affine_add_cst(-sum, e_prime_mac_batch[i]));
         }
         print!("CHECK_Z< ... ");
         let start = Instant::now();
-        let b = self
-            .fcom
+        self.fcom
             .check_zero(channel, rng, &e_prime_minus_sum_batch)?;
         println!("CHECK_Z> {:?}", start.elapsed());
 
-        return Ok(b);
+        Ok(())
     }
 
     /// conversion checking
@@ -1314,8 +1332,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             let idx = base + i;
             let a_mac = &r_mac[idx];
             self.fcom_f2.open(channel, &a_mac.bits, &mut a_vec)?;
-            self.fcom.open(channel, &vec![a_mac.value], &mut a_m)?;
-            if convert_f2_to_field::<FE::PrimeField>(&a_vec) != a_m[0] {
+            self.fcom.open(channel, &[a_mac.value], &mut a_m)?;
+            if convert_bits_to_field::<FE::PrimeField>(&a_vec) != a_m[0] {
                 return Err(Error::Other("Wrong open random edabit".to_string()));
             }
         }
@@ -1329,7 +1347,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             let base = n * num_bucket * nb_bits;
             for i in 0..num_cut * nb_bits {
                 let (x_mac, y_mac, z_mac) = random_triples[base + i];
-                self.fcom_f2.open(channel, &vec![x_mac, y_mac], &mut res)?;
+                self.fcom_f2.open(channel, &[x_mac, y_mac], &mut res)?;
                 let x = res[0];
                 let y = res[1];
                 let v = self.fcom_f2.affine_add_cst(-(x * y), z_mac);
@@ -1343,7 +1361,6 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         let phase2 = Instant::now();
         // step 6)
         println!("step 6)a-e) bitADDcarry etc: ... ");
-        let mut b = true;
 
         if bucket_channels.is_none() {
             let mut convert_bit_2_field_aux1 = Vec::with_capacity(n);
@@ -1355,33 +1372,31 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
                 let idx_base = j * n;
 
                 if with_quicksilver {
-                    b = b
-                        && self.conv_loop(
-                            channel,
-                            rng,
-                            &edabits_vector_mac,
-                            &r_mac[idx_base..idx_base + n],
-                            &dabits_mac[idx_base..idx_base + n],
-                            &mut convert_bit_2_field_aux1,
-                            &mut convert_bit_2_field_aux2,
-                            &mut e_m_batch,
-                            &mut ei_batch,
-                            &Vec::new(),
-                        )?;
+                    self.conv_loop(
+                        channel,
+                        rng,
+                        &edabits_vector_mac,
+                        &r_mac[idx_base..idx_base + n],
+                        &dabits_mac[idx_base..idx_base + n],
+                        &mut convert_bit_2_field_aux1,
+                        &mut convert_bit_2_field_aux2,
+                        &mut e_m_batch,
+                        &mut ei_batch,
+                        &Vec::new(),
+                    )?;
                 } else {
-                    b = b
-                        && self.conv_loop(
-                            channel,
-                            rng,
-                            &edabits_vector_mac,
-                            &r_mac[idx_base..idx_base + n],
-                            &dabits_mac[idx_base..idx_base + n],
-                            &mut convert_bit_2_field_aux1,
-                            &mut convert_bit_2_field_aux2,
-                            &mut e_m_batch,
-                            &mut ei_batch,
-                            &random_triples[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits],
-                        )?;
+                    self.conv_loop(
+                        channel,
+                        rng,
+                        &edabits_vector_mac,
+                        &r_mac[idx_base..idx_base + n],
+                        &dabits_mac[idx_base..idx_base + n],
+                        &mut convert_bit_2_field_aux1,
+                        &mut convert_bit_2_field_aux2,
+                        &mut e_m_batch,
+                        &mut ei_batch,
+                        &random_triples[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits],
+                    )?;
                 }
             }
         } else {
@@ -1442,16 +1457,12 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             }
 
             for handle in handles {
-                b = b && handle.join().unwrap().unwrap();
+                handle.join().unwrap().unwrap();
             }
         }
         println!("step 6)a-e) bitADDcarry etc: {:?}", phase2.elapsed());
 
-        if b {
-            Ok(())
-        } else {
-            Err(Error::Other("conversion check failed".to_string()))
-        }
+        Ok(())
     }
 }
 
@@ -1460,7 +1471,7 @@ mod tests {
 
     use super::super::homcom::{MacProver, MacVerifier};
     use super::{
-        bit_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ProverConv,
+        f2_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ProverConv,
         VerifierConv,
     };
     use crate::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
@@ -1493,8 +1504,8 @@ mod tests {
             let mut res = Vec::new();
             for _ in 0..count {
                 let MacProver(rb, rb_mac) = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
-                let rm = bit_to_fe(rb);
-                let rm_mac = fconv.fcom.input(&mut channel, &mut rng, &vec![rm]).unwrap()[0];
+                let rm = f2_to_fe(rb);
+                let rm_mac = fconv.fcom.input(&mut channel, &mut rng, &[rm]).unwrap()[0];
                 let MacProver(x_f2, x_f2_mac) =
                     fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
 
@@ -1503,18 +1514,18 @@ mod tests {
                 fconv
                     .convert_bit_2_field(
                         &mut channel,
-                        &vec![DabitProver {
+                        &[DabitProver {
                             bit: MacProver(rb, rb_mac),
                             value: MacProver(rm, rm_mac),
                         }],
-                        &vec![MacProver(x_f2, x_f2_mac)],
+                        &[MacProver(x_f2, x_f2_mac)],
                         &mut convert_bit_2_field_aux,
                         &mut x_m_batch,
                     )
                     .unwrap();
 
                 let _ = fconv.fcom.open(&mut channel, &x_m_batch).unwrap();
-                assert_eq!(bit_to_fe::<FE::PrimeField>(x_f2), x_m_batch[0].0);
+                assert_eq!(f2_to_fe::<FE::PrimeField>(x_f2), x_m_batch[0].0);
                 res.push((x_f2, x_m_batch[0].0));
             }
             res
@@ -1539,11 +1550,11 @@ mod tests {
             fconv
                 .convert_bit_2_field(
                     &mut channel,
-                    &vec![DabitVerifier {
+                    &[DabitVerifier {
                         bit: rb_mac,
                         value: r_m_mac,
                     }],
-                    &vec![x_f2_mac],
+                    &[x_f2_mac],
                     &mut convert_bit_2_field_aux1,
                     &mut convert_bit_2_field_aux2,
                     &mut x_m_batch,
@@ -1553,7 +1564,7 @@ mod tests {
             let mut x_m = Vec::new();
             fconv
                 .fcom
-                .open(&mut channel, &vec![x_m_batch[0]], &mut x_m)
+                .open(&mut channel, &[x_m_batch[0]], &mut x_m)
                 .unwrap();
             res.push(x_m[0]);
         }
@@ -1605,16 +1616,14 @@ mod tests {
                 .bit_add_carry(
                     &mut channel,
                     &mut rng,
-                    vec![EdabitsProver {
+                    &[EdabitsProver {
                         bits: vx,
                         value: default_fe,
-                    }]
-                    .as_slice(),
-                    vec![EdabitsProver {
+                    }],
+                    &[EdabitsProver {
                         bits: vy,
                         value: default_fe,
-                    }]
-                    .as_slice(),
+                    }],
                     vec![].as_slice(),
                 )
                 .unwrap()[0]
@@ -1622,7 +1631,7 @@ mod tests {
 
             fconv.fcom_f2.open(&mut channel, &res).unwrap();
 
-            fconv.fcom_f2.open(&mut channel, &vec![c]).unwrap();
+            fconv.fcom_f2.open(&mut channel, &[c]).unwrap();
             (res, c)
         });
         let mut rng = AesRng::new();
@@ -1641,16 +1650,14 @@ mod tests {
             .bit_add_carry(
                 &mut channel,
                 &mut rng,
-                vec![EdabitsVerifier {
+                &[EdabitsVerifier {
                     bits: x_mac,
                     value: default_fe,
-                }]
-                .as_slice(),
-                vec![EdabitsVerifier {
+                }],
+                &[EdabitsVerifier {
                     bits: y_mac,
                     value: default_fe,
-                }]
-                .as_slice(),
+                }],
                 vec![].as_slice(),
             )
             .unwrap()[0]
@@ -1663,10 +1670,7 @@ mod tests {
             .unwrap();
 
         let mut c = Vec::new();
-        fconv
-            .fcom_f2
-            .open(&mut channel, &vec![c_mac], &mut c)
-            .unwrap();
+        fconv.fcom_f2.open(&mut channel, &[c_mac], &mut c).unwrap();
 
         let _resprover = handle.join().unwrap();
 
