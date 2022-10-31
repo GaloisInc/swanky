@@ -1,0 +1,3 @@
+[submodule "fancy-garbling/deps/protos"]
+	path = fancy-garbling/deps/protos
+	url = git@github.com:Interstellar-Network/protos.git
