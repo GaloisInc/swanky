@@ -1,6 +1,7 @@
 use crate::Proof;
 use proptest::prelude::*;
 use scuttlebutt::field::{F61p, F64b, FiniteField, F2};
+use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{AesRng, Block};
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
@@ -88,7 +89,7 @@ fn test_bristol() {
         let circuit = Circuit::read_bristol_fashion(&circuit, None).unwrap();
         eprintln!("Reading time: {} ms", time.elapsed().as_millis());
         let witness: Vec<F2> = (0..circuit.ninputs())
-            .map(|_| F2::random(&mut rng))
+            .map(|_| <F2 as FiniteRing>::random(&mut rng))
             .collect();
         let mut wires = Vec::with_capacity(circuit.nwires());
         let outputs = circuit.eval(&witness, &mut wires);

@@ -7,8 +7,8 @@ use crate::{
 use anyhow::anyhow;
 use blake3::{Hash, Hasher, OutputReader};
 use rand::{Rng, SeedableRng};
-use scuttlebutt::field::serialization::serde_vec;
 use scuttlebutt::{field::FiniteField, AesRng, Block};
+use scuttlebutt::{ring::FiniteRing, serialization::serde_vec};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
 
@@ -90,7 +90,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     // 2. The `fs` and `gs` shares dot product to `h`.
     pub fn verify(&self) -> anyhow::Result<()> {
         let output = self.output.reconstruct();
-        if output != F::PrimeField::ZERO {
+        if output != <F::PrimeField as FiniteRing>::ZERO {
             return Err(anyhow!("Output not equal to zero"));
         }
         let mut sum = F::ZERO;

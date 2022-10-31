@@ -1,8 +1,8 @@
 use blake3::Hasher;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::polynomial::{lagrange_denominator, lagrange_numerator};
-use scuttlebutt::field::serialization::{FiniteFieldDeserializer, FiniteFieldSerializer};
-use scuttlebutt::field::{FiniteField, IsSubfieldOf};
+use scuttlebutt::field::FiniteField;
+use scuttlebutt::serialization::{SequenceDeserializer, SequenceSerializer};
 
 /// This trait defines an `N`-party linear secret sharing scheme
 /// over finite field `F`.
@@ -116,16 +116,16 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F
     #[inline]
     fn lift_into_superfield(x: &Self::SelfWithPrimeField) -> Self {
         Self {
-            shares: x.shares.map(|s| s.lift_into_superfield()),
-            correction: x.correction.lift_into_superfield(),
+            shares: x.shares.map(|s| s.into()),
+            correction: x.correction.into(),
         }
     }
 
     #[inline]
     fn multiply_by_superfield(x: &Self::SelfWithPrimeField, y: F) -> Self {
         Self {
-            shares: x.shares.map(|share| y.multiply_by_prime_subfield(share)),
-            correction: y.multiply_by_prime_subfield(x.correction),
+            shares: x.shares.map(|share| share * y),
+            correction: x.correction * y,
         }
     }
 }
@@ -337,7 +337,7 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for SecretSharing<F, N>
     fn lift_into_superfield(x: &SecretSharing<F::PrimeField, N>) -> Self {
         Self {
             shares: CorrectionSharing::lift_into_superfield(&x.shares),
-            secret: x.secret.lift_into_superfield(),
+            secret: x.secret.into(),
         }
     }
 
@@ -345,7 +345,7 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for SecretSharing<F, N>
     fn multiply_by_superfield(x: &Self::SelfWithPrimeField, y: F) -> Self {
         Self {
             shares: CorrectionSharing::multiply_by_superfield(&x.shares, y),
-            secret: y.multiply_by_prime_subfield(x.secret),
+            secret: x.secret * y,
         }
     }
 }
@@ -462,7 +462,8 @@ mod tests {
     use super::*;
     use rand::SeedableRng;
     use scuttlebutt::field::polynomial::Polynomial;
-    use scuttlebutt::field::{F128p, F61p, F2};
+    use scuttlebutt::field::{F61p, F2};
+    use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::AesRng;
 
     const N: usize = 16;
@@ -477,7 +478,7 @@ mod tests {
                     .collect::<Vec<AesRng>>()
                     .try_into()
                     .unwrap();
-                let x = <$field>::random(&mut rng);
+                let x = <$field as FiniteRing>::random(&mut rng);
                 let sharing = SecretSharing::<$field, N>::new(x, &mut rngs);
                 let x_ = sharing.shares.reconstruct();
                 assert_eq!(x, x_);
@@ -487,7 +488,6 @@ mod tests {
 
     test_sharing!(test_sharing_f2, F2);
     test_sharing!(test_sharing_f61p, F61p);
-    test_sharing!(test_sharing_f128p, F128p);
 
     macro_rules! test_poly_eval {
         ($name:ident, $field:ty) => {
@@ -534,7 +534,7 @@ mod tests {
 
                 fn any_fe() -> impl Strategy<Value = $field> {
                     any::<u128>().prop_map(|seed| {
-                        <$field as FiniteField>::from_uniform_bytes(&seed.to_le_bytes())
+                        <$field as FiniteRing>::from_uniform_bytes(&seed.to_le_bytes())
                     })
                 }
 
@@ -601,7 +601,6 @@ mod tests {
     }
 
     test_poly_eval!(test_poly_eval_f61p, F61p);
-    test_poly_eval!(test_poly_eval_f128p, F128p);
     test_serialization!(serialization_f61p, F61p);
     test_serialization!(serialization_f2, F2);
 }
