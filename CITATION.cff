@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: >-
+  swanky: A suite of rust libraries for secure computation
+message: >-
+  If you use this software in your academic paper, please cite it as follows.
+type: software
+authors:
+  - given-names: 'Galois, Inc.'
+    email: swanky@galois.com
+url: "https://github.com/GaloisInc/swanky"
