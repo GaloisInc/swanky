@@ -405,3 +405,15 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U32,
     num_bits = generic_array::typenum::U254,
 );
+
+prime_field_using_ff!(
+    /// The finite field over the prime $`2^{400} - 593`$.
+    F400p,
+    f400p,
+    modulus = "2582249878086908589655919172003011874329705792829223512830659356540647622016841194629645353280137831435903171972747492783",
+    generator = "5",
+    limbs = 7,
+    actual_limbs = 7,
+    num_bytes = generic_array::typenum::U56,
+    num_bits = generic_array::typenum::U400,
+);

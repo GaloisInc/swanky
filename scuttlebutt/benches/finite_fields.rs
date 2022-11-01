@@ -98,6 +98,8 @@ finite_field_benchmarks!(f384p, scuttlebutt::field::F384p,);
 #[cfg(feature = "ff")]
 finite_field_benchmarks!(f384q, scuttlebutt::field::F384q,);
 #[cfg(feature = "ff")]
+finite_field_benchmarks!(f400p, scuttlebutt::field::F400p,);
+#[cfg(feature = "ff")]
 finite_field_benchmarks!(fbls12381, scuttlebutt::field::Fbls12381,);
 #[cfg(feature = "ff")]
 finite_field_benchmarks!(fbn254, scuttlebutt::field::Fbn254,);
@@ -130,6 +132,7 @@ criterion::criterion_main!(
     f256p::f256p,
     f384p::f384p,
     f384q::f384q,
+    f400p::f400p,
     fbls12381::fbls12381,
     fbn254::fbn254
 );

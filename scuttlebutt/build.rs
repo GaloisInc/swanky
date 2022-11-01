@@ -53,6 +53,13 @@ fn main() {
                 generator: "7",
                 endianness: Little,
             },
+            PrimeFieldCodegen {
+                ident: "F400p",
+                is_pub: true,
+                modulus: "2582249878086908589655919172003011874329705792829223512830659356540647622016841194629645353280137831435903171972747492783",
+                generator: "5",
+                endianness: Little,
+            },
         ] {
             let path = Path::new(&std::env::var("OUT_DIR").unwrap()).join(format!("ff-{}.rs", cg.ident));
             cg.ident = "Internal";
