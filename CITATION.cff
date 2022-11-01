@@ -7,3 +7,4 @@ type: software
 authors:
   - given-names: 'Galois, Inc.'
     email: swanky@galois.com
+    url: "https://github.com/GaloisInc/swanky"
