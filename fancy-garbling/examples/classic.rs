@@ -1,16 +1,12 @@
 use fancy_garbling::{circuit::Circuit, circuit::CircuitBuilder, classic::garble};
 use std::time::SystemTime;
 
-// TODO(interstellar) use prost-build? or should we keep using pre-generated?
+// deps/protos/generated/ DOES NOT work b/c it only contains "APIs" and we want circuits/skcd.proto etc
+//
 // https://github.com/neoeinstein/protoc-gen-prost/issues/26
 #[allow(clippy::derive_partial_eq_without_eq)]
-mod interstellarpbapicircuits {
-    // include_bytes!(concat!(env!("OUT_DIR")), "/interstellarpbapicircuits.rs");
-    // include_bytes!(concat!(env!("OUT_DIR"), "/interstellarpbapicircuits.rs"));
-    //
-    // prost-build FAIL in enclave/SGX
-    // include!(concat!(env!("OUT_DIR"), "/interstellarpbapicircuits.rs"));
-    include!("../deps/protos/generated/rust/interstellarpbapicircuits.rs");
+mod interstellarpbskcd {
+    include!(concat!(env!("OUT_DIR"), "/interstellarpbskcd.rs"));
 }
 
 /// Errors emitted by the circuit parser.
@@ -35,12 +31,33 @@ pub enum CircuitParserError {
 /// - in "Bilf Fashion": gates are written "gate0_input0 gate0_input1 gate0_output gate0_type" etc
 /// - in SKCD: "gate0_input0 gate1_input0 gate2_input0" etc
 fn parse_skcd(filename: &str) -> Result<Circuit, CircuitParserError> {
+    use std::io::BufReader;
+    use std::io::Read;
+
+    let f = std::fs::File::open(filename).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut buffer = Vec::new();
+    // read the whole file
+    reader.read_to_end(&mut buffer).unwrap();
+
+    let mut buf = &*buffer;
+    // TODO(interstellar) decode_length_delimited ?
+    let skcd: interstellarpbskcd::Skcd = prost::Message::decode(&mut buf).unwrap();
+    println!("skcd : a = {}", skcd.a.len());
+
     let circ_builder = CircuitBuilder::new();
 
     Ok(circ_builder.finish())
 }
 
 fn main() {
+    ////////////////////////////////////////////////////////////////////////////
+
+    parse_skcd("../../lib_garble/tests/data/display_message_120x52_2digits.skcd.pb.bin").unwrap();
+
+    ////////////////////////////////////////////////////////////////////////////
+
     let circ = Circuit::parse("circuits/adder_32bit.txt").unwrap();
 
     let start = SystemTime::now();
@@ -118,7 +135,7 @@ fn main() {
         println!("expected_result: {:?} ms", expected_result);
         // TODO interstellar
         // assert_eq!(res, expected_result);
-        if (res != expected_result) {
+        if res != expected_result {
             println!("FAIL!");
         } else {
             println!("OK!");
