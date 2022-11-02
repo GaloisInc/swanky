@@ -19,14 +19,14 @@ production, or trust it with sensitive data.
 # Using `swanky`
 ## Preferred Way
 The preferred way to use `swanky` is to fork this monorepo, and add your code
-your fork. This approach makes it easy for your code to inherit the
+to your fork. This approach makes it easy for your code to inherit the
 configuration of the `swanky` repo.
 
 ## Alternative Way
 It is also possible to use `swanky` as traditional Rust crates. The downside of
 this approach is that you won't automatically get the configuration of the
 `swanky` repo. `swanky` is _only_ tested against the pinned rust version in the
-repoistory and the pinned dependencey versions.
+repository and the pinned dependency versions.
 
 To use a `swanky` crate in your project, add the following line to the
 `[dependencies]` entry in `Cargo.toml`:
