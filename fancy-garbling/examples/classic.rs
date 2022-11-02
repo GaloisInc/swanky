@@ -30,23 +30,24 @@ pub enum CircuitParserError {
 /// SKCD is essentially the same format, but with the gates written in a different order:
 /// - in "Bilf Fashion": gates are written "gate0_input0 gate0_input1 gate0_output gate0_type" etc
 /// - in SKCD: "gate0_input0 gate1_input0 gate2_input0" etc
-fn parse_skcd(filename: &str) -> Result<Circuit, CircuitParserError> {
-    use std::io::BufReader;
-    use std::io::Read;
+fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
+    use std::convert::TryInto;
 
-    let f = std::fs::File::open(filename).unwrap();
-    let mut reader = BufReader::new(f);
-
-    let mut buffer = Vec::new();
-    // read the whole file
-    reader.read_to_end(&mut buffer).unwrap();
-
-    let mut buf = &*buffer;
+    let mut buf = &*buf;
     // TODO(interstellar) decode_length_delimited ?
     let skcd: interstellarpbskcd::Skcd = prost::Message::decode(&mut buf).unwrap();
+    assert!(
+        skcd.a.len() == skcd.b.len()
+            && skcd.b.len() == skcd.go.len()
+            && skcd.go.len() == skcd.gt.len()
+            && skcd.gt.len() == skcd.q.try_into().unwrap(),
+        "number of gates inputs/outputs/types DO NOT match!"
+    );
     println!("skcd : a = {}", skcd.a.len());
 
     let circ_builder = CircuitBuilder::new();
+
+    // circ_builder.
 
     Ok(circ_builder.finish())
 }
@@ -54,7 +55,20 @@ fn parse_skcd(filename: &str) -> Result<Circuit, CircuitParserError> {
 fn main() {
     ////////////////////////////////////////////////////////////////////////////
 
-    parse_skcd("../../lib_garble/tests/data/display_message_120x52_2digits.skcd.pb.bin").unwrap();
+    use std::io::BufReader;
+    use std::io::Read;
+
+    let f = std::fs::File::open(
+        "../../lib_garble/tests/data/display_message_120x52_2digits.skcd.pb.bin",
+    )
+    .unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut buffer = Vec::new();
+    // read the whole file
+    reader.read_to_end(&mut buffer).unwrap();
+
+    parse_skcd(&buffer).unwrap();
 
     ////////////////////////////////////////////////////////////////////////////
 
