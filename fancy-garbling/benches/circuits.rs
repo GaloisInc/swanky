@@ -2,10 +2,10 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::{circuit::BinaryCircuit, classic::garble, AllWire, WireMod2};
-use std::time::Duration;
+use std::{fs::File, io::BufReader, time::Duration};
 
 fn circuit(fname: &str) -> BinaryCircuit {
-    let circ = BinaryCircuit::parse(fname).unwrap();
+    let circ = BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap();
     // println!("{}", fname);
     // circ.print_info().unwrap();
     circ

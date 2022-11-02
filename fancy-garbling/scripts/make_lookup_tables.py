@@ -11,6 +11,7 @@ bits_per_chunk = 8
 ndigits_dict = {}
 names_dict = {}
 
+
 def digits(x, base):
     ds = []
     while x >= base:
@@ -20,25 +21,27 @@ def digits(x, base):
     ds.append(x)
     return ds
 
+
 def digits_for_pos(pos, base):
-    max_ndigits = 0;
+    max_ndigits = 0
     ds = []
-    for x in range(1<<bits_per_chunk):
+    for x in range(1 << bits_per_chunk):
         d = digits(x << (bits_per_chunk * pos), base)
         ds.append(d)
         max_ndigits = max(len(d), max_ndigits)
 
     # pad them to be the same length
     for d in ds:
-        while (len(d) < max_ndigits):
+        while len(d) < max_ndigits:
             d.append(0)
 
     return (max_ndigits, ds)
 
+
 def write_tables_for_base(base, f):
     ndigits_dict[base] = []
     names_dict[base] = []
-    for pos in range(128//bits_per_chunk):
+    for pos in range(128 // bits_per_chunk):
         (n, ds) = digits_for_pos(pos, base)
         name = f"BASE{base}_POS{pos}"
         ndigits_dict[base].append(n)
@@ -55,10 +58,12 @@ def write_tables_for_base(base, f):
             print("    " + line, file=f)
         print("};\n", file=f)
 
+
 def write_header(f):
-    print("#include <stdint.h>", file=f);
-    print("#include <stddef.h>", file=f);
-    print("#include <stdbool.h>\n", file=f);
+    print("#include <stdint.h>", file=f)
+    print("#include <stddef.h>", file=f)
+    print("#include <stdbool.h>\n", file=f)
+
 
 def write_get_table_function(f):
     for base, names in names_dict.items():
@@ -78,9 +83,10 @@ def write_get_table_function(f):
     print("    }", file=f)
     print("}\n", file=f)
 
+
 def write_num_digits_function(f):
     for base, ndigits in ndigits_dict.items():
-        ndigits_arr = ", ".join(map(str,ndigits))
+        ndigits_arr = ", ".join(map(str, ndigits))
         print(f"const size_t NDIGITS_BASE{base} [] = {{{ndigits_arr}}};", file=f)
 
     print(file=f)
@@ -95,10 +101,12 @@ def write_num_digits_function(f):
     print("    }", file=f)
     print("}\n", file=f)
 
+
 def is_power_of_two(base):
     base & (base - 1) == 0
 
-with open('base_conversion/cbits/lookup_tables.c', 'w') as f:
+
+with open("base_conversion/cbits/lookup_tables.c", "w") as f:
     write_header(f)
 
     for base in range(5, 114):

@@ -12,7 +12,6 @@ use crate::SimdBase8;
 use crate::SimdBase8x;
 use crate::SimdBaseGatherable;
 use proptest::prelude::*;
-use std::convert::TryFrom;
 use std::ops::*;
 proptest! { #[test] fn test_equality( a in any::<[u32; 4]>(), b in any::<[u32; 4]>(), ) { let scalar_out = { use scalar::*; let a: U32x4 = a.into(); let b: U32x4 = b.into(); a == b }; let platform_out = { use crate::*; let a: U32x4 = a.into(); let b: U32x4 = b.into(); a == b }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_is_zero( a in any::<[u32; 4]>(), ) { let scalar_out = { use scalar::*; let a: U32x4 = a.into(); a.is_zero() }; let platform_out = { use crate::*; let a: U32x4 = a.into(); a.is_zero() }; prop_assert_eq!(scalar_out, platform_out); } }

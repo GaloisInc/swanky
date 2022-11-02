@@ -5,11 +5,11 @@ use fancy_garbling::{
 };
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
-use std::time::SystemTime;
+use std::{fs::File, io::BufReader, time::SystemTime};
 
 fn circuit(fname: &str) -> Circuit {
     println!("* Circuit: {}", fname);
-    Circuit::parse(fname).unwrap()
+    Circuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
 fn run_circuit(circ: &mut Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {

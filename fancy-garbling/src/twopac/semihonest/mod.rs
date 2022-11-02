@@ -147,13 +147,19 @@ mod tests {
 
     #[test]
     fn test_aes_arithmetic() {
-        let circ = BinaryCircuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let circ = BinaryCircuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+            "../../../circuits/AES-non-expanded.txt"
+        )))
+        .unwrap();
         test_circuit::<_, AllWire>(circ);
     }
 
     #[test]
     fn test_aes_binary() {
-        let circ = BinaryCircuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let circ = BinaryCircuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+            "../../../circuits/AES-non-expanded.txt"
+        )))
+        .unwrap();
         test_circuit::<_, WireMod2>(circ);
     }
 }

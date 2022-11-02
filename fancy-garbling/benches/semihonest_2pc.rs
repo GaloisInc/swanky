@@ -9,6 +9,7 @@ use fancy_garbling::{
 use ocelot::ot::{AlszReceiver as OtReceiver, AlszSender as OtSender};
 use scuttlebutt::{AesRng, Channel};
 use std::{
+    fs::File,
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
     time::Duration,
@@ -19,7 +20,7 @@ type Writer = BufWriter<UnixStream>;
 type MyChannel = Channel<Reader, Writer>;
 
 fn circuit(fname: &str) -> Circuit {
-    Circuit::parse(fname).unwrap()
+    Circuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 
 fn _bench_circuit(circ: &Circuit, gb_inputs: Vec<u16>, ev_inputs: Vec<u16>) {

@@ -6,11 +6,7 @@ use crate::{
     errors::CircuitParserError as Error,
 };
 use regex::{Captures, Regex};
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    str::FromStr,
-};
+use std::str::FromStr;
 
 enum GateType {
     AndGate,
@@ -42,10 +38,7 @@ impl BinaryCircuit {
     /// format given here: <https://homes.esat.kuleuven.be/~nsmart/MPC/old-circuits.html>,
     /// (Bristol Format---the OLD format---not Bristol Fashion---the NEW format) otherwise
     /// a `CircuitParserError` is returned.
-    pub fn parse(filename: &str) -> Result<Self, Error> {
-        let f = File::open(filename)?;
-        let mut reader = BufReader::new(f);
-
+    pub fn parse(mut reader: impl std::io::BufRead) -> Result<Self, Error> {
         // Parse first line: ngates nwires\n
         let mut line = String::new();
         reader.read_line(&mut line)?;
@@ -176,7 +169,10 @@ mod tests {
 
     #[test]
     fn test_parser() {
-        let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
+        let circ = Circuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+            "../circuits/AES-non-expanded.txt"
+        )))
+        .unwrap();
         let key = vec![0u16; 128];
         let pt = vec![0u16; 128];
         let output = eval_plain(&circ, &pt, &key).unwrap();
@@ -205,10 +201,13 @@ mod tests {
 
     #[test]
     fn test_gc_eval() {
-        let mut circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
-        let (en, gc) = garble::<WireMod2, _>(&mut circ).unwrap();
+        let circ = Circuit::parse(std::io::Cursor::<&'static [u8]>::new(include_bytes!(
+            "../circuits/AES-non-expanded.txt"
+        )))
+        .unwrap();
+        let (en, gc) = garble::<WireMod2, _>(&circ).unwrap();
         let gb = en.encode_garbler_inputs(&vec![0u16; 128]);
         let ev = en.encode_evaluator_inputs(&vec![0u16; 128]);
-        gc.eval(&mut circ, &gb, &ev).unwrap();
+        gc.eval(&circ, &gb, &ev).unwrap();
     }
 }
