@@ -207,19 +207,6 @@ macro_rules! prime_field_using_ff {
                 };
 
                 type PrimeField = Self;
-                type Degree = generic_array::typenum::U1;
-
-                fn from_polynomial_coefficients(
-                    coeff: GenericArray<Self::PrimeField, Self::Degree>,
-                ) -> Self {
-                    coeff[0]
-                }
-
-                fn to_polynomial_coefficients(
-                    &self,
-                ) -> GenericArray<Self::PrimeField, Self::Degree> {
-                    GenericArray::from([*self])
-                }
 
                 fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
                     Polynomial::x()

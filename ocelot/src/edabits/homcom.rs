@@ -8,6 +8,7 @@ use crate::svole::wykw::{LpnParams, Receiver, Sender};
 use crate::svole::{SVoleReceiver, SVoleSender};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::field::Degree;
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
@@ -57,9 +58,9 @@ pub struct FComProver<FE: FiniteField> {
 }
 
 fn make_x_i<FE: FiniteField>(i: usize) -> FE {
-    let mut v: GenericArray<FE::PrimeField, FE::Degree> = GenericArray::default();
+    let mut v: GenericArray<FE::PrimeField, Degree<FE>> = GenericArray::default();
     v[i] = FE::PrimeField::ONE;
-    FE::from_polynomial_coefficients(v)
+    FE::from_subfield(&v)
 }
 
 impl<FE: FiniteField> FComProver<FE> {
@@ -271,7 +272,7 @@ impl<FE: FiniteField> FComProver<FE> {
         let mut mask = FE::ZERO;
         let mut mask_mac = FE::ZERO;
 
-        for i in 0..FE::Degree::USIZE {
+        for i in 0..Degree::<FE>::USIZE {
             let MacProver(u, u_mac) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
             mask += u * x_i;
@@ -573,7 +574,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
 
         // The following block implements VOPE(1)
         let mut mask_mac = FE::ZERO;
-        for i in 0..FE::Degree::USIZE {
+        for i in 0..Degree::<FE>::USIZE {
             let MacVerifier(v_m) = self.random(channel, rng)?;
             let x_i: FE = make_x_i(i);
             mask_mac += v_m * x_i;

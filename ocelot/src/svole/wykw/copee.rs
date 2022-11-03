@@ -9,7 +9,7 @@ use crate::{
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{
-    field::FiniteField as FF, ring::FiniteRing, AbstractChannel, Aes128, Block, Malicious,
+    field::{FiniteField as FF, Degree}, ring::FiniteRing, AbstractChannel, Aes128, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -51,7 +51,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
     ) -> Result<Self, Error> {
         let mut ot = ROT::init(channel, &mut rng)?;
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let keys = ot.send_random(channel, nbits * r, &mut rng)?;
         let aes_objs: Vec<(Aes128, Aes128)> = keys
             .iter()
