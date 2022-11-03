@@ -35,6 +35,7 @@
 //!
 //! Use this module as follows:
 //! ```
+//! # use scuttlebutt::generic_array_length::{AnyArrayLength, Arr};
 //! trait MyBlockCipher {
 //!     type BlockSize: AnyArrayLength;
 //! }
@@ -45,6 +46,7 @@
 //! Because we've used `AnyArrayLength`, we can instantiate an array of length `BlockSize` with
 //! any type that we want! (And we couldn't do that with the "normal" `GenericArray` solution.)
 //! ```
+//! # use scuttlebutt::generic_array_length::{AnyArrayLength, Arr};
 //! # trait MyBlockCipher {
 //! #     type BlockSize: AnyArrayLength;
 //! # }
