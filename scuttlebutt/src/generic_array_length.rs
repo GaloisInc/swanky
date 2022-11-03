@@ -42,7 +42,7 @@
 //!     let _ = x; // do something!
 //! }
 //! ```
-//! Because we've used `AnyArrayLength`, we can instantiate the an array of length `BlockSize` with
+//! Because we've used `AnyArrayLength`, we can instantiate an array of length `BlockSize` with
 //! any type that we want! (And we couldn't do that with the "normal" `GenericArray` solution.)
 //! ```
 //! # trait MyBlockCipher {
