@@ -72,19 +72,8 @@ impl CanonicalSerialize for F61p {
 
 impl FiniteField for F61p {
     type PrimeField = Self;
-    type Degree = generic_array::typenum::U1;
 
     const GENERATOR: Self = F61p(37);
-
-    #[inline]
-    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self {
-        coeff[0]
-    }
-
-    #[inline]
-    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree> {
-        [*self].into()
-    }
 
     fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         Polynomial::x()

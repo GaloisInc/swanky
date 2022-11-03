@@ -14,7 +14,9 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
 };
 use scuttlebutt::{
-    field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng, Block, Malicious, SemiHonest,
+    field::{Degree, FiniteField},
+    ring::FiniteRing,
+    AbstractChannel, AesRng, Block, Malicious, SemiHonest,
 };
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
@@ -87,7 +89,7 @@ const LPN_PARAMS_D: usize = 10;
 
 // Computes the number of saved VOLEs we need for specific LPN parameters.
 fn compute_num_saved<FE: FiniteField>(params: LpnParams) -> usize {
-    params.rows + params.weight + FE::Degree::to_usize()
+    params.rows + params.weight + Degree::<FE>::USIZE
 }
 
 fn lpn_mtx_indices<FE: FiniteField>(
@@ -128,7 +130,7 @@ impl<FE: FiniteField> Sender<FE> {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + r;
@@ -295,7 +297,7 @@ impl<FE: FiniteField> Receiver<FE> {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + r;

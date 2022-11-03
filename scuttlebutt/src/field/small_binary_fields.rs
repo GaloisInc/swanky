@@ -1,4 +1,4 @@
-use crate::field::{FiniteField, Polynomial, F2};
+use crate::field::{Degree, FiniteField, Polynomial, F2};
 use crate::ring::FiniteRing;
 use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
 use bytemuck::{TransparentWrapper, Zeroable};
@@ -27,11 +27,7 @@ pub unsafe trait SmallBinaryField:
     FiniteField<PrimeField = F2> + TransparentWrapper<u64> + Zeroable
 {
     /// Produce a field element of `Self` by zeroing the upper bits of `x`.
-    fn from_lower_bits(x: u64) -> Self {
-        let out = x & (1 << Self::Degree::U64) - 1;
-        debug_assert_eq!((out >> Self::Degree::U64), 0);
-        Self::wrap(out)
-    }
+    fn from_lower_bits(x: u64) -> Self;
     /// Reduce the result of a single 128-bit carryless multiply of two `Self` values modulo
     /// [`FiniteField::reduce_multiplication_over()`]
     fn reduce(x: U64x2) -> Self;
@@ -156,32 +152,9 @@ macro_rules! small_binary_field {
         impl FiniteField for $name {
 
             type PrimeField = F2;
-            type Degree = $num_bits;
 
             // This corresponds to the polynomial P(x) = x
             const GENERATOR: Self = $name(0b10);
-
-            fn from_polynomial_coefficients(
-                coeff: GenericArray<Self::PrimeField, Self::Degree>,
-            ) -> Self {
-                let mut out = 0;
-                for x in coeff.iter().rev() {
-                    out <<= 1;
-                    out |= u64::from(u8::from(*x));
-                }
-                $name(out)
-            }
-
-            fn to_polynomial_coefficients(
-                &self,
-            ) -> GenericArray<Self::PrimeField, Self::Degree> {
-                let x = self.0;
-                GenericArray::from_iter(
-                    (0..<$num_bits as Unsigned>::U64).map(
-                        |shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()
-                    ),
-                )
-            }
 
             fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
                 $modulus_fn()
@@ -201,6 +174,25 @@ macro_rules! small_binary_field {
             }
         }
         impl crate::ring::IsSubRingOf<$name> for F2 {}
+        impl crate::field::IsSubFieldOf<$name> for F2 {
+            type DegreeModulo = $num_bits;
+            fn decompose_superfield(fe: &$name) -> generic_array::GenericArray<Self, $num_bits> {
+                let x = fe.0;
+                GenericArray::from_iter(
+                    (0..<$num_bits as Unsigned>::U64).map(
+                        |shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()
+                    ),
+                )
+            }
+            fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> $name {
+                let mut out = 0;
+                for x in components.iter().rev() {
+                    out <<= 1;
+                    out |= u64::from(u8::from(*x));
+                }
+                $name(out)
+            }
+        }
         impl From<F2> for $name {
             fn from(pf: F2) -> Self {
                 Self(pf.0.into())
@@ -223,6 +215,13 @@ macro_rules! small_binary_field {
         }
 
         unsafe impl SmallBinaryField for $name {
+            #[inline]
+            fn from_lower_bits(x: u64) -> Self {
+                let out = x & (1 << Degree::<Self>::U64) - 1;
+                debug_assert_eq!((out >> Degree::<Self>::U64), 0);
+                Self::wrap(out)
+            }
+
             #[inline(always)] // due to SIMD
             fn reduce(product: U64x2) -> Self {
                 debug_assert!($name::NUM_BITS_OF_WIDEST_PRODUCT >= 64);
@@ -438,7 +437,7 @@ fn polynomial_modulus_f45b() -> Polynomial<F2> {
 }
 
 small_binary_field!(
-    /// An element of the finite field $\textsf{GF}(2^{45})$ reduced over $x^{45} + x^{28} + x^{17} + x^{11} + 1$
+    /// An element of the finite field $`\textsf{GF}(2^{45})`$ reduced over $`x^{45} + x^{28} + x^{17} + x^{11} + 1`$
     F45b,
     f45b,
     num_bits = generic_array::typenum::U45,

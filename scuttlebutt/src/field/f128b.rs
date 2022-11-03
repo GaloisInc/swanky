@@ -12,6 +12,8 @@ use std::{
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
+use super::IsSubFieldOf;
+
 /// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^7 + x^2 + x + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 // We use a u128 since Rust will pass it in registers, unlike a __m128i
@@ -139,7 +141,7 @@ mod multiply {
         }
 
         fn poly_from_128(x: u128) -> Polynomial<F2> {
-            crate::field::test_utils::make_polynomial(&F128b(x).to_polynomial_coefficients())
+            crate::field::test_utils::make_polynomial(&F128b(x).decompose())
         }
 
         proptest! {
@@ -228,25 +230,8 @@ impl CanonicalSerialize for F128b {
 
 impl FiniteField for F128b {
     type PrimeField = F2;
-    type Degree = generic_array::typenum::U128;
 
     const GENERATOR: Self = F128b(2);
-
-    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self {
-        let mut out = 0;
-        for x in coeff.iter().rev() {
-            out <<= 1;
-            out |= u128::from(u8::from(*x));
-        }
-        F128b(out)
-    }
-
-    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree> {
-        let x = self.0;
-        GenericArray::from_iter(
-            (0..128).map(|shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()),
-        )
-    }
 
     fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         let mut coefficients = smallvec![F2::ZERO; 128];
@@ -289,6 +274,23 @@ impl Mul<F128b> for F2 {
 }
 
 impl IsSubRingOf<F128b> for F2 {}
+impl IsSubFieldOf<F128b> for F2 {
+    type DegreeModulo = generic_array::typenum::U128;
+    fn decompose_superfield(fe: &F128b) -> GenericArray<Self, Self::DegreeModulo> {
+        GenericArray::from_iter(
+            (0..128).map(|shift| F2::try_from(((fe.0 >> shift) & 1) as u8).unwrap()),
+        )
+    }
+
+    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F128b {
+        let mut out = 0;
+        for x in components.iter().rev() {
+            out <<= 1;
+            out |= u128::from(u8::from(*x));
+        }
+        F128b(out)
+    }
+}
 
 field_ops!(F128b);
 

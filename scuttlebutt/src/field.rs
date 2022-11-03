@@ -2,6 +2,7 @@
 
 use crate::{
     field::polynomial::Polynomial,
+    generic_array_length::AnyArrayLength,
     ring::{FiniteRing, IsSubRingOf},
 };
 use generic_array::{ArrayLength, GenericArray};
@@ -11,13 +12,6 @@ use std::ops::{Div, DivAssign};
 pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// The prime-order subfield of the finite field.
     type PrimeField: PrimeFiniteField + IsSubFieldOf<Self>;
-    /// When elements of this field are represented as a polynomial over the prime field,
-    /// how many coefficients are needed?
-    type Degree: ArrayLength<Self::PrimeField> + ArrayLength<Self>;
-    /// Convert a polynomial over the prime field into a field element of the finite field.
-    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self;
-    /// Convert the field element into (coefficients of) a polynomial over the prime field.
-    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree>;
     /// Multiplication over field elements should be reduced over this polynomial.
     fn polynomial_modulus() -> Polynomial<Self::PrimeField>;
 
@@ -65,20 +59,83 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// # Panics
     /// This function will panic if `*self == Self::ZERO`
     fn inverse(&self) -> Self;
+
+    /// Decompose `self` into an array of `T` elements where `T` is a subfield of `Self`.
+    ///
+    /// See [`IsSubFieldOf`] for more info.
+    #[inline]
+    fn decompose<T: FiniteField + IsSubFieldOf<Self>>(
+        &self,
+    ) -> GenericArray<T, DegreeModulo<T, Self>> {
+        T::decompose_superfield(self)
+    }
+    /// Create a field element from an array of subfield `T` elements.
+    ///
+    /// See [`IsSubFieldOf`] for more info.
+    #[inline]
+    fn from_subfield<T: FiniteField + IsSubFieldOf<Self>>(
+        arr: &GenericArray<T, DegreeModulo<T, Self>>,
+    ) -> Self {
+        T::form_superfield(arr)
+    }
 }
+
+/// The degree, $`r`$ of a finite field.
+///
+/// Where `Self` is $`\textsf{GF(p^r)}`$
+pub type Degree<FE> = DegreeModulo<<FE as FiniteField>::PrimeField, FE>;
+
+/// The relative degree between two Finite Fields.
+///
+/// Let $`A`$ be a subfield of $`B`$. `DegreeModulo<A, B>` is `DegreeModulo` as defined by
+/// [`IsSubFieldOf`].
+pub type DegreeModulo<A, B> = <A as IsSubFieldOf<B>>::DegreeModulo;
 
 /// Denotes that `Self` is a subfield of `FE`.
 ///
-/// You should _not_ implement this field yourself. Instead, implement [`IsSubRingOf`].
-/// This trait is automatically implemented for all pairs of fields with an `IsSubRingOf`
-/// relationship
-pub trait IsSubFieldOf<FE: FiniteField>: FiniteField + IsSubRingOf<FE> {}
-impl<FE: FiniteField, FE2: FiniteField + IsSubRingOf<FE>> IsSubFieldOf<FE> for FE2 {}
+/// All finite fields can be written as $`\textsf{GF}(p^r)`$ where $`p`$ is prime.
+///
+/// Let the finite field $`A`$ denote `Self` and $`B`$ denote `FE`.
+///
+/// If $`A`$ is a subfield of $`B`$, it's true that
+/// 1. When $`A`$ and $`B`$ are written in the $`\textsf{GF}(p^r)`$ form, their primes are equal.
+/// 2. $`r_A \vert r_B`$
+///
+/// Let $`n`$ be $`\frac{r_B}{r_A}`$.
+///
+/// $`B`$ is isomorphic to the set of polynomials of maximum degree $`n`$ where coefficients are
+/// taken from $`A`$. To put it another way, we can represent $`B`$ as vectors containing $`n`$
+/// $`A`$ values.
+///
+/// # Alternatives
+/// These methods exist on the _subfield_ type, which is not a natural API. You may prefer using
+/// [`FiniteField::decompose`], [`FiniteField::from_subfield`], or the type alias [`DegreeModulo`].
+pub trait IsSubFieldOf<FE: FiniteField>: FiniteField + IsSubRingOf<FE> {
+    /// The value $`n`$ from above.
+    type DegreeModulo: ArrayLength<Self> + AnyArrayLength;
+    /// Turn `FE` into an array of `Self`, a subfield of `FE`.
+    fn decompose_superfield(fe: &FE) -> GenericArray<Self, Self::DegreeModulo>;
+    /// Homomorphically lift an array of `Self` into an `FE`.
+    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> FE;
+}
+impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
+    type DegreeModulo = generic_array::typenum::U1;
+    #[inline]
+    fn decompose_superfield(fe: &FE) -> GenericArray<Self, Self::DegreeModulo> {
+        GenericArray::from([*fe])
+    }
+    #[inline]
+    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> FE {
+        components[0]
+    }
+}
 
 /// A `PrimeFiniteField` is a `FiniteField` with a prime modulus. In this case
 /// the field is isomorphic to integers modulo prime `p`.
 pub trait PrimeFiniteField:
-    FiniteField<Degree = generic_array::typenum::U1, PrimeField = Self> + std::convert::TryFrom<u128>
+    FiniteField<PrimeField = Self>
+    + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
+    + std::convert::TryFrom<u128>
 {
 }
 

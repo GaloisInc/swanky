@@ -56,15 +56,15 @@ macro_rules! test_field {
             proptest! {
                 #[test]
                 fn polynomial_roundtrip(a in any_fe()) {
-                    prop_assert_eq!(<$f>::from_polynomial_coefficients(a.to_polynomial_coefficients()), a);
+                    prop_assert_eq!(<$f>::from_subfield(&a.decompose::<<$f as FiniteField>::PrimeField>()), a);
                 }
             }
             proptest! {
                 #[test]
                 fn polynomial_add(a in any_fe(), b in any_fe()) {
-                    let mut poly = make_polynomial(a.to_polynomial_coefficients());
-                    poly += &make_polynomial(b.to_polynomial_coefficients());
-                    prop_assert_eq!(<$f>::from_polynomial_coefficients(make_polynomial_coefficients(&poly)), a + b);
+                    let mut poly = make_polynomial(a.decompose::<<$f as FiniteField>::PrimeField>());
+                    poly += &make_polynomial(b.decompose::<<$f as FiniteField>::PrimeField>());
+                    prop_assert_eq!(<$f>::from_subfield(&make_polynomial_coefficients(&poly)), a + b);
                 }
             }
 
@@ -76,11 +76,11 @@ macro_rules! test_field {
                 ))]
                 #[test]
                 fn polynomial_mul(a in any_fe(), b in any_fe()) {
-                    let mut poly = make_polynomial(a.to_polynomial_coefficients());
-                    poly *= &make_polynomial(b.to_polynomial_coefficients());
+                    let mut poly = make_polynomial(a.decompose::<<$f as FiniteField>::PrimeField>());
+                    poly *= &make_polynomial(b.decompose::<<$f as FiniteField>::PrimeField>());
                     let (_, remainder) = poly.divmod(&<$f>::polynomial_modulus());
                     prop_assert_eq!(
-                        <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
+                        <$f>::from_subfield(&make_polynomial_coefficients(&remainder)),
                         a * b
                     );
                 }
@@ -99,11 +99,11 @@ macro_rules! test_field {
             proptest! {
                 #[test]
                 fn lifted_polynomial_mul(a in any_fe(), b in any_prime_fe()) {
-                    let mut poly = make_polynomial(a.to_polynomial_coefficients());
-                    poly *= &make_polynomial(b.to_polynomial_coefficients());
+                    let mut poly = make_polynomial(a.decompose::<<$f as FiniteField>::PrimeField>());
+                    poly *= &make_polynomial(b.decompose::<<$f as FiniteField>::PrimeField>());
                     let (_, remainder) = poly.divmod(&<$f>::polynomial_modulus());
                     prop_assert_eq!(
-                        <$f>::from_polynomial_coefficients(make_polynomial_coefficients(&remainder)),
+                        <$f>::from_subfield(&make_polynomial_coefficients(&remainder)),
                         b * a
                     );
                 }
@@ -112,11 +112,11 @@ macro_rules! test_field {
             #[test]
             fn polynomial_constants() {
                 assert_eq!(
-                    make_polynomial(<$f>::ZERO.to_polynomial_coefficients()),
+                    make_polynomial(<$f>::ZERO.decompose::<<$f as FiniteField>::PrimeField>()),
                     $crate::field::Polynomial::zero()
                 );
                 assert_eq!(
-                    make_polynomial(<$f>::ONE.to_polynomial_coefficients()),
+                    make_polynomial(<$f>::ONE.decompose::<<$f as FiniteField>::PrimeField>()),
                     $crate::field::Polynomial::one()
                 );
             }
@@ -126,10 +126,10 @@ macro_rules! test_field {
                     let decomp = x.bit_decomposition();
                     prop_assert_eq!(
                         decomp.len(),
-                        <$f as FiniteField>::Degree::USIZE *
+                        crate::field::Degree::<$f>::USIZE *
                             <<$f as FiniteField>::PrimeField as FiniteField>::NumberOfBitsInBitDecomposition::USIZE
                     );
-                    let coeffs = x.to_polynomial_coefficients();
+                    let coeffs = x.decompose::<<$f as FiniteField>::PrimeField>();
                     type PF = <$f as FiniteField>::PrimeField;
                     for (coeff_bits, coeff) in decomp.chunks_exact(<PF as FiniteField>::NumberOfBitsInBitDecomposition::USIZE).zip(coeffs) {
                         // This will equal 2 modulo PF. We couldn't do this for extension fields.

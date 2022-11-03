@@ -9,6 +9,8 @@ use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use vectoreyes::{SimdBase, U64x2};
 
+use super::IsSubFieldOf;
+
 /// An element of the finite field $`\textsf{GF}({2^{64}})`$ reduced over $`x^{64} + x^{19} + x^{16} + x + 1`$.
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 pub struct F64b(u64);
@@ -119,23 +121,6 @@ impl FiniteRing for F64b {
 
 impl FiniteField for F64b {
     type PrimeField = F2;
-    type Degree = generic_array::typenum::U64;
-
-    fn from_polynomial_coefficients(coeff: GenericArray<Self::PrimeField, Self::Degree>) -> Self {
-        let mut out = 0;
-        for x in coeff.iter().rev() {
-            out <<= 1;
-            out |= u64::from(u8::from(*x));
-        }
-        Self(out)
-    }
-
-    fn to_polynomial_coefficients(&self) -> GenericArray<Self::PrimeField, Self::Degree> {
-        let x = self.0;
-        GenericArray::from_iter(
-            (0..64).map(|shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()),
-        )
-    }
 
     fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         let mut coefficients = smallvec![F2::ZERO; 64];
@@ -184,6 +169,24 @@ impl std::ops::Mul<F64b> for F2 {
     }
 }
 impl IsSubRingOf<F64b> for F2 {}
+impl IsSubFieldOf<F64b> for F2 {
+    type DegreeModulo = generic_array::typenum::U64;
+
+    fn decompose_superfield(fe: &F64b) -> GenericArray<Self, Self::DegreeModulo> {
+        GenericArray::from_iter(
+            (0..64).map(|shift| F2::try_from(((fe.0 >> shift) & 1) as u8).unwrap()),
+        )
+    }
+
+    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F64b {
+        let mut out = 0;
+        for x in components.iter().rev() {
+            out <<= 1;
+            out |= u64::from(u8::from(*x));
+        }
+        F64b(out)
+    }
+}
 
 #[cfg(test)]
 mod tests {

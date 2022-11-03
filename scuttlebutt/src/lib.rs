@@ -19,6 +19,7 @@ mod rand_aes;
 pub mod ring;
 #[macro_use]
 pub mod serialization;
+pub mod generic_array_length;
 pub mod utils;
 
 pub(crate) mod ops;

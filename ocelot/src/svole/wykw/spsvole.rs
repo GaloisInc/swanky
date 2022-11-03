@@ -16,7 +16,7 @@ use rand::{
 };
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
-    field::FiniteField as FF,
+    field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
     AbstractChannel, AesRng, Block, Malicious,
@@ -125,7 +125,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             n
         );
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let total_len = base_voles.len();
         let base_uws = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
@@ -181,7 +181,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         base_xzs: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         // Generate `chi`s from seed and send seed to receiver at the end.
         let seed = rng.gen::<Block>();
         let mut rng_chi = AesRng::from_seed(seed);
@@ -198,7 +198,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             if u != FE::PrimeField::ZERO {
                 for (x, chi_coeff) in x_stars
                     .iter_mut()
-                    .zip(chi.to_polynomial_coefficients().into_iter())
+                    .zip(chi.decompose::<FE::PrimeField>().into_iter())
                 {
                     *x += u * chi_coeff;
                 }
@@ -268,7 +268,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         rng: &mut RNG,
     ) -> Result<Vec<FE>, Error> {
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let total_len = base_voles.len();
         let base_vs = &base_voles[0..total_len - r];
         let base_consistency = &base_voles[total_len - r..];
@@ -312,7 +312,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         y_stars: &[FE],
         rng: &mut RNG,
     ) -> Result<(), Error> {
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
             *item = channel.read_serializable()?;
@@ -367,7 +367,7 @@ mod test {
     };
     use generic_array::typenum::Unsigned;
     use scuttlebutt::{
-        field::{F128b, F40b, F61p, FiniteField as FF},
+        field::{Degree, F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{
@@ -376,7 +376,7 @@ mod test {
     };
 
     fn test_spsvole_<FE: FF>(cols: usize, weight: usize) {
-        let r = FE::Degree::to_usize();
+        let r = Degree::<FE>::USIZE;
         let n = cols / weight;
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
