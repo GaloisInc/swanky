@@ -9,7 +9,11 @@ use crate::errors::Error;
 use crate::svole::wykw::specialization::FiniteFieldSpecialization;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
-use scuttlebutt::{field::{FiniteField as FF, Degree}, ring::FiniteRing, AbstractChannel, AesRng};
+use scuttlebutt::{
+    field::{Degree, FiniteField as FF},
+    ring::FiniteRing,
+    AbstractChannel, AesRng,
+};
 use std::marker::PhantomData;
 
 pub(super) struct Sender<FE: FF, S: FiniteFieldSpecialization<FE>> {

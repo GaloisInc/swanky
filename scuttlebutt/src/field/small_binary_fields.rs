@@ -1,4 +1,4 @@
-use crate::field::{FiniteField, Polynomial, F2, Degree};
+use crate::field::{Degree, FiniteField, Polynomial, F2};
 use crate::ring::FiniteRing;
 use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
 use bytemuck::{TransparentWrapper, Zeroable};
@@ -154,7 +154,7 @@ macro_rules! small_binary_field {
             type PrimeField = F2;
 
             // This corresponds to the polynomial P(x) = x
-            const GENERATOR: Self = $name(0b10); 
+            const GENERATOR: Self = $name(0b10);
 
             fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
                 $modulus_fn()

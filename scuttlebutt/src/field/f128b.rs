@@ -231,7 +231,7 @@ impl CanonicalSerialize for F128b {
 impl FiniteField for F128b {
     type PrimeField = F2;
 
-    const GENERATOR: Self = F128b(2); 
+    const GENERATOR: Self = F128b(2);
 
     fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
         let mut coefficients = smallvec![F2::ZERO; 128];

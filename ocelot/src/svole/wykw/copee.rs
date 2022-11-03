@@ -9,7 +9,9 @@ use crate::{
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{
-    field::{FiniteField as FF, Degree}, ring::FiniteRing, AbstractChannel, Aes128, Block, Malicious,
+    field::{Degree, FiniteField as FF},
+    ring::FiniteRing,
+    AbstractChannel, Aes128, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};

@@ -16,7 +16,7 @@ use rand::{
 };
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
-    field::{FiniteField as FF, Degree},
+    field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
     AbstractChannel, AesRng, Block, Malicious,
@@ -367,7 +367,7 @@ mod test {
     };
     use generic_array::typenum::Unsigned;
     use scuttlebutt::{
-        field::{F128b, F40b, F61p, FiniteField as FF, Degree},
+        field::{Degree, F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
     };
     use std::{

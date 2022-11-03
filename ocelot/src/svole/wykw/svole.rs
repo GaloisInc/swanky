@@ -14,7 +14,9 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
 };
 use scuttlebutt::{
-    field::{FiniteField, Degree}, ring::FiniteRing, AbstractChannel, AesRng, Block, Malicious, SemiHonest,
+    field::{Degree, FiniteField},
+    ring::FiniteRing,
+    AbstractChannel, AesRng, Block, Malicious, SemiHonest,
 };
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN

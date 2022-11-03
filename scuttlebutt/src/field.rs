@@ -2,7 +2,8 @@
 
 use crate::{
     field::polynomial::Polynomial,
-    ring::{FiniteRing, IsSubRingOf}, generic_array_length::AnyArrayLength,
+    generic_array_length::AnyArrayLength,
+    ring::{FiniteRing, IsSubRingOf},
 };
 use generic_array::{ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
@@ -63,14 +64,18 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     ///
     /// See [`IsSubFieldOf`] for more info.
     #[inline]
-    fn decompose<T: FiniteField + IsSubFieldOf<Self>>(&self) -> GenericArray<T, DegreeModulo<T, Self>> {
+    fn decompose<T: FiniteField + IsSubFieldOf<Self>>(
+        &self,
+    ) -> GenericArray<T, DegreeModulo<T, Self>> {
         T::decompose_superfield(self)
     }
     /// Create a field element from an array of subfield `T` elements.
     ///
     /// See [`IsSubFieldOf`] for more info.
     #[inline]
-    fn from_subfield<T: FiniteField + IsSubFieldOf<Self>>(arr: &GenericArray<T, DegreeModulo<T, Self>>) -> Self {
+    fn from_subfield<T: FiniteField + IsSubFieldOf<Self>>(
+        arr: &GenericArray<T, DegreeModulo<T, Self>>,
+    ) -> Self {
         T::form_superfield(arr)
     }
 }
@@ -87,9 +92,9 @@ pub type Degree<FE> = DegreeModulo<<FE as FiniteField>::PrimeField, FE>;
 pub type DegreeModulo<A, B> = <A as IsSubFieldOf<B>>::DegreeModulo;
 
 /// Denotes that `Self` is a subfield of `FE`.
-/// 
+///
 /// All finite fields can be written as $`\textsf{GF}(p^r)`$ where $`p`$ is prime.
-/// 
+///
 /// Let the finite field $`A`$ denote `Self` and $`B`$ denote `FE`.
 ///
 /// If $`A`$ is a subfield of $`B`$, it's true that
@@ -128,7 +133,9 @@ impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
 /// A `PrimeFiniteField` is a `FiniteField` with a prime modulus. In this case
 /// the field is isomorphic to integers modulo prime `p`.
 pub trait PrimeFiniteField:
-    FiniteField<PrimeField = Self> + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1> + std::convert::TryFrom<u128>
+    FiniteField<PrimeField = Self>
+    + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
+    + std::convert::TryFrom<u128>
 {
 }
 

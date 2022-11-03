@@ -1,4 +1,7 @@
-use scuttlebutt::{field::{FiniteField, Degree}, generic_array_length::Arr};
+use scuttlebutt::{
+    field::{Degree, FiniteField},
+    generic_array_length::Arr,
+};
 
 /// Generates powers of `FE::GENERATOR`.
 fn gen_pows<FE: FiniteField>() -> Arr<FE, Degree<FE>> {
