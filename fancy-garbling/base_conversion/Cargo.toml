@@ -1,11 +1,13 @@
 [package]
-name = "base_conversion"
-version = "0.4.0"
-authors = ["Brent Carmer <bcarmer@galois.com>"]
-edition = "2018"
+name = "fancy-garbling-base-conversion"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 
 [dependencies]
 
 [build-dependencies]
-cc = "1.0.73"
+cc.workspace = true
 

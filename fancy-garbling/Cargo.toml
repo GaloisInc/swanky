@@ -1,15 +1,15 @@
 [package]
 name = "fancy-garbling"
-version = "0.4.0"
-authors = ["swanky authors <swanky@galois.com>"]
-license = "MIT"
 readme = "README.md"
 description = "A library for boolean and arithmetic garbling"
 categories = ["cryptography"]
 keywords = ["cryptography", "garbled-circuit", "GC"]
-edition = "2021"
 autobenches = false
-publish = false
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 
 [lib]
 doctest = false
@@ -19,19 +19,19 @@ nightly = ["scuttlebutt/nightly"]
 serde = ["dep:serde", "dep:serde_json", "scuttlebutt/serde"]
 
 [dependencies]
-base_conversion = { path = "base_conversion" }
-scuttlebutt = { path = "../scuttlebutt" }
-ocelot = { path = "../ocelot" }
-vectoreyes = { path = "../vectoreyes" }
-itertools = "0.10.3"
-rand = "0.8.5"
-regex = "1.5.5"
-serde = { version = "1.0.136", features = ["derive"], optional = true }
-serde_json = { version = "1.0.79", optional = true }
-subtle = "2.4.1"
+fancy-garbling-base-conversion = { workspace = true }
+scuttlebutt = { workspace = true }
+ocelot = { workspace = true }
+vectoreyes = { workspace = true }
+itertools.workspace = true
+rand.workspace = true
+regex.workspace = true
+subtle.workspace = true
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
-criterion = "0.3.5"
+criterion.workspace = true
 
 [[bin]]
 name = "gen-deltas"
