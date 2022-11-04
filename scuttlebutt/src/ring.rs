@@ -33,7 +33,6 @@ pub trait FiniteRing:
     + num_traits::Zero
     + num_traits::One
     + CanonicalSerialize
-    + rand::distributions::Distribution<Self>
 {
     /// Construct an element from the given uniformly chosen random bytes.
     fn from_uniform_bytes(x: &[u8; 16]) -> Self;
@@ -183,9 +182,9 @@ macro_rules! ring_ops {
             }
         }
 
-        impl rand::distributions::Distribution<Self> for $f {
-            fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Self {
-                Self::random(rng)
+        impl rand::distributions::Distribution<$f> for rand::distributions::Standard {
+            fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> $f {
+                <$f>::random(rng)
             }
         }
 
