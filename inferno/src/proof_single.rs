@@ -1,4 +1,5 @@
-/// Implements a single MPC-in-the-head iteration of the Limbo protocol.
+//! Implements a single MPC-in-the-head iteration of the Limbo protocol.
+
 use crate::{
     cache::Cache,
     circuit::CircuitEvaluator,
@@ -22,8 +23,11 @@ struct Round<F> {
     z: Option<F>,
 }
 
-/// The proof for a single execution of the protocol. This contains:
-/// 1. The output of the prover
+/// The proof for a single execution of the protocol. `N` denotes
+/// the number of participants in the MPC.
+///
+/// A proof contains:
+/// 1. The shares of the output of the prover
 /// 2. The shares of the opened parties
 /// 3. The info needed to "process" the unopened party
 #[derive(Serialize, Deserialize)]

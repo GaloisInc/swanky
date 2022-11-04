@@ -1,5 +1,5 @@
-//! This module implements a basic cache for the various MPC-in-the-head executions to share
-//! common computations.
+//! This module implements a basic cache for the various MPC-in-the-head
+//! executions to share common computations.
 
 use crate::secretsharing::LagrangeEvaluator;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 ///
 /// We wrap a bunch of these cached computations in a `RwLock` because each MPC-in-the-head
 /// execution is executed in a different thread.
+// TODO: There's probably a better way of doing this without using `RwLock`!
 pub struct Cache<F: FiniteField> {
     /// Contains the points `g, g^2, ..., g^{2k}`, where `g` is the field generator
     /// and `k` is the compression factor.
@@ -20,7 +21,7 @@ pub struct Cache<F: FiniteField> {
     pub evaluators: RwLock<HashMap<usize, LagrangeEvaluator<F>>>,
     /// Map from chunk size to its associated Newton polynomial.
     pub newton_polys: RwLock<HashMap<usize, NewtonPolynomial<F>>>,
-    /// Map from a chunk size + is final round tuple to its associated Newton bases.
+    /// Map from a (chunk size, is final round) tuple to its associated Newton bases.
     pub newton_bases: RwLock<HashMap<(usize, bool), Vec<Vec<F>>>>,
 }
 

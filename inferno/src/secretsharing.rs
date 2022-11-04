@@ -1,3 +1,6 @@
+//! This module implements secret sharing constructs for use within a single
+//! MPC-in-the-head evaluation.
+
 use blake3::Hasher;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::field::polynomial::{lagrange_denominator, lagrange_numerator};
@@ -20,15 +23,15 @@ pub trait LinearSharing<F: FiniteField, const N: usize>:
     /// The type denoting a sharing of `F::PrimeField`.
     type SelfWithPrimeField: LinearSharing<F::PrimeField, N>;
     /// Generate a new sharing of `secret`, where each share is generated
-    /// using it's corresponding RNG provided in `rngs`.
+    /// using its corresponding RNG provided in `rngs`.
     fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self;
     /// Generate a _non-random_ sharing of `secret`.
     fn new_non_random(secret: F) -> Self;
     /// Hash each individual share into its associated `Hasher`.
     fn hash(&self, hashers: &mut [Hasher; N]);
-
+    /// Lift a sharing in the prime subfield into a sharing in the field.
     fn lift_into_superfield(x: &Self::SelfWithPrimeField) -> Self;
-
+    /// Multiply a sharing in the prime field by a value in the field.
     fn multiply_by_superfield(x: &Self::SelfWithPrimeField, y: F) -> Self;
 }
 
@@ -47,7 +50,7 @@ impl<F: FiniteField> LagrangeEvaluator<F> {
         Self { denominators }
     }
 
-    /// Pre-compute the Lagrange polynomial for evaluation point `e`.
+    /// Compute the Lagrange polynomial for evaluation point `e`.
     #[inline]
     pub fn basis_polynomial(&self, points: &[F], e: F, polynomial: &mut Vec<F>) {
         polynomial.clear();
@@ -57,7 +60,8 @@ impl<F: FiniteField> LagrangeEvaluator<F> {
         }
     }
 
-    /// Evaluate the Lagrange polynomial using the pre-computed polynomial.
+    /// Evaluate the Lagrange polynomial over a secret sharing using a
+    /// Lagrange polynomial computed by `self.basis_polynomial`.
     #[inline]
     pub fn eval_with_basis_polynomial<S: LinearSharing<F, N>, const N: usize>(
         &self,

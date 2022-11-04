@@ -1,3 +1,14 @@
+//! This module implements the Limbo zero knowledge proof protocol.
+//!
+//! Limbo is an MPC-in-the-head protocol that uses a "compression" technique to
+//! optimize the check that multiplications are done correctly. To prove something
+//! using Limbo you need to select a _compression factor_ (a.k.a. how much you want
+//! to compress the multiplications by each round) and a _number of repetitions_,
+//! which denotes how many times to run the MPC-in-the-head protocol. The soundness
+//! of the protocol is effected by both of these parameters (alongside the field size);
+//! see the [Limbo paper](https://eprint.iacr.org/2021/215) for more details on secure
+//! settings of these parameters.
+
 use crate::cache::Cache;
 use crate::proof_single::{ProofSingle, ProverSingle};
 use anyhow::anyhow;
@@ -14,7 +25,8 @@ pub struct Proof<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> Proof<F, N> {
-    /// Construct a proof for `circuit` with `witness`, using the provided compression factor and number of repetitions.
+    /// Constructs a proof for `circuit` with `witness`, using the provided compression factor
+    /// and number of repetitions.
     ///
     /// # Panics
     ///
@@ -33,7 +45,9 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
         log::debug!("Number of compression rounds = {nrounds}");
         let cache = Cache::new(circuit, compression_factor, true);
+        // Each MPC-in-the-head repetition needs its own RNG, so we create the necessary RNGs here.
         let mut rngs: Vec<AesRng> = (0..repetitions).map(|_| rng.fork()).collect();
+        // Use `rayon` to parallelize the MPC-in-the-head repetitions.
         let proofs: Vec<ProofSingle<F, N>> = rngs
             .par_iter_mut()
             .enumerate()
@@ -51,7 +65,8 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         Self { proofs }
     }
 
-    /// Verify that the proof on `circuit` is valid, for the given compression factor and number of repetitions.
+    /// Verify that the proof on `circuit` is valid, for the given compression factor and
+    /// number of repetitions.
     ///
     /// # Panics
     ///
@@ -68,6 +83,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         if self.proofs.len() != repetitions {
             return Err(anyhow!("Invalid number of repetitions"));
         }
+        // Use `rayon` to parallelize the MPC-in-the-head repetitions.
         let results: Vec<anyhow::Result<()>> = self
             .proofs
             .par_iter()
