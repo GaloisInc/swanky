@@ -1,20 +1,22 @@
 [package]
-authors = ["Marc Rosen <marc@galois.com>"]
-edition = "2021"
 name = "vectoreyes"
-version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 
 [dependencies]
-num-traits = "0.2.14"
-bytemuck = "1.8.0"
-subtle = "2.4.1"
+num-traits.workspace = true
+bytemuck.workspace = true
+subtle.workspace = true
 
 # NOTE: keep in sync with the cfg for the scalar backend in generated/implementation.rs
 [target.'cfg(not(all(target_arch = "x86_64",all(target_feature = "sse2",target_feature = "avx",target_feature = "sse4.1",target_feature = "avx2",target_feature = "aes",target_feature="sse4.2",target_feature="PCLMULQDQ"))))'.dependencies]
-aes = "0.8.1"
-lazy_static = "1.4.0"
+aes.workspace = true
+lazy_static.workspace = true
 
 [dev-dependencies]
-aes = "0.8.1"
-proptest = "1.0.0"
-lazy_static = "1.4.0"
+aes.workspace = true
+proptest.workspace = true
+lazy_static.workspace = true

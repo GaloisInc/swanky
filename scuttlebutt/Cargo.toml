@@ -1,14 +1,14 @@
 [package]
 name = "scuttlebutt"
-version = "0.4.0"
-authors = ["swanky authors <swanky@galois.com>"]
-license = "MIT"
 readme = "README.md"
 description = "A library of useful multi-party computation utilities"
 keywords = ["cryptography", "MPC", "secure-computation"]
 categories = ["cryptography"]
-edition = "2021"
-publish = false
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 
 [features]
 ff = ["dep:ff", "dep:ff_codegen", "rand_chacha"]
@@ -17,39 +17,37 @@ unstable = []
 serde = []
 
 [dependencies]
-curve25519-dalek = { package = "curve25519-dalek-ng", version = "4", optional = true }
-rand = "0.8.5"
-rand_core = "0.6.3"
-rand_chacha = { version = "0.3.1", optional = true }
-serde = { version = "1.0.136" }
-sha2 = "0.10.2"
-subtle = "2.4.1"
-generic-array = "0.14.5"
-smallvec = "1.8.0"
-bytemuck = { version = "1.8.0", features = ["derive"] }
-vectoreyes = { path = "../vectoreyes" }
-ndarray = "0.15.4"
-num-traits = "0.2.15"
-ff = { git = "https://github.com/GaloisInc/ff", rev = "b8d8570f67d04cf5a8b82df3d6eb36aeb4732e92", features = [
-  "derive",
-], optional = true }
+curve25519-dalek = { package = "curve25519-dalek-ng", workspace = true, optional = true }
+rand.workspace = true
+rand_core.workspace = true
+rand_chacha = { workspace = true, optional = true }
+serde.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+generic-array.workspace = true
+smallvec.workspace = true
+bytemuck = { workspace = true, features = ["derive"] }
+vectoreyes.workspace = true
+ndarray.workspace = true
+num-traits.workspace = true
+ff = { workspace = true, features = ["derive"], optional = true }
 
 [build-dependencies]
-ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "b8d8570f67d04cf5a8b82df3d6eb36aeb4732e92", optional = true }
-tempfile = "3.3.0"
-sha2 = "0.10.2"
+ff_codegen = { workspace = true, optional = true }
+tempfile.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
-criterion = "0.3.5"
-hex = "0.4.3"
-proptest = "1.0.0"
-num-bigint = "0.4.3"
-serde_json = "1.0.0"
-bincode = "1.3.3"
-serde = { version = "1.0.136", features = ["derive"] }
+criterion.workspace = true
+hex.workspace = true
+proptest.workspace = true
+num-bigint.workspace = true
+serde_json.workspace = true
+bincode.workspace = true
+serde = { workspace = true, features = ["derive"] }
 
 [target.'cfg(target_os="linux")'.dev-dependencies]
-criterion-linux-perf = "0.1.0"
+criterion-linux-perf.workspace = true
 
 [[bench]]
 name = "aes128"

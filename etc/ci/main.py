@@ -5,11 +5,13 @@ import atexit
 import base64
 import contextlib
 import enum
+import itertools
 import os
 import subprocess
 import sys
 import tempfile
 import time
+from collections import defaultdict
 from hashlib import sha256
 from pathlib import Path
 from typing import Dict, List
@@ -33,20 +35,26 @@ def pretty_check_call(args, help_on_failure: str = "", extra_env: Dict[str, str]
     if rc != 0:
         typer.secho(f"ERROR: Command {args} failed with {rc}", fg=typer.colors.RED)
         if help_on_failure:
-            print(help_on_failure)
+            typer.secho(help_on_failure)
         raise typer.Exit(code=1)
+
+
+gitlab_ci_section_stack = []
 
 
 @contextlib.contextmanager
 def gitlab_ci_section(name: str):
     "While this context is active, render the output under a collapsable section"
+    global gitlab_ci_section_stack
     ident = uuid4()
+    gitlab_ci_section_stack.append(name)
     sys.stdout.write(f"\x1b[0Ksection_start:{int(time.time())}:{ident}\r\x1b[0K")
-    typer.secho(name, underline=True, bold=True)
+    typer.secho(" > ".join(gitlab_ci_section_stack), underline=True, bold=True)
     sys.stdout.flush()
     try:
         yield
     finally:
+        gitlab_ci_section_stack.pop()
         sys.stdout.write(f"\x1b[0Ksection_end:{int(time.time())}:{ident}\r\x1b[0K\n")
         sys.stdout.flush()
 
@@ -185,6 +193,77 @@ def ci(nightly: bool = False):
                 if x.endswith(".py")
             ]
         )
+    with gitlab_ci_section("Check Cargo.toml files"):
+        any_errors = False
+        cargo_toml_files = [
+            ROOT / x
+            for x in subprocess.check_output(["git", "ls-files"], cwd=str(ROOT))
+            .decode("ascii")
+            .strip()
+            .split("\n")
+            if x.endswith("Cargo.toml")
+        ]
+        root_cargo_toml = toml.loads((ROOT / "Cargo.toml").read_text())
+        crates_in_manifest = list(
+            itertools.chain.from_iterable(
+                ROOT.glob(member) for member in root_cargo_toml["workspace"]["members"]
+            )
+        )
+        crates_in_manifest_cargo_tomls = set(
+            crate / "Cargo.toml" for crate in crates_in_manifest
+        )
+        for path in cargo_toml_files:
+            data = toml.loads(path.read_text())
+            if "workspace" in data:
+                continue
+            if path not in crates_in_manifest_cargo_tomls:
+                any_errors = True
+                typer.secho(
+                    f"ERROR: {path} is not listed as a cargo workspace member",
+                    fg=typer.colors.RED,
+                )
+            missing_workspace_keys = set(
+                root_cargo_toml["workspace"]["package"].keys()
+            ) - set(
+                k
+                for k, v in data["package"].items()
+                if isinstance(v, dict) and v.get("workspace") == True
+            )
+            if len(missing_workspace_keys) > 0:
+                typer.secho(
+                    f"ERROR: {path} missing workspace package keys", fg=typer.colors.RED
+                )
+                typer.secho(
+                    f"Add the following to {path} (in the [package] section) to resolve the problem "
+                    "(and remove any duplicate keys)"
+                )
+                for k in sorted(list(missing_workspace_keys)):
+                    typer.secho(f"    {k}.workspace = true")
+                any_errors = True
+            deps_needing_workspace = defaultdict(lambda: set())
+            # TODO: this list of sections isn't complete, since these also exist in target-specific sections.
+            for section in ["dependencies", "dev-dependencies", "build-dependencies"]:
+                for k, v in data.get(section, dict()).items():
+                    if (not isinstance(v, dict)) or v.get("workspace") != True:
+                        deps_needing_workspace[section].add(k)
+            if len(deps_needing_workspace) > 0:
+                any_errors = True
+                typer.secho(
+                    f"ERROR: {path} isn't using a workspace dependency",
+                    fg=typer.colors.RED,
+                )
+                typer.secho("Below are keys that should change.")
+                for section, deps in deps_needing_workspace.items():
+                    typer.secho(f"    [{section}]")
+                    for dep in sorted(list(deps)):
+                        typer.secho(f"    {dep}.workspace = true")
+                typer.secho(
+                    "See https://gist.github.com/kriogenia/ea08d190ea8a008bbcceb17ebeb90676 as an"
+                    " example of how to specify feature flags on the dependencies, if you'd like."
+                )
+                typer.secho("")
+        if any_errors:
+            raise typer.Exit(code=1)
     with gitlab_ci_section("Code Generation"):
 
         def compute_cache_key():
