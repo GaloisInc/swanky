@@ -7,6 +7,58 @@ use scuttlebutt::field::polynomial::{lagrange_denominator, lagrange_numerator};
 use scuttlebutt::field::FiniteField;
 use scuttlebutt::serialization::{SequenceDeserializer, SequenceSerializer};
 
+/// An evaluator for Lagrange polynomials.
+pub struct LagrangeEvaluator<F> {
+    denominators: Vec<F>,
+}
+
+impl<F: FiniteField> LagrangeEvaluator<F> {
+    /// Construct a Lagrange evaluator for distinct x-coordinates given by `points`.
+    ///
+    /// Note: It is required that the `points` slice contains _distinct field elements_.
+    pub fn new(points: &[F]) -> Self {
+        let mut denominators: Vec<F> = Vec::with_capacity(points.len());
+        for x in points.iter() {
+            let d = lagrange_denominator(points, *x);
+            denominators.push(d);
+        }
+        Self { denominators }
+    }
+
+    /// Compute the Lagrange basis polynomial for evaluation point `e`.
+    /// This corresponds to the values
+    /// $`\ell_j(e) = \frac{e - x_0}{x_j - x_0} \dots \frac{e - x_{j-1}}{x_j - x_{j-1}}
+    ///   \frac{e - x_{j + 1}}{x_j - x_{j + 1}} \dots \frac{e - x_k}{x_j - x_k}`$,
+    /// where the $`x_i`$s are given in `points`.
+    /// The result is stored in `polynomial`.
+    #[inline]
+    pub fn basis_polynomial(&self, points: &[F], e: F, polynomial: &mut Vec<F>) {
+        polynomial.clear();
+        for (point, denominator) in points.iter().zip(self.denominators.iter()) {
+            let point = lagrange_numerator(points, *point, e) * *denominator;
+            polynomial.push(point);
+        }
+    }
+
+    /// Evaluate the Lagrange polynomial over a secret sharing using a
+    /// Lagrange basis polynomial computed by `self.basis_polynomial`.
+    /// This corresponds to $`L(e) = \sum y_j \ell_j(e)`$, where the $`y_j`$s
+    /// are given in `coefficients` and the $`\ell_j(e)`$ values are contained
+    /// in `polynomial`.
+    #[inline]
+    pub fn eval_with_basis_polynomial<S: LinearSharing<F, N>, const N: usize>(
+        &self,
+        coefficients: &[S],
+        polynomial: &[F],
+    ) -> S {
+        let mut result = S::default();
+        for (x, y) in polynomial.iter().zip(coefficients.iter()) {
+            result += *y * *x;
+        }
+        result
+    }
+}
+
 /// This trait defines an `N`-party linear secret sharing scheme
 /// over finite field `F`.
 pub trait LinearSharing<F: FiniteField, const N: usize>:
@@ -33,47 +85,6 @@ pub trait LinearSharing<F: FiniteField, const N: usize>:
     fn lift_into_superfield(x: &Self::SelfWithPrimeField) -> Self;
     /// Multiply a sharing in the prime field by a value in the field.
     fn multiply_by_superfield(x: &Self::SelfWithPrimeField, y: F) -> Self;
-}
-
-pub struct LagrangeEvaluator<F> {
-    denominators: Vec<F>,
-}
-
-impl<F: FiniteField> LagrangeEvaluator<F> {
-    /// Construct a new Lagrange evaluator given `points`.
-    pub fn new(points: &[F]) -> Self {
-        let mut denominators: Vec<F> = Vec::with_capacity(points.len());
-        for x in points.iter() {
-            let d = lagrange_denominator(points, *x);
-            denominators.push(d);
-        }
-        Self { denominators }
-    }
-
-    /// Compute the Lagrange polynomial for evaluation point `e`.
-    #[inline]
-    pub fn basis_polynomial(&self, points: &[F], e: F, polynomial: &mut Vec<F>) {
-        polynomial.clear();
-        for (point, denominator) in points.iter().zip(self.denominators.iter()) {
-            let point = lagrange_numerator(points, *point, e) * *denominator;
-            polynomial.push(point);
-        }
-    }
-
-    /// Evaluate the Lagrange polynomial over a secret sharing using a
-    /// Lagrange polynomial computed by `self.basis_polynomial`.
-    #[inline]
-    pub fn eval_with_basis_polynomial<S: LinearSharing<F, N>, const N: usize>(
-        &self,
-        coefficients: &[S],
-        polynomial: &[F],
-    ) -> S {
-        let mut result = S::default();
-        for (x, y) in polynomial.iter().zip(coefficients.iter()) {
-            result += *y * *x;
-        }
-        result
-    }
 }
 
 /// A sharing with a separate correction value which, when all summed together, equals the
@@ -135,26 +146,33 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F
 }
 
 impl<F: FiniteField, const N: usize> CorrectionSharing<F, N> {
-    pub fn check_equality(&self, other: &Self, id: usize) -> bool {
-        assert!(id < N);
+    /// Check that two `CorrectionSharing`s are equal except for the
+    /// index specified by `exclude`.
+    ///
+    /// # Panics
+    /// Panics if `exclude >= N`.
+    pub fn check_equality(&self, other: &Self, exclude: usize) -> bool {
+        assert!(exclude < N);
         for i in 0..N {
-            if i != id && self.shares[i] != other.shares[i] {
+            if i != exclude && self.shares[i] != other.shares[i] {
                 return false;
             }
         }
         true
     }
 
+    /// Generate a `CorrectionSharing` from an array of RNGs and a correction
+    /// element.
     #[inline]
     pub fn from_rngs<R: Rng + CryptoRng>(correction: F, rngs: &mut [R; N]) -> Self {
         let mut shares = [F::ZERO; N];
         for (share, rng) in shares.iter_mut().zip(rngs.iter_mut()) {
-            let r = F::random(rng);
-            *share = r;
+            *share = F::random(rng);
         }
         Self { shares, correction }
     }
 
+    /// Reconstruct the underlying shared value.
     #[inline]
     pub fn reconstruct(&self) -> F {
         self.shares.into_iter().sum::<F>() + self.correction
@@ -355,6 +373,8 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for SecretSharing<F, N>
 }
 
 impl<F: FiniteField, const N: usize> SecretSharing<F, N> {
+    /// Generate a random `SecretSharing` given a set of RNGs corresponding to
+    /// each of the shares.
     #[inline]
     pub fn random<R: Rng + CryptoRng>(rngs: &mut [R; N]) -> Self {
         let mut secret = F::ZERO;
@@ -372,27 +392,35 @@ impl<F: FiniteField, const N: usize> SecretSharing<F, N> {
         }
     }
 
+    /// Return the underlying secret.
     #[inline]
     pub fn secret(&self) -> F {
         self.secret
     }
 
+    /// Return the correction value.
     #[inline]
     pub fn correction(&self) -> F {
         self.shares.correction
     }
 
+    /// Return a `CorrectionSharing` that corresponds to `Self`
+    /// with the entry associated with `exclude` zero-ed out.
+    ///
+    /// # Panics
+    /// Panics if `exclude >= N`.
     #[inline]
-    pub fn extract(&self, id: usize) -> CorrectionSharing<F, N> {
-        debug_assert!(id < N);
+    pub fn extract(&self, exclude: usize) -> CorrectionSharing<F, N> {
+        assert!(exclude < N);
         let mut arr = self.shares.shares;
-        arr[id] = F::ZERO;
+        arr[exclude] = F::ZERO;
         CorrectionSharing {
             shares: arr,
             correction: self.shares.correction,
         }
     }
 
+    /// Compute the dot product between to sets of sharings.
     #[inline]
     pub fn dot(xs: &[Self], ys: &[Self]) -> F {
         xs.iter()

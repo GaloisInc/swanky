@@ -25,7 +25,7 @@ pub struct Proof<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> Proof<F, N> {
-    /// Constructs a proof for `circuit` with `witness`, using the provided compression factor
+    /// Construct a proof for `circuit` with `witness`, using the provided compression factor
     /// and number of repetitions.
     ///
     /// # Panics

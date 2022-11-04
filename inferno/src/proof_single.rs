@@ -80,6 +80,9 @@ pub struct OutputShares<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> OutputShares<F, N> {
+    /// Construct an `OutputShares` object from the computations of a round
+    /// of the MPC-in-the-head protocol and the output shares of the protocol
+    /// execution.
     fn new(round: Round<SecretSharing<F, N>>, output: SecretSharing<F::PrimeField, N>) -> Self {
         Self {
             fs: round.xs.into_iter().map(|x| x.into()).collect(),
@@ -89,9 +92,9 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         }
     }
 
-    // Verify that the prover output is valid. This involes the following checks:
-    // 1. The `output` shares reconstruct to `1`.
-    // 2. The `fs` and `gs` shares dot product to `h`.
+    /// Verify that the prover output is valid. This involes the following checks:
+    /// 1. The `output` shares reconstruct to `1`.
+    /// 2. The `fs` and `gs` shares dot product to `h`.
     pub fn verify(&self) -> anyhow::Result<()> {
         let output = self.output.reconstruct();
         if output != <F::PrimeField as FiniteRing>::ZERO {
@@ -107,24 +110,28 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         Ok(())
     }
 
-    // Verify that the shares in `round` are valid for all parties except the party matching index `id`.
+    /// Verify that the shares in `round` are valid for all parties except
+    /// the party matching index `exclude`.
+    ///
+    /// # Panics
+    /// Panics if `exclude >= N`.
     fn verify_shares(
         &self,
         round: Round<CorrectionSharing<F, N>>,
-        id: usize,
+        exclude: usize,
     ) -> anyhow::Result<()> {
-        assert!(id < N);
+        assert!(exclude < N);
         for (f, f_) in self.fs.iter().zip(round.xs.iter()) {
-            if !f.check_equality(f_, id) {
+            if !f.check_equality(f_, exclude) {
                 return Err(anyhow!("`f` shares not equal"));
             }
         }
         for (g, g_) in self.gs.iter().zip(round.ys.iter()) {
-            if !g.check_equality(g_, id) {
+            if !g.check_equality(g_, exclude) {
                 return Err(anyhow!("`g` shares not equal"));
             }
         }
-        if !self.h.check_equality(&round.z.unwrap(), id) {
+        if !self.h.check_equality(&round.z.unwrap(), exclude) {
             return Err(anyhow!("`h` shares not equal"));
         }
         Ok(())
@@ -152,7 +159,8 @@ pub struct OpenedParties<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
-    // Checks that the shares are valid for the given circuit and the given unopened party.
+    /// Checks that the shares are valid for the given circuit and the given
+    /// unopened party.
     fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
@@ -186,13 +194,25 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
                 CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
             })
             .collect();
+        // Hash the first round to derive the initial Fiat-Shamir challenge.
         hashers.hash_round0(&witness, &mults);
         let c = hashers.extract_challenge(Some((unopened.id, Hash::from(unopened.commitments[0]))));
         log::debug!("Challenge: {:?}", c);
+        // Compute the multiplication inputs from the reconstructed
+        // witness and reconstructed multiplication outputs.
         let (xs, ys) = circuit.eval_trace(&witness, &mults);
+        // Now let's validate that these multiplication inputs are correct!
+        // We do this by running the protocol on these reconstructed values
+        // and seeing whether we get the correct result at the end.
         let round0 = Round { xs, ys, z: None };
         let mut round = round1(&round0, &mults, c);
+        // If we have no multiplication gates, then we have no rounds, in which
+        // case we don't need to do this processing. So only do it if we have more
+        // than zero rounds.
         if nrounds > 0 {
+            // Iterate through all but the last rounds, using the commitments
+            // of the unopened parties to help compute the Fiat-Shamir derived
+            // challenge.
             for (hs, com) in self
                 .hs
                 .iter()
@@ -233,12 +253,14 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
             round =
                 round_compress_finish(&round_, &self.rands, hs, c, compression_factor, true, cache);
         }
+        // Now we derive the unopened party ID again using Fiat-Shamir.
         let id = hashers.extract_unopened_party(Some((unopened.id, Hash::from(unopened.trace))), N);
         log::debug!("Party ID: {id}");
         if id != unopened.id {
             return Err(anyhow!("Incorrect party ID encountered"));
         }
-        // Now check that `round` was computed correctly.
+        // Finally, check that `round` was computed correctly by verifying
+        // that the resulting shares are valid.
         output.verify_shares(round, id)
     }
 }
@@ -644,12 +666,11 @@ impl<F: FiniteField, const N: usize> PartyShares<F, N> {
         }
     }
 
-    // Extracts the party trace from the various views collected during the
-    // execution of a prover for all parties but the one specified by `id`.
-    //
+    /// Extracts the party trace from the various views collected during the
+    /// execution of a prover for all parties but the one specified by `exclude`.
     // TODO: This should be `self` instead of `&self`.
-    pub fn extract(&self, id: usize) -> OpenedParties<F, N> {
-        assert!(id < N);
+    pub fn extract(&self, exclude: usize) -> OpenedParties<F, N> {
+        assert!(exclude < N);
         let mut witness = Vec::with_capacity(self.witness.len());
         for w in self.witness.iter() {
             witness.push(w.correction());
@@ -662,19 +683,19 @@ impl<F: FiniteField, const N: usize> PartyShares<F, N> {
         for hshares in self.hs.iter() {
             let mut shares = Vec::with_capacity(hshares.len());
             for h in hshares.iter() {
-                let arr = h.extract(id);
+                let arr = h.extract(exclude);
                 shares.push(arr);
             }
             hs.push(shares);
         }
         let mut rands = Vec::with_capacity(self.rands.len());
         for r in self.rands.iter() {
-            let arr0 = r.0.extract(id);
-            let arr1 = r.1.extract(id);
+            let arr0 = r.0.extract(exclude);
+            let arr1 = r.1.extract(exclude);
             rands.push((arr0, arr1));
         }
         let mut seeds = self.seeds;
-        seeds[id] = 0u128;
+        seeds[exclude] = 0u128;
         OpenedParties {
             witness,
             mults,
@@ -706,7 +727,8 @@ impl<const N: usize> Hashers<N> {
     // If `unopened` is `None`, this corresponds to the prover.
     // In this case we simply combine the hashes of each party.
     // If `unopened` is `Some((id, com))`, we combine the hashes of each party
-    // _except_ the party corresponding to `id`. In this case, we use `com` instead.
+    // _except_ the party corresponding to `id`. In this case, we use that party's
+    // `com` value instead.
     fn output(&self, unopened: Option<(usize, Hash)>) -> OutputReader {
         let mut hasher = Hasher::new();
         let (unopened_id, unopened_hash) = match unopened {
@@ -723,7 +745,7 @@ impl<const N: usize> Hashers<N> {
         hasher.finalize_xof()
     }
 
-    // Extract the ID of the party to _not_ open.
+    /// Extract the ID of the party to _not_ open.
     pub fn extract_unopened_party(&self, unopened: Option<(usize, Hash)>, n: usize) -> usize {
         let mut output = self.output(unopened);
         let mut result = [0u8; 1];
@@ -732,7 +754,7 @@ impl<const N: usize> Hashers<N> {
         id % n
     }
 
-    // Extract a challenge field element.
+    /// Extract a challenge field element.
     pub fn extract_challenge<F: FiniteField>(&self, unopened: Option<(usize, Hash)>) -> F {
         let mut output = self.output(unopened);
         let mut result = [0u8; 16];
@@ -740,12 +762,16 @@ impl<const N: usize> Hashers<N> {
         F::from_uniform_bytes(&result)
     }
 
-    // Extract the hash of the trace for the given `id`.
+    /// Extract the hash of the trace for the given `id`.
+    ///
+    /// # Panics
+    /// Panics if `id >= N`.
     pub fn hash_of_id(&self, id: usize) -> Hash {
+        assert!(id < N);
         self.0[id].finalize()
     }
 
-    // Extract the hashes of the traces of all parties.
+    /// Extract the hashes of the traces of all parties.
     pub fn hashes(&self) -> [Hash; N] {
         self.0
             .iter()
@@ -755,11 +781,13 @@ impl<const N: usize> Hashers<N> {
             .unwrap() // This `unwrap` will never fail
     }
 
+    /// Hash a `LinearSharing` into the existing hash state.
     #[inline]
     pub fn hash_sharing<S: LinearSharing<F, N>, F: FiniteField>(&mut self, share: &S) {
         share.hash(&mut self.0)
     }
 
+    /// Hash Round 0 of the protocol into the existing hash state.
     pub fn hash_round0<S: LinearSharing<F, N>, F: FiniteField>(&mut self, ws: &[S], zs: &[S]) {
         for w in ws.iter() {
             self.hash_sharing(w);
@@ -769,6 +797,7 @@ impl<const N: usize> Hashers<N> {
         }
     }
 
+    /// Hash Round i (!= 0) of the protocol into the existing hash state.
     fn hash_round<S: LinearSharing<F, N>, F: FiniteField>(&mut self, hs: &[S]) {
         for h in hs.iter() {
             h.hash(&mut self.0);

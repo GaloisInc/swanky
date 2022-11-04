@@ -51,7 +51,7 @@ fn bench_random_circuit<F: FiniteField>(c: &mut Criterion, group: &str) {
                         (circuit, proof)
                     },
                     |(circuit, proof)| {
-                        let res = proof.verify(&circuit, k, t);
+                        let res = proof.verify(&circuit, k, t).unwrap();
                         black_box(res);
                     },
                     BatchSize::SmallInput,
