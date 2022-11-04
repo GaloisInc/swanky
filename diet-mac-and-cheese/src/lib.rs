@@ -10,8 +10,10 @@ then it produces a private value.
 Public and private values are ingested using the pair of functions `input_public()`/`input_private()`
 and they return public/private values whose type is exposed to to the user as `ValueProver` and `ValueVerifier`.
 
-Note that the interfaces for the prover and the verifier are almost identical at a high-level, except
-for the `input_private()` function.
+The `DietMacAndCheeseProver`/`DietMacAndCheeseVerfier` are almost identical at a high-level and differ
+solely on the `input_private()` function. Also the API satisfies the following invariant:
+if any function call returns an error then any subsequent gate function call
+will directly return an error.
 */
 
 mod backend;

@@ -13,7 +13,7 @@ use scuttlebutt::{field::FiniteField, AbstractChannel};
 // * The communication during circuit evaluation goes from the prover to the verifier,
 //   therefore it is possible to flush only when queues are full and mult or zero checks are performed.
 // * Gates do not specifiy whether their input values are public or private, their execution
-//   does a case analysis and to perform the right operation.
+//   does a case analysis to perform the right operation.
 //   For example, a multiplication with public values requires a simple field multiplication,
 //   whereas the input are private it requires a zero_knowledge multiplication check.
 
@@ -170,6 +170,7 @@ type FieldClear<FE> = <FE as FiniteField>::PrimeField;
 
 /// Prover for Diet Mac'n'Cheese.
 pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
+    is_ok: bool,
     prover: FComProver<FE>,
     channel: C,
     rng: RNG,
@@ -202,6 +203,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         lpn_extend: LpnParams,
     ) -> std::result::Result<Self, Error> {
         Ok(Self {
+            is_ok: true,
             prover: FComProver::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
             rng: rng,
@@ -211,22 +213,38 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         })
     }
 
+    // this function should be called before every function exposed publicly by the API.
+    fn check_is_ok(&self) -> Result<()> {
+        if !self.is_ok {
+            return Err(BackendError(
+                "An error occurred earlier. This functionality should not be used further".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn input(&mut self, v: FE::PrimeField) -> Result<MacProver<FE>> {
-        let tag = self.prover.input1(&mut self.channel, &mut self.rng, v)?;
-        Ok(MacProver(v, tag))
+        let tag = self.prover.input1(&mut self.channel, &mut self.rng, v);
+        if tag.is_err() {
+            self.is_ok = false;
+        }
+        Ok(MacProver(v, tag?))
     }
 
     fn do_mult_check(&mut self) -> Result<()> {
         debug!("do mult_check");
         self.channel.flush()?;
-        self.prover.quicksilver_check_multiply(
+        let r = self.prover.quicksilver_check_multiply(
             &mut self.channel,
             &mut self.rng,
             &self.mult_check_list,
-        )?;
+        );
+        if r.is_err() {
+            self.is_ok = false;
+        }
         self.monitor.incr_zk_mult_check(self.mult_check_list.len());
         self.mult_check_list.clear();
-        Ok(())
+        Ok(r?)
     }
 
     fn push_mult_check_list(
@@ -247,8 +265,9 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         let r = self
             .prover
             .check_zero(&mut self.channel, &self.check_zero_list);
-        // the counter is increased and queue is cleared before possibly raising the verifier error,
-        // so that the Verifier is in a legit state if/when `finalize()` is called.
+        if r.is_err() {
+            self.is_ok = false;
+        }
         self.monitor.incr_zk_check_zero(self.check_zero_list.len());
         self.check_zero_list.clear();
         Ok(r?)
@@ -265,6 +284,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     /// Assert a value is zero.
     pub fn assert_zero(&mut self, a: &ValueProver<FE>) -> Result<()> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_check_zero();
         match a {
             ValueProver::Public(a1) => {
@@ -283,6 +303,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     /// Add two values.
     pub fn add(&mut self, a: &ValueProver<FE>, b: &ValueProver<FE>) -> Result<ValueProver<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_add();
 
         match (a, b) {
@@ -308,6 +329,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     /// Multiply two values.
     pub fn mul(&mut self, a: &ValueProver<FE>, b: &ValueProver<FE>) -> Result<ValueProver<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_mul();
         match (a, b) {
             (ValueProver::Public(a1), ValueProver::Public(b1)) => {
@@ -338,6 +360,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     /// Add a value and a constant.
     pub fn addc(&mut self, a: &ValueProver<FE>, b: FE::PrimeField) -> Result<ValueProver<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
         match a {
             ValueProver::Public(a1) => return Ok(ValueProver::Public(*a1 + b)),
@@ -351,6 +374,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     /// Multiply a value and a constant.
     pub fn mulc(&mut self, a: &ValueProver<FE>, b: FE::PrimeField) -> Result<ValueProver<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_mulc();
 
         match a {
@@ -371,6 +395,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     /// Input a private value and prover value.
     pub fn input_private(&mut self, v: FieldClear<FE>) -> Result<ValueProver<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_witness();
         let v_tag = self.input(v)?;
         Ok(ValueProver::Private(v_tag))
@@ -379,6 +404,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     /// `finalize` execute its queued multiplication and zero checks.
     /// It can be called at any time and it is also called when the functionality is dropped.
     pub fn finalize(&mut self) -> Result<()> {
+        self.check_is_ok()?;
         self.channel.flush()?;
         let zero_len = self.check_zero_list.len();
         self.do_check_zero()?;
@@ -402,8 +428,10 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
     for DietMacAndCheeseProver<FE, C, RNG>
 {
     fn drop(&mut self) {
-        if (self.check_zero_list.len() != 0) || (self.mult_check_list.len() != 0) {
-            warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
+        if self.is_ok {
+            if (self.check_zero_list.len() != 0) || (self.mult_check_list.len() != 0) {
+                warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
+            }
         }
     }
 }
@@ -423,6 +451,7 @@ impl<FE: FiniteField> Default for ValueVerifier<FE> {
 
 /// Verifier for Diet Mac'n'Cheese.
 pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
+    is_ok: bool,
     verifier: FComVerifier<FE>,
     channel: C,
     rng: RNG,
@@ -444,6 +473,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         lpn_extend: LpnParams,
     ) -> std::result::Result<Self, Error> {
         Ok(Self {
+            is_ok: true,
             verifier: FComVerifier::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
             rng: rng,
@@ -453,22 +483,38 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         })
     }
 
+    // this function should be called before every function exposed publicly by the API.
+    fn check_is_ok(&self) -> Result<()> {
+        if !self.is_ok {
+            return Err(BackendError(
+                "An error occurred earlier. This functionality should not be used further".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn input(&mut self) -> Result<MacVerifier<FE>> {
-        let tag = self.verifier.input1(&mut self.channel, &mut self.rng)?;
-        Ok(tag)
+        let tag = self.verifier.input1(&mut self.channel, &mut self.rng);
+        if tag.is_err() {
+            self.is_ok = false;
+        }
+        Ok(tag?)
     }
 
     fn do_mult_check(&mut self) -> Result<()> {
         debug!("do mult_check");
         self.channel.flush()?;
-        self.verifier.quicksilver_check_multiply(
+        let r = self.verifier.quicksilver_check_multiply(
             &mut self.channel,
             &mut self.rng,
             &self.mult_check_list,
-        )?;
+        );
+        if r.is_err() {
+            self.is_ok = false;
+        }
         self.monitor.incr_zk_mult_check(self.mult_check_list.len());
         self.mult_check_list.clear();
-        Ok(())
+        Ok(r?)
     }
 
     fn push_mult_check_list(
@@ -489,8 +535,9 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         let r = self
             .verifier
             .check_zero(&mut self.channel, &mut self.rng, &self.check_zero_list);
-        // the counter is increased and queue is cleared before possibly raising the verifier error,
-        // so that the Verifier is in a legit state if/when `finalize()` is called.
+        if r.is_err() {
+            self.is_ok = false;
+        }
         self.monitor.incr_zk_check_zero(self.check_zero_list.len());
         self.check_zero_list.clear();
         Ok(r?)
@@ -507,6 +554,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
 
     /// Assert a value is zero.
     pub fn assert_zero(&mut self, a: &ValueVerifier<FE>) -> Result<()> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_check_zero();
         match a {
             ValueVerifier::Public(a1) => {
@@ -529,6 +577,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         a: &ValueVerifier<FE>,
         b: &ValueVerifier<FE>,
     ) -> Result<ValueVerifier<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_add();
 
         match (a, b) {
@@ -558,6 +607,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         a: &ValueVerifier<FE>,
         b: &ValueVerifier<FE>,
     ) -> Result<ValueVerifier<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_mul();
         match (a, b) {
             (ValueVerifier::Public(a1), ValueVerifier::Public(b1)) => {
@@ -584,6 +634,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
 
     /// Add a value and a constant.
     pub fn addc(&mut self, a: &ValueVerifier<FE>, b: FE::PrimeField) -> Result<ValueVerifier<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
         match a {
             ValueVerifier::Public(a1) => return Ok(ValueVerifier::Public(*a1 + b)),
@@ -597,6 +648,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
 
     /// Multiply a value and a constant.
     pub fn mulc(&mut self, a: &ValueVerifier<FE>, b: FE::PrimeField) -> Result<ValueVerifier<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_mulc();
 
         match a {
@@ -617,6 +669,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
 
     /// Input a private value and verifier value.
     pub fn input_private(&mut self) -> Result<ValueVerifier<FE>> {
+        self.check_is_ok()?;
         self.monitor.incr_monitor_witness();
         let v_tag = self.input()?;
         Ok(ValueVerifier::Private(v_tag))
@@ -625,6 +678,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     /// `finalize` execute its internal queued multiplication and zero checks.
     /// It can be called at any time and it is also be called when the functionality is dropped.
     pub fn finalize(&mut self) -> Result<()> {
+        self.check_is_ok()?;
         self.channel.flush()?;
         let zero_len = self.check_zero_list.len();
         self.do_check_zero()?;
@@ -648,8 +702,10 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
     for DietMacAndCheeseVerifier<FE, C, RNG>
 {
     fn drop(&mut self) {
-        if (self.check_zero_list.len() != 0) || (self.mult_check_list.len() != 0) {
-            warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
+        if self.is_ok {
+            if (self.check_zero_list.len() != 0) || (self.mult_check_list.len() != 0) {
+                warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
+            }
         }
     }
 }
