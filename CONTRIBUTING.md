@@ -1,7 +1,7 @@
 This document is still a work in progress. More information will be added later.
 
 # Cargo Workspace Inheritance
-To ensure unifomrity across Cargo metadata, `swanky` employs [Cargo's workspace inheritance functionality](https://betterprogramming.pub/workspace-inheritance-in-rust-65d0bb8f9424).
+To ensure uniformity across Cargo metadata, `swanky` employs [Cargo's workspace inheritance functionality](https://betterprogramming.pub/workspace-inheritance-in-rust-65d0bb8f9424).
 This functionality lets us set a common set of metadata (such as version, license, author) in the root `Cargo.toml` file, and have it automatically applied across all of our crates.
 Similarly, we also use workspace inheritance to specify a single version of our dependencies in the root `Cargo.toml` file.
 
@@ -22,7 +22,7 @@ vector2d.workspace = true
 rand = { workspace = true, features = [ "log" ] }
 ```
 
-CI will enforce the use of workspace in inheritance.
+CI will enforce the use of workspace inheritance.
 
 # Tests
 ## Assets for Tests
