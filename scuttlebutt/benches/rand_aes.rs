@@ -3,23 +3,12 @@ use rand::distributions::{Distribution, Uniform};
 use rand_core::RngCore;
 use scuttlebutt::{AesRng, UniformIntegersUnderBound};
 
-#[cfg(not(target_os = "linux"))]
 mod measurement {
     use criterion::measurement::WallTime;
     pub(super) type Measurement = WallTime;
 
     pub(super) fn new_measurement() -> Measurement {
         WallTime
-    }
-}
-
-#[cfg(target_os = "linux")]
-mod measurement {
-    use criterion_linux_perf::{PerfMeasurement, PerfMode};
-    pub(super) type Measurement = PerfMeasurement;
-
-    pub(super) fn new_measurement() -> Measurement {
-        PerfMeasurement::new(PerfMode::Cycles)
     }
 }
 

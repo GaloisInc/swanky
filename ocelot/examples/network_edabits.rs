@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{Arg, ArgAction, Command};
 use ocelot::edabits::{ProverConv, VerifierConv};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
@@ -227,83 +227,80 @@ fn run(
 }
 
 fn main() -> std::io::Result<()> {
-    let matches = App::new("Edabit conversion protocol")
+    let matches = Command::new("Edabit conversion protocol")
         .version("1.0")
         .author("Ben Razet")
         .about("")
         .arg(
-            Arg::with_name("prover")
-                .short("p")
+            Arg::new("prover")
+                .short('p')
                 .long("prover")
                 .help("set to be the prover")
-                .required(false),
+                .required(false)
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("addr")
+            Arg::new("addr")
                 .long("addr")
                 .value_name("ADDR")
                 .help("Set addr for tcp connection")
-                .takes_value(true)
                 .required(false)
                 .default_value(DEFAULT_ADDR),
         )
         .arg(
-            Arg::with_name("bucket")
-                .short("b")
+            Arg::new("bucket")
+                .short('b')
                 .long("bucket")
                 .value_name("NUM_BUCKET")
                 .help("Set the number of buckets")
-                .takes_value(true)
                 .required(false)
                 .default_value(DEFAULT_NUM_BUCKET),
         )
         .arg(
-            Arg::with_name("nb_bits")
-                .short("m")
+            Arg::new("nb_bits")
+                .short('m')
                 .long("nb_bits")
                 .value_name("NB_BITS")
                 .help("Set the number of bits in edabits")
-                .takes_value(true)
                 .default_value(DEFAULT_NB_BITS),
         )
         .arg(
-            Arg::with_name("num_edabits")
-                .short("n")
+            Arg::new("num_edabits")
+                .short('n')
                 .long("num")
                 .value_name("NUM_EDABITS")
                 .help("Set the number of edabits")
-                .takes_value(true)
                 .default_value(DEFAULT_NUM_EDABITS),
         )
         .arg(
-            Arg::with_name("with_quicksilver")
+            Arg::new("with_quicksilver")
                 .long("quicksilver")
                 .help("use quicksilver")
                 .required(false),
         )
         .arg(
-            Arg::with_name("multithreaded")
+            Arg::new("multithreaded")
                 .long("multithreaded")
                 .help("Using multithreading on B-loop"),
         )
         .get_matches();
     let whoami;
-    if !matches.is_present("prover") {
+    if !matches.contains_id("prover") {
         whoami = VERIFIER;
     } else {
         whoami = PROVER;
     }
-    let connection_addr = &matches.value_of("addr").unwrap();
-    let num_bucket = usize::from_str_radix(&matches.value_of("bucket").unwrap(), 10)
+    let connection_addr = &matches.get_one::<String>("addr").unwrap();
+    let num_bucket = usize::from_str_radix(&matches.get_one::<String>("bucket").unwrap(), 10)
         .unwrap_or(usize::from_str_radix(DEFAULT_NUM_BUCKET, 10).unwrap());
-    let nb_bits = usize::from_str_radix(&matches.value_of("nb_bits").unwrap(), 10)
+    let nb_bits = usize::from_str_radix(&matches.get_one::<String>("nb_bits").unwrap(), 10)
         .unwrap_or(usize::from_str_radix(DEFAULT_NB_BITS, 10).unwrap());
-    let num_edabits = usize::from_str_radix(&matches.value_of("num_edabits").unwrap(), 10)
+    let num_edabits = usize::from_str_radix(&matches.get_one::<String>("num_edabits").unwrap(), 10)
         .unwrap_or(usize::from_str_radix(DEFAULT_NUM_EDABITS, 10).unwrap());
 
-    let multithreaded = matches.is_present("multithreaded");
+    let multithreaded = matches.contains_id("multithreaded");
     let num_cut = num_bucket;
-    let with_quicksilver = matches.is_present("with_quicksilver");
+    let with_quicksilver = matches.contains_id("with_quicksilver");
     run(
         whoami,
         connection_addr,
