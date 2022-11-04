@@ -46,9 +46,6 @@ serde_json.workspace = true
 bincode.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
-[target.'cfg(target_os="linux")'.dev-dependencies]
-criterion-linux-perf.workspace = true
-
 [[bench]]
 name = "aes128"
 harness = false
