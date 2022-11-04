@@ -1,4 +1,6 @@
+use fancy_garbling::Fancy;
 use fancy_garbling::{circuit::Circuit, circuit::CircuitBuilder, classic::garble};
+use std::convert::TryFrom;
 use std::time::SystemTime;
 
 // deps/protos/generated/ DOES NOT work b/c it only contains "APIs" and we want circuits/skcd.proto etc
@@ -7,6 +9,63 @@ use std::time::SystemTime;
 #[allow(clippy::derive_partial_eq_without_eq)]
 mod interstellarpbskcd {
     include!(concat!(env!("OUT_DIR"), "/interstellarpbskcd.rs"));
+}
+
+/// All the Gates type possible in SKCD file format
+///
+/// SHOULD match
+/// - "enum SkcdGateType" from skcd.proto
+/// - lib_circuits/src/blif/gate_types.h
+/// - lib_garble/src/justgarble/gate_types.h
+enum SkcdGateType {
+    ZERO = 0,
+    NOR = 1,
+    /// A-and-not-B
+    AANB = 2,
+    /// NOT B
+    INVB = 3,
+    /// not-A-and-B?
+    NAAB = 4,
+    /// NOT A
+    INV = 5,
+    XOR = 6,
+    NAND = 7,
+    AND = 8,
+    XNOR = 9,
+    BUF = 11,
+    /// A-or-NOT-B?
+    AONB = 12,
+    BUFB = 13,
+    /// NOT-A-or-B?
+    NAOB = 14,
+    OR = 15,
+    ONE = 16,
+}
+
+impl TryFrom<i32> for SkcdGateType {
+    type Error = ();
+
+    fn try_from(v: i32) -> Result<Self, Self::Error> {
+        match v {
+            x if x == SkcdGateType::ZERO as i32 => Ok(SkcdGateType::ZERO),
+            x if x == SkcdGateType::NOR as i32 => Ok(SkcdGateType::NOR),
+            x if x == SkcdGateType::AANB as i32 => Ok(SkcdGateType::AANB),
+            x if x == SkcdGateType::INVB as i32 => Ok(SkcdGateType::INVB),
+            x if x == SkcdGateType::NAAB as i32 => Ok(SkcdGateType::NAAB),
+            x if x == SkcdGateType::INV as i32 => Ok(SkcdGateType::INV),
+            x if x == SkcdGateType::XOR as i32 => Ok(SkcdGateType::XOR),
+            x if x == SkcdGateType::NAND as i32 => Ok(SkcdGateType::NAND),
+            x if x == SkcdGateType::AND as i32 => Ok(SkcdGateType::AND),
+            x if x == SkcdGateType::XNOR as i32 => Ok(SkcdGateType::XNOR),
+            x if x == SkcdGateType::BUF as i32 => Ok(SkcdGateType::BUF),
+            x if x == SkcdGateType::AONB as i32 => Ok(SkcdGateType::AONB),
+            x if x == SkcdGateType::BUFB as i32 => Ok(SkcdGateType::BUFB),
+            x if x == SkcdGateType::NAOB as i32 => Ok(SkcdGateType::NAOB),
+            x if x == SkcdGateType::OR as i32 => Ok(SkcdGateType::OR),
+            x if x == SkcdGateType::ONE as i32 => Ok(SkcdGateType::ONE),
+            _ => Err(()),
+        }
+    }
 }
 
 /// Errors emitted by the circuit parser.
@@ -45,9 +104,45 @@ fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
     );
     println!("skcd : a = {}", skcd.a.len());
 
-    let circ_builder = CircuitBuilder::new();
+    let mut circ_builder = CircuitBuilder::new();
 
-    // circ_builder.
+    // TODO(interstellar) modulus: what should we use??
+    let q = 2;
+
+    // TODO(interstellar) how should we use skcd's a/b/go?
+    for g in 0..skcd.q as usize {
+        let skcd_input0 = skcd.a.get(g).unwrap();
+        let skcd_input1 = skcd.b.get(g).unwrap();
+        let skcd_output = skcd.go.get(g).unwrap();
+        let skcd_gate_type = *skcd.gt.get(g).unwrap();
+        // println!("Processing gate: {}", g);
+
+        match skcd_gate_type.try_into() {
+            Ok(SkcdGateType::ZERO) => {
+                circ_builder.constant(0, q).unwrap();
+            }
+            Ok(SkcdGateType::OR) => {
+                let x = circ_builder.evaluator_input(q);
+                let y = circ_builder.evaluator_input(q);
+                let z = circ_builder.or(&x, &y).unwrap();
+                circ_builder.output(&z).unwrap();
+            }
+            Ok(SkcdGateType::XOR) => {
+                let x = circ_builder.evaluator_input(q);
+                let y = circ_builder.evaluator_input(q);
+                let z = circ_builder.xor(&x, &y).unwrap();
+                circ_builder.output(&z).unwrap();
+            }
+            Ok(SkcdGateType::NAND) => {
+                let x = circ_builder.evaluator_input(q);
+                let y = circ_builder.evaluator_input(q);
+                let z = circ_builder.and(&x, &y).unwrap();
+                let z = circ_builder.negate(&z).unwrap();
+                circ_builder.output(&z).unwrap();
+            }
+            _ => todo!(),
+        }
+    }
 
     Ok(circ_builder.finish())
 }
