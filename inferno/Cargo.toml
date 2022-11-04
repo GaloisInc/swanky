@@ -10,8 +10,8 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
-simple-arith-circuit = { path = "../simple-arith-circuit", features = ["serde"] }
-scuttlebutt = { path = "../scuttlebutt", features = ["serde"] }
+simple-arith-circuit = { workspace = true, features = ["serde"] }
+scuttlebutt = { workspace = true, features = ["serde"] }
 log.workspace = true
 rand.workspace = true
 simple_logger.workspace = true
