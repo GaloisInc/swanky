@@ -109,10 +109,18 @@ fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
     // TODO(interstellar) modulus: what should we use??
     let q = 2;
 
+    // create a vec of [2,2,2..] containing skcd.n elements
+    // that is needed for "evaluator_inputs"
+    let mods = vec![2u16; skcd.n.try_into().unwrap()];
+    // TODO(interstellar) should we use "garbler_inputs" instead?
+    let inputs = circ_builder.evaluator_inputs(&mods);
+    // TODO(interstellar) pre-generate all gates(skcd.q)? other field?
+    // TODO(interstellar) parser: "Create a constant wire for negations."?
+
     // TODO(interstellar) how should we use skcd's a/b/go?
     for g in 0..skcd.q as usize {
-        let skcd_input0 = skcd.a.get(g).unwrap();
-        let skcd_input1 = skcd.b.get(g).unwrap();
+        let skcd_input0 = *skcd.a.get(g).unwrap() as usize;
+        let skcd_input1 = *skcd.b.get(g).unwrap() as usize;
         let skcd_output = skcd.go.get(g).unwrap();
         let skcd_gate_type = *skcd.gt.get(g).unwrap();
         // println!("Processing gate: {}", g);
@@ -122,20 +130,20 @@ fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
                 circ_builder.constant(0, q).unwrap();
             }
             Ok(SkcdGateType::OR) => {
-                let x = circ_builder.evaluator_input(q);
-                let y = circ_builder.evaluator_input(q);
+                let x = inputs.get(skcd_input0).unwrap();
+                let y = inputs.get(skcd_input1).unwrap();
                 let z = circ_builder.or(&x, &y).unwrap();
                 circ_builder.output(&z).unwrap();
             }
             Ok(SkcdGateType::XOR) => {
-                let x = circ_builder.evaluator_input(q);
-                let y = circ_builder.evaluator_input(q);
+                let x = inputs.get(skcd_input0).unwrap();
+                let y = inputs.get(skcd_input1).unwrap();
                 let z = circ_builder.xor(&x, &y).unwrap();
                 circ_builder.output(&z).unwrap();
             }
             Ok(SkcdGateType::NAND) => {
-                let x = circ_builder.evaluator_input(q);
-                let y = circ_builder.evaluator_input(q);
+                let x = inputs.get(skcd_input0).unwrap();
+                let y = inputs.get(skcd_input1).unwrap();
                 let z = circ_builder.and(&x, &y).unwrap();
                 let z = circ_builder.negate(&z).unwrap();
                 circ_builder.output(&z).unwrap();
