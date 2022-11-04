@@ -22,7 +22,7 @@ blake3.workspace = true
 curve25519-dalek = { package = "curve25519-dalek-ng", workspace = true }
 rand.workspace = true
 scuttlebutt = { workspace = true, features = ["curve25519-dalek"] }
-vectoreyes = { workspace = true }
+vectoreyes.workspace = true
 generic-array.workspace = true
 subtle.workspace = true
 bytemuck.workspace = true

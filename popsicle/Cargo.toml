@@ -18,8 +18,8 @@ psty = ["fancy-garbling", "openssl"]
 psty_payload = ["fancy-garbling", "serde", "serde_json", "fancy-garbling/serde"]
 
 [dependencies]
-ocelot         = { workspace = true }
-scuttlebutt    = { workspace = true }
+ocelot.workspace = true
+scuttlebutt.workspace = true
 itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true

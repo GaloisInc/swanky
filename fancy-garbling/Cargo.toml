@@ -19,10 +19,10 @@ nightly = ["scuttlebutt/nightly"]
 serde = ["dep:serde", "dep:serde_json", "scuttlebutt/serde"]
 
 [dependencies]
-fancy-garbling-base-conversion = { workspace = true }
-scuttlebutt = { workspace = true }
-ocelot = { workspace = true }
-vectoreyes = { workspace = true }
+fancy-garbling-base-conversion.workspace = true
+scuttlebutt.workspace = true
+ocelot.workspace = true
+vectoreyes.workspace = true
 itertools.workspace = true
 rand.workspace = true
 regex.workspace = true

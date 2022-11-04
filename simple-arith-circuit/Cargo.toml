@@ -13,7 +13,7 @@ proptest = ["dep:proptest"]
 serde = ["dep:serde", "scuttlebutt/serde"]
 
 [dependencies]
-scuttlebutt = { workspace = true }
+scuttlebutt.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }

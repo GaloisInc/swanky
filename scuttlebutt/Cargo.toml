@@ -21,13 +21,13 @@ curve25519-dalek = { package = "curve25519-dalek-ng", workspace = true, optional
 rand.workspace = true
 rand_core.workspace = true
 rand_chacha = { workspace = true, optional = true }
-serde = { workspace = true }
+serde.workspace = true
 sha2.workspace = true
 subtle.workspace = true
 generic-array.workspace = true
 smallvec.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
-vectoreyes = { workspace = true }
+vectoreyes.workspace = true
 ndarray.workspace = true
 num-traits.workspace = true
 ff = { workspace = true, features = ["derive"], optional = true }
