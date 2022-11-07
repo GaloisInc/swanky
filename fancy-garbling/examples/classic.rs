@@ -143,6 +143,12 @@ impl HasParseSkcd<Circuit> for Circuit {
         // };
         // circ.const_refs.push(oneref);
 
+        // TODO(interstellar)? parser.rs "Process outputs."
+        for i in 0..skcd.m as usize {
+            let z = CircuitRef { ix: i, modulus: q };
+            circ_builder.output(&z).unwrap();
+        }
+
         // TODO(interstellar) how should we use skcd's a/b/go?
         for g in 0..skcd.q as usize {
             let skcd_input0 = *skcd.a.get(g).unwrap() as usize;
@@ -172,14 +178,14 @@ impl HasParseSkcd<Circuit> for Circuit {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
                     let z = circ_builder.or(&xref, &yref).unwrap();
-                    circ_builder.output(&z).unwrap();
+                    // circ_builder.output(&z).unwrap();
                 }
                 // "Xor is just addition, with the requirement that `x` and `y` are mod 2."
                 Ok(SkcdGateType::XOR) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
                     let z = circ_builder.xor(&xref, &yref).unwrap();
-                    circ_builder.output(&z).unwrap();
+                    // circ_builder.output(&z).unwrap();
 
                     // circ.gates.push(Gate::Add {
                     //     xref,
@@ -192,7 +198,7 @@ impl HasParseSkcd<Circuit> for Circuit {
                     // let y = inputs.get(skcd_input1).unwrap();
                     let z = circ_builder.and(&xref, &yref).unwrap();
                     let z = circ_builder.negate(&z).unwrap();
-                    circ_builder.output(&z).unwrap();
+                    // circ_builder.output(&z).unwrap();
                 }
                 _ => todo!(),
             }
@@ -248,7 +254,7 @@ fn main() {
 
     // TODO(interstellar) FIX: nb outputs SHOULD be == 120x52 = 6240; but 6341 for now!
     // possibly linked to  println!("output called"); in fancy-garbling/src/circuit.rs ?
-    writer.write_image_data(&data[0..6240]).unwrap(); // Save
+    writer.write_image_data(&data).unwrap(); // Save
 
     ////////////////////////////////////////////////////////////////////////////
 
