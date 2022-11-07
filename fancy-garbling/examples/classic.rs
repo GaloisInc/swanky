@@ -1,5 +1,5 @@
 use fancy_garbling::Fancy;
-use fancy_garbling::{circuit::Circuit, circuit::CircuitBuilder, classic::garble};
+use fancy_garbling::{circuit::Circuit, circuit::Gate, classic::garble};
 use std::convert::TryFrom;
 use std::time::SystemTime;
 
@@ -83,76 +83,121 @@ pub enum CircuitParserError {
     ParseGateError(String),
 }
 
-/// Parse a Protobuf-serialized .skcd file
-/// It is doing what fancy-garbling/src/parser.rs is doing for a "Blif Fashion" txt file,
-/// but for a .skcd instead.
-/// SKCD is essentially the same format, but with the gates written in a different order:
-/// - in "Bilf Fashion": gates are written "gate0_input0 gate0_input1 gate0_output gate0_type" etc
-/// - in SKCD: "gate0_input0 gate1_input0 gate2_input0" etc
-fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
-    use std::convert::TryInto;
+/// Additional method "parse_skcd" to fancy_garbling::circuit::Circuit
+/// We need a Trait b/c without it we only have access to CircuitBuilder and that
+/// is NOT enough; we MUST do like "pub fn parse" and that requires access to "circ.gates"
+/// which is not public in CircuitBuilder...
+pub trait HasParseSkcd<T> {
+    /// Parse a Protobuf-serialized .skcd file
+    /// It is doing what fancy-garbling/src/parser.rs is doing for a "Blif Fashion" txt file,
+    /// but for a .skcd instead.
+    /// SKCD is essentially the same format, but with the gates written in a different order:
+    /// - in "Bilf Fashion": gates are written "gate0_input0 gate0_input1 gate0_output gate0_type" etc
+    /// - in SKCD: "gate0_input0 gate1_input0 gate2_input0" etc
+    fn parse_skcd(buf: &[u8]) -> Result<T, CircuitParserError>;
+}
 
-    let mut buf = &*buf;
-    // TODO(interstellar) decode_length_delimited ?
-    let skcd: interstellarpbskcd::Skcd = prost::Message::decode(&mut buf).unwrap();
-    assert!(
-        skcd.a.len() == skcd.b.len()
-            && skcd.b.len() == skcd.go.len()
-            && skcd.go.len() == skcd.gt.len()
-            && skcd.gt.len() == skcd.q.try_into().unwrap(),
-        "number of gates inputs/outputs/types DO NOT match!"
-    );
-    println!("skcd : a = {}", skcd.a.len());
+impl HasParseSkcd<Circuit> for Circuit {
+    fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
+        use fancy_garbling::circuit::CircuitRef;
+        use std::convert::TryInto;
 
-    let mut circ_builder = CircuitBuilder::new();
+        let mut buf = &*buf;
+        // TODO(interstellar) decode_length_delimited ?
+        let skcd: interstellarpbskcd::Skcd = prost::Message::decode(&mut buf).unwrap();
+        assert!(
+            skcd.a.len() == skcd.b.len()
+                && skcd.b.len() == skcd.go.len()
+                && skcd.go.len() == skcd.gt.len()
+                && skcd.gt.len() == skcd.q.try_into().unwrap(),
+            "number of gates inputs/outputs/types DO NOT match!"
+        );
+        println!("skcd : a = {}", skcd.a.len());
 
-    // TODO(interstellar) modulus: what should we use??
-    let q = 2;
+        let mut circ = Circuit::new(Some(skcd.q.try_into().unwrap()));
 
-    // create a vec of [2,2,2..] containing skcd.n elements
-    // that is needed for "evaluator_inputs"
-    let mods = vec![2u16; skcd.n.try_into().unwrap()];
-    // TODO(interstellar) should we use "garbler_inputs" instead?
-    let inputs = circ_builder.evaluator_inputs(&mods);
-    // TODO(interstellar) pre-generate all gates(skcd.q)? other field?
-    // TODO(interstellar) parser: "Create a constant wire for negations."?
+        // TODO(interstellar) modulus: what should we use??
+        let q = 2;
 
-    // TODO(interstellar) how should we use skcd's a/b/go?
-    for g in 0..skcd.q as usize {
-        let skcd_input0 = *skcd.a.get(g).unwrap() as usize;
-        let skcd_input1 = *skcd.b.get(g).unwrap() as usize;
-        let skcd_output = skcd.go.get(g).unwrap();
-        let skcd_gate_type = *skcd.gt.get(g).unwrap();
-        // println!("Processing gate: {}", g);
+        // create a vec of [2,2,2..] containing skcd.n elements
+        // that is needed for "evaluator_inputs"
+        let mods = vec![2u16; skcd.n.try_into().unwrap()];
 
-        match skcd_gate_type.try_into() {
-            Ok(SkcdGateType::ZERO) => {
-                circ_builder.constant(0, q).unwrap();
-            }
-            Ok(SkcdGateType::OR) => {
-                let x = inputs.get(skcd_input0).unwrap();
-                let y = inputs.get(skcd_input1).unwrap();
-                let z = circ_builder.or(&x, &y).unwrap();
-                circ_builder.output(&z).unwrap();
-            }
-            Ok(SkcdGateType::XOR) => {
-                let x = inputs.get(skcd_input0).unwrap();
-                let y = inputs.get(skcd_input1).unwrap();
-                let z = circ_builder.xor(&x, &y).unwrap();
-                circ_builder.output(&z).unwrap();
-            }
-            Ok(SkcdGateType::NAND) => {
-                let x = inputs.get(skcd_input0).unwrap();
-                let y = inputs.get(skcd_input1).unwrap();
-                let z = circ_builder.and(&x, &y).unwrap();
-                let z = circ_builder.negate(&z).unwrap();
-                circ_builder.output(&z).unwrap();
-            }
-            _ => todo!(),
+        // TODO(interstellar) should we use "garbler_inputs" instead?
+        // let inputs = circ_builder.evaluator_inputs(&mods);
+        for i in 0..skcd.n as usize {
+            circ.gates.push(Gate::EvaluatorInput { id: i });
+            circ.evaluator_input_refs
+                .push(CircuitRef { ix: i, modulus: q });
         }
-    }
 
-    Ok(circ_builder.finish())
+        // TODO(interstellar) pre-generate all gates(skcd.q)? other field?
+
+        // TODO(interstellar) cf parser.rs: "Create a constant wire for negations."?
+        circ.gates.push(Gate::Constant { val: 1 });
+        let oneref = CircuitRef {
+            ix: skcd.n as usize,
+            modulus: q,
+        };
+        circ.const_refs.push(oneref);
+
+        // TODO(interstellar) how should we use skcd's a/b/go?
+        for g in 0..skcd.q as usize {
+            let skcd_input0 = *skcd.a.get(g).unwrap() as usize;
+            let skcd_input1 = *skcd.b.get(g).unwrap() as usize;
+            let skcd_output = *skcd.go.get(g).unwrap() as usize;
+            let skcd_gate_type = *skcd.gt.get(g).unwrap();
+            // println!("Processing gate: {}", g);
+
+            let xref = CircuitRef {
+                ix: skcd_input0,
+                modulus: 2,
+            };
+            let yref = CircuitRef {
+                ix: skcd_input1,
+                modulus: 2,
+            };
+
+            // cf "pub trait Fancy"(fancy.rs) for how to build eac htype of Gate
+            match skcd_gate_type.try_into() {
+                Ok(SkcdGateType::ZERO) => {
+                    // circ_builder.constant(0, q).unwrap();
+
+                    circ.gates.push(Gate::Constant { val: 0 })
+                }
+                // "Or uses Demorgan's Rule implemented with multiplication and negation."
+                Ok(SkcdGateType::OR) => {
+                    // let x = inputs.get(skcd_input0).unwrap();
+                    // let y = inputs.get(skcd_input1).unwrap();
+                    // let z = circ_builder.or(&x, &y).unwrap();
+                    // circ_builder.output(&z).unwrap();
+                }
+                // "Xor is just addition, with the requirement that `x` and `y` are mod 2."
+                Ok(SkcdGateType::XOR) => {
+                    // let x = inputs.get(skcd_input0).unwrap();
+                    // let y = inputs.get(skcd_input1).unwrap();
+                    // let z = circ_builder.xor(&x, &y).unwrap();
+                    // circ_builder.output(&z).unwrap();
+
+                    circ.gates.push(Gate::Add {
+                        xref,
+                        yref,
+                        out: Some(skcd_output),
+                    })
+                }
+                Ok(SkcdGateType::NAND) => {
+                    // let x = inputs.get(skcd_input0).unwrap();
+                    // let y = inputs.get(skcd_input1).unwrap();
+                    // let z = circ_builder.and(&x, &y).unwrap();
+                    // let z = circ_builder.negate(&z).unwrap();
+                    // circ_builder.output(&z).unwrap();
+                }
+                _ => todo!(),
+            }
+        }
+
+        Ok(circ)
+    }
 }
 
 fn main() {
@@ -171,7 +216,7 @@ fn main() {
     // read the whole file
     reader.read_to_end(&mut buffer).unwrap();
 
-    parse_skcd(&buffer).unwrap();
+    Circuit::parse_skcd(&buffer).unwrap();
 
     ////////////////////////////////////////////////////////////////////////////
 

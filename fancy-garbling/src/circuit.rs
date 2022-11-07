@@ -16,11 +16,12 @@ use itertools::Itertools;
 use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
+// TODO(interstellar) visibility modified! [fork the repo and use instead via [patch]]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct CircuitRef {
-    pub(crate) ix: usize,
-    pub(crate) modulus: u16,
+    pub ix: usize,
+    pub modulus: u16,
 }
 
 impl std::fmt::Display for CircuitRef {
@@ -36,14 +37,15 @@ impl HasModulus for CircuitRef {
 }
 
 /// Static representation of the type of computation supported by fancy garbling.
+// TODO(interstellar) visibility modified! [fork the repo and use instead via [patch]]
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Circuit {
-    pub(crate) gates: Vec<Gate>,
+    pub gates: Vec<Gate>,
     pub(crate) gate_moduli: Vec<u16>,
-    pub(crate) garbler_input_refs: Vec<CircuitRef>,
-    pub(crate) evaluator_input_refs: Vec<CircuitRef>,
-    pub(crate) const_refs: Vec<CircuitRef>,
+    pub garbler_input_refs: Vec<CircuitRef>,
+    pub evaluator_input_refs: Vec<CircuitRef>,
+    pub const_refs: Vec<CircuitRef>,
     pub(crate) output_refs: Vec<CircuitRef>,
     pub(crate) num_nonfree_gates: usize,
 }
@@ -52,9 +54,10 @@ pub struct Circuit {
 ///
 /// `id` represents the gate number. `out` gives the output wire index; if `out
 /// = None`, then we use the gate index as the output wire index.
+// TODO(interstellar) visibility modified! [fork the repo and use instead via [patch]]
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) enum Gate {
+pub enum Gate {
     GarblerInput {
         id: usize,
     },
