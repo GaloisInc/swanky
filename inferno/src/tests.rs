@@ -6,8 +6,11 @@ use scuttlebutt::{AesRng, Block};
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
 
+// The number of parties in the MPC
 const N: usize = 16;
+// The compression factor
 const K: usize = 8;
+// The number of repetitions
 const T: usize = 11;
 
 fn test<F: FiniteField>(
