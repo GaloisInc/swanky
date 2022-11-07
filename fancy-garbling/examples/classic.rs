@@ -206,7 +206,9 @@ fn main() {
     ////////////////////////////////////////////////////////////////////////////
 
     use std::convert::TryInto;
+    use std::fs::File;
     use std::io::BufReader;
+    use std::io::BufWriter;
     use std::io::Read;
 
     let f = std::fs::File::open(
@@ -224,8 +226,29 @@ fn main() {
     assert!(circ.num_evaluator_inputs() == 24);
     let outputs = circ.eval_plain(&[], &[0; 24]).unwrap();
 
+    let path = "eval_outputs.png";
+    let file = File::create(path).unwrap();
+    let ref mut w = BufWriter::new(file);
+
+    // TODO(interstellar) get from Circuit's "config"
+    let mut encoder = png::Encoder::new(w, 120, 52);
+    encoder.set_color(png::ColorType::Grayscale);
+    encoder.set_depth(png::BitDepth::Eight);
+
+    let mut writer = encoder.write_header().unwrap();
+
+    // let data = [255, 0, 0, 255, 0, 0, 0, 255]; // "An array containing a RGBA sequence. First pixel is red and second pixel is black."
+    let data: Vec<u8> = outputs
+        .iter()
+        .map(|v| {
+            let pixel_value: u8 = (*v).try_into().unwrap();
+            pixel_value * 255
+        })
+        .collect();
+
     // TODO(interstellar) FIX: nb outputs SHOULD be == 120x52 = 6240; but 6341 for now!
     // possibly linked to  println!("output called"); in fancy-garbling/src/circuit.rs ?
+    writer.write_image_data(&data[0..6240]).unwrap(); // Save
 
     ////////////////////////////////////////////////////////////////////////////
 
