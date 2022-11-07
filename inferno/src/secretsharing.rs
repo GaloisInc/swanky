@@ -250,14 +250,13 @@ impl<F: FiniteField, const N: usize> serde::Serialize for CorrectionSharing<F, N
         let nbytes = F::Serializer::serialized_size(N + 1);
         let mut bytes = Vec::with_capacity(nbytes);
         let mut cursor = std::io::Cursor::new(&mut bytes);
-        let mut ser = F::Serializer::new(&mut cursor).map_err(|e| Error::custom(e))?;
+        let mut ser = F::Serializer::new(&mut cursor).map_err(Error::custom)?;
         for share in self.shares {
-            ser.write(&mut cursor, share)
-                .map_err(|e| Error::custom(e))?;
+            ser.write(&mut cursor, share).map_err(Error::custom)?;
         }
         ser.write(&mut cursor, self.correction)
-            .map_err(|e| Error::custom(e))?;
-        ser.finish(&mut cursor).map_err(|e| Error::custom(e))?;
+            .map_err(Error::custom)?;
+        ser.finish(&mut cursor).map_err(Error::custom)?;
 
         let mut state = serializer.serialize_tuple_struct("Share", 1)?;
         state.serialize_field(&bytes)?;
@@ -295,7 +294,7 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Correction
                     Some(e) => e,
                     None => return Err(A::Error::missing_field("vector of bytes")),
                 };
-                if let Some(_) = seq.next_element::<u8>()? {
+                if seq.next_element::<u8>()?.is_some() {
                     return Err(A::Error::custom("extra field encountered"));
                 }
                 if bytes.len() != nbytes {
@@ -303,13 +302,13 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Correction
                 }
 
                 let mut cursor = std::io::Cursor::new(&bytes);
-                let mut de = F::Deserializer::new(&mut cursor).map_err(|e| Error::custom(e))?;
+                let mut de = F::Deserializer::new(&mut cursor).map_err(Error::custom)?;
 
                 let mut shares = CorrectionSharing::<F, N>::default();
                 for (_i, share) in shares.shares.iter_mut().enumerate() {
-                    *share = de.read(&mut cursor).map_err(|e| Error::custom(e))?;
+                    *share = de.read(&mut cursor).map_err(Error::custom)?;
                 }
-                shares.correction = de.read(&mut cursor).map_err(|e| Error::custom(e))?;
+                shares.correction = de.read(&mut cursor).map_err(Error::custom)?;
                 Ok(shares)
             }
         }

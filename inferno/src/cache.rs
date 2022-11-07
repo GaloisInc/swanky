@@ -21,7 +21,7 @@ pub struct Cache<F: FiniteField> {
     pub evaluators: RwLock<HashMap<usize, LagrangeEvaluator<F>>>,
     /// Map from chunk size to its associated Newton polynomial.
     pub newton_polys: RwLock<HashMap<usize, NewtonPolynomial<F>>>,
-    /// Map from a (chunk size, is final round) tuple to its associated Newton bases.
+    /// Map from (chunk size, is final round) tuple to its associated Newton bases.
     pub newton_bases: RwLock<HashMap<(usize, bool), Vec<Vec<F>>>>,
 }
 
