@@ -1,24 +1,31 @@
 [package]
 name = "diet-mac-and-cheese"
-authors = ["swanky authors <swanky@galois.com>"]
-version = "0.1.0"
-edition = "2021"
+readme = "README.md"
+description = "A diet version of the Mac'n'Cheese protocol"
+categories = ["cryptography"]
+keywords = ["cryptography", "zero-knowledge", "circuit"]
+autoexamples = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 
 [features]
 exe = ["clap/derive"]
 ff = ["scuttlebutt/ff"]
 
 [dependencies]
-rand = "0.8.5"
-clap = {version = "3.2.21", optional = true}
-generic-array = "0.14.4"
-log = "0.4.14"
-pretty_env_logger = "0.4"
-num-bigint = "0.3.0"
-num-traits = "0.2.12"
-scuttlebutt = { path = "../scuttlebutt" }
-ocelot = { path = "../ocelot" }
-zki_sieve = { git = "https://github.com/QED-it/zkinterface-ir.git", rev = "3368622bdf5306256e56826141517a3a34f8f85c"}
+rand.workspace = true
+clap = {workspace = true, optional = true}
+generic-array.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+scuttlebutt.workspace = true
+ocelot.workspace = true
+zki_sieve.workspace = true
 
 [[bin]]
 name = "dietmc_zki"

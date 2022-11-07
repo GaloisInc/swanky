@@ -56,7 +56,7 @@ pub struct Cli {
     pub connection_addr: String,
 
     /// Select lpn parameter
-    #[clap(arg_enum, default_value_t = DEFAULT_LPN, long)]
+    #[clap(value_enum, default_value_t = DEFAULT_LPN, long)]
     pub lpn: LpnSize,
 
     /// instance path
