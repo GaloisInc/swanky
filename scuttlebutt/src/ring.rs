@@ -182,6 +182,12 @@ macro_rules! ring_ops {
             }
         }
 
+        impl rand::distributions::Distribution<$f> for rand::distributions::Standard {
+            fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> $f {
+                <$f>::random(rng)
+            }
+        }
+
         $crate::serialization::serde_implementation!($f);
     };
 }
