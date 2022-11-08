@@ -10,7 +10,7 @@
 //! settings of these parameters.
 
 use crate::cache::Cache;
-use crate::proof_single::{ProofSingle, ProverSingle};
+use crate::proof_single::ProofSingle;
 use anyhow::anyhow;
 use rayon::prelude::*;
 use scuttlebutt::field::FiniteField;
@@ -56,9 +56,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
             .map(|(i, rng)| {
                 log::info!("Proof #{}", i + 1);
                 let time_ = std::time::Instant::now();
-                let mut prover =
-                    ProverSingle::new(circuit, witness, compression_factor, nrounds, rng);
-                let proof = prover.run(&cache);
+                let proof = ProofSingle::prove(circuit, witness, compression_factor, &cache, rng);
                 log::info!("Proof #{} time: {:?}", i + 1, time_.elapsed());
                 proof
             })

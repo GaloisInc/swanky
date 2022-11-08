@@ -41,6 +41,203 @@ pub(crate) struct ProofSingle<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
+    pub fn prove(
+        circuit: &Circuit<F::PrimeField>,
+        witness: &[F::PrimeField],
+        compression_factor: usize,
+        cache: &Cache<F>,
+        rng: &mut AesRng,
+    ) -> Self {
+        let nrounds = crate::utils::nrounds(circuit, compression_factor);
+        let mut hashers = Hashers::new();
+        let mut commitments = vec![];
+
+        // Construct RNGs for each party.
+        let seeds: [u128; N] = (0..N)
+            .map(|_| rng.gen::<u128>())
+            .collect::<Vec<u128>>()
+            .try_into()
+            .unwrap(); // This `unwrap` will never fail.
+        let mut rngs = seeds.map(|seed| AesRng::from_seed(Block::from(seed)));
+
+        // Secret share the witness.
+        let ws: Vec<SecretSharing<F::PrimeField, N>> = witness
+            .iter()
+            .map(|w| SecretSharing::<F::PrimeField, N>::new(*w, &mut rngs))
+            .collect();
+
+        // Compute the sharing of the circuit itself.
+        let mut xs = Vec::with_capacity(circuit.nmuls());
+        let mut ys = Vec::with_capacity(circuit.nmuls());
+        let mut zs = Vec::with_capacity(circuit.nmuls());
+        let output = circuit.eval_secret_sharing(&ws, &mut xs, &mut ys, &mut zs, &mut rngs);
+
+        hashers.hash_round0(&ws, &zs);
+        let challenge = Self::challenge(&mut hashers, &mut commitments);
+
+        let mut shares = PartyShares::new(ws, zs, output, seeds);
+        let round0 = Round { xs, ys, z: None };
+        let mut round = round1(round0, &shares.mults, challenge);
+        // If we have no multiplication gates, then we have no compression to do.
+        if nrounds > 0 {
+            for i in 0..=nrounds {
+                round = Self::round_compress_start(
+                    round,
+                    compression_factor,
+                    &mut hashers,
+                    &mut shares,
+                    i == nrounds,
+                    cache,
+                    &mut rngs,
+                );
+                let challenge = Self::challenge(&mut hashers, &mut commitments);
+                round = round_compress_finish::<SecretSharing<F, N>, F, N>(
+                    round,
+                    &shares.rands,
+                    shares.hs.last().unwrap(),
+                    challenge,
+                    compression_factor,
+                    i == nrounds,
+                    cache,
+                );
+            }
+        }
+        let output = OutputShares::new(round, shares.output);
+        // Figure out which party will not be opened.
+        let id = hashers.extract_unopened_party(None, N);
+        log::debug!("Party ID: {}", id);
+        // Gather info for the unopened party.
+        let unopened = UnopenedParty::new(id, &commitments, hashers.hash_of_id(id));
+        // Provide shares for all the opened parties.
+        let shares = shares.extract(id);
+        // And that's our proof!
+        ProofSingle {
+            output,
+            shares,
+            unopened,
+        }
+    }
+
+    fn challenge(hashers: &mut Hashers<N>, commitments: &mut Vec<[Hash; N]>) -> F {
+        let challenge = hashers.extract_challenge(None);
+        log::debug!("Challenge: {:?}", challenge);
+        commitments.push(hashers.hashes());
+        challenge
+    }
+
+    // This round is only run by the prover.
+    fn round_compress_start(
+        round: Round<SecretSharing<F, N>>,
+        k: usize, // The compression factor
+        hashers: &mut Hashers<N>,
+        shares: &mut PartyShares<F, N>,
+        final_round: bool, // If `true` then run `Π_CompressRand`.
+        cache: &Cache<F>,
+        rngs: &mut [AesRng; N],
+    ) -> Round<SecretSharing<F, N>> {
+        let dimension = (round.xs.len() as f32 / k as f32).ceil() as usize;
+        log::debug!(
+            "{}Compressing length {} vector by {} ⟶  {dimension}",
+            if final_round { "[Final Round] " } else { "" },
+            round.xs.len(),
+            k
+        );
+        let k = round.xs.chunks(dimension).count();
+
+        // Build `f` and `g` polynomials according to `Π_Compress[Rand]`.
+        log::debug!(
+            "Defining {} dimension-{} vectors of degree-{} polynomials",
+            k,
+            dimension,
+            k - 1
+        );
+
+        let nchunks = if final_round { k + 1 } else { k };
+        let top = if final_round { 2 * k + 1 } else { 2 * k - 1 };
+
+        // Construct `c` and `h` sharings according to Steps 2, 3, and 5.
+        let mut sum = F::ZERO;
+        let mut hshares = vec![SecretSharing::<F, N>::default(); top];
+        for (i, (left, right)) in round
+            .xs
+            .chunks(dimension)
+            .take(k - 1)
+            .zip(round.ys.chunks(dimension).take(k - 1))
+            .enumerate()
+        {
+            let c = SecretSharing::<F, N>::dot(left, right);
+            sum += c;
+            hshares[i] = SecretSharing::<F, N>::new(c, rngs);
+            hashers.hash_sharing(&hshares[i]);
+        }
+        hshares[k - 1] = SecretSharing::<F, N>::new(round.z.unwrap().secret() - sum, rngs);
+        hashers.hash_sharing(&hshares[k - 1]);
+
+        let mut rand_shares = if final_round {
+            Vec::with_capacity(dimension)
+        } else {
+            vec![]
+        };
+        let mut random = (SecretSharing::default(), SecretSharing::default());
+        let mut dots = vec![F::ZERO; top - k];
+        let mut f_i = vec![F::ZERO; nchunks];
+        let mut g_i = vec![F::ZERO; nchunks];
+        let newton_polys = cache.newton_polys.read();
+        let newton_bases = cache.newton_bases.read();
+        let poly = newton_polys.get(&nchunks).unwrap();
+        let bases = newton_bases.get(&(k, final_round)).unwrap();
+        for i in 0..dimension {
+            if final_round {
+                random = (SecretSharing::random(rngs), SecretSharing::random(rngs));
+            }
+            // Polynomial `f_i` is a degree `k-1` polynomial defined by the points `(j, x_i[j])`.
+            for (j, chunk) in round.xs.chunks(dimension).enumerate() {
+                f_i[j] = if i < chunk.len() {
+                    chunk[i].secret()
+                } else {
+                    F::ZERO
+                };
+            }
+            if final_round {
+                f_i[k] = random.0.secret();
+            }
+            poly.interpolate_in_place(&mut f_i[0..nchunks]);
+            // Polynomial `g_i` is a degree `k-1` polynomial defined by the points `(j, y_i[j])`.
+            for (j, chunk) in round.ys.chunks(dimension).enumerate() {
+                g_i[j] = if i < chunk.len() {
+                    chunk[i].secret()
+                } else {
+                    F::ZERO
+                };
+            }
+            if final_round {
+                g_i[k] = random.1.secret();
+            }
+            poly.interpolate_in_place(&mut g_i[0..nchunks]);
+            // Iteratively compute the dot product of `f_i(u)` and `g_i(u)`.
+            for (j, basis) in bases.iter().enumerate() {
+                dots[j] += poly.eval_with_basis_polynomial(basis, &f_i)
+                    * poly.eval_with_basis_polynomial(basis, &g_i);
+            }
+            if final_round {
+                rand_shares.push(random);
+            }
+        }
+        for (i, h_u) in dots.into_iter().enumerate() {
+            hshares[k + i] = SecretSharing::<F, N>::new(h_u, rngs);
+            hashers.hash_sharing(&hshares[k + i]);
+        }
+        shares.add_hs(hshares);
+        if final_round {
+            shares.set_rands(rand_shares);
+        }
+        Round {
+            xs: round.xs,
+            ys: round.ys,
+            z: None,
+        }
+    }
+
     /// Verify the proof. This checks that:
     /// 1. The outputs of the MPC parties are correct.
     /// 2. The shares of the opened parties are correct.
@@ -206,7 +403,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
         // We do this by running the protocol on these reconstructed values
         // and seeing whether we get the correct result at the end.
         let round0 = Round { xs, ys, z: None };
-        let mut round = round1(&round0, &mults, c);
+        let mut round = round1(round0, &mults, c);
         // If we have no multiplication gates, then we have no rounds, in which
         // case we don't need to do this processing. So only do it if we have more
         // than zero rounds.
@@ -229,7 +426,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
                 let c = hashers.extract_challenge(Some((unopened.id, Hash::from(*com))));
                 log::debug!("Challenge: {:?}", c);
                 round = round_compress_finish(
-                    &round_,
+                    round_,
                     &self.rands,
                     hs,
                     c,
@@ -252,7 +449,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
             )));
             log::debug!("Challenge: {:?}", c);
             round =
-                round_compress_finish(&round_, &self.rands, hs, c, compression_factor, true, cache);
+                round_compress_finish(round_, &self.rands, hs, c, compression_factor, true, cache);
         }
         // Now we derive the unopened party ID again using Fiat-Shamir.
         let id = hashers.extract_unopened_party(Some((unopened.id, Hash::from(unopened.trace))), N);
@@ -290,265 +487,9 @@ impl UnopenedParty {
     }
 }
 
-// The state of the prover for any given round of the protocol.
-enum ProverSingleState<F: FiniteField, const N: usize> {
-    Init(Round<SecretSharing<F::PrimeField, N>>),
-    Next(Round<SecretSharing<F, N>>),
-    Finished,
-}
-
-// The prover for a single execution of the Limbo protocol.
-pub(crate) struct ProverSingle<F: FiniteField, const N: usize> {
-    // The compression factor.
-    k: usize,
-    // The number of compression rounds.
-    nrounds: usize,
-    // What round are we on currently.
-    niters: usize,
-    // The hashers for each of the `N` MPC parties.
-    hashers: Hashers<N>,
-    // The shares of each MPC party.
-    shares: PartyShares<F, N>,
-    // What state of the protocol are we in.
-    state: ProverSingleState<F, N>,
-    // The "commitments" of each party at each step of the protocol.
-    // In reality, these correspond to the hashes of that party's trace up to
-    // the given point.
-    commitments: Vec<[Hash; N]>,
-    // The RNGs used for generating shares of each party.
-    rngs: [AesRng; N],
-}
-
-impl<F: FiniteField, const N: usize> ProverSingle<F, N> {
-    /// Start a new prover for `circuit` and `witness`, using the given compression factor.
-    pub fn new(
-        circuit: &Circuit<F::PrimeField>,
-        witness: &[F::PrimeField],
-        compression_factor: usize,
-        nrounds: usize,
-        rng: &mut AesRng,
-    ) -> Self {
-        let mut hashers = Hashers::new();
-        let seeds: [u128; N] = (0..N)
-            .map(|_| rng.gen::<u128>())
-            .collect::<Vec<u128>>()
-            .try_into()
-            .unwrap(); // This `unwrap` will never fail.
-        let mut rngs = seeds.map(|seed| AesRng::from_seed(Block::from(seed)));
-        // Secret share the witness.
-        let ws: Vec<SecretSharing<F::PrimeField, N>> = witness
-            .iter()
-            .map(|w| SecretSharing::<F::PrimeField, N>::new(*w, &mut rngs))
-            .collect();
-        // Compute the sharing of the circuit itself.
-        let mut xs = Vec::with_capacity(circuit.nmuls());
-        let mut ys = Vec::with_capacity(circuit.nmuls());
-        let mut zs = Vec::with_capacity(circuit.nmuls());
-        let output = circuit.eval_secret_sharing(&ws, &mut xs, &mut ys, &mut zs, &mut rngs);
-        hashers.hash_round0(&ws, &zs);
-        let shares = PartyShares::new(ws, zs, output, seeds);
-        let round0 = Round { xs, ys, z: None };
-        Self {
-            k: compression_factor,
-            nrounds,
-            niters: 0,
-            hashers,
-            shares,
-            state: ProverSingleState::Init(round0),
-            commitments: vec![],
-            rngs,
-        }
-    }
-
-    /// Run the prover.
-    pub fn run(&mut self, cache: &Cache<F>) -> ProofSingle<F, N> {
-        // Run the MPC protocol.
-        let mut output = None;
-        while output.is_none() {
-            output = self.next(cache);
-        }
-        // The MPC protocol is complete. Now, collect the necessary information for constructing the proof.
-        let output = output.unwrap(); // This `unwrap` will never fail.
-
-        // Figure out which party will not be opened.
-        let id = self.hashers.extract_unopened_party(None, N);
-        log::debug!("Party ID: {}", id);
-        // Gather info for the unopened party.
-        let unopened = UnopenedParty::new(id, &self.commitments, self.hashers.hash_of_id(id));
-        // Provide shares for all the opened parties.
-        let shares = self.shares.extract(id);
-        // And that's our proof!
-        ProofSingle {
-            output,
-            shares,
-            unopened,
-        }
-    }
-
-    /// Run the next step of the proof. Upon proof completion, this outputs a
-    /// `ProverSingleOutput` object containing the output to be sent to the verifier.
-    /// Otherwise, it outputs `None`, meaning `next` should continue to be called.
-    fn next(&mut self, cache: &Cache<F>) -> Option<OutputShares<F, N>> {
-        // Figure out the challenge.
-        let challenge = self.hashers.extract_challenge(None);
-        log::debug!("Challenge: {:?}", challenge);
-        // Store the current hashes of each party trace as commitments.
-        self.commitments.push(self.hashers.hashes());
-        let round = match &self.state {
-            ProverSingleState::Init(round) => {
-                let round = round1(round, &self.shares.mults, challenge);
-                // This happens if the circuit has _no_ multiplication gates
-                if self.niters == self.nrounds {
-                    return self.finish(round);
-                }
-                round
-            }
-            ProverSingleState::Next(round) => {
-                let round = round_compress_finish::<SecretSharing<F, N>, F, N>(
-                    round,
-                    &self.shares.rands,
-                    self.shares.hs.last().unwrap(),
-                    challenge,
-                    self.k,
-                    self.niters == self.nrounds,
-                    cache,
-                );
-                if self.niters == self.nrounds {
-                    return self.finish(round);
-                }
-                self.niters += 1;
-                round
-            }
-            ProverSingleState::Finished => unreachable!("No more rounds to process"),
-        };
-        let round = self.round_compress_start(round, self.niters == self.nrounds, cache);
-        self.state = ProverSingleState::Next(round);
-        None
-    }
-
-    fn finish(&mut self, round: Round<SecretSharing<F, N>>) -> Option<OutputShares<F, N>> {
-        self.state = ProverSingleState::Finished;
-        Some(OutputShares::new(round, self.shares.output))
-    }
-
-    fn round_compress_start(
-        &mut self,
-        round: Round<SecretSharing<F, N>>,
-        // If `true` then run `Π_CompressRand`.
-        final_round: bool,
-        cache: &Cache<F>,
-    ) -> Round<SecretSharing<F, N>> {
-        let dimension = (round.xs.len() as f32 / self.k as f32).ceil() as usize;
-        log::debug!(
-            "{}Compressing length {} vector by {} ⟶  {dimension}",
-            if final_round { "[Final Round] " } else { "" },
-            round.xs.len(),
-            self.k
-        );
-        let k = round.xs.chunks(dimension).count();
-
-        // Build `f` and `g` polynomials according to `Π_Compress[Rand]`.
-        log::debug!(
-            "Defining {} dimension-{} vectors of degree-{} polynomials",
-            k,
-            dimension,
-            k - 1
-        );
-
-        let nchunks = if final_round { k + 1 } else { k };
-        let top = if final_round { 2 * k + 1 } else { 2 * k - 1 };
-
-        // Construct `c` and `h` sharings according to Steps 2, 3, and 5.
-        let mut sum = F::ZERO;
-        let mut hshares = vec![SecretSharing::<F, N>::default(); top];
-        for (i, (left, right)) in round
-            .xs
-            .chunks(dimension)
-            .take(k - 1)
-            .zip(round.ys.chunks(dimension).take(k - 1))
-            .enumerate()
-        {
-            let c = SecretSharing::<F, N>::dot(left, right);
-            sum += c;
-            hshares[i] = SecretSharing::<F, N>::new(c, &mut self.rngs);
-            self.hashers.hash_sharing(&hshares[i]);
-        }
-        hshares[k - 1] =
-            SecretSharing::<F, N>::new(round.z.unwrap().secret() - sum, &mut self.rngs);
-        self.hashers.hash_sharing(&hshares[k - 1]);
-
-        let mut rand_shares = if final_round {
-            Vec::with_capacity(dimension)
-        } else {
-            vec![]
-        };
-        let mut random = (SecretSharing::default(), SecretSharing::default());
-        let mut dots = vec![F::ZERO; top - k];
-        let mut f_i = vec![F::ZERO; nchunks];
-        let mut g_i = vec![F::ZERO; nchunks];
-        let newton_polys = cache.newton_polys.read();
-        let newton_bases = cache.newton_bases.read();
-        let poly = newton_polys.get(&nchunks).unwrap();
-        let bases = newton_bases.get(&(k, final_round)).unwrap();
-        for i in 0..dimension {
-            if final_round {
-                random = (
-                    SecretSharing::random(&mut self.rngs),
-                    SecretSharing::random(&mut self.rngs),
-                );
-            }
-            // Polynomial `f_i` is a degree `k-1` polynomial defined by the points `(j, x_i[j])`.
-            for (j, chunk) in round.xs.chunks(dimension).enumerate() {
-                f_i[j] = if i < chunk.len() {
-                    chunk[i].secret()
-                } else {
-                    F::ZERO
-                };
-            }
-            if final_round {
-                f_i[k] = random.0.secret();
-            }
-            poly.interpolate_in_place(&mut f_i[0..nchunks]);
-            // Polynomial `g_i` is a degree `k-1` polynomial defined by the points `(j, y_i[j])`.
-            for (j, chunk) in round.ys.chunks(dimension).enumerate() {
-                g_i[j] = if i < chunk.len() {
-                    chunk[i].secret()
-                } else {
-                    F::ZERO
-                };
-            }
-            if final_round {
-                g_i[k] = random.1.secret();
-            }
-            poly.interpolate_in_place(&mut g_i[0..nchunks]);
-            // Iteratively compute the dot product of `f_i(u)` and `g_i(u)`.
-            for (j, basis) in bases.iter().enumerate() {
-                dots[j] += poly.eval_with_basis_polynomial(basis, &f_i)
-                    * poly.eval_with_basis_polynomial(basis, &g_i);
-            }
-            if final_round {
-                rand_shares.push(random);
-            }
-        }
-        for (i, h_u) in dots.into_iter().enumerate() {
-            hshares[k + i] = SecretSharing::<F, N>::new(h_u, &mut self.rngs);
-            self.hashers.hash_sharing(&hshares[k + i]);
-        }
-        self.shares.add_hs(hshares);
-        if final_round {
-            self.shares.set_rands(rand_shares);
-        }
-        Round {
-            xs: round.xs,
-            ys: round.ys,
-            z: None,
-        }
-    }
-}
-
 // This round is shared between the prover and verifier, hence why it exists as a standalone function.
 fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
-    round0: &Round<S::SelfWithPrimeField>,
+    round0: Round<S::SelfWithPrimeField>,
     mults: &[S::SelfWithPrimeField],
     challenge: F,
 ) -> Round<S> {
@@ -578,7 +519,7 @@ fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
 
 // This round is shared between the prover and verifier, hence why it exists as a standalone function.
 fn round_compress_finish<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
-    input: &Round<S>,
+    input: Round<S>,
     rands: &[(S, S)],
     hs: &[S],
     challenge: F,
@@ -740,10 +681,8 @@ mod tests {
                 fn serialize_bincode(seed in any_seed()) {
                     let mut rng = AesRng::from_seed(seed);
                     let (circuit, witness) = simple_arith_circuit::circuitgen::random_zero_circuit::<<$field as FiniteField>::PrimeField, AesRng>(10, 1000, &mut rng);
-                    let nrounds = crate::utils::nrounds(&circuit, K);
-                    let mut prover = ProverSingle::<$field, N>::new(&circuit, &witness, K, nrounds, &mut rng);
                     let cache = crate::cache::Cache::new(&circuit, K, true);
-                    let proof = prover.run(&cache);
+                    let proof = ProofSingle::<$field, N>::prove(&circuit, &witness, K, &cache, &mut rng);
                     let serialized = bincode::serialize(&proof).unwrap();
                     let proof: ProofSingle<$field, N> = bincode::deserialize(&serialized).unwrap();
                     let cache = crate::cache::Cache::new(&circuit, K, false);
