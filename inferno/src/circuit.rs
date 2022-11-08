@@ -4,7 +4,7 @@ use scuttlebutt::field::FiniteField;
 use simple_arith_circuit::{Circuit, Op};
 
 /// A trait for additional functionality for circuit execution needed by inferno.
-pub trait CircuitEvaluator<F: FiniteField, const N: usize> {
+pub(crate) trait CircuitEvaluator<F: FiniteField, const N: usize> {
     fn eval_secret_sharing<R: Rng + CryptoRng>(
         &self,
         inputs: &[SecretSharing<F, N>],

@@ -30,8 +30,9 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
     ///
     /// # Panics
     ///
-    /// `witness` must be of length equal to the number of inputs to `circuit`, and `circuit` must only
-    /// contain one output wire, otherwise this method panics.
+    /// Panics if (1) `witness` is not of length equal to the number of inputs to `circuit`,
+    /// (2) `circuit` does not contain exactly one output wire, and
+    /// (3) `N` is not a power of two.
     pub fn prove(
         circuit: &Circuit<F::PrimeField>,
         witness: &[F::PrimeField],
@@ -39,6 +40,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         repetitions: usize,
         rng: &mut AesRng,
     ) -> Self {
+        assert!(N.is_power_of_two());
         assert_eq!(witness.len(), circuit.ninputs());
         assert_eq!(circuit.noutputs(), 1);
         let time = std::time::Instant::now();
@@ -70,13 +72,15 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
     ///
     /// # Panics
     ///
-    /// `circuit` must contain only one output wire, otherwise this method panics.
+    /// Panics if (1) `circuit` does not contain only one output wire, or
+    /// (2) `N` is not a power of two.
     pub fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         repetitions: usize,
     ) -> anyhow::Result<()> {
+        assert!(N.is_power_of_two());
         assert_eq!(circuit.noutputs(), 1);
         let time = std::time::Instant::now();
         let cache = Cache::new(circuit, compression_factor, false);

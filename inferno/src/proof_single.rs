@@ -3,10 +3,11 @@
 use crate::{
     cache::Cache,
     circuit::CircuitEvaluator,
+    hashers::Hashers,
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
 use anyhow::anyhow;
-use blake3::{Hash, Hasher, OutputReader};
+use blake3::Hash;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::{field::FiniteField, AesRng, Block};
 use scuttlebutt::{ring::FiniteRing, serialization::serde_vec};
@@ -31,7 +32,7 @@ struct Round<F> {
 /// 2. The shares of the opened parties
 /// 3. The info needed to "process" the unopened party
 #[derive(Serialize, Deserialize)]
-pub struct ProofSingle<F: FiniteField, const N: usize> {
+pub(crate) struct ProofSingle<F: FiniteField, const N: usize> {
     #[serde(bound = "")] // Needed due to https://github.com/rust-lang/rust/issues/41617
     output: OutputShares<F, N>,
     #[serde(bound = "")] // Needed due to https://github.com/rust-lang/rust/issues/41617
@@ -67,7 +68,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
 /// All four of these pieces are provided in shared form, as they correspond to the values of
 /// each party in the MPC computation.
 #[derive(Serialize, Deserialize)]
-pub struct OutputShares<F: FiniteField, const N: usize> {
+pub(crate) struct OutputShares<F: FiniteField, const N: usize> {
     // TODO: We can make these serialize smaller by doing a manual vector serialization.
     #[serde(bound = "")]
     fs: Vec<CorrectionSharing<F, N>>,
@@ -140,7 +141,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
 
 // The secret shares of the parties opened as part of the verification check.
 #[derive(Serialize, Deserialize)]
-pub struct OpenedParties<F: FiniteField, const N: usize> {
+pub(crate) struct OpenedParties<F: FiniteField, const N: usize> {
     // The RNG seeds used for each party, with the seed of the unopened party
     // zero-ed out.
     // XXX: This is a `Vec<u128>` instead of a `[u128; N]` because deriving
@@ -267,7 +268,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
 
 /// Info necessary to "process" the unopened party when validating the proof.
 #[derive(Serialize, Deserialize)]
-pub struct UnopenedParty {
+pub(crate) struct UnopenedParty {
     // The index of this party
     id: usize,
     // The commitments, for each round of the protocol, associated with this party.
@@ -297,7 +298,7 @@ enum ProverSingleState<F: FiniteField, const N: usize> {
 }
 
 // The prover for a single execution of the Limbo protocol.
-pub struct ProverSingle<F: FiniteField, const N: usize> {
+pub(crate) struct ProverSingle<F: FiniteField, const N: usize> {
     // The compression factor.
     k: usize,
     // The number of compression rounds.
@@ -711,97 +712,6 @@ impl<F: FiniteField, const N: usize> PartyShares<F, N> {
 
     pub fn set_rands(&mut self, rands: Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>) {
         self.rands = rands;
-    }
-}
-
-// A collection of `N` `Hasher`s, one for each of the `N` parties in the MPC.
-struct Hashers<const N: usize>([Hasher; N]);
-
-impl<const N: usize> Hashers<N> {
-    pub fn new() -> Self {
-        let hashers = [(); N].map(|_| Hasher::new());
-        Self(hashers)
-    }
-
-    // Construct a hash output from the hash of each party's trace.
-    // If `unopened` is `None`, this corresponds to the prover.
-    // In this case we simply combine the hashes of each party.
-    // If `unopened` is `Some((id, com))`, we combine the hashes of each party
-    // _except_ the party corresponding to `id`. In this case, we use that party's
-    // `com` value instead.
-    fn output(&self, unopened: Option<(usize, Hash)>) -> OutputReader {
-        let mut hasher = Hasher::new();
-        let (unopened_id, unopened_hash) = match unopened {
-            Some((id, hash)) => (id, *hash.as_bytes()),
-            None => (usize::MAX, [0u8; 32]),
-        };
-        for (id, hasher_) in self.0.iter().enumerate() {
-            if id == unopened_id {
-                hasher.update(&unopened_hash);
-            } else {
-                hasher.update(hasher_.finalize().as_bytes());
-            }
-        }
-        hasher.finalize_xof()
-    }
-
-    /// Extract the ID of the party to _not_ open.
-    pub fn extract_unopened_party(&self, unopened: Option<(usize, Hash)>, n: usize) -> usize {
-        let mut output = self.output(unopened);
-        let mut result = [0u8; 1];
-        output.fill(&mut result);
-        let id: usize = result[0] as usize;
-        id % n
-    }
-
-    /// Extract a challenge field element.
-    pub fn extract_challenge<F: FiniteField>(&self, unopened: Option<(usize, Hash)>) -> F {
-        let mut output = self.output(unopened);
-        let mut result = [0u8; 16];
-        output.fill(&mut result);
-        F::from_uniform_bytes(&result)
-    }
-
-    /// Extract the hash of the trace for the given `id`.
-    ///
-    /// # Panics
-    /// Panics if `id >= N`.
-    pub fn hash_of_id(&self, id: usize) -> Hash {
-        assert!(id < N);
-        self.0[id].finalize()
-    }
-
-    /// Extract the hashes of the traces of all parties.
-    pub fn hashes(&self) -> [Hash; N] {
-        self.0
-            .iter()
-            .map(|h| h.finalize())
-            .collect::<Vec<Hash>>()
-            .try_into()
-            .unwrap() // This `unwrap` will never fail
-    }
-
-    /// Hash a `LinearSharing` into the existing hash state.
-    #[inline]
-    pub fn hash_sharing<S: LinearSharing<F, N>, F: FiniteField>(&mut self, share: &S) {
-        share.hash(&mut self.0)
-    }
-
-    /// Hash Round 0 of the protocol into the existing hash state.
-    pub fn hash_round0<S: LinearSharing<F, N>, F: FiniteField>(&mut self, ws: &[S], zs: &[S]) {
-        for w in ws.iter() {
-            self.hash_sharing(w);
-        }
-        for z in zs.iter() {
-            self.hash_sharing(z);
-        }
-    }
-
-    /// Hash Round i (!= 0) of the protocol into the existing hash state.
-    fn hash_round<S: LinearSharing<F, N>, F: FiniteField>(&mut self, hs: &[S]) {
-        for h in hs.iter() {
-            h.hash(&mut self.0);
-        }
     }
 }
 

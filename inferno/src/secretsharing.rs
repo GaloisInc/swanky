@@ -8,7 +8,7 @@ use scuttlebutt::field::FiniteField;
 use scuttlebutt::serialization::{SequenceDeserializer, SequenceSerializer};
 
 /// An evaluator for Lagrange polynomials.
-pub struct LagrangeEvaluator<F> {
+pub(crate) struct LagrangeEvaluator<F> {
     denominators: Vec<F>,
 }
 
@@ -61,7 +61,7 @@ impl<F: FiniteField> LagrangeEvaluator<F> {
 
 /// This trait defines an `N`-party linear secret sharing scheme
 /// over finite field `F`.
-pub trait LinearSharing<F: FiniteField, const N: usize>:
+pub(crate) trait LinearSharing<F: FiniteField, const N: usize>:
     'static
     + Default
     + Sized
@@ -90,7 +90,7 @@ pub trait LinearSharing<F: FiniteField, const N: usize>:
 /// A sharing with a separate correction value which, when all summed together, equals the
 /// underlying secret.
 #[derive(Debug, Clone, Copy, Hash)]
-pub struct CorrectionSharing<F: FiniteField, const N: usize> {
+pub(crate) struct CorrectionSharing<F: FiniteField, const N: usize> {
     shares: [F; N],
     correction: F,
 }
@@ -325,7 +325,7 @@ impl<'de, F: FiniteField, const N: usize> serde::Deserialize<'de> for Correction
 
 /// A `CorrectionSharing` along with its secret.
 #[derive(Debug, Clone, Copy, Hash)]
-pub struct SecretSharing<F: FiniteField, const N: usize> {
+pub(crate) struct SecretSharing<F: FiniteField, const N: usize> {
     shares: CorrectionSharing<F, N>,
     secret: F,
 }

@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 /// We wrap a bunch of these cached computations in a `RwLock` because each MPC-in-the-head
 /// execution is executed in a different thread.
 // TODO: There's probably a better way of doing this without using `RwLock`!
-pub struct Cache<F: FiniteField> {
+pub(crate) struct Cache<F: FiniteField> {
     /// Contains the points `g, g^2, ..., g^{2k}`, where `g` is the field generator
     /// and `k` is the compression factor.
     pub points: Vec<F>,
