@@ -49,8 +49,9 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         rng: &mut AesRng,
     ) -> Self {
         let nrounds = crate::utils::nrounds(circuit, compression_factor);
+        let nmuls = circuit.nmuls();
         let mut hashers = Hashers::new();
-        let mut commitments = vec![];
+        let mut commitments = Vec::with_capacity(nrounds + 2);
 
         // Construct RNGs for each party.
         let seeds: [u128; N] = (0..N)
@@ -67,15 +68,16 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             .collect();
 
         // Compute the sharing of the circuit itself.
-        let mut xs = Vec::with_capacity(circuit.nmuls());
-        let mut ys = Vec::with_capacity(circuit.nmuls());
-        let mut zs = Vec::with_capacity(circuit.nmuls());
+        let mut xs = Vec::with_capacity(nmuls);
+        let mut ys = Vec::with_capacity(nmuls);
+        let mut zs = Vec::with_capacity(nmuls);
         let output = circuit.eval_secret_sharing(&ws, &mut xs, &mut ys, &mut zs, &mut rngs);
-
+        // Hash Round 0 of the protocol and derive a challenge from the hashes.
         hashers.hash_round0(&ws, &zs);
         let challenge = Self::challenge(&mut hashers, &mut commitments);
 
         let mut shares = PartyShares::new(ws, zs, output, seeds);
+        // Run Round 1 of the protocol.
         let round0 = Round { xs, ys, z: None };
         let mut round = round1(round0, &shares.mults, challenge);
         // If we have no multiplication gates, then we have no compression to do.
@@ -84,21 +86,21 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
                 round = Self::round_compress_start(
                     round,
                     compression_factor,
-                    &mut hashers,
-                    &mut shares,
                     i == nrounds,
                     cache,
+                    &mut hashers,
+                    &mut shares,
                     &mut rngs,
                 );
                 let challenge = Self::challenge(&mut hashers, &mut commitments);
                 round = round_compress_finish::<SecretSharing<F, N>, F, N>(
                     round,
-                    &shares.rands,
-                    shares.hs.last().unwrap(),
-                    challenge,
                     compression_factor,
                     i == nrounds,
                     cache,
+                    challenge,
+                    &shares.rands,
+                    shares.hs.last().unwrap(),
                 );
             }
         }
@@ -128,11 +130,11 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
     // This round is only run by the prover.
     fn round_compress_start(
         round: Round<SecretSharing<F, N>>,
-        k: usize, // The compression factor
-        hashers: &mut Hashers<N>,
-        shares: &mut PartyShares<F, N>,
+        k: usize,          // The compression factor.
         final_round: bool, // If `true` then run `Π_CompressRand`.
         cache: &Cache<F>,
+        hashers: &mut Hashers<N>,
+        shares: &mut PartyShares<F, N>,
         rngs: &mut [AesRng; N],
     ) -> Round<SecretSharing<F, N>> {
         let dimension = (round.xs.len() as f32 / k as f32).ceil() as usize;
@@ -254,6 +256,100 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             compression_factor,
             cache,
         ))
+    }
+}
+
+// This round is shared between the prover and verifier, hence why it exists as a standalone function.
+fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
+    round0: Round<S::SelfWithPrimeField>,
+    mults: &[S::SelfWithPrimeField],
+    challenge: F,
+) -> Round<S> {
+    // Lift the sharings into the superfield.
+    let mut sum = S::default();
+    let mut xs = vec![S::default(); round0.xs.len()];
+    let mut ys = vec![S::default(); round0.ys.len()];
+    let mut r = challenge;
+    for (i, ((x, y), z)) in round0
+        .xs
+        .iter()
+        .zip(round0.ys.iter())
+        .zip(mults.iter())
+        .enumerate()
+    {
+        sum += S::multiply_by_superfield(z, r);
+        xs[i] = S::multiply_by_superfield(x, r);
+        ys[i] = S::lift_into_superfield(y);
+        r *= r;
+    }
+    Round {
+        xs,
+        ys,
+        z: Some(sum),
+    }
+}
+
+// This round is shared between the prover and verifier, hence why it exists as a standalone function.
+fn round_compress_finish<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
+    input: Round<S>,
+    compression_factor: usize,
+    final_round: bool,
+    cache: &Cache<F>,
+    challenge: F,
+    rands: &[(S, S)],
+    hs: &[S],
+) -> Round<S> {
+    let dimension = (input.xs.len() as f32 / compression_factor as f32).ceil() as usize; // `ℓ` from the paper
+    let nchunks = input.xs.chunks(dimension).count();
+    let nchunks = if final_round { nchunks + 1 } else { nchunks };
+    let mut fs = vec![S::default(); dimension];
+    let mut gs = vec![S::default(); dimension];
+    let mut values = vec![S::default(); nchunks];
+    let mut polynomial = Vec::with_capacity(2 * nchunks - 1);
+    {
+        let lock = cache.evaluators.read();
+        let evaluator = lock.get(&nchunks).unwrap();
+        evaluator.basis_polynomial(&cache.points[0..nchunks], challenge, &mut polynomial);
+        for i in 0..dimension {
+            for (j, chunk) in input.xs.chunks(dimension).enumerate() {
+                values[j] = if i < chunk.len() {
+                    chunk[i]
+                } else {
+                    S::default()
+                };
+            }
+            if final_round {
+                *values.last_mut().unwrap() = rands[i].0;
+            }
+            fs[i] = evaluator.eval_with_basis_polynomial(&values[0..nchunks], &polynomial);
+            for (j, chunk) in input.ys.chunks(dimension).enumerate() {
+                values[j] = if i < chunk.len() {
+                    chunk[i]
+                } else {
+                    S::default()
+                };
+            }
+            if final_round {
+                *values.last_mut().unwrap() = rands[i].1;
+            }
+            gs[i] = evaluator.eval_with_basis_polynomial(&values[0..nchunks], &polynomial);
+        }
+    }
+    debug_assert_eq!(hs.len(), 2 * nchunks - 1);
+    let z = {
+        let lock = cache.evaluators.read();
+        let evaluator = lock.get(&(2 * nchunks - 1)).unwrap();
+        evaluator.basis_polynomial(
+            &cache.points[0..2 * nchunks - 1],
+            challenge,
+            &mut polynomial,
+        );
+        evaluator.eval_with_basis_polynomial(hs, &polynomial)
+    };
+    Round {
+        xs: fs,
+        ys: gs,
+        z: Some(z),
     }
 }
 
@@ -427,12 +523,12 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
                 log::debug!("Challenge: {:?}", c);
                 round = round_compress_finish(
                     round_,
-                    &self.rands,
-                    hs,
-                    c,
                     compression_factor,
                     false,
                     cache,
+                    c,
+                    &self.rands,
+                    hs,
                 );
             }
             // Last round!
@@ -449,7 +545,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
             )));
             log::debug!("Challenge: {:?}", c);
             round =
-                round_compress_finish(round_, &self.rands, hs, c, compression_factor, true, cache);
+                round_compress_finish(round_, compression_factor, true, cache, c, &self.rands, hs);
         }
         // Now we derive the unopened party ID again using Fiat-Shamir.
         let id = hashers.extract_unopened_party(Some((unopened.id, Hash::from(unopened.trace))), N);
@@ -484,100 +580,6 @@ impl UnopenedParty {
             commitments,
             trace: *hash.as_bytes(),
         }
-    }
-}
-
-// This round is shared between the prover and verifier, hence why it exists as a standalone function.
-fn round1<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
-    round0: Round<S::SelfWithPrimeField>,
-    mults: &[S::SelfWithPrimeField],
-    challenge: F,
-) -> Round<S> {
-    // Lift the sharings into the superfield.
-    let mut sum = S::default();
-    let mut xs = vec![S::default(); round0.xs.len()];
-    let mut ys = vec![S::default(); round0.ys.len()];
-    let mut r = challenge;
-    for (i, ((x, y), z)) in round0
-        .xs
-        .iter()
-        .zip(round0.ys.iter())
-        .zip(mults.iter())
-        .enumerate()
-    {
-        sum += S::multiply_by_superfield(z, r);
-        xs[i] = S::multiply_by_superfield(x, r);
-        ys[i] = S::lift_into_superfield(y);
-        r *= r;
-    }
-    Round {
-        xs,
-        ys,
-        z: Some(sum),
-    }
-}
-
-// This round is shared between the prover and verifier, hence why it exists as a standalone function.
-fn round_compress_finish<S: LinearSharing<F, N>, F: FiniteField, const N: usize>(
-    input: Round<S>,
-    rands: &[(S, S)],
-    hs: &[S],
-    challenge: F,
-    compression_factor: usize,
-    final_round: bool,
-    cache: &Cache<F>,
-) -> Round<S> {
-    let dimension = (input.xs.len() as f32 / compression_factor as f32).ceil() as usize; // `ℓ` from the paper
-    let nchunks = input.xs.chunks(dimension).count();
-    let nchunks = if final_round { nchunks + 1 } else { nchunks };
-    let mut fs = vec![S::default(); dimension];
-    let mut gs = vec![S::default(); dimension];
-    let mut values = vec![S::default(); nchunks];
-    let mut polynomial = Vec::with_capacity(2 * nchunks - 1);
-    {
-        let lock = cache.evaluators.read();
-        let evaluator = lock.get(&nchunks).unwrap();
-        evaluator.basis_polynomial(&cache.points[0..nchunks], challenge, &mut polynomial);
-        for i in 0..dimension {
-            for (j, chunk) in input.xs.chunks(dimension).enumerate() {
-                values[j] = if i < chunk.len() {
-                    chunk[i]
-                } else {
-                    S::default()
-                };
-            }
-            if final_round {
-                *values.last_mut().unwrap() = rands[i].0;
-            }
-            fs[i] = evaluator.eval_with_basis_polynomial(&values[0..nchunks], &polynomial);
-            for (j, chunk) in input.ys.chunks(dimension).enumerate() {
-                values[j] = if i < chunk.len() {
-                    chunk[i]
-                } else {
-                    S::default()
-                };
-            }
-            if final_round {
-                *values.last_mut().unwrap() = rands[i].1;
-            }
-            gs[i] = evaluator.eval_with_basis_polynomial(&values[0..nchunks], &polynomial);
-        }
-    }
-    debug_assert_eq!(hs.len(), 2 * nchunks - 1);
-    let z = {
-        let lock = cache.evaluators.read();
-        let evaluator = lock.get(&(2 * nchunks - 1)).unwrap();
-        evaluator.basis_polynomial(
-            &cache.points[0..2 * nchunks - 1],
-            challenge,
-            &mut polynomial,
-        );
-        evaluator.eval_with_basis_polynomial(hs, &polynomial)
-    };
-    Round {
-        xs: fs,
-        ys: gs,
-        z: Some(z),
     }
 }
 
