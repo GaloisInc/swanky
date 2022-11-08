@@ -1,0 +1,39 @@
+{n:3, m:2, q:9}
+skcd.a (9) vec![0, 0, 0, 0, 1, 7, 1, 7, 10]
+skcd.b (9) vec![0, 0, 0, 0, 0, 2, 0, 2, 9]
+skcd.go (9) vec![3, 4, 5, 6, 7, 8, 9, 10, 11]
+skcd.gt (9) vec![0, 0, 15, 15, 6, 6, 7, 7, 7]
+skcd.o (2) vec![8, 11]
+
+enum SkcdGateType {
+    ZERO = 0;
+    NOR = 1;
+    AANB = 2;
+    INVB = 3;
+    NAAB = 4;
+    INV = 5;
+    XOR = 6;
+    NAND = 7;
+    AND = 8;
+    XNOR = 9;
+    BUF = 10;
+    AONB = 11;
+    BUFB = 12;
+    NAOB = 13;
+    OR = 14;
+    ONE = 15;
+  };
+
+// useless? (ie not used for as input of other gates)
+3 = ZERO(0,0)
+4 = ZERO(0,0)
+5 = ONE(0,0)
+6 = ONE(0,0)
+
+// Sum = Cin xor A xor B
+7 = XOR(1,0)        // 7 = A xor B
+8 = XOR(7,2)        // 8 = 7 xor Cin
+
+9 = NAND(1,0)       // 9 = A nand B
+10 = NAND(7,2)      // 10 = 7 nand Cin
+11 = NAND(10,9)     // 11 = 10 nand 9

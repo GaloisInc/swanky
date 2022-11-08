@@ -33,14 +33,14 @@ enum SkcdGateType {
     NAND = 7,
     AND = 8,
     XNOR = 9,
-    BUF = 11,
+    BUF = 10,
     /// A-or-NOT-B?
-    AONB = 12,
-    BUFB = 13,
+    AONB = 11,
+    BUFB = 12,
     /// NOT-A-or-B?
-    NAOB = 14,
-    OR = 15,
-    ONE = 16,
+    NAOB = 13,
+    OR = 14,
+    ONE = 15,
 }
 
 impl TryFrom<i32> for SkcdGateType {
@@ -123,15 +123,17 @@ impl HasParseSkcd<Circuit> for Circuit {
 
         // create a vec of [2,2,2..] containing skcd.n elements
         // that is needed for "evaluator_inputs"
-        let mods = vec![2u16; skcd.n.try_into().unwrap()];
+        // let mods = vec![2u16; skcd.n.try_into().unwrap()];
 
         // TODO(interstellar) should we use "garbler_inputs" instead?
-        let inputs = circ_builder.evaluator_inputs(&mods);
-        // for i in 0..skcd.n as usize {
-        //     circ.gates.push(Gate::EvaluatorInput { id: i });
-        //     circ.evaluator_input_refs
-        //         .push(CircuitRef { ix: i, modulus: q });
-        // }
+        // let inputs = circ_builder.evaluator_inputs(&mods);
+        for i in 0..skcd.n as usize {
+            // circ.gates.push(Gate::EvaluatorInput { id: i });
+            // circ.evaluator_input_refs
+            //     .push(CircuitRef { ix: i, modulus: q });
+
+            circ_builder.evaluator_input(q);
+        }
 
         // TODO(interstellar) pre-generate all gates(skcd.q)? other field?
 
@@ -144,8 +146,19 @@ impl HasParseSkcd<Circuit> for Circuit {
         // circ.const_refs.push(oneref);
 
         // TODO(interstellar)? parser.rs "Process outputs."
-        for i in 0..skcd.m as usize {
-            let z = CircuitRef { ix: i, modulus: q };
+        // IMPORTANT: we MUST use skcd.o to set the CORRECT outputs
+        // eg for the 2 bits adder.skcd:
+        // - skcd.m = 1
+        // - skcd.o = [8,11]
+        // -> the 2 CORRECT outputs to be set are: [8,11]
+        // If we set the bad ones, we get "FancyError::UninitializedValue" in fancy-garbling/src/circuit.rs at "fn eval"
+        // eg L161 etc b/c the cache is not properly set
+        for o in skcd.o {
+            let z = CircuitRef {
+                ix: o as usize,
+                modulus: q,
+            };
+            // TODO put that in "outputs_refs" vec? and use it below?
             circ_builder.output(&z).unwrap();
         }
 
@@ -170,6 +183,11 @@ impl HasParseSkcd<Circuit> for Circuit {
             match skcd_gate_type.try_into() {
                 Ok(SkcdGateType::ZERO) => {
                     circ_builder.constant(0, q).unwrap();
+
+                    // circ.gates.push(Gate::Constant { val: 0 })
+                }
+                Ok(SkcdGateType::ONE) => {
+                    circ_builder.constant(1, q).unwrap();
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
@@ -217,10 +235,7 @@ fn main() {
     use std::io::BufWriter;
     use std::io::Read;
 
-    let f = std::fs::File::open(
-        "../../lib_garble/tests/data/display_message_120x52_2digits.skcd.pb.bin",
-    )
-    .unwrap();
+    let f = std::fs::File::open("../../lib_garble/tests/data/adder.skcd.pb.bin").unwrap();
     let mut reader = BufReader::new(f);
 
     let mut buffer = Vec::new();
@@ -229,32 +244,72 @@ fn main() {
 
     let circ = Circuit::parse_skcd(&buffer).unwrap();
 
-    assert!(circ.num_evaluator_inputs() == 24);
-    let outputs = circ.eval_plain(&[], &[0; 24]).unwrap();
+    // all_inputs/all_expected_outputs: standard full-adder 2 bits truth table(and expected results)
+    // input  i_bit1;
+    // input  i_bit2;
+    // input  i_carry;
+    let all_inputs = vec![
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [1, 1, 0],
+        [0, 0, 1],
+        [1, 0, 1],
+        [0, 1, 1],
+        [1, 1, 1],
+    ];
 
-    let path = "eval_outputs.png";
-    let file = File::create(path).unwrap();
-    let ref mut w = BufWriter::new(file);
+    // output o_sum;
+    // output o_carry;
+    let all_expected_outputs = [
+        [0, 0],
+        [1, 0],
+        [1, 0],
+        [0, 1],
+        [1, 0],
+        [0, 1],
+        [0, 1],
+        [1, 1],
+    ];
 
-    // TODO(interstellar) get from Circuit's "config"
-    let mut encoder = png::Encoder::new(w, 120, 52);
-    encoder.set_color(png::ColorType::Grayscale);
-    encoder.set_depth(png::BitDepth::Eight);
+    assert!(circ.num_evaluator_inputs() == 3);
+    for (i, inputs) in all_inputs.iter().enumerate() {
+        let outputs = circ.eval_plain(&[], inputs).unwrap();
+        if outputs == all_expected_outputs[i] {
+            println!("adder OK");
+        } else {
+            println!("adder FAIL!");
+        }
+    }
 
-    let mut writer = encoder.write_header().unwrap();
+    //////////////////////////////////
+    // TODO refactor "adder" as a test; and then add version with "display" and then write .png
 
-    // let data = [255, 0, 0, 255, 0, 0, 0, 255]; // "An array containing a RGBA sequence. First pixel is red and second pixel is black."
-    let data: Vec<u8> = outputs
-        .iter()
-        .map(|v| {
-            let pixel_value: u8 = (*v).try_into().unwrap();
-            pixel_value * 255
-        })
-        .collect();
+    // let path = "eval_outputs.png";
+    // let file = File::create(path).unwrap();
+    // let ref mut w = BufWriter::new(file);
 
-    // TODO(interstellar) FIX: nb outputs SHOULD be == 120x52 = 6240; but 6341 for now!
-    // possibly linked to  println!("output called"); in fancy-garbling/src/circuit.rs ?
-    writer.write_image_data(&data).unwrap(); // Save
+    // // TODO(interstellar) get from Circuit's "config"
+    // let mut encoder = png::Encoder::new(w, 120, 52);
+    // encoder.set_color(png::ColorType::Grayscale);
+    // encoder.set_depth(png::BitDepth::Eight);
+
+    // let mut writer = encoder.write_header().unwrap();
+
+    // // let data = [255, 0, 0, 255, 0, 0, 0, 255]; // "An array containing a RGBA sequence. First pixel is red and second pixel is black."
+    // let data: Vec<u8> = outputs
+    //     .iter()
+    //     .map(|v| {
+    //         let pixel_value: u8 = (*v).try_into().unwrap();
+    //         pixel_value * 255
+    //     })
+    //     .collect();
+
+    // // TODO(interstellar) FIX: nb outputs SHOULD be == 120x52 = 6240; but 6341 for now!
+    // // possibly linked to  println!("output called"); in fancy-garbling/src/circuit.rs ?
+    // writer.write_image_data(&data).unwrap(); // Save
+
+    //////////////////////////////////
 
     ////////////////////////////////////////////////////////////////////////////
 
