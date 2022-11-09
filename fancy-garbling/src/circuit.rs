@@ -42,11 +42,11 @@ impl HasModulus for CircuitRef {
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Circuit {
     pub gates: Vec<Gate>,
-    pub(crate) gate_moduli: Vec<u16>,
+    pub gate_moduli: Vec<u16>,
     pub garbler_input_refs: Vec<CircuitRef>,
     pub evaluator_input_refs: Vec<CircuitRef>,
     pub const_refs: Vec<CircuitRef>,
-    pub(crate) output_refs: Vec<CircuitRef>,
+    pub output_refs: Vec<CircuitRef>,
     pub(crate) num_nonfree_gates: usize,
 }
 

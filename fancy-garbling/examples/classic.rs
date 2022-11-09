@@ -1,4 +1,5 @@
 use fancy_garbling::circuit::CircuitBuilder;
+use fancy_garbling::circuit::CircuitRef;
 use fancy_garbling::Fancy;
 use fancy_garbling::{circuit::Circuit, circuit::Gate, classic::garble};
 use std::convert::TryFrom;
@@ -98,9 +99,81 @@ pub trait HasParseSkcd<T> {
     fn parse_skcd(buf: &[u8]) -> Result<T, CircuitParserError>;
 }
 
+/// TODO(interstellar)? Intermediate struct, that way wa can "impl Fancy for MyCircuit"
+/// which means we simply have to define the basics constant/add/sub/etc
+/// and the rest(xor, and, ...) are built onto of them
+// struct MyCircuit {
+//     circ: Circuit,
+// }
+
+// impl Fancy for MyCircuit {
+//     type Item: Clone + HasModulus;
+
+//     /// Errors which may be thrown by the users of Fancy.
+//     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
+
+//     /// Create a constant `x` with modulus `q`.
+//     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
+
+//     /// Add `x` and `y`.
+//     fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+
+//     /// Subtract `x` and `y`.
+//     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+
+//     /// Multiply `x` times the constant `c`.
+//     fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
+
+//     /// Multiply `x` and `y`.
+//     fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
+
+//     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
+//     ///
+//     /// Optional `tt` is useful for hiding the gate from the evaluator.
+//     fn proj(
+//         &mut self,
+//         x: &Self::Item,
+//         q: u16,
+//         tt: Option<Vec<u16>>,
+//     ) -> Result<Self::Item, Self::Error>;
+
+//     /// Process this wire as output. Some `Fancy` implementors dont actually *return*
+//     /// output, but they need to be involved in the process, so they can return `None`.
+//     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
+// }
+
+#[derive(Debug)]
+enum MyFancyError {}
+
+const MODULUS: u16 = 2;
+
+/// Xor is just addition, with the requirement that `x` and `y` are mod 2.
+fn fancy_xor(circ: &mut Circuit, x: &CircuitRef, y: &CircuitRef) -> CircuitRef {
+    // TODO(interstellar) fancy: output?
+    fancy_add(circ, x, y, None)
+}
+
+/// fancy.rs: "Negate by xoring `x` with `1`."
+fn fancy_negate(circ: &mut Circuit, x: &CircuitRef, oneref: &CircuitRef) -> CircuitRef {
+    fancy_xor(circ, x, oneref)
+}
+
+fn fancy_add(circ: &mut Circuit, x: &CircuitRef, y: &CircuitRef, out: Option<usize>) -> CircuitRef {
+    let gate = Gate::Add {
+        xref: *x,
+        yref: *y,
+        out: out,
+    };
+    circ.gates.push(gate);
+
+    CircuitRef {
+        ix: circ.gates.len(),
+        modulus: MODULUS,
+    }
+}
+
 impl HasParseSkcd<Circuit> for Circuit {
     fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
-        use fancy_garbling::circuit::CircuitRef;
         use std::convert::TryInto;
 
         let mut buf = &*buf;
@@ -115,35 +188,39 @@ impl HasParseSkcd<Circuit> for Circuit {
         );
         println!("skcd : a = {}", skcd.a.len());
 
-        // let mut circ = Circuit::new(Some(skcd.q.try_into().unwrap()));
-        let mut circ_builder = CircuitBuilder::new();
+        let mut circ = Circuit::new(Some(skcd.q.try_into().unwrap()));
 
         // TODO(interstellar) modulus: what should we use??
         let q = 2;
 
-        // create a vec of [2,2,2..] containing skcd.n elements
-        // that is needed for "evaluator_inputs"
-        // let mods = vec![2u16; skcd.n.try_into().unwrap()];
-
+        // parser.rs
         // TODO(interstellar) should we use "garbler_inputs" instead?
-        // let inputs = circ_builder.evaluator_inputs(&mods);
-        for i in 0..skcd.n as usize {
-            // circ.gates.push(Gate::EvaluatorInput { id: i });
-            // circ.evaluator_input_refs
-            //     .push(CircuitRef { ix: i, modulus: q });
+        let n1 = 0usize; // Number of garbler inputs
+        let n2 = skcd.n as usize; // Number of evaluator inputs
+        let n3 = skcd.m as usize; // Number of outputs
 
-            circ_builder.evaluator_input(q);
+        // TODO(interstellar) parser.rs: "Process garbler inputs."
+        for i in 0..n1 {
+            circ.gates.push(Gate::GarblerInput { id: i });
+            circ.garbler_input_refs
+                .push(CircuitRef { ix: i, modulus: q });
+        }
+        // parser.rs: "Process evaluator inputs."
+        for i in 0..n2 {
+            circ.gates.push(Gate::EvaluatorInput { id: i });
+            circ.evaluator_input_refs.push(CircuitRef {
+                ix: n1 + i,
+                modulus: q,
+            });
         }
 
-        // TODO(interstellar) pre-generate all gates(skcd.q)? other field?
-
-        // TODO(interstellar) cf parser.rs: "Create a constant wire for negations."?
-        // circ.gates.push(Gate::Constant { val: 1 });
-        // let oneref = CircuitRef {
-        //     ix: skcd.n as usize,
-        //     modulus: q,
-        // };
-        // circ.const_refs.push(oneref);
+        // TODO(interstellar) parser.rs: "Create a constant wire for negations."?
+        circ.gates.push(Gate::Constant { val: 1 });
+        let oneref = CircuitRef {
+            ix: n1 + n2,
+            modulus: q,
+        };
+        circ.const_refs.push(oneref);
 
         // TODO(interstellar)? parser.rs "Process outputs."
         // IMPORTANT: we MUST use skcd.o to set the CORRECT outputs
@@ -153,16 +230,25 @@ impl HasParseSkcd<Circuit> for Circuit {
         // -> the 2 CORRECT outputs to be set are: [8,11]
         // If we set the bad ones, we get "FancyError::UninitializedValue" in fancy-garbling/src/circuit.rs at "fn eval"
         // eg L161 etc b/c the cache is not properly set
-        for o in skcd.o {
-            let z = CircuitRef {
-                ix: o as usize,
-                modulus: q,
-            };
+        // TODO(interstellar) parser.rs proper wires?
+        for i in skcd.o {
+            // let z = CircuitRef {
+            //     ix: o as usize,
+            //     modulus: q,
+            // };
             // TODO put that in "outputs_refs" vec? and use it below?
-            circ_builder.output(&z).unwrap();
+            // circ_builder.output(&z).unwrap();
+
+            circ.output_refs.push(CircuitRef {
+                // TODO(interstellar) parser.rs proper wires?
+                // ix: nwires - n3 + i,
+                ix: i as usize,
+                modulus: q,
+            });
         }
 
         // TODO(interstellar) how should we use skcd's a/b/go?
+        let mut id = 0;
         for g in 0..skcd.q as usize {
             let skcd_input0 = *skcd.a.get(g).unwrap() as usize;
             let skcd_input1 = *skcd.b.get(g).unwrap() as usize;
@@ -182,12 +268,12 @@ impl HasParseSkcd<Circuit> for Circuit {
             // cf "pub trait Fancy"(fancy.rs) for how to build eac htype of Gate
             match skcd_gate_type.try_into() {
                 Ok(SkcdGateType::ZERO) => {
-                    circ_builder.constant(0, q).unwrap();
+                    // circ_builder.constant(0, q).unwrap();
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
                 Ok(SkcdGateType::ONE) => {
-                    circ_builder.constant(1, q).unwrap();
+                    // circ_builder.constant(1, q).unwrap();
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
@@ -195,14 +281,38 @@ impl HasParseSkcd<Circuit> for Circuit {
                 Ok(SkcdGateType::OR) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
-                    let z = circ_builder.or(&xref, &yref).unwrap();
+                    // let z = circ_builder.or(&xref, &yref).unwrap();
                     // circ_builder.output(&z).unwrap();
+
+                    // fn or(&mut self, x: &Self::Item, y: &Self::Item):
+                    // let notx = self.negate(x)?;
+                    // let noty = self.negate(y)?;
+                    // let z = self.and(&notx, &noty)?;
+                    // self.negate(&z)
+                    //
+                    let notx = fancy_negate(&mut circ, &xref, &oneref);
+                    let noty = fancy_negate(&mut circ, &yref, &oneref);
+                    // "And is just multiplication, with the requirement that `x` and `y` are mod 2."
+                    let z = Gate::Mul {
+                        xref: notx,
+                        yref: noty,
+                        id: id,
+                        // TODO(interstellar)
+                        // out: Some(out),
+                        out: None,
+                    };
+
+                    let zref = CircuitRef { ix: id, modulus: q };
+
+                    id += 1;
+
+                    fancy_negate(&mut circ, &zref, &oneref);
                 }
                 // "Xor is just addition, with the requirement that `x` and `y` are mod 2."
                 Ok(SkcdGateType::XOR) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
-                    let z = circ_builder.xor(&xref, &yref).unwrap();
+                    // let z = circ_builder.xor(&xref, &yref).unwrap();
                     // circ_builder.output(&z).unwrap();
 
                     // circ.gates.push(Gate::Add {
@@ -210,19 +320,39 @@ impl HasParseSkcd<Circuit> for Circuit {
                     //     yref,
                     //     out: Some(skcd_output),
                     // })
+
+                    fancy_xor(&mut circ, &xref, &yref);
                 }
                 Ok(SkcdGateType::NAND) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
-                    let z = circ_builder.and(&xref, &yref).unwrap();
-                    let z = circ_builder.negate(&z).unwrap();
+                    // let z = circ_builder.and(&xref, &yref).unwrap();
+                    // let z = circ_builder.negate(&z).unwrap();
                     // circ_builder.output(&z).unwrap();
+
+                    // "And is just multiplication, with the requirement that `x` and `y` are mod 2."
+                    let z = Gate::Mul {
+                        xref: xref,
+                        yref: yref,
+                        id: id,
+                        // TODO(interstellar)
+                        // out: Some(out),
+                        out: None,
+                    };
+
+                    let zref = CircuitRef { ix: id, modulus: q };
+
+                    id += 1;
+
+                    fancy_negate(&mut circ, &zref, &oneref);
                 }
                 _ => todo!(),
             }
         }
 
-        Ok(circ_builder.finish())
+        circ.gate_moduli = vec![q as u16; circ.gates.len()];
+
+        Ok(circ)
     }
 }
 
