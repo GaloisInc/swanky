@@ -32,7 +32,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
     ///
     /// Panics if (1) `witness` is not of length equal to the number of inputs to `circuit`,
     /// (2) `circuit` does not contain exactly one output wire, and
-    /// (3) `N` is not a power of two.
+    /// (3) `N` is not a power of two or `N > 256`.
     pub fn prove(
         circuit: &Circuit<F::PrimeField>,
         witness: &[F::PrimeField],
@@ -40,7 +40,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         repetitions: usize,
         rng: &mut AesRng,
     ) -> Self {
-        assert!(N.is_power_of_two());
+        assert!(N.is_power_of_two() && N <= 256);
         assert_eq!(witness.len(), circuit.ninputs());
         assert_eq!(circuit.noutputs(), 1);
         let time = std::time::Instant::now();
@@ -71,15 +71,18 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
     /// # Panics
     ///
     /// Panics if (1) `circuit` does not contain only one output wire, or
-    /// (2) `N` is not a power of two.
+    /// (2) `N` is not a power of two or `N > 256`.
     pub fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
         compression_factor: usize,
         repetitions: usize,
     ) -> anyhow::Result<()> {
-        assert!(N.is_power_of_two());
+        assert!(N.is_power_of_two() && N <= 256);
         assert_eq!(circuit.noutputs(), 1);
+        if !crate::utils::validate_parameters::<F>(N, compression_factor, repetitions) {
+            return Err(anyhow!("Invalid parameters: ({N}, {compression_factor}, {repetitions}) do not match acceptable settings"));
+        }
         let time = std::time::Instant::now();
         let cache = Cache::new(circuit, compression_factor, false);
         if self.proofs.len() != repetitions {
@@ -114,7 +117,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use scuttlebutt::field::{F61p, F64b};
+    use scuttlebutt::field::{F64b};
 
     const N: usize = 16;
     const K: usize = 8;
@@ -147,6 +150,5 @@ mod tests {
         };
     }
 
-    test_serialization!(serialization_f61p, F61p);
     test_serialization!(test_serialization_f64b, F64b);
 }

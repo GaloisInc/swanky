@@ -10,19 +10,20 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
-simple-arith-circuit = { workspace = true, features = ["serde"] }
-scuttlebutt = { workspace = true, features = ["serde"] }
-log.workspace = true
-rand.workspace = true
-simple_logger.workspace = true
-blake3.workspace = true
-serde = { workspace = true, features = ["derive"] }
-rayon.workspace = true
-parking_lot.workspace = true
-clap = { workspace = true, features = ["derive"] }
-snafu.workspace = true
-bincode.workspace = true
 anyhow.workspace = true
+bincode.workspace = true
+blake3.workspace = true
+clap = { workspace = true, features = ["derive"] }
+generic-array.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+rayon.workspace = true
+scuttlebutt = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+simple-arith-circuit = { workspace = true, features = ["serde"] }
+simple_logger.workspace = true
+snafu.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

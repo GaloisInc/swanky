@@ -1,6 +1,6 @@
 use crate::Proof;
 use proptest::prelude::*;
-use scuttlebutt::field::{F61p, F64b, FiniteField, F2};
+use scuttlebutt::field::{F64b, FiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{AesRng, Block};
 use simple_arith_circuit::Circuit;
@@ -11,7 +11,7 @@ const N: usize = 16;
 // The compression factor
 const K: usize = 8;
 // The number of repetitions
-const T: usize = 11;
+const T: usize = 40;
 
 fn test<F: FiniteField>(
     circuit: Circuit<F::PrimeField>,
@@ -69,7 +69,6 @@ macro_rules! test_circuits {
     };
 }
 
-test_circuits!(test_circuits_f61p, F61p);
 test_circuits!(test_circuits_f64b, F64b);
 
 #[test]
