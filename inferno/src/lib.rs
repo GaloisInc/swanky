@@ -6,6 +6,7 @@ mod circuit;
 mod hashers;
 mod proof;
 mod proof_single;
+mod round;
 mod secretsharing;
 mod utils;
 
