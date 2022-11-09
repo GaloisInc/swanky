@@ -83,17 +83,23 @@ impl<const N: usize> Hashers<N> {
         share.hash(&mut self.hashers)
     }
 
-    /// Hash Round 0 of the protocol into the existing hash state.
-    pub fn hash_round0<S: LinearSharing<F, N>, F: FiniteField>(&mut self, ws: &[S], zs: &[S]) {
-        for w in ws.iter() {
+    /// Hash the initial circuit sharing into the existing hash state.
+    /// The initial circuit sharing contains the sharing of the witness and
+    /// the sharings of the output of each multiplication gate.
+    pub fn hash_circuit_sharing<S: LinearSharing<F, N>, F: FiniteField>(
+        &mut self,
+        witness: &[S],
+        mults: &[S],
+    ) {
+        for w in witness.iter() {
             self.hash_sharing(w);
         }
-        for z in zs.iter() {
-            self.hash_sharing(z);
+        for m in mults.iter() {
+            self.hash_sharing(m);
         }
     }
 
-    /// Hash Round i (!= 0) of the protocol into the existing hash state.
+    /// Hash Round `i` of the protocol into the existing hash state.
     pub fn hash_round<S: LinearSharing<F, N>, F: FiniteField>(&mut self, hs: &[S]) {
         for h in hs.iter() {
             h.hash(&mut self.hashers);

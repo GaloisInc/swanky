@@ -28,19 +28,20 @@ struct Round<F> {
 /// the number of participants in the MPC.
 ///
 /// A proof contains:
-/// 1. The shares of the output of the prover
-/// 2. The shares of the opened parties
-/// 3. The info needed to "process" the unopened party
+/// 1. The shares of the output of the prover;
+/// 2. The shares of the opened parties; and
+/// 3. The info needed for the verifier to "process" the unopened party.
 #[derive(Serialize, Deserialize)]
 pub(crate) struct ProofSingle<F: FiniteField, const N: usize> {
     #[serde(bound = "")] // Needed due to https://github.com/rust-lang/rust/issues/41617
     output: OutputShares<F, N>,
     #[serde(bound = "")] // Needed due to https://github.com/rust-lang/rust/issues/41617
-    shares: OpenedParties<F, N>,
+    shares: OpenedPartiesShares<F, N>,
     unopened: UnopenedParty,
 }
 
 impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
+    /// Generate a proof that `circuit(witness) = 0`.
     pub fn prove(
         circuit: &Circuit<F::PrimeField>,
         witness: &[F::PrimeField],
@@ -72,14 +73,15 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         let mut ys = Vec::with_capacity(nmuls);
         let mut zs = Vec::with_capacity(nmuls);
         let output = circuit.eval_secret_sharing(&ws, &mut xs, &mut ys, &mut zs, &mut rngs);
-        // Hash Round 0 of the protocol and derive a challenge from the hashes.
-        hashers.hash_round0(&ws, &zs);
+        hashers.hash_circuit_sharing(&ws, &zs);
         let challenge = Self::challenge(&mut hashers, &mut commitments);
+        let mut rands = vec![];
+        let mut hs = vec![];
 
-        let mut shares = PartyShares::new(ws, zs, output, seeds);
+        // let mut shares = PartyShares::new(ws, zs, output, seeds);
         // Run Round 1 of the protocol.
         let round0 = Round { xs, ys, z: None };
-        let mut round = round1(round0, &shares.mults, challenge);
+        let mut round = round1(round0, &zs, challenge);
         // If we have no multiplication gates, then we have no compression to do.
         if nrounds > 0 {
             for i in 0..=nrounds {
@@ -89,7 +91,8 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
                     i == nrounds,
                     cache,
                     &mut hashers,
-                    &mut shares,
+                    &mut rands,
+                    &mut hs,
                     &mut rngs,
                 );
                 let challenge = Self::challenge(&mut hashers, &mut commitments);
@@ -99,19 +102,19 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
                     i == nrounds,
                     cache,
                     challenge,
-                    &shares.rands,
-                    shares.hs.last().unwrap(),
+                    &rands,
+                    hs.last().unwrap(),
                 );
             }
         }
-        let output = OutputShares::new(round, shares.output);
+        let output = OutputShares::new(round, output);
         // Figure out which party will not be opened.
         let id = hashers.extract_unopened_party(None, N);
         log::debug!("Party ID: {}", id);
         // Gather info for the unopened party.
         let unopened = UnopenedParty::new(id, &commitments, hashers.hash_of_id(id));
         // Provide shares for all the opened parties.
-        let shares = shares.extract(id);
+        let shares = OpenedPartiesShares::<F, N>::extract(ws, zs, hs, rands, seeds, id);
         // And that's our proof!
         ProofSingle {
             output,
@@ -134,7 +137,8 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         final_round: bool, // If `true` then run `Π_CompressRand`.
         cache: &Cache<F>,
         hashers: &mut Hashers<N>,
-        shares: &mut PartyShares<F, N>,
+        rands: &mut Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>,
+        hs: &mut Vec<Vec<SecretSharing<F, N>>>,
         rngs: &mut [AesRng; N],
     ) -> Round<SecretSharing<F, N>> {
         let dimension = (round.xs.len() as f32 / k as f32).ceil() as usize;
@@ -229,9 +233,9 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             hshares[k + i] = SecretSharing::<F, N>::new(h_u, rngs);
             hashers.hash_sharing(&hshares[k + i]);
         }
-        shares.add_hs(hshares);
+        hs.push(hshares);
         if final_round {
-            shares.set_rands(rand_shares);
+            *rands = rand_shares;
         }
         Round {
             xs: round.xs,
@@ -434,7 +438,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
 
 // The secret shares of the parties opened as part of the verification check.
 #[derive(Serialize, Deserialize)]
-pub(crate) struct OpenedParties<F: FiniteField, const N: usize> {
+pub(crate) struct OpenedPartiesShares<F: FiniteField, const N: usize> {
     // The RNG seeds used for each party, with the seed of the unopened party
     // zero-ed out.
     // XXX: This is a `Vec<u128>` instead of a `[u128; N]` because deriving
@@ -452,10 +456,54 @@ pub(crate) struct OpenedParties<F: FiniteField, const N: usize> {
     rands: Vec<(CorrectionSharing<F, N>, CorrectionSharing<F, N>)>,
 }
 
-impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
+impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
+    /// Extracts the party trace from the various views collected during the
+    /// execution of a prover for all parties but the one specified by `exclude`.
+    pub fn extract(
+        witness: Vec<SecretSharing<F::PrimeField, N>>,
+        mults: Vec<SecretSharing<F::PrimeField, N>>,
+        hs: Vec<Vec<SecretSharing<F, N>>>,
+        rands: Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>,
+        mut seeds: [u128; N],
+        exclude: usize,
+    ) -> Self {
+        assert!(exclude < N);
+        let mut witness_ = Vec::with_capacity(witness.len());
+        for w in witness.iter() {
+            witness_.push(w.correction());
+        }
+        let mut mults_ = Vec::with_capacity(mults.len());
+        for m in mults.iter() {
+            mults_.push(m.correction());
+        }
+        let mut hs_ = Vec::with_capacity(hs.len());
+        for hshares in hs.iter() {
+            let mut shares = Vec::with_capacity(hshares.len());
+            for h in hshares.iter() {
+                let arr = h.extract(exclude);
+                shares.push(arr);
+            }
+            hs_.push(shares);
+        }
+        let mut rands_ = Vec::with_capacity(rands.len());
+        for r in rands.iter() {
+            let arr0 = r.0.extract(exclude);
+            let arr1 = r.1.extract(exclude);
+            rands_.push((arr0, arr1));
+        }
+        seeds[exclude] = 0u128;
+        Self {
+            witness: witness_,
+            mults: mults_,
+            hs: hs_,
+            rands: rands_,
+            seeds: seeds.to_vec(),
+        }
+    }
+
     /// Checks that the shares are valid for the given circuit and the given
     /// unopened party.
-    fn verify(
+    pub fn verify(
         &self,
         circuit: &Circuit<F::PrimeField>,
         output: &OutputShares<F, N>,
@@ -489,7 +537,7 @@ impl<F: FiniteField, const N: usize> OpenedParties<F, N> {
             })
             .collect();
         // Hash the first round to derive the initial Fiat-Shamir challenge.
-        hashers.hash_round0(&witness, &mults);
+        hashers.hash_circuit_sharing(&witness, &mults);
         let c = hashers.extract_challenge(Some((unopened.id, Hash::from(unopened.commitments[0]))));
         log::debug!("Challenge: {:?}", c);
         // Compute the multiplication inputs from the reconstructed
@@ -580,81 +628,6 @@ impl UnopenedParty {
             commitments,
             trace: *hash.as_bytes(),
         }
-    }
-}
-
-// The secret shares for the protocol execution.
-struct PartyShares<F: FiniteField, const N: usize> {
-    witness: Vec<SecretSharing<F::PrimeField, N>>,
-    mults: Vec<SecretSharing<F::PrimeField, N>>,
-    hs: Vec<Vec<SecretSharing<F, N>>>,
-    rands: Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>,
-    output: SecretSharing<F::PrimeField, N>,
-    seeds: [u128; N],
-}
-
-impl<F: FiniteField, const N: usize> PartyShares<F, N> {
-    pub fn new(
-        witness: Vec<SecretSharing<F::PrimeField, N>>,
-        mults: Vec<SecretSharing<F::PrimeField, N>>,
-        output: SecretSharing<F::PrimeField, N>,
-        seeds: [u128; N],
-    ) -> Self {
-        Self {
-            witness,
-            mults,
-            output,
-            hs: vec![],
-            rands: vec![],
-            seeds,
-        }
-    }
-
-    /// Extracts the party trace from the various views collected during the
-    /// execution of a prover for all parties but the one specified by `exclude`.
-    // TODO: This should be `self` instead of `&self`.
-    pub fn extract(&self, exclude: usize) -> OpenedParties<F, N> {
-        assert!(exclude < N);
-        let mut witness = Vec::with_capacity(self.witness.len());
-        for w in self.witness.iter() {
-            witness.push(w.correction());
-        }
-        let mut mults = Vec::with_capacity(self.mults.len());
-        for m in self.mults.iter() {
-            mults.push(m.correction());
-        }
-        let mut hs = Vec::with_capacity(self.hs.len());
-        for hshares in self.hs.iter() {
-            let mut shares = Vec::with_capacity(hshares.len());
-            for h in hshares.iter() {
-                let arr = h.extract(exclude);
-                shares.push(arr);
-            }
-            hs.push(shares);
-        }
-        let mut rands = Vec::with_capacity(self.rands.len());
-        for r in self.rands.iter() {
-            let arr0 = r.0.extract(exclude);
-            let arr1 = r.1.extract(exclude);
-            rands.push((arr0, arr1));
-        }
-        let mut seeds = self.seeds;
-        seeds[exclude] = 0u128;
-        OpenedParties {
-            witness,
-            mults,
-            hs,
-            rands,
-            seeds: seeds.to_vec(),
-        }
-    }
-
-    pub fn add_hs(&mut self, hs: Vec<SecretSharing<F, N>>) {
-        self.hs.push(hs);
-    }
-
-    pub fn set_rands(&mut self, rands: Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>) {
-        self.rands = rands;
     }
 }
 
