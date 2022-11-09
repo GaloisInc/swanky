@@ -3,7 +3,7 @@
 use crate::{
     cache::Cache,
     circuit::CircuitEvaluator,
-    hashers::Hashers,
+    hashers::{Hashers, Party},
     round::{round1, round_compress_finish, round_compress_start, Round},
     secretsharing::{CorrectionSharing, LinearSharing, SecretSharing},
 };
@@ -69,8 +69,6 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         let mut rands = vec![];
         let mut hs = vec![];
 
-        // let mut shares = PartyShares::new(ws, zs, output, seeds);
-        // Run Round 1 of the protocol.
         let round0 = Round { xs, ys, z: None };
         let mut round = round1(round0, &zs, challenge);
         // If we have no multiplication gates, then we have no compression to do.
@@ -99,7 +97,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             }
         }
         let output = OutputShares::new(round, output);
-        let id = hashers.extract_unopened_party(None, N);
+        let id = hashers.extract_unopened_party(Party::Prover, N);
         log::debug!("Party ID: {}", id);
         let unopened = UnopenedParty::new(id, &commitments, hashers.hash_of_id(id));
         let shares = OpenedPartiesShares::<F, N>::extract(ws, zs, hs, rands, seeds, id);
@@ -111,7 +109,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
     }
 
     fn challenge(hashers: &mut Hashers<N>, commitments: &mut Vec<[Hash; N]>) -> F {
-        let challenge = hashers.extract_challenge(None);
+        let challenge = hashers.extract_challenge(Party::Prover);
         log::debug!("Challenge: {:?}", challenge);
         commitments.push(hashers.hashes());
         challenge
@@ -168,7 +166,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
         }
     }
 
-    /// Verify that the prover output is valid. This involes the following checks:
+    /// Verify that the prover output is valid. This involves the following checks:
     /// 1. The `output` shares reconstruct to `1`.
     /// 2. The `fs` and `gs` shares dot product to `h`.
     pub fn verify(&self) -> anyhow::Result<()> {
@@ -316,7 +314,10 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
             .collect();
         // Hash the first round to derive the initial Fiat-Shamir challenge.
         hashers.hash_circuit_sharing(&witness, &mults);
-        let c = hashers.extract_challenge(Some((unopened.id, Hash::from(unopened.commitments[0]))));
+        let c = hashers.extract_challenge(Party::Verifier((
+            unopened.id,
+            Hash::from(unopened.commitments[0]),
+        )));
         log::debug!("Challenge: {:?}", c);
         // Compute the multiplication inputs from the reconstructed
         // witness and reconstructed multiplication outputs.
@@ -345,7 +346,7 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
                     z: None,
                 };
                 hashers.hash_round(hs);
-                let c = hashers.extract_challenge(Some((unopened.id, Hash::from(*com))));
+                let c = hashers.extract_challenge(Party::Verifier((unopened.id, Hash::from(*com))));
                 log::debug!("Challenge: {:?}", c);
                 round = round_compress_finish(
                     round_,
@@ -365,7 +366,7 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
             };
             let hs = self.hs.last().unwrap();
             hashers.hash_round(hs);
-            let c = hashers.extract_challenge(Some((
+            let c = hashers.extract_challenge(Party::Verifier((
                 unopened.id,
                 Hash::from(*unopened.commitments.last().unwrap()),
             )));
@@ -374,7 +375,10 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
                 round_compress_finish(round_, compression_factor, true, cache, c, &self.rands, hs);
         }
         // Now we derive the unopened party ID again using Fiat-Shamir.
-        let id = hashers.extract_unopened_party(Some((unopened.id, Hash::from(unopened.trace))), N);
+        let id = hashers.extract_unopened_party(
+            Party::Verifier((unopened.id, Hash::from(unopened.trace))),
+            N,
+        );
         log::debug!("Party ID: {id}");
         if id != unopened.id {
             return Err(anyhow!("Incorrect party ID encountered"));
