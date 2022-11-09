@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "diet-mac-and-cheese",
     "fancy-garbling",
     "fancy-garbling/base_conversion",
     "humidor",
@@ -58,6 +59,7 @@ nix = "0.25.0"
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
 openssl = "0.10.42"
+pretty_env_logger = "0.4"
 proptest = "1.0.0"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
@@ -70,6 +72,7 @@ smallvec = "1.10.0"
 sprs = "0.11.0"
 subtle = "2.4.1"
 tempfile = "3.3.0"
+zki_sieve = { git = "https://github.com/QED-it/zkinterface-ir.git", rev = "3368622bdf5306256e56826141517a3a34f8f85c"}
 
 [profile.release]
 opt-level = 3

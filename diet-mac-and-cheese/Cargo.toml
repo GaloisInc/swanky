@@ -1,0 +1,33 @@
+[package]
+name = "diet-mac-and-cheese"
+readme = "README.md"
+description = "A diet version of the Mac'n'Cheese protocol"
+categories = ["cryptography"]
+keywords = ["cryptography", "zero-knowledge", "circuit"]
+autoexamples = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[features]
+exe = ["clap/derive"]
+ff = ["scuttlebutt/ff"]
+
+[dependencies]
+rand.workspace = true
+clap = {workspace = true, optional = true}
+generic-array.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+scuttlebutt.workspace = true
+ocelot.workspace = true
+zki_sieve.workspace = true
+
+[[bin]]
+name = "dietmc_zki"
+required-features = ["exe"]
+path = "bin/dietmc_zki.rs"
