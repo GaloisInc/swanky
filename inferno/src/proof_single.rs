@@ -69,6 +69,8 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         let mut rands = vec![];
         let mut hs = vec![];
 
+        // Run the protocol: Start by lifting the initial sharings into their extension field and then
+        // iteratively compress the multiplication check.
         let round0 = Round { xs, ys, z: None };
         let mut round = round1(round0, &zs, challenge);
         // If we have no multiplication gates, then we have no compression to do.
@@ -100,7 +102,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         let id = hashers.extract_unopened_party(Party::Prover, N);
         log::debug!("Party ID: {}", id);
         let unopened = UnopenedParty::new(id, &commitments, hashers.hash_of_id(id));
-        let shares = OpenedPartiesShares::<F, N>::extract(ws, zs, hs, rands, seeds, id);
+        let shares = OpenedPartiesShares::<F, N>::new(id, ws, zs, hs, rands, seeds);
         ProofSingle {
             output,
             shares,
@@ -124,15 +126,122 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
         compression_factor: usize,
         cache: &Cache<F>,
     ) -> anyhow::Result<()> {
-        self.output.verify().and(self.shares.verify(
-            circuit,
-            &self.output,
-            &self.unopened,
-            compression_factor,
-            cache,
-        ))
+        let nrounds = crate::utils::nrounds(circuit, compression_factor);
+        let mut rngs: [AesRng; N] = self
+            .shares
+            .seeds
+            .iter()
+            .map(|seed| AesRng::from_seed(Block::from(*seed)))
+            .collect::<Vec<AesRng>>()
+            .try_into()
+            .unwrap();
+        let mut hashers = Hashers::<N>::new();
+        // Reconstruct the witness from the correction values and rng seeds.
+        let witness: Vec<CorrectionSharing<F::PrimeField, N>> = self
+            .shares
+            .witness
+            .iter()
+            .map(|correction| {
+                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
+            })
+            .collect();
+        // Reconstruct the multiplication values from the correction values and rng seeds.
+        let mults: Vec<CorrectionSharing<F::PrimeField, N>> = self
+            .shares
+            .mults
+            .iter()
+            .map(|correction| {
+                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
+            })
+            .collect();
+        // Hash the first round to derive the initial Fiat-Shamir challenge.
+        hashers.hash_circuit_sharing(&witness, &mults);
+        let c = hashers.extract_challenge(Party::Verifier((
+            self.unopened.id,
+            Hash::from(self.unopened.commitments[0]),
+        )));
+        log::debug!("Challenge: {:?}", c);
+        // Compute the multiplication inputs from the reconstructed
+        // witness and reconstructed multiplication outputs.
+        let (xs, ys) = circuit.eval_trace(&witness, &mults);
+        // Now let's validate that these multiplication inputs are correct!
+        // We do this by running the protocol on these reconstructed values
+        // and seeing whether we get the correct result at the end.
+        let round0 = Round { xs, ys, z: None };
+        let mut round = round1(round0, &mults, c);
+        // If we have no multiplication gates, then we have no rounds, in which
+        // case we don't need to do this processing. So only do it if we have more
+        // than zero rounds.
+        if nrounds > 0 {
+            // Iterate through all but the last rounds, using the commitments
+            // of the unopened parties to help compute the Fiat-Shamir derived
+            // challenge.
+            for (hs, com) in self
+                .shares
+                .hs
+                .iter()
+                .take(nrounds)
+                .zip(self.unopened.commitments.iter().skip(1))
+            {
+                let round_ = Round {
+                    xs: round.xs,
+                    ys: round.ys,
+                    z: None,
+                };
+                hashers.hash_round(hs);
+                let c = hashers
+                    .extract_challenge(Party::Verifier((self.unopened.id, Hash::from(*com))));
+                log::debug!("Challenge: {:?}", c);
+                round = round_compress_finish(
+                    round_,
+                    compression_factor,
+                    false,
+                    cache,
+                    c,
+                    &self.shares.rands,
+                    hs,
+                );
+            }
+            // Last round!
+            let round_ = Round {
+                xs: round.xs,
+                ys: round.ys,
+                z: None,
+            };
+            let hs = self.shares.hs.last().unwrap();
+            hashers.hash_round(hs);
+            let c = hashers.extract_challenge(Party::Verifier((
+                self.unopened.id,
+                Hash::from(*self.unopened.commitments.last().unwrap()),
+            )));
+            log::debug!("Challenge: {:?}", c);
+            round = round_compress_finish(
+                round_,
+                compression_factor,
+                true,
+                cache,
+                c,
+                &self.shares.rands,
+                hs,
+            );
+        }
+        let id = hashers.extract_unopened_party(
+            Party::Verifier((self.unopened.id, Hash::from(self.unopened.trace))),
+            N,
+        );
+        log::debug!("Party ID: {id}");
+        if id != self.unopened.id {
+            return Err(anyhow!("Incorrect party ID encountered"));
+        }
+        // Check that the last round was computed correctly by verifying
+        // that they match the output shares.
+        self.output.verify_last_round(round, id)?;
+        // Finally, check that the output shares are valid.
+        self.output.verify()?;
+        Ok(())
     }
 }
+
 /// The output shares of the prover. This output contains four pieces of information:
 /// * `fs`, `gs`, and `h` correspond to the final dot product. For the proof to be valid
 /// it needs to hold that `dot(fs, gs) = h`.
@@ -154,7 +263,7 @@ pub(crate) struct OutputShares<F: FiniteField, const N: usize> {
 }
 
 impl<F: FiniteField, const N: usize> OutputShares<F, N> {
-    /// Construct an `OutputShares` object from the computations of a round
+    /// Construct an `OutputShares` object from the computations of the final round
     /// of the MPC-in-the-head protocol and the output shares of the protocol
     /// execution.
     fn new(round: Round<SecretSharing<F, N>>, output: SecretSharing<F::PrimeField, N>) -> Self {
@@ -167,7 +276,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     }
 
     /// Verify that the prover output is valid. This involves the following checks:
-    /// 1. The `output` shares reconstruct to `1`.
+    /// 1. The `output` shares reconstruct to `0`.
     /// 2. The `fs` and `gs` shares dot product to `h`.
     pub fn verify(&self) -> anyhow::Result<()> {
         let output = self.output.reconstruct();
@@ -189,7 +298,7 @@ impl<F: FiniteField, const N: usize> OutputShares<F, N> {
     ///
     /// # Panics
     /// Panics if `exclude >= N`.
-    fn verify_shares(
+    fn verify_last_round(
         &self,
         round: Round<CorrectionSharing<F, N>>,
         exclude: usize,
@@ -235,13 +344,13 @@ pub(crate) struct OpenedPartiesShares<F: FiniteField, const N: usize> {
 impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
     /// Extracts the party trace from the various views collected during the
     /// execution of a prover for all parties but the one specified by `exclude`.
-    pub fn extract(
+    pub fn new(
+        exclude: usize,
         witness: Vec<SecretSharing<F::PrimeField, N>>,
         mults: Vec<SecretSharing<F::PrimeField, N>>,
         hs: Vec<Vec<SecretSharing<F, N>>>,
         rands: Vec<(SecretSharing<F, N>, SecretSharing<F, N>)>,
         mut seeds: [u128; N],
-        exclude: usize,
     ) -> Self {
         assert!(exclude < N);
         let mut witness_ = Vec::with_capacity(witness.len());
@@ -276,123 +385,12 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
             seeds: seeds.to_vec(),
         }
     }
-
-    /// Checks that the shares are valid for the given circuit and the given
-    /// unopened party.
-    pub fn verify(
-        &self,
-        circuit: &Circuit<F::PrimeField>,
-        output: &OutputShares<F, N>,
-        unopened: &UnopenedParty,
-        compression_factor: usize,
-        cache: &Cache<F>,
-    ) -> anyhow::Result<()> {
-        let nrounds = crate::utils::nrounds(circuit, compression_factor);
-        let mut rngs: [AesRng; N] = self
-            .seeds
-            .iter()
-            .map(|seed| AesRng::from_seed(Block::from(*seed)))
-            .collect::<Vec<AesRng>>()
-            .try_into()
-            .unwrap();
-        let mut hashers = Hashers::<N>::new();
-        // Reconstruct the witness from the correction values and rng seeds.
-        let witness: Vec<CorrectionSharing<F::PrimeField, N>> = self
-            .witness
-            .iter()
-            .map(|correction| {
-                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
-            })
-            .collect();
-        // Reconstruct the multiplication values from the correction values and rng seeds.
-        let mults: Vec<CorrectionSharing<F::PrimeField, N>> = self
-            .mults
-            .iter()
-            .map(|correction| {
-                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
-            })
-            .collect();
-        // Hash the first round to derive the initial Fiat-Shamir challenge.
-        hashers.hash_circuit_sharing(&witness, &mults);
-        let c = hashers.extract_challenge(Party::Verifier((
-            unopened.id,
-            Hash::from(unopened.commitments[0]),
-        )));
-        log::debug!("Challenge: {:?}", c);
-        // Compute the multiplication inputs from the reconstructed
-        // witness and reconstructed multiplication outputs.
-        let (xs, ys) = circuit.eval_trace(&witness, &mults);
-        // Now let's validate that these multiplication inputs are correct!
-        // We do this by running the protocol on these reconstructed values
-        // and seeing whether we get the correct result at the end.
-        let round0 = Round { xs, ys, z: None };
-        let mut round = round1(round0, &mults, c);
-        // If we have no multiplication gates, then we have no rounds, in which
-        // case we don't need to do this processing. So only do it if we have more
-        // than zero rounds.
-        if nrounds > 0 {
-            // Iterate through all but the last rounds, using the commitments
-            // of the unopened parties to help compute the Fiat-Shamir derived
-            // challenge.
-            for (hs, com) in self
-                .hs
-                .iter()
-                .take(nrounds)
-                .zip(unopened.commitments.iter().skip(1))
-            {
-                let round_ = Round {
-                    xs: round.xs,
-                    ys: round.ys,
-                    z: None,
-                };
-                hashers.hash_round(hs);
-                let c = hashers.extract_challenge(Party::Verifier((unopened.id, Hash::from(*com))));
-                log::debug!("Challenge: {:?}", c);
-                round = round_compress_finish(
-                    round_,
-                    compression_factor,
-                    false,
-                    cache,
-                    c,
-                    &self.rands,
-                    hs,
-                );
-            }
-            // Last round!
-            let round_ = Round {
-                xs: round.xs,
-                ys: round.ys,
-                z: None,
-            };
-            let hs = self.hs.last().unwrap();
-            hashers.hash_round(hs);
-            let c = hashers.extract_challenge(Party::Verifier((
-                unopened.id,
-                Hash::from(*unopened.commitments.last().unwrap()),
-            )));
-            log::debug!("Challenge: {:?}", c);
-            round =
-                round_compress_finish(round_, compression_factor, true, cache, c, &self.rands, hs);
-        }
-        // Now we derive the unopened party ID again using Fiat-Shamir.
-        let id = hashers.extract_unopened_party(
-            Party::Verifier((unopened.id, Hash::from(unopened.trace))),
-            N,
-        );
-        log::debug!("Party ID: {id}");
-        if id != unopened.id {
-            return Err(anyhow!("Incorrect party ID encountered"));
-        }
-        // Finally, check that `round` was computed correctly by verifying
-        // that the resulting shares are valid.
-        output.verify_shares(round, id)
-    }
 }
 
 /// Info necessary to "process" the unopened party when validating the proof.
 #[derive(Serialize, Deserialize)]
 pub(crate) struct UnopenedParty {
-    // The index of this party
+    // The index of this party.
     id: usize,
     // The commitments, for each round of the protocol, associated with this party.
     commitments: Vec<[u8; 32]>,
