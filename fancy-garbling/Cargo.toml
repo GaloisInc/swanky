@@ -36,6 +36,7 @@ crossbeam = "0.8.0"
 prost = { version = "0.11", default-features = false, features = ["prost-derive"] }
 bytes = { version = "1", default-features = false }
 png = "0.17.7"
+petgraph = "0.6.2"
 
 # TODO(interstellar)
 [build-dependencies]
