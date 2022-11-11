@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
 // TODO(interstellar) visibility modified! [fork the repo and use instead via [patch]]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct CircuitRef {
     pub ix: usize,

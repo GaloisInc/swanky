@@ -2,14 +2,10 @@ use fancy_garbling::circuit::CircuitBuilder;
 use fancy_garbling::circuit::CircuitRef;
 use fancy_garbling::Fancy;
 use fancy_garbling::{circuit::Circuit, circuit::Gate, classic::garble};
-use itertools::Iterate;
-use petgraph::graph::NodeIndex;
-use petgraph::visit::EdgeIndexable;
-use petgraph::Graph;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::convert::TryFrom;
-use std::ops::Index;
 use std::time::SystemTime;
-use std::vec;
 
 // deps/protos/generated/ DOES NOT work b/c it only contains "APIs" and we want circuits/skcd.proto etc
 //
@@ -96,11 +92,7 @@ pub enum CircuitParserError {
 /// We need a Trait b/c without it we only have access to CircuitBuilder and that
 /// is NOT enough; we MUST do like "pub fn parse" and that requires access to "circ.gates"
 /// which is not public in CircuitBuilder...
-pub trait HasParseSkcd<G, C> {
-    /// The type that is passed between "parse_skcd" and "skcd_to_circuit"
-    /// eg Vec<u16>
-    type GateIds;
-
+pub trait HasParseSkcd<C> {
     /// Parse a Protobuf-serialized .skcd file
     /// It is doing what fancy-garbling/src/parser.rs is doing for a "Blif Fashion" txt file,
     /// but for a .skcd instead.
@@ -113,9 +105,7 @@ pub trait HasParseSkcd<G, C> {
     /// - the list of inputs (gate ids)
     /// - the list of ouputs (gate ids)
     /// [inputs/outputs are needed to walk the graph, and optimize/rewrite if desired]
-    fn parse_skcd(buf: &[u8]) -> Result<(G, Self::GateIds, Self::GateIds), CircuitParserError>;
-
-    fn skcd_to_circuit(circ_graph: G, inputs: Self::GateIds, outputs: Self::GateIds) -> C;
+    fn parse_skcd(buf: &[u8]) -> Result<C, CircuitParserError>;
 }
 
 /// TODO(interstellar)? Intermediate struct, that way wa can "impl Fancy for MyCircuit"
@@ -196,13 +186,8 @@ struct MyCircuitGraphNode {
     gate_type: Option<SkcdGateType>,
 }
 
-impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
-    type GateIds = Vec<u16>;
-
-    fn parse_skcd(
-        buf: &[u8],
-    ) -> Result<(Graph<MyCircuitGraphNode, ()>, Self::GateIds, Self::GateIds), CircuitParserError>
-    {
+impl HasParseSkcd<Circuit> for Circuit {
+    fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
         use std::convert::TryInto;
 
         let mut buf = &*buf;
@@ -217,10 +202,28 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
         );
         println!("skcd : a = {}", skcd.a.len());
 
-        let mut circ_graph = Graph::default();
+        let mut circ_builder = CircuitBuilder::new();
 
-        // TODO(interstellar) graph: use HashMap to avoid re-inserting a input/output if already in the Graph
-        // let map_idx_to_node: HashMap<usize, > = HashMap::new();
+        // TODO(interstellar) modulus: what should we use??
+        let q = 2;
+
+        // We need to use a CircuitRef for Fancy gates(fn xor/fn and/etc)
+        // which means we must convert a .skcd GateID(integer) to its corresponding CircuitRef
+        let mut map_skcd_gate_id_to_circuit_ref: HashMap<usize, CircuitRef> = HashMap::new();
+
+        // create a vec of [2,2,2..] containing skcd.n elements
+        // that is needed for "evaluator_inputs"
+        // let mods = vec![2u16; skcd.n.try_into().unwrap()];
+
+        // TODO(interstellar) should we use "garbler_inputs" instead?
+        // let inputs = circ_builder.evaluator_inputs(&mods);
+        for i in 0..skcd.n as usize {
+            // circ.gates.push(Gate::EvaluatorInput { id: i });
+            // circ.evaluator_input_refs
+            //     .push(CircuitRef { ix: i, modulus: q });
+
+            map_skcd_gate_id_to_circuit_ref.insert(i, circ_builder.evaluator_input(q));
+        }
 
         // TODO(interstellar)? parser.rs "Process outputs."
         // IMPORTANT: we MUST use skcd.o to set the CORRECT outputs
@@ -231,13 +234,13 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
         // If we set the bad ones, we get "FancyError::UninitializedValue" in fancy-garbling/src/circuit.rs at "fn eval"
         // eg L161 etc b/c the cache is not properly set
         // TODO(interstellar) parser.rs proper wires?
-        for i in skcd.o {
-            // let z = CircuitRef {
-            //     ix: o as usize,
-            //     modulus: q,
-            // };
+        for o in skcd.o {
+            let z = CircuitRef {
+                ix: o as usize,
+                modulus: q,
+            };
             // TODO put that in "outputs_refs" vec? and use it below?
-            // circ_builder.output(&z).unwrap();
+            circ_builder.output(&z).unwrap();
 
             // circ.output_refs.push(CircuitRef {
             //     // TODO(interstellar) parser.rs proper wires?
@@ -247,9 +250,15 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
             // });
         }
 
+        // We MUST rewrite certain Gate, which means some Gates in .skcd will be converted to several in CircuiBuilder
+        // eg OR -> NOT+AND+AND+NOT
+        // This means we MUST "correct" the GateID in .skcd by a given offset
+        let mut gate_offset = 0;
+        let mut current_gates = HashSet::new();
+
         // TODO(interstellar) how should we use skcd's a/b/go?
-        let mut id = 0;
         for g in 0..skcd.q as usize {
+            // TODO(interstellar) gate_offset?
             let skcd_input0 = *skcd.a.get(g).unwrap() as usize;
             let skcd_input1 = *skcd.b.get(g).unwrap() as usize;
             // TODO(interstellar) graph: how to use skcd_output?
@@ -257,34 +266,35 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
             let skcd_gate_type = *skcd.gt.get(g).unwrap();
             // println!("Processing gate: {}", g);
 
-            let input0 = circ_graph.add_node(MyCircuitGraphNode { gate_type: None });
-            let input1 = circ_graph.add_node(MyCircuitGraphNode { gate_type: None });
-
-            let node = circ_graph.add_node(MyCircuitGraphNode {
-                gate_type: Some(skcd_gate_type.try_into().unwrap()),
-            });
-            // TODO(interstellar) graph: invert input->node ? other thing entirely?
-            circ_graph.add_edge(node, input0, ());
-            circ_graph.add_edge(node, input1, ());
-
             // let xref = CircuitRef {
-            //     ix: skcd_input0,
+            //     ix: skcd_input0 + gate_offset,
             //     modulus: q,
             // };
             // let yref = CircuitRef {
-            //     ix: skcd_input1,
+            //     ix: skcd_input1 + gate_offset,
             //     modulus: q,
             // };
+
+            let xref = map_skcd_gate_id_to_circuit_ref.get(&skcd_input0).unwrap();
+            let yref = map_skcd_gate_id_to_circuit_ref.get(&skcd_input1).unwrap();
 
             // cf "pub trait Fancy"(fancy.rs) for how to build eac htype of Gate
             match skcd_gate_type.try_into() {
                 Ok(SkcdGateType::ZERO) => {
+                    if current_gates.insert(circ_builder.constant(0, q).unwrap()) {
+                        gate_offset += 1;
+                    }
+
                     // circ_builder.constant(0, q).unwrap();
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
                 Ok(SkcdGateType::ONE) => {
-                    // circ_builder.constant(1, q).unwrap();
+                    if current_gates.insert(circ_builder.constant(1, q).unwrap()) {
+                        gate_offset += 1;
+                    }
+
+                    // circ_builder.constant(0, q).unwrap();
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
@@ -292,8 +302,10 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
                 Ok(SkcdGateType::OR) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
-                    // let z = circ_builder.or(&xref, &yref).unwrap();
-                    // circ_builder.output(&z).unwrap();
+                    let z = circ_builder.or(&xref, &yref).unwrap();
+
+                    // TODO(interstellar) output? circ_builder.output(&z);
+                    map_skcd_gate_id_to_circuit_ref.insert(skcd_output, z);
 
                     // fn or(&mut self, x: &Self::Item, y: &Self::Item):
                     // let notx = self.negate(x)?;
@@ -323,8 +335,10 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
                 Ok(SkcdGateType::XOR) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
-                    // let z = circ_builder.xor(&xref, &yref).unwrap();
-                    // circ_builder.output(&z).unwrap();
+                    let z = circ_builder.xor(&xref, &yref).unwrap();
+
+                    // TODO(interstellar) output? circ_builder.output(&z);
+                    map_skcd_gate_id_to_circuit_ref.insert(skcd_output, z);
 
                     // circ.gates.push(Gate::Add {
                     //     xref,
@@ -337,9 +351,11 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
                 Ok(SkcdGateType::NAND) => {
                     // let x = inputs.get(skcd_input0).unwrap();
                     // let y = inputs.get(skcd_input1).unwrap();
-                    // let z = circ_builder.and(&xref, &yref).unwrap();
-                    // let z = circ_builder.negate(&z).unwrap();
-                    // circ_builder.output(&z).unwrap();
+                    let z = circ_builder.and(&xref, &yref).unwrap();
+                    let z = circ_builder.negate(&z).unwrap();
+
+                    // TODO(interstellar) output? circ_builder.output(&z);
+                    map_skcd_gate_id_to_circuit_ref.insert(skcd_output, z);
 
                     // "And is just multiplication, with the requirement that `x` and `y` are mod 2."
                     // let z = Gate::Mul {
@@ -353,7 +369,7 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
 
                     // let zref = CircuitRef { ix: id, modulus: q };
 
-                    id += 1;
+                    // id += 1;
 
                     // fancy_negate(&mut circ, &zref, &oneref);
                 }
@@ -361,81 +377,14 @@ impl HasParseSkcd<Graph<MyCircuitGraphNode, ()>, Circuit> for Circuit {
             }
         }
 
-        Ok((circ_graph, vec![], vec![]))
-    }
-
-    fn skcd_to_circuit(
-        circ_graph: Graph<MyCircuitGraphNode, ()>,
-        inputs: Self::GateIds,
-        outputs: Self::GateIds,
-    ) -> Circuit {
-        use petgraph::prelude::Dfs;
-        use petgraph::Incoming;
-
-        println!("skcd_to_circuit: circ_graph = {:?}", circ_graph);
-
-        // TODO(interstellar) pre-allocate using proper number of gates
-        let mut circ = Circuit::new(None);
-
-        // TODO(interstellar) modulus: what should we use??
-        let q = 2;
-
-        // parser.rs
-        // TODO(interstellar) should we use "garbler_inputs" instead?
-        let n1 = 0usize; // Number of garbler inputs
-        let n2 = inputs.len(); // Number of evaluator inputs
-        let n3 = outputs.len(); // Number of outputs
-
-        // TODO(interstellar) parser.rs: "Process garbler inputs."
-        for i in 0..n1 {
-            circ.gates.push(Gate::GarblerInput { id: i });
-            circ.garbler_input_refs
-                .push(CircuitRef { ix: i, modulus: q });
-        }
-        // parser.rs: "Process evaluator inputs."
-        for i in 0..n2 {
-            circ.gates.push(Gate::EvaluatorInput { id: i });
-            circ.evaluator_input_refs.push(CircuitRef {
-                ix: n1 + i,
-                modulus: q,
-            });
-        }
-
-        // TODO(interstellar) parser.rs: "Create a constant wire for negations."?
-        circ.gates.push(Gate::Constant { val: 1 });
-        let oneref = CircuitRef {
-            ix: n1 + n2,
-            modulus: q,
-        };
-        circ.const_refs.push(oneref);
-
-        // "walk the graph"
-        // TODO(interstellar) loop on all inputs? outputs? both?
-        let a = NodeIndex::new(0);
-        // TODO(interstellar) if a node is not connected to any output -> optimize-it away(eg gate ZERO/ONE in adder.skcd)
-        let mut dfs = Dfs::new(&circ_graph, a);
-        while let Some(node) = dfs.next(&circ_graph) {
-            // use a walker -- a detached neighbors iterator
-            let mut edges = circ_graph.neighbors_directed(node, Incoming).detach();
-            while let Some(edge) = edges.next_edge(&circ_graph) {
-                // let (nw, ew) = circ_graph.index_twice_mut(node, edge);
-                // *nw += *ew;
-            }
-        }
-
-        circ.gate_moduli = vec![q as u16; circ.gates.len()];
-
-        circ
+        Ok(circ_builder.finish())
     }
 }
 
 fn main() {
     ////////////////////////////////////////////////////////////////////////////
 
-    use std::convert::TryInto;
-    use std::fs::File;
     use std::io::BufReader;
-    use std::io::BufWriter;
     use std::io::Read;
 
     let f = std::fs::File::open("../../lib_garble/tests/data/adder.skcd.pb.bin").unwrap();
@@ -445,8 +394,7 @@ fn main() {
     // read the whole file
     reader.read_to_end(&mut buffer).unwrap();
 
-    let (circ_graph, inputs, outputs) = Circuit::parse_skcd(&buffer).unwrap();
-    let circ = Circuit::skcd_to_circuit(circ_graph, inputs, outputs);
+    let circ = Circuit::parse_skcd(&buffer).unwrap();
 
     // all_inputs/all_expected_outputs: standard full-adder 2 bits truth table(and expected results)
     // input  i_bit1;
