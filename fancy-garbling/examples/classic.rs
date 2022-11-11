@@ -225,31 +225,6 @@ impl HasParseSkcd<Circuit> for Circuit {
             map_skcd_gate_id_to_circuit_ref.insert(i, circ_builder.evaluator_input(q));
         }
 
-        // TODO(interstellar)? parser.rs "Process outputs."
-        // IMPORTANT: we MUST use skcd.o to set the CORRECT outputs
-        // eg for the 2 bits adder.skcd:
-        // - skcd.m = 1
-        // - skcd.o = [8,11]
-        // -> the 2 CORRECT outputs to be set are: [8,11]
-        // If we set the bad ones, we get "FancyError::UninitializedValue" in fancy-garbling/src/circuit.rs at "fn eval"
-        // eg L161 etc b/c the cache is not properly set
-        // TODO(interstellar) parser.rs proper wires?
-        for o in skcd.o {
-            let z = CircuitRef {
-                ix: o as usize,
-                modulus: q,
-            };
-            // TODO put that in "outputs_refs" vec? and use it below?
-            circ_builder.output(&z).unwrap();
-
-            // circ.output_refs.push(CircuitRef {
-            //     // TODO(interstellar) parser.rs proper wires?
-            //     // ix: nwires - n3 + i,
-            //     ix: i as usize,
-            //     modulus: q,
-            // });
-        }
-
         // We MUST rewrite certain Gate, which means some Gates in .skcd will be converted to several in CircuiBuilder
         // eg OR -> NOT+AND+AND+NOT
         // This means we MUST "correct" the GateID in .skcd by a given offset
@@ -375,6 +350,28 @@ impl HasParseSkcd<Circuit> for Circuit {
                 }
                 _ => todo!(),
             }
+        }
+
+        // TODO(interstellar)? parser.rs "Process outputs."
+        // IMPORTANT: we MUST use skcd.o to set the CORRECT outputs
+        // eg for the 2 bits adder.skcd:
+        // - skcd.m = 1
+        // - skcd.o = [8,11]
+        // -> the 2 CORRECT outputs to be set are: [8,11]
+        // If we set the bad ones, we get "FancyError::UninitializedValue" in fancy-garbling/src/circuit.rs at "fn eval"
+        // eg L161 etc b/c the cache is not properly set
+        // TODO(interstellar) parser.rs proper wires?
+        for o in skcd.o {
+            let z = map_skcd_gate_id_to_circuit_ref.get(&(o as usize)).unwrap();
+            // TODO put that in "outputs_refs" vec? and use it below?
+            circ_builder.output(&z).unwrap();
+
+            // circ.output_refs.push(CircuitRef {
+            //     // TODO(interstellar) parser.rs proper wires?
+            //     // ix: nwires - n3 + i,
+            //     ix: i as usize,
+            //     modulus: q,
+            // });
         }
 
         Ok(circ_builder.finish())
