@@ -228,8 +228,8 @@ impl HasParseSkcd<Circuit> for Circuit {
         // We MUST rewrite certain Gate, which means some Gates in .skcd will be converted to several in CircuiBuilder
         // eg OR -> NOT+AND+AND+NOT
         // This means we MUST "correct" the GateID in .skcd by a given offset
-        let mut gate_offset = 0;
-        let mut current_gates = HashSet::new();
+        // let mut gate_offset = 0;
+        // let mut current_gates = HashSet::new();
 
         // TODO(interstellar) how should we use skcd's a/b/go?
         for g in 0..skcd.q as usize {
@@ -241,35 +241,42 @@ impl HasParseSkcd<Circuit> for Circuit {
             let skcd_gate_type = *skcd.gt.get(g).unwrap();
             // println!("Processing gate: {}", g);
 
-            // let xref = CircuitRef {
-            //     ix: skcd_input0 + gate_offset,
-            //     modulus: q,
-            // };
-            // let yref = CircuitRef {
-            //     ix: skcd_input1 + gate_offset,
-            //     modulus: q,
-            // };
+            // TODO(interstellar) gate_offset?
+            let default_xref = CircuitRef {
+                ix: skcd_input0,
+                modulus: q,
+            };
+            let default_yref = CircuitRef {
+                ix: skcd_input1,
+                modulus: q,
+            };
 
+            // TODO(interstellar) apparently "unwrap_or" needed for "display skcd"; why???
             let xref = map_skcd_gate_id_to_circuit_ref.get(&skcd_input0).unwrap();
+            // .unwrap_or(&default_xref);
             let yref = map_skcd_gate_id_to_circuit_ref.get(&skcd_input1).unwrap();
+            // .unwrap_or(&default_yref);
 
-            // cf "pub trait Fancy"(fancy.rs) for how to build eac htype of Gate
+            // cf "pub trait Fancy"(fancy.rs) for how to build each type of Gate
             match skcd_gate_type.try_into() {
                 Ok(SkcdGateType::ZERO) => {
-                    if current_gates.insert(circ_builder.constant(0, q).unwrap()) {
-                        gate_offset += 1;
-                    }
+                    // if current_gates.insert(circ_builder.constant(0, q).unwrap()) {
+                    //     gate_offset += 1;
+                    // }
 
-                    // circ_builder.constant(0, q).unwrap();
+                    // TODO(interstellar) apparently needed for "display skcd"; why???
+                    map_skcd_gate_id_to_circuit_ref
+                        .insert(skcd_output, circ_builder.constant(0, q).unwrap());
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
                 Ok(SkcdGateType::ONE) => {
-                    if current_gates.insert(circ_builder.constant(1, q).unwrap()) {
-                        gate_offset += 1;
-                    }
+                    // if current_gates.insert(circ_builder.constant(1, q).unwrap()) {
+                    //     gate_offset += 1;
+                    // }
 
-                    // circ_builder.constant(0, q).unwrap();
+                    map_skcd_gate_id_to_circuit_ref
+                        .insert(skcd_output, circ_builder.constant(1, q).unwrap());
 
                     // circ.gates.push(Gate::Constant { val: 0 })
                 }
@@ -384,7 +391,65 @@ fn main() {
     use std::io::BufReader;
     use std::io::Read;
 
-    let f = std::fs::File::open("../../lib_garble/tests/data/adder.skcd.pb.bin").unwrap();
+    if true {
+        let f = std::fs::File::open("../../lib_garble/tests/data/adder.skcd.pb.bin").unwrap();
+        let mut reader = BufReader::new(f);
+
+        let mut buffer = Vec::new();
+        // read the whole file
+        reader.read_to_end(&mut buffer).unwrap();
+
+        let circ = Circuit::parse_skcd(&buffer).unwrap();
+
+        // all_inputs/all_expected_outputs: standard full-adder 2 bits truth table(and expected results)
+        // input  i_bit1;
+        // input  i_bit2;
+        // input  i_carry;
+        let all_inputs = vec![
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [1, 1, 0],
+            [0, 0, 1],
+            [1, 0, 1],
+            [0, 1, 1],
+            [1, 1, 1],
+        ];
+
+        // output o_sum;
+        // output o_carry;
+        let all_expected_outputs = [
+            [0, 0],
+            [1, 0],
+            [1, 0],
+            [0, 1],
+            [1, 0],
+            [0, 1],
+            [0, 1],
+            [1, 1],
+        ];
+
+        assert!(circ.num_evaluator_inputs() == 3);
+        for (i, inputs) in all_inputs.iter().enumerate() {
+            let outputs = circ.eval_plain(&[], inputs).unwrap();
+            if outputs == all_expected_outputs[i] {
+                println!("adder OK");
+            } else {
+                println!("adder FAIL!");
+            }
+        }
+    }
+
+    //////////////////////////////////
+    // TODO refactor "adder" as a test; and then add version with "display" and then write .png
+
+    use std::convert::TryInto;
+    use std::io::BufWriter;
+
+    let f = std::fs::File::open(
+        "../../lib_garble/tests/data/display_message_120x52_2digits.skcd.pb.bin",
+    )
+    .unwrap();
     let mut reader = BufReader::new(f);
 
     let mut buffer = Vec::new();
@@ -393,70 +458,31 @@ fn main() {
 
     let circ = Circuit::parse_skcd(&buffer).unwrap();
 
-    // all_inputs/all_expected_outputs: standard full-adder 2 bits truth table(and expected results)
-    // input  i_bit1;
-    // input  i_bit2;
-    // input  i_carry;
-    let all_inputs = vec![
-        [0, 0, 0],
-        [1, 0, 0],
-        [0, 1, 0],
-        [1, 1, 0],
-        [0, 0, 1],
-        [1, 0, 1],
-        [0, 1, 1],
-        [1, 1, 1],
-    ];
+    let outputs = circ.eval_plain(&[], &[1; 24]).unwrap();
 
-    // output o_sum;
-    // output o_carry;
-    let all_expected_outputs = [
-        [0, 0],
-        [1, 0],
-        [1, 0],
-        [0, 1],
-        [1, 0],
-        [0, 1],
-        [0, 1],
-        [1, 1],
-    ];
+    let path = "eval_outputs.png";
+    let file = std::fs::File::create(path).unwrap();
+    let ref mut w = BufWriter::new(file);
 
-    assert!(circ.num_evaluator_inputs() == 3);
-    for (i, inputs) in all_inputs.iter().enumerate() {
-        let outputs = circ.eval_plain(&[], inputs).unwrap();
-        if outputs == all_expected_outputs[i] {
-            println!("adder OK");
-        } else {
-            println!("adder FAIL!");
-        }
-    }
+    // TODO(interstellar) get from Circuit's "config"
+    let mut encoder = png::Encoder::new(w, 120, 52);
+    encoder.set_color(png::ColorType::Grayscale);
+    encoder.set_depth(png::BitDepth::Eight);
 
-    //////////////////////////////////
-    // TODO refactor "adder" as a test; and then add version with "display" and then write .png
+    let mut writer = encoder.write_header().unwrap();
 
-    // let path = "eval_outputs.png";
-    // let file = File::create(path).unwrap();
-    // let ref mut w = BufWriter::new(file);
+    // let data = [255, 0, 0, 255, 0, 0, 0, 255]; // "An array containing a RGBA sequence. First pixel is red and second pixel is black."
+    let data: Vec<u8> = outputs
+        .iter()
+        .map(|v| {
+            let pixel_value: u8 = (*v).try_into().unwrap();
+            pixel_value * 255
+        })
+        .collect();
 
-    // // TODO(interstellar) get from Circuit's "config"
-    // let mut encoder = png::Encoder::new(w, 120, 52);
-    // encoder.set_color(png::ColorType::Grayscale);
-    // encoder.set_depth(png::BitDepth::Eight);
-
-    // let mut writer = encoder.write_header().unwrap();
-
-    // // let data = [255, 0, 0, 255, 0, 0, 0, 255]; // "An array containing a RGBA sequence. First pixel is red and second pixel is black."
-    // let data: Vec<u8> = outputs
-    //     .iter()
-    //     .map(|v| {
-    //         let pixel_value: u8 = (*v).try_into().unwrap();
-    //         pixel_value * 255
-    //     })
-    //     .collect();
-
-    // // TODO(interstellar) FIX: nb outputs SHOULD be == 120x52 = 6240; but 6341 for now!
-    // // possibly linked to  println!("output called"); in fancy-garbling/src/circuit.rs ?
-    // writer.write_image_data(&data).unwrap(); // Save
+    // TODO(interstellar) FIX: nb outputs SHOULD be == 120x52 = 6240; but 6341 for now!
+    // possibly linked to  println!("output called"); in fancy-garbling/src/circuit.rs ?
+    writer.write_image_data(&data).unwrap(); // Save
 
     //////////////////////////////////
 
