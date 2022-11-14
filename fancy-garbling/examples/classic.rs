@@ -1,7 +1,7 @@
 use fancy_garbling::circuit::CircuitBuilder;
 use fancy_garbling::circuit::CircuitRef;
 use fancy_garbling::Fancy;
-use fancy_garbling::{circuit::Circuit, circuit::Gate, classic::garble};
+use fancy_garbling::{circuit::Circuit, classic::garble};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::TryFrom;
@@ -108,84 +108,6 @@ pub trait HasParseSkcd<C> {
     fn parse_skcd(buf: &[u8]) -> Result<C, CircuitParserError>;
 }
 
-/// TODO(interstellar)? Intermediate struct, that way wa can "impl Fancy for MyCircuit"
-/// which means we simply have to define the basics constant/add/sub/etc
-/// and the rest(xor, and, ...) are built onto of them
-// struct MyCircuit {
-//     circ: Circuit,
-// }
-
-// impl Fancy for MyCircuit {
-//     type Item: Clone + HasModulus;
-
-//     /// Errors which may be thrown by the users of Fancy.
-//     type Error: std::fmt::Debug + std::fmt::Display + std::convert::From<FancyError>;
-
-//     /// Create a constant `x` with modulus `q`.
-//     fn constant(&mut self, x: u16, q: u16) -> Result<Self::Item, Self::Error>;
-
-//     /// Add `x` and `y`.
-//     fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
-
-//     /// Subtract `x` and `y`.
-//     fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
-
-//     /// Multiply `x` times the constant `c`.
-//     fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
-
-//     /// Multiply `x` and `y`.
-//     fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
-
-//     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
-//     ///
-//     /// Optional `tt` is useful for hiding the gate from the evaluator.
-//     fn proj(
-//         &mut self,
-//         x: &Self::Item,
-//         q: u16,
-//         tt: Option<Vec<u16>>,
-//     ) -> Result<Self::Item, Self::Error>;
-
-//     /// Process this wire as output. Some `Fancy` implementors dont actually *return*
-//     /// output, but they need to be involved in the process, so they can return `None`.
-//     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
-// }
-
-#[derive(Debug)]
-enum MyFancyError {}
-
-const MODULUS: u16 = 2;
-
-/// Xor is just addition, with the requirement that `x` and `y` are mod 2.
-fn fancy_xor(circ: &mut Circuit, x: &CircuitRef, y: &CircuitRef) -> CircuitRef {
-    // TODO(interstellar) fancy: output?
-    fancy_add(circ, x, y, None)
-}
-
-/// fancy.rs: "Negate by xoring `x` with `1`."
-fn fancy_negate(circ: &mut Circuit, x: &CircuitRef, oneref: &CircuitRef) -> CircuitRef {
-    fancy_xor(circ, x, oneref)
-}
-
-fn fancy_add(circ: &mut Circuit, x: &CircuitRef, y: &CircuitRef, out: Option<usize>) -> CircuitRef {
-    let gate = Gate::Add {
-        xref: *x,
-        yref: *y,
-        out: out,
-    };
-    circ.gates.push(gate);
-
-    CircuitRef {
-        ix: circ.gates.len(),
-        modulus: MODULUS,
-    }
-}
-
-#[derive(Debug)]
-struct MyCircuitGraphNode {
-    gate_type: Option<SkcdGateType>,
-}
-
 impl HasParseSkcd<Circuit> for Circuit {
     fn parse_skcd(buf: &[u8]) -> Result<Circuit, CircuitParserError> {
         use std::convert::TryInto;
@@ -242,14 +164,14 @@ impl HasParseSkcd<Circuit> for Circuit {
             // println!("Processing gate: {}", g);
 
             // TODO(interstellar) gate_offset?
-            let default_xref = CircuitRef {
-                ix: skcd_input0,
-                modulus: q,
-            };
-            let default_yref = CircuitRef {
-                ix: skcd_input1,
-                modulus: q,
-            };
+            // let default_xref = CircuitRef {
+            //     ix: skcd_input0,
+            //     modulus: q,
+            // };
+            // let default_yref = CircuitRef {
+            //     ix: skcd_input1,
+            //     modulus: q,
+            // };
 
             // TODO(interstellar) apparently "unwrap_or" needed for "display skcd"; why???
             let xref = map_skcd_gate_id_to_circuit_ref.get(&skcd_input0).unwrap();
