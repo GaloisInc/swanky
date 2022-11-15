@@ -19,7 +19,7 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct CircuitRef {
-    pub(crate) ix: usize,
+    pub ix: usize,
     pub(crate) modulus: u16,
 }
 
@@ -39,7 +39,7 @@ impl HasModulus for CircuitRef {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Circuit {
-    pub(crate) gates: Vec<Gate>,
+    pub gates: Vec<Gate>,
     pub(crate) gate_moduli: Vec<u16>,
     pub(crate) garbler_input_refs: Vec<CircuitRef>,
     pub(crate) evaluator_input_refs: Vec<CircuitRef>,
@@ -54,7 +54,7 @@ pub struct Circuit {
 /// = None`, then we use the gate index as the output wire index.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) enum Gate {
+pub enum Gate {
     GarblerInput {
         id: usize,
     },
