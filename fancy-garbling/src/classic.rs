@@ -8,7 +8,7 @@
 //! circuit without streaming.
 
 use crate::{
-    circuit::Circuit,
+    circuit::{eval_eval, eval_prepare, Circuit},
     errors::{EvaluatorError, GarblerError},
     fancy::HasModulus,
     garble::{Evaluator, Garbler},
@@ -25,12 +25,16 @@ use std::{collections::HashMap, convert::TryInto, rc::Rc};
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
+    // TODO(interstellar) remove Circuit; and possibly refactor output_refs/cache/etc
+    circuit: Circuit,
+    // output_refs: Vec<CircuitRef>,
+    // cache: Vec<Option<Wire>>,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
-    pub fn new(blocks: Vec<Block>) -> Self {
-        GarbledCircuit { blocks }
+    pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
+        GarbledCircuit { blocks, circuit }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
@@ -41,19 +45,27 @@ impl GarbledCircuit {
     /// Evaluate the garbled circuit.
     pub fn eval(
         &self,
-        c: &Circuit,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
         let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
         let mut evaluator = Evaluator::new(channel);
-        let outputs = c.eval(&mut evaluator, garbler_inputs, evaluator_inputs)?;
+
+        let cache = eval_prepare(
+            &mut evaluator,
+            &garbler_inputs,
+            &evaluator_inputs,
+            &self.circuit.gates,
+            &self.circuit.gate_moduli,
+        )?;
+        let outputs = eval_eval(&cache, &mut evaluator, &self.circuit.output_refs)?;
+
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
 }
 
 /// Garble a circuit without streaming.
-pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
+pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     let channel = Channel::new(
         GarbledReader::new(&[]),
         GarbledWriter::new(Some(c.num_nonfree_gates)),
@@ -80,7 +92,8 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
         })
         .collect_vec();
 
-    c.eval(&mut garbler, &gb_inps, &ev_inps)?;
+    let cache = eval_prepare(&mut garbler, &gb_inps, &ev_inps, &c.gates, &c.gate_moduli)?;
+    eval_eval(&cache, &mut garbler, &c.output_refs)?;
 
     let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
 
@@ -89,6 +102,7 @@ pub fn garble(c: &Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
             .unwrap()
             .into_inner()
             .blocks,
+        c,
     );
 
     Ok((en, gc))
