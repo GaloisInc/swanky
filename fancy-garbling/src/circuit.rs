@@ -115,7 +115,7 @@ impl std::fmt::Display for Gate {
     }
 }
 
-pub fn eval_prepare<F: Fancy>(
+pub(crate) fn eval_prepare<F: Fancy>(
     f: &mut F,
     garbler_inputs: &[F::Item],
     evaluator_inputs: &[F::Item],
@@ -200,7 +200,7 @@ pub fn eval_prepare<F: Fancy>(
     Ok(cache)
 }
 
-pub fn eval_eval<F: Fancy>(
+pub(crate) fn eval_eval<F: Fancy>(
     cache: &[Option<F::Item>],
     f: &mut F,
     output_refs: &[CircuitRef],

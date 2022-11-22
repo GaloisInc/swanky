@@ -21,31 +21,37 @@ use std::{collections::HashMap, convert::TryInto, rc::Rc};
 /// Static evaluator for a circuit, created by the `garble` function.
 ///
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
-#[derive(Debug)]
+// #[derive(Debug)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
     // TODO(interstellar) remove Circuit; and possibly refactor output_refs/cache/etc
+    // TODO(interstellar) are Evaluator and output_refs OK to be kept around? are they serializable?
     // circuit: Circuit,
-    gates: Vec<Gate>,
-    gate_moduli: Vec<u16>,
+    // gates: Vec<Gate>,
+    // gate_moduli: Vec<u16>,
     output_refs: Vec<CircuitRef>,
-    // cache: Vec<Option<Wire>>,
+    evaluator: Evaluator<Channel<GarbledReader, GarbledWriter>>,
+    cache: Vec<Option<Wire>>,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(
         blocks: Vec<Block>,
-        gates: Vec<Gate>,
-        gate_moduli: Vec<u16>,
+        // gates: Vec<Gate>,
+        // gate_moduli: Vec<u16>,
         output_refs: Vec<CircuitRef>,
+        evaluator: Evaluator<Channel<GarbledReader, GarbledWriter>>,
+        cache: Vec<Option<Wire>>,
     ) -> Self {
         GarbledCircuit {
             blocks,
-            gates,
-            gate_moduli,
+            // gates,
+            // gate_moduli,
             output_refs,
+            evaluator,
+            cache,
         }
     }
 
@@ -56,21 +62,21 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit.
     pub fn eval(
-        &self,
+        &mut self,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
-        let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
-        let mut evaluator = Evaluator::new(channel);
+        // let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
+        // let mut evaluator = Evaluator::new(channel);
 
-        let cache = eval_prepare(
-            &mut evaluator,
-            &garbler_inputs,
-            &evaluator_inputs,
-            &self.gates,
-            &self.gate_moduli,
-        )?;
-        let outputs = eval_eval(&cache, &mut evaluator, &self.output_refs)?;
+        // let cache = eval_prepare(
+        //     &mut evaluator,
+        //     &garbler_inputs,
+        //     &evaluator_inputs,
+        //     &self.gates,
+        //     &self.gate_moduli,
+        // )?;
+        let outputs = eval_eval(&self.cache, &mut self.evaluator, &self.output_refs)?;
 
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
@@ -109,15 +115,34 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
 
     let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
 
-    let gc = GarbledCircuit::new(
-        Rc::try_unwrap(channel.writer())
-            .unwrap()
-            .into_inner()
-            .blocks,
-        c.gates,
-        c.gate_moduli,
-        c.output_refs,
-    );
+    let blocks = Rc::try_unwrap(channel.writer())
+        .unwrap()
+        .into_inner()
+        .blocks;
+
+    // BEGIN BLOCK
+    // TODO(interstellar) how to prepare "generic inputs" at this stage??? We DO NOT want to set them in stone now!
+
+    let channel = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
+    let mut evaluator = Evaluator::new(channel);
+
+    let evaluator_inputs = vec![0; c.num_evaluator_inputs()];
+    let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
+    let garbler_inputs = vec![0; c.num_garbler_inputs()];
+    let garbler_inputs = &en.encode_garbler_inputs(&garbler_inputs);
+
+    let cache2 = eval_prepare(
+        &mut evaluator,
+        &garbler_inputs,
+        &evaluator_inputs,
+        &c.gates,
+        &c.gate_moduli,
+    )
+    .unwrap();
+
+    // END BLOCK
+
+    let gc = GarbledCircuit::new(blocks, c.output_refs, evaluator, cache2);
 
     Ok((en, gc))
 }
@@ -197,7 +222,7 @@ impl Encoder {
 
 /// Implementation of the `Read` trait for use by the `Evaluator`.
 #[derive(Debug)]
-struct GarbledReader {
+pub struct GarbledReader {
     blocks: Vec<Block>,
     index: usize,
 }
