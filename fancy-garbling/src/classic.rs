@@ -8,7 +8,7 @@
 //! circuit without streaming.
 
 use crate::{
-    circuit::{eval_eval, eval_prepare, Circuit},
+    circuit::{eval_eval, eval_prepare, Circuit, CircuitRef, Gate},
     errors::{EvaluatorError, GarblerError},
     fancy::HasModulus,
     garble::{Evaluator, Garbler},
@@ -26,15 +26,27 @@ use std::{collections::HashMap, convert::TryInto, rc::Rc};
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
     // TODO(interstellar) remove Circuit; and possibly refactor output_refs/cache/etc
-    circuit: Circuit,
-    // output_refs: Vec<CircuitRef>,
+    // circuit: Circuit,
+    gates: Vec<Gate>,
+    gate_moduli: Vec<u16>,
+    output_refs: Vec<CircuitRef>,
     // cache: Vec<Option<Wire>>,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
-    pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
-        GarbledCircuit { blocks, circuit }
+    pub fn new(
+        blocks: Vec<Block>,
+        gates: Vec<Gate>,
+        gate_moduli: Vec<u16>,
+        output_refs: Vec<CircuitRef>,
+    ) -> Self {
+        GarbledCircuit {
+            blocks,
+            gates,
+            gate_moduli,
+            output_refs,
+        }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
@@ -55,10 +67,10 @@ impl GarbledCircuit {
             &mut evaluator,
             &garbler_inputs,
             &evaluator_inputs,
-            &self.circuit.gates,
-            &self.circuit.gate_moduli,
+            &self.gates,
+            &self.gate_moduli,
         )?;
-        let outputs = eval_eval(&cache, &mut evaluator, &self.circuit.output_refs)?;
+        let outputs = eval_eval(&cache, &mut evaluator, &self.output_refs)?;
 
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
@@ -102,7 +114,9 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
             .unwrap()
             .into_inner()
             .blocks,
-        c,
+        c.gates,
+        c.gate_moduli,
+        c.output_refs,
     );
 
     Ok((en, gc))
