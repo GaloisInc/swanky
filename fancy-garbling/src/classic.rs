@@ -28,7 +28,8 @@ pub struct GarbledCircuit {
     // TODO(interstellar) remove Circuit; and possibly refactor output_refs/cache/etc
     // TODO(interstellar) are Evaluator and output_refs OK to be kept around? are they serializable?
     output_refs: Vec<CircuitRef>,
-    cache: Vec<Option<Wire>>,
+    cache_zeros: Vec<Option<Wire>>,
+    map_patch_evaluator_inputs_ones: HashMap<usize, Vec<(usize, Option<Wire>)>>,
     // This fields allows calling "eval" repeatedly on the same GarbledCircuit(Evaluator)
     // Without it, it fails with eg "panicked at 'index out of bounds: the len is 12 but the index is 12'"
     reader_index: usize,
@@ -40,14 +41,16 @@ impl GarbledCircuit {
     pub fn new(
         blocks: Vec<Block>,
         output_refs: Vec<CircuitRef>,
-        cache: Vec<Option<Wire>>,
+        cache_zeros: Vec<Option<Wire>>,
+        map_patch_evaluator_inputs_ones: HashMap<usize, Vec<(usize, Option<Wire>)>>,
         reader_index: usize,
         evaluator_current_gate: usize,
     ) -> Self {
         GarbledCircuit {
             blocks,
             output_refs,
-            cache,
+            cache_zeros,
+            map_patch_evaluator_inputs_ones,
             reader_index,
             evaluator_current_gate,
         }
@@ -61,24 +64,41 @@ impl GarbledCircuit {
     /// Evaluate the garbled circuit.
     pub fn eval(
         &mut self,
-        garbler_inputs: &[Wire],
-        evaluator_inputs: &[Wire],
+        encoder: &Encoder,
+        garbler_inputs: &[u16],
+        evaluator_inputs: &[u16],
     ) -> Result<Vec<u16>, EvaluatorError> {
         let reader = GarbledReader::new_with_index(&self.blocks, self.reader_index);
         let channel = Channel::new(reader, GarbledWriter::new(None));
 
         let mut evaluator = Evaluator::new_with_current_gate(channel, self.evaluator_current_gate);
 
+        let cache = &mut self.cache_zeros;
+
         // We MUST set garbler_inputs/evaluator_inputs to their correct values.
         // This is what "fn eval_prepare" is doing.
-        for (i, garbler_input_wire) in garbler_inputs.iter().enumerate() {
-            self.cache[i] = Some(garbler_input_wire.clone());
+        for (i, garbler_input) in garbler_inputs.iter().enumerate() {
+            // cache[i] = Some(garbler_input_wire.clone());
+
+            cache[i] = Some(encoder.encode_garbler_input(*garbler_input, i));
+
+            if *garbler_input == 1 {
+                todo!("same as below for evaluator_input, and add corresponding map map_patch_evaluator_inputs_ones");
+            }
         }
-        for (i, evaluator_input_wire) in evaluator_inputs.iter().enumerate() {
-            self.cache[i] = Some(evaluator_input_wire.clone());
+        for (i, evaluator_input) in evaluator_inputs.iter().enumerate() {
+            // cache[i] = Some(evaluator_input_wire.clone());
+
+            cache[i] = Some(encoder.encode_evaluator_input(*evaluator_input, i));
+
+            if *evaluator_input == 1 {
+                for (idx, wire) in self.map_patch_evaluator_inputs_ones[&i].iter() {
+                    cache[*idx] = wire.clone();
+                }
+            }
         }
 
-        let outputs = eval_eval(&self.cache, &mut evaluator, &self.output_refs)?;
+        let outputs = eval_eval(&cache, &mut evaluator, &self.output_refs)?;
 
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
@@ -128,12 +148,12 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     let channel = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
     let mut evaluator = Evaluator::new(channel);
 
-    let evaluator_inputs = vec![1; c.num_evaluator_inputs()];
+    let evaluator_inputs = vec![0; c.num_evaluator_inputs()];
     let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
     let garbler_inputs = vec![0; c.num_garbler_inputs()];
     let garbler_inputs = &en.encode_garbler_inputs(&garbler_inputs);
 
-    let cache2 = eval_prepare(
+    let cache_zeros = eval_prepare(
         &mut evaluator,
         &garbler_inputs,
         &evaluator_inputs,
@@ -141,6 +161,51 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
         &c.gate_moduli,
     )
     .unwrap();
+
+    let mut map_patch_evaluator_inputs_ones: HashMap<usize, Vec<(usize, Option<Wire>)>> =
+        HashMap::new();
+
+    {
+        for i in 0..c.num_evaluator_inputs() {
+            let channel_temp = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
+            let mut evaluator_temp = Evaluator::new(channel_temp);
+
+            let mut evaluator_inputs = vec![0; c.num_evaluator_inputs()];
+
+            evaluator_inputs[i] = 1;
+            // TODO(interstellar) there is a LOT of work dup b/w loop iterations
+            //  This SHOULD be refactored into "pregen inputs all 0" + "pregen inputs all 1" and combine as needed
+            let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
+            let garbler_inputs = vec![0; c.num_garbler_inputs()];
+            let garbler_inputs = &en.encode_garbler_inputs(&garbler_inputs);
+
+            let cache_temp = eval_prepare(
+                &mut evaluator_temp,
+                &garbler_inputs,
+                &evaluator_inputs,
+                &c.gates,
+                &c.gate_moduli,
+            )
+            .unwrap();
+
+            assert_eq!(
+                cache_temp.len(),
+                cache_zeros.len(),
+                "caches MUST be the same size!"
+            );
+
+            for (cache_idx, cache_zero_wire) in cache_zeros.iter().enumerate() {
+                if &cache_temp[cache_idx] != cache_zero_wire {
+                    map_patch_evaluator_inputs_ones
+                        .entry(i)
+                        .or_insert(Vec::new())
+                        .push((cache_idx, cache_temp[cache_idx].clone()));
+                }
+            }
+        }
+
+        // println!("cache_ones : {:?}", cache_ones);
+    }
 
     // TODO(interstellar) pass map_garbler_inputs_id_to_gate_id+map_evaluator_input_id_to_gate_id to GarbledCircuit::new
     //  and use them during "fn eval"
@@ -166,7 +231,8 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     let gc = GarbledCircuit::new(
         blocks,
         c.output_refs,
-        cache2,
+        cache_zeros,
+        map_patch_evaluator_inputs_ones,
         reader.index,
         evaluator.get_current_gate(),
     );
