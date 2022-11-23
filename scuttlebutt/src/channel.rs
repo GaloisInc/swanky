@@ -229,6 +229,11 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.reader
     }
 
+    /// Return a reader object wrapped in `Rc<RefCell>`.
+    pub fn reader_ptr(&self) -> *const R {
+        (*self.reader).as_ptr()
+    }
+
     /// Return a writer object wrapped in `Rc<RefCell>`.
     pub fn writer(self) -> Rc<RefCell<W>> {
         self.writer

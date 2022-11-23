@@ -15,7 +15,7 @@ use crate::{
     wire::Wire,
 };
 use itertools::Itertools;
-use scuttlebutt::{channel, AbstractChannel, AesRng, Block, Channel};
+use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
 use std::{collections::HashMap, convert::TryInto, rc::Rc};
 
 /// Static evaluator for a circuit, created by the `garble` function.
@@ -27,13 +27,9 @@ pub struct GarbledCircuit {
     blocks: Vec<Block>,
     // TODO(interstellar) remove Circuit; and possibly refactor output_refs/cache/etc
     // TODO(interstellar) are Evaluator and output_refs OK to be kept around? are they serializable?
-    // circuit: Circuit,
-    // gates: Vec<Gate>,
-    // gate_moduli: Vec<u16>,
     output_refs: Vec<CircuitRef>,
-    // channel: Channel<GarbledReader, GarbledWriter>,
     cache: Vec<Option<Wire>>,
-    // This field allows calling "eval" repeatedly on the same GarbledCircuit(Evaluator)
+    // This fields allows calling "eval" repeatedly on the same GarbledCircuit(Evaluator)
     // Without it, it fails with eg "panicked at 'index out of bounds: the len is 12 but the index is 12'"
     reader_index: usize,
     evaluator_current_gate: usize,
@@ -72,6 +68,15 @@ impl GarbledCircuit {
         let channel = Channel::new(reader, GarbledWriter::new(None));
 
         let mut evaluator = Evaluator::new_with_current_gate(channel, self.evaluator_current_gate);
+
+        // We MUST set garbler_inputs/evaluator_inputs to their correct values.
+        // This is what "fn eval_prepare" is doing.
+        for (i, garbler_input_wire) in garbler_inputs.iter().enumerate() {
+            self.cache[i] = Some(garbler_input_wire.clone());
+        }
+        for (i, evaluator_input_wire) in evaluator_inputs.iter().enumerate() {
+            self.cache[i] = Some(evaluator_input_wire.clone());
+        }
 
         let outputs = eval_eval(&self.cache, &mut evaluator, &self.output_refs)?;
 
@@ -121,9 +126,9 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     // TODO(interstellar) how to prepare "generic inputs" at this stage??? We DO NOT want to set them in stone now!
 
     let channel = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
-    let mut evaluator = Evaluator::new(channel.clone());
+    let mut evaluator = Evaluator::new(channel);
 
-    let evaluator_inputs = vec![0; c.num_evaluator_inputs()];
+    let evaluator_inputs = vec![1; c.num_evaluator_inputs()];
     let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
     let garbler_inputs = vec![0; c.num_garbler_inputs()];
     let garbler_inputs = &en.encode_garbler_inputs(&garbler_inputs);
@@ -137,9 +142,34 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     )
     .unwrap();
 
+    // TODO(interstellar) pass map_garbler_inputs_id_to_gate_id+map_evaluator_input_id_to_gate_id to GarbledCircuit::new
+    //  and use them during "fn eval"
+    let mut map_garbler_inputs_id_to_gate_id = vec![None; c.num_garbler_inputs()];
+    let mut map_evaluator_input_id_to_gate_id = vec![None; c.num_evaluator_inputs()];
+    for (i, gate) in c.gates.iter().enumerate() {
+        match *gate {
+            Gate::GarblerInput { id } => {
+                map_garbler_inputs_id_to_gate_id[i] = Some(id);
+            }
+            Gate::EvaluatorInput { id } => {
+                map_evaluator_input_id_to_gate_id[i] = Some(id);
+            }
+            _ => {}
+        };
+    }
+
     // END BLOCK
 
-    let gc = GarbledCircuit::new(blocks, c.output_refs, cache2, 8, 3);
+    // TODO(interstellar) modify Swanky API to get "index" properly
+    let reader: &GarbledReader = unsafe { &(*evaluator.get_channel_ref().reader_ptr()) };
+
+    let gc = GarbledCircuit::new(
+        blocks,
+        c.output_refs,
+        cache2,
+        reader.index,
+        evaluator.get_current_gate(),
+    );
 
     Ok((en, gc))
 }
