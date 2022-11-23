@@ -32,6 +32,15 @@ impl<C: AbstractChannel> Evaluator<C> {
         }
     }
 
+    /// Create a new `Evaluator` with a given "current_gate"
+    pub fn new_with_current_gate(channel: C, current_gate: usize) -> Self {
+        Evaluator {
+            channel,
+            current_gate: current_gate,
+            current_output: 0,
+        }
+    }
+
     /// The current non-free gate index of the garbling computation.
     fn current_gate(&mut self) -> usize {
         let current = self.current_gate;

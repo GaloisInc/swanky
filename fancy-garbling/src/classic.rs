@@ -15,7 +15,7 @@ use crate::{
     wire::Wire,
 };
 use itertools::Itertools;
-use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
+use scuttlebutt::{channel, AbstractChannel, AesRng, Block, Channel};
 use std::{collections::HashMap, convert::TryInto, rc::Rc};
 
 /// Static evaluator for a circuit, created by the `garble` function.
@@ -31,27 +31,29 @@ pub struct GarbledCircuit {
     // gates: Vec<Gate>,
     // gate_moduli: Vec<u16>,
     output_refs: Vec<CircuitRef>,
-    evaluator: Evaluator<Channel<GarbledReader, GarbledWriter>>,
+    // channel: Channel<GarbledReader, GarbledWriter>,
     cache: Vec<Option<Wire>>,
+    // This field allows calling "eval" repeatedly on the same GarbledCircuit(Evaluator)
+    // Without it, it fails with eg "panicked at 'index out of bounds: the len is 12 but the index is 12'"
+    reader_index: usize,
+    evaluator_current_gate: usize,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(
         blocks: Vec<Block>,
-        // gates: Vec<Gate>,
-        // gate_moduli: Vec<u16>,
         output_refs: Vec<CircuitRef>,
-        evaluator: Evaluator<Channel<GarbledReader, GarbledWriter>>,
         cache: Vec<Option<Wire>>,
+        reader_index: usize,
+        evaluator_current_gate: usize,
     ) -> Self {
         GarbledCircuit {
             blocks,
-            // gates,
-            // gate_moduli,
             output_refs,
-            evaluator,
             cache,
+            reader_index,
+            evaluator_current_gate,
         }
     }
 
@@ -66,17 +68,12 @@ impl GarbledCircuit {
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
-        // let channel = Channel::new(GarbledReader::new(&self.blocks), GarbledWriter::new(None));
-        // let mut evaluator = Evaluator::new(channel);
+        let reader = GarbledReader::new_with_index(&self.blocks, self.reader_index);
+        let channel = Channel::new(reader, GarbledWriter::new(None));
 
-        // let cache = eval_prepare(
-        //     &mut evaluator,
-        //     &garbler_inputs,
-        //     &evaluator_inputs,
-        //     &self.gates,
-        //     &self.gate_moduli,
-        // )?;
-        let outputs = eval_eval(&self.cache, &mut self.evaluator, &self.output_refs)?;
+        let mut evaluator = Evaluator::new_with_current_gate(channel, self.evaluator_current_gate);
+
+        let outputs = eval_eval(&self.cache, &mut evaluator, &self.output_refs)?;
 
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
@@ -124,7 +121,7 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     // TODO(interstellar) how to prepare "generic inputs" at this stage??? We DO NOT want to set them in stone now!
 
     let channel = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
-    let mut evaluator = Evaluator::new(channel);
+    let mut evaluator = Evaluator::new(channel.clone());
 
     let evaluator_inputs = vec![0; c.num_evaluator_inputs()];
     let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
@@ -142,7 +139,7 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
 
     // END BLOCK
 
-    let gc = GarbledCircuit::new(blocks, c.output_refs, evaluator, cache2);
+    let gc = GarbledCircuit::new(blocks, c.output_refs, cache2, 8, 3);
 
     Ok((en, gc))
 }
@@ -232,6 +229,13 @@ impl GarbledReader {
         Self {
             blocks: blocks.to_vec(),
             index: 0,
+        }
+    }
+
+    fn new_with_index(blocks: &[Block], index: usize) -> Self {
+        Self {
+            blocks: blocks.to_vec(),
+            index: index,
         }
     }
 }
