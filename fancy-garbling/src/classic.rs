@@ -8,7 +8,7 @@
 //! circuit without streaming.
 
 use crate::{
-    circuit::{eval_eval, eval_prepare, Circuit, CircuitRef, Gate},
+    circuit::Circuit,
     errors::{EvaluatorError, GarblerError},
     fancy::HasModulus,
     garble::{Evaluator, Garbler},
@@ -25,35 +25,15 @@ use std::{collections::HashMap, convert::TryInto, rc::Rc};
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
-    // TODO(interstellar) remove Circuit; and possibly refactor output_refs/cache/etc
-    // TODO(interstellar) are Evaluator and output_refs OK to be kept around? are they serializable?
-    output_refs: Vec<CircuitRef>,
-    cache_zeros: Vec<Option<Wire>>,
-    map_patch_evaluator_inputs_ones: HashMap<usize, Vec<(usize, Option<Wire>)>>,
-    // This fields allows calling "eval" repeatedly on the same GarbledCircuit(Evaluator)
-    // Without it, it fails with eg "panicked at 'index out of bounds: the len is 12 but the index is 12'"
-    reader_index: usize,
-    evaluator_current_gate: usize,
+    // TODO(interstellar) can we remove Circuit; and possibly refactor output_refs/cache/etc
+    //  Should we remove Circuit? Does it leak critical data to the client?
+    circuit: Circuit,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
-    pub fn new(
-        blocks: Vec<Block>,
-        output_refs: Vec<CircuitRef>,
-        cache_zeros: Vec<Option<Wire>>,
-        map_patch_evaluator_inputs_ones: HashMap<usize, Vec<(usize, Option<Wire>)>>,
-        reader_index: usize,
-        evaluator_current_gate: usize,
-    ) -> Self {
-        GarbledCircuit {
-            blocks,
-            output_refs,
-            cache_zeros,
-            map_patch_evaluator_inputs_ones,
-            reader_index,
-            evaluator_current_gate,
-        }
+    pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
+        GarbledCircuit { blocks, circuit }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
@@ -63,42 +43,18 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit.
     pub fn eval(
-        &mut self,
-        encoder: &Encoder,
-        garbler_inputs: &[u16],
-        evaluator_inputs: &[u16],
+        &self,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
     ) -> Result<Vec<u16>, EvaluatorError> {
-        let reader = GarbledReader::new_with_index(&self.blocks, self.reader_index);
+        let reader = GarbledReader::new(&self.blocks);
         let channel = Channel::new(reader, GarbledWriter::new(None));
 
-        let mut evaluator = Evaluator::new_with_current_gate(channel, self.evaluator_current_gate);
+        let mut evaluator = Evaluator::new(channel);
 
-        let cache = &mut self.cache_zeros;
-
-        // We MUST set garbler_inputs/evaluator_inputs to their correct values.
-        // This is what "fn eval_prepare" is doing.
-        for (i, garbler_input) in garbler_inputs.iter().enumerate() {
-            // cache[i] = Some(garbler_input_wire.clone());
-
-            cache[i] = Some(encoder.encode_garbler_input(*garbler_input, i));
-
-            if *garbler_input == 1 {
-                todo!("same as below for evaluator_input, and add corresponding map map_patch_evaluator_inputs_ones");
-            }
-        }
-        for (i, evaluator_input) in evaluator_inputs.iter().enumerate() {
-            // cache[i] = Some(evaluator_input_wire.clone());
-
-            cache[i] = Some(encoder.encode_evaluator_input(*evaluator_input, i));
-
-            if *evaluator_input == 1 {
-                for (idx, wire) in self.map_patch_evaluator_inputs_ones[&i].iter() {
-                    cache[*idx] = wire.clone();
-                }
-            }
-        }
-
-        let outputs = eval_eval(&cache, &mut evaluator, &self.output_refs)?;
+        let outputs = self
+            .circuit
+            .eval(&mut evaluator, &garbler_inputs, &evaluator_inputs)?;
 
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
     }
@@ -132,8 +88,7 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
         })
         .collect_vec();
 
-    let cache = eval_prepare(&mut garbler, &gb_inps, &ev_inps, &c.gates, &c.gate_moduli)?;
-    eval_eval(&cache, &mut garbler, &c.output_refs)?;
+    c.eval(&mut garbler, &gb_inps, &ev_inps)?;
 
     let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
 
@@ -142,100 +97,7 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
         .into_inner()
         .blocks;
 
-    // BEGIN BLOCK
-    // TODO(interstellar) how to prepare "generic inputs" at this stage??? We DO NOT want to set them in stone now!
-
-    let channel = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
-    let mut evaluator = Evaluator::new(channel);
-
-    let evaluator_inputs = vec![0; c.num_evaluator_inputs()];
-    let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
-    let garbler_inputs = vec![0; c.num_garbler_inputs()];
-    let garbler_inputs = &en.encode_garbler_inputs(&garbler_inputs);
-
-    let cache_zeros = eval_prepare(
-        &mut evaluator,
-        &garbler_inputs,
-        &evaluator_inputs,
-        &c.gates,
-        &c.gate_moduli,
-    )
-    .unwrap();
-
-    let mut map_patch_evaluator_inputs_ones: HashMap<usize, Vec<(usize, Option<Wire>)>> =
-        HashMap::new();
-
-    {
-        for i in 0..c.num_evaluator_inputs() {
-            let channel_temp = Channel::new(GarbledReader::new(&blocks), GarbledWriter::new(None));
-            let mut evaluator_temp = Evaluator::new(channel_temp);
-
-            let mut evaluator_inputs = vec![0; c.num_evaluator_inputs()];
-
-            evaluator_inputs[i] = 1;
-            // TODO(interstellar) there is a LOT of work dup b/w loop iterations
-            //  This SHOULD be refactored into "pregen inputs all 0" + "pregen inputs all 1" and combine as needed
-            let evaluator_inputs = &en.encode_evaluator_inputs(&evaluator_inputs);
-            let garbler_inputs = vec![0; c.num_garbler_inputs()];
-            let garbler_inputs = &en.encode_garbler_inputs(&garbler_inputs);
-
-            let cache_temp = eval_prepare(
-                &mut evaluator_temp,
-                &garbler_inputs,
-                &evaluator_inputs,
-                &c.gates,
-                &c.gate_moduli,
-            )
-            .unwrap();
-
-            assert_eq!(
-                cache_temp.len(),
-                cache_zeros.len(),
-                "caches MUST be the same size!"
-            );
-
-            for (cache_idx, cache_zero_wire) in cache_zeros.iter().enumerate() {
-                if &cache_temp[cache_idx] != cache_zero_wire {
-                    map_patch_evaluator_inputs_ones
-                        .entry(i)
-                        .or_insert(Vec::new())
-                        .push((cache_idx, cache_temp[cache_idx].clone()));
-                }
-            }
-        }
-
-        // println!("cache_ones : {:?}", cache_ones);
-    }
-
-    // TODO(interstellar) pass map_garbler_inputs_id_to_gate_id+map_evaluator_input_id_to_gate_id to GarbledCircuit::new
-    //  and use them during "fn eval"
-    let mut map_garbler_inputs_id_to_gate_id = vec![None; c.num_garbler_inputs()];
-    let mut map_evaluator_input_id_to_gate_id = vec![None; c.num_evaluator_inputs()];
-    for (i, gate) in c.gates.iter().enumerate() {
-        match *gate {
-            Gate::GarblerInput { id } => {
-                map_garbler_inputs_id_to_gate_id[i] = Some(id);
-            }
-            Gate::EvaluatorInput { id } => {
-                map_evaluator_input_id_to_gate_id[i] = Some(id);
-            }
-            _ => {}
-        };
-    }
-
-    // END BLOCK
-
-    // TODO(interstellar) modify Swanky API to get "index" properly
-    let reader: &GarbledReader = unsafe { &(*evaluator.get_channel_ref().reader_ptr()) };
-
-    let gc = GarbledCircuit::new(
-        blocks,
-        c.output_refs,
-        cache_zeros,
-        map_patch_evaluator_inputs_ones,
-        reader.index,
-        evaluator.get_current_gate(),
-    );
+    let gc = GarbledCircuit::new(blocks, c);
 
     Ok((en, gc))
 }
@@ -315,7 +177,7 @@ impl Encoder {
 
 /// Implementation of the `Read` trait for use by the `Evaluator`.
 #[derive(Debug)]
-pub struct GarbledReader {
+struct GarbledReader {
     blocks: Vec<Block>,
     index: usize,
 }
@@ -325,13 +187,6 @@ impl GarbledReader {
         Self {
             blocks: blocks.to_vec(),
             index: 0,
-        }
-    }
-
-    fn new_with_index(blocks: &[Block], index: usize) -> Self {
-        Self {
-            blocks: blocks.to_vec(),
-            index: index,
         }
     }
 }
