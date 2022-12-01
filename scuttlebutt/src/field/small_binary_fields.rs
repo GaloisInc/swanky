@@ -360,7 +360,7 @@ fn polynomial_modulus_f56b() -> Polynomial<F2> {
 }
 
 small_binary_field!(
-    /// An element of the finite field $`\textsf{GF}(2^{63})`$ reduced over $`x^{63} + x + 1`$
+    /// An element of the finite field $`\textsf{GF}(2^{56})`$ reduced over $`x^{56} + x^8 + x^3 + x^2 + 1`$
     F56b,
     f56b,
     num_bits = generic_array::typenum::U56,
