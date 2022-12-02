@@ -18,14 +18,11 @@ As more intrinsics get stabilized in Rust, and as we get access to newer hardwar
 # Generated Code
 While vectoreyes initially started as a pile of macros and traits, it was easier to develop by generating code using Python (and the jinja2 templating language). The generated code is checked in to avoid the dependency on Python at build-time.
 
-# Minimum Supported Rust Version
-This code extensively uses `min_const_generics`. This feature is currently in Rust's beta release. It will enter Rust's stable release on 03/25/2021.
-
 # External Resources
-This merge request checks in two files by external authors. If there are issues re-distributing either of these files, the `generate.py` script could probably just download them when it's run.
-
-## `vectoreyes/src/codegen/uops.info-Oct2020.xml.xz`
-This file from https://uops.info/ contains the latency and throughput info that is embedded in the documentation. I've found this information to be very valuable when developing. I couldn't find any licensing info on their website. I can reach out to the authors to ask about licensing info. Alternatively, there are other sources we could pull from. Or, worse case, we could remove the performance numbers altogether (though that would be a shame, since it's super useful!).
 
 ## `vectoreyes/src/codegen/intel-intrinsics-3.4.5.xml.xz`
 This file is provided by Intel and contains information on each of the platform intrinsics. I could not find any licensing on it. However, it seems to be pretty regularly included in code repos (e.g. [by rust](https://github.com/rust-lang/stdarch/blob/master/crates/stdarch-verify/x86-intel.xml)).
+
+# Documentation
+The generated code which is checked in _does not_ use data from https://uops.info/ to enhance the documentation.
+If you want to see additional performance information in the vectoryes documentation, download an `instructions.xml` file from [the uops.info website](https://uops.info/xml.html), and set the `UOPS_INFO_XML` to the path of the XML file.

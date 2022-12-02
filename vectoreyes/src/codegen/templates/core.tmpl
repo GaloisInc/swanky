@@ -197,25 +197,33 @@ macro_rules! select_impl_block {
             {% if intrinsic.sequence() %}
             /// Instruction sequence.
             {% else %}
+                {% set displayed_perf_numbers = False %}
                 {% for instruction in intrinsic.instructions() %}
-                    /// [`{{instruction}}`]({{instruction.reference_url}}): {{instruction.summary}}
-                    ///
-                    /// <table style="line-height:0.7">
-                    /// <thead><tr>
-                    /// <th class="perf-table-architecture-heading">Architecture</th>
-                    /// <th>Latency (cycles)</th>
-                    /// <th>Throughput (CPI)</th>
-                    /// </tr></thead><tbody>
-                    {% for platform, key in avx2_intrinsic_builder.DISPLAY_PERF_NUMBERS_FOR.items() %}
-                        /// <tr class="perf-table-entry-{{key}}">
-                            /// <td><a href="{{instruction.perf_url}}#{{key}}">{{ platform }}</a></td>
-                            /// <td>{{instruction.perf[key] | render_latency}}</td>
-                            /// <td>{{instruction.perf[key]["throughput"]}}</td>
-                        /// </tr>
-                    {% endfor %}
-                    /// </tbody></table>
+                    {% if instruction.reference_url and instruction.summary %}
+                        /// [`{{instruction}}`]({{instruction.reference_url}}): {{instruction.summary}}
+                    {% else %}
+                        /// * `{{instruction}}`
+                    {% endif %}
+                    {% if instruction.perf %}
+                        {% set displayed_perf_numbers = True %}
+                        ///
+                        /// <table style="line-height:0.7">
+                        /// <thead><tr>
+                        /// <th class="perf-table-architecture-heading">Architecture</th>
+                        /// <th>Latency (cycles)</th>
+                        /// <th>Throughput (CPI)</th>
+                        /// </tr></thead><tbody>
+                        {% for platform, key in avx2_intrinsic_builder.DISPLAY_PERF_NUMBERS_FOR.items() %}
+                            /// <tr class="perf-table-entry-{{key}}">
+                                /// <td><a href="{{instruction.perf_url}}#{{key}}">{{ platform }}</a></td>
+                                /// <td>{{instruction.perf[key] | render_latency}}</td>
+                                /// <td>{{instruction.perf[key]["throughput"]}}</td>
+                            /// </tr>
+                        {% endfor %}
+                        /// </tbody></table>
+                    {% endif %}
                 {% endfor %}
-                {% if intrinsic.instructions() %}
+                {% if displayed_perf_numbers %}
                     ///
                     /// _<span style="font-size:0.8em;float:right">Performance numbers are measurements from [uops.info](https://uops.info/).</span>_ <div style="clear:both"></div>
                 {% endif %}

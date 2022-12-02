@@ -1,11 +1,10 @@
-import dbm
+import dataclasses
 import json
 import lzma
 import os
-import subprocess
+import typing
 import xml.etree.ElementTree as ET
 from collections import namedtuple
-from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
@@ -19,80 +18,74 @@ with lzma.open(INTEL_INTRINSICS_XML_XZ) as compressed_xml:
         x.get("name"): x for x in ET.parse(compressed_xml).getroot()
     }
 
-# This is a compressed version of the March 2021 XML table from uops.info
-UOPS_INFO_XML_XZ = Path(__file__).resolve().parent / "uops.info-Mar2021.xml.xz"
+if "UOPS_INFO_XML" in os.environ:
+    UOPS_INFO_DB = dict()
+    _Latency = namedtuple("_Latency", "value is_exact")
+    with open(os.environ["UOPS_INFO_XML"]) as xml:
+        UOPS_XML = ET.parse(xml)
+
+    def perf(arch):
+        measurement = arch.find("measurement")
+        if measurement is None:
+            return None
+        min_latency = _Latency(0x10000, True)
+        max_latency = _Latency(0, False)
+        for latency_elem in measurement.findall("latency"):
+            for k, v in latency_elem.attrib.items():
+                if "cycles" not in k or "upper_bound" in k:
+                    continue
+                l = _Latency(int(v), not latency_elem.get(f"{k}_is_upper_bound"))
+                min_latency = min(l, min_latency)
+                max_latency = max(l, max_latency)
+        return dict(
+            # TODO: is "unrolled" the right "default" to fall back to?
+            throughput=measurement.get("TP", measurement.get("TP_unrolled")),
+            min_latency=min_latency._asdict(),
+            max_latency=max_latency._asdict(),
+        )
+
+    for ext in UOPS_XML.getroot():
+        for insn in ext:
+            iform = insn.get("iform")
+            if not iform:
+                continue
+            key = iform
+            if key in UOPS_INFO_DB:
+                # db[key] = {"has_duplicate": True}
+                continue
+            data = dict(
+                url=insn.get("url"),
+                ref_url=insn.get("url-ref"),
+                string=insn.get("string"),
+                summary=insn.get("summary"),
+                perf={
+                    arch.get("name"): perf(arch)
+                    for arch in insn.findall("architecture")
+                    if arch.find("measurement")
+                },
+            )
+            UOPS_INFO_DB[key] = data
+else:
+    UOPS_INFO_DB = None
 
 SWANKY_CACHE_DIR = (
     Path(os.environ["SWANKY_CACHE_DIR"]) / "avx2-uops.info-dbm-cache"
     if "SWANKY_CACHE_DIR" in os.environ
-    else UOPS_INFO_XML_XZ.parent
+    else Path(__file__).resolve().parent
 )
-# NOTE: update version v every time the extraction algorithm changes to ensure that the cache
-# never becomes stale.
-UOPS_INFO_DB = (
-    SWANKY_CACHE_DIR / f"{sha256(UOPS_INFO_XML_XZ.read_bytes()).hexdigest()}.v1.dbm"
-)
-if not UOPS_INFO_DB.exists():
-    _Latency = namedtuple("_Latency", "value is_exact")
-    UOPS_INFO_DB.parent.mkdir(exist_ok=True)
-    tmp = UOPS_INFO_DB.parent / f"{uuid4()}.tmp.dbm"
-    with dbm.open(str(tmp), "n") as db:
-        with lzma.open(str(UOPS_INFO_XML_XZ)) as compressed_xml:
-            UOPS_XML = ET.parse(compressed_xml)
-
-        def perf(arch):
-            measurement = arch.find("measurement")
-            if measurement is None:
-                return None
-            min_latency = _Latency(0x10000, True)
-            max_latency = _Latency(0, False)
-            for latency_elem in measurement.findall("latency"):
-                for k, v in latency_elem.attrib.items():
-                    if "cycles" not in k or "upper_bound" in k:
-                        continue
-                    l = _Latency(int(v), not latency_elem.get(f"{k}_is_upper_bound"))
-                    min_latency = min(l, min_latency)
-                    max_latency = max(l, max_latency)
-            return dict(
-                # TODO: is "unrolled" the right "default" to fall back to?
-                throughput=measurement.get("TP", measurement.get("TP_unrolled")),
-                min_latency=min_latency._asdict(),
-                max_latency=max_latency._asdict(),
-            )
-
-        for ext in UOPS_XML.getroot():
-            for insn in ext:
-                iform = insn.get("iform")
-                if not iform:
-                    continue
-                key = iform.encode("ascii")
-                if key in db:
-                    db[key] = b'{"has_duplicate": true}'
-                    continue
-                data = dict(
-                    url=insn.get("url"),
-                    ref_url=insn.get("url-ref"),
-                    string=insn.get("string"),
-                    summary=insn.get("summary"),
-                    perf={
-                        arch.get("name"): perf(arch)
-                        for arch in insn.findall("architecture")
-                        if arch.find("measurement")
-                    },
-                )
-                db[key] = json.dumps(data).encode("ascii")
-    tmp.rename(UOPS_INFO_DB)
-UOPS_INFO_DB = dbm.open(str(UOPS_INFO_DB))
 
 
 def uops_info(iform):
-    key = iform.encode("ascii")
-    if key not in UOPS_INFO_DB:
+    if UOPS_INFO_DB is None:
         return None
-    return json.loads(UOPS_INFO_DB[key])
+    return UOPS_INFO_DB.get(iform)
 
 
-class IntelInstruction(namedtuple("IntelInstruction", "xml uops_info")):
+@dataclasses.dataclass(frozen=True)
+class IntelInstruction:
+    xml: typing.Any
+    uops_info: typing.Any
+
     @property
     def name(self):
         return self.xml.get("name")
@@ -107,19 +100,31 @@ class IntelInstruction(namedtuple("IntelInstruction", "xml uops_info")):
 
     @property
     def reference_url(self):
-        return "https://" + self.uops_info["ref_url"]
+        if self.uops_info:
+            return "https://" + self.uops_info["ref_url"]
+        else:
+            return None
 
     @property
     def perf_url(self):
-        return "https://" + self.uops_info["url"]
+        if self.uops_info:
+            return "https://" + self.uops_info["url"]
+        else:
+            return None
 
     @property
     def summary(self):
-        return self.uops_info["summary"]
+        if self.uops_info:
+            return self.uops_info["summary"]
+        else:
+            return None
 
     @property
     def perf(self):
-        return self.uops_info["perf"]
+        if self.uops_info:
+            return self.uops_info["perf"]
+        else:
+            return None
 
     def __str__(self):
         if self.uops_info:
