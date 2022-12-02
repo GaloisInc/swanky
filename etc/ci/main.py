@@ -30,8 +30,10 @@ def restore_cargo_config():
     subprocess.check_call(["git", "checkout", ".cargo/config"], cwd=str(ROOT))
 
 
-def pretty_check_call(args, help_on_failure: str = "", extra_env: Dict[str, str] = {}):
-    rc = subprocess.call(args, cwd=str(ROOT), env=os.environ | extra_env)
+def pretty_check_call(
+    args, help_on_failure: str = "", extra_env: Dict[str, str] = {}, stdout=None
+):
+    rc = subprocess.call(args, cwd=str(ROOT), env=os.environ | extra_env, stdout=stdout)
     if rc != 0:
         typer.secho(f"ERROR: Command {args} failed with {rc}", fg=typer.colors.RED)
         if help_on_failure:
@@ -176,6 +178,14 @@ def ci(nightly: bool = False):
     os.environ["CARGO_TARGET_X86_64_UNKNOWN_LINUX_LINKER"] = str(
         ROOT / "etc/ci/wrappers/linker.sh"
     )
+    # Check the Cargo.lock file FIRST so that tools don't have a chance to update it before we can
+    # check it.
+    with gitlab_ci_section("Check Cargo.lock is up-to-date"):
+        pretty_check_call(
+            ["cargo", "metadata", "--format-version=1", "--locked"],
+            stdout=subprocess.DEVNULL,
+            help_on_failure="To fix this, run `cargo update`",
+        )
     with gitlab_ci_section("Code Formatting"):
         pretty_check_call(
             ["cargo", "fmt", "--", "--check"],
