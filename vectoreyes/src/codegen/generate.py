@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#!nix-shell --pure -i python3 ../../../etc/nix/vectoreyes-codegen.nix
+#!nix-shell --keep UOPS_INFO_XML --pure -i python3 ../../../etc/nix/vectoreyes-codegen.nix
 import json
 import re
 import shutil
