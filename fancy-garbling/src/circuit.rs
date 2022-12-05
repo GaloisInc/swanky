@@ -123,6 +123,28 @@ fn eval_prepare<F: Fancy>(
     gate_moduli: &[u16],
 ) -> Result<Vec<Option<F::Item>>, F::Error> {
     let mut cache: Vec<Option<F::Item>> = vec![None; gates.len()];
+
+    eval_prepare_with_prealloc(
+        f,
+        garbler_inputs,
+        evaluator_inputs,
+        gates,
+        gate_moduli,
+        &mut cache,
+    )?;
+
+    Ok(cache)
+}
+
+fn eval_prepare_with_prealloc<F: Fancy>(
+    f: &mut F,
+    garbler_inputs: &[F::Item],
+    evaluator_inputs: &[F::Item],
+    gates: &[Gate],
+    gate_moduli: &[u16],
+    cache: &mut Vec<Option<F::Item>>,
+) -> Result<(), F::Error> {
+    debug_assert_eq!(cache.len(), gates.len(), "cache is NOT the correct size!");
     for (i, gate) in gates.iter().enumerate() {
         let q = gate_moduli[i];
         let (zref_, val) = match *gate {
@@ -197,7 +219,7 @@ fn eval_prepare<F: Fancy>(
         cache[zref_.unwrap_or(i)] = Some(val);
     }
 
-    Ok(cache)
+    Ok(())
 }
 
 fn eval_eval<F: Fancy>(
@@ -206,6 +228,17 @@ fn eval_eval<F: Fancy>(
     output_refs: &[CircuitRef],
 ) -> Result<Option<Vec<u16>>, F::Error> {
     let mut outputs = Vec::with_capacity(output_refs.len());
+    eval_eval_with_prealloc(cache, f, output_refs, &mut outputs)?;
+    Ok(outputs.into_iter().collect())
+}
+
+fn eval_eval_with_prealloc<F: Fancy>(
+    cache: &[Option<F::Item>],
+    f: &mut F,
+    output_refs: &[CircuitRef],
+    outputs: &mut Vec<Option<u16>>,
+) -> Result<(), F::Error> {
+    outputs.clear();
     for r in output_refs.iter() {
         let r = cache[r.ix]
             .as_ref()
@@ -213,7 +246,8 @@ fn eval_eval<F: Fancy>(
         let out = f.output(r)?;
         outputs.push(out);
     }
-    Ok(outputs.into_iter().collect())
+
+    Ok(())
 }
 
 impl Circuit {
@@ -247,6 +281,28 @@ impl Circuit {
         )?;
 
         eval_eval(&cache, f, &self.output_refs)
+    }
+
+    /// fn eval: version with preallocated outputs
+    /// This is the client-side use case, where we call eval() inside a render loop
+    pub fn eval_with_prealloc<F: Fancy>(
+        &self,
+        f: &mut F,
+        garbler_inputs: &[F::Item],
+        evaluator_inputs: &[F::Item],
+        outputs: &mut Vec<Option<u16>>,
+        cache: &mut Vec<Option<F::Item>>,
+    ) -> Result<(), F::Error> {
+        eval_prepare_with_prealloc(
+            f,
+            garbler_inputs,
+            evaluator_inputs,
+            &self.gates,
+            &self.gate_moduli,
+            cache,
+        )?;
+
+        eval_eval_with_prealloc(&cache, f, &self.output_refs, outputs)
     }
 
     /// Evaluate the circuit in plaintext.

@@ -28,12 +28,18 @@ pub struct GarbledCircuit {
     // TODO(interstellar) can we remove Circuit; and possibly refactor output_refs/cache/etc
     //  Should we remove Circuit? Does it leak critical data to the client?
     circuit: Circuit,
+    /// Only needed for "eval_with_prealloc"
+    cache: Option<Vec<Option<Wire>>>,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
-        GarbledCircuit { blocks, circuit }
+        GarbledCircuit {
+            blocks,
+            circuit,
+            cache: None,
+        }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
@@ -57,6 +63,34 @@ impl GarbledCircuit {
             .eval(&mut evaluator, &garbler_inputs, &evaluator_inputs)?;
 
         Ok(outputs.expect("evaluator outputs always are Some(u16)"))
+    }
+
+    /// Evaluate the garbled circuit.
+    pub fn eval_with_prealloc(
+        &mut self,
+        garbler_inputs: &[Wire],
+        evaluator_inputs: &[Wire],
+        outputs: &mut Vec<Option<u16>>,
+    ) -> Result<(), EvaluatorError> {
+        let reader = GarbledReader::new(&self.blocks);
+        let channel = Channel::new(reader, GarbledWriter::new(None));
+
+        let mut evaluator = Evaluator::new(channel);
+
+        self.circuit.eval_with_prealloc(
+            &mut evaluator,
+            &garbler_inputs,
+            &evaluator_inputs,
+            outputs,
+            // TODO!!! expect("cache not init! MUST call init_cache()")
+            &mut self.cache.as_mut().unwrap(),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn init_cache(&mut self) {
+        self.cache = Some(vec![None; self.circuit.gates.len()]);
     }
 }
 
