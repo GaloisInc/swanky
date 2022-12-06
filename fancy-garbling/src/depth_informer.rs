@@ -13,7 +13,7 @@ use crate::{
 use std::cmp::max;
 
 /// Carries the depth of the computation.
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct DepthItem {
     modulus: u16,
     depth: usize,

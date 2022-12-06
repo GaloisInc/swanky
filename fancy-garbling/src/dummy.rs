@@ -18,7 +18,7 @@ use crate::{
 pub struct Dummy {}
 
 /// Wrapper around `u16`.
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct DummyVal {
     val: u16,
     modulus: u16,
@@ -141,7 +141,8 @@ impl Fancy for Dummy {
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
-        todo!()
+        // TODO(interstellar)!!! output_with_prealloc vs output
+        Ok(Some(x.val))
     }
 }
 

@@ -30,6 +30,7 @@ pub struct GarbledCircuit {
     circuit: Circuit,
     /// Only needed for "eval_with_prealloc"
     cache: Option<Vec<Option<Wire>>>,
+    temp_blocks: Option<Vec<Wire>>,
 }
 
 impl GarbledCircuit {
@@ -39,6 +40,7 @@ impl GarbledCircuit {
             blocks,
             circuit,
             cache: None,
+            temp_blocks: None,
         }
     }
 
@@ -84,6 +86,7 @@ impl GarbledCircuit {
             outputs,
             // TODO!!! expect("cache not init! MUST call init_cache()")
             &mut self.cache.as_mut().unwrap(),
+            &mut self.temp_blocks.as_mut().unwrap(),
         )?;
 
         Ok(())
@@ -91,6 +94,7 @@ impl GarbledCircuit {
 
     pub fn init_cache(&mut self) {
         self.cache = Some(vec![None; self.circuit.gates.len()]);
+        self.temp_blocks = Some(vec![Wire::default(); 2]);
     }
 }
 

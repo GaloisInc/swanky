@@ -16,7 +16,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct CircuitRef {
     pub(crate) ix: usize,
@@ -228,7 +228,8 @@ fn eval_eval<F: Fancy>(
     output_refs: &[CircuitRef],
 ) -> Result<Option<Vec<u16>>, F::Error> {
     let mut outputs = vec![None; output_refs.len()];
-    eval_eval_with_prealloc(cache, f, output_refs, &mut outputs)?;
+    let mut temp_blocks = vec![F::Item::default(); 2];
+    eval_eval_with_prealloc(cache, f, output_refs, &mut outputs, &mut temp_blocks)?;
     Ok(outputs.into_iter().collect())
 }
 
@@ -237,13 +238,14 @@ fn eval_eval_with_prealloc<F: Fancy>(
     f: &mut F,
     output_refs: &[CircuitRef],
     outputs: &mut Vec<Option<u16>>,
+    temp_blocks: &mut Vec<F::Item>,
 ) -> Result<(), F::Error> {
     debug_assert_eq!(output_refs.len(), outputs.len(), "outputs NOT init!");
     for (i, r) in output_refs.iter().enumerate() {
         let r = cache[r.ix]
             .as_ref()
             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
-        let out = f.output(r)?;
+        let out = f.output_with_prealloc(r, temp_blocks)?;
         outputs[i] = out;
     }
 
@@ -292,6 +294,7 @@ impl Circuit {
         evaluator_inputs: &[F::Item],
         outputs: &mut Vec<Option<u16>>,
         cache: &mut Vec<Option<F::Item>>,
+        temp_blocks: &mut Vec<F::Item>,
     ) -> Result<(), F::Error> {
         eval_prepare_with_prealloc(
             f,
@@ -302,7 +305,7 @@ impl Circuit {
             cache,
         )?;
 
-        eval_eval_with_prealloc(&cache, f, &self.output_refs, outputs)
+        eval_eval_with_prealloc(&cache, f, &self.output_refs, outputs, temp_blocks)
     }
 
     /// Evaluate the circuit in plaintext.

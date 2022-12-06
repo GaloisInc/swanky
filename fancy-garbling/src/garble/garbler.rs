@@ -358,8 +358,9 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
     fn output_with_prealloc(
         &mut self,
         x: &Self::Item,
-        temp_blocks: &mut Vec<Self::Item>,
+        _temp_blocks: &mut Vec<Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
-        todo!()
+        // TODO(interstellar)!!! output_with_prealloc vs output
+        self.output(x)
     }
 }
