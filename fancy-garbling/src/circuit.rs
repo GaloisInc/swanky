@@ -227,7 +227,7 @@ fn eval_eval<F: Fancy>(
     f: &mut F,
     output_refs: &[CircuitRef],
 ) -> Result<Option<Vec<u16>>, F::Error> {
-    let mut outputs = Vec::with_capacity(output_refs.len());
+    let mut outputs = vec![None; output_refs.len()];
     eval_eval_with_prealloc(cache, f, output_refs, &mut outputs)?;
     Ok(outputs.into_iter().collect())
 }
@@ -238,13 +238,13 @@ fn eval_eval_with_prealloc<F: Fancy>(
     output_refs: &[CircuitRef],
     outputs: &mut Vec<Option<u16>>,
 ) -> Result<(), F::Error> {
-    outputs.clear();
-    for r in output_refs.iter() {
+    debug_assert_eq!(output_refs.len(), outputs.len(), "outputs NOT init!");
+    for (i, r) in output_refs.iter().enumerate() {
         let r = cache[r.ix]
             .as_ref()
             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
         let out = f.output(r)?;
-        outputs.push(out);
+        outputs[i] = out;
     }
 
     Ok(())
@@ -496,6 +496,14 @@ impl Fancy for CircuitBuilder {
         // println!("output called");
         self.circ.output_refs.push(*xref);
         Ok(None)
+    }
+
+    fn output_with_prealloc(
+        &mut self,
+        xref: &CircuitRef,
+        temp_blocks: &mut Vec<CircuitRef>,
+    ) -> Result<Option<u16>, Self::Error> {
+        todo!()
     }
 }
 

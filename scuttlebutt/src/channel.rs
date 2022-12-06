@@ -166,6 +166,15 @@ pub trait AbstractChannel {
         (0..n).map(|_| self.read_block()).collect()
     }
 
+    /// Read `n` `Block`s from the channel.
+    #[inline(always)]
+    fn read_blocks_with_prealloc(&mut self, blocks: &mut Vec<&mut Block>) -> Result<()> {
+        for block in blocks.iter_mut() {
+            self.read_bytes(&mut *block.as_mut())?;
+        }
+        Ok(())
+    }
+
     /// Write a `Block512` to the channel.
     #[inline(always)]
     fn write_block512(&mut self, b: &Block512) -> Result<()> {

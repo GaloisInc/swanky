@@ -313,6 +313,14 @@ impl<F: Fancy> Fancy for Informer<F> {
         self.stats.outputs.push(x.modulus());
         Ok(result)
     }
+
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+    ) -> Result<Option<u16>, Self::Error> {
+        todo!()
+    }
 }
 
 impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {

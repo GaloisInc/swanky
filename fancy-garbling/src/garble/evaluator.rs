@@ -169,18 +169,34 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         }
     }
 
-    fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
+    fn output_with_prealloc(
+        &mut self,
+        x: &Wire,
+        temp_blocks: &mut Vec<Wire>,
+    ) -> Result<Option<u16>, EvaluatorError> {
+        use scuttlebutt::Block;
+
         let q = x.modulus();
         let i = self.current_output();
 
         // Receive the output ciphertext from the garbler
-        let ct = self.channel.read_blocks(q as usize)?;
+        debug_assert_eq!(
+            temp_blocks.len(),
+            q as usize,
+            "temp_blocks / q sizes mistmach!"
+        );
+        // TODO!!! is this doing a copy/assign?
+        let mut temp_wires: Vec<&mut Block> = temp_blocks
+            .iter_mut()
+            .map(|wire| wire.as_mut_block())
+            .collect();
+        self.channel.read_blocks_with_prealloc(&mut temp_wires)?;
 
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
         for k in 0..q {
             let hashed_wire = x.hash(output_tweak(i, k));
-            if hashed_wire == ct[k as usize] {
+            if hashed_wire == *temp_blocks[k as usize].as_mut_block() {
                 decoded = Some(k);
                 break;
             }
@@ -191,5 +207,13 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         } else {
             Err(EvaluatorError::DecodingFailed)
         }
+    }
+
+    fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
+        let q = x.modulus();
+        // let mut temp_blocks = vec![Block::default(); q.into()];
+        let mut temp_blocks = vec![Wire::default(); q.into()];
+
+        Ok(self.output_with_prealloc(x, &mut temp_blocks)?)
     }
 }

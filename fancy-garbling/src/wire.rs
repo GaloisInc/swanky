@@ -192,6 +192,14 @@ impl Wire {
         }
     }
 
+    pub fn as_mut_block(&mut self) -> &mut Block {
+        match self {
+            Wire::Mod2 { val } => &mut *val,
+            Wire::Mod3 { lsb, msb } => todo!(),
+            Wire::ModN { q, ref ds } => todo!(),
+        }
+    }
+
     /// The zero wire with modulus `q`.
     pub fn zero(q: u16) -> Self {
         match q {

@@ -260,6 +260,8 @@ pub trait Fancy {
     }
 
     /// Output a slice of wires.
+    // TODO(interstellar) outputs with prealloc? is this copying???
+    // TODO(interstellar) what is "outputs" vs "output"; is this what is calling the alloc in Callgrind profiling?
     fn outputs(&mut self, xs: &[Self::Item]) -> Result<Option<Vec<u16>>, Self::Error> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
@@ -267,4 +269,11 @@ pub trait Fancy {
         }
         Ok(zs.into_iter().collect())
     }
+
+    // TODO!!! this SHOULD probably by Self::Item instead of Block?
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+    ) -> Result<Option<u16>, Self::Error>;
 }

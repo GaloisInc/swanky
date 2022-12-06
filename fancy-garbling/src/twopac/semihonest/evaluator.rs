@@ -127,6 +127,14 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, Self::Error> {
         self.evaluator.output(&x).map_err(Self::Error::from)
     }
+
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+    ) -> Result<Option<u16>, Self::Error> {
+        todo!()
+    }
 }
 
 impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyReveal for Evaluator<C, RNG, OT> {

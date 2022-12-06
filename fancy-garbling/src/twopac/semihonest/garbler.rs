@@ -149,6 +149,14 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error> {
         self.garbler.output(x).map_err(Self::Error::from)
     }
+
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+    ) -> Result<Option<u16>, Self::Error> {
+        todo!()
+    }
 }
 
 impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> FancyReveal for Garbler<C, RNG, OT> {

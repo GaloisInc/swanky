@@ -354,4 +354,12 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         }
         Ok(None)
     }
+
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+    ) -> Result<Option<u16>, Self::Error> {
+        todo!()
+    }
 }

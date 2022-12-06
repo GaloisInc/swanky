@@ -135,6 +135,14 @@ impl Fancy for Dummy {
     fn output(&mut self, x: &DummyVal) -> Result<Option<u16>, Self::Error> {
         Ok(Some(x.val))
     }
+
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+    ) -> Result<Option<u16>, Self::Error> {
+        todo!()
+    }
 }
 
 impl FancyReveal for Dummy {
