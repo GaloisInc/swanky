@@ -7,6 +7,7 @@
 //! `Informer` runs a fancy computation and learns information from it.
 
 use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
+use core::hash::BuildHasher;
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -314,11 +315,11 @@ impl<F: Fancy> Fancy for Informer<F> {
         Ok(result)
     }
 
-    fn output_with_prealloc(
+    fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

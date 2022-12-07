@@ -12,6 +12,7 @@ use crate::{
     errors::{CircuitBuilderError, DummyError, FancyError},
     fancy::{BinaryBundle, CrtBundle, Fancy, FancyInput, HasModulus},
 };
+use core::hash::BuildHasher;
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -241,13 +242,13 @@ fn eval_eval<F: Fancy>(
     Ok(outputs.into_iter().collect())
 }
 
-pub fn eval_eval_with_prealloc<F: Fancy>(
+pub fn eval_eval_with_prealloc<F: Fancy, H: BuildHasher>(
     cache: &[Option<F::Item>],
     f: &mut F,
     output_refs: &[CircuitRef],
     outputs: &mut Vec<Option<u16>>,
     temp_blocks: &mut Vec<F::Item>,
-    hashes_cache: &mut HashMap<(F::Item, usize, u16), F::Item>,
+    hashes_cache: &mut HashMap<(F::Item, usize, u16), F::Item, H>,
 ) -> Result<(), F::Error> {
     debug_assert_eq!(output_refs.len(), outputs.len(), "outputs NOT init!");
     for (i, r) in output_refs.iter().enumerate() {
@@ -297,7 +298,7 @@ impl Circuit {
 
     /// fn eval: version with preallocated outputs
     /// This is the client-side use case, where we call eval() inside a render loop
-    pub fn eval_with_prealloc<F: Fancy>(
+    pub fn eval_with_prealloc<F: Fancy, H: BuildHasher>(
         &self,
         f: &mut F,
         garbler_inputs: &[F::Item],
@@ -305,7 +306,7 @@ impl Circuit {
         outputs: &mut Vec<Option<u16>>,
         cache: &mut Vec<Option<F::Item>>,
         temp_blocks: &mut Vec<F::Item>,
-        hashes_cache: &mut HashMap<(F::Item, usize, u16), F::Item>,
+        hashes_cache: &mut HashMap<(F::Item, usize, u16), F::Item, H>,
     ) -> Result<(), F::Error> {
         eval_prepare_with_prealloc(
             f,
@@ -519,11 +520,11 @@ impl Fancy for CircuitBuilder {
         Ok(None)
     }
 
-    fn output_with_prealloc(
+    fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         xref: &CircuitRef,
         temp_blocks: &mut Vec<CircuitRef>,
-        hashes_cache: &mut HashMap<(CircuitRef, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(CircuitRef, usize, u16), Self::Item, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

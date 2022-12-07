@@ -14,9 +14,13 @@ use crate::{
     garble::{Evaluator, Garbler},
     wire::Wire,
 };
+use fnv::FnvHasher;
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
+use std::hash::BuildHasherDefault;
 use std::{collections::HashMap, convert::TryInto, rc::Rc};
+
+type MyBuildHasher = BuildHasherDefault<FnvHasher>;
 
 /// Static evaluator for a circuit, created by the `garble` function.
 ///
@@ -31,7 +35,23 @@ pub struct GarbledCircuit {
     /// Only needed for "eval_with_prealloc"
     cache: Vec<Option<Wire>>,
     temp_blocks: Vec<Wire>,
-    hashes_cache: HashMap<(Wire, usize, u16), Wire>,
+    // default hasher:
+    // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
+    // eval_times : [65, 60, 56, 55, 56, 57, 58, 58, 57, 59]
+    // eval_datas : 10
+    // -----------------------------------------------------------------------
+    // twox-hash = "1.6.3"
+    // use twox_hash::XxHash64;
+    // BuildHasherDefault<XxHash64>
+    // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
+    // eval_times : [82, 67, 66, 67, 66, 64, 66, 67, 65, 65]
+    // eval_datas : 10
+    // -----------------------------------------------------------------------
+    // fnv = "1.0.7"
+    // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
+    // eval_times : [77, 64, 65, 66, 63, 68, 66, 68, 67, 64]
+    // eval_datas : 10
+    hashes_cache: HashMap<(Wire, usize, u16), Wire, MyBuildHasher>,
 }
 
 impl GarbledCircuit {
@@ -42,7 +62,7 @@ impl GarbledCircuit {
             circuit,
             cache: Vec::new(),
             temp_blocks: Vec::new(),
-            hashes_cache: HashMap::new(),
+            hashes_cache: HashMap::default(),
         }
     }
 
@@ -119,7 +139,15 @@ impl GarbledCircuit {
         self.temp_blocks = vec![Wire::default(); 2];
         // TODO(interstellar)!!! try different hashers; the default "provide resistance against HashDoS attacks"
         //  but this MAY not be needed
-        self.hashes_cache = HashMap::new();
+        // NOTE: typically there are around self.circuit.gates.len() / 2 entries in "hashes_cache" after "fn eval_with_prealloc"
+        // TODO(interstellar) bne with capacity: self.circuit.gates.len()
+
+        // self.hashes_cache = HashMap::with_capacity_and_hasher(
+        //     self.circuit.gates.len(),
+        //     BuildHasherDefault::from(RandomXxHashBuilder64::default()),
+        // );
+
+        // self.hashes_cache = HashMap
     }
 }
 

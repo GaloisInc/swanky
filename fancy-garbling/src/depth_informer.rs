@@ -10,6 +10,7 @@ use crate::{
     errors::FancyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
+use core::hash::BuildHasher;
 use std::cmp::max;
 use std::collections::HashMap;
 
@@ -178,11 +179,11 @@ impl Fancy for DepthInformer {
         Ok(None)
     }
 
-    fn output_with_prealloc(
+    fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

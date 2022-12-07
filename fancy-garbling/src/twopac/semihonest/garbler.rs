@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::{errors::TwopacError, Fancy, FancyInput, FancyReveal, Garbler as Gb, Wire};
+use core::hash::BuildHasher;
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
@@ -151,11 +152,11 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
         self.garbler.output(x).map_err(Self::Error::from)
     }
 
-    fn output_with_prealloc(
+    fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

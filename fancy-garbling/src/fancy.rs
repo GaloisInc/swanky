@@ -10,6 +10,7 @@
 //! create projections.
 
 use crate::errors::FancyError;
+use core::hash::BuildHasher;
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -69,11 +70,11 @@ pub trait Fancy {
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
 
     // TODO!!! this SHOULD probably by a (kind of &Self::Item), is this doable?
-    fn output_with_prealloc(
+    fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
     ) -> Result<Option<u16>, Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////

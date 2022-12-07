@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 use crate::{errors::TwopacError, Evaluator as Ev, Fancy, FancyInput, FancyReveal, Wire};
+use core::hash::BuildHasher;
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
@@ -129,11 +130,11 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
         self.evaluator.output(&x).map_err(Self::Error::from)
     }
 
-    fn output_with_prealloc(
+    fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         x: &Wire,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }
