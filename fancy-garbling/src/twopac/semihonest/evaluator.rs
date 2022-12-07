@@ -131,10 +131,9 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
 
     fn output_with_prealloc(
         &mut self,
-        cache: &[Option<Self::Item>],
-        cache_idx: usize,
+        x: &Wire,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(&Self::Item, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

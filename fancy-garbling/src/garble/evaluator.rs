@@ -177,17 +177,12 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     ///     Or rather "hashes_cache"
     /// param hashes_cache: cache the operation "x.hash(output_tweak(i, k))" in memory
     ///     because that is quite slow, and most of those are the same b/w eval(=render) loops
-    fn output_with_prealloc(
+    fn output_with_prealloc<'a>(
         &mut self,
-        cache: &[Option<Wire>],
-        cache_idx: usize,
+        x: &'a Wire,
         temp_blocks: &mut Vec<Wire>,
-        hashes_cache: &mut HashMap<(usize, usize, u16), Wire>,
+        hashes_cache: &mut HashMap<(&'a Wire, usize, u16), Wire>,
     ) -> Result<Option<u16>, EvaluatorError> {
-        let x = cache[cache_idx].as_ref().ok_or_else(|| {
-            EvaluatorError::FancyError(FancyError::InvalidArg("cache_idx".to_string()))
-        })?;
-
         let q = x.modulus();
         let i = self.current_output();
 
@@ -208,7 +203,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let mut decoded = None;
         for k in 0..q {
             let hashed_wire = hashes_cache
-                .entry((cache_idx, i, k))
+                .entry((x, i, k))
                 .or_insert(Wire::from_block(x.hash(output_tweak(i, k)), q));
             // let hashed_wire = x.hash(output_tweak(i, k));
             if hashed_wire.as_ref_block() == temp_blocks[k as usize].as_ref_block() {
@@ -229,8 +224,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         // let mut temp_blocks = vec![Block::default(); q.into()];
         let mut temp_blocks = vec![Wire::default(); q.into()];
         let mut hashes_cache = HashMap::new();
-        let cache = vec![Some(x.clone())];
 
-        Ok(self.output_with_prealloc(&cache, 0, &mut temp_blocks, &mut hashes_cache)?)
+        Ok(self.output_with_prealloc(x, &mut temp_blocks, &mut hashes_cache)?)
     }
 }

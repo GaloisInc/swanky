@@ -68,6 +68,14 @@ pub trait Fancy {
     /// output, but they need to be involved in the process, so they can return `None`.
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
 
+    // TODO!!! this SHOULD probably by Self::Item instead of Block?
+    fn output_with_prealloc<'caches, 'circ>(
+        &'circ mut self,
+        x: &'caches Self::Item,
+        temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(&'caches Self::Item, usize, u16), Self::Item>,
+    ) -> Result<Option<u16>, Self::Error>;
+
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.
 
@@ -270,13 +278,4 @@ pub trait Fancy {
         }
         Ok(zs.into_iter().collect())
     }
-
-    // TODO!!! this SHOULD probably by Self::Item instead of Block?
-    fn output_with_prealloc(
-        &mut self,
-        cache: &[Option<Self::Item>],
-        cache_idx: usize,
-        temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
-    ) -> Result<Option<u16>, Self::Error>;
 }

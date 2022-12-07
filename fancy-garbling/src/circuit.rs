@@ -7,6 +7,7 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
+use crate::Wire;
 use crate::{
     dummy::{Dummy, DummyVal},
     errors::{CircuitBuilderError, DummyError, FancyError},
@@ -229,7 +230,7 @@ fn eval_eval<F: Fancy>(
 ) -> Result<Option<Vec<u16>>, F::Error> {
     let mut outputs = vec![None; output_refs.len()];
     let mut temp_blocks = vec![F::Item::default(); 2];
-    let mut hashes_cache: HashMap<(usize, usize, u16), F::Item> = HashMap::new();
+    let mut hashes_cache: HashMap<(&F::Item, usize, u16), F::Item> = HashMap::new();
     eval_eval_with_prealloc(
         cache,
         f,
@@ -241,18 +242,21 @@ fn eval_eval<F: Fancy>(
     Ok(outputs.into_iter().collect())
 }
 
-fn eval_eval_with_prealloc<F: Fancy>(
-    cache: &[Option<F::Item>],
+fn eval_eval_with_prealloc<'caches, F: Fancy>(
+    cache: &'caches [Option<F::Item>],
     f: &mut F,
     output_refs: &[CircuitRef],
     outputs: &mut Vec<Option<u16>>,
     temp_blocks: &mut Vec<F::Item>,
-    hashes_cache: &mut HashMap<(usize, usize, u16), F::Item>,
+    hashes_cache: &mut HashMap<(&'caches F::Item, usize, u16), F::Item>,
 ) -> Result<(), F::Error> {
     debug_assert_eq!(output_refs.len(), outputs.len(), "outputs NOT init!");
     for (i, r) in output_refs.iter().enumerate() {
         // TODO(interstellar) debug_assert_eq!(cache[i], Some(r), "bad index!");
-        let out = f.output_with_prealloc(&cache, i, temp_blocks, hashes_cache)?;
+        let r = cache[r.ix]
+            .as_ref()
+            .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
+        let out = f.output_with_prealloc(r, temp_blocks, hashes_cache)?;
         outputs[i] = out;
     }
 
@@ -294,15 +298,15 @@ impl Circuit {
 
     /// fn eval: version with preallocated outputs
     /// This is the client-side use case, where we call eval() inside a render loop
-    pub fn eval_with_prealloc<F: Fancy>(
-        &self,
+    pub fn eval_with_prealloc<'circ, 'caches, F: Fancy>(
+        &'caches self,
         f: &mut F,
         garbler_inputs: &[F::Item],
         evaluator_inputs: &[F::Item],
         outputs: &mut Vec<Option<u16>>,
-        cache: &mut Vec<Option<F::Item>>,
+        cache: &'caches mut Vec<Option<F::Item>>,
         temp_blocks: &mut Vec<F::Item>,
-        hashes_cache: &mut HashMap<(usize, usize, u16), F::Item>,
+        hashes_cache: &mut HashMap<(&'caches F::Item, usize, u16), F::Item>,
     ) -> Result<(), F::Error> {
         eval_prepare_with_prealloc(
             f,
@@ -518,10 +522,9 @@ impl Fancy for CircuitBuilder {
 
     fn output_with_prealloc(
         &mut self,
-        cache: &[Option<Self::Item>],
-        cache_idx: usize,
+        xref: &CircuitRef,
         temp_blocks: &mut Vec<CircuitRef>,
-        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(&CircuitRef, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

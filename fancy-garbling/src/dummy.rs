@@ -139,13 +139,12 @@ impl Fancy for Dummy {
 
     fn output_with_prealloc(
         &mut self,
-        cache: &[Option<Self::Item>],
-        cache_idx: usize,
+        x: &DummyVal,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(&DummyVal, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         // TODO(interstellar)!!! output_with_prealloc vs output
-        Ok(Some(cache[cache_idx].clone().unwrap().val))
+        Ok(Some(x.val))
     }
 }
 

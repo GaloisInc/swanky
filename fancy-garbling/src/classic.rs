@@ -23,7 +23,7 @@ use std::{collections::HashMap, convert::TryInto, rc::Rc};
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
 // #[derive(Debug)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
-pub struct GarbledCircuit {
+pub struct GarbledCircuit<'a> {
     blocks: Vec<Block>,
     // TODO(interstellar) can we remove Circuit; and possibly refactor output_refs/cache/etc
     //  Should we remove Circuit? Does it leak critical data to the client?
@@ -31,10 +31,10 @@ pub struct GarbledCircuit {
     /// Only needed for "eval_with_prealloc"
     cache: Vec<Option<Wire>>,
     temp_blocks: Vec<Wire>,
-    hashes_cache: HashMap<(usize, usize, u16), Wire>,
+    hashes_cache: HashMap<(&'a Wire, usize, u16), Wire>,
 }
 
-impl GarbledCircuit {
+impl<'a> GarbledCircuit<'_> {
     /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
         GarbledCircuit {
@@ -95,6 +95,7 @@ impl GarbledCircuit {
         Ok(())
     }
 
+    // TODO(interstellar) remove?
     pub fn init_cache(&mut self) {
         self.cache = vec![None; self.circuit.gates.len()];
         self.temp_blocks = vec![Wire::default(); 2];
@@ -105,7 +106,7 @@ impl GarbledCircuit {
 }
 
 /// Garble a circuit without streaming.
-pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
+pub fn garble<'a>(c: Circuit) -> Result<(Encoder, GarbledCircuit<'a>), GarblerError> {
     let channel = Channel::new(
         GarbledReader::new(&[]),
         GarbledWriter::new(Some(c.num_nonfree_gates)),
