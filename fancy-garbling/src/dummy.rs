@@ -14,6 +14,7 @@ use crate::{
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 use core::hash::BuildHasher;
+use scuttlebutt::Block;
 use std::collections::HashMap;
 
 /// Simple struct that performs the fancy computation over `u16`.
@@ -142,7 +143,7 @@ impl Fancy for Dummy {
         &mut self,
         x: &DummyVal,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(DummyVal, usize, u16), Self::Item, H>,
+        hashes_cache: &mut HashMap<(DummyVal, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error> {
         // TODO(interstellar)!!! output_with_prealloc vs output
         Ok(Some(x.val))

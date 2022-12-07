@@ -11,6 +11,7 @@ use crate::{
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 use core::hash::BuildHasher;
+use scuttlebutt::Block;
 use std::cmp::max;
 use std::collections::HashMap;
 
@@ -183,7 +184,7 @@ impl Fancy for DepthInformer {
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

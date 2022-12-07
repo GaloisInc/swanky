@@ -14,6 +14,7 @@ use crate::{
 };
 use core::hash::BuildHasher;
 use itertools::Itertools;
+use scuttlebutt::Block;
 use std::collections::HashMap;
 
 /// The index and modulus of a gate in a circuit.
@@ -230,7 +231,7 @@ fn eval_eval<F: Fancy>(
 ) -> Result<Option<Vec<u16>>, F::Error> {
     let mut outputs = vec![None; output_refs.len()];
     let mut temp_blocks = vec![F::Item::default(); 2];
-    let mut hashes_cache: HashMap<(F::Item, usize, u16), F::Item> = HashMap::new();
+    let mut hashes_cache: HashMap<(F::Item, usize, u16), Block> = HashMap::new();
     eval_eval_with_prealloc(
         cache,
         f,
@@ -248,7 +249,7 @@ pub fn eval_eval_with_prealloc<F: Fancy, H: BuildHasher>(
     output_refs: &[CircuitRef],
     outputs: &mut Vec<Option<u16>>,
     temp_blocks: &mut Vec<F::Item>,
-    hashes_cache: &mut HashMap<(F::Item, usize, u16), F::Item, H>,
+    hashes_cache: &mut HashMap<(F::Item, usize, u16), Block, H>,
 ) -> Result<(), F::Error> {
     debug_assert_eq!(output_refs.len(), outputs.len(), "outputs NOT init!");
     for (i, r) in output_refs.iter().enumerate() {
@@ -306,7 +307,7 @@ impl Circuit {
         outputs: &mut Vec<Option<u16>>,
         cache: &mut Vec<Option<F::Item>>,
         temp_blocks: &mut Vec<F::Item>,
-        hashes_cache: &mut HashMap<(F::Item, usize, u16), F::Item, H>,
+        hashes_cache: &mut HashMap<(F::Item, usize, u16), Block, H>,
     ) -> Result<(), F::Error> {
         eval_prepare_with_prealloc(
             f,
@@ -524,7 +525,7 @@ impl Fancy for CircuitBuilder {
         &mut self,
         xref: &CircuitRef,
         temp_blocks: &mut Vec<CircuitRef>,
-        hashes_cache: &mut HashMap<(CircuitRef, usize, u16), Self::Item, H>,
+        hashes_cache: &mut HashMap<(CircuitRef, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

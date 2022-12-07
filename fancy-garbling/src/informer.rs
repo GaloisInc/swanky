@@ -8,6 +8,7 @@
 
 use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
 use core::hash::BuildHasher;
+use scuttlebutt::Block;
 use std::collections::{HashMap, HashSet};
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
@@ -319,7 +320,7 @@ impl<F: Fancy> Fancy for Informer<F> {
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

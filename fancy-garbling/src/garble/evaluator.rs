@@ -182,7 +182,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         &mut self,
         x: &Wire,
         temp_blocks: &mut Vec<Wire>,
-        hashes_cache: &mut HashMap<(Wire, usize, u16), Wire, H>,
+        hashes_cache: &mut HashMap<(Wire, usize, u16), Block, H>,
     ) -> Result<Option<u16>, EvaluatorError> {
         let q = x.modulus();
         let i = self.current_output();
@@ -204,12 +204,12 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let mut decoded = None;
         for k in 0..q {
             // TODO(interstellar) can we remove x.clone()? is this slow?
-            let hashed_wire = hashes_cache
-                .entry((x.clone(), i, k))
-                .or_insert(Wire::from_block(x.hash(output_tweak(i, k)), q));
-            if hashed_wire.as_ref_block() == temp_blocks[k as usize].as_ref_block() {
-                // let hashed_wire = x.hash(output_tweak(i, k));
-                // if hashed_wire == *temp_blocks[k as usize].as_ref_block() {
+            // let hashed_wire = hashes_cache
+            //     .entry((x.clone(), i, k))
+            //     .or_insert(x.hash(output_tweak(i, k)));
+            // if hashed_wire == temp_blocks[k as usize].as_ref_block() {
+            let hashed_wire = x.hash(output_tweak(i, k));
+            if hashed_wire == *temp_blocks[k as usize].as_ref_block() {
                 decoded = Some(k);
                 break;
             }

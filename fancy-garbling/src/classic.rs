@@ -14,13 +14,13 @@ use crate::{
     garble::{Evaluator, Garbler},
     wire::Wire,
 };
-use fnv::FnvHasher;
 use itertools::Itertools;
 use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
+use std::collections::hash_map::DefaultHasher;
 use std::hash::BuildHasherDefault;
 use std::{collections::HashMap, convert::TryInto, rc::Rc};
 
-type MyBuildHasher = BuildHasherDefault<FnvHasher>;
+type MyBuildHasher = BuildHasherDefault<DefaultHasher>;
 
 /// Static evaluator for a circuit, created by the `garble` function.
 ///
@@ -51,7 +51,7 @@ pub struct GarbledCircuit {
     // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
     // eval_times : [77, 64, 65, 66, 63, 68, 66, 68, 67, 64]
     // eval_datas : 10
-    hashes_cache: HashMap<(Wire, usize, u16), Wire, MyBuildHasher>,
+    hashes_cache: HashMap<(Wire, usize, u16), Block, MyBuildHasher>,
 }
 
 impl GarbledCircuit {

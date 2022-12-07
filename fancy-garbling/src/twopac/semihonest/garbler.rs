@@ -156,7 +156,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item, H>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }
