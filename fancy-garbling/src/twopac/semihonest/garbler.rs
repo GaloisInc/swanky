@@ -8,6 +8,7 @@ use crate::{errors::TwopacError, Fancy, FancyInput, FancyReveal, Garbler as Gb, 
 use ocelot::ot::Sender as OtSender;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use std::collections::HashMap;
 
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT> {
@@ -152,8 +153,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
 
     fn output_with_prealloc(
         &mut self,
-        x: &Self::Item,
+        cache: &[Option<Self::Item>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

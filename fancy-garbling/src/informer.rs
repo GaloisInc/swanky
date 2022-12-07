@@ -316,8 +316,10 @@ impl<F: Fancy> Fancy for Informer<F> {
 
     fn output_with_prealloc(
         &mut self,
-        x: &Self::Item,
+        cache: &[Option<Self::Item>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

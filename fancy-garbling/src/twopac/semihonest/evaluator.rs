@@ -8,6 +8,7 @@ use crate::{errors::TwopacError, Evaluator as Ev, Fancy, FancyInput, FancyReveal
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use std::collections::HashMap;
 
 /// Semi-honest evaluator.
 pub struct Evaluator<C, RNG, OT> {
@@ -130,8 +131,10 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
 
     fn output_with_prealloc(
         &mut self,
-        x: &Self::Item,
+        cache: &[Option<Self::Item>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

@@ -11,6 +11,7 @@
 
 use crate::errors::FancyError;
 use itertools::Itertools;
+use std::collections::HashMap;
 
 mod binary;
 mod bundle;
@@ -273,7 +274,9 @@ pub trait Fancy {
     // TODO!!! this SHOULD probably by Self::Item instead of Block?
     fn output_with_prealloc(
         &mut self,
-        x: &Self::Item,
+        cache: &[Option<Self::Item>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error>;
 }

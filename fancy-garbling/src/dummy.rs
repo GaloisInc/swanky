@@ -13,6 +13,7 @@ use crate::{
     errors::{DummyError, FancyError},
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
+use std::collections::HashMap;
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {}
@@ -138,11 +139,13 @@ impl Fancy for Dummy {
 
     fn output_with_prealloc(
         &mut self,
-        x: &Self::Item,
+        cache: &[Option<Self::Item>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         // TODO(interstellar)!!! output_with_prealloc vs output
-        Ok(Some(x.val))
+        Ok(Some(cache[cache_idx].clone().unwrap().val))
     }
 }
 

@@ -4,6 +4,8 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use std::collections::HashMap;
+
 use crate::{
     errors::{EvaluatorError, FancyError},
     fancy::{Fancy, FancyReveal, HasModulus},
@@ -11,6 +13,7 @@ use crate::{
     wire::Wire,
 };
 use scuttlebutt::AbstractChannel;
+use scuttlebutt::Block;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -169,12 +172,21 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         }
     }
 
+    /// TODO(interstellar) param tweaks: Vec<Block> corresponding to "output_tweak(i, k)"
+    ///     with let i = self.current_output(); and k = 0..x.modulus()
+    ///     Or rather "hashes_cache"
+    /// param hashes_cache: cache the operation "x.hash(output_tweak(i, k))" in memory
+    ///     because that is quite slow, and most of those are the same b/w eval(=render) loops
     fn output_with_prealloc(
         &mut self,
-        x: &Wire,
+        cache: &[Option<Wire>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Wire>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Wire>,
     ) -> Result<Option<u16>, EvaluatorError> {
-        use scuttlebutt::Block;
+        let x = cache[cache_idx].as_ref().ok_or_else(|| {
+            EvaluatorError::FancyError(FancyError::InvalidArg("cache_idx".to_string()))
+        })?;
 
         let q = x.modulus();
         let i = self.current_output();
@@ -195,8 +207,11 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
         for k in 0..q {
-            let hashed_wire = x.hash(output_tweak(i, k));
-            if hashed_wire == *temp_blocks[k as usize].as_mut_block() {
+            let hashed_wire = hashes_cache
+                .entry((cache_idx, i, k))
+                .or_insert(Wire::from_block(x.hash(output_tweak(i, k)), q));
+            // let hashed_wire = x.hash(output_tweak(i, k));
+            if hashed_wire.as_ref_block() == temp_blocks[k as usize].as_ref_block() {
                 decoded = Some(k);
                 break;
             }
@@ -213,7 +228,9 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let q = x.modulus();
         // let mut temp_blocks = vec![Block::default(); q.into()];
         let mut temp_blocks = vec![Wire::default(); q.into()];
+        let mut hashes_cache = HashMap::new();
+        let cache = vec![Some(x.clone())];
 
-        Ok(self.output_with_prealloc(x, &mut temp_blocks)?)
+        Ok(self.output_with_prealloc(&cache, 0, &mut temp_blocks, &mut hashes_cache)?)
     }
 }

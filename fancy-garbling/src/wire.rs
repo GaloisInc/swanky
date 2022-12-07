@@ -13,7 +13,7 @@ use scuttlebutt::{Block, AES_HASH};
 mod npaths_tab;
 
 /// The core wire-label type.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub enum Wire {
     /// Representation of a `mod-2` wire.
@@ -195,6 +195,14 @@ impl Wire {
     pub fn as_mut_block(&mut self) -> &mut Block {
         match self {
             Wire::Mod2 { val } => &mut *val,
+            Wire::Mod3 { lsb, msb } => todo!(),
+            Wire::ModN { q, ref ds } => todo!(),
+        }
+    }
+
+    pub fn as_ref_block(&mut self) -> &Block {
+        match self {
+            Wire::Mod2 { val } => &*val,
             Wire::Mod3 { lsb, msb } => todo!(),
             Wire::ModN { q, ref ds } => todo!(),
         }

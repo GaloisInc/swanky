@@ -29,8 +29,9 @@ pub struct GarbledCircuit {
     //  Should we remove Circuit? Does it leak critical data to the client?
     circuit: Circuit,
     /// Only needed for "eval_with_prealloc"
-    cache: Option<Vec<Option<Wire>>>,
-    temp_blocks: Option<Vec<Wire>>,
+    cache: Vec<Option<Wire>>,
+    temp_blocks: Vec<Wire>,
+    hashes_cache: HashMap<(usize, usize, u16), Wire>,
 }
 
 impl GarbledCircuit {
@@ -39,8 +40,9 @@ impl GarbledCircuit {
         GarbledCircuit {
             blocks,
             circuit,
-            cache: None,
-            temp_blocks: None,
+            cache: Vec::new(),
+            temp_blocks: Vec::new(),
+            hashes_cache: HashMap::new(),
         }
     }
 
@@ -85,16 +87,20 @@ impl GarbledCircuit {
             &evaluator_inputs,
             outputs,
             // TODO!!! expect("cache not init! MUST call init_cache()")
-            &mut self.cache.as_mut().unwrap(),
-            &mut self.temp_blocks.as_mut().unwrap(),
+            &mut self.cache,
+            &mut self.temp_blocks,
+            &mut self.hashes_cache,
         )?;
 
         Ok(())
     }
 
     pub fn init_cache(&mut self) {
-        self.cache = Some(vec![None; self.circuit.gates.len()]);
-        self.temp_blocks = Some(vec![Wire::default(); 2]);
+        self.cache = vec![None; self.circuit.gates.len()];
+        self.temp_blocks = vec![Wire::default(); 2];
+        // TODO(interstellar)!!! try different hashers; the default "provide resistance against HashDoS attacks"
+        //  but this MAY not be needed
+        self.hashes_cache = HashMap::new();
     }
 }
 

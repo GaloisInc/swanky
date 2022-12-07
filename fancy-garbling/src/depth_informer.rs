@@ -11,6 +11,7 @@ use crate::{
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
 };
 use std::cmp::max;
+use std::collections::HashMap;
 
 /// Carries the depth of the computation.
 #[derive(Default, Clone, Debug)]
@@ -179,8 +180,10 @@ impl Fancy for DepthInformer {
 
     fn output_with_prealloc(
         &mut self,
-        x: &Self::Item,
+        cache: &[Option<Self::Item>],
+        cache_idx: usize,
         temp_blocks: &mut Vec<Self::Item>,
+        hashes_cache: &mut HashMap<(usize, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }
