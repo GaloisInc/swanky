@@ -23,7 +23,7 @@ use std::{collections::HashMap, convert::TryInto, rc::Rc};
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
 // #[derive(Debug)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
-pub struct GarbledCircuit<'a> {
+pub struct GarbledCircuit {
     blocks: Vec<Block>,
     // TODO(interstellar) can we remove Circuit; and possibly refactor output_refs/cache/etc
     //  Should we remove Circuit? Does it leak critical data to the client?
@@ -31,10 +31,10 @@ pub struct GarbledCircuit<'a> {
     /// Only needed for "eval_with_prealloc"
     cache: Vec<Option<Wire>>,
     temp_blocks: Vec<Wire>,
-    hashes_cache: HashMap<(&'a Wire, usize, u16), Wire>,
+    hashes_cache: HashMap<(Wire, usize, u16), Wire>,
 }
 
-impl<'a> GarbledCircuit<'_> {
+impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
         GarbledCircuit {
@@ -70,8 +70,8 @@ impl<'a> GarbledCircuit<'_> {
     }
 
     /// Evaluate the garbled circuit.
-    pub fn eval_with_prealloc(
-        &mut self,
+    pub fn eval_with_prealloc<'garb>(
+        &'garb mut self,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
         outputs: &mut Vec<Option<u16>>,
@@ -92,6 +92,24 @@ impl<'a> GarbledCircuit<'_> {
             &mut self.hashes_cache,
         )?;
 
+        // eval_prepare_with_prealloc(
+        //     &mut evaluator,
+        //     garbler_inputs,
+        //     evaluator_inputs,
+        //     &self.circuit.gates,
+        //     &self.circuit.gate_moduli,
+        //     &mut self.cache,
+        // )?;
+
+        // eval_eval_with_prealloc(
+        //     &mut self.cache,
+        //     &mut evaluator,
+        //     &self.circuit.output_refs,
+        //     outputs,
+        //     &mut self.temp_blocks,
+        //     &mut self.hashes_cache,
+        // )?;
+
         Ok(())
     }
 
@@ -106,7 +124,7 @@ impl<'a> GarbledCircuit<'_> {
 }
 
 /// Garble a circuit without streaming.
-pub fn garble<'a>(c: Circuit) -> Result<(Encoder, GarbledCircuit<'a>), GarblerError> {
+pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
     let channel = Channel::new(
         GarbledReader::new(&[]),
         GarbledWriter::new(Some(c.num_nonfree_gates)),

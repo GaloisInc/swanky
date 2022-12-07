@@ -141,7 +141,7 @@ impl Fancy for Dummy {
         &mut self,
         x: &DummyVal,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(&DummyVal, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(DummyVal, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         // TODO(interstellar)!!! output_with_prealloc vs output
         Ok(Some(x.val))

@@ -68,12 +68,12 @@ pub trait Fancy {
     /// output, but they need to be involved in the process, so they can return `None`.
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
 
-    // TODO!!! this SHOULD probably by Self::Item instead of Block?
-    fn output_with_prealloc<'caches, 'circ>(
-        &'circ mut self,
-        x: &'caches Self::Item,
+    // TODO!!! this SHOULD probably by a (kind of &Self::Item), is this doable?
+    fn output_with_prealloc(
+        &mut self,
+        x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(&'caches Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error>;
 
     ////////////////////////////////////////////////////////////////////////////////

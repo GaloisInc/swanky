@@ -177,11 +177,11 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     ///     Or rather "hashes_cache"
     /// param hashes_cache: cache the operation "x.hash(output_tweak(i, k))" in memory
     ///     because that is quite slow, and most of those are the same b/w eval(=render) loops
-    fn output_with_prealloc<'a>(
+    fn output_with_prealloc(
         &mut self,
-        x: &'a Wire,
+        x: &Wire,
         temp_blocks: &mut Vec<Wire>,
-        hashes_cache: &mut HashMap<(&'a Wire, usize, u16), Wire>,
+        hashes_cache: &mut HashMap<(Wire, usize, u16), Wire>,
     ) -> Result<Option<u16>, EvaluatorError> {
         let q = x.modulus();
         let i = self.current_output();
@@ -202,8 +202,9 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
         for k in 0..q {
+            // TODO(interstellar) can we remove x.clone()? is this slow?
             let hashed_wire = hashes_cache
-                .entry((x, i, k))
+                .entry((x.clone(), i, k))
                 .or_insert(Wire::from_block(x.hash(output_tweak(i, k)), q));
             // let hashed_wire = x.hash(output_tweak(i, k));
             if hashed_wire.as_ref_block() == temp_blocks[k as usize].as_ref_block() {

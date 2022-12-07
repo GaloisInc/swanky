@@ -182,7 +182,7 @@ impl Fancy for DepthInformer {
         &mut self,
         x: &Self::Item,
         temp_blocks: &mut Vec<Self::Item>,
-        hashes_cache: &mut HashMap<(&Self::Item, usize, u16), Self::Item>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Self::Item>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }
