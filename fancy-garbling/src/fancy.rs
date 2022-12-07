@@ -74,7 +74,7 @@ pub trait Fancy {
     fn output_with_prealloc<H: BuildHasher>(
         &mut self,
         x: &Self::Item,
-        temp_blocks: &mut Vec<Self::Item>,
+        temp_blocks: &mut Vec<Block>,
         hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error>;
 

@@ -34,7 +34,7 @@ pub struct GarbledCircuit {
     circuit: Circuit,
     /// Only needed for "eval_with_prealloc"
     cache: Vec<Option<Wire>>,
-    temp_blocks: Vec<Wire>,
+    temp_blocks: Vec<Block>,
     // default hasher:
     // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
     // eval_times : [65, 60, 56, 55, 56, 57, 58, 58, 57, 59]
@@ -136,7 +136,7 @@ impl GarbledCircuit {
     // TODO(interstellar) remove?
     pub fn init_cache(&mut self) {
         self.cache = vec![None; self.circuit.gates.len()];
-        self.temp_blocks = vec![Wire::default(); 2];
+        self.temp_blocks = vec![Block::default(); 2];
         // TODO(interstellar)!!! try different hashers; the default "provide resistance against HashDoS attacks"
         //  but this MAY not be needed
         // NOTE: typically there are around self.circuit.gates.len() / 2 entries in "hashes_cache" after "fn eval_with_prealloc"

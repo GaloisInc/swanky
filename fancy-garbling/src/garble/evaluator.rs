@@ -180,9 +180,9 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     ///     because that is quite slow, and most of those are the same b/w eval(=render) loops
     fn output_with_prealloc<H: BuildHasher>(
         &mut self,
-        x: &Wire,
-        temp_blocks: &mut Vec<Wire>,
-        hashes_cache: &mut HashMap<(Wire, usize, u16), Block, H>,
+        x: &Self::Item,
+        temp_blocks: &mut Vec<Block>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
     ) -> Result<Option<u16>, EvaluatorError> {
         let q = x.modulus();
         let i = self.current_output();
@@ -194,11 +194,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             "temp_blocks / q sizes mistmach!"
         );
         // TODO!!! is this doing a copy/assign?
-        let mut temp_wires: Vec<&mut Block> = temp_blocks
-            .iter_mut()
-            .map(|wire| wire.as_mut_block())
-            .collect();
-        self.channel.read_blocks_with_prealloc(&mut temp_wires)?;
+        self.channel.read_blocks_with_prealloc(temp_blocks)?;
 
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
@@ -209,7 +205,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             //     .or_insert(x.hash(output_tweak(i, k)));
             // if hashed_wire == temp_blocks[k as usize].as_ref_block() {
             let hashed_wire = x.hash(output_tweak(i, k));
-            if hashed_wire == *temp_blocks[k as usize].as_ref_block() {
+            if hashed_wire == temp_blocks[k as usize] {
                 decoded = Some(k);
                 break;
             }
@@ -225,7 +221,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
         let q = x.modulus();
         // let mut temp_blocks = vec![Block::default(); q.into()];
-        let mut temp_blocks = vec![Wire::default(); q.into()];
+        let mut temp_blocks = vec![Block::default(); q.into()];
         let mut hashes_cache = HashMap::new();
 
         Ok(self.output_with_prealloc(x, &mut temp_blocks, &mut hashes_cache)?)

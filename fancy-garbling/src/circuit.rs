@@ -230,7 +230,7 @@ fn eval_eval<F: Fancy>(
     output_refs: &[CircuitRef],
 ) -> Result<Option<Vec<u16>>, F::Error> {
     let mut outputs = vec![None; output_refs.len()];
-    let mut temp_blocks = vec![F::Item::default(); 2];
+    let mut temp_blocks = vec![Block::default(); 2];
     let mut hashes_cache: HashMap<(F::Item, usize, u16), Block> = HashMap::new();
     eval_eval_with_prealloc(
         cache,
@@ -248,7 +248,7 @@ pub fn eval_eval_with_prealloc<F: Fancy, H: BuildHasher>(
     f: &mut F,
     output_refs: &[CircuitRef],
     outputs: &mut Vec<Option<u16>>,
-    temp_blocks: &mut Vec<F::Item>,
+    temp_blocks: &mut Vec<Block>,
     hashes_cache: &mut HashMap<(F::Item, usize, u16), Block, H>,
 ) -> Result<(), F::Error> {
     debug_assert_eq!(output_refs.len(), outputs.len(), "outputs NOT init!");
@@ -306,7 +306,7 @@ impl Circuit {
         evaluator_inputs: &[F::Item],
         outputs: &mut Vec<Option<u16>>,
         cache: &mut Vec<Option<F::Item>>,
-        temp_blocks: &mut Vec<F::Item>,
+        temp_blocks: &mut Vec<Block>,
         hashes_cache: &mut HashMap<(F::Item, usize, u16), Block, H>,
     ) -> Result<(), F::Error> {
         eval_prepare_with_prealloc(
@@ -523,9 +523,9 @@ impl Fancy for CircuitBuilder {
 
     fn output_with_prealloc<H: BuildHasher>(
         &mut self,
-        xref: &CircuitRef,
-        temp_blocks: &mut Vec<CircuitRef>,
-        hashes_cache: &mut HashMap<(CircuitRef, usize, u16), Block, H>,
+        xref: &Self::Item,
+        temp_blocks: &mut Vec<Block>,
+        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
     ) -> Result<Option<u16>, Self::Error> {
         todo!()
     }

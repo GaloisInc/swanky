@@ -168,7 +168,7 @@ pub trait AbstractChannel {
 
     /// Read `n` `Block`s from the channel.
     #[inline(always)]
-    fn read_blocks_with_prealloc(&mut self, blocks: &mut Vec<&mut Block>) -> Result<()> {
+    fn read_blocks_with_prealloc(&mut self, blocks: &mut Vec<Block>) -> Result<()> {
         for block in blocks.iter_mut() {
             self.read_bytes(&mut *block.as_mut())?;
         }
