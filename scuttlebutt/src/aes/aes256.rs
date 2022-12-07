@@ -28,92 +28,94 @@
 // SOFTWARE.
 
 use crate::Block;
-use core::{arch::x86_64::*, mem};
+// use core::{arch::x86_64::*, mem};
+use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::Aes256 as AesAes256;
 
 /// AES-256, encryption only.
 #[derive(Clone)]
 pub struct Aes256 {
-    rkeys: [__m128i; 15],
+    rkeys: AesAes256,
 }
 
-macro_rules! expand_round {
-    ($enc_keys:expr, $pos:expr, $round:expr) => {
-        let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 2));
-        let mut t2;
-        let mut t3 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
-        let mut t4;
+// macro_rules! expand_round {
+//     ($enc_keys:expr, $pos:expr, $round:expr) => {
+//         let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 2));
+//         let mut t2;
+//         let mut t3 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
+//         let mut t4;
 
-        t2 = _mm_aeskeygenassist_si128(t3, $round);
-        t2 = _mm_shuffle_epi32(t2, 0xff);
-        t4 = _mm_slli_si128(t1, 0x4);
-        t1 = _mm_xor_si128(t1, t4);
-        t4 = _mm_slli_si128(t4, 0x4);
-        t1 = _mm_xor_si128(t1, t4);
-        t4 = _mm_slli_si128(t4, 0x4);
-        t1 = _mm_xor_si128(t1, t4);
-        t1 = _mm_xor_si128(t1, t2);
+//         t2 = _mm_aeskeygenassist_si128(t3, $round);
+//         t2 = _mm_shuffle_epi32(t2, 0xff);
+//         t4 = _mm_slli_si128(t1, 0x4);
+//         t1 = _mm_xor_si128(t1, t4);
+//         t4 = _mm_slli_si128(t4, 0x4);
+//         t1 = _mm_xor_si128(t1, t4);
+//         t4 = _mm_slli_si128(t4, 0x4);
+//         t1 = _mm_xor_si128(t1, t4);
+//         t1 = _mm_xor_si128(t1, t2);
 
-        _mm_store_si128($enc_keys.as_mut_ptr().offset($pos), t1);
+//         _mm_store_si128($enc_keys.as_mut_ptr().offset($pos), t1);
 
-        t4 = _mm_aeskeygenassist_si128(t1, 0x00);
-        t2 = _mm_shuffle_epi32(t4, 0xaa);
-        t4 = _mm_slli_si128(t3, 0x4);
-        t3 = _mm_xor_si128(t3, t4);
-        t4 = _mm_slli_si128(t4, 0x4);
-        t3 = _mm_xor_si128(t3, t4);
-        t4 = _mm_slli_si128(t4, 0x4);
-        t3 = _mm_xor_si128(t3, t4);
-        t3 = _mm_xor_si128(t3, t2);
+//         t4 = _mm_aeskeygenassist_si128(t1, 0x00);
+//         t2 = _mm_shuffle_epi32(t4, 0xaa);
+//         t4 = _mm_slli_si128(t3, 0x4);
+//         t3 = _mm_xor_si128(t3, t4);
+//         t4 = _mm_slli_si128(t4, 0x4);
+//         t3 = _mm_xor_si128(t3, t4);
+//         t4 = _mm_slli_si128(t4, 0x4);
+//         t3 = _mm_xor_si128(t3, t4);
+//         t3 = _mm_xor_si128(t3, t2);
 
-        _mm_store_si128($enc_keys.as_mut_ptr().offset($pos + 1), t3);
-    };
-}
+//         _mm_store_si128($enc_keys.as_mut_ptr().offset($pos + 1), t3);
+//     };
+// }
 
-macro_rules! expand_round_last {
-    ($enc_keys:expr, $pos:expr, $round:expr) => {
-        let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 2));
-        let mut t2;
-        let t3 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
-        let mut t4;
+// macro_rules! expand_round_last {
+//     ($enc_keys:expr, $pos:expr, $round:expr) => {
+//         let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 2));
+//         let mut t2;
+//         let t3 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
+//         let mut t4;
 
-        t2 = _mm_aeskeygenassist_si128(t3, $round);
-        t2 = _mm_shuffle_epi32(t2, 0xff);
-        t4 = _mm_slli_si128(t1, 0x4);
-        t1 = _mm_xor_si128(t1, t4);
-        t4 = _mm_slli_si128(t4, 0x4);
-        t1 = _mm_xor_si128(t1, t4);
-        t4 = _mm_slli_si128(t4, 0x4);
-        t1 = _mm_xor_si128(t1, t4);
-        t1 = _mm_xor_si128(t1, t2);
+//         t2 = _mm_aeskeygenassist_si128(t3, $round);
+//         t2 = _mm_shuffle_epi32(t2, 0xff);
+//         t4 = _mm_slli_si128(t1, 0x4);
+//         t1 = _mm_xor_si128(t1, t4);
+//         t4 = _mm_slli_si128(t4, 0x4);
+//         t1 = _mm_xor_si128(t1, t4);
+//         t4 = _mm_slli_si128(t4, 0x4);
+//         t1 = _mm_xor_si128(t1, t4);
+//         t1 = _mm_xor_si128(t1, t2);
 
-        _mm_store_si128($enc_keys.as_mut_ptr().offset($pos), t1);
-    };
-}
+//         _mm_store_si128($enc_keys.as_mut_ptr().offset($pos), t1);
+//     };
+// }
 
-#[inline(always)]
-fn expand(key: &[u8; 32]) -> [__m128i; 15] {
-    unsafe {
-        let mut enc_keys: [__m128i; 15] = mem::MaybeUninit::uninit().assume_init();
+// #[inline(always)]
+// fn expand(key: &[u8; 32]) -> [__m128i; 15] {
+//     unsafe {
+//         let mut enc_keys: [__m128i; 15] = mem::MaybeUninit::uninit().assume_init();
 
-        #[allow(clippy::useless_transmute)] // XXX remove if possible!
-        let kp = std::mem::transmute(key);
-        // let kp = key.as_ptr() as *const __m128i;
-        let k1 = _mm_loadu_si128(kp);
-        let k2 = _mm_loadu_si128(kp.offset(1));
-        _mm_store_si128(enc_keys.as_mut_ptr(), k1);
-        _mm_store_si128(enc_keys.as_mut_ptr().offset(1), k2);
+//         #[allow(clippy::useless_transmute)] // XXX remove if possible!
+//         let kp = std::mem::transmute(key);
+//         // let kp = key.as_ptr() as *const __m128i;
+//         let k1 = _mm_loadu_si128(kp);
+//         let k2 = _mm_loadu_si128(kp.offset(1));
+//         _mm_store_si128(enc_keys.as_mut_ptr(), k1);
+//         _mm_store_si128(enc_keys.as_mut_ptr().offset(1), k2);
 
-        expand_round!(enc_keys, 2, 0x01);
-        expand_round!(enc_keys, 4, 0x02);
-        expand_round!(enc_keys, 6, 0x04);
-        expand_round!(enc_keys, 8, 0x08);
-        expand_round!(enc_keys, 10, 0x10);
-        expand_round!(enc_keys, 12, 0x20);
-        expand_round_last!(enc_keys, 14, 0x40);
+//         expand_round!(enc_keys, 2, 0x01);
+//         expand_round!(enc_keys, 4, 0x02);
+//         expand_round!(enc_keys, 6, 0x04);
+//         expand_round!(enc_keys, 8, 0x08);
+//         expand_round!(enc_keys, 10, 0x10);
+//         expand_round!(enc_keys, 12, 0x20);
+//         expand_round_last!(enc_keys, 14, 0x40);
 
-        enc_keys
-    }
-}
+//         enc_keys
+//     }
+// }
 
 impl Aes256 {
     /// Make a new `Aes256` object with key `key`.
@@ -126,24 +128,25 @@ impl Aes256 {
     #[inline]
     pub fn encrypt(&self, m: Block) -> Block {
         let keys = self.rkeys;
-        unsafe {
-            let mut block = m.0;
-            block = _mm_xor_si128(block, keys[0]);
-            block = _mm_aesenc_si128(block, keys[1]);
-            block = _mm_aesenc_si128(block, keys[2]);
-            block = _mm_aesenc_si128(block, keys[3]);
-            block = _mm_aesenc_si128(block, keys[4]);
-            block = _mm_aesenc_si128(block, keys[5]);
-            block = _mm_aesenc_si128(block, keys[6]);
-            block = _mm_aesenc_si128(block, keys[7]);
-            block = _mm_aesenc_si128(block, keys[8]);
-            block = _mm_aesenc_si128(block, keys[9]);
-            block = _mm_aesenc_si128(block, keys[10]);
-            block = _mm_aesenc_si128(block, keys[11]);
-            block = _mm_aesenc_si128(block, keys[12]);
-            block = _mm_aesenc_si128(block, keys[13]);
-            Block(_mm_aesenclast_si128(block, keys[14]))
-        }
+        // unsafe {
+        //     let mut block = m.0;
+        //     block = _mm_xor_si128(block, keys[0]);
+        //     block = _mm_aesenc_si128(block, keys[1]);
+        //     block = _mm_aesenc_si128(block, keys[2]);
+        //     block = _mm_aesenc_si128(block, keys[3]);
+        //     block = _mm_aesenc_si128(block, keys[4]);
+        //     block = _mm_aesenc_si128(block, keys[5]);
+        //     block = _mm_aesenc_si128(block, keys[6]);
+        //     block = _mm_aesenc_si128(block, keys[7]);
+        //     block = _mm_aesenc_si128(block, keys[8]);
+        //     block = _mm_aesenc_si128(block, keys[9]);
+        //     block = _mm_aesenc_si128(block, keys[10]);
+        //     block = _mm_aesenc_si128(block, keys[11]);
+        //     block = _mm_aesenc_si128(block, keys[12]);
+        //     block = _mm_aesenc_si128(block, keys[13]);
+        //     Block(_mm_aesenclast_si128(block, keys[14]))
+        // }
+        Block(keys.encrypt_block(&mut m))
     }
 }
 

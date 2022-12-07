@@ -28,105 +28,107 @@
 // SOFTWARE.
 
 use crate::Block;
-use std::arch::x86_64::*;
+use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::Aes128 as AesAes128;
 
 /// AES-128, encryption only.
 #[derive(Clone)]
 pub struct Aes128 {
-    rkeys: [__m128i; 11],
+    rkeys: AesAes128,
 }
 
-macro_rules! xor4 {
-    ($b:expr, $key:expr) => {
-        $b[0].0 = _mm_xor_si128($b[0].0, $key);
-        $b[1].0 = _mm_xor_si128($b[1].0, $key);
-        $b[2].0 = _mm_xor_si128($b[2].0, $key);
-        $b[3].0 = _mm_xor_si128($b[3].0, $key);
-    };
-}
+// macro_rules! xor4 {
+//     ($b:expr, $key:expr) => {
+//         $b[0].0 = _mm_xor_si128($b[0].0, $key);
+//         $b[1].0 = _mm_xor_si128($b[1].0, $key);
+//         $b[2].0 = _mm_xor_si128($b[2].0, $key);
+//         $b[3].0 = _mm_xor_si128($b[3].0, $key);
+//     };
+// }
 
-macro_rules! aesenc4 {
-    ($b:expr, $key:expr) => {
-        $b[0].0 = _mm_aesenc_si128($b[0].0, $key);
-        $b[1].0 = _mm_aesenc_si128($b[1].0, $key);
-        $b[2].0 = _mm_aesenc_si128($b[2].0, $key);
-        $b[3].0 = _mm_aesenc_si128($b[3].0, $key);
-    };
-}
+// macro_rules! aesenc4 {
+//     ($b:expr, $key:expr) => {
+//         $b[0].0 = _mm_aesenc_si128($b[0].0, $key);
+//         $b[1].0 = _mm_aesenc_si128($b[1].0, $key);
+//         $b[2].0 = _mm_aesenc_si128($b[2].0, $key);
+//         $b[3].0 = _mm_aesenc_si128($b[3].0, $key);
+//     };
+// }
 
-macro_rules! aesenclast4 {
-    ($b:expr, $key:expr) => {
-        $b[0].0 = _mm_aesenclast_si128($b[0].0, $key);
-        $b[1].0 = _mm_aesenclast_si128($b[1].0, $key);
-        $b[2].0 = _mm_aesenclast_si128($b[2].0, $key);
-        $b[3].0 = _mm_aesenclast_si128($b[3].0, $key);
-    };
-}
+// macro_rules! aesenclast4 {
+//     ($b:expr, $key:expr) => {
+//         $b[0].0 = _mm_aesenclast_si128($b[0].0, $key);
+//         $b[1].0 = _mm_aesenclast_si128($b[1].0, $key);
+//         $b[2].0 = _mm_aesenclast_si128($b[2].0, $key);
+//         $b[3].0 = _mm_aesenclast_si128($b[3].0, $key);
+//     };
+// }
 
-macro_rules! xor8 {
-    ($b:expr, $key:expr) => {
-        $b[0].0 = _mm_xor_si128($b[0].0, $key);
-        $b[1].0 = _mm_xor_si128($b[1].0, $key);
-        $b[2].0 = _mm_xor_si128($b[2].0, $key);
-        $b[3].0 = _mm_xor_si128($b[3].0, $key);
-        $b[4].0 = _mm_xor_si128($b[4].0, $key);
-        $b[5].0 = _mm_xor_si128($b[5].0, $key);
-        $b[6].0 = _mm_xor_si128($b[6].0, $key);
-        $b[7].0 = _mm_xor_si128($b[7].0, $key);
-    };
-}
+// macro_rules! xor8 {
+//     ($b:expr, $key:expr) => {
+//         $b[0].0 = _mm_xor_si128($b[0].0, $key);
+//         $b[1].0 = _mm_xor_si128($b[1].0, $key);
+//         $b[2].0 = _mm_xor_si128($b[2].0, $key);
+//         $b[3].0 = _mm_xor_si128($b[3].0, $key);
+//         $b[4].0 = _mm_xor_si128($b[4].0, $key);
+//         $b[5].0 = _mm_xor_si128($b[5].0, $key);
+//         $b[6].0 = _mm_xor_si128($b[6].0, $key);
+//         $b[7].0 = _mm_xor_si128($b[7].0, $key);
+//     };
+// }
 
-macro_rules! aesenc8 {
-    ($b:expr, $key:expr) => {
-        $b[0].0 = _mm_aesenc_si128($b[0].0, $key);
-        $b[1].0 = _mm_aesenc_si128($b[1].0, $key);
-        $b[2].0 = _mm_aesenc_si128($b[2].0, $key);
-        $b[3].0 = _mm_aesenc_si128($b[3].0, $key);
-        $b[4].0 = _mm_aesenc_si128($b[4].0, $key);
-        $b[5].0 = _mm_aesenc_si128($b[5].0, $key);
-        $b[6].0 = _mm_aesenc_si128($b[6].0, $key);
-        $b[7].0 = _mm_aesenc_si128($b[7].0, $key);
-    };
-}
+// macro_rules! aesenc8 {
+//     ($b:expr, $key:expr) => {
+//         $b[0].0 = _mm_aesenc_si128($b[0].0, $key);
+//         $b[1].0 = _mm_aesenc_si128($b[1].0, $key);
+//         $b[2].0 = _mm_aesenc_si128($b[2].0, $key);
+//         $b[3].0 = _mm_aesenc_si128($b[3].0, $key);
+//         $b[4].0 = _mm_aesenc_si128($b[4].0, $key);
+//         $b[5].0 = _mm_aesenc_si128($b[5].0, $key);
+//         $b[6].0 = _mm_aesenc_si128($b[6].0, $key);
+//         $b[7].0 = _mm_aesenc_si128($b[7].0, $key);
+//     };
+// }
 
-macro_rules! aesenclast8 {
-    ($b:expr, $key:expr) => {
-        $b[0].0 = _mm_aesenclast_si128($b[0].0, $key);
-        $b[1].0 = _mm_aesenclast_si128($b[1].0, $key);
-        $b[2].0 = _mm_aesenclast_si128($b[2].0, $key);
-        $b[3].0 = _mm_aesenclast_si128($b[3].0, $key);
-        $b[4].0 = _mm_aesenclast_si128($b[4].0, $key);
-        $b[5].0 = _mm_aesenclast_si128($b[5].0, $key);
-        $b[6].0 = _mm_aesenclast_si128($b[6].0, $key);
-        $b[7].0 = _mm_aesenclast_si128($b[7].0, $key);
-    };
-}
+// macro_rules! aesenclast8 {
+//     ($b:expr, $key:expr) => {
+//         $b[0].0 = _mm_aesenclast_si128($b[0].0, $key);
+//         $b[1].0 = _mm_aesenclast_si128($b[1].0, $key);
+//         $b[2].0 = _mm_aesenclast_si128($b[2].0, $key);
+//         $b[3].0 = _mm_aesenclast_si128($b[3].0, $key);
+//         $b[4].0 = _mm_aesenclast_si128($b[4].0, $key);
+//         $b[5].0 = _mm_aesenclast_si128($b[5].0, $key);
+//         $b[6].0 = _mm_aesenclast_si128($b[6].0, $key);
+//         $b[7].0 = _mm_aesenclast_si128($b[7].0, $key);
+//     };
+// }
 
 impl Aes128 {
     /// Create a new `Aes128` object, using `key` as the AES key.
     #[inline]
     pub fn new(key: Block) -> Self {
-        let rkeys = expand(key.0);
-        Aes128 { rkeys }
+        let rkeys = GenericArray::from(key.0);
+        Aes128::new(&rkeys)
     }
     /// Encrypt a block, outputting the ciphertext.
     #[inline(always)]
     pub fn encrypt(&self, m: Block) -> Block {
         let rkeys = self.rkeys;
-        unsafe {
-            let mut c: __m128i = m.into();
-            c = _mm_xor_si128(c, rkeys[0]);
-            c = _mm_aesenc_si128(c, rkeys[1]);
-            c = _mm_aesenc_si128(c, rkeys[2]);
-            c = _mm_aesenc_si128(c, rkeys[3]);
-            c = _mm_aesenc_si128(c, rkeys[4]);
-            c = _mm_aesenc_si128(c, rkeys[5]);
-            c = _mm_aesenc_si128(c, rkeys[6]);
-            c = _mm_aesenc_si128(c, rkeys[7]);
-            c = _mm_aesenc_si128(c, rkeys[8]);
-            c = _mm_aesenc_si128(c, rkeys[9]);
-            Block(_mm_aesenclast_si128(c, rkeys[10]))
-        }
+        // unsafe {
+        //     let mut c: __m128i = m.into();
+        //     c = _mm_xor_si128(c, rkeys[0]);
+        //     c = _mm_aesenc_si128(c, rkeys[1]);
+        //     c = _mm_aesenc_si128(c, rkeys[2]);
+        //     c = _mm_aesenc_si128(c, rkeys[3]);
+        //     c = _mm_aesenc_si128(c, rkeys[4]);
+        //     c = _mm_aesenc_si128(c, rkeys[5]);
+        //     c = _mm_aesenc_si128(c, rkeys[6]);
+        //     c = _mm_aesenc_si128(c, rkeys[7]);
+        //     c = _mm_aesenc_si128(c, rkeys[8]);
+        //     c = _mm_aesenc_si128(c, rkeys[9]);
+        //     Block(_mm_aesenclast_si128(c, rkeys[10]))
+        // }
+        Block(rkeys.encrypt_block(&mut m))
     }
     /// Encrypt four blocks at a time, outputting the ciphertexts.
     ///
@@ -171,44 +173,44 @@ impl Aes128 {
     }
 }
 
-macro_rules! expand_round {
-    ($enc_keys:expr, $pos:expr, $round:expr) => {
-        let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
-        let mut t2;
-        let mut t3;
+// macro_rules! expand_round {
+//     ($enc_keys:expr, $pos:expr, $round:expr) => {
+//         let mut t1 = _mm_load_si128($enc_keys.as_ptr().offset($pos - 1));
+//         let mut t2;
+//         let mut t3;
 
-        t2 = _mm_aeskeygenassist_si128(t1, $round);
-        t2 = _mm_shuffle_epi32(t2, 0xff);
-        t3 = _mm_slli_si128(t1, 0x4);
-        t1 = _mm_xor_si128(t1, t3);
-        t3 = _mm_slli_si128(t3, 0x4);
-        t1 = _mm_xor_si128(t1, t3);
-        t3 = _mm_slli_si128(t3, 0x4);
-        t1 = _mm_xor_si128(t1, t3);
-        t1 = _mm_xor_si128(t1, t2);
+//         t2 = _mm_aeskeygenassist_si128(t1, $round);
+//         t2 = _mm_shuffle_epi32(t2, 0xff);
+//         t3 = _mm_slli_si128(t1, 0x4);
+//         t1 = _mm_xor_si128(t1, t3);
+//         t3 = _mm_slli_si128(t3, 0x4);
+//         t1 = _mm_xor_si128(t1, t3);
+//         t3 = _mm_slli_si128(t3, 0x4);
+//         t1 = _mm_xor_si128(t1, t3);
+//         t1 = _mm_xor_si128(t1, t2);
 
-        _mm_store_si128($enc_keys.as_mut_ptr().offset($pos), t1);
-    };
-}
+//         _mm_store_si128($enc_keys.as_mut_ptr().offset($pos), t1);
+//     };
+// }
 
-#[inline(always)]
-fn expand(key: __m128i) -> [__m128i; 11] {
-    unsafe {
-        let mut keys: [__m128i; 11] = std::mem::MaybeUninit::uninit().assume_init();
-        _mm_store_si128(keys.as_mut_ptr(), key);
-        expand_round!(keys, 1, 0x01);
-        expand_round!(keys, 2, 0x02);
-        expand_round!(keys, 3, 0x04);
-        expand_round!(keys, 4, 0x08);
-        expand_round!(keys, 5, 0x10);
-        expand_round!(keys, 6, 0x20);
-        expand_round!(keys, 7, 0x40);
-        expand_round!(keys, 8, 0x80);
-        expand_round!(keys, 9, 0x1B);
-        expand_round!(keys, 10, 0x36);
-        keys
-    }
-}
+// #[inline(always)]
+// fn expand(key: __m128i) -> [__m128i; 11] {
+//     unsafe {
+//         let mut keys: [__m128i; 11] = std::mem::MaybeUninit::uninit().assume_init();
+//         _mm_store_si128(keys.as_mut_ptr(), key);
+//         expand_round!(keys, 1, 0x01);
+//         expand_round!(keys, 2, 0x02);
+//         expand_round!(keys, 3, 0x04);
+//         expand_round!(keys, 4, 0x08);
+//         expand_round!(keys, 5, 0x10);
+//         expand_round!(keys, 6, 0x20);
+//         expand_round!(keys, 7, 0x40);
+//         expand_round!(keys, 8, 0x80);
+//         expand_round!(keys, 9, 0x1B);
+//         expand_round!(keys, 10, 0x36);
+//         keys
+//     }
+// }
 
 union __U128 {
     vector: __m128i,
