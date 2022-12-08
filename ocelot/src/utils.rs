@@ -23,12 +23,8 @@ fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
     assert!(nrows >= 16);
     assert_eq!(nrows % 8, 0);
     assert_eq!(ncols % 8, 0);
-    unsafe { sse_trans(out, inp, nrows, ncols) }
-}
-
-#[link(name = "transpose")]
-extern "C" {
-    fn sse_trans(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64);
+    // unsafe { sse_trans(out, inp, nrows, ncols) }
+    transpose::transpose(inp, out, ncols, nrows)
 }
 
 // The hypothesis that a rust implementation of matrix transpose would be faster

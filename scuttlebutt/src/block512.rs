@@ -7,10 +7,12 @@
 //! Defines a 512-bit value.
 use crate::Block;
 use std::{
-    arch::x86_64::*,
     convert::TryFrom,
     hash::{Hash, Hasher},
 };
+
+#[cfg(target_feature = "sse2")]
+use core::arch::x86_64::*;
 
 /// A 512-bit value.
 #[derive(Clone, Copy)]
@@ -108,6 +110,7 @@ impl From<Block512> for [u32; 16] {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl From<Block512> for [__m128i; 4] {
     #[inline]
     fn from(m: Block512) -> [__m128i; 4] {
@@ -143,6 +146,7 @@ impl<'a> From<&'a mut Block512> for &'a mut [u8; 64] {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl From<[__m128i; 4]> for Block512 {
     #[inline]
     fn from(m: [__m128i; 4]) -> Block512 {

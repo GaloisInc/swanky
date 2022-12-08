@@ -24,9 +24,6 @@
 // welcome.
 
 #include <stdint.h>
-
-#ifndef __ANDROID_API__
-
 #include <assert.h>
 #include <emmintrin.h>
 #include <smmintrin.h>
@@ -120,12 +117,3 @@ void sse_trans(uint8_t *out, uint8_t const *inp, uint64_t nrows,
   for (i = 8; --i >= 0; tmp.x = _mm_slli_epi64(tmp.x, 1))
     OUT(rr, cc + i) = _mm_movemask_epi8(tmp.x);
 }
-
-#else
-
-void sse_trans(uint8_t *out, uint8_t const *inp, uint64_t nrows,
-               uint64_t ncols)
-{
-}
-
-#endif

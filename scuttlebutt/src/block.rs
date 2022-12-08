@@ -10,27 +10,30 @@
 use crate::Aes256;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
-use std::{
-    arch::x86_64::*,
-    hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
+
+#[cfg(target_feature = "sse2")]
+use core::arch::x86_64::*;
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]
-pub struct Block(pub __m128i);
+pub struct Block(
+    #[cfg(not(target_feature = "sse2"))] pub u128,
+    #[cfg(target_feature = "sse2")] pub __m128i,
+);
 
-union __U128 {
-    vector: __m128i,
-    bytes: u128,
-}
+// union __U128 {
+//     vector: __m128i,
+//     bytes: u128,
+// }
 
-const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
-const ONES: __m128i = unsafe {
-    (__U128 {
-        bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
-    })
-    .vector
-};
+// const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
+// const ONES: __m128i = unsafe {
+//     (__U128 {
+//         bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
+//     })
+//     .vector
+// };
 
 impl Block {
     /// Convert into a pointer.
@@ -48,6 +51,7 @@ impl Block {
     ///
     /// This code is adapted from the EMP toolkit's implementation.
     #[inline]
+    #[cfg(target_feature = "sse2")]
     pub fn clmul(self, rhs: Self) -> (Self, Self) {
         unsafe {
             let x = self.0;
@@ -68,6 +72,7 @@ impl Block {
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
+    // TODO(interstellar) this SHOULD NOT be here; it should be into aes256.rs
     #[cfg(feature = "curve25519-dalek")]
     #[inline]
     pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
@@ -78,16 +83,19 @@ impl Block {
 
     /// Return the least significant bit.
     #[inline]
+    #[cfg(target_feature = "sse2")]
     pub fn lsb(&self) -> bool {
         unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
     }
     /// Set the least significant bit.
     #[inline]
+    #[cfg(target_feature = "sse2")]
     pub fn set_lsb(&self) -> Block {
         unsafe { Block(_mm_or_si128(self.0, ONE)) }
     }
     /// Flip all bits.
     #[inline]
+    #[cfg(target_feature = "sse2")]
     pub fn flip(&self) -> Self {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
     }
@@ -107,16 +115,26 @@ impl Block {
 impl Default for Block {
     #[inline]
     fn default() -> Self {
-        unsafe { Block(_mm_setzero_si128()) }
+        #[cfg(target_feature = "sse2")]
+        unsafe {
+            Block(_mm_setzero_si128())
+        }
+        #[cfg(not(target_feature = "sse2"))]
+        Block(0)
     }
 }
 
 impl PartialEq for Block {
     #[inline]
     fn eq(&self, other: &Block) -> bool {
+        #[cfg(target_feature = "sse2")]
         unsafe {
             let neq = _mm_xor_si128(self.0, other.0);
             _mm_test_all_zeros(neq, neq) != 0
+        }
+        #[cfg(not(target_feature = "sse2"))]
+        {
+            self.0 == other.0
         }
     }
 }
@@ -149,6 +167,7 @@ impl AsMut<[u8]> for Block {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl std::ops::BitAnd for Block {
     type Output = Block;
     #[inline]
@@ -157,6 +176,7 @@ impl std::ops::BitAnd for Block {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl std::ops::BitAndAssign for Block {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
@@ -164,6 +184,7 @@ impl std::ops::BitAndAssign for Block {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl std::ops::BitOr for Block {
     type Output = Block;
     #[inline]
@@ -172,6 +193,7 @@ impl std::ops::BitOr for Block {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl std::ops::BitOrAssign for Block {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
@@ -183,14 +205,28 @@ impl std::ops::BitXor for Block {
     type Output = Block;
     #[inline]
     fn bitxor(self, rhs: Self) -> Self {
-        unsafe { Block(_mm_xor_si128(self.0, rhs.0)) }
+        #[cfg(target_feature = "sse2")]
+        unsafe {
+            Block(_mm_xor_si128(self.0, rhs.0))
+        }
+        #[cfg(not(target_feature = "sse2"))]
+        Block(self.0 ^ rhs.0)
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl std::ops::BitXorAssign for Block {
     #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
         unsafe { self.0 = _mm_xor_si128(self.0, rhs.0) }
+    }
+}
+
+#[cfg(not(target_feature = "sse2"))]
+impl std::ops::BitXorAssign for Block {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 = self.0 ^ rhs.0;
     }
 }
 
@@ -237,6 +273,7 @@ impl From<u128> for Block {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl From<Block> for __m128i {
     #[inline]
     fn from(m: Block) -> __m128i {
@@ -244,6 +281,7 @@ impl From<Block> for __m128i {
     }
 }
 
+#[cfg(target_feature = "sse2")]
 impl From<__m128i> for Block {
     #[inline]
     fn from(m: __m128i) -> Self {
