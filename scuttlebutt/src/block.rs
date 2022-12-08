@@ -22,18 +22,21 @@ pub struct Block(
     #[cfg(target_feature = "sse2")] pub __m128i,
 );
 
-// union __U128 {
-//     vector: __m128i,
-//     bytes: u128,
-// }
+#[cfg(target_feature = "sse2")]
+union __U128 {
+    vector: __m128i,
+    bytes: u128,
+}
 
-// const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
-// const ONES: __m128i = unsafe {
-//     (__U128 {
-//         bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
-//     })
-//     .vector
-// };
+#[cfg(target_feature = "sse2")]
+const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
+#[cfg(target_feature = "sse2")]
+const ONES: __m128i = unsafe {
+    (__U128 {
+        bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
+    })
+    .vector
+};
 
 impl Block {
     /// Convert into a pointer.
@@ -258,53 +261,53 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
     }
 }
 
-// impl From<Block> for u128 {
-//     #[inline]
-//     fn from(m: Block) -> u128 {
-//         unsafe { *(&m as *const _ as *const u128) }
-//     }
-// }
+impl From<Block> for u128 {
+    #[inline]
+    fn from(m: Block) -> u128 {
+        unsafe { *(&m as *const _ as *const u128) }
+    }
+}
 
-// impl From<u128> for Block {
-//     #[inline]
-//     fn from(m: u128) -> Self {
-//         unsafe { std::mem::transmute(m) }
-//         // XXX: the below doesn't work due to pointer-alignment issues.
-//         // unsafe { *(&m as *const _ as *const Block) }
-//     }
-// }
+impl From<u128> for Block {
+    #[inline]
+    fn from(m: u128) -> Self {
+        unsafe { std::mem::transmute(m) }
+        // XXX: the below doesn't work due to pointer-alignment issues.
+        // unsafe { *(&m as *const _ as *const Block) }
+    }
+}
 
-// #[cfg(target_feature = "sse2")]
-// impl From<Block> for __m128i {
-//     #[inline]
-//     fn from(m: Block) -> __m128i {
-//         m.0
-//     }
-// }
+#[cfg(target_feature = "sse2")]
+impl From<Block> for __m128i {
+    #[inline]
+    fn from(m: Block) -> __m128i {
+        m.0
+    }
+}
 
-// #[cfg(target_feature = "sse2")]
-// impl From<__m128i> for Block {
-//     #[inline]
-//     fn from(m: __m128i) -> Self {
-//         Block(m)
-//     }
-// }
+#[cfg(target_feature = "sse2")]
+impl From<__m128i> for Block {
+    #[inline]
+    fn from(m: __m128i) -> Self {
+        Block(m)
+    }
+}
 
-// impl From<Block> for [u8; 16] {
-//     #[inline]
-//     fn from(m: Block) -> [u8; 16] {
-//         unsafe { *(&m as *const _ as *const [u8; 16]) }
-//     }
-// }
+impl From<Block> for [u8; 16] {
+    #[inline]
+    fn from(m: Block) -> [u8; 16] {
+        unsafe { *(&m as *const _ as *const [u8; 16]) }
+    }
+}
 
-// impl From<[u8; 16]> for Block {
-//     #[inline]
-//     fn from(m: [u8; 16]) -> Self {
-//         unsafe { std::mem::transmute(m) }
-//         // XXX: the below doesn't work due to pointer-alignment issues.
-//         // unsafe { *(&m as *const _ as *const Block) }
-//     }
-// }
+impl From<[u8; 16]> for Block {
+    #[inline]
+    fn from(m: [u8; 16]) -> Self {
+        unsafe { std::mem::transmute(m) }
+        // XXX: the below doesn't work due to pointer-alignment issues.
+        // unsafe { *(&m as *const _ as *const Block) }
+    }
+}
 
 // impl From<[u16; 8]> for Block {
 //     #[inline]
@@ -319,6 +322,13 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
 //         unsafe { *(&m as *const _ as *const [u32; 4]) }
 //     }
 // }
+
+impl From<&[u8]> for Block {
+    #[inline]
+    fn from(m: &[u8]) -> Self {
+        unsafe { std::mem::transmute(m) }
+    }
+}
 
 impl Hash for Block {
     fn hash<H: Hasher>(&self, state: &mut H) {

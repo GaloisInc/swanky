@@ -15,6 +15,7 @@
 //!
 
 mod errors;
+#[cfg(feature = "utils_transpose")]
 mod utils;
 
 pub use crate::errors::Error;

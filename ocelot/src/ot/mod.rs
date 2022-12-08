@@ -16,10 +16,13 @@
 //! * `kos`: Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT).
 //!
 
+#[cfg(feature = "cointoss")]
 pub mod alsz;
 pub mod chou_orlandi;
 pub mod dummy;
+#[cfg(feature = "cointoss")]
 pub mod kos;
+#[cfg(feature = "cointoss")]
 pub mod kos_delta;
 pub mod naor_pinkas;
 
@@ -40,16 +43,22 @@ pub type NaorPinkasSender = naor_pinkas::Sender;
 /// Instantiation of the Naor-Pinkas OT receiver.
 pub type NaorPinkasReceiver = naor_pinkas::Receiver;
 /// Instantiation of the ALSZ OT extension sender, using Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type AlszSender = alsz::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the ALSZ OT extension receiver, using Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type AlszReceiver = alsz::Receiver<ChouOrlandiSender>;
 /// Instantiation of the KOS OT extension sender, using Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type KosSender = kos::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the KOS OT extension receiver, using Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type KosReceiver = kos::Receiver<ChouOrlandiSender>;
 /// Instantiation of the KOS Delta-OT extension sender, using Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type KosDeltaSender = kos_delta::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the KOS Delta-OT extension receiver, using Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type KosDeltaReceiver = kos_delta::Receiver<ChouOrlandiSender>;
 
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.

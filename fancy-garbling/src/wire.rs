@@ -440,7 +440,8 @@ impl Wire {
     /// Uses fixed-key AES.
     #[inline(never)]
     pub fn hash(&self, tweak: Block) -> Block {
-        AES_HASH.tccr_hash(tweak, self.as_block())
+        // AES_HASH.tccr_hash(tweak, self.as_block())
+        todo!("AES_HASH, refactor here?")
     }
 
     /// Compute the hash of this wire, converting the result back to a wire.

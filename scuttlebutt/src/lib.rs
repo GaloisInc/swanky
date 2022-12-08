@@ -22,21 +22,23 @@ pub mod channel;
 #[cfg(feature = "cointoss")]
 pub mod cointoss;
 pub mod commitment;
+#[cfg(feature = "hash_aes")]
 mod hash_aes;
 #[cfg(feature = "cointoss")]
 mod rand_aes;
 pub mod utils;
 
 pub use crate::{
-    aes::{
-        aes128::{Aes128, FIXED_KEY_AES128},
-        aes256::Aes256,
-    },
+    aes::{aes128::Aes128, aes256::Aes256},
     block::Block,
     block512::Block512,
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
-    hash_aes::{AesHash, AES_HASH},
 };
+
+#[cfg(feature = "hash_aes")]
+pub use crate::aes::aes128::FIXED_KEY_AES128;
+#[cfg(feature = "hash_aes")]
+pub use crate::hash_aes::{AesHash, AES_HASH};
 
 #[cfg(feature = "cointoss")]
 pub use crate::rand_aes::AesRng;

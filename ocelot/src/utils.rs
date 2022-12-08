@@ -5,6 +5,7 @@
 // See LICENSE for licensing information.
 
 use scuttlebutt::Block;
+use std::convert::TryInto;
 
 #[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
@@ -24,7 +25,12 @@ fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
     assert_eq!(nrows % 8, 0);
     assert_eq!(ncols % 8, 0);
     // unsafe { sse_trans(out, inp, nrows, ncols) }
-    transpose::transpose(inp, out, ncols, nrows)
+    transpose::transpose(
+        inp,
+        out,
+        ncols.try_into().unwrap(),
+        nrows.try_into().unwrap(),
+    )
 }
 
 // The hypothesis that a rust implementation of matrix transpose would be faster

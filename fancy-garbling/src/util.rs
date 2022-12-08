@@ -9,7 +9,7 @@
 //! Note: all number representations in this library are little-endian.
 
 use crate::Wire;
-#[cfg(all(feature = "nightly", target_feature("sse2")))]
+#[cfg(all(feature = "nightly", target_feature = "sse2"))]
 use core::arch::x86_64::*;
 use itertools::Itertools;
 use scuttlebutt::Block;

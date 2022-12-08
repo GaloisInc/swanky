@@ -6,7 +6,9 @@
 
 //! Oblivious PRF traits + instantiations.
 
+#[cfg(feature = "cointoss")]
 pub mod kkrt;
+#[cfg(feature = "cointoss")]
 pub mod kmprt;
 mod prc;
 
@@ -15,12 +17,16 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::AbstractChannel;
 
 /// KKRT oblivious PRF sender using ALSZ OT extension with Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type KkrtSender = kkrt::Sender<ot::AlszReceiver>;
 /// KKRT oblivious PRF receiver using ALSZ OT extension with Chou-Orlandi as the base OT.
+#[cfg(feature = "cointoss")]
 pub type KkrtReceiver = kkrt::Receiver<ot::AlszSender>;
 /// KMPRT hash-based OPPRF sender, using KKRT as the underlying OPRF.
+#[cfg(feature = "cointoss")]
 pub type KmprtSender = kmprt::Sender<KkrtSender>;
 /// KMPRT hash-based OPPRF receiver, using KKRT as the underlying OPRF.
+#[cfg(feature = "cointoss")]
 pub type KmprtReceiver = kmprt::Receiver<KkrtReceiver>;
 
 /// Trait containing the associated types used by an oblivious PRF.

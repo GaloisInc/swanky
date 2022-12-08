@@ -30,8 +30,14 @@
 use std::convert::TryInto;
 
 use crate::Block;
-use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::cipher::{
+    generic_array::typenum, generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt,
+    KeyInit,
+};
 use aes::Aes128 as AesAes128;
+
+#[cfg(target_feature = "sse2")]
+use core::arch::x86_64::__m128i;
 
 /// AES-128, encryption only.
 #[derive(Clone)]
@@ -52,21 +58,29 @@ impl Aes128 {
     /// Encrypt a block, outputting the ciphertext.
     #[inline(always)]
     pub fn encrypt(&self, m: Block) -> Block {
-        let rkeys = self.rkeys;
-        let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
-        let in_place = m_bytes.try_into().unwrap();
+        let rkeys = &self.rkeys;
+        // let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
+        // let mut in_place = m_bytes.try_into().unwrap();
+        let mut in_place: GenericArray<u8, typenum::U16> =
+            GenericArray::clone_from_slice(m.as_ref());
         rkeys.encrypt_block(&mut in_place);
-        Block(in_place.as_slice())
+        in_place.as_slice().into()
     }
 
-    /// Encrypt eight blocks at a time, outputting the ciphertexts.
-    #[inline(always)]
-    pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
-        let rkeys = self.rkeys;
-        let mut blocks_copy = blocks.to_vec();
-        rkeys.encrypt_blocks(&mut blocks_copy);
-        blocks_copy.into()
-    }
+    // /// Encrypt eight blocks at a time, outputting the ciphertexts.
+    // #[inline(always)]
+    // pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
+    //     let rkeys = self.rkeys;
+    //     let mut blocks_copy: [GenericArray<u8, typenum::U32>; 8] = blocks
+    //         .iter()
+    //         .map(|m| {
+    //             let m_bytes: [u8; 8] = m.as_ref().try_into().unwrap();
+    //             m_bytes
+    //         })
+    //         .collect();
+    //     rkeys.encrypt_blocks(&mut blocks_copy);
+    //     blocks_copy
+    // }
 }
 
 union __U128 {
@@ -78,53 +92,20 @@ union __U128 {
 }
 
 /// Fixed-key AES-128.
+#[cfg(feature = "TODO_hash_aes")]
 pub const FIXED_KEY_AES128: Aes128 = Aes128 {
-    rkeys: unsafe {
-        [
-            (__U128 {
-                bytes: 0x15B5_32C2_F193_1C94,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0xD754_876D_FE7E_6726,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0xA7EB_4F98_1986_CFCF,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0x80E6_BBED_F88D_E8C9,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0x1210_4B44_43D8_B35C,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0xF467_7B3C_8DCB_047B,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0x578C_DBAC_AED1_C9DC,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0x295D_2051_CF6F_5E25,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0x0CE1_FD36_50DE_FFAB,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0xDDFA_4FE9_E2CD_2D23,
-            })
-            .vector,
-            (__U128 {
-                bytes: 0x96F6_769D_AF14_18D2,
-            })
-            .vector,
-        ]
-    },
+    rkeys: AesAes128::new_from_slice(&[
+        0x15B5_32C2_F193_1C94,
+        0xD754_876D_FE7E_6726,
+        0xA7EB_4F98_1986_CFCF,
+        0x80E6_BBED_F88D_E8C9,
+        0x1210_4B44_43D8_B35C,
+        0xF467_7B3C_8DCB_047B,
+        0x578C_DBAC_AED1_C9DC,
+        0x295D_2051_CF6F_5E25,
+        0x0CE1_FD36_50DE_FFAB,
+        0xDDFA_4FE9_E2CD_2D23,
+        0x96F6_769D_AF14_18D2,
+    ])
+    .unwrap(),
 };

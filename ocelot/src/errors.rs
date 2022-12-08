@@ -14,6 +14,7 @@ pub enum Error {
     /// Some other error, given by `String`.
     Other(String),
     /// Coin tossing failed.
+    #[cfg(feature = "cointoss")]
     CoinTossError(scuttlebutt::cointoss::Error),
 }
 
@@ -23,6 +24,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
+#[cfg(feature = "cointoss")]
 impl From<scuttlebutt::cointoss::Error> for Error {
     fn from(e: scuttlebutt::cointoss::Error) -> Error {
         Error::CoinTossError(e)
@@ -35,6 +37,7 @@ impl std::fmt::Display for Error {
             Error::InvalidInputLength => "invalid input length".fmt(f),
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::Other(s) => write!(f, "other error: {}", s),
+            #[cfg(feature = "cointoss")]
             Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
         }
     }

@@ -18,6 +18,8 @@ unstable = []
 serde1 = ["serde"]
 # TODO(interstellar) CHECK that it compiles when enabled; and also most related deps under this feature
 cointoss = ["rand", "rand_core"]
+# TODO(interstellar) CHECK that it compiles when enabled;
+hash_aes = []
 
 [dependencies]
 curve25519-dalek = { version = "2", features = ["std"], optional = true }

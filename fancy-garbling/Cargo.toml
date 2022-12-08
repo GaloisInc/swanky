@@ -20,7 +20,8 @@ serde1 = ["serde", "scuttlebutt/serde1"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
-scuttlebutt = { path = "../scuttlebutt" }
+# TODO(interstellar)? features = ["hash_aes"], grep "pub fn hash"
+scuttlebutt = { path = "../scuttlebutt", features = ["hash_aes"] }
 ocelot = { path = "../ocelot" }
 itertools = "0.10.0"
 rand = "0.7"

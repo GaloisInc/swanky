@@ -46,19 +46,18 @@ impl Aes256 {
     /// Make a new `Aes256` object with key `key`.
     #[inline]
     pub fn new(key: &[u8; 32]) -> Self {
-        let key: GenericArray<u8, typenum::U32> =
-            GenericArray::from(key.try_into().expect("wrong key size"));
-        let rkeys: AesAes256 = AesAes256::new(&key);
+        let key: &GenericArray<u8, typenum::U32> = GenericArray::from_slice(key);
+        let rkeys: AesAes256 = AesAes256::new(key);
         Self { rkeys: rkeys }
     }
 
     /// Encrypt block `m`.
     #[inline]
     pub fn encrypt(&self, m: Block) -> Block {
-        let rkeys = self.rkeys;
+        let rkeys = &self.rkeys;
         let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
-        let in_place = m_bytes.try_into().unwrap();
+        let mut in_place = m_bytes.try_into().unwrap();
         rkeys.encrypt_block(&mut in_place);
-        Block(in_place.as_slice())
+        in_place.as_slice().into()
     }
 }
