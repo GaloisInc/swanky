@@ -90,6 +90,7 @@ impl std::fmt::Display for Block512 {
     }
 }
 
+#[cfg(feature = "cointoss")]
 impl rand::distributions::Distribution<Block512> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block512 {

@@ -250,6 +250,7 @@ impl std::fmt::Display for Block {
     }
 }
 
+#[cfg(feature = "cointoss")]
 impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
     #[inline]
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
@@ -257,67 +258,67 @@ impl rand::distributions::Distribution<Block> for rand::distributions::Standard 
     }
 }
 
-impl From<Block> for u128 {
-    #[inline]
-    fn from(m: Block) -> u128 {
-        unsafe { *(&m as *const _ as *const u128) }
-    }
-}
+// impl From<Block> for u128 {
+//     #[inline]
+//     fn from(m: Block) -> u128 {
+//         unsafe { *(&m as *const _ as *const u128) }
+//     }
+// }
 
-impl From<u128> for Block {
-    #[inline]
-    fn from(m: u128) -> Self {
-        unsafe { std::mem::transmute(m) }
-        // XXX: the below doesn't work due to pointer-alignment issues.
-        // unsafe { *(&m as *const _ as *const Block) }
-    }
-}
+// impl From<u128> for Block {
+//     #[inline]
+//     fn from(m: u128) -> Self {
+//         unsafe { std::mem::transmute(m) }
+//         // XXX: the below doesn't work due to pointer-alignment issues.
+//         // unsafe { *(&m as *const _ as *const Block) }
+//     }
+// }
 
-#[cfg(target_feature = "sse2")]
-impl From<Block> for __m128i {
-    #[inline]
-    fn from(m: Block) -> __m128i {
-        m.0
-    }
-}
+// #[cfg(target_feature = "sse2")]
+// impl From<Block> for __m128i {
+//     #[inline]
+//     fn from(m: Block) -> __m128i {
+//         m.0
+//     }
+// }
 
-#[cfg(target_feature = "sse2")]
-impl From<__m128i> for Block {
-    #[inline]
-    fn from(m: __m128i) -> Self {
-        Block(m)
-    }
-}
+// #[cfg(target_feature = "sse2")]
+// impl From<__m128i> for Block {
+//     #[inline]
+//     fn from(m: __m128i) -> Self {
+//         Block(m)
+//     }
+// }
 
-impl From<Block> for [u8; 16] {
-    #[inline]
-    fn from(m: Block) -> [u8; 16] {
-        unsafe { *(&m as *const _ as *const [u8; 16]) }
-    }
-}
+// impl From<Block> for [u8; 16] {
+//     #[inline]
+//     fn from(m: Block) -> [u8; 16] {
+//         unsafe { *(&m as *const _ as *const [u8; 16]) }
+//     }
+// }
 
-impl From<[u8; 16]> for Block {
-    #[inline]
-    fn from(m: [u8; 16]) -> Self {
-        unsafe { std::mem::transmute(m) }
-        // XXX: the below doesn't work due to pointer-alignment issues.
-        // unsafe { *(&m as *const _ as *const Block) }
-    }
-}
+// impl From<[u8; 16]> for Block {
+//     #[inline]
+//     fn from(m: [u8; 16]) -> Self {
+//         unsafe { std::mem::transmute(m) }
+//         // XXX: the below doesn't work due to pointer-alignment issues.
+//         // unsafe { *(&m as *const _ as *const Block) }
+//     }
+// }
 
-impl From<[u16; 8]> for Block {
-    #[inline]
-    fn from(m: [u16; 8]) -> Self {
-        unsafe { std::mem::transmute(m) }
-    }
-}
+// impl From<[u16; 8]> for Block {
+//     #[inline]
+//     fn from(m: [u16; 8]) -> Self {
+//         unsafe { std::mem::transmute(m) }
+//     }
+// }
 
-impl From<Block> for [u32; 4] {
-    #[inline]
-    fn from(m: Block) -> Self {
-        unsafe { *(&m as *const _ as *const [u32; 4]) }
-    }
-}
+// impl From<Block> for [u32; 4] {
+//     #[inline]
+//     fn from(m: Block) -> Self {
+//         unsafe { *(&m as *const _ as *const [u32; 4]) }
+//     }
+// }
 
 impl Hash for Block {
     fn hash<H: Hasher>(&self, state: &mut H) {

@@ -29,7 +29,10 @@
 
 use crate::Block;
 // use core::{arch::x86_64::*, mem};
-use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::cipher::{
+    generic_array::typenum, generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt,
+    KeyInit,
+};
 use aes::Aes256 as AesAes256;
 use std::convert::TryInto;
 
@@ -43,7 +46,8 @@ impl Aes256 {
     /// Make a new `Aes256` object with key `key`.
     #[inline]
     pub fn new(key: &[u8; 32]) -> Self {
-        let key = GenericArray::from(key);
+        let key: GenericArray<u8, typenum::U32> =
+            GenericArray::from(key.try_into().expect("wrong key size"));
         let rkeys: AesAes256 = AesAes256::new(&key);
         Self { rkeys: rkeys }
     }
@@ -55,6 +59,6 @@ impl Aes256 {
         let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
         let in_place = m_bytes.try_into().unwrap();
         rkeys.encrypt_block(&mut in_place);
-        Block(in_place)
+        Block(in_place.as_slice())
     }
 }

@@ -19,9 +19,11 @@ mod block512;
 pub mod bloomfilter;
 /// Module for encapsulating communication channels for `swanky`.
 pub mod channel;
+#[cfg(feature = "cointoss")]
 pub mod cointoss;
 pub mod commitment;
 mod hash_aes;
+#[cfg(feature = "cointoss")]
 mod rand_aes;
 pub mod utils;
 
@@ -32,17 +34,16 @@ pub use crate::{
     },
     block::Block,
     block512::Block512,
-    channel::{AbstractChannel, Channel, HashChannel, SyncChannel, TrackChannel, SymChannel},
+    channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
-    rand_aes::AesRng,
 };
+
+#[cfg(feature = "cointoss")]
+pub use crate::rand_aes::AesRng;
 
 #[cfg(unix)]
 pub use crate::channel::{
-    track_unix_channel_pair,
-    unix_channel_pair,
-    TrackUnixChannel,
-    UnixChannel,
+    track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

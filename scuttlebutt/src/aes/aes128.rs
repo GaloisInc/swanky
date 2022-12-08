@@ -56,7 +56,7 @@ impl Aes128 {
         let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
         let in_place = m_bytes.try_into().unwrap();
         rkeys.encrypt_block(&mut in_place);
-        Block(in_place)
+        Block(in_place.as_slice())
     }
 
     /// Encrypt eight blocks at a time, outputting the ciphertexts.
