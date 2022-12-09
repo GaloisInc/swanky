@@ -9,7 +9,7 @@
 
 use crate::{Aes128, Block};
 
-#[cfg(target_feature = "sse2")]
+#[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
 /// AES-based correlation-robust hash function.
@@ -70,7 +70,7 @@ impl AesHash {
     /// The function computes `H(σ(x))`, where `H` is a correlation-robust hash
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline]
-    #[cfg(target_feature = "sse2")]
+    #[cfg(target_arch = "x86_64")]
     pub fn ccr_hash(&self, i: Block, x: Block) -> Block {
         unsafe {
             let x = _mm_xor_si128(
