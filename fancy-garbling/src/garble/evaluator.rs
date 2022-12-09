@@ -115,7 +115,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         &mut self,
         A: &Wire,
         B: &Wire,
-        temp_blocks: &mut Vec<Block>,
+        gate: &mut Vec<Block>,
     ) -> Result<Wire, EvaluatorError> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A);
@@ -124,13 +124,9 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let qb = B.modulus();
         let unequal = q != qb;
         let ngates = q as usize + qb as usize - 2 + unequal as usize;
-        let mut gate = Vec::with_capacity(ngates);
-        {
-            for _ in 0..ngates {
-                let block = self.channel.read_block()?;
-                gate.push(block);
-            }
-        }
+        // TODO(interstellar) "<=" instead of ==; but need to modify "read_blocks_with_prealloc" call
+        assert!(ngates == gate.len(), "temp_blocks is too small!");
+        self.channel.read_blocks_with_prealloc(gate)?;
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
