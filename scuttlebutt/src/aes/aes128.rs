@@ -102,30 +102,3 @@ impl Aes128 {
         ]
     }
 }
-
-union __U128 {
-    #[cfg(target_feature = "sse2")]
-    vector: __m128i,
-    #[cfg(not(target_feature = "sse2"))]
-    vector: u128,
-    bytes: u128,
-}
-
-/// Fixed-key AES-128.
-#[cfg(feature = "fixed_hash_aes")]
-pub const FIXED_KEY_AES128: Aes128 = Aes128 {
-    rkeys: AesAes128::new_from_slice(&[
-        0x15B5_32C2_F193_1C94,
-        0xD754_876D_FE7E_6726,
-        0xA7EB_4F98_1986_CFCF,
-        0x80E6_BBED_F88D_E8C9,
-        0x1210_4B44_43D8_B35C,
-        0xF467_7B3C_8DCB_047B,
-        0x578C_DBAC_AED1_C9DC,
-        0x295D_2051_CF6F_5E25,
-        0x0CE1_FD36_50DE_FFAB,
-        0xDDFA_4FE9_E2CD_2D23,
-        0x96F6_769D_AF14_18D2,
-    ])
-    .unwrap(),
-};

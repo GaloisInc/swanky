@@ -8,7 +8,7 @@
 
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::Block;
+use scuttlebutt::{AesHash, Block};
 
 mod npaths_tab;
 
@@ -439,16 +439,15 @@ impl Wire {
     ///
     /// Uses fixed-key AES.
     #[inline(never)]
-    pub fn hash(&self, tweak: Block) -> Block {
-        // scuttlebutt::AES_HASH.tccr_hash(tweak, self.as_block())
-        todo!("AES_HASH, refactor here?")
+    pub fn hash(&self, tweak: Block, aes_hash: &AesHash) -> Block {
+        aes_hash.tccr_hash(tweak, self.as_block())
     }
 
     /// Compute the hash of this wire, converting the result back to a wire.
     ///
     /// Uses fixed-key AES.
-    pub fn hashback(&self, tweak: Block, q: u16) -> Wire {
-        let block = self.hash(tweak);
+    pub fn hashback(&self, tweak: Block, q: u16, aes_hash: &AesHash) -> Wire {
+        let block = self.hash(tweak, aes_hash);
         if q == 3 {
             // We have to convert `block` into a valid `Mod3` encoding. We do
             // this by computing the `Mod3` digits using `_unrank`, and then map

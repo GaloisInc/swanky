@@ -35,12 +35,8 @@ pub use crate::{
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
 };
 
-#[cfg(feature = "fixed_hash_aes")]
-pub use crate::aes::aes128::FIXED_KEY_AES128;
 #[cfg(feature = "hash_aes")]
 pub use crate::hash_aes::AesHash;
-#[cfg(feature = "fixed_hash_aes")]
-pub use crate::hash_aes::AES_HASH;
 
 #[cfg(feature = "rand_aes")]
 pub use crate::rand_aes::AesRng;

@@ -13,8 +13,7 @@ use crate::{
     wire::Wire,
 };
 use core::hash::BuildHasher;
-use scuttlebutt::AbstractChannel;
-use scuttlebutt::Block;
+use scuttlebutt::{AbstractChannel, AesHash, Block};
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
@@ -24,6 +23,7 @@ pub struct Evaluator<C> {
     channel: C,
     current_gate: usize,
     current_output: usize,
+    aes_hash: AesHash,
 }
 
 impl<C: AbstractChannel> Evaluator<C> {
@@ -33,6 +33,7 @@ impl<C: AbstractChannel> Evaluator<C> {
             channel,
             current_gate: 0,
             current_output: 0,
+            aes_hash: AesHash::new_with_fixed_key(),
         }
     }
 
@@ -46,6 +47,7 @@ impl<C: AbstractChannel> Evaluator<C> {
             channel,
             current_gate: current_gate,
             current_output: 0,
+            aes_hash: AesHash::new_with_fixed_key(),
         }
     }
 
@@ -129,25 +131,25 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
 
         // garbler's half gate
         let L = if A.color() == 0 {
-            A.hashback(g, q)
+            A.hashback(g, q, &self.aes_hash)
         } else {
             let ct_left = gate[A.color() as usize - 1];
-            Wire::from_block(ct_left ^ A.hash(g), q)
+            Wire::from_block(ct_left ^ A.hash(g, &self.aes_hash), q)
         };
 
         // evaluator's half gate
         let R = if B.color() == 0 {
-            B.hashback(g, q)
+            B.hashback(g, q, &self.aes_hash)
         } else {
             let ct_right = gate[(q + B.color()) as usize - 2];
-            Wire::from_block(ct_right ^ B.hash(g), q)
+            Wire::from_block(ct_right ^ B.hash(g, &self.aes_hash), q)
         };
 
         // hack for unequal mods
         let new_b_color = if unequal {
             let minitable = *gate.last().unwrap();
             let ct = u128::from(minitable) >> (B.color() * 16);
-            let pt = u128::from(B.hash(tweak2(gate_num as u64, 1))) ^ ct;
+            let pt = u128::from(B.hash(tweak2(gate_num as u64, 1), &self.aes_hash)) ^ ct;
             pt as u16
         } else {
             B.color()
@@ -166,10 +168,10 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         }
         let t = tweak(self.current_gate());
         if x.color() == 0 {
-            Ok(x.hashback(t, q))
+            Ok(x.hashback(t, q, &self.aes_hash))
         } else {
             let ct = gate[x.color() as usize - 1];
-            Ok(Wire::from_block(ct ^ x.hash(t), q))
+            Ok(Wire::from_block(ct ^ x.hash(t, &self.aes_hash), q))
         }
     }
 
@@ -204,7 +206,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             //     .entry((x.clone(), i, k))
             //     .or_insert(x.hash(output_tweak(i, k)));
             // if hashed_wire == temp_blocks[k as usize].as_ref_block() {
-            let hashed_wire = x.hash(output_tweak(i, k));
+            let hashed_wire = x.hash(output_tweak(i, k), &self.aes_hash);
             if hashed_wire == temp_blocks[k as usize] {
                 decoded = Some(k);
                 break;
