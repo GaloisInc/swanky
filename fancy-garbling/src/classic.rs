@@ -286,10 +286,12 @@ impl std::io::Read for GarbledReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         assert_eq!(buf.len() % 16, 0);
         for data in buf.chunks_mut(16) {
-            let block: [u8; 16] = self.blocks[self.index].into();
-            for (a, b) in data.iter_mut().zip(block.iter()) {
-                *a = *b;
-            }
+            // TODO(interstellar) can we improve this?
+            // let block: [u8; 16] = self.blocks[self.index].into();
+            // for (a, b) in data.iter_mut().zip(block.iter()) {
+            //     *a = *b;
+            // }
+            data.copy_from_slice(self.blocks[self.index].as_ref());
             self.index += 1;
         }
         Ok(buf.len())
