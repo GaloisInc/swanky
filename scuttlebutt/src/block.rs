@@ -253,14 +253,6 @@ impl std::fmt::Display for Block {
     }
 }
 
-#[cfg(feature = "cointoss")]
-impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
-    #[inline]
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
-        Block::from(rng.gen::<u128>())
-    }
-}
-
 impl From<Block> for u128 {
     #[inline]
     fn from(m: Block) -> u128 {

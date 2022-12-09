@@ -145,6 +145,14 @@ impl From<AesRngCore> for AesRng {
     }
 }
 
+#[cfg(feature = "rand_aes")]
+impl rand::distributions::Distribution<Block> for rand::distributions::Standard {
+    #[inline]
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Block {
+        Block::from(rng.gen::<u128>())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -58,7 +58,7 @@ impl Aes128 {
     /// Encrypt a block, outputting the ciphertext.
     #[inline(always)]
     pub fn encrypt(&self, m: Block) -> Block {
-        let rkeys = &self.rkeys;
+        let rkeys: &AesAes128 = &self.rkeys;
         // let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
         // let mut in_place = m_bytes.try_into().unwrap();
         let mut in_place: GenericArray<u8, typenum::U16> =
@@ -67,20 +67,40 @@ impl Aes128 {
         in_place.as_slice().into()
     }
 
-    // /// Encrypt eight blocks at a time, outputting the ciphertexts.
-    // #[inline(always)]
-    // pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
-    //     let rkeys = self.rkeys;
-    //     let mut blocks_copy: [GenericArray<u8, typenum::U32>; 8] = blocks
-    //         .iter()
-    //         .map(|m| {
-    //             let m_bytes: [u8; 8] = m.as_ref().try_into().unwrap();
-    //             m_bytes
-    //         })
-    //         .collect();
-    //     rkeys.encrypt_blocks(&mut blocks_copy);
-    //     blocks_copy
-    // }
+    /// Encrypt eight blocks at a time, outputting the ciphertexts.
+    #[cfg(feature = "rand_aes")]
+    #[inline(always)]
+    pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
+        let rkeys: &AesAes128 = &self.rkeys;
+        // TODO(interstellar)!!! use "encrypt_blocks"
+        // let mut blocks_copy: [GenericArray<u8, typenum::U8>] = blocks
+        //     .iter()
+        //     .map(|m| {
+        //         let m_bytes: [u8; 8] = m.as_ref().try_into().unwrap();
+        //         m_bytes
+        //     })
+        //     .collect();
+        // let mut blocks_copy = GenericArray::from(blocks);
+        // let mut blocks_copy: [GenericArray<u8, typenum::U8>] = blocks_copy
+        //     .iter()
+        //     .map(|m| {
+        //         let m_bytes: [u8; 8] = m.as_ref().try_into().unwrap();
+        //         m_bytes
+        //     })
+        //     .collect();
+        // rkeys.encrypt_blocks(&mut blocks_copy);
+        // blocks_copy.into()
+        [
+            self.encrypt(blocks[0]),
+            self.encrypt(blocks[1]),
+            self.encrypt(blocks[2]),
+            self.encrypt(blocks[3]),
+            self.encrypt(blocks[4]),
+            self.encrypt(blocks[5]),
+            self.encrypt(blocks[6]),
+            self.encrypt(blocks[7]),
+        ]
+    }
 }
 
 union __U128 {
@@ -92,7 +112,7 @@ union __U128 {
 }
 
 /// Fixed-key AES-128.
-#[cfg(feature = "TODO_hash_aes")]
+#[cfg(feature = "fixed_hash_aes")]
 pub const FIXED_KEY_AES128: Aes128 = Aes128 {
     rkeys: AesAes128::new_from_slice(&[
         0x15B5_32C2_F193_1C94,

@@ -8,7 +8,7 @@
 
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
-use scuttlebutt::{Block, AES_HASH};
+use scuttlebutt::Block;
 
 mod npaths_tab;
 
@@ -440,7 +440,7 @@ impl Wire {
     /// Uses fixed-key AES.
     #[inline(never)]
     pub fn hash(&self, tweak: Block) -> Block {
-        // AES_HASH.tccr_hash(tweak, self.as_block())
+        // scuttlebutt::AES_HASH.tccr_hash(tweak, self.as_block())
         todo!("AES_HASH, refactor here?")
     }
 

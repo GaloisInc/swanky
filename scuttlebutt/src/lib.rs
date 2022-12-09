@@ -24,7 +24,7 @@ pub mod cointoss;
 pub mod commitment;
 #[cfg(feature = "hash_aes")]
 mod hash_aes;
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "rand_aes")]
 mod rand_aes;
 pub mod utils;
 
@@ -35,12 +35,14 @@ pub use crate::{
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
 };
 
-#[cfg(feature = "hash_aes")]
+#[cfg(feature = "fixed_hash_aes")]
 pub use crate::aes::aes128::FIXED_KEY_AES128;
 #[cfg(feature = "hash_aes")]
-pub use crate::hash_aes::{AesHash, AES_HASH};
+pub use crate::hash_aes::AesHash;
+#[cfg(feature = "fixed_hash_aes")]
+pub use crate::hash_aes::AES_HASH;
 
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "rand_aes")]
 pub use crate::rand_aes::AesRng;
 
 #[cfg(unix)]
