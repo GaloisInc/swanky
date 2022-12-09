@@ -17,6 +17,7 @@ use core::arch::x86_64::*;
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct Block(
     #[cfg(not(target_feature = "sse2"))] pub u128,
     #[cfg(target_feature = "sse2")] pub __m128i,
@@ -90,11 +91,21 @@ impl Block {
     pub fn lsb(&self) -> bool {
         unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
     }
+    #[inline]
+    #[cfg(not(target_feature = "sse2"))]
+    pub fn lsb(&self) -> bool {
+        (self.0 & 1) == 1
+    }
     /// Set the least significant bit.
     #[inline]
     #[cfg(target_feature = "sse2")]
     pub fn set_lsb(&self) -> Block {
         unsafe { Block(_mm_or_si128(self.0, ONE)) }
+    }
+    #[inline]
+    #[cfg(not(target_feature = "sse2"))]
+    pub fn set_lsb(&self) -> Block {
+        Block(self.0 | 1u128)
     }
     /// Flip all bits.
     #[inline]
