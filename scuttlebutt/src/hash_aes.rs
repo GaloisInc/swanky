@@ -86,6 +86,7 @@ impl AesHash {
     /// <https://eprint.iacr.org/2019/074>, §7.4).
     ///
     /// The function computes `π(π(x) ⊕ i) ⊕ π(x)`.
+    // TODO(interstellar) add overload "inplace"
     #[inline]
     pub fn tccr_hash(&self, i: Block, x: Block) -> Block {
         let y = self.aes.encrypt(x);

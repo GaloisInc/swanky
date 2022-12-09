@@ -438,6 +438,7 @@ impl Wire {
     /// Compute the hash of this wire.
     ///
     /// Uses fixed-key AES.
+    // TODO(interstellar) add overload "inplace"
     #[inline(never)]
     pub fn hash(&self, tweak: Block, aes_hash: &AesHash) -> Block {
         aes_hash.tccr_hash(tweak, self.as_block())
