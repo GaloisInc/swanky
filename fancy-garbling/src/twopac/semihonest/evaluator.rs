@@ -118,8 +118,15 @@ impl<C: AbstractChannel, RNG, OT> Fancy for Evaluator<C, RNG, OT> {
         self.evaluator.cmul(&x, c).map_err(Self::Error::from)
     }
 
-    fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.evaluator.mul(&x, &y).map_err(Self::Error::from)
+    fn mul_with_prealloc(
+        &mut self,
+        x: &Wire,
+        y: &Wire,
+        temp_blocks: &mut Vec<Block>,
+    ) -> Result<Self::Item, Self::Error> {
+        self.evaluator
+            .mul_with_prealloc(&x, &y, temp_blocks)
+            .map_err(Self::Error::from)
     }
 
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {

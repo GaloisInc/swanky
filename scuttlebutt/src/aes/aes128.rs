@@ -70,6 +70,16 @@ impl Aes128 {
         in_place.into()
     }
 
+    /// Encrypt a block, outputting the ciphertext.
+    /// in-place version
+    #[inline(always)]
+    pub fn encrypt_inplace(&self, block: &mut Block) {
+        let rkeys: &AesAes128 = &self.rkeys;
+        let mut in_place: &mut GenericArray<u8, typenum::U16> =
+            GenericArray::from_mut_slice(block.as_mut());
+        rkeys.encrypt_block(in_place);
+    }
+
     /// Encrypt eight blocks at a time, outputting the ciphertexts.
     #[cfg(feature = "rand_aes")]
     #[inline(always)]

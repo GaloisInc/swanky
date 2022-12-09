@@ -125,6 +125,7 @@ fn eval_prepare<F: Fancy>(
     gate_moduli: &[u16],
 ) -> Result<Vec<Option<F::Item>>, F::Error> {
     let mut cache: Vec<Option<F::Item>> = vec![None; gates.len()];
+    let mut temp_blocks = vec![Block::default(); 2];
 
     eval_prepare_with_prealloc(
         f,
@@ -133,6 +134,7 @@ fn eval_prepare<F: Fancy>(
         gates,
         gate_moduli,
         &mut cache,
+        &mut temp_blocks,
     )?;
 
     Ok(cache)
@@ -145,6 +147,7 @@ pub fn eval_prepare_with_prealloc<F: Fancy>(
     gates: &[Gate],
     gate_moduli: &[u16],
     cache: &mut Vec<Option<F::Item>>,
+    temp_blocks: &mut Vec<Block>,
 ) -> Result<(), F::Error> {
     debug_assert_eq!(cache.len(), gates.len(), "cache is NOT the correct size!");
     for (i, gate) in gates.iter().enumerate() {
@@ -208,13 +211,14 @@ pub fn eval_prepare_with_prealloc<F: Fancy>(
                 xref, yref, out, ..
             } => (
                 out,
-                f.mul(
+                f.mul_with_prealloc(
                     cache[xref.ix]
                         .as_ref()
                         .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                     cache[yref.ix]
                         .as_ref()
                         .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
+                    temp_blocks,
                 )?,
             ),
         };
@@ -316,6 +320,7 @@ impl Circuit {
             &self.gates,
             &self.gate_moduli,
             cache,
+            temp_blocks,
         )?;
 
         eval_eval_with_prealloc(
@@ -500,7 +505,12 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, output_modulus))
     }
 
-    fn mul(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
+    fn mul_with_prealloc(
+        &mut self,
+        xref: &CircuitRef,
+        yref: &CircuitRef,
+        temp_blocks: &mut Vec<Block>,
+    ) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() < yref.modulus() {
             return self.mul(yref, xref);
         }

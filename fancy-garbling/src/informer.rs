@@ -282,7 +282,12 @@ impl<F: Fancy> Fancy for Informer<F> {
         Ok(result)
     }
 
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn mul_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        temp_blocks: &mut Vec<Block>,
+    ) -> Result<Self::Item, Self::Error> {
         if x.modulus() < y.modulus() {
             return self.mul(y, x);
         }

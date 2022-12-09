@@ -111,7 +111,12 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         Ok(x.cmul(c))
     }
 
-    fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
+    fn mul_with_prealloc(
+        &mut self,
+        A: &Wire,
+        B: &Wire,
+        temp_blocks: &mut Vec<Block>,
+    ) -> Result<Wire, EvaluatorError> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A);
         }

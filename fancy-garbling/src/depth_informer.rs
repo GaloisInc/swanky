@@ -158,7 +158,12 @@ impl Fancy for DepthInformer {
         })
     }
 
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
+    fn mul_with_prealloc(
+        &mut self,
+        x: &Self::Item,
+        y: &Self::Item,
+        temp_blocks: &mut Vec<Block>,
+    ) -> Result<Self::Item, Self::Error> {
         self.nmuls += 1;
         Ok(DepthItem {
             modulus: x.modulus,

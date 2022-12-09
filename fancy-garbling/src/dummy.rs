@@ -114,7 +114,12 @@ impl Fancy for Dummy {
         })
     }
 
-    fn mul(&mut self, x: &DummyVal, y: &DummyVal) -> Result<DummyVal, Self::Error> {
+    fn mul_with_prealloc(
+        &mut self,
+        x: &DummyVal,
+        y: &DummyVal,
+        temp_blocks: &mut Vec<Block>,
+    ) -> Result<DummyVal, Self::Error> {
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
