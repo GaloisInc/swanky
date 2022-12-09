@@ -10,21 +10,28 @@
 use crate::Aes256;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
-use std::{
-    arch::x86_64::*,
-    hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
+
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::*;
 
 /// A 128-bit chunk.
 #[derive(Clone, Copy)]
-pub struct Block(pub __m128i);
+#[repr(transparent)]
+pub struct Block(
+    #[cfg(not(target_arch = "x86_64"))] pub u128,
+    #[cfg(target_arch = "x86_64")] pub __m128i,
+);
 
+#[cfg(target_arch = "x86_64")]
 union __U128 {
     vector: __m128i,
     bytes: u128,
 }
 
+#[cfg(target_arch = "x86_64")]
 const ONE: __m128i = unsafe { (__U128 { bytes: 1 }).vector };
+#[cfg(target_arch = "x86_64")]
 const ONES: __m128i = unsafe {
     (__U128 {
         bytes: 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF,
@@ -48,6 +55,7 @@ impl Block {
     ///
     /// This code is adapted from the EMP toolkit's implementation.
     #[inline]
+    #[cfg(target_arch = "x86_64")]
     pub fn clmul(self, rhs: Self) -> (Self, Self) {
         unsafe {
             let x = self.0;
@@ -68,6 +76,7 @@ impl Block {
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
+    // TODO(interstellar) this SHOULD NOT be here; it should be into aes256.rs
     #[cfg(feature = "curve25519-dalek")]
     #[inline]
     pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
@@ -78,16 +87,29 @@ impl Block {
 
     /// Return the least significant bit.
     #[inline]
+    #[cfg(target_arch = "x86_64")]
     pub fn lsb(&self) -> bool {
         unsafe { _mm_extract_epi8(_mm_and_si128(self.0, ONE), 0) == 1 }
     }
+    #[inline]
+    #[cfg(not(target_arch = "x86_64"))]
+    pub fn lsb(&self) -> bool {
+        (self.0 & 1) == 1
+    }
     /// Set the least significant bit.
     #[inline]
+    #[cfg(target_arch = "x86_64")]
     pub fn set_lsb(&self) -> Block {
         unsafe { Block(_mm_or_si128(self.0, ONE)) }
     }
+    #[inline]
+    #[cfg(not(target_arch = "x86_64"))]
+    pub fn set_lsb(&self) -> Block {
+        Block(self.0 | 1u128)
+    }
     /// Flip all bits.
     #[inline]
+    #[cfg(target_arch = "x86_64")]
     pub fn flip(&self) -> Self {
         unsafe { Block(_mm_xor_si128(self.0, ONES)) }
     }
@@ -107,16 +129,26 @@ impl Block {
 impl Default for Block {
     #[inline]
     fn default() -> Self {
-        unsafe { Block(_mm_setzero_si128()) }
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            Block(_mm_setzero_si128())
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        Block(0)
     }
 }
 
 impl PartialEq for Block {
     #[inline]
     fn eq(&self, other: &Block) -> bool {
+        #[cfg(target_arch = "x86_64")]
         unsafe {
             let neq = _mm_xor_si128(self.0, other.0);
             _mm_test_all_zeros(neq, neq) != 0
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            self.0 == other.0
         }
     }
 }
@@ -149,6 +181,7 @@ impl AsMut<[u8]> for Block {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl std::ops::BitAnd for Block {
     type Output = Block;
     #[inline]
@@ -157,6 +190,7 @@ impl std::ops::BitAnd for Block {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl std::ops::BitAndAssign for Block {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
@@ -164,6 +198,7 @@ impl std::ops::BitAndAssign for Block {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl std::ops::BitOr for Block {
     type Output = Block;
     #[inline]
@@ -172,6 +207,7 @@ impl std::ops::BitOr for Block {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl std::ops::BitOrAssign for Block {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
@@ -183,14 +219,28 @@ impl std::ops::BitXor for Block {
     type Output = Block;
     #[inline]
     fn bitxor(self, rhs: Self) -> Self {
-        unsafe { Block(_mm_xor_si128(self.0, rhs.0)) }
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            Block(_mm_xor_si128(self.0, rhs.0))
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        Block(self.0 ^ rhs.0)
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl std::ops::BitXorAssign for Block {
     #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
         unsafe { self.0 = _mm_xor_si128(self.0, rhs.0) }
+    }
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+impl std::ops::BitXorAssign for Block {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 = self.0 ^ rhs.0;
     }
 }
 
@@ -230,6 +280,7 @@ impl From<u128> for Block {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl From<Block> for __m128i {
     #[inline]
     fn from(m: Block) -> __m128i {
@@ -237,6 +288,7 @@ impl From<Block> for __m128i {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl From<__m128i> for Block {
     #[inline]
     fn from(m: __m128i) -> Self {
@@ -271,6 +323,13 @@ impl From<Block> for [u32; 4] {
     #[inline]
     fn from(m: Block) -> Self {
         unsafe { *(&m as *const _ as *const [u32; 4]) }
+    }
+}
+
+impl From<&[u8]> for Block {
+    #[inline]
+    fn from(m: &[u8]) -> Self {
+        unsafe { std::mem::transmute(m) }
     }
 }
 

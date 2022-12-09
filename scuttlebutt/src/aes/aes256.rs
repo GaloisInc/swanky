@@ -58,6 +58,8 @@ impl Aes256 {
         let m_bytes: [u8; 16] = m.as_ref().try_into().unwrap();
         let mut in_place = m_bytes.try_into().unwrap();
         rkeys.encrypt_block(&mut in_place);
-        in_place.as_slice().into()
+
+        let in_place: [u8; 16] = in_place.as_slice().try_into().expect("Wrong length");
+        in_place.into()
     }
 }
