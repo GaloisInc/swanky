@@ -33,6 +33,8 @@ pub trait HasModulus {
     fn modulus(&self) -> u16;
 }
 
+pub struct FancyEvalCache {}
+
 /// DSL for the basic computations supported by `fancy-garbling`.
 pub trait Fancy {
     /// The underlying wire datatype created by an object implementing `Fancy`.
@@ -82,13 +84,11 @@ pub trait Fancy {
     /// output, but they need to be involved in the process, so they can return `None`.
     fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, Self::Error>;
 
-    // TODO!!! this SHOULD probably by a (kind of &Self::Item), is this doable?
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        x: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, Self::Error>;
+    // fn output_with_prealloc<H: BuildHasher>(
+    //     &mut self,
+    //     x: &Self::Item,
+    //     eval_cache: &mut FancyEvalCache,
+    // ) -> Result<Option<u16>, Self::Error>
 
     ////////////////////////////////////////////////////////////////////////////////
     // Functions built on top of basic fancy operations.

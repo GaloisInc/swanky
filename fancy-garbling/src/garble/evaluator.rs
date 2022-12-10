@@ -175,29 +175,22 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
     ///     Or rather "hashes_cache"
     /// param hashes_cache: cache the operation "x.hash(output_tweak(i, k))" in memory
     ///     because that is quite slow, and most of those are the same b/w eval(=render) loops
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        x: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, EvaluatorError> {
+    fn output(&mut self, x: &Self::Item) -> Result<Option<u16>, EvaluatorError> {
         let q = x.modulus();
         let i = self.current_output();
 
         // Receive the output ciphertext from the garbler
-        debug_assert_eq!(
-            temp_blocks.len(),
-            q as usize,
-            "temp_blocks / q sizes mistmach!"
-        );
 
         // TODO!!! is this doing a copy/assign?
         // self.channel.read_blocks_with_prealloc(temp_blocks)?;
-        // IMPORTANT: we MUST ALWAYS read q(==temp_blocks.len()) from the Channel's reader
-        // else the index gets messed up and we get "DecodingFailed"
-        for i in 0..q {
-            temp_blocks[i as usize] = self.channel.get_current_block().clone();
-        }
+        // debug_assert_eq!(
+        //     temp_blocks.len(),
+        //     q as usize,
+        //     "temp_blocks / q sizes mistmach!"
+        // );
+        // for i in 0..q {
+        //     temp_blocks[i as usize] = self.channel.get_current_block().clone();
+        // }
 
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
@@ -207,9 +200,17 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             //     .entry((x.clone(), i, k))
             //     .or_insert(x.hash(output_tweak(i, k)));
             let hashed_wire = x.hash(output_tweak(i, k), &self.aes_hash);
-            if hashed_wire == temp_blocks[k as usize] {
-                // if &hashed_wire == self.channel.get_current_block() {
+            // if hashed_wire == temp_blocks[k as usize] {
+            if &hashed_wire == self.channel.get_current_block() {
                 decoded = Some(k);
+                // IMPORTANT: we MUST ALWAYS read q(==temp_blocks.len()) from the Channel's reader
+                // else the index gets messed up and we get "DecodingFailed"
+                // Also careful when refactoring this fn: we SHOULD avoid calling "x.hash" when already have a valid output;
+                // it is really expansive!
+                for i in 0..(q - 1 - k) {
+                    self.channel.next();
+                }
+
                 break;
             }
         }
@@ -219,14 +220,5 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         } else {
             Err(EvaluatorError::DecodingFailed)
         }
-    }
-
-    fn output(&mut self, x: &Wire) -> Result<Option<u16>, EvaluatorError> {
-        let q = x.modulus();
-        // let mut temp_blocks = vec![Block::default(); q.into()];
-        let mut temp_blocks = vec![Block::default(); q.into()];
-        let mut hashes_cache = HashMap::new();
-
-        Ok(self.output_with_prealloc(x, &mut temp_blocks, &mut hashes_cache)?)
     }
 }

@@ -374,14 +374,4 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         }
         Ok(None)
     }
-
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        x: &Self::Item,
-        _temp_blocks: &mut Vec<Block>,
-        _hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, Self::Error> {
-        // TODO(interstellar)!!! output_with_prealloc vs output
-        self.output(x)
-    }
 }

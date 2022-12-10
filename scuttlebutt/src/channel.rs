@@ -43,6 +43,9 @@ pub trait AbstractChannel {
     /// Typically this will call "self.reader.get_current_block"
     fn get_current_block(&mut self) -> &Block;
 
+    /// Contrary to "get_current_block", this simply move the "internal index"
+    fn next(&mut self);
+
     /// Read `nbytes` from the channel, and return it as a `Vec`.
     fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
         let mut data = vec![0; nbytes];
@@ -220,6 +223,8 @@ pub trait GetBlockByIndex {
     /// going through the whole io::read->buffer->alloc new Block just to
     /// iterate over the Channel's blocks.
     fn get_current_block(&mut self) -> &Block;
+
+    fn next(&mut self);
 }
 
 /// A standard read/write channel that implements `AbstractChannel`.
@@ -295,6 +300,10 @@ impl<R: Read + GetBlockByIndex, W: Write> AbstractChannel for Channel<R, W> {
     fn get_current_block(&mut self) -> &Block {
         self.reader_mut().get_current_block()
     }
+
+    fn next(&mut self) {
+        self.reader_mut().next()
+    }
 }
 
 /// Standard Read/Write channel built from a symmetric stream.
@@ -336,5 +345,9 @@ impl<S: Read + Write> AbstractChannel for SymChannel<S> {
 
     fn get_current_block(&mut self) -> &Block {
         todo!("SymChannel<R, W> get_current_block")
+    }
+
+    fn next(&mut self) {
+        todo!("SymChannel<UnixStream>: next")
     }
 }

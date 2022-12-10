@@ -306,6 +306,10 @@ impl GetBlockByIndex for GarbledReader {
         self.index += 1;
         b
     }
+
+    fn next(&mut self) {
+        self.index += 1;
+    }
 }
 
 /// Implementation of the `Write` trait for use by `Garbler`.

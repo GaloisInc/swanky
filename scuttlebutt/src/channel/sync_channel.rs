@@ -65,4 +65,8 @@ impl<R: Read, W: Write> AbstractChannel for SyncChannel<R, W> {
     fn get_current_block(&mut self) -> &Block {
         todo!("SyncChannel<R, W> get_current_block")
     }
+
+    fn next(&mut self) {
+        todo!("SyncChannel<UnixStream>: next")
+    }
 }

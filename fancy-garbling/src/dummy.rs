@@ -143,16 +143,6 @@ impl Fancy for Dummy {
     fn output(&mut self, x: &DummyVal) -> Result<Option<u16>, Self::Error> {
         Ok(Some(x.val))
     }
-
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        x: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, Self::Error> {
-        // TODO(interstellar)!!! output_with_prealloc vs output
-        Ok(Some(x.val))
-    }
 }
 
 impl FancyReveal for Dummy {

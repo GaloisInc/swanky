@@ -184,15 +184,6 @@ impl Fancy for DepthInformer {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }
-
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        x: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, Self::Error> {
-        todo!()
-    }
 }
 
 impl FancyReveal for DepthInformer {

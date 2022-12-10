@@ -320,15 +320,6 @@ impl<F: Fancy> Fancy for Informer<F> {
         self.stats.outputs.push(x.modulus());
         Ok(result)
     }
-
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        x: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, Self::Error> {
-        todo!()
-    }
 }
 
 impl<F: Fancy + FancyReveal> FancyReveal for Informer<F> {

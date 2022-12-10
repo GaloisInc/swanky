@@ -23,6 +23,10 @@ impl GetBlockByIndex for BufReader<UnixStream> {
     fn get_current_block(&mut self) -> &Block {
         todo!("BufReader<UnixStream>: get_current_block");
     }
+
+    fn next(&mut self) {
+        todo!("BufReader<UnixStream>: next")
+    }
 }
 
 /// Convenience function to create a pair of UnixChannels for local tests in `swanky`.

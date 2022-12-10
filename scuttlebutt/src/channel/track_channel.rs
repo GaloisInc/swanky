@@ -99,4 +99,8 @@ impl<R: Read + GetBlockByIndex, W: Write> AbstractChannel for TrackChannel<R, W>
     fn get_current_block(&mut self) -> &Block {
         todo!("TrackChannel<R, W> get_current_block")
     }
+
+    fn next(&mut self) {
+        todo!("TrackChannel<UnixStream>: next")
+    }
 }

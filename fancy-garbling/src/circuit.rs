@@ -261,7 +261,7 @@ pub fn eval_eval_with_prealloc<F: Fancy, H: BuildHasher>(
         let r = cache[r.ix]
             .as_ref()
             .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?;
-        let out = f.output_with_prealloc(r, temp_blocks, hashes_cache)?;
+        let out = f.output(r)?;
         outputs[i] = out;
     }
 
@@ -529,15 +529,6 @@ impl Fancy for CircuitBuilder {
         // println!("output called");
         self.circ.output_refs.push(*xref);
         Ok(None)
-    }
-
-    fn output_with_prealloc<H: BuildHasher>(
-        &mut self,
-        xref: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-        hashes_cache: &mut HashMap<(Self::Item, usize, u16), Block, H>,
-    ) -> Result<Option<u16>, Self::Error> {
-        todo!()
     }
 }
 
