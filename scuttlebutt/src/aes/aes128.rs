@@ -30,14 +30,8 @@
 use std::convert::TryInto;
 
 use crate::Block;
-use aes::cipher::{
-    generic_array::typenum, generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt,
-    KeyInit,
-};
+use aes::cipher::{generic_array::typenum, generic_array::GenericArray, BlockEncrypt, KeyInit};
 use aes::Aes128 as AesAes128;
-
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::__m128i;
 
 /// AES-128, encryption only.
 #[derive(Clone)]
@@ -75,7 +69,7 @@ impl Aes128 {
     #[inline(always)]
     pub fn encrypt_inplace(&self, block: &mut Block) {
         let rkeys: &AesAes128 = &self.rkeys;
-        let mut in_place: &mut GenericArray<u8, typenum::U16> =
+        let in_place: &mut GenericArray<u8, typenum::U16> =
             GenericArray::from_mut_slice(block.as_mut());
         rkeys.encrypt_block(in_place);
     }
@@ -83,8 +77,8 @@ impl Aes128 {
     /// Encrypt eight blocks at a time, outputting the ciphertexts.
     #[cfg(feature = "rand_aes")]
     #[inline(always)]
-    pub fn encrypt8(&self, mut blocks: [Block; 8]) -> [Block; 8] {
-        let rkeys: &AesAes128 = &self.rkeys;
+    pub fn encrypt8(&self, blocks: [Block; 8]) -> [Block; 8] {
+        // let rkeys: &AesAes128 = &self.rkeys;
         // TODO(interstellar)!!! use "encrypt_blocks"
         // let mut blocks_copy: [GenericArray<u8, typenum::U8>] = blocks
         //     .iter()

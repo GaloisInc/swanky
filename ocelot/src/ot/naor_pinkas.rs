@@ -49,7 +49,7 @@ impl OtSender for Sender {
             channel.write_pt(&c)?;
             cs.push(c);
         }
-        channel.flush()?;
+        // channel.flush()?;
         for c in cs.into_iter() {
             let pk0 = channel.read_pt()?;
             pks.push((pk0, c - pk0));
@@ -65,7 +65,7 @@ impl OtSender for Sender {
             channel.write_block(&e01)?;
             channel.write_block(&e11)?;
         }
-        channel.flush()?;
+        // channel.flush()?;
         Ok(())
     }
 }
@@ -109,7 +109,7 @@ impl OtReceiver for Receiver {
             };
             ks.push(k);
         }
-        channel.flush()?;
+        // channel.flush()?;
         inputs
             .iter()
             .zip(ks.into_iter())

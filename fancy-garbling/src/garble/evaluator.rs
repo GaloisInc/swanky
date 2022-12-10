@@ -37,29 +37,11 @@ impl<C: AbstractChannel> Evaluator<C> {
         }
     }
 
-    pub fn get_channel_ref(&self) -> &C {
-        &self.channel
-    }
-
-    /// Create a new `Evaluator` with a given "current_gate"
-    pub fn new_with_current_gate(channel: C, current_gate: usize) -> Self {
-        Evaluator {
-            channel,
-            current_gate: current_gate,
-            current_output: 0,
-            aes_hash: AesHash::new_with_fixed_key(),
-        }
-    }
-
     /// The current non-free gate index of the garbling computation.
     fn current_gate(&mut self) -> usize {
         let current = self.current_gate;
         self.current_gate += 1;
         current
-    }
-
-    pub fn get_current_gate(&self) -> usize {
-        self.current_gate
     }
 
     /// The current output index of the garbling computation.
@@ -74,13 +56,17 @@ impl<C: AbstractChannel> Evaluator<C> {
         let block = self.channel.read_block()?;
         Ok(Wire::from_block(block, modulus))
     }
+
+    pub fn get_channel_mut(&mut self) -> &mut C {
+        &mut self.channel
+    }
 }
 
 impl<C: AbstractChannel> FancyReveal for Evaluator<C> {
     fn reveal(&mut self, x: &Wire) -> Result<u16, EvaluatorError> {
         let val = self.output(x)?.expect("Evaluator always outputs Some(u16)");
         self.channel.write_u16(val)?;
-        self.channel.flush()?;
+        // self.channel.flush()?;
         Ok(val)
     }
 }
@@ -126,7 +112,15 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let ngates = q as usize + qb as usize - 2 + unequal as usize;
         // TODO(interstellar) "<=" instead of ==; but need to modify "read_blocks_with_prealloc" call
         assert!(ngates == gate.len(), "temp_blocks is too small!");
-        self.channel.read_blocks_with_prealloc(gate)?;
+        // self.channel.read_blocks_with_prealloc(gate)?;
+        // let channel = &mut self.channel;
+        // gate.iter_mut()
+        //     .enumerate()
+        //     .map(|(idx, block)| channel.get_current_block().unwrap().clone());
+        for i in 0..ngates {
+            gate[i] = self.channel.get_current_block().clone();
+        }
+
         let gate_num = self.current_gate();
         let g = tweak2(gate_num as u64, 0);
 
@@ -196,8 +190,14 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             q as usize,
             "temp_blocks / q sizes mistmach!"
         );
+
         // TODO!!! is this doing a copy/assign?
-        self.channel.read_blocks_with_prealloc(temp_blocks)?;
+        // self.channel.read_blocks_with_prealloc(temp_blocks)?;
+        // IMPORTANT: we MUST ALWAYS read q(==temp_blocks.len()) from the Channel's reader
+        // else the index gets messed up and we get "DecodingFailed"
+        for i in 0..q {
+            temp_blocks[i as usize] = self.channel.get_current_block().clone();
+        }
 
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
@@ -206,9 +206,9 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
             // let hashed_wire = hashes_cache
             //     .entry((x.clone(), i, k))
             //     .or_insert(x.hash(output_tweak(i, k)));
-            // if hashed_wire == temp_blocks[k as usize].as_ref_block() {
             let hashed_wire = x.hash(output_tweak(i, k), &self.aes_hash);
             if hashed_wire == temp_blocks[k as usize] {
+                // if &hashed_wire == self.channel.get_current_block() {
                 decoded = Some(k);
                 break;
             }

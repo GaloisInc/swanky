@@ -29,10 +29,7 @@
 
 use crate::Block;
 // use core::{arch::x86_64::*, mem};
-use aes::cipher::{
-    generic_array::typenum, generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt,
-    KeyInit,
-};
+use aes::cipher::{generic_array::typenum, generic_array::GenericArray, BlockEncrypt, KeyInit};
 use aes::Aes256 as AesAes256;
 use std::convert::TryInto;
 

@@ -15,7 +15,7 @@ use crate::{
     wire::Wire,
 };
 use itertools::Itertools;
-use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
+use scuttlebutt::{channel::GetBlockByIndex, AbstractChannel, AesRng, Block, Channel};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::BuildHasherDefault;
 use std::{collections::HashMap, convert::TryInto, rc::Rc};
@@ -90,8 +90,8 @@ impl GarbledCircuit {
     }
 
     /// Evaluate the garbled circuit.
-    pub fn eval_with_prealloc<'garb>(
-        &'garb mut self,
+    pub fn eval_with_prealloc(
+        &mut self,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
         outputs: &mut Vec<Option<u16>>,
@@ -157,10 +157,10 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
         GarbledReader::new(&[]),
         GarbledWriter::new(Some(c.num_nonfree_gates)),
     );
-    let channel_ = channel.clone();
+    // let channel_ = channel.clone();
 
     let rng = AesRng::new();
-    let mut garbler = Garbler::new(channel_, rng);
+    let mut garbler = Garbler::new(channel, rng);
 
     // get input wires, ignoring encoded values
     let gb_inps = (0..c.num_garbler_inputs())
@@ -181,12 +181,14 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
 
     c.eval(&mut garbler, &gb_inps, &ev_inps)?;
 
-    let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas());
+    // TODO(interstellar) remove deltas clone? or deltas altogether? are they used?
+    let en = Encoder::new(gb_inps, ev_inps, garbler.get_deltas_ref().clone());
 
-    let blocks = Rc::try_unwrap(channel.writer())
-        .unwrap()
-        .into_inner()
-        .blocks;
+    // let blocks = Rc::try_unwrap(channel.writer())
+    //     .unwrap()
+    //     .into_inner()
+    //     .blocks;
+    let blocks = garbler.get_channel_ref().writer_ref().blocks.clone();
 
     let gc = GarbledCircuit::new(blocks, c);
 
@@ -295,6 +297,14 @@ impl std::io::Read for GarbledReader {
             self.index += 1;
         }
         Ok(buf.len())
+    }
+}
+
+impl GetBlockByIndex for GarbledReader {
+    fn get_current_block(&mut self) -> &Block {
+        let b = &self.blocks[self.index];
+        self.index += 1;
+        b
     }
 }
 

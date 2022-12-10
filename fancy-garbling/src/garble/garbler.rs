@@ -38,6 +38,14 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         }
     }
 
+    pub fn get_channel_ref(&self) -> &C {
+        &self.channel
+    }
+
+    pub fn get_channel_mut(&mut self) -> &mut C {
+        &mut self.channel
+    }
+
     #[cfg(feature = "serde1")]
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -78,6 +86,10 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
     /// This is useful for reusing wires in multiple garbled circuit instances.
     pub fn get_deltas(self) -> HashMap<u16, Wire> {
         self.deltas
+    }
+
+    pub fn get_deltas_ref(&self) -> &HashMap<u16, Wire> {
+        &self.deltas
     }
 
     /// Send a wire over the established channel.
@@ -144,7 +156,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> FancyReveal for Garbler<C, RN
         // The evaluator needs our cooperation in order to see the output.
         // Hence, we call output() ourselves.
         self.output(x)?;
-        self.channel.flush()?;
+        // self.channel.flush()?;
         let val = self.channel.read_u16()?;
         Ok(val)
     }

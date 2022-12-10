@@ -14,7 +14,6 @@ use std::collections::HashMap;
 /// Semi-honest evaluator.
 pub struct Evaluator<C, RNG, OT> {
     evaluator: Ev<C>,
-    channel: C,
     ot: OT,
     rng: RNG,
 }
@@ -27,23 +26,18 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + Sem
     /// Make a new `Evaluator`.
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
         let ot = OT::init(&mut channel, &mut rng)?;
-        let evaluator = Ev::new(channel.clone());
-        Ok(Self {
-            evaluator,
-            channel,
-            ot,
-            rng,
-        })
+        let evaluator = Ev::new(channel);
+        Ok(Self { evaluator, ot, rng })
     }
 
     /// Get a reference to the internal channel.
-    pub fn get_channel(&mut self) -> &mut C {
-        &mut self.channel
-    }
+    // pub fn get_channel(&mut self) -> &mut C {
+    //     &mut self.channel
+    // }
 
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, TwopacError> {
         self.ot
-            .receive(&mut self.channel, &inputs, &mut self.rng)
+            .receive(self.evaluator.get_channel_mut(), &inputs, &mut self.rng)
             .map_err(TwopacError::from)
     }
 }

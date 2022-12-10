@@ -46,7 +46,7 @@ impl OtSender for Sender {
         let y = Scalar::random(&mut rng);
         let s = &y * &RISTRETTO_BASEPOINT_TABLE;
         channel.write_pt(&s)?;
-        channel.flush()?;
+        // channel.flush()?;
         Ok(Self { y, s, counter: 0 })
     }
 
@@ -73,7 +73,7 @@ impl OtSender for Sender {
             channel.write_block(&c0)?;
             channel.write_block(&c1)?;
         }
-        channel.flush()?;
+        // channel.flush()?;
         Ok(())
     }
 }
@@ -121,7 +121,7 @@ impl OtReceiver for Receiver {
                 Ok(Block::hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
             .collect::<Result<Vec<Block>, Error>>()?;
-        channel.flush()?;
+        // channel.flush()?;
         self.counter += inputs.len() as u128;
         inputs
             .iter()

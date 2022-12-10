@@ -12,7 +12,7 @@ pub mod kkrt;
 pub mod kmprt;
 mod prc;
 
-use crate::{errors::Error, ot};
+use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::AbstractChannel;
 

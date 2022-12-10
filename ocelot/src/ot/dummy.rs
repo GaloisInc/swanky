@@ -44,7 +44,7 @@ impl OtSender for Sender {
             let m = if b { m.1 } else { m.0 };
             channel.write_block(&m)?;
         }
-        channel.flush()?;
+        // channel.flush()?;
         Ok(())
     }
 }
@@ -74,7 +74,7 @@ impl OtReceiver for Receiver {
         for b in inputs.iter() {
             channel.write_bool(*b)?;
         }
-        channel.flush()?;
+        // channel.flush()?;
         let mut out = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
             let m = channel.read_block()?;
