@@ -97,12 +97,7 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         Ok(x.cmul(c))
     }
 
-    fn mul_with_prealloc(
-        &mut self,
-        A: &Wire,
-        B: &Wire,
-        gate: &mut Vec<Block>,
-    ) -> Result<Wire, EvaluatorError> {
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, EvaluatorError> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A);
         }
@@ -110,19 +105,18 @@ impl<C: AbstractChannel> Fancy for Evaluator<C> {
         let qb = B.modulus();
         let unequal = q != qb;
         let ngates = q as usize + qb as usize - 2 + unequal as usize;
+
+        let gate_num = self.current_gate().clone();
+        let g = tweak2(gate_num as u64, 0);
+
         // TODO(interstellar) "<=" instead of ==; but need to modify "read_blocks_with_prealloc" call
-        assert!(ngates == gate.len(), "temp_blocks is too small!");
+        // assert!(ngates == gate.len(), "temp_blocks is too small!");
         // self.channel.read_blocks_with_prealloc(gate)?;
         // let channel = &mut self.channel;
         // gate.iter_mut()
         //     .enumerate()
         //     .map(|(idx, block)| channel.get_current_block().unwrap().clone());
-        for i in 0..ngates {
-            gate[i] = self.channel.get_current_block().clone();
-        }
-
-        let gate_num = self.current_gate();
-        let g = tweak2(gate_num as u64, 0);
+        let gate = self.channel.get_current_blocks(ngates);
 
         // garbler's half gate
         let L = if A.color() == 0 {

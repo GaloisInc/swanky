@@ -191,12 +191,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng> Fancy for Garbler<C, RNG> {
         Ok(x.cmul(c))
     }
 
-    fn mul_with_prealloc(
-        &mut self,
-        A: &Wire,
-        B: &Wire,
-        temp_blocks: &mut Vec<Block>,
-    ) -> Result<Wire, GarblerError> {
+    fn mul(&mut self, A: &Wire, B: &Wire) -> Result<Wire, GarblerError> {
         if A.modulus() < B.modulus() {
             return self.mul(B, A);
         }

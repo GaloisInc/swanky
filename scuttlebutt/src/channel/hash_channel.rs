@@ -60,12 +60,4 @@ impl<R: Read + GetBlockByIndex, W: Write> AbstractChannel for HashChannel<R, W> 
     //         hash: self.hash.clone(),
     //     }
     // }
-
-    fn get_current_block(&mut self) -> &Block {
-        todo!("HashChannel<R, W> get_current_block")
-    }
-
-    fn next(&mut self) {
-        todo!("HashChannel<UnixStream>: next")
-    }
 }

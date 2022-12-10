@@ -139,17 +139,6 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng, OT> Fancy for Garbler<C, RNG, OT>
         self.garbler.mul(x, y).map_err(Self::Error::from)
     }
 
-    fn mul_with_prealloc(
-        &mut self,
-        x: &Wire,
-        y: &Wire,
-        temp_blocks: &mut Vec<Block>,
-    ) -> Result<Self::Item, Self::Error> {
-        self.garbler
-            .mul_with_prealloc(x, y, temp_blocks)
-            .map_err(Self::Error::from)
-    }
-
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
         self.garbler.proj(x, q, tt).map_err(Self::Error::from)
     }

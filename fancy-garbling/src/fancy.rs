@@ -56,19 +56,7 @@ pub trait Fancy {
     fn cmul(&mut self, x: &Self::Item, c: u16) -> Result<Self::Item, Self::Error>;
 
     /// Multiply `x` and `y`.
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {
-        let mut temp_blocks =
-            vec![Block::default(); std::cmp::max(x.modulus().into(), y.modulus().into())];
-        self.mul_with_prealloc(x, y, &mut temp_blocks)
-    }
-
-    /// Multiply `x` and `y`.
-    fn mul_with_prealloc(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        temp_blocks: &mut Vec<Block>,
-    ) -> Result<Self::Item, Self::Error>;
+    fn mul(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error>;
 
     /// Project `x` according to the truth table `tt`. Resulting wire has modulus `q`.
     ///

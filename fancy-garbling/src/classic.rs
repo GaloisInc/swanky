@@ -310,6 +310,12 @@ impl GetBlockByIndex for GarbledReader {
     fn next(&mut self) {
         self.index += 1;
     }
+
+    fn get_current_blocks(&mut self, nb_blocks: usize) -> &[Block] {
+        let blocks = &self.blocks[self.index..self.index + nb_blocks];
+        self.index += nb_blocks;
+        blocks
+    }
 }
 
 /// Implementation of the `Write` trait for use by `Garbler`.

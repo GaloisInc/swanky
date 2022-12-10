@@ -211,14 +211,13 @@ pub fn eval_prepare_with_prealloc<F: Fancy>(
                 xref, yref, out, ..
             } => (
                 out,
-                f.mul_with_prealloc(
+                f.mul(
                     cache[xref.ix]
                         .as_ref()
                         .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
                     cache[yref.ix]
                         .as_ref()
                         .ok_or_else(|| F::Error::from(FancyError::UninitializedValue))?,
-                    temp_blocks,
                 )?,
             ),
         };
@@ -505,12 +504,7 @@ impl Fancy for CircuitBuilder {
         Ok(self.gate(gate, output_modulus))
     }
 
-    fn mul_with_prealloc(
-        &mut self,
-        xref: &CircuitRef,
-        yref: &CircuitRef,
-        temp_blocks: &mut Vec<Block>,
-    ) -> Result<CircuitRef, Self::Error> {
+    fn mul(&mut self, xref: &CircuitRef, yref: &CircuitRef) -> Result<CircuitRef, Self::Error> {
         if xref.modulus() < yref.modulus() {
             return self.mul(yref, xref);
         }

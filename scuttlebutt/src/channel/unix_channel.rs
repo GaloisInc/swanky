@@ -7,7 +7,6 @@
 use crate::channel::GetBlockByIndex;
 use crate::Block;
 use crate::{SyncChannel, TrackChannel};
-use std::io::Error;
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -19,15 +18,7 @@ pub type UnixChannel = SyncChannel<BufReader<UnixStream>, BufWriter<UnixStream>>
 /// A TrackChannel which uses UnixStreams.
 pub type TrackUnixChannel = TrackChannel<BufReader<UnixStream>, BufWriter<UnixStream>>;
 
-impl GetBlockByIndex for BufReader<UnixStream> {
-    fn get_current_block(&mut self) -> &Block {
-        todo!("BufReader<UnixStream>: get_current_block");
-    }
-
-    fn next(&mut self) {
-        todo!("BufReader<UnixStream>: next")
-    }
-}
+impl GetBlockByIndex for BufReader<UnixStream> {}
 
 /// Convenience function to create a pair of UnixChannels for local tests in `swanky`.
 pub fn unix_channel_pair() -> (UnixChannel, UnixChannel) {
