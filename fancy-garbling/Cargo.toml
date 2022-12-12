@@ -15,10 +15,12 @@ publish = false
 doctest = false
 
 [features]
+default = ["std"]
 nightly = ["scuttlebutt/nightly"]
 serde1 = ["serde", "scuttlebutt/serde1", "serde_json"]
 parser = ["regex"]
 sgx = ["scuttlebutt/sgx"]
+std = ["scuttlebutt/std"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }

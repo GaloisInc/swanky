@@ -7,9 +7,13 @@
 //! Fixed-key AES random number generator.
 
 use crate::{Aes128, Block};
-use rand::{CryptoRng, Error, Rng, RngCore};
+use rand::Rng;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
-use rand_core::block::{BlockRng, BlockRngCore};
+use rand_core::block::BlockRng;
+use rand_core::block::BlockRngCore;
+use rand_core::CryptoRng;
+use rand_core::Error;
+use rand_core::RngCore;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///

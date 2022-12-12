@@ -365,14 +365,14 @@ pub fn is_power_of_2(x: u16) -> bool {
 }
 
 // Generate deltas for GC
-pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
-    let mut deltas = HashMap::new();
-    let mut rng = rand::thread_rng();
-    for q in primes {
-        deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
-    }
-    deltas
-}
+// pub fn generate_deltas(primes: &[u16]) -> HashMap<u16, Wire> {
+//     let mut deltas = HashMap::new();
+//     let mut rng = rand::thread_rng();
+//     for q in primes {
+//         deltas.insert(*q, Wire::rand_delta(&mut rng, *q));
+//     }
+//     deltas
+// }
 
 /// Extra Rng functionality, useful for `fancy-garbling`.
 pub trait RngExt: rand::Rng + Sized {

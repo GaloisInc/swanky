@@ -14,6 +14,7 @@ autoexamples = true
 [lib]
 
 [features]
+default = ["std"]
 # TODO(interstellar) CHECK that it compiles when enabled;
 curve25519-dalek = ["curve25519-dalek", "scuttlebutt/curve25519-dalek"]
 nightly = ["curve25519-dalek/avx2_backend", "scuttlebutt/nightly"]
@@ -23,12 +24,14 @@ cointoss = ["scuttlebutt/cointoss"]
 hash_aes = ["scuttlebutt/hash_aes"]
 # TODO(interstellar) CHECK that it compiles when enabled;
 utils_transpose = ["transpose"]
+sgx = ["scuttlebutt/sgx"]
+std = ["scuttlebutt/std"]
 
 [dependencies]
 curve25519-dalek = { version = "2", features = ["std"], optional = true }
 libc = "0.2"
 rand = { version = "0.8.5", default-features = false }
-scuttlebutt = { path = "../scuttlebutt" }
+scuttlebutt = { path = "../scuttlebutt", default-features = false }
 transpose = { version =  "0.2.2", optional = true }
 
 [dev-dependencies]

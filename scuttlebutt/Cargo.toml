@@ -13,6 +13,7 @@ publish = false
 [lib]
 
 [features]
+default = ["std"]
 nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
 unstable = []
 serde1 = ["serde"]
@@ -27,6 +28,7 @@ sgx = [
 	# IMPORTANT without this the "seed" in ocw-garble is always the same!
 	"rand/getrandom",
 ]
+std = ["rand_chacha/std", "rand_core/getrandom"]
 
 [dependencies]
 auto_ops = "0.3.0"
