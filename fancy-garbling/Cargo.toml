@@ -24,7 +24,7 @@ base_conversion = { path = "base_conversion" }
 # TODO(interstellar)? features = ["hash_aes"], grep "pub fn hash"
 scuttlebutt = { path = "../scuttlebutt", features = ["hash_aes", "rand_aes"] }
 ocelot = { path = "../ocelot" }
-itertools = "0.10.0"
+itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
 rand = "0.7"
 regex = { version = "1.4.3", optional = true }
 serde = { version = "1.0.123", features = ["derive"], optional = true }
