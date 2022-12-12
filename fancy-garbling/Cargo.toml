@@ -17,6 +17,7 @@ doctest = false
 [features]
 nightly = ["scuttlebutt/nightly"]
 serde1 = ["serde", "scuttlebutt/serde1"]
+parser = ["regex"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
@@ -25,7 +26,7 @@ scuttlebutt = { path = "../scuttlebutt", features = ["hash_aes", "rand_aes"] }
 ocelot = { path = "../ocelot" }
 itertools = "0.10.0"
 rand = "0.7"
-regex = "1.4.3"
+regex = { version = "1.4.3", optional = true }
 serde = { version = "1.0.123", features = ["derive"], optional = true }
 serde_json = "1.0.58"
 

@@ -249,6 +249,7 @@ pub enum CircuitParserError {
     /// An I/O error occurred.
     IoError(std::io::Error),
     /// A regular expression parsing error occurred.
+    #[cfg(feature = "parser")]
     RegexError(regex::Error),
     /// An error occurred parsing an integer.
     ParseIntError,
@@ -262,6 +263,7 @@ impl Display for CircuitParserError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             CircuitParserError::IoError(e) => write!(f, "io error: {}", e),
+            #[cfg(feature = "parser")]
             CircuitParserError::RegexError(e) => write!(f, "regex error: {}", e),
             CircuitParserError::ParseIntError => write!(f, "unable to parse integer"),
             CircuitParserError::ParseLineError(s) => write!(f, "unable to parse line '{}'", s),
@@ -276,6 +278,7 @@ impl From<std::io::Error> for CircuitParserError {
     }
 }
 
+#[cfg(feature = "parser")]
 impl From<regex::Error> for CircuitParserError {
     fn from(e: regex::Error) -> CircuitParserError {
         CircuitParserError::RegexError(e)

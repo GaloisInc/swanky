@@ -29,6 +29,7 @@ pub mod errors;
 mod fancy;
 mod garble;
 pub mod informer;
+#[cfg(feature = "parser")]
 mod parser;
 pub mod twopac;
 pub mod util;
