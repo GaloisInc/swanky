@@ -16,11 +16,13 @@
 mod aes;
 mod block;
 mod block512;
+#[cfg(feature = "hash_channel")]
 pub mod bloomfilter;
 /// Module for encapsulating communication channels for `swanky`.
 pub mod channel;
 #[cfg(feature = "cointoss")]
 pub mod cointoss;
+#[cfg(feature = "hash_channel")]
 pub mod commitment;
 #[cfg(feature = "hash_aes")]
 mod hash_aes;
@@ -32,8 +34,11 @@ pub use crate::{
     aes::{aes128::Aes128, aes256::Aes256},
     block::Block,
     block512::Block512,
-    channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
+    channel::{AbstractChannel, Channel, SymChannel, SyncChannel, TrackChannel},
 };
+
+#[cfg(feature = "hash_channel")]
+pub use crate::channel::HashChannel;
 
 #[cfg(feature = "hash_aes")]
 pub use crate::hash_aes::AesHash;

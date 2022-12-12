@@ -4,12 +4,14 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#[cfg(feature = "hash_channel")]
 mod hash_channel;
 mod sync_channel;
 mod track_channel;
 #[cfg(unix)]
 mod unix_channel;
 
+#[cfg(feature = "hash_channel")]
 pub use hash_channel::HashChannel;
 pub use sync_channel::SyncChannel;
 pub use track_channel::TrackChannel;

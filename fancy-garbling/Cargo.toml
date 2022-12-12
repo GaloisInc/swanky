@@ -19,14 +19,14 @@ default = ["std"]
 nightly = ["scuttlebutt/nightly"]
 serde1 = ["serde", "scuttlebutt/serde1", "serde_json"]
 parser = ["regex"]
-sgx = ["scuttlebutt/sgx"]
-std = ["scuttlebutt/std"]
+sgx = ["scuttlebutt/sgx", "ocelot/sgx"]
+std = ["scuttlebutt/std", "ocelot/std"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
 # TODO(interstellar)? features = ["hash_aes"], grep "pub fn hash"
-scuttlebutt = { path = "../scuttlebutt", features = ["hash_aes", "rand_aes"] }
-ocelot = { path = "../ocelot" }
+scuttlebutt = { path = "../scuttlebutt", default-features = false, features = ["hash_aes", "rand_aes"] }
+ocelot = { path = "../ocelot", default-features = false }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
 rand = { version = "0.8.5", default-features = false }
 regex = { version = "1.4.3", optional = true }
