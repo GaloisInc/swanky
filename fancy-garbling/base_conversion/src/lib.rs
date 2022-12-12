@@ -4,13 +4,14 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#![no_std]
 #![deny(clippy::all)]
 
 pub fn lookup_digits_mod_at_position(x: u8, q: u16, pos: usize) -> &'static [u16] {
     unsafe {
         let tab = c_get_table(q, pos);
         let len = c_num_digits(q, pos);
-        std::slice::from_raw_parts(tab.add(len * (x as usize)), len)
+        core::slice::from_raw_parts(tab.add(len * (x as usize)), len)
     }
 }
 
