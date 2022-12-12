@@ -16,7 +16,7 @@ doctest = false
 
 [features]
 nightly = ["scuttlebutt/nightly"]
-serde1 = ["serde", "scuttlebutt/serde1"]
+serde1 = ["serde", "scuttlebutt/serde1", "serde_json"]
 parser = ["regex"]
 
 [dependencies]
@@ -28,7 +28,7 @@ itertools = { version = "0.10.0", default-features = false, features = ["use_all
 rand = "0.7"
 regex = { version = "1.4.3", optional = true }
 serde = { version = "1.0.123", features = ["derive"], optional = true }
-serde_json = "1.0.58"
+serde_json = { version = "1.0.58", optional = true }
 
 [dev-dependencies]
 criterion = "0.3.4"
