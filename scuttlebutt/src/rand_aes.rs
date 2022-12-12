@@ -7,7 +7,8 @@
 //! Fixed-key AES random number generator.
 
 use crate::{Aes128, Block};
-use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
+use rand::{CryptoRng, Error, Rng, RngCore};
+use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use rand_core::block::{BlockRng, BlockRngCore};
 
 /// Implementation of a random number generator based on fixed-key AES.
@@ -56,7 +57,11 @@ impl AesRng {
     /// `rand::random`.
     #[inline]
     pub fn new() -> Self {
-        let seed = rand::random::<Block>();
+        // let seed = rand::random::<Block>();
+        // https://github.com/paritytech/substrate/blob/master/frame/society/src/lib.rs#L1420
+        // TODO is ChaChaRng secure? (or at least good enough)
+        let mut rng = ChaChaRng::from_entropy();
+        let seed: Block = rng.gen();
         AesRng::from_seed(seed)
     }
 

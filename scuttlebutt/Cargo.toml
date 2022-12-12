@@ -19,15 +19,21 @@ serde1 = ["serde"]
 # TODO(interstellar) CHECK that it compiles when enabled; and also most related deps under this feature
 cointoss = ["rand_aes"]
 # TODO(interstellar) CHECK that it compiles when enabled; and also most related deps under this feature
-rand_aes = ["rand", "rand_core"]
+rand_aes = ["rand", "rand_core", "rand_chacha"]
 # TODO(interstellar) CHECK that it compiles when enabled;
 hash_aes = ["rand_aes"]
+sgx = [
+	# Needed to match [patch.crates-io] getrandom in enclave-runtime/Cargo.toml
+	# IMPORTANT without this the "seed" in ocw-garble is always the same!
+	"rand/getrandom",
+]
 
 [dependencies]
 auto_ops = "0.3.0"
 curve25519-dalek = { version = "2", features = ["std"], optional = true }
-rand = { version = "0.7", optional = true }
-rand_core = {  version = "0.5", optional = true }
+rand = { version = "0.8.5", default-features = false, optional = true }
+rand_core = {  version = "0.6.4", optional = true, default-features = false }
+rand_chacha = { version = "0.3.1", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 sha2 = "0.8"
 aes = "0.8.2"
