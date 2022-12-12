@@ -13,9 +13,6 @@
 
 //!
 
-#[macro_use]
-extern crate impl_ops;
-
 mod aes;
 mod block;
 mod block512;

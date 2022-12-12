@@ -24,7 +24,7 @@ rand_aes = ["rand", "rand_core"]
 hash_aes = ["rand_aes"]
 
 [dependencies]
-impl_ops = "0.1.1"
+auto_ops = "0.3.0"
 curve25519-dalek = { version = "2", features = ["std"], optional = true }
 rand = { version = "0.7", optional = true }
 rand_core = {  version = "0.5", optional = true }

@@ -6,6 +6,7 @@
 
 //! Defines a block as a 128-bit value, and implements block-related functions.
 
+use auto_ops::*;
 use std::ops;
 
 #[cfg(feature = "curve25519-dalek")]
