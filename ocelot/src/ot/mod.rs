@@ -18,12 +18,14 @@
 
 #[cfg(feature = "cointoss")]
 pub mod alsz;
+#[cfg(feature = "curve25519-dalek")]
 pub mod chou_orlandi;
 pub mod dummy;
 #[cfg(feature = "cointoss")]
 pub mod kos;
 #[cfg(feature = "cointoss")]
 pub mod kos_delta;
+#[cfg(feature = "curve25519-dalek")]
 pub mod naor_pinkas;
 
 use crate::errors::Error;
@@ -31,16 +33,20 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::AbstractChannel;
 
 /// Instantiation of the Chou-Orlandi OT sender.
+#[cfg(feature = "curve25519-dalek")]
 pub type ChouOrlandiSender = chou_orlandi::Sender;
 /// Instantiation of the Chou-Orlandi OT receiver.
+#[cfg(feature = "curve25519-dalek")]
 pub type ChouOrlandiReceiver = chou_orlandi::Receiver;
 /// Instantiation of the dummy OT sender.
 pub type DummySender = dummy::Sender;
 /// Instantiation of the dummy OT receiver.
 pub type DummyReceiver = dummy::Receiver;
 /// Instantiation of the Naor-Pinkas OT sender.
+#[cfg(feature = "curve25519-dalek")]
 pub type NaorPinkasSender = naor_pinkas::Sender;
 /// Instantiation of the Naor-Pinkas OT receiver.
+#[cfg(feature = "curve25519-dalek")]
 pub type NaorPinkasReceiver = naor_pinkas::Receiver;
 /// Instantiation of the ALSZ OT extension sender, using Chou-Orlandi as the base OT.
 #[cfg(feature = "cointoss")]
