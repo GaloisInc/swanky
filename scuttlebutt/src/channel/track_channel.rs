@@ -4,7 +4,6 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-use crate::Block;
 use crate::{AbstractChannel, Channel};
 use std::{
     io::{Read, Result, Write},

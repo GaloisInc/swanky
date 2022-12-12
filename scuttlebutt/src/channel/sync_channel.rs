@@ -5,7 +5,6 @@
 // See LICENSE for licensing information.
 
 use crate::AbstractChannel;
-use crate::Block;
 use std::{
     io::{Read, Result, Write},
     sync::{Arc, Mutex},

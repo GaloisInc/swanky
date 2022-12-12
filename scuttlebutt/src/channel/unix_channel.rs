@@ -5,7 +5,6 @@
 // See LICENSE for licensing information.
 
 use crate::channel::GetBlockByIndex;
-use crate::Block;
 use crate::{SyncChannel, TrackChannel};
 use std::{
     io::{BufReader, BufWriter},
