@@ -8,12 +8,18 @@
 //!
 //! Note: all number representations in this library are little-endian.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::Wire;
 #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
 use core::arch::x86_64::*;
 use itertools::Itertools;
 use scuttlebutt::Block;
 use std::collections::HashMap;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tweak functions for garbling

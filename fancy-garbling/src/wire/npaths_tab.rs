@@ -6,6 +6,11 @@
 
 #![allow(clippy::unreadable_literal)]
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
+
 use crate::util;
 
 pub fn lookup(q: u16) -> Vec<u128> {

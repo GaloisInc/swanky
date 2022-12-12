@@ -4,6 +4,12 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::string::String;
+
 /// Errors produced by `ocelot`.
 #[derive(Debug)]
 pub enum Error {

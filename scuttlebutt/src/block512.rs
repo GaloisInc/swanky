@@ -3,8 +3,11 @@
 // This file is part of `scuttlebutt`.
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
-
 //! Defines a 512-bit value.
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::Block;
 use std::{
     convert::TryFrom,

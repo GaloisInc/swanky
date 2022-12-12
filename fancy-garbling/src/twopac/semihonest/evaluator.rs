@@ -4,12 +4,18 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{errors::TwopacError, Evaluator as Ev, Fancy, FancyInput, FancyReveal, Wire};
 use core::hash::BuildHasher;
 use ocelot::ot::Receiver as OtReceiver;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 use std::collections::HashMap;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Semi-honest evaluator.
 pub struct Evaluator<C, RNG, OT> {

@@ -8,13 +8,19 @@ use crate::{
     errors::FancyError,
     fancy::{
         bundle::{Bundle, BundleGadgets},
-        Fancy,
-        HasModulus,
+        Fancy, HasModulus,
     },
     util,
 };
+use core::ops::{Deref, DerefMut};
 use itertools::Itertools;
-use std::ops::{Deref, DerefMut};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::string::ToString;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]

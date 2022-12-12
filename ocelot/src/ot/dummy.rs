@@ -7,12 +7,21 @@
 //! Implementation of an **entirely insecure** oblivious transfer protocol for
 //! testing purposes.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{
     errors::Error,
     ot::{Receiver as OtReceiver, Sender as OtSender},
 };
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::string::String;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Oblivious transfer sender.
 pub struct Sender {}

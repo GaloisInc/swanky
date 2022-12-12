@@ -24,7 +24,7 @@ cointoss = ["scuttlebutt/cointoss"]
 hash_aes = ["scuttlebutt/hash_aes"]
 # TODO(interstellar) CHECK that it compiles when enabled;
 utils_transpose = ["transpose"]
-sgx = ["scuttlebutt/sgx"]
+sgx = ["scuttlebutt/sgx", "sgx_tstd"]
 std = ["scuttlebutt/std"]
 
 [dependencies]
@@ -33,6 +33,7 @@ libc = "0.2"
 rand = { version = "0.8.5", default-features = false }
 scuttlebutt = { path = "../scuttlebutt", default-features = false }
 transpose = { version =  "0.2.2", optional = true }
+sgx_tstd = { branch = "master", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
 [dev-dependencies]
 criterion = "0.2"

@@ -6,10 +6,18 @@
 
 //! `Informer` runs a fancy computation and learns information from it.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::fancy::{Fancy, FancyInput, FancyReveal, HasModulus};
 use core::hash::BuildHasher;
 use scuttlebutt::Block;
 use std::collections::{HashMap, HashSet};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Implements `Fancy`. Used to learn information about a `Fancy` computation in
 /// a lightweight way.

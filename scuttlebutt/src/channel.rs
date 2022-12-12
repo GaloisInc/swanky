@@ -4,29 +4,41 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 #[cfg(feature = "hash_channel")]
 mod hash_channel;
+#[cfg(feature = "sync_channel")]
 mod sync_channel;
+#[cfg(feature = "track_channel")]
 mod track_channel;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "unix_channel"))]
 mod unix_channel;
 
 #[cfg(feature = "hash_channel")]
 pub use hash_channel::HashChannel;
+#[cfg(feature = "sync_channel")]
 pub use sync_channel::SyncChannel;
+#[cfg(feature = "track_channel")]
 pub use track_channel::TrackChannel;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "unix_channel"))]
 pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
 use crate::{Block, Block512};
+use core::cell::RefCell;
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use std::{
-    cell::RefCell,
     io::{Read, Result, Write},
     rc::Rc,
 };
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.
@@ -47,7 +59,7 @@ pub trait AbstractChannel {
         todo!("AbstractChannel: get_current_block")
     }
 
-    fn get_current_blocks(&mut self, nb_blocks: usize) -> &[Block] {
+    fn get_current_blocks(&mut self, _nb_blocks: usize) -> &[Block] {
         todo!("AbstractChannel: get_current_blocks")
     }
 
@@ -97,7 +109,7 @@ pub trait AbstractChannel {
     /// Write a `u16` to the channel.
     #[inline(always)]
     fn write_u16(&mut self, s: u16) -> Result<()> {
-        let data: [u8; 2] = unsafe { std::mem::transmute(s) };
+        let data: [u8; 2] = unsafe { core::mem::transmute(s) };
         self.write_bytes(&data)?;
         Ok(())
     }
@@ -107,14 +119,14 @@ pub trait AbstractChannel {
     fn read_u16(&mut self) -> Result<u16> {
         let mut data = [0u8; 2];
         self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
+        let s = unsafe { core::mem::transmute(data) };
         Ok(s)
     }
 
     /// Write a `u32` to the channel.
     #[inline(always)]
     fn write_u32(&mut self, s: u32) -> Result<()> {
-        let data: [u8; 4] = unsafe { std::mem::transmute(s) };
+        let data: [u8; 4] = unsafe { core::mem::transmute(s) };
         self.write_bytes(&data)?;
         Ok(())
     }
@@ -124,14 +136,14 @@ pub trait AbstractChannel {
     fn read_u32(&mut self) -> Result<u32> {
         let mut data = [0u8; 4];
         self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
+        let s = unsafe { core::mem::transmute(data) };
         Ok(s)
     }
 
     /// Write a `u64` to the channel.
     #[inline(always)]
     fn write_u64(&mut self, s: u64) -> Result<()> {
-        let data: [u8; 8] = unsafe { std::mem::transmute(s) };
+        let data: [u8; 8] = unsafe { core::mem::transmute(s) };
         self.write_bytes(&data)?;
         Ok(())
     }
@@ -141,14 +153,14 @@ pub trait AbstractChannel {
     fn read_u64(&mut self) -> Result<u64> {
         let mut data = [0u8; 8];
         self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
+        let s = unsafe { core::mem::transmute(data) };
         Ok(s)
     }
 
     /// Write a `usize` to the channel.
     #[inline(always)]
     fn write_usize(&mut self, s: usize) -> Result<()> {
-        let data: [u8; 8] = unsafe { std::mem::transmute(s) };
+        let data: [u8; 8] = unsafe { core::mem::transmute(s) };
         self.write_bytes(&data)?;
         Ok(())
     }
@@ -158,7 +170,7 @@ pub trait AbstractChannel {
     fn read_usize(&mut self) -> Result<usize> {
         let mut data = [0u8; 8];
         self.read_bytes(&mut data)?;
-        let s = unsafe { std::mem::transmute(data) };
+        let s = unsafe { core::mem::transmute(data) };
         Ok(s)
     }
 
@@ -329,10 +341,12 @@ impl<R: Read + GetBlockByIndex, W: Write> AbstractChannel for Channel<R, W> {
 }
 
 /// Standard Read/Write channel built from a symmetric stream.
+#[cfg(feature = "sym_channel")]
 pub struct SymChannel<S> {
     stream: Rc<RefCell<S>>,
 }
 
+#[cfg(feature = "sym_channel")]
 impl<S: Read + Write> SymChannel<S> {
     /// Make a new `Channel` from a stream.
     pub fn new(stream: S) -> Self {
@@ -341,6 +355,7 @@ impl<S: Read + Write> SymChannel<S> {
     }
 }
 
+#[cfg(feature = "sym_channel")]
 impl<S: Read + Write> AbstractChannel for SymChannel<S> {
     #[inline(always)]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {

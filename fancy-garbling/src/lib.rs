@@ -6,6 +6,7 @@
 
 //! `fancy-garbling` provides boolean and arithmetic garbling capabilities.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(clippy::all)]
 #![allow(
     clippy::cast_lossless,

@@ -4,6 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::many_single_char_names)]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 #![cfg_attr(feature = "nightly", feature(test))]
@@ -34,8 +35,17 @@ pub use crate::{
     aes::{aes128::Aes128, aes256::Aes256},
     block::Block,
     block512::Block512,
-    channel::{AbstractChannel, Channel, SymChannel, SyncChannel, TrackChannel},
+    channel::{AbstractChannel, Channel},
 };
+
+#[cfg(feature = "sym_channel")]
+pub use crate::channel::SymChannel;
+
+#[cfg(feature = "sync_channel")]
+pub use crate::channel::SyncChannel;
+
+#[cfg(feature = "track_channel")]
+pub use crate::channel::TrackChannel;
 
 #[cfg(feature = "hash_channel")]
 pub use crate::channel::HashChannel;
@@ -46,7 +56,7 @@ pub use crate::hash_aes::AesHash;
 #[cfg(feature = "rand_aes")]
 pub use crate::rand_aes::AesRng;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "unix_channel"))]
 pub use crate::channel::{
     track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
 };

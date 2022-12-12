@@ -7,6 +7,9 @@
 //! DSL for creating circuits compatible with fancy-garbling in the old-fashioned way,
 //! where you create a circuit for a computation then garble it.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{
     dummy::{Dummy, DummyVal},
     errors::{CircuitBuilderError, DummyError, FancyError},
@@ -16,6 +19,13 @@ use core::hash::BuildHasher;
 use itertools::Itertools;
 use scuttlebutt::Block;
 use std::collections::HashMap;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::println;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// The index and modulus of a gate in a circuit.
 #[derive(Default, Clone, Copy, Debug, PartialEq)]

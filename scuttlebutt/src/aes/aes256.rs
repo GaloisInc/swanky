@@ -27,6 +27,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::Block;
 // use core::{arch::x86_64::*, mem};
 use aes::cipher::{generic_array::typenum, generic_array::GenericArray, BlockEncrypt, KeyInit};

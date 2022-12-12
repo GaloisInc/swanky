@@ -6,8 +6,18 @@
 
 //! Errors that may be output by this library.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use scuttlebutt::Block;
 use std::fmt::{self, Display, Formatter};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::string::String;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::string::ToString;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Errors that may occur when using the `Fancy` trait. These errors are
 /// API-usage errors, such as trying to add two `Items` with different moduli.
@@ -170,11 +180,11 @@ impl From<std::io::Error> for EvaluatorError {
     }
 }
 
-impl From<std::sync::mpsc::RecvError> for EvaluatorError {
-    fn from(e: std::sync::mpsc::RecvError) -> Self {
-        EvaluatorError::CommunicationError(e.to_string())
-    }
-}
+// impl From<std::sync::mpsc::RecvError> for EvaluatorError {
+//     fn from(e: std::sync::mpsc::RecvError) -> Self {
+//         EvaluatorError::CommunicationError(e.to_string())
+//     }
+// }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Garbler error
@@ -215,11 +225,11 @@ impl From<std::io::Error> for GarblerError {
     }
 }
 
-impl From<std::sync::mpsc::SendError<Vec<Block>>> for GarblerError {
-    fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> Self {
-        GarblerError::CommunicationError(e.to_string())
-    }
-}
+// impl From<std::sync::mpsc::SendError<Vec<Block>>> for GarblerError {
+//     fn from(e: std::sync::mpsc::SendError<Vec<Block>>) -> Self {
+//         GarblerError::CommunicationError(e.to_string())
+//     }
+// }
 
 ////////////////////////////////////////////////////////////////////////////////
 // circuit builder error

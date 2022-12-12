@@ -9,7 +9,7 @@
 
 use super::{Fancy, HasModulus};
 use crate::fancy::bundle::{Bundle, BundleGadgets};
-use std::ops::Deref;
+use core::ops::Deref;
 
 /// Bundle which is explicitly PMR-representation.
 #[derive(Clone)]

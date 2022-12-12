@@ -9,11 +9,17 @@
 //! An implementer must be able to create inputs, constants, do modular arithmetic, and
 //! create projections.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::errors::FancyError;
 use core::hash::BuildHasher;
 use itertools::Itertools;
 use scuttlebutt::Block;
 use std::collections::HashMap;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 mod binary;
 mod bundle;

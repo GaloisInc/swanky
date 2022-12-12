@@ -6,6 +6,9 @@
 
 //! Fancy object to compute the multiplicative depth of a computation.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{
     errors::FancyError,
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
@@ -14,6 +17,9 @@ use core::hash::BuildHasher;
 use scuttlebutt::Block;
 use std::cmp::max;
 use std::collections::HashMap;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Carries the depth of the computation.
 #[derive(Default, Clone, Debug)]

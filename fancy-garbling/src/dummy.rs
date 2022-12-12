@@ -9,6 +9,9 @@
 //! Useful for evaluating the circuits produced by `Fancy` without actually
 //! creating any circuits.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{
     errors::{DummyError, FancyError},
     fancy::{Fancy, FancyInput, FancyReveal, HasModulus},
@@ -16,6 +19,9 @@ use crate::{
 use core::hash::BuildHasher;
 use scuttlebutt::Block;
 use std::collections::HashMap;
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Simple struct that performs the fancy computation over `u16`.
 pub struct Dummy {}

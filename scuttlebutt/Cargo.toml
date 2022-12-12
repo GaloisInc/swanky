@@ -24,8 +24,13 @@ rand_aes = ["rand", "rand_core", "rand_chacha", "rand_core/getrandom"]
 # TODO(interstellar) CHECK that it compiles when enabled;
 hash_aes = ["rand_aes"]
 hash_channel = ["sha2"]
+sync_channel = []
+track_channel = []
+sym_channel = []
+unix_channel = []
 
 sgx = [
+	"sgx_tstd",
 	# Needed to match [patch.crates-io] getrandom in enclave-runtime/Cargo.toml
 	# IMPORTANT without this the "seed" in ocw-garble is always the same!
 	"rand/getrandom",
@@ -41,6 +46,7 @@ rand_chacha = { version = "0.3.1", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 sha2 = { version = "0.8", optional = true }
 aes = "0.8.2"
+sgx_tstd = { branch = "master", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
 [dev-dependencies]
 criterion = "0.2"

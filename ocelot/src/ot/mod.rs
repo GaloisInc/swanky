@@ -32,6 +32,9 @@ use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::AbstractChannel;
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
+
 /// Instantiation of the Chou-Orlandi OT sender.
 #[cfg(feature = "curve25519-dalek")]
 pub type ChouOrlandiSender = chou_orlandi::Sender;

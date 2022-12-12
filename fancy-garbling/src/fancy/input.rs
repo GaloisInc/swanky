@@ -8,6 +8,11 @@ use super::*;
 use crate::util;
 use itertools::Itertools;
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::string::ToString;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+
 /// Convenience functions for encoding input to Fancy objects.
 pub trait FancyInput {
     /// The type that this Fancy object operates over.

@@ -6,9 +6,17 @@
 
 //! Low-level operations on wire-labels, the basic building block of garbled circuits.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{fancy::HasModulus, util};
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{AesHash, Block};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 mod npaths_tab;
 

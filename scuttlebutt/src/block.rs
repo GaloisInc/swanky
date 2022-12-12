@@ -6,7 +6,8 @@
 
 //! Defines a block as a 128-bit value, and implements block-related functions.
 
-use auto_ops::*;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
 
 #[cfg(feature = "curve25519-dalek")]
 use crate::Aes256;
@@ -217,14 +218,18 @@ impl std::ops::BitOrAssign for Block {
     }
 }
 
-impl_op_ex!(^ |a: &Block, b: &Block| -> Block {
-    #[cfg(target_arch = "x86_64")]
-    unsafe {
-        Block(_mm_xor_si128(a.0, b.0))
+impl std::ops::BitXor for Block {
+    type Output = Block;
+    #[inline]
+    fn bitxor(self, rhs: Block) -> Block {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            Block(_mm_xor_si128(self.0, rhs.0))
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        Block(self.0 ^ rhs.0)
     }
-    #[cfg(not(target_arch = "x86_64"))]
-    Block(a.0 ^ b.0)
-});
+}
 
 #[cfg(target_arch = "x86_64")]
 impl std::ops::BitXorAssign for Block {

@@ -7,6 +7,9 @@
 //! Provides objects and functions for statically garbling and evaluating a
 //! circuit without streaming.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use crate::{
     circuit::Circuit,
     errors::{EvaluatorError, GarblerError},
@@ -19,6 +22,11 @@ use scuttlebutt::{channel::GetBlockByIndex, AbstractChannel, AesRng, Block, Chan
 use std::collections::hash_map::DefaultHasher;
 use std::hash::BuildHasherDefault;
 use std::{collections::HashMap, convert::TryInto, rc::Rc};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 type MyBuildHasher = BuildHasherDefault<DefaultHasher>;
 

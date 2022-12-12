@@ -4,6 +4,9 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd as std;
+
 use std::collections::HashMap;
 
 use crate::{
@@ -14,6 +17,9 @@ use crate::{
 };
 use core::hash::BuildHasher;
 use scuttlebutt::{AbstractChannel, AesHash, Block};
+
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::vec::Vec;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
