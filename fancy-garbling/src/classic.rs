@@ -40,9 +40,12 @@ pub struct GarbledCircuit {
     // TODO(interstellar) can we remove Circuit; and possibly refactor output_refs/cache/etc
     //  Should we remove Circuit? Does it leak critical data to the client?
     circuit: Circuit,
+}
+
+pub struct EvalCache {
     /// Only needed for "eval_with_prealloc"
-    cache: Vec<Option<Wire>>,
-    temp_blocks: Vec<Block>,
+    pub(crate) cache: Vec<Option<Wire>>,
+    pub(crate) temp_blocks: Vec<Block>,
     // default hasher:
     // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
     // eval_times : [65, 60, 56, 55, 56, 57, 58, 58, 57, 59]
@@ -59,19 +62,13 @@ pub struct GarbledCircuit {
     // ---- tests::bench_garble_display_message_640x360_2digits_42 stdout ----
     // eval_times : [77, 64, 65, 66, 63, 68, 66, 68, 67, 64]
     // eval_datas : 10
-    hashes_cache: HashMap<(Wire, usize, u16), Block, MyBuildHasher>,
+    pub(crate) hashes_cache: HashMap<(Wire, usize, u16), Block, MyBuildHasher>,
 }
 
 impl GarbledCircuit {
     /// Create a new object from a vector of garbled gates and constant wires.
     pub fn new(blocks: Vec<Block>, circuit: Circuit) -> Self {
-        GarbledCircuit {
-            blocks,
-            circuit,
-            cache: Vec::new(),
-            temp_blocks: Vec::new(),
-            hashes_cache: HashMap::default(),
-        }
+        GarbledCircuit { blocks, circuit }
     }
 
     /// The number of garbled rows and constant wires in the garbled circuit.
@@ -99,7 +96,8 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit.
     pub fn eval_with_prealloc(
-        &mut self,
+        &self,
+        eval_cache: &mut EvalCache,
         garbler_inputs: &[Wire],
         evaluator_inputs: &[Wire],
         outputs: &mut Vec<Option<u16>>,
@@ -115,9 +113,9 @@ impl GarbledCircuit {
             &evaluator_inputs,
             outputs,
             // TODO!!! expect("cache not init! MUST call init_cache()")
-            &mut self.cache,
-            &mut self.temp_blocks,
-            &mut self.hashes_cache,
+            &mut eval_cache.cache,
+            &mut eval_cache.temp_blocks,
+            &mut eval_cache.hashes_cache,
         )?;
 
         // eval_prepare_with_prealloc(
@@ -142,20 +140,20 @@ impl GarbledCircuit {
     }
 
     // TODO(interstellar) remove?
-    pub fn init_cache(&mut self) {
-        self.cache = vec![None; self.circuit.gates.len()];
-        self.temp_blocks = vec![Block::default(); 2];
-        // TODO(interstellar)!!! try different hashers; the default "provide resistance against HashDoS attacks"
-        //  but this MAY not be needed
-        // NOTE: typically there are around self.circuit.gates.len() / 2 entries in "hashes_cache" after "fn eval_with_prealloc"
-        // TODO(interstellar) bne with capacity: self.circuit.gates.len()
-
-        // self.hashes_cache = HashMap::with_capacity_and_hasher(
-        //     self.circuit.gates.len(),
-        //     BuildHasherDefault::from(RandomXxHashBuilder64::default()),
-        // );
-
-        // self.hashes_cache = HashMap
+    pub fn init_cache(&self) -> EvalCache {
+        EvalCache {
+            cache: vec![None; self.circuit.gates.len()],
+            temp_blocks: vec![Block::default(); 2],
+            // TODO(interstellar)!!! try different hashers; the default "provide resistance against HashDoS attacks"
+            //  but this MAY not be needed
+            // NOTE: typically there are around self.circuit.gates.len() / 2 entries in "hashes_cache" after "fn eval_with_prealloc"
+            // TODO(interstellar) bne with capacity: self.circuit.gates.len()
+            // self.hashes_cache = HashMap::with_capacity_and_hasher(
+            //     self.circuit.gates.len(),
+            //     BuildHasherDefault::from(RandomXxHashBuilder64::default()),
+            // );
+            hashes_cache: HashMap::default(),
+        }
     }
 }
 
