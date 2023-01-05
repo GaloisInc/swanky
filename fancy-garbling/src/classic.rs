@@ -204,12 +204,52 @@ pub fn garble(c: Circuit) -> Result<(Encoder, GarbledCircuit), GarblerError> {
 ////////////////////////////////////////////////////////////////////////////////
 // Encoder
 
+/// cf https://stackoverflow.com/a/64949136/5312991
+/// NOTE: this thread points to https://crates.io/crates/vectorize
+/// but unfortunately this crate depends on full "serde", which means it fails under no_std/sgx...
+pub mod vectorize {
+    #[cfg(all(not(feature = "std"), feature = "sgx"))]
+    use sgx_tstd as std;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::iter::FromIterator;
+    use std::vec::Vec;
+
+    pub fn serialize<'a, T, K, V, S>(target: T, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: IntoIterator<Item = (&'a K, &'a V)>,
+        K: Serialize + 'a,
+        V: Serialize + 'a,
+    {
+        let container: Vec<_> = target.into_iter().collect();
+        serde::Serialize::serialize(&container, ser)
+    }
+
+    pub fn deserialize<'de, T, K, V, D>(des: D) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: FromIterator<(K, V)>,
+        K: Deserialize<'de>,
+        V: Deserialize<'de>,
+    {
+        let container: Vec<_> = serde::Deserialize::deserialize(des)?;
+        Ok(T::from_iter(container.into_iter()))
+    }
+}
+
 /// Encode inputs statically.
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder {
     garbler_inputs: Vec<Wire>,
     evaluator_inputs: Vec<Wire>,
+    // cf https://stackoverflow.com/a/64949136/5312991
+    // without serde_with we get: eg "the trait `Serialize` is not implemented for `HashMap<u16, wire::Wire>`"
+    // #[serde_as(as = "Vec<(DisplayFromStr,_)>")]
+    // #[serde(flatten)]
+    // #[serde(with = "::serde_with::rust::maps_duplicate_key_is_error")]
+    #[serde(with = "vectorize")]
     deltas: HashMap<u16, Wire>,
 }
 

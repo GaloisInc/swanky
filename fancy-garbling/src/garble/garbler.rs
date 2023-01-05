@@ -19,6 +19,8 @@ use scuttlebutt::{AbstractChannel, AesHash, Block};
 use std::collections::HashMap;
 
 #[cfg(all(not(feature = "std"), feature = "sgx"))]
+use sgx_tstd::boxed::Box;
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
 use sgx_tstd::vec;
 #[cfg(all(not(feature = "std"), feature = "sgx"))]
 use sgx_tstd::vec::Vec;
@@ -54,14 +56,17 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         &mut self.channel
     }
 
+    // FIXME the original version required serde_json::from_reader, but that requires "std"
+    // which is an issue b/c we want this lib to work in no_std/sgx env
+    // But this fn is not used so...
     #[cfg(feature = "serde1")]
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let f = std::fs::File::open(filename)?;
-        let reader = std::io::BufReader::new(f);
-        let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
-        self.deltas.extend(deltas.into_iter());
-        Ok(())
+        todo!("load_deltas")
+        // let buf = std::fs::read_to_string(filename)?;
+        // let deltas: HashMap<u16, Wire> = serde_json::from_slice(buf.as_bytes())?;
+        // self.deltas.extend(deltas.into_iter());
+        // Ok(())
     }
 
     /// The current non-free gate index of the garbling computation

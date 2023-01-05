@@ -19,8 +19,8 @@ default = ["std"]
 nightly = ["scuttlebutt/nightly"]
 serde1 = ["serde", "scuttlebutt/serde1", "serde_json"]
 parser = ["regex"]
-sgx = ["scuttlebutt/sgx", "ocelot/sgx", "sgx_tstd"]
-std = ["scuttlebutt/std", "ocelot/std"]
+sgx = ["scuttlebutt/sgx", "ocelot/sgx", "sgx_tstd", "serde_json/alloc"]
+std = ["scuttlebutt/std", "ocelot/std", "serde_json/std"]
 
 [dependencies]
 base_conversion = { path = "base_conversion" }
@@ -30,8 +30,10 @@ ocelot = { path = "../ocelot", default-features = false }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
 rand = { version = "0.8.5", default-features = false }
 regex = { version = "1.4.3", optional = true }
-serde = { version = "1.0.123", features = ["derive"], optional = true }
-serde_json = { version = "1.0.58", optional = true }
+serde = { version = "1", default-features = false, features = ["derive"], optional = true }
+serde_json = { version = "1", default-features = false, optional = true }
+# # TODO(interstellar) serde_with: features = ["alloc"]
+# serde_with = { version = "2.1.0", default-features = false, features = ["alloc", "macros"] }
 sgx_tstd = { branch = "master", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
 [dev-dependencies]
