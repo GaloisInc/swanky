@@ -33,7 +33,7 @@ type MyBuildHasher = BuildHasherDefault<DefaultHasher>;
 /// Static evaluator for a circuit, created by the `garble` function.
 ///
 /// Uses `Evaluator` under the hood to actually implement the evaluation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct GarbledCircuit {
     blocks: Vec<Block>,
@@ -239,7 +239,7 @@ pub mod vectorize {
 }
 
 /// Encode inputs statically.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder {
     /// (interstellar) garbler_inputs: are only needed server side b/c they are serialized ENCODED
