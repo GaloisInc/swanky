@@ -242,6 +242,11 @@ pub mod vectorize {
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder {
+    /// (interstellar) garbler_inputs: are only needed server side b/c they are serialized ENCODED
+    /// and THEN sent to the client.
+    /// So for simplicity we skip serializing them
+    /// TODO(interstellar) find a better way; maybe https://serde.rs/remote-derive.html ?
+    #[serde(skip)]
     garbler_inputs: Vec<Wire>,
     evaluator_inputs: Vec<Wire>,
     // cf https://stackoverflow.com/a/64949136/5312991
