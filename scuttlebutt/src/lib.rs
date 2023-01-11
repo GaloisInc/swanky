@@ -5,14 +5,13 @@
 // See LICENSE for licensing information.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![doc = include_str!("../README.md")]
 #![allow(clippy::many_single_char_names)]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 #![cfg_attr(feature = "nightly", feature(test))]
-#![cfg_attr(feature = "nightly", feature(external_doc))]
-#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
-//!
+extern crate alloc;
 
 mod aes;
 mod block;
@@ -58,7 +57,10 @@ pub use crate::rand_aes::AesRng;
 
 #[cfg(all(unix, feature = "unix_channel"))]
 pub use crate::channel::{
-    track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel,
+    track_unix_channel_pair,
+    unix_channel_pair,
+    TrackUnixChannel,
+    UnixChannel,
 };
 
 /// A marker trait denoting that the given scheme is semi-honest secure.

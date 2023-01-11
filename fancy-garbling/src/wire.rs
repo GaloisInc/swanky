@@ -200,6 +200,7 @@ impl Wire {
         }
     }
 
+    /// as_mut_block
     pub fn as_mut_block(&mut self) -> &mut Block {
         match self {
             Wire::Mod2 { val } => &mut *val,
@@ -208,6 +209,7 @@ impl Wire {
         }
     }
 
+    /// as_ref_block
     pub fn as_ref_block(&mut self) -> &Block {
         match self {
             Wire::Mod2 { val } => &*val,
@@ -512,10 +514,11 @@ mod tests {
     #[test]
     fn hash() {
         let mut rng = thread_rng();
+        let aes_hash = AesHash::new_with_fixed_key();
         for _ in 0..100 {
             let q = 2 + (rng.gen_u16() % 110);
             let x = Wire::rand(&mut rng, q);
-            let y = x.hashback(Block::from(1u128), q);
+            let y = x.hashback(Block::from(1u128), q, &aes_hash);
             assert!(x != y);
             match y {
                 Wire::Mod2 { val } => assert!(u128::from(val) > 0),
@@ -625,13 +628,22 @@ mod tests {
         let hashes = crossbeam::scope(|scope| {
             let hs = ws
                 .iter()
-                .map(|w| scope.spawn(move |_| w.hash(Block::default())))
+                .map(|w| {
+                    scope.spawn(move |_| {
+                        let aes_hash = AesHash::new_with_fixed_key();
+                        w.hash(Block::default(), &aes_hash)
+                    })
+                })
                 .collect_vec();
             hs.into_iter().map(|h| h.join().unwrap()).collect_vec()
         })
         .unwrap();
 
-        let should_be = ws.iter().map(|w| w.hash(Block::default())).collect_vec();
+        let aes_hash = AesHash::new_with_fixed_key();
+        let should_be = ws
+            .iter()
+            .map(|w| w.hash(Block::default(), &aes_hash))
+            .collect_vec();
 
         assert_eq!(hashes, should_be);
     }

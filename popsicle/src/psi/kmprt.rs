@@ -8,6 +8,7 @@
 //! set intersection protocol (cf. <https://eprint.iacr.org/2017/799.pdf>).
 
 use crate::Error;
+use alloc::vec::Vec;
 use itertools::Itertools;
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};

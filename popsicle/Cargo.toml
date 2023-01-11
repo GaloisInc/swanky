@@ -7,12 +7,14 @@ readme = "README.md"
 description = "A library for private set intersection"
 categories = ["cryptography"]
 keywords = ["cryptography", "private-set-intersection", "PSI"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]
 
 [features]
+default = ["std"]
+std = []
 nightly = ["rand/nightly", "scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 fancy = ["fancy-garbling"]
 psty = ["fancy", "openssl"]
@@ -22,7 +24,7 @@ psty_payload = ["fancy","serde", "serde_json", "fancy-garbling/serde1"]
 ocelot         = { path = "../ocelot" }
 scuttlebutt    = { path = "../scuttlebutt",  features = ["serde1"]}
 itertools      = "0.8"
-rand           = "0.7"
+rand           = "0.8"
 sha2           = "0.8"
 serde          = {version = "1.0.117", features = ["derive"], optional = true }
 serde_json     = {version = "1.0.59", optional = true }

@@ -67,6 +67,7 @@ pub struct Circuit {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub enum Gate {
+    /// GarblerInput
     GarblerInput {
         id: usize,
     },

@@ -16,16 +16,16 @@
 //! * `kos`: Keller-Orsini-Scholl malicious OT extension (+ correlated and random OT).
 //!
 
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub mod alsz;
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "ot")]
 pub mod chou_orlandi;
 pub mod dummy;
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub mod kos;
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub mod kos_delta;
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "ot")]
 pub mod naor_pinkas;
 
 use crate::errors::Error;
@@ -36,38 +36,38 @@ use scuttlebutt::AbstractChannel;
 use sgx_tstd::vec::Vec;
 
 /// Instantiation of the Chou-Orlandi OT sender.
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "ot")]
 pub type ChouOrlandiSender = chou_orlandi::Sender;
 /// Instantiation of the Chou-Orlandi OT receiver.
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "ot")]
 pub type ChouOrlandiReceiver = chou_orlandi::Receiver;
 /// Instantiation of the dummy OT sender.
 pub type DummySender = dummy::Sender;
 /// Instantiation of the dummy OT receiver.
 pub type DummyReceiver = dummy::Receiver;
 /// Instantiation of the Naor-Pinkas OT sender.
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "ot")]
 pub type NaorPinkasSender = naor_pinkas::Sender;
 /// Instantiation of the Naor-Pinkas OT receiver.
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "ot")]
 pub type NaorPinkasReceiver = naor_pinkas::Receiver;
 /// Instantiation of the ALSZ OT extension sender, using Chou-Orlandi as the base OT.
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub type AlszSender = alsz::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the ALSZ OT extension receiver, using Chou-Orlandi as the base OT.
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub type AlszReceiver = alsz::Receiver<ChouOrlandiSender>;
 /// Instantiation of the KOS OT extension sender, using Chou-Orlandi as the base OT.
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub type KosSender = kos::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the KOS OT extension receiver, using Chou-Orlandi as the base OT.
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub type KosReceiver = kos::Receiver<ChouOrlandiSender>;
 /// Instantiation of the KOS Delta-OT extension sender, using Chou-Orlandi as the base OT.
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub type KosDeltaSender = kos_delta::Sender<ChouOrlandiReceiver>;
 /// Instantiation of the KOS Delta-OT extension receiver, using Chou-Orlandi as the base OT.
-#[cfg(feature = "cointoss")]
+#[cfg(feature = "ot")]
 pub type KosDeltaReceiver = kos_delta::Receiver<ChouOrlandiSender>;
 
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
@@ -393,16 +393,19 @@ mod tests {
         test_ot::<DummySender, DummyReceiver>();
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_naor_pinkas() {
         test_ot::<NaorPinkasSender, NaorPinkasReceiver>();
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_chou_orlandi() {
         test_ot::<ChouOrlandiSender, ChouOrlandiReceiver>();
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_alsz() {
         let ninputs = 1 << 10;
@@ -415,6 +418,7 @@ mod tests {
         test_rotext::<AlszSender, AlszReceiver>(ninputs);
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_kos() {
         let ninputs = 1 << 10;
@@ -427,6 +431,7 @@ mod tests {
         test_rotext::<KosSender, KosReceiver>(ninputs);
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_kos_delta() {
         let ninputs = 1 << 10;

@@ -10,6 +10,8 @@
 #![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
+extern crate alloc;
+
 //!
 
 mod cuckoo;

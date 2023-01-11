@@ -7,7 +7,7 @@ readme = "README.md"
 description = "A library for oblivious transfer protocols"
 categories = ["cryptography"]
 keywords = ["cryptography", "oblivious-transfer", "OT"]
-edition = "2018"
+edition = "2021"
 publish = false
 autoexamples = true
 
@@ -16,10 +16,9 @@ autoexamples = true
 [features]
 default = ["std"]
 # TODO(interstellar) CHECK that it compiles when enabled;
-curve25519-dalek = ["curve25519-dalek", "scuttlebutt/curve25519-dalek"]
+ot = ["scuttlebutt/cointoss","curve25519-dalek", "scuttlebutt/curve25519"]
+# TODO(interstellar) CHECK that it compiles when enabled;
 nightly = ["curve25519-dalek/avx2_backend", "scuttlebutt/nightly"]
-# TODO(interstellar) CHECK that it compiles when enabled; and also most related deps under this feature
-cointoss = ["scuttlebutt/cointoss"]
 # TODO(interstellar) CHECK that it compiles when enabled;
 hash_aes = ["scuttlebutt/hash_aes"]
 # TODO(interstellar) CHECK that it compiles when enabled;
@@ -49,3 +48,8 @@ harness = false
 [[example]]
 name = "kmprt"
 harness = false
+
+[[example]]
+name = "kkrt"
+harness = false
+required-features = ["ot"]

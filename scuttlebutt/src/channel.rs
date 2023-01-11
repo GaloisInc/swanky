@@ -28,7 +28,7 @@ pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChan
 
 use crate::{Block, Block512};
 use core::cell::RefCell;
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "curve25519")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use std::{
     io::{Read, Result, Write},
@@ -59,6 +59,7 @@ pub trait AbstractChannel {
         todo!("AbstractChannel: get_current_block")
     }
 
+    /// get_current_blocks
     fn get_current_blocks(&mut self, _nb_blocks: usize) -> &[Block] {
         todo!("AbstractChannel: get_current_blocks")
     }
@@ -213,7 +214,7 @@ pub trait AbstractChannel {
     }
 
     /// Write a `RistrettoPoint` to the channel.
-    #[cfg(feature = "curve25519-dalek")]
+    #[cfg(feature = "curve25519")]
     #[inline(always)]
     fn write_pt(&mut self, pt: &RistrettoPoint) -> Result<()> {
         self.write_bytes(pt.compress().as_bytes())?;
@@ -221,7 +222,7 @@ pub trait AbstractChannel {
     }
 
     /// Read a `RistrettoPoint` from the channel.
-    #[cfg(feature = "curve25519-dalek")]
+    #[cfg(feature = "curve25519")]
     #[inline(always)]
     fn read_pt(&mut self) -> Result<RistrettoPoint> {
         let mut data = [0u8; 32];
@@ -239,6 +240,7 @@ pub trait AbstractChannel {
     }
 }
 
+/// GetBlockByIndex
 pub trait GetBlockByIndex {
     /// Return a ref to the "current block"
     /// This is made to be used by classic.rs(ie nonstreaming), to avoid
@@ -248,10 +250,12 @@ pub trait GetBlockByIndex {
         todo!("GetBlockByIndex : get_current_block")
     }
 
+    /// get_current_blocks
     fn get_current_blocks(&mut self, nb_blocks: usize) -> &[Block] {
         todo!("GetBlockByIndex : get_current_blocks")
     }
 
+    /// next
     fn next(&mut self) {
         todo!("GetBlockByIndex: next")
     }

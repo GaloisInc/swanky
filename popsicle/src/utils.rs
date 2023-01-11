@@ -4,6 +4,7 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
+use alloc::vec::Vec;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AesHash, Block};
 use sha2::{Digest, Sha256};

@@ -7,16 +7,18 @@ readme = "README.md"
 description = "A library of useful multi-party computation utilities"
 keywords = ["cryptography", "MPC", "secure-computation"]
 categories = ["cryptography"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]
 
 [features]
 default = ["std"]
-nightly = ["curve25519-dalek/avx2_backend", "rand/nightly"]
+nightly = ["rand/nightly", "curve25519"]
 unstable = []
 serde1 = ["serde"]
+# TODO(interstellar) CHECK that it compiles when enabled;
+curve25519 = ["curve25519-dalek/avx2_backend"]
 # TODO(interstellar) CHECK that it compiles when enabled; and also most related deps under this feature
 cointoss = ["rand_aes"]
 # TODO(interstellar) CHECK that it compiles when enabled; and also most related deps under this feature
@@ -27,7 +29,7 @@ hash_channel = ["sha2"]
 sync_channel = []
 track_channel = []
 sym_channel = []
-unix_channel = []
+unix_channel = ["sync_channel", "track_channel"]
 
 sgx = [
 	"sgx_tstd",

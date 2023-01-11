@@ -1,0 +1,5 @@
+[toolchain]
+# try to follow https://github.com/apache/incubator-teaclave-sgx-sdk/blob/master/rust-toolchain
+channel = "nightly-2022-10-22"
+targets = ["wasm32-unknown-unknown"]
+profile = "default" # include rustfmt, clippy

@@ -48,10 +48,12 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         }
     }
 
+    /// get_channel_ref
     pub fn get_channel_ref(&self) -> &C {
         &self.channel
     }
 
+    /// get_channel_mut
     pub fn get_channel_mut(&mut self) -> &mut C {
         &mut self.channel
     }
@@ -101,6 +103,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore> Garbler<C, RNG> {
         self.deltas
     }
 
+    /// get_deltas_ref
     pub fn get_deltas_ref(&self) -> &HashMap<u16, Wire> {
         &self.deltas
     }

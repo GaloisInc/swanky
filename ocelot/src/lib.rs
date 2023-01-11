@@ -5,12 +5,11 @@
 // See LICENSE for licensing information.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![doc = include_str!("../README.md")]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::type_complexity)]
 #![cfg_attr(feature = "nightly", feature(test))]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
-#![cfg_attr(feature = "nightly", feature(external_doc))]
-#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![cfg_attr(feature = "nightly", deny(missing_docs))]
 
 //!

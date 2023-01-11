@@ -25,7 +25,6 @@ mod tests {
         FancyInput,
     };
     use itertools::Itertools;
-    use ocelot::ot::{ChouOrlandiReceiver, ChouOrlandiSender};
     use scuttlebutt::{unix_channel_pair, AesRng, UnixChannel};
 
     fn addition<F: Fancy>(f: &mut F, a: &F::Item, b: &F::Item) -> Result<Option<u16>, F::Error> {
@@ -33,6 +32,7 @@ mod tests {
         f.output(&c)
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_addition_circuit() {
         for a in 0..2 {
@@ -41,16 +41,20 @@ mod tests {
                 std::thread::spawn(move || {
                     let rng = AesRng::new();
                     let mut gb =
-                        Garbler::<UnixChannel, AesRng, ChouOrlandiSender>::new(sender, rng)
-                            .unwrap();
+                        Garbler::<UnixChannel, AesRng, ocelot::ot::ChouOrlandiSender>::new(
+                            sender, rng,
+                        )
+                        .unwrap();
                     let x = gb.encode(a, 3).unwrap();
                     let ys = gb.receive_many(&[3]).unwrap();
                     addition(&mut gb, &x, &ys[0]).unwrap();
                 });
                 let rng = AesRng::new();
                 let mut ev =
-                    Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng)
-                        .unwrap();
+                    Evaluator::<UnixChannel, AesRng, ocelot::ot::ChouOrlandiReceiver>::new(
+                        receiver, rng,
+                    )
+                    .unwrap();
                 let x = ev.receive(3).unwrap();
                 let ys = ev.encode_many(&[b], &[3]).unwrap();
                 let output = addition(&mut ev, &x, &ys[0]).unwrap().unwrap();
@@ -71,6 +75,7 @@ mod tests {
         outputs.into_iter().collect()
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_relu() {
         let mut rng = rand::thread_rng();
@@ -92,19 +97,22 @@ mod tests {
         std::thread::spawn(move || {
             let rng = AesRng::new();
             let mut gb =
-                Garbler::<UnixChannel, AesRng, ChouOrlandiSender>::new(sender, rng).unwrap();
+                Garbler::<UnixChannel, AesRng, ocelot::ot::ChouOrlandiSender>::new(sender, rng)
+                    .unwrap();
             let xs = gb.crt_encode_many(&input, q).unwrap();
             relu(&mut gb, &xs);
         });
 
         let rng = AesRng::new();
         let mut ev =
-            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng).unwrap();
+            Evaluator::<UnixChannel, AesRng, ocelot::ot::ChouOrlandiReceiver>::new(receiver, rng)
+                .unwrap();
         let xs = ev.crt_receive_many(n, q).unwrap();
         let result = relu(&mut ev, &xs).unwrap();
         assert_eq!(target, result);
     }
 
+    #[cfg(feature = "ot")]
     #[test]
     fn test_aes() {
         let circ = Circuit::parse("circuits/AES-non-expanded.txt").unwrap();
@@ -116,14 +124,16 @@ mod tests {
         let handle = std::thread::spawn(move || {
             let rng = AesRng::new();
             let mut gb =
-                Garbler::<UnixChannel, AesRng, ChouOrlandiSender>::new(sender, rng).unwrap();
+                Garbler::<UnixChannel, AesRng, ocelot::ot::ChouOrlandiSender>::new(sender, rng)
+                    .unwrap();
             let xs = gb.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
             let ys = gb.receive_many(&vec![2; 128]).unwrap();
             circ_.eval(&mut gb, &xs, &ys).unwrap();
         });
         let rng = AesRng::new();
         let mut ev =
-            Evaluator::<UnixChannel, AesRng, ChouOrlandiReceiver>::new(receiver, rng).unwrap();
+            Evaluator::<UnixChannel, AesRng, ocelot::ot::ChouOrlandiReceiver>::new(receiver, rng)
+                .unwrap();
         let xs = ev.receive_many(&vec![2; 128]).unwrap();
         let ys = ev.encode_many(&vec![0_u16; 128], &vec![2; 128]).unwrap();
         circ.eval(&mut ev, &xs, &ys).unwrap();

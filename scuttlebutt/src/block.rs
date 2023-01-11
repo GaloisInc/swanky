@@ -9,9 +9,9 @@
 #[cfg(all(not(feature = "std"), feature = "sgx"))]
 use sgx_tstd as std;
 
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "curve25519")]
 use crate::Aes256;
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "curve25519")]
 use curve25519_dalek::ristretto::RistrettoPoint;
 use std::hash::{Hash, Hasher};
 
@@ -80,7 +80,7 @@ impl Block {
     ///
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
     // TODO(interstellar) this SHOULD NOT be here; it should be into aes256.rs
-    #[cfg(feature = "curve25519-dalek")]
+    #[cfg(feature = "curve25519")]
     #[inline]
     pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();

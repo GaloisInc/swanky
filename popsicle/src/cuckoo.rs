@@ -14,6 +14,7 @@
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
+use alloc::vec::Vec;
 use scuttlebutt::{Aes128, Block};
 use std::fmt::Debug;
 

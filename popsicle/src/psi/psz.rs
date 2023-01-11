@@ -14,6 +14,7 @@ use crate::{
     cuckoo::{compute_masksize, CuckooHash},
     utils, Error,
 };
+use alloc::vec::Vec;
 use itertools::Itertools;
 use ocelot::oprf::{self, Receiver as OprfReceiver, Sender as OprfSender};
 use rand::{seq::SliceRandom, CryptoRng, Rng, RngCore};

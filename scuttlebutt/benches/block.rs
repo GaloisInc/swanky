@@ -5,13 +5,13 @@
 // See LICENSE for licensing information.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "curve25519")]
 use curve25519_dalek::ristretto::RistrettoPoint;
 use rand::Rng;
 use scuttlebutt::{AesRng, Block};
 use std::time::Duration;
 
-#[cfg(feature = "curve25519-dalek")]
+#[cfg(feature = "curve25519")]
 fn bench_hash_pt(c: &mut Criterion) {
     c.bench_function("Block::hash_pt", |b| {
         let pt = RistrettoPoint::random(&mut rand::thread_rng());
@@ -22,7 +22,7 @@ fn bench_hash_pt(c: &mut Criterion) {
         });
     });
 }
-#[cfg(not(feature = "curve25519-dalek"))]
+#[cfg(not(feature = "curve25519"))]
 fn bench_hash_pt(_: &mut Criterion) {}
 
 fn bench_clmul(c: &mut Criterion) {

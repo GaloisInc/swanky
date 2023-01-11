@@ -7,6 +7,8 @@
 #![no_std]
 #![deny(clippy::all)]
 
+extern crate alloc;
+
 pub fn lookup_digits_mod_at_position(x: u8, q: u16, pos: usize) -> &'static [u16] {
     unsafe {
         let tab = c_get_table(q, pos);
@@ -34,7 +36,7 @@ mod tests {
             assert_eq!(lookup_digits_mod_at_position(0, 3, 0), &[0, 0, 0, 0, 0, 0]);
             assert_eq!(
                 lookup_digits_mod_at_position(2, 3, 6).to_vec(),
-                vec![
+                alloc::vec![
                     2, 0, 1, 1, 2, 0, 1, 1, 2, 2, 0, 2, 1, 1, 0, 0, 2, 0, 1, 1, 1, 0, 2, 0, 1, 1,
                     2, 1, 0, 2, 2, 0, 0, 0, 0, 0
                 ]

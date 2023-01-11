@@ -38,3 +38,10 @@ material are those of the author(s) and do not necessarily reflect the views of
 the ARO, SSC Pacific, and DARPA.
 
 Copyright © 2019 Galois, Inc.
+
+# INTERSTELLAR WIP
+
+- build: `cargo test --features=serde1,unix_channel,track_channel,sync_channel,curve25519,rand_aes,nightly,std,hash_aes,parser`
+  - FAIL: good amount of work done but still not working
+- `fancy-garling` OK? `cargo test -p fancy-garbling --features=serde1,nightly,std,parser`
+  - compiles OK but some tests FAIL
