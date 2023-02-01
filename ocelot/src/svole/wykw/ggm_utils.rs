@@ -1,14 +1,12 @@
 //! Provides an implementation of the GGM construction.
 
-use crate::svole::wykw::specialization::FiniteFieldSpecialization;
-use scuttlebutt::{field::FiniteField, utils::unpack_bits};
+use scuttlebutt::field::{FiniteField, IsSubFieldOf};
 use vectoreyes::{
     array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16,
 };
 
-#[derive(Default)]
-pub(crate) struct GgmTemporaryStorage {
-    seeds: Vec<U8x16>,
+pub const fn ggm_temporary_storage_size(depth: usize) -> usize {
+    1 << (depth + 1)
 }
 
 /// Implementation of GGM based on the procedure explained in the write-up
@@ -20,20 +18,21 @@ pub(crate) struct GgmTemporaryStorage {
 /// construction on top of AES.
 ///
 /// `keys_out` **WILL NOT** be `clear()`ed. Results will be appended to it.
+/// it should be able to store `depth` items.
 ///
-/// `tmp_storage` allows `ggm` to preserve allocations across invocations.
+/// `tmp_storage` allows `ggm` to preserve allocations across invocations. It should be a slice
+/// of size `ggm_temporary_storage_size(depth)`. Its contents should be ignored.
 /// `depth` doesn't count the "root" node.
-pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
+pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
     depth: usize,
     initial_seed: U8x16,
     aes: &(Aes128EncryptOnly, Aes128EncryptOnly),
     results: &mut [FE],
-    keys_out: &mut Vec<(T, T)>,
-    tmp_storage: &mut GgmTemporaryStorage,
+    keys_out: &mut Dst,
+    tmp_storage: &mut [U8x16],
 ) {
-    let seeds = &mut tmp_storage.seeds;
-    seeds.resize(1 << (depth + 1), U8x16::ZERO);
-    let seeds: &mut [U8x16] = seeds.as_mut_slice();
+    let seeds = tmp_storage;
+    assert_eq!(seeds.len(), ggm_temporary_storage_size(depth));
     seeds[0] = initial_seed;
     // We do a level-order traversal. We could conceivably do a depth-first traversal of the tree,
     // (which would avoid the need for a large intermediate buffer). However, then we wouldn't be
@@ -41,7 +40,7 @@ pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
     // a little bit less memory usage.
     //
     // The seeds vector contains a level-order traversal of the GGM tree.
-    for i in 0..depth {
+    keys_out.extend((0..depth).map(|i| {
         // i is the index of the _previous_/source level. We write into level i+1.
         let mut k0 = U8x16::ZERO;
         let mut k1 = U8x16::ZERO;
@@ -114,13 +113,18 @@ pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
             k0 ^= s0;
             k1 ^= s1;
         }
-        keys_out.push((k0.into(), k1.into()));
-    }
+        (k0.into(), k1.into())
+    }));
     // TODO: fuse this loop with the previous loop.
     let exp = 1 << depth;
     for (v, seed) in results.iter_mut().zip(seeds[exp - 1..].iter()) {
         *v = FE::from_uniform_bytes(&<[u8; 16]>::from(*seed));
     }
+}
+
+pub fn ggm_prime_temporary_storage_size(depth: usize) -> usize {
+    let leaves = 1 << depth;
+    2 * leaves - 2
 }
 
 /// Implementation of GGM' based on the procedure explained in the
@@ -129,96 +133,214 @@ pub(super) fn ggm<FE: FiniteField, T: From<U8x16>>(
 /// (<https://eprint.iacr.org/2019/1084.pdf>, Page 7). GGM' is used compute the
 /// vector of field elements except a path `b1..bn` where `b1` represents the
 /// msb of `alpha`.
-pub(super) fn ggm_prime<FE: FiniteField, S: FiniteFieldSpecialization<FE>>(
+///
+/// `ot_output` are the values that we've received via OT.
+///
+/// The value at `results[alpha]` is unspecified. (That is, do not depend on its output being a
+/// specific value, but it will be properly initialized to avoid Undefined Behavior.)
+///
+/// This code will leave all the prime field elements of the sender pair untouched.
+///
+/// `tmp_storage` allows `ggm_prime` to preserve allocations across invocations. It should be a slice
+/// of size `ggm_prime_temporary_storage_size(ot_output.len())`. Its contents should be ignored.
+///
+/// # Preconditions
+/// * `results.len()` should be `1 << ot_output.len()`.
+/// * `alpha` should be strictly less then `1 << ot_output.len()`
+///
+/// # Return Value
+/// This function will return the sum of the `.1` elements in the results array
+pub fn ggm_prime<
+    VF: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+    T: From<(VF, FE)> + Into<(VF, FE)> + Copy,
+>(
     alpha: usize,
-    keys: &[U8x16],
+    ot_output: &[U8x16],
     aes: &(Aes128EncryptOnly, Aes128EncryptOnly),
-    results: &mut [S::SenderPairContents],
+    results: &mut [T],
+    tmp_storage: &mut [U8x16],
 ) -> FE {
-    let depth = keys.len();
-    let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), depth);
-    // To get MSB as first elt.
-    alpha_bits.reverse();
+    // TODO: several constant-time MUXes are currently written as if statements. We need a more
+    // efficient constant time library compared to subtle.
+    let depth = ot_output.len();
     let leaves = 1 << depth;
-    let mut sv: Vec<U8x16> = vec![Default::default(); 2 * leaves - 1]; // to store all seeds up to level depth
-    sv[1 + !alpha_bits[0] as usize] = keys[0];
-    for i in 2..depth + 1 {
-        let exp = 1 << (i - 1) as usize; // number of nodes in the prev. level.
-        let exp_idx = 1 << i; // starting insertion position at the currrent level.
-        for j in 0..exp {
-            if sv[exp + j - 1] != Default::default() {
-                let s = sv[exp + j - 1];
-                let s0 = aes.0.encrypt(s) ^ s;
-                let s1 = aes.1.encrypt(s) ^ s;
-                sv[2 * j + exp_idx - 1] = s0; // Even node
-                sv[2 * j + exp_idx] = s1; // Odd node
-            }
-        }
-        // let b1..bi-1 (b1 is MSB) be the bit representation of alpha up to the previous level
-        // Then the insertion node at the current node would be b1..bi-1comp(bi).
-        let mut tmp = alpha_bits.clone();
-        tmp.truncate(i - 1);
-        let ai_comp = !alpha_bits[i - 1];
-        tmp.push(ai_comp);
-        tmp.reverse();
-        let ai_star = bv_to_num(&tmp); // node number at the current level
-        let s_alpha = (0..exp).fold(Default::default(), |sum: U8x16, j| {
-            sum ^ sv[exp_idx + 2 * j + ai_comp as usize - 1]
-        });
-        sv[exp_idx + ai_star as usize - 1] = s_alpha ^ keys[i - 1];
-    }
-
-    for j in 0..leaves {
-        if j != alpha {
-            let (u, _w) = S::extract_sender_pair(results[j]);
-            results[j] = S::new_sender_pair(
-                u,
-                FE::from_uniform_bytes(&<[u8; 16]>::from(sv[leaves + j - 1])),
+    assert_eq!(leaves, results.len());
+    debug_assert!(alpha < leaves);
+    assert!(depth >= 2);
+    // sv contains a level-order traversal of the seeds in the seed tree.
+    let mut sv = tmp_storage;
+    assert_eq!(sv.len(), 2 * leaves - 2);
+    // When implemented GGM', we need to be careful to _not_ use alpha as part of the index to any
+    // array accesses. It's a secret value, and so using it as part of an array access can lead to
+    // timing attacks.
+    // We set both keys at the first level to the first key that we recieve. The one of these values
+    // will never be used since it corresponds to the path that we've selected with alpha.
+    sv[0] = ot_output[0];
+    sv[1] = ot_output[0];
+    let mut previous_level_reconstruction = ot_output[0];
+    for level in 2..=depth {
+        let (prev_level, remaining_sv) = sv.split_at_mut(1 << (level - 1));
+        sv = remaining_sv;
+        let current_level = &mut sv[0..(1 << level)];
+        debug_assert!(prev_level.len().is_power_of_two());
+        debug_assert_eq!(current_level.len(), prev_level.len() * 2);
+        let which_parent_node_is_unknown = alpha >> (depth - level + 1);
+        let which_parent_node_was_reconstructed = which_parent_node_is_unknown ^ 1;
+        // Apply our PRF (lambda s: aes.encrypt(s) ^ s) to the previous level to generate the new
+        // level.
+        let mut level_xor = ot_output[level - 1];
+        let mut prev_level = prev_level.chunks_exact(Aes128EncryptOnly::BLOCK_COUNT_HINT);
+        let mut i = 0;
+        while let Some(parents) = prev_level.next() {
+            let parents = <&[U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT]>::try_from(parents)
+                .expect("The chunk size matches");
+            let parents = parents.array_enumerate().array_map(
+                #[inline(always)]
+                |(j, parent)| {
+                    // TODO: constant time
+                    if i + j == which_parent_node_was_reconstructed {
+                        previous_level_reconstruction
+                    } else {
+                        parent
+                    }
+                },
             );
+            let keys = [&aes.0, &aes.1];
+            // Array of [which key][which parent index] => PRF output
+            let current_level_entries = keys.array_map(
+                #[inline(always)]
+                |key| {
+                    let encryptions = key.encrypt_many(parents);
+                    // Uncommenting the below gives a 5% reduction in nanoseconds per VOLE.
+                    // This code block is currently specialized to BLOCK_COUNT_HINT==4. If you want
+                    // to uncomment this block for realsies, then you should modify the surrounding
+                    // code to force it to encrypt exactly 4 blocks at a time. (We do that in other
+                    // places in the code, anyway.)
+                    /*let encryptions: [U8x16; 4] = unsafe {
+                    let mut encryptions: [std::arch::x86_64::__m128i; 4] =
+                        bytemuck::cast(encryptions);
+                    std::arch::asm!(
+                        "/* {} {} {} {} */
+",
+                            inout(xmm_reg) encryptions[0],
+                            inout(xmm_reg) encryptions[1],
+                            inout(xmm_reg) encryptions[2],
+                            inout(xmm_reg) encryptions[3],
+                            options(pure, nomem, nostack, preserves_flags),
+                        );
+                        bytemuck::cast(encryptions)
+                    };*/
+                    encryptions.array_zip(parents).array_enumerate().array_map(
+                        #[inline(always)]
+                        |(j, (key, parent))| {
+                            let new_node = key ^ parent;
+                            // TODO: constant time
+                            if i + j == which_parent_node_is_unknown {
+                                U8x16::ZERO
+                            } else {
+                                new_node
+                            }
+                        },
+                    )
+                },
+            );
+            // We transpose the array.
+            // Array of [which parent index][which key] => PRF output
+            let current_level_entries =
+                <[[U8x16; 2]; Aes128EncryptOnly::BLOCK_COUNT_HINT]>::array_generate(
+                    #[inline(always)]
+                    |j| [current_level_entries[0][j], current_level_entries[1][j]],
+                );
+            current_level_entries.array_enumerate().array_for_each(
+                #[inline(always)]
+                |(j, [s0, s1])| {
+                    // TODO: constant time
+                    level_xor ^= if (alpha >> (depth - level)) & 1 == 1 {
+                        s0
+                    } else {
+                        s1
+                    };
+                    current_level[(i + j) * 2] = s0;
+                    current_level[(i + j) * 2 + 1] = s1;
+                },
+            );
+            // TODO: write current_level_entries
+            i += Aes128EncryptOnly::BLOCK_COUNT_HINT;
         }
+        for (i, (parent, current)) in prev_level
+            .remainder()
+            .iter()
+            .copied()
+            .zip(current_level.chunks_exact_mut(2))
+            .enumerate()
+        {
+            // TODO: constant time
+            let parent = if i == which_parent_node_was_reconstructed {
+                previous_level_reconstruction
+            } else {
+                parent
+            };
+            let s0 = aes.0.encrypt(parent) ^ parent;
+            let s1 = aes.1.encrypt(parent) ^ parent;
+            // TODO: constant time
+            let s0 = if i == which_parent_node_is_unknown {
+                U8x16::ZERO
+            } else {
+                s0
+            };
+            let s1 = if i == which_parent_node_is_unknown {
+                U8x16::ZERO
+            } else {
+                s1
+            };
+            current[0] = s0;
+            current[1] = s1;
+            // TODO: constant time
+            level_xor ^= if (alpha >> (depth - level)) & 1 == 1 {
+                s0
+            } else {
+                s1
+            };
+        }
+        previous_level_reconstruction = level_xor;
     }
-    let sum = (0..leaves)
-        .map(|j| S::extract_sender_pair(results[j]).1)
-        .sum();
-
-    sum
-}
-
-/// Convert bit-vector to a number.
-fn bv_to_num(v: &[bool]) -> usize {
-    v.iter()
-        .enumerate()
-        .map(|(i, &v)| (1 << i) * v as usize)
-        .sum()
+    debug_assert_eq!(sv.len(), leaves);
+    let mut w_sum = FE::ZERO;
+    for (i, (dst, src)) in results.iter_mut().zip(sv.iter()).enumerate() {
+        let (u, _w) = (*dst).into();
+        // TODO: constant-time
+        let w = FE::from_uniform_bytes(bytemuck::cast_ref(if i ^ 1 == alpha {
+            &previous_level_reconstruction
+        } else {
+            src
+        }));
+        // TODO: constant-time
+        if i != alpha {
+            w_sum += w;
+        }
+        *dst = (u, w).into();
+    }
+    w_sum
 }
 
 #[cfg(test)]
-// When this module is included a benchmark, the test functions don't get called.
-#[allow(unused_imports, dead_code)]
 mod tests {
     use super::*;
-    use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
     use proptest::prelude::*;
-    use rand::Rng;
     use scuttlebutt::{
-        field::{F128b, F40b, F61p, FiniteField, F2},
-        ring::FiniteRing,
+        field::{F128b, F61p, F63b, FiniteField, F2},
         utils::unpack_bits,
     };
 
-    #[test]
-    fn test_bv_to_num() {
-        let x = rand::random::<usize>();
-        let bv = unpack_bits(&x.to_le_bytes(), 64);
-        assert_eq!(bv_to_num(&bv), x);
-    }
-
-    fn test_ggm_<FE: FiniteField, S: FiniteFieldSpecialization<FE>>(
+    fn test_ggm_<VF: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
         depth: usize,
         seed: [u8; 16],
         seed0: [u8; 16],
         seed1: [u8; 16],
+        alpha: usize,
     ) -> Result<(), TestCaseError> {
+        assert!(alpha < (1 << depth));
         let seed = U8x16::from(seed);
         let seed0 = U8x16::from(seed0);
         let seed1 = U8x16::from(seed1);
@@ -234,10 +356,8 @@ mod tests {
             &ggm_seeds.clone(),
             &mut vs,
             &mut keys,
-            &mut GgmTemporaryStorage::default(),
+            &mut vec![U8x16::ZERO; ggm_temporary_storage_size(depth)],
         );
-        let leaves = (1 << depth) - 1;
-        let alpha: usize = rand::thread_rng().gen_range(1..leaves);
         let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
         alpha_bits.reverse();
         let alpha_keys: Vec<U8x16> = alpha_bits
@@ -245,36 +365,44 @@ mod tests {
             .zip(keys.iter())
             .map(|(b, k)| if !*b { k.1 } else { k.0 })
             .collect();
-        let mut vs_ = vec![S::new_sender_pair(FE::PrimeField::ZERO, FE::ZERO); exp];
-        let _ = ggm_prime::<FE, S>(alpha, &alpha_keys, &ggm_seeds, &mut vs_);
+        let mut vs_ = vec![(VF::ZERO, FE::ZERO); exp];
+        let sum = ggm_prime::<VF, FE, (VF, FE)>(
+            alpha,
+            &alpha_keys,
+            &ggm_seeds,
+            &mut vs_,
+            &mut vec![U8x16::ZERO; ggm_prime_temporary_storage_size(alpha_keys.len())],
+        );
         for i in 0..vs_.len() {
             if i != alpha {
-                prop_assert_eq!(vs[i], S::extract_sender_pair(vs_[i]).1);
+                prop_assert_eq!(vs[i], vs_[i].1);
             }
         }
+        prop_assert_eq!(sum, vs_.iter().map(|x| x.1).sum());
         Ok(())
     }
     macro_rules! test_ggm {
-        ($(($name:ident, $field:ty, $specialization:ty),)*) => {
+        ($(($name:ident, $vf:ty, $field:ty),)*) => {
             $(proptest! {
                 #[test]
                 fn $name(
                     // Runs for a while if the range is over 20.
                     // depth has to be atleast 2.
-                    depth in 2..14_usize,
                     seed in any::<[u8;16]>(),
                     seed0 in any::<[u8; 16]>(),
                     seed1 in any::<[u8; 16]>(),
+                    (depth, alpha) in (2..14_usize)
+                        .prop_flat_map(|depth| (Just(depth), 0_usize..(1_usize << depth))),
                 ) {
-                    test_ggm_::<$field, $specialization>(depth, seed, seed0, seed1)?;
+                    test_ggm_::<$vf, $field>(depth, seed, seed0, seed1, alpha)?;
                 }
             })*
         };
     }
     test_ggm!(
-        (f61p, F61p, NoSpecialization),
-        (f2, F2, NoSpecialization),
-        (f128b, F128b, NoSpecialization),
-        (f40b, F40b, NoSpecialization),
+        (f61p, F61p, F61p),
+        (f128b, F2, F128b),
+        (f63b, F2, F63b),
+        (f63b_full_field, F63b, F63b),
     );
 }
