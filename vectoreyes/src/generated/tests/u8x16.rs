@@ -4,6 +4,7 @@
 use super::scalar;
 use crate::ExtendingCast;
 use crate::SimdBase;
+use crate::SimdBase16;
 use crate::SimdBase32;
 use crate::SimdBase4x;
 use crate::SimdBase4x64;
@@ -11,6 +12,7 @@ use crate::SimdBase64;
 use crate::SimdBase8;
 use crate::SimdBase8x;
 use crate::SimdBaseGatherable;
+use crate::SimdSaturatingArithmetic;
 use proptest::prelude::*;
 use std::ops::*;
 proptest! { #[test] fn test_equality( a in any::<[u8; 16]>(), b in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); a == b }; let platform_out = { use crate::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); a == b }; prop_assert_eq!(scalar_out, platform_out); } }
@@ -47,6 +49,8 @@ proptest! { #[test] fn test_cast_from_u32x4( a in any::<[u32; 4]>(), ) { let sca
 proptest! { #[test] fn test_cast_from_u64x2( a in any::<[u64; 2]>(), ) { let scalar_out = { use scalar::*; let a: U64x2 = a.into(); U8x16::from(a).as_array() }; let platform_out = { use crate::*; let a: U64x2 = a.into(); U8x16::from(a).as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_shift_left( a in any::<[u8; 16]>(), amm in any::<u64>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); let amm: u64 = amm.into(); let out = (a << amm).as_array(); prop_assert_eq!((a << U8x16::broadcast(if amm < 8 { amm as u8 } else { 127 })).as_array(), out); out }; let platform_out = { use crate::*; let a: U8x16 = a.into(); let amm: u64 = amm.into(); let out = (a << amm).as_array(); prop_assert_eq!((a << U8x16::broadcast(if amm < 8 { amm as u8 } else { 127 })).as_array(), out); out }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_shift_right( a in any::<[u8; 16]>(), amm in any::<u64>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); let amm: u64 = amm.into(); let out = (a >> amm).as_array(); prop_assert_eq!((a >> U8x16::broadcast(if amm < 8 { amm as u8 } else { 127 })).as_array(), out); out }; let platform_out = { use crate::*; let a: U8x16 = a.into(); let amm: u64 = amm.into(); let out = (a >> amm).as_array(); prop_assert_eq!((a >> U8x16::broadcast(if amm < 8 { amm as u8 } else { 127 })).as_array(), out); out }; prop_assert_eq!(scalar_out, platform_out); } }
+proptest! { #[test] fn test_saturating_add( a in any::<[u8; 16]>(), b in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); (a.saturating_add(b)).as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); (a.saturating_add(b)).as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
+proptest! { #[test] fn test_saturating_sub( a in any::<[u8; 16]>(), b in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); (a.saturating_sub(b)).as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); (a.saturating_sub(b)).as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_byte_shift_left0( a in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); a.shift_bytes_left::<0>().as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); a.shift_bytes_left::<0>().as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_byte_shift_left5( a in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); a.shift_bytes_left::<5>().as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); a.shift_bytes_left::<5>().as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_byte_shift_left8( a in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); a.shift_bytes_left::<8>().as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); a.shift_bytes_left::<8>().as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
@@ -54,6 +58,7 @@ proptest! { #[test] fn test_byte_shift_right0( a in any::<[u8; 16]>(), ) { let s
 proptest! { #[test] fn test_byte_shift_right5( a in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); a.shift_bytes_right::<5>().as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); a.shift_bytes_right::<5>().as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_byte_shift_right8( a in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); a.shift_bytes_right::<8>().as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); a.shift_bytes_right::<8>().as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 proptest! { #[test] fn test_most_significant_bits( a in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); a.most_significant_bits() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); a.most_significant_bits() }; prop_assert_eq!(scalar_out, platform_out); } }
+proptest! { #[test] fn test_shuffle( a in any::<[u8; 16]>(), b in any::<[u8; 16]>(), ) { let scalar_out = { use scalar::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); a.shuffle(b).as_array() }; let platform_out = { use crate::*; let a: U8x16 = a.into(); let b: U8x16 = b.into(); a.shuffle(b).as_array() }; prop_assert_eq!(scalar_out, platform_out); } }
 #[test]
 fn zero_is_zero() {
     assert!(crate::U8x16::ZERO.is_zero());

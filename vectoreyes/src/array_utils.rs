@@ -28,6 +28,8 @@ pub trait UnrollableArraySize<const N: usize> {
     fn array_fold<T, U, F: FnMut(U, T) -> U>(arr: [T; N], init: U, f: F) -> U;
     fn array_zip<T1, T2>(arr1: [T1; N], arr2: [T2; N]) -> [(T1, T2); N];
     fn array_enumerate<T>(arr: [T; N]) -> [(usize, T); N];
+    fn array_as_ref<T>(arr: &[T; N]) -> [&T; N];
+    fn array_as_mut<T>(arr: &mut [T; N]) -> [&mut T; N];
 }
 
 /// Manually unrolled operations on arrays.
@@ -93,6 +95,10 @@ pub trait ArrayUnrolledExt<T, const N: usize>: Sized {
     /// );
     /// ```
     fn array_enumerate(self) -> [(usize, T); N];
+    /// Produce an array containing references to the initial array.
+    fn array_as_ref(&self) -> [&T; N];
+    /// Produce an array containing mutable references to the initial array.
+    fn array_as_mut(&mut self) -> [&mut T; N];
 }
 impl<T, const N: usize> ArrayUnrolledExt<T, N> for [T; N]
 where
@@ -121,6 +127,14 @@ where
     #[inline(always)]
     fn array_enumerate(self) -> [(usize, T); N] {
         ArrayUnrolledOps::array_enumerate(self)
+    }
+    #[inline(always)]
+    fn array_as_ref(&self) -> [&T; N] {
+        ArrayUnrolledOps::array_as_ref(self)
+    }
+    #[inline(always)]
+    fn array_as_mut(&mut self) -> [&mut T; N] {
+        ArrayUnrolledOps::array_as_mut(self)
     }
 }
 

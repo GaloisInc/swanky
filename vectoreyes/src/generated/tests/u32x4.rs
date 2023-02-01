@@ -4,6 +4,7 @@
 use super::scalar;
 use crate::ExtendingCast;
 use crate::SimdBase;
+use crate::SimdBase16;
 use crate::SimdBase32;
 use crate::SimdBase4x;
 use crate::SimdBase4x64;
@@ -11,6 +12,7 @@ use crate::SimdBase64;
 use crate::SimdBase8;
 use crate::SimdBase8x;
 use crate::SimdBaseGatherable;
+use crate::SimdSaturatingArithmetic;
 use proptest::prelude::*;
 use std::ops::*;
 proptest! { #[test] fn test_equality( a in any::<[u32; 4]>(), b in any::<[u32; 4]>(), ) { let scalar_out = { use scalar::*; let a: U32x4 = a.into(); let b: U32x4 = b.into(); a == b }; let platform_out = { use crate::*; let a: U32x4 = a.into(); let b: U32x4 = b.into(); a == b }; prop_assert_eq!(scalar_out, platform_out); } }

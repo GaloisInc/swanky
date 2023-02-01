@@ -277,8 +277,14 @@ pub trait SimdBase8x: SimdBase {
     ) -> Self;
 }
 
+/// A vector supporting saturating arithmetic on each entry
+pub trait SimdSaturatingArithmetic: SimdBase {
+    fn saturating_add(&self, other: Self) -> Self;
+    fn saturating_sub(&self, other: Self) -> Self;
+}
+
 /// A vector containing 8-bit values.
-pub trait SimdBase8: SimdBase
+pub trait SimdBase8: SimdBase + SimdSaturatingArithmetic
 where
     Self::Scalar: Scalar<Unsigned = u8, Signed = i8>,
 {
@@ -288,6 +294,21 @@ where
     fn shift_bytes_right<const AMOUNT: usize>(&self) -> Self;
     /// Get the sign/most significant bits of the elements of the vector.
     fn most_significant_bits(&self) -> u32;
+}
+
+/// A vector containing 16-bit values.
+pub trait SimdBase16: SimdBase + SimdSaturatingArithmetic
+where
+    Self::Scalar: Scalar<Unsigned = u16, Signed = i16>,
+{
+    /// Shuffle within the lower 64-bits of each 128-bit lane.
+    fn shuffle_lo<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> Self;
+    /// Shuffle within the upper 64-bits of each 128-bit lane.
+    fn shuffle_hi<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> Self;
 }
 
 /// A vector containing 32-bit values.

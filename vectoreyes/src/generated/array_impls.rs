@@ -45,6 +45,18 @@ impl UnrollableArraySize<0> for ArrayUnrolledOps {
             },
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 0]) -> [&T; 0] {
+        match arr {
+            [] => [],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 0]) -> [&mut T; 0] {
+        match arr {
+            [] => [],
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 0] {
     type T = T;
@@ -110,6 +122,18 @@ impl UnrollableArraySize<1> for ArrayUnrolledOps {
             },
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 1]) -> [&T; 1] {
+        match arr {
+            [arr_0] => [arr_0],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 1]) -> [&mut T; 1] {
+        match arr {
+            [arr_0] => [arr_0],
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 1] {
     type T = T;
@@ -167,6 +191,18 @@ impl UnrollableArraySize<2> for ArrayUnrolledOps {
             [arr1_0, arr1_1] => match arr2 {
                 [arr2_0, arr2_1] => [(arr1_0, arr2_0), (arr1_1, arr2_1)],
             },
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 2]) -> [&T; 2] {
+        match arr {
+            [arr_0, arr_1] => [arr_0, arr_1],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 2]) -> [&mut T; 2] {
+        match arr {
+            [arr_0, arr_1] => [arr_0, arr_1],
         }
     }
 }
@@ -238,6 +274,18 @@ impl UnrollableArraySize<3> for ArrayUnrolledOps {
             },
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 3]) -> [&T; 3] {
+        match arr {
+            [arr_0, arr_1, arr_2] => [arr_0, arr_1, arr_2],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 3]) -> [&mut T; 3] {
+        match arr {
+            [arr_0, arr_1, arr_2] => [arr_0, arr_1, arr_2],
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 3] {
     type T = T;
@@ -304,6 +352,18 @@ impl UnrollableArraySize<4> for ArrayUnrolledOps {
                     (arr1_3, arr2_3),
                 ],
             },
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 4]) -> [&T; 4] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3] => [arr_0, arr_1, arr_2, arr_3],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 4]) -> [&mut T; 4] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3] => [arr_0, arr_1, arr_2, arr_3],
         }
     }
 }
@@ -389,6 +449,18 @@ impl UnrollableArraySize<5> for ArrayUnrolledOps {
                     (arr1_4, arr2_4),
                 ],
             },
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 5]) -> [&T; 5] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4] => [arr_0, arr_1, arr_2, arr_3, arr_4],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 5]) -> [&mut T; 5] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4] => [arr_0, arr_1, arr_2, arr_3, arr_4],
         }
     }
 }
@@ -481,6 +553,22 @@ impl UnrollableArraySize<6> for ArrayUnrolledOps {
                     (arr1_5, arr2_5),
                 ],
             },
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 6]) -> [&T; 6] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5] => {
+                [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 6]) -> [&mut T; 6] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5] => {
+                [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5]
+            }
         }
     }
 }
@@ -596,6 +684,22 @@ impl UnrollableArraySize<7> for ArrayUnrolledOps {
             },
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 7]) -> [&T; 7] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6] => {
+                [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 7]) -> [&mut T; 7] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6] => {
+                [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 7] {
     type T = T;
@@ -706,6 +810,22 @@ impl UnrollableArraySize<8> for ArrayUnrolledOps {
                     (arr1_7, arr2_7),
                 ],
             },
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 8]) -> [&T; 8] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7] => {
+                [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 8]) -> [&mut T; 8] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7] => {
+                [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7]
+            }
         }
     }
 }
@@ -841,6 +961,22 @@ impl UnrollableArraySize<9> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 9]) -> [&T; 9] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8] => [
+                arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8,
+            ],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 9]) -> [&mut T; 9] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8] => [
+                arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8,
+            ],
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 9] {
     type T = T;
@@ -968,6 +1104,22 @@ impl UnrollableArraySize<10> for ArrayUnrolledOps {
                     }
                 }
             }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 10]) -> [&T; 10] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9] => [
+                arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9,
+            ],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 10]) -> [&mut T; 10] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9] => [
+                arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9,
+            ],
         }
     }
 }
@@ -1119,6 +1271,22 @@ impl UnrollableArraySize<11> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 11]) -> [&T; 11] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10] => [
+                arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+            ],
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 11]) -> [&mut T; 11] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10] => [
+                arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+            ],
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 11] {
     type T = T;
@@ -1267,6 +1435,28 @@ impl UnrollableArraySize<12> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 12]) -> [&T; 12] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 12]) -> [&mut T; 12] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11,
+                ]
             }
         }
     }
@@ -1446,6 +1636,28 @@ impl UnrollableArraySize<13> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 13]) -> [&T; 13] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 13]) -> [&mut T; 13] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 13] {
     type T = T;
@@ -1609,6 +1821,28 @@ impl UnrollableArraySize<14> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 14]) -> [&T; 14] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 14]) -> [&mut T; 14] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13,
+                ]
             }
         }
     }
@@ -1802,6 +2036,28 @@ impl UnrollableArraySize<15> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 15]) -> [&T; 15] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 15]) -> [&mut T; 15] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 15] {
     type T = T;
@@ -1978,6 +2234,28 @@ impl UnrollableArraySize<16> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 16]) -> [&T; 16] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 16]) -> [&mut T; 16] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15,
+                ]
             }
         }
     }
@@ -2186,6 +2464,28 @@ impl UnrollableArraySize<17> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 17]) -> [&T; 17] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 17]) -> [&mut T; 17] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 17] {
     type T = T;
@@ -2376,6 +2676,28 @@ impl UnrollableArraySize<18> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 18]) -> [&T; 18] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 18]) -> [&mut T; 18] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17,
+                ]
             }
         }
     }
@@ -2598,6 +2920,28 @@ impl UnrollableArraySize<19> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 19]) -> [&T; 19] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 19]) -> [&mut T; 19] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 19] {
     type T = T;
@@ -2801,6 +3145,28 @@ impl UnrollableArraySize<20> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 20]) -> [&T; 20] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 20]) -> [&mut T; 20] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19,
+                ]
             }
         }
     }
@@ -3037,6 +3403,28 @@ impl UnrollableArraySize<21> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 21]) -> [&T; 21] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 21]) -> [&mut T; 21] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 21] {
     type T = T;
@@ -3253,6 +3641,30 @@ impl UnrollableArraySize<22> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 22]) -> [&T; 22] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 22]) -> [&mut T; 22] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21,
+                ]
             }
         }
     }
@@ -3503,6 +3915,30 @@ impl UnrollableArraySize<23> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 23]) -> [&T; 23] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 23]) -> [&mut T; 23] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 23] {
     type T = T;
@@ -3732,6 +4168,30 @@ impl UnrollableArraySize<24> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 24]) -> [&T; 24] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 24]) -> [&mut T; 24] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23,
+                ]
             }
         }
     }
@@ -3996,6 +4456,30 @@ impl UnrollableArraySize<25> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 25]) -> [&T; 25] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 25]) -> [&mut T; 25] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 25] {
     type T = T;
@@ -4238,6 +4722,30 @@ impl UnrollableArraySize<26> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 26]) -> [&T; 26] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 26]) -> [&mut T; 26] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25,
+                ]
             }
         }
     }
@@ -4516,6 +5024,30 @@ impl UnrollableArraySize<27> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 27]) -> [&T; 27] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 27]) -> [&mut T; 27] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 27] {
     type T = T;
@@ -4771,6 +5303,30 @@ impl UnrollableArraySize<28> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 28]) -> [&T; 28] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 28]) -> [&mut T; 28] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27,
+                ]
             }
         }
     }
@@ -5063,6 +5619,30 @@ impl UnrollableArraySize<29> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 29]) -> [&T; 29] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 29]) -> [&mut T; 29] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 29] {
     type T = T;
@@ -5331,6 +5911,30 @@ impl UnrollableArraySize<30> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 30]) -> [&T; 30] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 30]) -> [&mut T; 30] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29,
+                ]
             }
         }
     }
@@ -5638,6 +6242,30 @@ impl UnrollableArraySize<31> for ArrayUnrolledOps {
             }
         }
     }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 31]) -> [&T; 31] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 31]) -> [&mut T; 31] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30,
+                ]
+            }
+        }
+    }
 }
 impl<T> ArrayAdjacentPairs for [T; 31] {
     type T = T;
@@ -5920,6 +6548,32 @@ impl UnrollableArraySize<32> for ArrayUnrolledOps {
                         ]
                     }
                 }
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_ref<T>(arr: &[T; 32]) -> [&T; 32] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30, arr_31] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30,
+                    arr_31,
+                ]
+            }
+        }
+    }
+    #[inline(always)]
+    fn array_as_mut<T>(arr: &mut [T; 32]) -> [&mut T; 32] {
+        match arr {
+            [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10, arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20, arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30, arr_31] => {
+                [
+                    arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7, arr_8, arr_9, arr_10,
+                    arr_11, arr_12, arr_13, arr_14, arr_15, arr_16, arr_17, arr_18, arr_19, arr_20,
+                    arr_21, arr_22, arr_23, arr_24, arr_25, arr_26, arr_27, arr_28, arr_29, arr_30,
+                    arr_31,
+                ]
             }
         }
     }

@@ -6,10 +6,11 @@
 
 {% macro the_implementation(force_scalar_for_test) %}
 {# Keep this in sync with the features in Cargo.toml to determine when to depend on soft-aes. #}
-{% set avx2_intrinsic_builder = IntelIntrinsicBuilder(["AVX", "AVX2", "SSE4.1", "AES", "SSE4.2", "PCLMULQDQ"])  %}
+{% set avx2_intrinsic_builder = IntelIntrinsicBuilder(["AVX", "AVX2", "SSE4.1", "AES", "SSE4.2", "SSSE3", "PCLMULQDQ"])  %}
 {% macro avx2_intrinsic(ty, op, ty2=None) %}avx2::{{avx2_intrinsic_builder(ty, op, ty2)}}{% endmacro %}
-{% set avx2_cfg = "#[cfg(" ~ avx2_intrinsic_builder.cfg_body ~ ")]" %}
-{% set scalar_cfg = "#[cfg(not(" ~ avx2_intrinsic_builder.cfg_body ~ "))]" %}
+{# miri supports _some_ vector instrinsics, not all of them though. #}
+{% set avx2_cfg = "#[cfg(all(not(miri), " ~ avx2_intrinsic_builder.cfg_body ~ "))]" %}
+{% set scalar_cfg = "#[cfg(any(miri, not(" ~ avx2_intrinsic_builder.cfg_body ~ ")))]" %}
 
 {% macro visit_avx2_target_cpu_block() %}
     {% for target_cpu in avx2_intrinsic_builder.TARGET_CPUS %}
@@ -370,8 +371,10 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
     {% include "impl/const.tmpl" %}
     {% include "impl/conversions.tmpl" %}
     {% include "impl/gather.tmpl" %}
+    {% include "impl/saturating.tmpl" %}
     {% include "impl/shift.tmpl" %}
     {% include "impl/SimdBase.tmpl" %}
+    {% include "impl/SimdBase16.tmpl" %}
     {% include "impl/SimdBase32.tmpl" %}
     {% include "impl/SimdBase4x.tmpl" %}
     {% include "impl/SimdBase64.tmpl" %}

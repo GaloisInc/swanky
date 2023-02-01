@@ -14,7 +14,11 @@ version.workspace = true
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend", "scuttlebutt/nightly"]
+nightly = [
+  "curve25519-dalek/nightly",
+  "curve25519-dalek/simd_backend",
+  "scuttlebutt/nightly",
+]
 
 
 [dependencies]
@@ -26,6 +30,8 @@ vectoreyes.workspace = true
 generic-array.workspace = true
 subtle.workspace = true
 bytemuck.workspace = true
+keyed_arena.workspace = true
+arrayvec.workspace = true
 
 [build-dependencies]
 cc.workspace = true

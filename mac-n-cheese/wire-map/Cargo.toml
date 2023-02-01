@@ -1,0 +1,20 @@
+[package]
+name = "mac-n-cheese-wire-map"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+vectoreyes.workspace = true
+eyre.workspace = true
+bytemuck.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
+
+[[bench]]
+name = "wire-map"
+harness = false
+

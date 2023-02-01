@@ -1,0 +1,22 @@
+[package]
+name = "mac-n-cheese-sieve-parser"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+flatbuffers.workspace = true
+bumpalo = { workspace = true, features = ["collections"] }
+eyre.workspace = true
+crypto-bigint.workspace = true
+memchr.workspace = true
+generic-array.workspace = true
+flume.workspace = true
+
+[dev-dependencies]
+color-eyre.workspace = true
+
+[build-dependencies]
+blake3.workspace = true

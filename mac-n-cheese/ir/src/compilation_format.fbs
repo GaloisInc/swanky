@@ -1,0 +1,83 @@
+struct Type {
+    encoding: uint16;
+}
+struct TaskId {
+    id: uint32;
+}
+struct DataChunkAddress {
+    start: uint64;
+    length: uint32;
+    hash_code: uint64;
+    compressed_length: uint32;
+}
+struct Shape {
+    ty: Type;
+    count: uint32;
+}
+enum TaskCommuniqueSender: uint8 {
+    Prover = 0,
+    Verifier = 1,
+}
+struct TaskCommunicationRound {
+    // size_a CANNOT be zero.
+    size_a: uint32;
+    // size_b MAY be zero.
+    size_b: uint32;
+}
+table TaskPrototype {
+    kind_encoding: uint16;
+    data: DataChunkAddress (required);
+    party_a: TaskCommuniqueSender;
+    rounds: [TaskCommunicationRound] (required);
+    // Inputs here should be sourced from a single array.
+    single_array_inputs: [Shape] (required);
+    // Inputs here may have more than one tributary.
+    multi_array_inputs: [Shape] (required);
+    // There should be at most one output per type.
+    outputs: [Shape] (required);
+    name: string;
+}
+struct TaskInput {
+    ty: Type;
+    source: TaskId;
+    start: uint32;
+    end: uint32;
+}
+struct TaskInputTributary {
+    source: TaskId;
+    start: uint32;
+    end: uint32;
+}
+table MultiArrayTaskInput {
+  ty: Type (required);
+  inputs: [TaskInputTributary] (required);
+}
+table Task {
+    prototype_id: uint32;
+    single_array_inputs: [TaskInput] (required);
+    multi_array_inputs: [MultiArrayTaskInput] (required);
+    inferred_priority: int32;
+    // This list MAY CONTAIN DUPLICATES. If task A references this task in two
+    // inputs, then task A will be listed here twice.
+    inferred_dependents: [TaskId] (required);
+    name: string;
+}
+table AllocationSize {
+    // If absent, then bytes.
+    type: Type;
+    count: uint32;
+}
+table Manifest {
+    tasks: [Task] (required);
+    prototypes: [TaskPrototype] (required);
+    initially_ready_tasks: [TaskId] (required);
+    // BOTH of these counts INCLUDE DUPLICATES.
+    // If Task A references Task B in two inputs, then the count here will be 2.
+    dependent_counts: DataChunkAddress (required);
+    dependency_counts: DataChunkAddress (required);
+    ///
+    allocation_sizes: [AllocationSize] (required);
+    task_kinds_used: [uint16] (required);
+}
+
+root_type Manifest;

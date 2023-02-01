@@ -312,6 +312,26 @@ impl From<U64x2> for I8x16 {
             bytemuck::cast(x.0) // TODO: big endian.
         })
     }
+}
+impl crate::SimdSaturatingArithmetic for I8x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x16  ,\n # )  -> I8x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_adds_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_adds_epi8)\n\n\n * `PADDSB xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: I8x16) -> I8x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x16  ,\n # )  -> I8x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_subs_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_subs_epi8)\n\n\n * `PSUBSB xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: I8x16) -> I8x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
+    }
 } // Static shift
 impl ShlAssign<u64> for I8x16 {
     #[inline(always)]
@@ -804,6 +824,28 @@ impl crate::SimdBase8 for I8x16 {
         out
     }
 }
+impl I8x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x16  ,\n # )  -> I8x16\n # {\n let mut arr = [0; 16];\n for (lane_dst, (lane_src, order)) in\n     arr.chunks_exact_mut(16).zip(\n         self.as_array().chunks_exact(16)\n         .zip(order.as_array().chunks_exact(16))\n     )\n {\n     for (dst, idx) in lane_dst.iter_mut().zip(order) {\n         let idx = *idx;\n         *dst = if (idx >> 7) == 1 {\n             0\n         } else {\n             lane_src[(idx as usize) % 16]\n         };\n     }\n }\n arr.into()\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_shuffle_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_shuffle_epi8)\n\n\n * `PSHUFB xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    pub fn shuffle(&self, order: U8x16) -> I8x16 {
+        let mut arr = [0; 16];
+        for (lane_dst, (lane_src, order)) in arr.chunks_exact_mut(16).zip(
+            self.as_array()
+                .chunks_exact(16)
+                .zip(order.as_array().chunks_exact(16)),
+        ) {
+            for (dst, idx) in lane_dst.iter_mut().zip(order) {
+                let idx = *idx;
+                *dst = if (idx >> 7) == 1 {
+                    0
+                } else {
+                    lane_src[(idx as usize) % 16]
+                };
+            }
+        }
+        arr.into()
+    }
+}
 type I8x32Internal = [i8; 32];
 #[doc = "`[i8; 32]` as a vector."]
 #[repr(transparent)]
@@ -1207,6 +1249,26 @@ impl From<I8x32> for [I8x16; 2] {
         lo.copy_from_slice(&vector.as_array()[0..16]);
         hi.copy_from_slice(&vector.as_array()[16..]);
         [I8x16::from(lo), I8x16::from(hi)]
+    }
+}
+impl crate::SimdSaturatingArithmetic for I8x32 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x32  ,\n # )  -> I8x32\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_adds_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_adds_epi8)\n\n\n * `VPADDSB ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: I8x32) -> I8x32 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I8x32  ,\n # )  -> I8x32\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_subs_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_subs_epi8)\n\n\n * `VPSUBSB ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: I8x32) -> I8x32 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
     }
 } // Static shift
 impl ShlAssign<u64> for I8x32 {
@@ -1972,6 +2034,28 @@ impl crate::SimdBase8 for I8x32 {
         out
     }
 }
+impl I8x32 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x32  ,\n # )  -> I8x32\n # {\n let mut arr = [0; 32];\n for (lane_dst, (lane_src, order)) in\n     arr.chunks_exact_mut(16).zip(\n         self.as_array().chunks_exact(16)\n         .zip(order.as_array().chunks_exact(16))\n     )\n {\n     for (dst, idx) in lane_dst.iter_mut().zip(order) {\n         let idx = *idx;\n         *dst = if (idx >> 7) == 1 {\n             0\n         } else {\n             lane_src[(idx as usize) % 16]\n         };\n     }\n }\n arr.into()\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_shuffle_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_shuffle_epi8)\n\n\n * `VPSHUFB ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    pub fn shuffle(&self, order: U8x32) -> I8x32 {
+        let mut arr = [0; 32];
+        for (lane_dst, (lane_src, order)) in arr.chunks_exact_mut(16).zip(
+            self.as_array()
+                .chunks_exact(16)
+                .zip(order.as_array().chunks_exact(16)),
+        ) {
+            for (dst, idx) in lane_dst.iter_mut().zip(order) {
+                let idx = *idx;
+                *dst = if (idx >> 7) == 1 {
+                    0
+                } else {
+                    lane_src[(idx as usize) % 16]
+                };
+            }
+        }
+        arr.into()
+    }
+}
 type I16x8Internal = [i16; 8];
 #[doc = "`[i16; 8]` as a vector."]
 #[repr(transparent)]
@@ -2241,6 +2325,26 @@ impl crate::ExtendingCast<I8x16> for I16x8 {
             i16::from(vector.as_array()[6]),
             i16::from(vector.as_array()[7]),
         ])
+    }
+}
+impl crate::SimdSaturatingArithmetic for I16x8 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x8  ,\n # )  -> I16x8\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_adds_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_adds_epi16)\n\n\n * `PADDSW xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: I16x8) -> I16x8 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x8  ,\n # )  -> I16x8\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_subs_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_subs_epi16)\n\n\n * `PSUBSW xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: I16x8) -> I16x8 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
     }
 } // Static shift
 impl ShlAssign<u64> for I16x8 {
@@ -2560,6 +2664,42 @@ impl SimdBase for I16x8 {
             self.as_array()[5].min(other.as_array()[5]),
             self.as_array()[6].min(other.as_array()[6]),
             self.as_array()[7].min(other.as_array()[7]),
+        ])
+    }
+}
+impl crate::SimdBase16 for I16x8 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     // 128-bit Lane #0\n     self.as_array()[I0 + 0 * 8],\n     self.as_array()[I1 + 0 * 8],\n     self.as_array()[I2 + 0 * 8],\n     self.as_array()[I3 + 0 * 8],\n     self.as_array()[4 + 0 * 8],\n     self.as_array()[5 + 0 * 8],\n     self.as_array()[6 + 0 * 8],\n     self.as_array()[7 + 0 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_shufflelo_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_shufflelo_epi16)\n\n\n * `PSHUFLW xmm, xmm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_lo<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> I16x8 {
+        I16x8::from([
+            // 128-bit Lane #0
+            self.as_array()[I0 + 0 * 8],
+            self.as_array()[I1 + 0 * 8],
+            self.as_array()[I2 + 0 * 8],
+            self.as_array()[I3 + 0 * 8],
+            self.as_array()[4 + 0 * 8],
+            self.as_array()[5 + 0 * 8],
+            self.as_array()[6 + 0 * 8],
+            self.as_array()[7 + 0 * 8],
+        ])
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     // 128-bit Lane #0\n     self.as_array()[0 + 0 * 8],\n     self.as_array()[1 + 0 * 8],\n     self.as_array()[2 + 0 * 8],\n     self.as_array()[3 + 0 * 8],\n     self.as_array()[I0 + 4 + 0 * 8],\n     self.as_array()[I1 + 4 + 0 * 8],\n     self.as_array()[I2 + 4 + 0 * 8],\n     self.as_array()[I3 + 4 + 0 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_shufflehi_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_shufflehi_epi16)\n\n\n * `PSHUFHW xmm, xmm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_hi<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> I16x8 {
+        I16x8::from([
+            // 128-bit Lane #0
+            self.as_array()[0 + 0 * 8],
+            self.as_array()[1 + 0 * 8],
+            self.as_array()[2 + 0 * 8],
+            self.as_array()[3 + 0 * 8],
+            self.as_array()[I0 + 4 + 0 * 8],
+            self.as_array()[I1 + 4 + 0 * 8],
+            self.as_array()[I2 + 4 + 0 * 8],
+            self.as_array()[I3 + 4 + 0 * 8],
         ])
     }
 }
@@ -2962,6 +3102,26 @@ impl From<I16x16> for [I16x8; 2] {
         lo.copy_from_slice(&vector.as_array()[0..8]);
         hi.copy_from_slice(&vector.as_array()[8..]);
         [I16x8::from(lo), I16x8::from(hi)]
+    }
+}
+impl crate::SimdSaturatingArithmetic for I16x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x16  ,\n # )  -> I16x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_adds_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_adds_epi16)\n\n\n * `VPADDSW ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: I16x16) -> I16x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : I16x16  ,\n # )  -> I16x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_subs_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_subs_epi16)\n\n\n * `VPSUBSW ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: I16x16) -> I16x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
     }
 } // Static shift
 impl ShlAssign<u64> for I16x16 {
@@ -3417,6 +3577,58 @@ impl SimdBase for I16x16 {
             self.as_array()[13].min(other.as_array()[13]),
             self.as_array()[14].min(other.as_array()[14]),
             self.as_array()[15].min(other.as_array()[15]),
+        ])
+    }
+}
+impl crate::SimdBase16 for I16x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     // 128-bit Lane #0\n     self.as_array()[I0 + 0 * 8],\n     self.as_array()[I1 + 0 * 8],\n     self.as_array()[I2 + 0 * 8],\n     self.as_array()[I3 + 0 * 8],\n     self.as_array()[4 + 0 * 8],\n     self.as_array()[5 + 0 * 8],\n     self.as_array()[6 + 0 * 8],\n     self.as_array()[7 + 0 * 8],\n     // 128-bit Lane #1\n     self.as_array()[I0 + 1 * 8],\n     self.as_array()[I1 + 1 * 8],\n     self.as_array()[I2 + 1 * 8],\n     self.as_array()[I3 + 1 * 8],\n     self.as_array()[4 + 1 * 8],\n     self.as_array()[5 + 1 * 8],\n     self.as_array()[6 + 1 * 8],\n     self.as_array()[7 + 1 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_shufflelo_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_shufflelo_epi16)\n\n\n * `VPSHUFLW ymm, ymm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_lo<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> I16x16 {
+        I16x16::from([
+            // 128-bit Lane #0
+            self.as_array()[I0 + 0 * 8],
+            self.as_array()[I1 + 0 * 8],
+            self.as_array()[I2 + 0 * 8],
+            self.as_array()[I3 + 0 * 8],
+            self.as_array()[4 + 0 * 8],
+            self.as_array()[5 + 0 * 8],
+            self.as_array()[6 + 0 * 8],
+            self.as_array()[7 + 0 * 8], // 128-bit Lane #1
+            self.as_array()[I0 + 1 * 8],
+            self.as_array()[I1 + 1 * 8],
+            self.as_array()[I2 + 1 * 8],
+            self.as_array()[I3 + 1 * 8],
+            self.as_array()[4 + 1 * 8],
+            self.as_array()[5 + 1 * 8],
+            self.as_array()[6 + 1 * 8],
+            self.as_array()[7 + 1 * 8],
+        ])
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     // 128-bit Lane #0\n     self.as_array()[0 + 0 * 8],\n     self.as_array()[1 + 0 * 8],\n     self.as_array()[2 + 0 * 8],\n     self.as_array()[3 + 0 * 8],\n     self.as_array()[I0 + 4 + 0 * 8],\n     self.as_array()[I1 + 4 + 0 * 8],\n     self.as_array()[I2 + 4 + 0 * 8],\n     self.as_array()[I3 + 4 + 0 * 8],\n     // 128-bit Lane #1\n     self.as_array()[0 + 1 * 8],\n     self.as_array()[1 + 1 * 8],\n     self.as_array()[2 + 1 * 8],\n     self.as_array()[3 + 1 * 8],\n     self.as_array()[I0 + 4 + 1 * 8],\n     self.as_array()[I1 + 4 + 1 * 8],\n     self.as_array()[I2 + 4 + 1 * 8],\n     self.as_array()[I3 + 4 + 1 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_shufflehi_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_shufflehi_epi16)\n\n\n * `VPSHUFHW ymm, ymm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_hi<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> I16x16 {
+        I16x16::from([
+            // 128-bit Lane #0
+            self.as_array()[0 + 0 * 8],
+            self.as_array()[1 + 0 * 8],
+            self.as_array()[2 + 0 * 8],
+            self.as_array()[3 + 0 * 8],
+            self.as_array()[I0 + 4 + 0 * 8],
+            self.as_array()[I1 + 4 + 0 * 8],
+            self.as_array()[I2 + 4 + 0 * 8],
+            self.as_array()[I3 + 4 + 0 * 8], // 128-bit Lane #1
+            self.as_array()[0 + 1 * 8],
+            self.as_array()[1 + 1 * 8],
+            self.as_array()[2 + 1 * 8],
+            self.as_array()[3 + 1 * 8],
+            self.as_array()[I0 + 4 + 1 * 8],
+            self.as_array()[I1 + 4 + 1 * 8],
+            self.as_array()[I2 + 4 + 1 * 8],
+            self.as_array()[I3 + 4 + 1 * 8],
         ])
     }
 }
@@ -6383,6 +6595,26 @@ impl From<U64x2> for U8x16 {
             bytemuck::cast(x.0) // TODO: big endian.
         })
     }
+}
+impl crate::SimdSaturatingArithmetic for U8x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x16  ,\n # )  -> U8x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_adds_epu8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_adds_epu8)\n\n\n * `PADDUSB xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: U8x16) -> U8x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x16  ,\n # )  -> U8x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_subs_epu8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_subs_epu8)\n\n\n * `PSUBUSB xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: U8x16) -> U8x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
+    }
 } // Static shift
 impl ShlAssign<u64> for U8x16 {
     #[inline(always)]
@@ -6863,6 +7095,28 @@ impl crate::SimdBase8 for U8x16 {
         out
     }
 }
+impl U8x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x16  ,\n # )  -> U8x16\n # {\n let mut arr = [0; 16];\n for (lane_dst, (lane_src, order)) in\n     arr.chunks_exact_mut(16).zip(\n         self.as_array().chunks_exact(16)\n         .zip(order.as_array().chunks_exact(16))\n     )\n {\n     for (dst, idx) in lane_dst.iter_mut().zip(order) {\n         let idx = *idx;\n         *dst = if (idx >> 7) == 1 {\n             0\n         } else {\n             lane_src[(idx as usize) % 16]\n         };\n     }\n }\n arr.into()\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_shuffle_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_shuffle_epi8)\n\n\n * `PSHUFB xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    pub fn shuffle(&self, order: U8x16) -> U8x16 {
+        let mut arr = [0; 16];
+        for (lane_dst, (lane_src, order)) in arr.chunks_exact_mut(16).zip(
+            self.as_array()
+                .chunks_exact(16)
+                .zip(order.as_array().chunks_exact(16)),
+        ) {
+            for (dst, idx) in lane_dst.iter_mut().zip(order) {
+                let idx = *idx;
+                *dst = if (idx >> 7) == 1 {
+                    0
+                } else {
+                    lane_src[(idx as usize) % 16]
+                };
+            }
+        }
+        arr.into()
+    }
+}
 type U8x32Internal = [u8; 32];
 #[doc = "`[u8; 32]` as a vector."]
 #[repr(transparent)]
@@ -7266,6 +7520,26 @@ impl From<U8x32> for [U8x16; 2] {
         lo.copy_from_slice(&vector.as_array()[0..16]);
         hi.copy_from_slice(&vector.as_array()[16..]);
         [U8x16::from(lo), U8x16::from(hi)]
+    }
+}
+impl crate::SimdSaturatingArithmetic for U8x32 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x32  ,\n # )  -> U8x32\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_adds_epu8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_adds_epu8)\n\n\n * `VPADDUSB ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: U8x32) -> U8x32 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U8x32  ,\n # )  -> U8x32\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_subs_epu8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_subs_epu8)\n\n\n * `VPSUBUSB ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: U8x32) -> U8x32 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
     }
 } // Static shift
 impl ShlAssign<u64> for U8x32 {
@@ -8019,6 +8293,28 @@ impl crate::SimdBase8 for U8x32 {
         out
     }
 }
+impl U8x32 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         order  : U8x32  ,\n # )  -> U8x32\n # {\n let mut arr = [0; 32];\n for (lane_dst, (lane_src, order)) in\n     arr.chunks_exact_mut(16).zip(\n         self.as_array().chunks_exact(16)\n         .zip(order.as_array().chunks_exact(16))\n     )\n {\n     for (dst, idx) in lane_dst.iter_mut().zip(order) {\n         let idx = *idx;\n         *dst = if (idx >> 7) == 1 {\n             0\n         } else {\n             lane_src[(idx as usize) % 16]\n         };\n     }\n }\n arr.into()\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_shuffle_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_shuffle_epi8)\n\n\n * `VPSHUFB ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    pub fn shuffle(&self, order: U8x32) -> U8x32 {
+        let mut arr = [0; 32];
+        for (lane_dst, (lane_src, order)) in arr.chunks_exact_mut(16).zip(
+            self.as_array()
+                .chunks_exact(16)
+                .zip(order.as_array().chunks_exact(16)),
+        ) {
+            for (dst, idx) in lane_dst.iter_mut().zip(order) {
+                let idx = *idx;
+                *dst = if (idx >> 7) == 1 {
+                    0
+                } else {
+                    lane_src[(idx as usize) % 16]
+                };
+            }
+        }
+        arr.into()
+    }
+}
 type U16x8Internal = [u16; 8];
 #[doc = "`[u16; 8]` as a vector."]
 #[repr(transparent)]
@@ -8288,6 +8584,26 @@ impl crate::ExtendingCast<U8x16> for U16x8 {
             u16::from(vector.as_array()[6]),
             u16::from(vector.as_array()[7]),
         ])
+    }
+}
+impl crate::SimdSaturatingArithmetic for U16x8 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x8  ,\n # )  -> U16x8\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_adds_epu16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_adds_epu16)\n\n\n * `PADDUSW xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: U16x8) -> U16x8 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x8  ,\n # )  -> U16x8\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_subs_epu16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_subs_epu16)\n\n\n * `PSUBUSW xmm, xmm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: U16x8) -> U16x8 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
     }
 } // Static shift
 impl ShlAssign<u64> for U16x8 {
@@ -8595,6 +8911,42 @@ impl SimdBase for U16x8 {
             self.as_array()[5].min(other.as_array()[5]),
             self.as_array()[6].min(other.as_array()[6]),
             self.as_array()[7].min(other.as_array()[7]),
+        ])
+    }
+}
+impl crate::SimdBase16 for U16x8 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     // 128-bit Lane #0\n     self.as_array()[I0 + 0 * 8],\n     self.as_array()[I1 + 0 * 8],\n     self.as_array()[I2 + 0 * 8],\n     self.as_array()[I3 + 0 * 8],\n     self.as_array()[4 + 0 * 8],\n     self.as_array()[5 + 0 * 8],\n     self.as_array()[6 + 0 * 8],\n     self.as_array()[7 + 0 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_shufflelo_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_shufflelo_epi16)\n\n\n * `PSHUFLW xmm, xmm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_lo<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> U16x8 {
+        U16x8::from([
+            // 128-bit Lane #0
+            self.as_array()[I0 + 0 * 8],
+            self.as_array()[I1 + 0 * 8],
+            self.as_array()[I2 + 0 * 8],
+            self.as_array()[I3 + 0 * 8],
+            self.as_array()[4 + 0 * 8],
+            self.as_array()[5 + 0 * 8],
+            self.as_array()[6 + 0 * 8],
+            self.as_array()[7 + 0 * 8],
+        ])
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     // 128-bit Lane #0\n     self.as_array()[0 + 0 * 8],\n     self.as_array()[1 + 0 * 8],\n     self.as_array()[2 + 0 * 8],\n     self.as_array()[3 + 0 * 8],\n     self.as_array()[I0 + 4 + 0 * 8],\n     self.as_array()[I1 + 4 + 0 * 8],\n     self.as_array()[I2 + 4 + 0 * 8],\n     self.as_array()[I3 + 4 + 0 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_shufflehi_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_shufflehi_epi16)\n\n\n * `PSHUFHW xmm, xmm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_hi<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> U16x8 {
+        U16x8::from([
+            // 128-bit Lane #0
+            self.as_array()[0 + 0 * 8],
+            self.as_array()[1 + 0 * 8],
+            self.as_array()[2 + 0 * 8],
+            self.as_array()[3 + 0 * 8],
+            self.as_array()[I0 + 4 + 0 * 8],
+            self.as_array()[I1 + 4 + 0 * 8],
+            self.as_array()[I2 + 4 + 0 * 8],
+            self.as_array()[I3 + 4 + 0 * 8],
         ])
     }
 }
@@ -8997,6 +9349,26 @@ impl From<U16x16> for [U16x8; 2] {
         lo.copy_from_slice(&vector.as_array()[0..8]);
         hi.copy_from_slice(&vector.as_array()[8..]);
         [U16x8::from(lo), U16x8::from(hi)]
+    }
+}
+impl crate::SimdSaturatingArithmetic for U16x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x16  ,\n # )  -> U16x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_add(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_adds_epu16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_adds_epu16)\n\n\n * `VPADDUSW ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_add(&self, other: U16x16) -> U16x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_add(*src);
+        }
+        Self::from(out)
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         &self  ,\n #         other  : U16x16  ,\n # )  -> U16x16\n # {\n let mut out = self.as_array();\n for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {\n     *dst = dst.saturating_sub(*src);\n }\n Self::from(out)\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_subs_epu16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_subs_epu16)\n\n\n * `VPSUBUSW ymm, ymm, ymm`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn saturating_sub(&self, other: U16x16) -> U16x16 {
+        let mut out = self.as_array();
+        for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+            *dst = dst.saturating_sub(*src);
+        }
+        Self::from(out)
     }
 } // Static shift
 impl ShlAssign<u64> for U16x16 {
@@ -9440,6 +9812,58 @@ impl SimdBase for U16x16 {
             self.as_array()[13].min(other.as_array()[13]),
             self.as_array()[14].min(other.as_array()[14]),
             self.as_array()[15].min(other.as_array()[15]),
+        ])
+    }
+}
+impl crate::SimdBase16 for U16x16 {
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     // 128-bit Lane #0\n     self.as_array()[I0 + 0 * 8],\n     self.as_array()[I1 + 0 * 8],\n     self.as_array()[I2 + 0 * 8],\n     self.as_array()[I3 + 0 * 8],\n     self.as_array()[4 + 0 * 8],\n     self.as_array()[5 + 0 * 8],\n     self.as_array()[6 + 0 * 8],\n     self.as_array()[7 + 0 * 8],\n     // 128-bit Lane #1\n     self.as_array()[I0 + 1 * 8],\n     self.as_array()[I1 + 1 * 8],\n     self.as_array()[I2 + 1 * 8],\n     self.as_array()[I3 + 1 * 8],\n     self.as_array()[4 + 1 * 8],\n     self.as_array()[5 + 1 * 8],\n     self.as_array()[6 + 1 * 8],\n     self.as_array()[7 + 1 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_shufflelo_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_shufflelo_epi16)\n\n\n * `VPSHUFLW ymm, ymm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_lo<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> U16x16 {
+        U16x16::from([
+            // 128-bit Lane #0
+            self.as_array()[I0 + 0 * 8],
+            self.as_array()[I1 + 0 * 8],
+            self.as_array()[I2 + 0 * 8],
+            self.as_array()[I3 + 0 * 8],
+            self.as_array()[4 + 0 * 8],
+            self.as_array()[5 + 0 * 8],
+            self.as_array()[6 + 0 * 8],
+            self.as_array()[7 + 0 * 8], // 128-bit Lane #1
+            self.as_array()[I0 + 1 * 8],
+            self.as_array()[I1 + 1 * 8],
+            self.as_array()[I2 + 1 * 8],
+            self.as_array()[I3 + 1 * 8],
+            self.as_array()[4 + 1 * 8],
+            self.as_array()[5 + 1 * 8],
+            self.as_array()[6 + 1 * 8],
+            self.as_array()[7 + 1 * 8],
+        ])
+    }
+    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n #     <\n #             const I3: usize,\n #             const I2: usize,\n #             const I1: usize,\n #             const I0: usize,\n #     >\n # (\n #         &self  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     // 128-bit Lane #0\n     self.as_array()[0 + 0 * 8],\n     self.as_array()[1 + 0 * 8],\n     self.as_array()[2 + 0 * 8],\n     self.as_array()[3 + 0 * 8],\n     self.as_array()[I0 + 4 + 0 * 8],\n     self.as_array()[I1 + 4 + 0 * 8],\n     self.as_array()[I2 + 4 + 0 * 8],\n     self.as_array()[I3 + 4 + 0 * 8],\n     // 128-bit Lane #1\n     self.as_array()[0 + 1 * 8],\n     self.as_array()[1 + 1 * 8],\n     self.as_array()[2 + 1 * 8],\n     self.as_array()[3 + 1 * 8],\n     self.as_array()[I0 + 4 + 1 * 8],\n     self.as_array()[I1 + 4 + 1 * 8],\n     self.as_array()[I2 + 4 + 1 * 8],\n     self.as_array()[I3 + 4 + 1 * 8],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_shufflehi_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_shufflehi_epi16)\n\n\n * `VPSHUFHW ymm, ymm, imm8`\n </li>\n </ul>"]
+    #[inline(always)]
+    fn shuffle_hi<const I3: usize, const I2: usize, const I1: usize, const I0: usize>(
+        &self,
+    ) -> U16x16 {
+        U16x16::from([
+            // 128-bit Lane #0
+            self.as_array()[0 + 0 * 8],
+            self.as_array()[1 + 0 * 8],
+            self.as_array()[2 + 0 * 8],
+            self.as_array()[3 + 0 * 8],
+            self.as_array()[I0 + 4 + 0 * 8],
+            self.as_array()[I1 + 4 + 0 * 8],
+            self.as_array()[I2 + 4 + 0 * 8],
+            self.as_array()[I3 + 4 + 0 * 8], // 128-bit Lane #1
+            self.as_array()[0 + 1 * 8],
+            self.as_array()[1 + 1 * 8],
+            self.as_array()[2 + 1 * 8],
+            self.as_array()[3 + 1 * 8],
+            self.as_array()[I0 + 4 + 1 * 8],
+            self.as_array()[I1 + 4 + 1 * 8],
+            self.as_array()[I2 + 4 + 1 * 8],
+            self.as_array()[I3 + 4 + 1 * 8],
         ])
     }
 }

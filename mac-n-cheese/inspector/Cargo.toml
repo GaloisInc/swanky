@@ -1,0 +1,18 @@
+[package]
+name = "mac-n-cheese-inspector"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+mac-n-cheese-ir.workspace = true
+mac-n-cheese-event-log.workspace = true
+eyre.workspace = true
+color-eyre.workspace = true
+bytemuck.workspace = true
+serde = { workspace = true, features = ["derive"] }
+ciborium.workspace = true
+
