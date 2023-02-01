@@ -8,6 +8,8 @@ use std::{
     marker::PhantomData,
 };
 
+mod impls;
+
 /// Types that implement this trait have a canonical serialization and a fixed
 /// serialization size.
 pub trait CanonicalSerialize: Copy + Serialize + DeserializeOwned {
