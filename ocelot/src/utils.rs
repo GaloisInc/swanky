@@ -22,7 +22,7 @@ fn set_bit(dst: &mut [u8], i: usize, b: u8) {
 #[inline]
 #[cfg(not(target_arch = "x86_64"))]
 fn transpose_naive_inplace(dst: &mut [u8], src: &[u8], m: usize) {
-    assert!(src.len() % m == 0);
+    assert_eq!(src.len() % m, 0);
     let l = src.len() * 8;
     let n = l / m;
 
@@ -45,6 +45,19 @@ fn transpose_naive(input: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     output
 }
 
+pub fn transpose_pre_allocated(m: &[u8], dst: &mut [u8], nrows: usize, ncols: usize) {
+    assert_eq!(dst.len(), nrows * ncols / 8);
+    assert_eq!(m.len(), nrows * ncols / 8);
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        transpose_naive_inplace(dst, m, ncols);
+    }
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        _transpose(dst.as_mut_ptr(), m.as_ptr(), nrows as u64, ncols as u64);
+    }
+}
+
 #[inline]
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     #[cfg(not(target_arch = "x86_64"))]
@@ -52,7 +65,7 @@ pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
         return transpose_naive(m, nrows, ncols);
     }
     #[cfg(target_arch = "x86_64")]
-    {
+    unsafe {
         let mut m_ = vec![0u8; nrows * ncols / 8];
         _transpose(
             m_.as_mut_ptr() as *mut u8,
@@ -66,11 +79,11 @@ pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
 
 #[inline(always)]
 #[cfg(target_arch = "x86_64")]
-fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
+unsafe fn _transpose(out: *mut u8, inp: *const u8, nrows: u64, ncols: u64) {
     assert!(nrows >= 16);
     assert_eq!(nrows % 8, 0);
     assert_eq!(ncols % 8, 0);
-    unsafe { sse_trans(out, inp, nrows, ncols) }
+    sse_trans(out, inp, nrows, ncols)
 }
 
 #[link(name = "transpose")]
