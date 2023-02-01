@@ -3,7 +3,6 @@ use super::{
     spsvole::{SpsReceiver, SpsSender},
     utils::Powers,
 };
-use crate::svole::wykw::specialization::NoSpecialization;
 use crate::{
     errors::Error,
     svole::{SVoleReceiver, SVoleSender},
@@ -192,14 +191,17 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
 
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
-        rng: &mut RNG,
+        mut rng: &mut RNG,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
         let pows: Powers<FE> = Default::default();
-        let mut base_sender = BaseSender::<FE, NoSpecialization>::init(channel, pows.clone(), rng)?;
-        let base_voles_setup =
-            base_sender.send(channel, compute_num_saved::<FE>(lpn_setup), rng)?;
+        let mut base_sender = BaseSender::<FE>::init(channel, pows.clone(), rng)?;
+        let base_voles_setup = base_sender.send(
+            channel,
+            compute_num_saved::<FE>(lpn_setup),
+            &mut AesRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
+        )?;
         let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
