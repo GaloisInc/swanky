@@ -39,6 +39,7 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
                 FieldType::from_modulus(modulus)
                     .with_context(|| format!("Unknown modulus {modulus}"))?,
             ),
+            mac_n_cheese_sieve_parser::Type::PluginType(_) => todo!(),
         });
     }
     let mut v = Visitor {

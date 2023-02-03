@@ -3,8 +3,6 @@
 pub mod fb_reader;
 pub mod text_parser;
 
-// TODO: add plugin support
-
 use std::{io::Write, path::Path};
 
 use eyre::Context;
@@ -14,8 +12,31 @@ pub type Identifier<'a> = &'a [u8];
 pub type Number = crypto_bigint::U384;
 
 #[derive(Debug, Clone)]
+pub enum PluginTypeArgs {
+    Number(Number),
+    String(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginType {
+    name: String,
+    operation: String,
+    args: Vec<PluginTypeArgs>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginBinding {
+    plugin_type: PluginType,
+    private_counts: Vec<TypedCount>,
+    public_counts: Vec<TypedCount>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Type {
     Field { modulus: Number },
+    // Ignores private/public counts in this context, but they're needed
+    // for plugin function bodies
+    PluginType(PluginType),
 }
 
 pub type TypeId = u64;
@@ -51,6 +72,26 @@ impl std::fmt::Display for Header {
         for ty in self.types.iter() {
             match ty {
                 Type::Field { modulus } => writeln!(f, "@type field 0x{modulus:X};")?,
+                Type::PluginType(PluginType {
+                    name,
+                    operation,
+                    args,
+                }) => {
+                    write!(f, "@type @plugin({}, {}", name, operation)?;
+                    if !args.is_empty() {
+                        write!(f, ", ")?;
+                        for (i, arg) in args.iter().enumerate() {
+                            if i != 0 {
+                                write!(f, ", ")?;
+                            }
+                            match arg {
+                                PluginTypeArgs::Number(n) => write!(f, "0x{n:X}")?,
+                                PluginTypeArgs::String(s) => write!(f, "{}", s)?,
+                            }
+                        }
+                    }
+                    writeln!(f, ");")?;
+                }
             }
         }
         for cd in self.conversion.iter() {
