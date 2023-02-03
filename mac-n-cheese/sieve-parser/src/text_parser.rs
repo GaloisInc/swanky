@@ -297,6 +297,7 @@ impl<T: Read + Seek> RelationReader<T> {
         };
         let mut out = Self {
             header: Header {
+                plugins: Vec::new(),
                 types: Vec::new(),
                 conversion: Vec::new(),
             },
@@ -321,6 +322,13 @@ impl<T: Read + Seek> RelationReader<T> {
             self.ps.at()?;
             self.ps.token(&mut buf)?;
             match buf.as_slice() {
+                b"plugin" => {
+                    self.ps.token(&mut buf)?;
+                    self.ps.semi()?;
+                    self.header
+                        .plugins
+                        .push(String::from_utf8_lossy(&buf).to_string());
+                }
                 b"type" => {
                     // TODO: support plugins
                     self.ps.expect_token(&mut buf, b"field")?;

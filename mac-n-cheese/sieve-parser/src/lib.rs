@@ -35,7 +35,7 @@ pub struct ConversionDescription {
 
 #[derive(Debug, Clone)]
 pub struct Header {
-    // pub plugins: &'a [Identifier<'a>],
+    pub plugins: Vec<String>,
     pub types: Vec<Type>,
     pub conversion: Vec<ConversionDescription>,
 }
@@ -43,6 +43,11 @@ impl std::fmt::Display for Header {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "version 2.0.0;")?;
         writeln!(f, "circuit;")?;
+
+        for plugin in self.plugins.iter() {
+            writeln!(f, "@plugin {};", plugin)?;
+        }
+
         for ty in self.types.iter() {
             match ty {
                 Type::Field { modulus } => writeln!(f, "@type field 0x{modulus:X};")?,

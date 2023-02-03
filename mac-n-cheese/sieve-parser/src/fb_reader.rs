@@ -235,6 +235,7 @@ impl super::RelationReader for RelationReader {
             .next_relation()?
             .context("There needs to be at least one relation")?;
         let mut header = Header {
+            plugins: Vec::new(),
             types: Vec::new(),
             conversion: Vec::new(),
         };
@@ -243,6 +244,9 @@ impl super::RelationReader for RelationReader {
             "Unknown sieve ir version {:?}",
             relation.version()
         );
+        for plugin in relation.plugins().into_iter().flat_map(|x| x.iter()) {
+            header.plugins.push(String::from(plugin))
+        }
         for ty in relation.types().into_iter().flat_map(|x| x.iter()) {
             if let Some(field) = ty.element_as_field() {
                 header.types.push(Type::Field {
