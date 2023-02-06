@@ -7,8 +7,8 @@ use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, UInt, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
-    FunctionBodyVisitor, Header, Number, RelationVisitor, Type, TypeId, TypedCount, TypedWireRange,
-    ValueStreamKind, WireId, WireRange,
+    FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArgs, RelationVisitor, Type, TypeId,
+    TypedCount, TypedWireRange, ValueStreamKind, WireId, WireRange,
 };
 
 #[cold]
@@ -330,11 +330,53 @@ impl<T: Read + Seek> RelationReader<T> {
                         .push(String::from_utf8_lossy(&buf).to_string());
                 }
                 b"type" => {
-                    // TODO: support plugins
-                    self.ps.expect_token(&mut buf, b"field")?;
-                    let modulus = self.ps.bignum()?;
-                    self.ps.semi()?;
-                    self.header.types.push(Type::Field { modulus });
+                    match self.ps.peek()? {
+                        // Only plugin types use the '@' here
+                        Some(b'@') => {
+                            self.ps.at()?;
+                            self.ps.expect_token(&mut buf, b"plugin")?;
+                            self.ps.expect_byte(b'(')?;
+                            self.ps.token(&mut buf)?;
+                            let name = String::from_utf8_lossy(&buf).to_string();
+
+                            self.ps.expect_byte(b',')?;
+                            self.ps.token(&mut buf)?;
+                            let operation = String::from_utf8_lossy(&buf).to_string();
+
+                            let mut args = Vec::new();
+                            while self.ps.peek()? == Some(b',') {
+                                self.ps.expect_byte(b',')?;
+                                // Need to determine whether to try to parse a
+                                // number or a token - just peek for a digit
+                                match self.ps.peek()? {
+                                    Some(x) if matches!(x, b'0'..=b'9') => args.push(
+                                        PluginTypeArgs::Number(self.ps.parse_uint_generic()?),
+                                    ),
+                                    _ => {
+                                        self.ps.token(&mut buf)?;
+                                        args.push(PluginTypeArgs::String(
+                                            String::from_utf8_lossy(&buf).to_string(),
+                                        ))
+                                    }
+                                }
+                            }
+
+                            self.ps.expect_byte(b')')?;
+                            self.ps.semi()?;
+
+                            self.header.types.push(Type::PluginType(PluginType {
+                                name,
+                                operation,
+                                args,
+                            }))
+                        }
+                        _ => {
+                            self.ps.expect_token(&mut buf, b"field")?;
+                            let modulus = self.ps.bignum()?;
+                            self.ps.semi()?;
+                            self.header.types.push(Type::Field { modulus });
+                        }
+                    }
                 }
                 b"convert" => todo!("parse conversion"),
                 b"begin" => return Ok(()),
