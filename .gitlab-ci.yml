@@ -1,0 +1,3 @@
+normal-test:
+  script:
+    - true
