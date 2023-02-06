@@ -18,8 +18,7 @@ variables:
   SWANKY_CACHE_DIR: /var/lib/swanky-sccache/
 
 normal-test:
-  script:
-    - true
+  script: ["true", "true"]
 
 nightly-test:
   rules:
