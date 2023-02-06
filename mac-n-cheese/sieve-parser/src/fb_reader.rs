@@ -14,8 +14,8 @@ use generic_array::GenericArray;
 use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, RelationVisitor, Type, TypedCount,
-    ValueStreamKind, WireRange,
+    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArgs,
+    RelationVisitor, Type, TypedCount, ValueStreamKind, WireRange,
 };
 
 fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
@@ -260,7 +260,24 @@ impl super::RelationReader for RelationReader {
                     )?,
                 })
             } else if let Some(plugin) = ty.element_as_plugin_type() {
-                todo!("support plugins");
+                let mut args_buf = Vec::new();
+                args_buf.extend(
+                    plugin
+                        .params()
+                        .into_iter()
+                        .flat_map(|x| x.iter())
+                        .map(|x| PluginTypeArgs::from_str(x))
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
+                header.types.push(Type::PluginType(PluginType {
+                    name: String::from(plugin.name().context("plugin type needs plugin name")?),
+                    operation: String::from(
+                        plugin
+                            .operation()
+                            .context("plugin type needs plugin operation")?,
+                    ),
+                    args: args_buf,
+                }))
             } else {
                 eyre::bail!("unknown type {:?}", ty.element_type());
             }

@@ -5,7 +5,9 @@ pub mod text_parser;
 
 use std::{io::Write, path::Path};
 
-use eyre::Context;
+use crypto_bigint::{CheckedAdd, CheckedMul};
+
+use eyre::{Context, ContextCompat};
 
 pub type Identifier<'a> = &'a [u8];
 // This needs to be big enough to store all the moduli of all the fields we support
@@ -15,6 +17,29 @@ pub type Number = crypto_bigint::U384;
 pub enum PluginTypeArgs {
     Number(Number),
     String(String),
+}
+
+impl PluginTypeArgs {
+    pub fn from_str(s: &str) -> eyre::Result<Self> {
+        if s.starts_with("0x") || s.starts_with("0X") {
+            Ok(PluginTypeArgs::Number(Number::from_be_hex(&s[2..])))
+        } else if s.starts_with("0o") || s.starts_with("0O") {
+            todo!()
+        } else if s.chars().all(|c| c.is_numeric()) {
+            let mut out = Number::default();
+            for &byte in s.as_bytes() {
+                if byte.is_ascii_digit() {
+                    out = Option::<_>::from(out.checked_mul(&Number::from_u8(10)))
+                        .context("number too big")?;
+                    out = Option::<_>::from(out.checked_add(&Number::from_u8(byte - b'0')))
+                        .context("number too big")?;
+                }
+            }
+            Ok(PluginTypeArgs::Number(out))
+        } else {
+            Ok(PluginTypeArgs::String(String::from(s)))
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
