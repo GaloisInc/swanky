@@ -44,16 +44,16 @@ impl PluginTypeArgs {
 
 #[derive(Debug, Clone)]
 pub struct PluginType {
-    name: String,
-    operation: String,
-    args: Vec<PluginTypeArgs>,
+    pub name: String,
+    pub operation: String,
+    pub args: Vec<PluginTypeArgs>,
 }
 
 #[derive(Debug, Clone)]
 pub struct PluginBinding {
-    plugin_type: PluginType,
-    private_counts: Vec<TypedCount>,
-    public_counts: Vec<TypedCount>,
+    pub plugin_type: PluginType,
+    pub private_counts: Vec<TypedCount>,
+    pub public_counts: Vec<TypedCount>,
 }
 
 #[derive(Debug, Clone)]
