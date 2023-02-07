@@ -32,7 +32,7 @@ mod supported_fields;
 mod circuit_ir;
 mod plaintext_eval;
 mod simple_writer;
-mod writer;
+// mod writer;
 
 #[derive(Args)]
 pub struct SieveArgs {
