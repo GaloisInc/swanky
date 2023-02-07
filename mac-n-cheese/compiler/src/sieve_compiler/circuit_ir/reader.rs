@@ -78,7 +78,16 @@ pub(super) fn read_circuit<
     r
 }
 
-type FunctionDefinitions = FxHashMap<Vec<u8>, (UserDefinedFunctonId, Arc<FunctionDefinition>)>;
+enum FunctionDef {
+    UserDefined(UserDefinedFunctonId, Arc<FunctionDefinition>),
+    // TODO: Flesh out plugin argument needs
+    Mux,
+    RamInit,
+    RamRead,
+    RamWrite,
+}
+
+type FunctionDefinitions = FxHashMap<Vec<u8>, FunctionDef>;
 
 trait InstructionSink {
     fn types(&self) -> &[Type];
@@ -268,7 +277,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         args: &[ParserWireRange],
     ) -> eyre::Result<()> {
         let name_str = || String::from_utf8_lossy(name);
-        let (id, definition) = self
+        let def = self
             .sink
             .functions()
             .get(name)
@@ -300,22 +309,27 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
             }
             Ok(out)
         }
-        let out_ranges = make_ranges("output", &definition.output_sizes, dst)
-            .with_note(|| format!("When calling function {:?}", name_str()))?;
-        let in_ranges = make_ranges("input", &definition.input_sizes, args)
-            .with_note(|| format!("When calling function {:?}", name_str()))?;
-        let public_input_needs = definition.public_inputs_needed;
-        let size_hint = definition.size_hint;
-        self.sink.push(Instruction::FunctionCall {
-            function_id: FunctionId::UserDefined(*id),
-            out_ranges,
-            in_ranges,
-        })?;
-        for field in FieldType::ALL {
-            self.sink
-                .needs_public_input(*field, public_input_needs[*field])?;
+        match def {
+            FunctionDef::UserDefined(id, definition) => {
+                let out_ranges = make_ranges("output", &definition.output_sizes, dst)
+                    .with_note(|| format!("When calling function {:?}", name_str()))?;
+                let in_ranges = make_ranges("input", &definition.input_sizes, args)
+                    .with_note(|| format!("When calling function {:?}", name_str()))?;
+                let public_input_needs = definition.public_inputs_needed;
+                let size_hint = definition.size_hint;
+                self.sink.push(Instruction::FunctionCall {
+                    function_id: FunctionId::UserDefined(*id),
+                    out_ranges,
+                    in_ranges,
+                })?;
+                for field in FieldType::ALL {
+                    self.sink
+                        .needs_public_input(*field, public_input_needs[*field])?;
+                }
+                self.sink.update_size_hint(size_hint + 1)?;
+            }
+            _ => todo!(),
         }
-        self.sink.update_size_hint(size_hint + 1)?;
         Ok(())
     }
 }
@@ -462,7 +476,7 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         let id = self.functions.len();
         let old = self
             .functions
-            .insert(defn.name.as_bytes().to_vec(), (id, defn.clone()));
+            .insert(defn.name.as_bytes().to_vec(), FunctionDef::UserDefined(id, defn.clone()));
         eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
         self.current_chunk.new_functions.push((id, defn));
         Ok(())
