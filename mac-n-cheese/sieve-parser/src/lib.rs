@@ -14,15 +14,15 @@ pub type Identifier<'a> = &'a [u8];
 pub type Number = crypto_bigint::U384;
 
 #[derive(Debug, Clone)]
-pub enum PluginTypeArgs {
+pub enum PluginTypeArg {
     Number(Number),
     String(String),
 }
 
-impl PluginTypeArgs {
+impl PluginTypeArg {
     pub fn from_str(s: &str) -> eyre::Result<Self> {
         if s.starts_with("0x") || s.starts_with("0X") {
-            Ok(PluginTypeArgs::Number(Number::from_be_hex(&s[2..])))
+            Ok(PluginTypeArg::Number(Number::from_be_hex(&s[2..])))
         } else if s.starts_with("0o") || s.starts_with("0O") {
             todo!()
         } else if s.chars().all(|c| c.is_numeric()) {
@@ -35,9 +35,9 @@ impl PluginTypeArgs {
                         .context("number too big")?;
                 }
             }
-            Ok(PluginTypeArgs::Number(out))
+            Ok(PluginTypeArg::Number(out))
         } else {
-            Ok(PluginTypeArgs::String(String::from(s)))
+            Ok(PluginTypeArg::String(String::from(s)))
         }
     }
 }
@@ -46,7 +46,7 @@ impl PluginTypeArgs {
 pub struct PluginType {
     pub name: String,
     pub operation: String,
-    pub args: Vec<PluginTypeArgs>,
+    pub args: Vec<PluginTypeArg>,
 }
 
 #[derive(Debug, Clone)]
@@ -110,8 +110,8 @@ impl std::fmt::Display for Header {
                                 write!(f, ", ")?;
                             }
                             match arg {
-                                PluginTypeArgs::Number(n) => write!(f, "0x{n:X}")?,
-                                PluginTypeArgs::String(s) => write!(f, "{}", s)?,
+                                PluginTypeArg::Number(n) => write!(f, "0x{n:X}")?,
+                                PluginTypeArg::String(s) => write!(f, "{}", s)?,
                             }
                         }
                     }

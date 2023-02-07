@@ -7,7 +7,7 @@ use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, UInt, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
-    FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArgs, RelationVisitor, Type, TypeId,
+    FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArg, RelationVisitor, Type, TypeId,
     TypedCount, TypedWireRange, ValueStreamKind, WireId, WireRange,
 };
 
@@ -350,11 +350,11 @@ impl<T: Read + Seek> RelationReader<T> {
                                 // number or a token - just peek for a digit
                                 match self.ps.peek()? {
                                     Some(x) if matches!(x, b'0'..=b'9') => args.push(
-                                        PluginTypeArgs::Number(self.ps.parse_uint_generic()?),
+                                        PluginTypeArg::Number(self.ps.parse_uint_generic()?),
                                     ),
                                     _ => {
                                         self.ps.token(&mut buf)?;
-                                        args.push(PluginTypeArgs::String(
+                                        args.push(PluginTypeArg::String(
                                             String::from_utf8_lossy(&buf).to_string(),
                                         ))
                                     }

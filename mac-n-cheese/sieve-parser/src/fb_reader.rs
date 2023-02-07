@@ -14,7 +14,7 @@ use generic_array::GenericArray;
 use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArgs,
+    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArg,
     RelationVisitor, Type, TypedCount, ValueStreamKind, WireRange,
 };
 
@@ -266,7 +266,7 @@ impl super::RelationReader for RelationReader {
                         .params()
                         .into_iter()
                         .flat_map(|x| x.iter())
-                        .map(|x| PluginTypeArgs::from_str(x))
+                        .map(|x| PluginTypeArg::from_str(x))
                         .collect::<Result<Vec<_>, _>>()?,
                 );
                 header.types.push(Type::PluginType(PluginType {
