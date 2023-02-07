@@ -184,6 +184,13 @@ pub trait RelationVisitor: FunctionBodyVisitor {
     ) -> eyre::Result<()>
     where
         for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>;
+    fn define_plugin_function(
+        &mut self,
+        name: Identifier,
+        outputs: &[TypedCount],
+        inputs: &[TypedCount],
+        body: PluginBinding,
+    ) -> eyre::Result<()>;
 }
 
 pub struct PrintingVisitor<T: Write>(pub T);
@@ -334,6 +341,72 @@ impl<T: Write> RelationVisitor for PrintingVisitor<T> {
         writeln!(self.0, ")")?;
         body(self)?;
         writeln!(self.0, "@end")?;
+        Ok(())
+    }
+
+    // TODO: Worth addressing the duplicate logic in here?
+    fn define_plugin_function(
+        &mut self,
+        name: Identifier,
+        outputs: &[TypedCount],
+        inputs: &[TypedCount],
+        body: PluginBinding,
+    ) -> eyre::Result<()> {
+        write!(
+            self.0,
+            "@function({}",
+            std::str::from_utf8(name).context("function name isn't utf-8")?
+        )?;
+        for (name, arr) in [("out", outputs), ("in", inputs)] {
+            if !arr.is_empty() {
+                write!(self.0, ", @{name}:")?;
+                for (i, entry) in arr.iter().enumerate() {
+                    if i != 0 {
+                        write!(self.0, ",")?;
+                    }
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)?;
+                }
+            }
+        }
+        writeln!(self.0, ")")?;
+
+        let PluginBinding {
+            plugin_type:
+                PluginType {
+                    name,
+                    operation,
+                    args,
+                },
+            private_counts,
+            public_counts,
+        } = body;
+
+        write!(self.0, "  @plugin({}, {}", name, operation)?;
+        if !args.is_empty() {
+            write!(self.0, ", ")?;
+            for (i, arg) in args.iter().enumerate() {
+                if i != 0 {
+                    write!(self.0, ",")?;
+                }
+                match arg {
+                    PluginTypeArg::Number(n) => write!(self.0, "0x{n:x}")?,
+                    PluginTypeArg::String(s) => write!(self.0, "{s}")?,
+                }
+            }
+        }
+        for (name, arr) in [("private", private_counts), ("public", public_counts)] {
+            if !arr.is_empty() {
+                write!(self.0, ", @{name}:")?;
+                for (i, entry) in arr.iter().enumerate() {
+                    if i != 0 {
+                        write!(self.0, ",")?;
+                    }
+                    write!(self.0, "0x{:x}:0x{:x}", entry.ty, entry.count)?;
+                }
+            }
+        }
+        writeln!(self.0, ")")?;
+
         Ok(())
     }
 }

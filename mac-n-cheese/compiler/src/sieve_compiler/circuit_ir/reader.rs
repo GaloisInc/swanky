@@ -81,7 +81,7 @@ pub(super) fn read_circuit<
 enum FunctionDef {
     UserDefined(UserDefinedFunctonId, Arc<FunctionDefinition>),
     // TODO: Flesh out plugin argument needs
-    Mux,
+    Mux { permissiveness: String },
     RamInit,
     RamRead,
     RamWrite,
@@ -374,6 +374,16 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
             size_hint: sink.size_hint,
         })?;
         Ok(())
+    }
+
+    fn define_plugin_function(
+            &mut self,
+            name: Identifier,
+            outputs: &[mac_n_cheese_sieve_parser::TypedCount],
+            inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+            body: mac_n_cheese_sieve_parser::PluginBinding,
+        ) -> eyre::Result<()> {
+        todo!()
     }
 }
 struct FunctionBuildingSink<'a> {

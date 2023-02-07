@@ -14,8 +14,8 @@ use generic_array::GenericArray;
 use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArg,
-    RelationVisitor, Type, TypedCount, ValueStreamKind, WireRange,
+    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
+    PluginTypeArg, RelationVisitor, Type, TypedCount, ValueStreamKind, WireRange,
 };
 
 fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
@@ -351,7 +351,63 @@ impl super::RelationReader for RelationReader {
                             },
                         )?;
                     } else if let Some(plugin) = function.body_as_plugin_body() {
-                        todo!("support plugins");
+                        let mut args_buf = Vec::new();
+                        let mut private_buf = Vec::new();
+                        let mut public_buf = Vec::new();
+
+                        args_buf.extend(
+                            plugin
+                                .params()
+                                .into_iter()
+                                .flat_map(|x| x.iter())
+                                .map(|x| PluginTypeArg::from_str(x))
+                                .collect::<Result<Vec<_>, _>>()?,
+                        );
+
+                        private_buf.extend(
+                            plugin
+                                .private_count()
+                                .into_iter()
+                                .flat_map(|x| x.iter())
+                                .map(|count| TypedCount {
+                                    ty: count.type_id().into(),
+                                    count: count.count(),
+                                }),
+                        );
+
+                        public_buf.extend(
+                            plugin
+                                .public_count()
+                                .into_iter()
+                                .flat_map(|x| x.iter())
+                                .map(|count| TypedCount {
+                                    ty: count.type_id().into(),
+                                    count: count.count(),
+                                }),
+                        );
+
+                        rv.define_plugin_function(
+                            function.name().context("functions need names")?.as_bytes(),
+                            &output_buf,
+                            &input_buf,
+                            PluginBinding {
+                                plugin_type: PluginType {
+                                    name: String::from(
+                                        plugin
+                                            .name()
+                                            .context("plugin binding needs plugin name")?,
+                                    ),
+                                    operation: String::from(
+                                        plugin
+                                            .operation()
+                                            .context("plugin binding needs plugin operation")?,
+                                    ),
+                                    args: args_buf,
+                                },
+                                private_counts: private_buf,
+                                public_counts: public_buf,
+                            },
+                        )?;
                     } else {
                         eyre::bail!("unknown function body type {:?}", function.body_type());
                     }
