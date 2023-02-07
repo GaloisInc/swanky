@@ -349,9 +349,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                 // Need to determine whether to try to parse a
                                 // number or a token - just peek for a digit
                                 match self.ps.peek()? {
-                                    Some(x) if matches!(x, b'0'..=b'9') => args.push(
-                                        PluginTypeArg::Number(self.ps.parse_uint_generic()?),
-                                    ),
+                                    Some(x) if matches!(x, b'0'..=b'9') => args
+                                        .push(PluginTypeArg::Number(self.ps.parse_uint_generic()?)),
                                     _ => {
                                         self.ps.token(&mut buf)?;
                                         args.push(PluginTypeArg::String(
