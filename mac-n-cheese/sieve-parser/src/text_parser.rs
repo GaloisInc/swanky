@@ -7,8 +7,8 @@ use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, UInt, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
-    FunctionBodyVisitor, Header, Number, PluginType, PluginTypeArg, RelationVisitor, Type, TypeId,
-    TypedCount, TypedWireRange, ValueStreamKind, WireId, WireRange,
+    FunctionBodyVisitor, Header, Number, PluginBinding, PluginType, PluginTypeArg, RelationVisitor,
+    Type, TypeId, TypedCount, TypedWireRange, ValueStreamKind, WireId, WireRange,
 };
 
 #[cold]
@@ -196,6 +196,12 @@ impl<T: Read + Seek> ParseState<T> {
         self.ws()?;
         Ok(self.inner.fill_buf()?.first().copied())
     }
+
+    // Doesn't consume whitespace
+    fn peek_n_bytes(&mut self, n: usize) -> eyre::Result<&[u8]> {
+        Ok(&self.inner.fill_buf()?[..n])
+    }
+
     fn consume_byte(&mut self) -> eyre::Result<u8> {
         let mut buf = [0];
         self.inner.read_exact(&mut buf)?;
@@ -693,9 +699,92 @@ impl<T: Read + Seek> RelationReader<T> {
             let count = self.ps.u64()?;
             dst.push(TypedCount { ty, count });
         }
-        rv.define_function(&name, &outputs, &inputs, |fbv| {
-            self.read_directives(fbv, |_, _| eyre::bail!("Nested functions aren't allowed"))
-        })?;
+
+        // Need to check for "@plugin"
+        if self.ps.peek_n_bytes("@plugin".len())? == b"@plugin" {
+            let mut buf = Vec::new();
+            self.ps.at()?;
+            self.ps.expect_token(&mut buf, b"plugin")?;
+            self.ps.expect_byte(b'(')?;
+            self.ps.token(&mut buf)?;
+            let plugin_name = String::from_utf8_lossy(&buf).to_string();
+
+            self.ps.expect_byte(b',')?;
+            self.ps.token(&mut buf)?;
+            let operation = String::from_utf8_lossy(&buf).to_string();
+
+            let mut args = Vec::new();
+            while self.ps.peek()? == Some(b',') {
+                self.ps.expect_byte(b',')?;
+                match self.ps.peek()? {
+                    Some(x) if matches!(x, b'0'..=b'9') => {
+                        args.push(PluginTypeArg::Number(self.ps.parse_uint_generic()?))
+                    }
+                    _ => {
+                        self.ps.token(&mut buf)?;
+                        args.push(PluginTypeArg::String(
+                            String::from_utf8_lossy(&buf).to_string(),
+                        ))
+                    }
+                }
+            }
+
+            let mut private_counts = Vec::new();
+            let mut public_counts = Vec::new();
+            let mut dst = &mut private_counts;
+            loop {
+                match self.ps.consume_byte()? {
+                    b',' => {}
+                    b')' => break,
+                    ch => eyre::bail!("Expected ',' or ')'. Got {:?}", ascii_str(&[ch])),
+                }
+
+                if self.ps.peek()? == Some(b'@') {
+                    self.ps.consume_byte()?;
+                    self.ps.ws()?;
+                    match self.ps.consume_byte()? {
+                        b'p' => match self.ps.consume_byte()? {
+                            b'r' => {
+                                self.ps.expect_token(&mut buf, b"ivate")?;
+                                dst = &mut private_counts;
+                            }
+                            b'u' => {
+                                self.ps.expect_token(&mut buf, b"blic")?;
+                                dst = &mut public_counts;
+                            }
+                            ch => eyre::bail!("Expected 'r' or 'u'. Got {:?}", ascii_str(&[ch])),
+                        },
+                        ch => eyre::bail!("Expected 'p'. Got {:?}", ascii_str(&[ch])),
+                    }
+                    self.ps.colon()?;
+                }
+
+                let ty = self.ps.u64()?;
+                self.ps.colon()?;
+                let count = self.ps.u64()?;
+                dst.push(TypedCount { ty, count });
+            }
+
+            rv.define_plugin_function(
+                &name,
+                &outputs,
+                &inputs,
+                PluginBinding {
+                    plugin_type: PluginType {
+                        name: plugin_name,
+                        operation,
+                        args,
+                    },
+                    private_counts,
+                    public_counts,
+                },
+            )?;
+        } else {
+            rv.define_function(&name, &outputs, &inputs, |fbv| {
+                self.read_directives(fbv, |_, _| eyre::bail!("Nested functions aren't allowed"))
+            })?;
+        }
+
         Ok(())
     }
     fn read_inner(&mut self, rv: &mut impl RelationVisitor) -> eyre::Result<()> {
