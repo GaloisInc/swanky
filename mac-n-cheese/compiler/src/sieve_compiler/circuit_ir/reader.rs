@@ -34,13 +34,23 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
     let public_inputs = Inputs::<VSR>::open(ValueStreamKind::Public, &public_inputs)?;
     let mut types: Vec<Type> = Vec::new();
     for ty in relation.header().types.iter() {
-        types.push(match ty {
-            mac_n_cheese_sieve_parser::Type::Field { modulus } => Type::Field(
+        match ty {
+            mac_n_cheese_sieve_parser::Type::Field { modulus } => types.push(Type::Field(
                 FieldType::from_modulus(modulus)
                     .with_context(|| format!("Unknown modulus {modulus}"))?,
-            ),
-            mac_n_cheese_sieve_parser::Type::PluginType(_) => todo!(),
-        });
+            )),
+            mac_n_cheese_sieve_parser::Type::PluginType(PluginType {
+                name,
+                operation,
+                args,
+            }) => match name.as_bytes() {
+                variant @ (b"ram_v0" | b"ram_arith_v0") => match operation.as_bytes() {
+                    b"ram" => todo!("Check args based on variant, put the type somewhere useful"),
+                    _ => eyre::bail!("Plugin {name} has no {operation} type"),
+                },
+                _ => eyre::bail!("Plugin {name} doesn't provide any types"),
+            },
+        }
     }
     let mut v = Visitor {
         sink: GlobalSink {
