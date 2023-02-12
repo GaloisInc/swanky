@@ -147,6 +147,14 @@ pub enum Instruction {
 #[derive(Clone, Copy, Debug)]
 pub enum Type {
     Field(FieldType),
+    Ram {
+        field: FieldType,
+        addr_count: usize,
+        value_count: usize,
+        num_allocs: usize,
+        total_alloc_size: usize,
+        max_live_alloc_size: usize,
+    },
 }
 
 pub type PublicInputsNeeded = FieldIndexedArray<u64>;
@@ -170,15 +178,21 @@ pub struct FunctionDefinition {
 impl FunctionDefinition {
     pub fn num_inputs(&self) -> FieldIndexedArray<u64> {
         let mut out = FieldIndexedArray::<u64>::default();
-        for (Type::Field(f), count) in self.input_sizes.iter() {
-            out[*f] += *count;
+        for (ty, count) in self.input_sizes.iter() {
+            if let Type::Field(f) = ty {
+                out[*f] += *count;
+            }
+            // TODO: What, if anything, should this do for RAM?
         }
         out
     }
     pub fn num_outputs(&self) -> FieldIndexedArray<u64> {
         let mut out = FieldIndexedArray::<u64>::default();
-        for (Type::Field(f), count) in self.output_sizes.iter() {
-            out[*f] += *count;
+        for (ty, count) in self.output_sizes.iter() {
+            if let Type::Field(f) = ty {
+                out[*f] += *count;
+            }
+            // TODO: What, if anything, should this do for RAM?
         }
         out
     }

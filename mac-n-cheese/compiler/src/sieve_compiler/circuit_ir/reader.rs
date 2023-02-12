@@ -169,6 +169,7 @@ impl<S: InstructionSink> Visitor<S> {
                 }
                 field.visit(V(&mut self.sink, v))?;
             }
+            Type::Ram { .. } => todo!(),
         }
         Ok(())
     }
@@ -256,6 +257,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
     fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
         match self.lookup_type(ty)? {
             Type::Field(field) => self.sink.needs_public_input(field, 1)?,
+            Type::Ram { .. } => eyre::bail!("No public inputs for RAM types"),
         }
         push_field_insn!(ty, |<FE> self, dst: WireId| {
             Ok(FieldInstruction::GetPublicInput { dst })
@@ -315,6 +317,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                         start: range.start,
                         inclusive_end: range.end,
                     }),
+                    Type::Ram { .. } => todo!(),
                 }
             }
             Ok(out)
@@ -494,9 +497,10 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
     fn add_function(&mut self, defn: FunctionDefinition) -> eyre::Result<()> {
         let defn = Arc::new(defn);
         let id = self.functions.len();
-        let old = self
-            .functions
-            .insert(defn.name.as_bytes().to_vec(), FunctionDef::UserDefined(id, defn.clone()));
+        let old = self.functions.insert(
+            defn.name.as_bytes().to_vec(),
+            FunctionDef::UserDefined(id, defn.clone()),
+        );
         eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
         self.current_chunk.new_functions.push((id, defn));
         Ok(())
