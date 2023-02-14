@@ -116,7 +116,9 @@ fn eval<VSR: ValueStreamReader>(
                 out_ranges,
                 in_ranges,
             } => {
-                let function = &functions[*function_id];
+                let UserDefinedFunction::FunctionDefinition(function) = &functions[*function_id] else {
+                    eyre::bail!("BUG: Call for 'normal' user-defined function generated for a plugin function")
+                };
                 let mut child_wire_maps = {
                     struct V<'a> {
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
@@ -167,17 +169,16 @@ fn eval<VSR: ValueStreamReader>(
                         out_ranges,
                     })?
                 };
-                if let UserDefinedFunction::FunctionDefinition(function) = function {
-                    eval(
-                        &mut child_wire_maps,
-                        witnesses,
-                        &function.body,
-                        public_inputs,
-                        functions,
-                        muls_per_field,
-                    )?;
-                }
+                eval(
+                    &mut child_wire_maps,
+                    witnesses,
+                    &function.body,
+                    public_inputs,
+                    functions,
+                    muls_per_field,
+                )?;
             }
+        }
     }
     Ok(())
 }
