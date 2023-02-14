@@ -216,6 +216,7 @@ pub enum Permissiveness {
 pub struct MuxDefinition {
     name: String,
     permissiveness: Permissiveness,
+    // must be a field type
     field_type: Type,
     // cond_count == 1 if field_type is not F2
     cond_count: u64,
