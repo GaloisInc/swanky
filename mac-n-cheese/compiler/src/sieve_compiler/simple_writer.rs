@@ -24,6 +24,7 @@ use scuttlebutt::field::F2;
 use super::{
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
+        UserDefinedFunction,
     },
     put,
     supported_fields::{FieldType, InvariantType},
@@ -494,7 +495,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
     witnesses: &mut ProverPrivate<P, Inputs<VSR>>,
     instructions: &[Instruction],
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
-    functions: &[Arc<FunctionDefinition>],
+    functions: &[UserDefinedFunction],
 ) -> eyre::Result<()> {
     for instruction in instructions {
         match instruction {
@@ -571,18 +572,21 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         phantom: PhantomData,
                     })?
                 };
-                eval(
-                    cb,
-                    vs,
-                    pb,
-                    &mut child_wire_maps,
-                    cm,
-                    witnesses,
-                    &function.body,
-                    public_inputs,
-                    functions,
-                )?;
-            }
+                if let UserDefinedFunction::FunctionDefinition(function) = function {
+                    eval(
+                        cb,
+                        vs,
+                        pb,
+                        &mut child_wire_maps,
+                        cm,
+                        witnesses,
+                        &function.body,
+                        public_inputs,
+                        functions,
+                    )?;
+                } else {
+                    unreachable!("Plugin functions impossible here")
+                }
         }
     }
     Ok(())

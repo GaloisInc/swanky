@@ -15,6 +15,7 @@ use crate::sieve_compiler::{
 use super::{
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
+        UserDefinedFunction,
     },
     put,
     supported_fields::InvariantType,
@@ -97,7 +98,7 @@ fn eval<VSR: ValueStreamReader>(
     witnesses: &mut Inputs<VSR>,
     instructions: &[Instruction],
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
-    functions: &[Arc<FunctionDefinition>],
+    functions: &[UserDefinedFunction],
     muls_per_field: &mut FieldIndexedArray<u64>,
 ) -> eyre::Result<()> {
     for instruction in instructions {
@@ -166,16 +167,17 @@ fn eval<VSR: ValueStreamReader>(
                         out_ranges,
                     })?
                 };
-                eval(
-                    &mut child_wire_maps,
-                    witnesses,
-                    &function.body,
-                    public_inputs,
-                    functions,
-                    muls_per_field,
-                )?;
+                if let UserDefinedFunction::FunctionDefinition(function) = function {
+                    eval(
+                        &mut child_wire_maps,
+                        witnesses,
+                        &function.body,
+                        public_inputs,
+                        functions,
+                        muls_per_field,
+                    )?;
+                }
             }
-        }
     }
     Ok(())
 }

@@ -198,7 +198,25 @@ impl FunctionDefinition {
     }
 }
 
-pub type NewFunctions = Vec<(UserDefinedFunctonId, Arc<FunctionDefinition>)>;
+#[derive(Debug)]
+pub enum Permissiveness {
+    Permissive,
+    Strict,
+}
+
+#[derive(Debug)]
+pub struct MuxDefinition {
+    permissiveness: Permissiveness,
+    cond: (Type, u64),
+}
+
+#[derive(Debug)]
+pub enum UserDefinedFunction {
+    FunctionDefinition(Arc<FunctionDefinition>),
+    MuxDefinition(Arc<MuxDefinition>),
+}
+
+pub type NewFunctions = Vec<(UserDefinedFunctonId, UserDefinedFunction)>;
 
 #[derive(Default, Debug)]
 pub struct CircuitChunk {

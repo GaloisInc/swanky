@@ -6,8 +6,9 @@ use std::{
 use color_eyre::Help;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_sieve_parser::{
-    FunctionBodyVisitor, Identifier, Number, RelationReader, RelationVisitor, TypeId,
-    TypedWireRange, ValueStreamKind, ValueStreamReader, WireId, WireRange as ParserWireRange,
+    FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType, RelationReader,
+    RelationVisitor, TypeId, TypedWireRange, ValueStreamKind, ValueStreamReader, WireId,
+    WireRange as ParserWireRange,
 };
 use rustc_hash::FxHashMap;
 
@@ -21,8 +22,8 @@ use crate::sieve_compiler::{
 };
 
 use super::{
-    CircuitChunk, FieldInstructionsTy, FunctionDefinition, Instruction, PublicInputsNeeded,
-    SizeHint, UserDefinedFunctonId,
+    CircuitChunk, FieldInstructionsTy, FunctionDefinition, Instruction, MuxDefinition,
+    PublicInputsNeeded, SizeHint, UserDefinedFunction, UserDefinedFunctonId,
 };
 
 fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
@@ -88,16 +89,7 @@ pub(super) fn read_circuit<
     r
 }
 
-enum FunctionDef {
-    UserDefined(UserDefinedFunctonId, Arc<FunctionDefinition>),
-    // TODO: Flesh out plugin argument needs
-    Mux { permissiveness: String },
-    RamInit,
-    RamRead,
-    RamWrite,
-}
-
-type FunctionDefinitions = FxHashMap<Vec<u8>, FunctionDef>;
+type FunctionDefinitions = FxHashMap<Vec<u8>, (UserDefinedFunctonId, UserDefinedFunction)>;
 
 trait InstructionSink {
     fn types(&self) -> &[Type];
@@ -107,6 +99,7 @@ trait InstructionSink {
     fn needs_public_input(&mut self, field: FieldType, count: u64) -> eyre::Result<()>;
     fn functions(&self) -> &FunctionDefinitions;
     fn add_function(&mut self, defn: FunctionDefinition) -> eyre::Result<()>;
+    fn add_mux(&mut self, defn: MuxDefinition) -> eyre::Result<()>;
     fn update_size_hint(&mut self, delta: SizeHint) -> eyre::Result<()>;
 }
 
@@ -289,7 +282,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         args: &[ParserWireRange],
     ) -> eyre::Result<()> {
         let name_str = || String::from_utf8_lossy(name);
-        let def = self
+        let (id, def) = self
             .sink
             .functions()
             .get(name)
@@ -323,7 +316,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
             Ok(out)
         }
         match def {
-            FunctionDef::UserDefined(id, definition) => {
+            UserDefinedFunction::FunctionDefinition(definition) => {
                 let out_ranges = make_ranges("output", &definition.output_sizes, dst)
                     .with_note(|| format!("When calling function {:?}", name_str()))?;
                 let in_ranges = make_ranges("input", &definition.input_sizes, args)
@@ -429,6 +422,10 @@ impl InstructionSink for FunctionBuildingSink<'_> {
         eyre::bail!("Functions cannot be nested")
     }
 
+    fn add_mux(&mut self, _defn: MuxDefinition) -> eyre::Result<()> {
+        eyre::bail!("Functions cannot be nested")
+    }
+
     fn types(&self) -> &[Type] {
         self.types
     }
@@ -499,10 +496,22 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         let id = self.functions.len();
         let old = self.functions.insert(
             defn.name.as_bytes().to_vec(),
-            FunctionDef::UserDefined(id, defn.clone()),
+            (id, UserDefinedFunction::FunctionDefinition(defn.clone())),
         );
         eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
-        self.current_chunk.new_functions.push((id, defn));
+        self.current_chunk.new_functions.push((id, UserDefinedFunction::FunctionDefinition(defn)));
+        Ok(())
+    }
+
+    fn add_mux(&mut self, defn: MuxDefinition) -> eyre::Result<()> {
+        let defn = Arc::new(defn);
+        let id = self.functions.len();
+        let old = self.functions.insert(
+            defn.name.as_bytes().to_vec(),
+            (id, UserDefinedFunction::MuxDefinition(defn.clone())),
+        );
+        eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
+        self.current_chunk.new_functions.push((id, UserDefinedFunction::MuxDefinition(defn)));
         Ok(())
     }
 
