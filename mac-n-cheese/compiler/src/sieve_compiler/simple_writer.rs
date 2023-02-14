@@ -515,7 +515,9 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 out_ranges,
                 in_ranges,
             } => {
-                let function = &functions[*function_id];
+                let UserDefinedFunction::FunctionDefinition(function) = &functions[*function_id] else {
+                    eyre::bail!("BUG: Call for 'normal' user-defined function generated for a plugin function")
+                };
                 let mut child_wire_maps = {
                     struct V<'a, P: Party> {
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
@@ -572,21 +574,24 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         phantom: PhantomData,
                     })?
                 };
-                if let UserDefinedFunction::FunctionDefinition(function) = function {
-                    eval(
-                        cb,
-                        vs,
-                        pb,
-                        &mut child_wire_maps,
-                        cm,
-                        witnesses,
-                        &function.body,
-                        public_inputs,
-                        functions,
-                    )?;
-                } else {
-                    unreachable!("Plugin functions impossible here")
-                }
+                eval(
+                    cb,
+                    vs,
+                    pb,
+                    &mut child_wire_maps,
+                    cm,
+                    witnesses,
+                    &function.body,
+                    public_inputs,
+                    functions,
+                )?;
+            }
+            Instruction::MuxCall {
+                function_id,
+                field_type,
+                out_ranges,
+                in_ranges,
+            } => todo!(),
         }
     }
     Ok(())

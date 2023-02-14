@@ -178,6 +178,12 @@ fn eval<VSR: ValueStreamReader>(
                     muls_per_field,
                 )?;
             }
+            Instruction::MuxCall {
+                function_id,
+                field_type,
+                out_ranges,
+                in_ranges,
+            } => todo!(),
         }
     }
     Ok(())
