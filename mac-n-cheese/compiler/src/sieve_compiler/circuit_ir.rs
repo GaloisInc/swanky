@@ -206,8 +206,13 @@ pub enum Permissiveness {
 
 #[derive(Debug)]
 pub struct MuxDefinition {
+    name: String,
     permissiveness: Permissiveness,
-    cond: (Type, u64),
+    field_type: Type,
+    // cond_count == 1 if field_type is not F2
+    cond_count: u64,
+    num_branches: usize,
+    branch_sizes: Vec<(Type, u64)>,
 }
 
 #[derive(Debug)]

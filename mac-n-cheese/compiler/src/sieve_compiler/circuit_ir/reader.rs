@@ -23,7 +23,7 @@ use crate::sieve_compiler::{
 
 use super::{
     CircuitChunk, FieldInstructionsTy, FunctionDefinition, Instruction, MuxDefinition,
-    PublicInputsNeeded, SizeHint, UserDefinedFunction, UserDefinedFunctonId,
+    Permissiveness, PublicInputsNeeded, SizeHint, UserDefinedFunction, UserDefinedFunctonId,
 };
 
 fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
@@ -383,13 +383,113 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
     }
 
     fn define_plugin_function(
-            &mut self,
-            name: Identifier,
-            outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-            inputs: &[mac_n_cheese_sieve_parser::TypedCount],
-            body: mac_n_cheese_sieve_parser::PluginBinding,
-        ) -> eyre::Result<()> {
-        todo!()
+        &mut self,
+        name: Identifier,
+        outputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        body: mac_n_cheese_sieve_parser::PluginBinding,
+    ) -> eyre::Result<()> {
+        let PluginBinding {
+            plugin_type:
+                PluginType {
+                    name: plugin_name,
+                    operation,
+                    args,
+                },
+            // No currently supported plugin operations use input streams, but
+            // we do sanity-checks that they aren't provided
+            private_counts,
+            public_counts,
+        } = body;
+
+        let name = std::str::from_utf8(name)
+            .context("Function name isn't UTF-8")?
+            .to_string();
+
+        match plugin_name.as_bytes() {
+            b"mux_v0" => {
+                // TODO: Should these maybe be debug_assert instead? Not sure
+                // we should assume the plugin use is spec-compliant (or if the
+                // spec is even complete enough to rely on...)
+                eyre::ensure!(args.is_empty(), "mux plugin binding takes no arguments");
+
+                eyre::ensure!(
+                    private_counts.is_empty(),
+                    "mux does not read private inputs"
+                );
+                eyre::ensure!(public_counts.is_empty(), "mux does not read public inputs");
+
+                let permissiveness = match operation.as_bytes() {
+                    b"permissive" => Permissiveness::Permissive,
+                    b"strict" => Permissiveness::Strict,
+                    _ => eyre::bail!("Invalid permissiveness {operation}"),
+                };
+
+                let cond_tc = inputs
+                    .get(0)
+                    .context("mux requires an input wire range for the condition")?;
+
+                // let-else <3
+                let (field_type @ Type::Field(field), cond_count) = (self.lookup_type(cond_tc.ty)?, cond_tc.count) else {
+                    eyre::bail!("mux only operates over field types")
+                };
+
+                if field != FieldType::F2 {
+                    eyre::ensure!(
+                        cond_count == 1,
+                        "mux requires only one condition wire for non-boolean fields"
+                    )
+                }
+
+                let branch_inputs = &inputs[1..];
+                let num_ranges_per_branch = outputs.len();
+
+                eyre::ensure!(
+                    branch_inputs.len() % num_ranges_per_branch == 0,
+                    "The number of branch inputs must be a multiple of the number of output wire ranges"
+                );
+
+                // TODO: Need clarification if the same type can be defined multiple times; if so,
+                // this check is too strict.
+                eyre::ensure!(
+                    outputs
+                        .iter()
+                        .chain(branch_inputs)
+                        .all(|tc| tc.ty == cond_tc.ty),
+                    "mux requires all output/input wire types to match the condition"
+                );
+
+                for branch_tcs in inputs.chunks_exact(num_ranges_per_branch) {
+                    eyre::ensure!(
+                        outputs
+                            .iter()
+                            .zip(branch_tcs)
+                            .all(|(o, i)| o.count == i.count),
+                        "mux requires branch range counts to match output ranges"
+                    );
+                }
+
+                let num_branches = branch_inputs.len() / num_ranges_per_branch;
+                let branch_sizes = outputs
+                    .iter()
+                    .map(|tc| Ok((self.lookup_type(tc.ty)?, tc.count)))
+                    .collect::<eyre::Result<Vec<_>>>()?;
+
+                self.sink.add_mux(MuxDefinition {
+                    name,
+                    permissiveness,
+                    field_type,
+                    cond_count,
+                    num_branches,
+                    branch_sizes,
+                })?;
+            }
+            b"ram_v0" | b"ram_arith_v0" => todo!(),
+            b"iter_v0" => todo!(),
+            _ => eyre::bail!("Unknown plugin {plugin_name}"),
+        }
+
+        Ok(())
     }
 }
 struct FunctionBuildingSink<'a> {
@@ -499,7 +599,9 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
             (id, UserDefinedFunction::FunctionDefinition(defn.clone())),
         );
         eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
-        self.current_chunk.new_functions.push((id, UserDefinedFunction::FunctionDefinition(defn)));
+        self.current_chunk
+            .new_functions
+            .push((id, UserDefinedFunction::FunctionDefinition(defn)));
         Ok(())
     }
 
@@ -511,7 +613,9 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
             (id, UserDefinedFunction::MuxDefinition(defn.clone())),
         );
         eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
-        self.current_chunk.new_functions.push((id, UserDefinedFunction::MuxDefinition(defn)));
+        self.current_chunk
+            .new_functions
+            .push((id, UserDefinedFunction::MuxDefinition(defn)));
         Ok(())
     }
 
