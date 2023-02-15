@@ -5,7 +5,7 @@ use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamRead
 use mac_n_cheese_wire_map::WireMap;
 
 use crate::sieve_compiler::{
-    circuit_ir::{CircuitChunk, Instruction, WireRange, Permissiveness},
+    circuit_ir::{CircuitChunk, Instruction, Permissiveness, WireRange},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct,
         FieldGenericType, FieldIndexedArray,
