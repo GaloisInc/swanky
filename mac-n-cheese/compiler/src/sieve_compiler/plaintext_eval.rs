@@ -5,7 +5,7 @@ use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamRead
 use mac_n_cheese_wire_map::WireMap;
 
 use crate::sieve_compiler::{
-    circuit_ir::{CircuitChunk, Instruction, WireRange},
+    circuit_ir::{CircuitChunk, Instruction, WireRange, Permissiveness},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct,
         FieldGenericType, FieldIndexedArray,
@@ -18,7 +18,7 @@ use super::{
         UserDefinedFunction,
     },
     put,
-    supported_fields::InvariantType,
+    supported_fields::{FieldType, InvariantType},
     Inputs, SieveArgs,
 };
 
