@@ -179,7 +179,8 @@ fn eval<VSR: ValueStreamReader>(
                 )?;
             }
             Instruction::MuxCall {
-                function_id,
+                function_id: FunctionId::UserDefined(function_id),
+                permissiveness,
                 field_type,
                 out_ranges,
                 in_ranges,

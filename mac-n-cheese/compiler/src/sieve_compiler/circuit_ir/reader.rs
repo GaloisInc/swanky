@@ -379,6 +379,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
 
                 self.sink.push(Instruction::MuxCall {
                     function_id: FunctionId::UserDefined(*id),
+                    permissiveness: definition.permissiveness,
                     field_type: definition.field_type,
                     out_ranges,
                     in_ranges,

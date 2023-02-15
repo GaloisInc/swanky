@@ -144,7 +144,7 @@ pub enum Instruction {
     // TODO: It would be better if we could make this a FieldInstruction
     MuxCall {
         function_id: FunctionId,
-        // must be a field type
+        permissiveness: Permissiveness,
         field_type: FieldType,
         out_ranges: Vec<WireRange>,
         in_ranges: Vec<WireRange>,
@@ -206,7 +206,7 @@ impl FunctionDefinition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Permissiveness {
     Permissive,
     Strict,
