@@ -470,10 +470,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 }
 
                 let num_branches = branch_inputs.len() / num_ranges_per_branch;
-                let branch_sizes = outputs
-                    .iter()
-                    .map(|tc| Ok((self.lookup_type(tc.ty)?, tc.count)))
-                    .collect::<eyre::Result<Vec<_>>>()?;
+                let branch_sizes = outputs.iter().map(|tc| tc.count).collect::<Vec<_>>();
 
                 self.sink.add_mux(MuxDefinition {
                     name,

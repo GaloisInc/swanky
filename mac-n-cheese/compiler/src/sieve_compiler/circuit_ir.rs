@@ -221,7 +221,7 @@ pub struct MuxDefinition {
     // cond_count == 1 if field_type is not F2
     cond_count: u64,
     num_branches: usize,
-    branch_sizes: Vec<(Type, u64)>,
+    branch_sizes: Vec<u64>,
 }
 
 #[derive(Debug)]
