@@ -334,7 +334,62 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                 }
                 self.sink.update_size_hint(size_hint + 1)?;
             }
-            _ => todo!(),
+            UserDefinedFunction::MuxDefinition(definition) => {
+                // Unfortunately need a slightly different version of this function than the one above
+                fn make_ranges(
+                    label: &str,
+                    fn_sizes: &[u64],
+                    ranges: &[ParserWireRange],
+                ) -> eyre::Result<Vec<WireRange>> {
+                    eyre::ensure!(
+                        ranges.len() == fn_sizes.len(),
+                        "need {} {label} ranges, but only {} were given",
+                        fn_sizes.len(),
+                        ranges.len()
+                    );
+                    let mut out = Vec::new();
+                    for (i, (sz, range)) in fn_sizes.iter().zip(ranges.iter()).enumerate() {
+                        eyre::ensure!(
+                            *sz == range.len(),
+                            "{label} {i} expects size {sz} but got size {}",
+                            range.len()
+                        );
+
+                        out.push(WireRange {
+                            start: range.start,
+                            inclusive_end: range.end,
+                        });
+                    }
+                    Ok(out)
+                }
+
+                let out_ranges = make_ranges(
+                    "output",
+                    &definition.branch_sizes,
+                    dst,
+                )
+                .with_note(|| format!("When calling mux {:?}", name_str()))?;
+
+                let input_sizes = vec![definition.cond_count]
+                    .into_iter()
+                    .chain(
+                        std::iter::repeat(definition.branch_sizes.iter().copied())
+                            .take(definition.num_branches)
+                            .flatten(),
+                    )
+                    .collect::<Vec<_>>();
+                let in_ranges = make_ranges("input", &input_sizes, args)
+                    .with_note(|| format!("When calling mux {:?}", name_str()))?;
+
+                self.sink.push(Instruction::MuxCall {
+                    function_id: FunctionId::UserDefined(*id),
+                    field_type: definition.field_type,
+                    out_ranges,
+                    in_ranges,
+                })?;
+                // TODO: Not sure if this is the right delta
+                self.sink.update_size_hint(1)?;
+            }
         }
         Ok(())
     }
