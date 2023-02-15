@@ -388,7 +388,6 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                     out_ranges,
                     in_ranges,
                 })?;
-                // TODO: Not sure if this is the right delta
                 self.sink.update_size_hint(1)?;
             }
         }
@@ -464,9 +463,6 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
 
         match plugin_name.as_bytes() {
             b"mux_v0" => {
-                // TODO: Should these maybe be debug_assert instead? Not sure
-                // we should assume the plugin use is spec-compliant (or if the
-                // spec is even complete enough to rely on...)
                 eyre::ensure!(args.is_empty(), "mux plugin binding takes no arguments");
 
                 eyre::ensure!(
