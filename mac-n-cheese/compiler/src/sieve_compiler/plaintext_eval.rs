@@ -231,7 +231,7 @@ fn eval<VSR: ValueStreamReader>(
                             debug_assert!(branch_inputs.len() % num_ranges_per_branch == 0);
 
                             let num_branches = branch_inputs.len() / num_ranges_per_branch;
-                            if cond >= num_branches.try_into()? {
+                            if cond >= num_branches {
                                 match self.permissiveness {
                                     Permissiveness::Permissive => {
                                         for wr in self.out_ranges {
