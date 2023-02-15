@@ -184,7 +184,92 @@ fn eval<VSR: ValueStreamReader>(
                 field_type,
                 out_ranges,
                 in_ranges,
-            } => todo!(),
+            } => {
+                let UserDefinedFunction::MuxDefinition(mux) = &functions[*function_id] else {
+                    panic!("Call for mux function generated for another type of function")
+                };
+
+                struct V<'a> {
+                    field_type: &'a FieldType,
+                    permissiveness: &'a Permissiveness,
+                    in_ranges: &'a Vec<WireRange>,
+                    out_ranges: &'a Vec<WireRange>,
+                }
+                impl<'a, 'b, 'c> CompilerFieldVisitor<&'b mut WireMap<'c, FieldGenericIdentity>> for &'_ mut V<'a> {
+                    type Output = eyre::Result<()>;
+                    fn visit<FE: CompilerField>(
+                        self,
+                        wm: &'b mut WireMap<'c, FE>,
+                    ) -> eyre::Result<()> {
+                        if FE::FIELD_TYPE == *self.field_type {
+                            for range in self.out_ranges.iter() {
+                                wm.alloc_range_if_unallocated(range.start, range.inclusive_end)?;
+                            }
+
+                            // There should at least be a wire range for the condition
+                            debug_assert_ne!(self.in_ranges.len(), 0);
+
+                            // For F2, need to interpret condition wires as big-endian
+                            // bits. Otherwise, we just use the value on the single wire.
+                            let cond_wire_range = self.in_ranges[0];
+                            // TODO: Sus type for the condition value?
+                            // We would like this to be able to hold supported field elements,
+                            // but we also need to use it to compute which input wire ranges
+                            // to write to the output wires...
+                            let cond: usize = match FE::FIELD_TYPE {
+                                FieldType::F2 => {
+                                    todo!()
+                                }
+                                _ => {
+                                    debug_assert_eq!(cond_wire_range.len(), 1);
+                                    todo!()
+                                }
+                            };
+
+                            let branch_inputs = &self.in_ranges[1..];
+                            let num_ranges_per_branch = self.out_ranges.len();
+                            debug_assert!(branch_inputs.len() % num_ranges_per_branch == 0);
+
+                            let num_branches = branch_inputs.len() / num_ranges_per_branch;
+                            if cond >= num_branches.try_into()? {
+                                match self.permissiveness {
+                                    Permissiveness::Permissive => {
+                                        for wr in self.out_ranges {
+                                            for w in wr.start..=wr.inclusive_end {
+                                                put(wm, w, FE::ZERO)?;
+                                            }
+                                        }
+                                    }
+                                    Permissiveness::Strict => eyre::bail!("Strict mux failed: selector value {cond} >= number of branches {}", num_branches - 1)
+                                }
+                            } else {
+                                let in_ranges_to_output: &[WireRange] = branch_inputs
+                                    .chunks_exact(num_ranges_per_branch)
+                                    .collect::<Vec<_>>()[cond];
+                                for (in_wr, out_wr) in
+                                    in_ranges_to_output.iter().zip(self.out_ranges)
+                                {
+                                    debug_assert_eq!(in_wr.len(), out_wr.len());
+                                    for (in_w, out_w) in (in_wr.start..=in_wr.inclusive_end)
+                                        .zip(out_wr.start..=out_wr.inclusive_end)
+                                    {
+                                        let src = *wm.get(in_w)?;
+                                        put(wm, out_w, src)?;
+                                    }
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+                }
+
+                wm.as_mut().map_result(&mut V {
+                    field_type,
+                    permissiveness,
+                    in_ranges,
+                    out_ranges,
+                })?;
+            }
         }
     }
     Ok(())
