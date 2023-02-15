@@ -588,6 +588,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
             }
             Instruction::MuxCall {
                 function_id,
+                field_type,
                 out_ranges,
                 in_ranges,
             } => todo!(),
