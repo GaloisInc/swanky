@@ -24,7 +24,6 @@ use scuttlebutt::field::F2;
 use super::{
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
-        UserDefinedFunction,
     },
     put,
     supported_fields::{FieldType, InvariantType},
@@ -495,7 +494,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
     witnesses: &mut ProverPrivate<P, Inputs<VSR>>,
     instructions: &[Instruction],
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
-    functions: &[UserDefinedFunction],
+    functions: &[Arc<FunctionDefinition>],
 ) -> eyre::Result<()> {
     for instruction in instructions {
         match instruction {
@@ -515,9 +514,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 out_ranges,
                 in_ranges,
             } => {
-                let UserDefinedFunction::FunctionDefinition(function) = &functions[*function_id] else {
-                    panic!("Call for 'normal' user-defined function generated for a plugin function")
-                };
+                let function = &functions[*function_id];
                 let mut child_wire_maps = {
                     struct V<'a, P: Party> {
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
@@ -587,7 +584,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 )?;
             }
             Instruction::MuxCall {
-                function_id,
                 permissiveness,
                 field_type,
                 out_ranges,

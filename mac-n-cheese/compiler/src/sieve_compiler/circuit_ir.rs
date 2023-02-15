@@ -143,7 +143,6 @@ pub enum Instruction {
     },
     // TODO: It would be better if we could make this a FieldInstruction
     MuxCall {
-        function_id: FunctionId,
         permissiveness: Permissiveness,
         field_type: FieldType,
         out_ranges: Vec<WireRange>,
@@ -223,13 +222,7 @@ pub struct MuxDefinition {
     branch_sizes: Vec<u64>,
 }
 
-#[derive(Debug)]
-pub enum UserDefinedFunction {
-    FunctionDefinition(Arc<FunctionDefinition>),
-    MuxDefinition(Arc<MuxDefinition>),
-}
-
-pub type NewFunctions = Vec<(UserDefinedFunctonId, UserDefinedFunction)>;
+pub type NewFunctions = Vec<(UserDefinedFunctonId, Arc<FunctionDefinition>)>;
 
 #[derive(Default, Debug)]
 pub struct CircuitChunk {

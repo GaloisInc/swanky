@@ -15,7 +15,6 @@ use crate::sieve_compiler::{
 use super::{
     circuit_ir::{
         FieldInstruction, FieldInstructions, FieldInstructionsTy, FunctionDefinition, FunctionId,
-        UserDefinedFunction,
     },
     put,
     supported_fields::{FieldType, InvariantType},
@@ -98,7 +97,7 @@ fn eval<VSR: ValueStreamReader>(
     witnesses: &mut Inputs<VSR>,
     instructions: &[Instruction],
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
-    functions: &[UserDefinedFunction],
+    functions: &[Arc<FunctionDefinition>],
     muls_per_field: &mut FieldIndexedArray<u64>,
 ) -> eyre::Result<()> {
     for instruction in instructions {
@@ -116,9 +115,7 @@ fn eval<VSR: ValueStreamReader>(
                 out_ranges,
                 in_ranges,
             } => {
-                let UserDefinedFunction::FunctionDefinition(function) = &functions[*function_id] else {
-                    panic!("Call for 'normal' user-defined function generated for a plugin function")
-                };
+                let function = &functions[*function_id];
                 let mut child_wire_maps = {
                     struct V<'a> {
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
@@ -179,16 +176,11 @@ fn eval<VSR: ValueStreamReader>(
                 )?;
             }
             Instruction::MuxCall {
-                function_id: FunctionId::UserDefined(function_id),
                 permissiveness,
                 field_type,
                 out_ranges,
                 in_ranges,
             } => {
-                let UserDefinedFunction::MuxDefinition(mux) = &functions[*function_id] else {
-                    panic!("Call for mux function generated for another type of function")
-                };
-
                 struct V<'a> {
                     field_type: &'a FieldType,
                     permissiveness: &'a Permissiveness,
