@@ -145,7 +145,7 @@ pub enum Instruction {
     MuxCall {
         function_id: FunctionId,
         // must be a field type
-        field_type: Type,
+        field_type: FieldType,
         out_ranges: Vec<WireRange>,
         in_ranges: Vec<WireRange>,
     },
@@ -216,8 +216,7 @@ pub enum Permissiveness {
 pub struct MuxDefinition {
     name: String,
     permissiveness: Permissiveness,
-    // must be a field type
-    field_type: Type,
+    field_type: FieldType,
     // cond_count == 1 if field_type is not F2
     cond_count: u64,
     num_branches: usize,

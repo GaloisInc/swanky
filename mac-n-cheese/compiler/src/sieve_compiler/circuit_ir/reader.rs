@@ -485,11 +485,11 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     .context("mux requires an input wire range for the condition")?;
 
                 // let-else <3
-                let (field_type @ Type::Field(field), cond_count) = (self.lookup_type(cond_tc.ty)?, cond_tc.count) else {
+                let (Type::Field(field_type), cond_count) = (self.lookup_type(cond_tc.ty)?, cond_tc.count) else {
                     eyre::bail!("mux only operates over field types")
                 };
 
-                if field != FieldType::F2 {
+                if field_type != FieldType::F2 {
                     eyre::ensure!(
                         cond_count == 1,
                         "mux requires only one condition wire for non-boolean fields"

@@ -117,7 +117,7 @@ fn eval<VSR: ValueStreamReader>(
                 in_ranges,
             } => {
                 let UserDefinedFunction::FunctionDefinition(function) = &functions[*function_id] else {
-                    eyre::bail!("BUG: Call for 'normal' user-defined function generated for a plugin function")
+                    panic!("Call for 'normal' user-defined function generated for a plugin function")
                 };
                 let mut child_wire_maps = {
                     struct V<'a> {
