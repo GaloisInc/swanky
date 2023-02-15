@@ -338,17 +338,16 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                 // Unfortunately need a slightly different version of this function than the one above
                 fn make_ranges(
                     label: &str,
-                    field_type: FieldType,
                     fn_sizes: &[u64],
                     ranges: &[ParserWireRange],
-                ) -> eyre::Result<FieldIndexedArray<Vec<WireRange>>> {
+                ) -> eyre::Result<Vec<WireRange>> {
                     eyre::ensure!(
                         ranges.len() == fn_sizes.len(),
                         "need {} {label} ranges, but only {} were given",
                         fn_sizes.len(),
                         ranges.len()
                     );
-                    let mut out = FieldIndexedArray::<Vec<WireRange>>::default();
+                    let mut out = Vec::new();
                     for (i, (sz, range)) in fn_sizes.iter().zip(ranges.iter()).enumerate() {
                         eyre::ensure!(
                             *sz == range.len(),
@@ -356,7 +355,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             range.len()
                         );
 
-                        out[field_type].push(WireRange {
+                        out.push(WireRange {
                             start: range.start,
                             inclusive_end: range.end,
                         });
@@ -366,7 +365,6 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
 
                 let out_ranges = make_ranges(
                     "output",
-                    definition.field_type,
                     &definition.branch_sizes,
                     dst,
                 )
@@ -380,11 +378,12 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             .flatten(),
                     )
                     .collect::<Vec<_>>();
-                let in_ranges = make_ranges("input", definition.field_type, &input_sizes, args)
+                let in_ranges = make_ranges("input", &input_sizes, args)
                     .with_note(|| format!("When calling mux {:?}", name_str()))?;
 
                 self.sink.push(Instruction::MuxCall {
                     function_id: FunctionId::UserDefined(*id),
+                    field_type: definition.field_type,
                     out_ranges,
                     in_ranges,
                 })?;

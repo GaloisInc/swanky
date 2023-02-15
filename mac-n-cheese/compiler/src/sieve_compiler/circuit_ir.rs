@@ -141,13 +141,13 @@ pub enum Instruction {
         out_ranges: FieldIndexedArray<Vec<WireRange>>,
         in_ranges: FieldIndexedArray<Vec<WireRange>>,
     },
-    // TODO: It would be better if we could make this a FieldInstruction,
-    // and it feels a bit funky to use a FieldIndexedArray when at this
-    // point, we have a known single FieldType for the mux.
+    // TODO: It would be better if we could make this a FieldInstruction
     MuxCall {
         function_id: FunctionId,
-        out_ranges: FieldIndexedArray<Vec<WireRange>>,
-        in_ranges: FieldIndexedArray<Vec<WireRange>>,
+        // must be a field type
+        field_type: FieldType,
+        out_ranges: Vec<WireRange>,
+        in_ranges: Vec<WireRange>,
     },
     // TODO: add field switching here
 }
