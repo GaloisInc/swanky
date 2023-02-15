@@ -363,12 +363,8 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                     Ok(out)
                 }
 
-                let out_ranges = make_ranges(
-                    "output",
-                    &definition.branch_sizes,
-                    dst,
-                )
-                .with_note(|| format!("When calling mux {:?}", name_str()))?;
+                let out_ranges = make_ranges("output", &definition.branch_sizes, dst)
+                    .with_note(|| format!("When calling mux {:?}", name_str()))?;
 
                 let input_sizes = vec![definition.cond_count]
                     .into_iter()
