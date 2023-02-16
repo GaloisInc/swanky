@@ -760,7 +760,7 @@ impl<T: Read + Seek> RelationReader<T> {
                 }
 
                 let ty = self.ps.u64()?;
-                self.ps.colon()?;
+                self.ps.semi()?;
                 let count = self.ps.u64()?;
                 dst.push(TypedCount { ty, count });
             }
