@@ -208,14 +208,12 @@ fn eval<VSR: ValueStreamReader>(
                             fn bits_to_usize(
                                 bits: impl IntoIterator<Item = bool>,
                             ) -> eyre::Result<usize> {
-                                let mut res: usize = 0;
-                                for bit in bits {
-                                    res = 2_usize
-                                        .checked_mul(res)
-                                        .and_then(|x| x.checked_add(bit.into()))
-                                        .context("Overflow while computing condition value")?;
-                                }
-                                Ok(res)
+                                bits.into_iter().fold(Ok(0_usize), |acc, b| {
+                                    2_usize
+                                        .checked_mul(acc?)
+                                        .and_then(|x| x.checked_add(b.into()))
+                                        .context("Overflow while computing condition value")
+                                })
                             }
 
                             let cond_wire_range = self.in_ranges[0];
