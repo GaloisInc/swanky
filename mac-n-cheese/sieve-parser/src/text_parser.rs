@@ -197,8 +197,8 @@ impl<T: Read + Seek> ParseState<T> {
         Ok(self.inner.fill_buf()?.first().copied())
     }
 
-    // Doesn't consume whitespace
     fn peek_n_bytes(&mut self, n: usize) -> eyre::Result<&[u8]> {
+        self.ws()?;
         Ok(&self.inner.fill_buf()?[..n])
     }
 
