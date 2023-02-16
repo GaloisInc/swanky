@@ -15,7 +15,7 @@ use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
     ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
-    PluginTypeArg, RelationVisitor, Type, TypedCount, ValueStreamKind, WireRange,
+    PluginTypeArg, RelationVisitor, Type, TypedCount, TypedWireRange, ValueStreamKind, WireRange,
 };
 
 fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
@@ -198,7 +198,22 @@ impl RelationReader {
         } else if let Some(x) = gate.gate_as_gate_delete() {
             v.delete(x.type_id().into(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_convert() {
-            todo!("implement gate convert");
+            v.convert(
+                TypedWireRange {
+                    ty: x.out_type_id().into(),
+                    range: WireRange {
+                        start: x.out_first_id(),
+                        end: x.out_last_id(),
+                    },
+                },
+                TypedWireRange {
+                    ty: x.in_type_id().into(),
+                    range: WireRange {
+                        start: x.in_first_id(),
+                        end: x.in_last_id(),
+                    },
+                },
+            )?;
         } else if let Some(x) = gate.gate_as_gate_call() {
             func_out_buf.clear();
             func_in_buf.clear();
