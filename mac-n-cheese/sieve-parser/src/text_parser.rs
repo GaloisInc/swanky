@@ -7,8 +7,9 @@ use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, UInt, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
-    FunctionBodyVisitor, Header, Number, PluginBinding, PluginType, PluginTypeArg, RelationVisitor,
-    Type, TypeId, TypedCount, TypedWireRange, ValueStreamKind, WireId, WireRange,
+    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
+    PluginTypeArg, RelationVisitor, Type, TypeId, TypedCount, TypedWireRange, ValueStreamKind,
+    WireId, WireRange,
 };
 
 #[cold]
@@ -383,7 +384,53 @@ impl<T: Read + Seek> RelationReader<T> {
                         }
                     }
                 }
-                b"convert" => todo!("parse conversion"),
+                b"convert" => {
+                    self.ps.expect_byte(b'(')?;
+
+                    self.ps.at()?;
+                    self.ps.expect_byte(b'o')?;
+                    self.ps.expect_byte(b'u')?;
+                    self.ps.expect_byte(b't')?;
+
+                    self.ps.colon()?;
+
+                    let out_ty = self.ps.u64()?;
+
+                    self.ps.colon()?;
+
+                    let out_count = self.ps.u64()?;
+
+                    self.ps.expect_byte(b',')?;
+
+                    self.ps.at()?;
+                    self.ps.expect_byte(b'i')?;
+                    self.ps.expect_byte(b'n')?;
+
+                    self.ps.colon()?;
+
+                    let in_ty = self.ps.u64()?;
+
+                    self.ps.colon()?;
+
+                    let in_count = self.ps.u64()?;
+
+                    // TODO: The spec appendix has an extra comma here, but
+                    // none of the examples have it, so we don't consume one
+
+                    self.ps.expect_byte(b')')?;
+                    self.ps.semi()?;
+
+                    self.header.conversion.push(ConversionDescription {
+                        output: TypedCount {
+                            ty: out_ty,
+                            count: out_count,
+                        },
+                        input: TypedCount {
+                            ty: in_ty,
+                            count: in_count,
+                        },
+                    })
+                }
                 b"begin" => return Ok(()),
                 _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
             }
