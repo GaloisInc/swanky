@@ -203,18 +203,33 @@ fn eval<VSR: ValueStreamReader>(
 
                             // For F2, need to interpret condition wires as big-endian
                             // bits. Otherwise, we just use the value on the single wire.
+
+                            // bits should be little-endian
+                            // NOTE: This can overflow!
+                            fn bits_to_usize(bits: impl IntoIterator<Item = bool>) -> usize {
+                                bits.into_iter().fold(0, |acc, b| 2 * acc + usize::from(b))
+                            }
+
                             let cond_wire_range = self.in_ranges[0];
-                            // TODO: Sus type for the condition value?
-                            // We would like this to be able to hold supported field elements,
-                            // but we also need to use it to compute which input wire ranges
-                            // to write to the output wires...
                             let cond: usize = match FE::FIELD_TYPE {
                                 FieldType::F2 => {
-                                    todo!()
+                                    // TODO: Can we avoid the allocation here?
+                                    // Get the wire values in reverse order (i.e. little-endian)
+                                    let le_vals = (cond_wire_range.start
+                                        ..=cond_wire_range.inclusive_end)
+                                        .rev()
+                                        .map(|w| Ok(*wm.get(w)?))
+                                        .collect::<eyre::Result<Vec<_>>>()?;
+
+                                    bits_to_usize(
+                                        le_vals.iter().map(|b| FE::bit_decomposition(b)).flatten(),
+                                    )
                                 }
                                 _ => {
                                     debug_assert_eq!(cond_wire_range.len(), 1);
-                                    todo!()
+                                    bits_to_usize(FE::bit_decomposition(
+                                        wm.get(cond_wire_range.start)?,
+                                    ))
                                 }
                             };
 
