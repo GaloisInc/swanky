@@ -205,9 +205,17 @@ fn eval<VSR: ValueStreamReader>(
                             // bits. Otherwise, we just use the value on the single wire.
 
                             // bits should be little-endian
-                            // NOTE: This can overflow!
-                            fn bits_to_usize(bits: impl IntoIterator<Item = bool>) -> usize {
-                                bits.into_iter().fold(0, |acc, b| 2 * acc + usize::from(b))
+                            fn bits_to_usize(
+                                bits: impl IntoIterator<Item = bool>,
+                            ) -> eyre::Result<usize> {
+                                let mut res: usize = 0;
+                                for bit in bits {
+                                    res = 2_usize
+                                        .checked_mul(res)
+                                        .and_then(|x| x.checked_add(bit.into()))
+                                        .context("Overflow while computing condition value")?;
+                                }
+                                Ok(res)
                             }
 
                             let cond_wire_range = self.in_ranges[0];
@@ -223,13 +231,13 @@ fn eval<VSR: ValueStreamReader>(
 
                                     bits_to_usize(
                                         le_vals.iter().map(|b| FE::bit_decomposition(b)).flatten(),
-                                    )
+                                    )?
                                 }
                                 _ => {
                                     debug_assert_eq!(cond_wire_range.len(), 1);
                                     bits_to_usize(FE::bit_decomposition(
                                         wm.get(cond_wire_range.start)?,
-                                    ))
+                                    ))?
                                 }
                             };
 
