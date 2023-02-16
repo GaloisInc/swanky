@@ -511,7 +511,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     "mux requires all output/input wire types to match the condition"
                 );
 
-                for branch_tcs in inputs.chunks_exact(num_ranges_per_branch) {
+                for branch_tcs in branch_inputs.chunks_exact(num_ranges_per_branch) {
                     eyre::ensure!(
                         outputs
                             .iter()
