@@ -643,7 +643,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 FieldType::F2 => todo!(),
                                 _ => {
                                     debug_assert_eq!(cond_wire_range.len(), 1);
-                                    let mut g = Vec::with_capacity(num_branches);
                                     for i in 0..num_branches {
                                         let i = to_fe(i)?;
 
