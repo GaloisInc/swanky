@@ -684,7 +684,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                                 // sum(g_i) - 1
                                 let one = cm.constant(self.cb, FE::ONE)?;
-                                let sum_minus_one = cm.linear(self.cb, sum, FE::ONE, one, FE::ONE)?;
+                                let sum_minus_one = cm.linear(self.cb, sum, FE::ONE, one, -FE::ONE)?;
 
                                 // AsserZero(sum(g_i) - 1)
                                 cm.assert_zero(self.cb, sum_minus_one)?;
