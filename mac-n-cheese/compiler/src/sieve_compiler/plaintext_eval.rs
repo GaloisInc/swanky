@@ -181,103 +181,104 @@ fn eval<VSR: ValueStreamReader>(
                 out_ranges,
                 in_ranges,
             } => {
-                struct V<'a> {
-                    field_type: &'a FieldType,
+                struct V<'a, 'b> {
+                    wm: &'a mut FieldGenericProduct<WireMap<'b, FieldGenericIdentity>>,
                     permissiveness: &'a Permissiveness,
                     in_ranges: &'a Vec<WireRange>,
                     out_ranges: &'a Vec<WireRange>,
                 }
-                impl<'a, 'b, 'c> CompilerFieldVisitor<&'b mut WireMap<'c, FieldGenericIdentity>> for &'_ mut V<'a> {
-                    type Output = eyre::Result<()>;
+                impl<'a, 'b> CompilerFieldVisitor for &'_ mut V<'a, 'b> {
+                    type Output = InvariantType<eyre::Result<()>>;
                     fn visit<FE: CompilerField>(
                         self,
-                        wm: &'b mut WireMap<'c, FE>,
+                        _arg: (),
                     ) -> eyre::Result<()> {
-                        if FE::FIELD_TYPE == *self.field_type {
-                            for range in self.out_ranges.iter() {
-                                wm.alloc_range_if_unallocated(range.start, range.inclusive_end)?;
+                        let wm = self.wm.as_mut().get::<FE>();
+
+                        for range in self.out_ranges.iter() {
+                            wm.alloc_range_if_unallocated(range.start, range.inclusive_end)?;
+                        }
+
+                        // There should at least be a wire range for the condition
+                        debug_assert_ne!(self.in_ranges.len(), 0);
+
+                        // For F2, need to interpret condition wires as big-endian
+                        // bits. Otherwise, we just use the value on the single wire.
+
+                        // bits should be little-endian
+                        fn bits_to_usize(
+                            bits: impl IntoIterator<Item = bool>,
+                        ) -> eyre::Result<usize> {
+                            bits.into_iter().fold(Ok(0_usize), |acc, b| {
+                                2_usize
+                                    .checked_mul(acc?)
+                                    .and_then(|x| x.checked_add(b.into()))
+                                    .context("Overflow while computing condition value")
+                            })
+                        }
+
+                        let cond_wire_range = self.in_ranges[0];
+                        let cond: usize = match FE::FIELD_TYPE {
+                            FieldType::F2 => {
+                                // TODO: Can we avoid the allocation here?
+                                // Get the wire values in reverse order (i.e. little-endian)
+                                let le_vals = (cond_wire_range.start
+                                    ..=cond_wire_range.inclusive_end)
+                                    .rev()
+                                    .map(|w| Ok(*wm.get(w)?))
+                                    .collect::<eyre::Result<Vec<_>>>()?;
+
+                                bits_to_usize(
+                                    le_vals.iter().map(|b| FE::bit_decomposition(b)).flatten(),
+                                )?
                             }
-
-                            // There should at least be a wire range for the condition
-                            debug_assert_ne!(self.in_ranges.len(), 0);
-
-                            // For F2, need to interpret condition wires as big-endian
-                            // bits. Otherwise, we just use the value on the single wire.
-
-                            // bits should be little-endian
-                            fn bits_to_usize(
-                                bits: impl IntoIterator<Item = bool>,
-                            ) -> eyre::Result<usize> {
-                                bits.into_iter().fold(Ok(0_usize), |acc, b| {
-                                    2_usize
-                                        .checked_mul(acc?)
-                                        .and_then(|x| x.checked_add(b.into()))
-                                        .context("Overflow while computing condition value")
-                                })
+                            _ => {
+                                debug_assert_eq!(cond_wire_range.len(), 1);
+                                bits_to_usize(FE::bit_decomposition(
+                                    wm.get(cond_wire_range.start)?,
+                                ))?
                             }
+                        };
 
-                            let cond_wire_range = self.in_ranges[0];
-                            let cond: usize = match FE::FIELD_TYPE {
-                                FieldType::F2 => {
-                                    // TODO: Can we avoid the allocation here?
-                                    // Get the wire values in reverse order (i.e. little-endian)
-                                    let le_vals = (cond_wire_range.start
-                                        ..=cond_wire_range.inclusive_end)
-                                        .rev()
-                                        .map(|w| Ok(*wm.get(w)?))
-                                        .collect::<eyre::Result<Vec<_>>>()?;
+                        let branch_inputs = &self.in_ranges[1..];
+                        let num_ranges_per_branch = self.out_ranges.len();
+                        debug_assert!(branch_inputs.len() % num_ranges_per_branch == 0);
 
-                                    bits_to_usize(
-                                        le_vals.iter().map(|b| FE::bit_decomposition(b)).flatten(),
-                                    )?
-                                }
-                                _ => {
-                                    debug_assert_eq!(cond_wire_range.len(), 1);
-                                    bits_to_usize(FE::bit_decomposition(
-                                        wm.get(cond_wire_range.start)?,
-                                    ))?
-                                }
-                            };
-
-                            let branch_inputs = &self.in_ranges[1..];
-                            let num_ranges_per_branch = self.out_ranges.len();
-                            debug_assert!(branch_inputs.len() % num_ranges_per_branch == 0);
-
-                            let num_branches = branch_inputs.len() / num_ranges_per_branch;
-                            if cond >= num_branches {
-                                match self.permissiveness {
-                                    Permissiveness::Permissive => {
-                                        for wr in self.out_ranges {
-                                            for w in wr.start..=wr.inclusive_end {
-                                                put(wm, w, FE::ZERO)?;
-                                            }
+                        let num_branches = branch_inputs.len() / num_ranges_per_branch;
+                        if cond >= num_branches {
+                            match self.permissiveness {
+                                Permissiveness::Permissive => {
+                                    for wr in self.out_ranges {
+                                        for w in wr.start..=wr.inclusive_end {
+                                            put(wm, w, FE::ZERO)?;
                                         }
                                     }
-                                    Permissiveness::Strict => eyre::bail!("Strict mux failed: selector value {cond} >= number of branches {}", num_branches - 1)
                                 }
-                            } else {
-                                let in_ranges_to_output: &[WireRange] = branch_inputs
-                                    .chunks_exact(num_ranges_per_branch)
-                                    .collect::<Vec<_>>()[cond];
-                                for (in_wr, out_wr) in
-                                    in_ranges_to_output.iter().zip(self.out_ranges)
+                                Permissiveness::Strict => eyre::bail!("Strict mux failed: selector value {cond} >= number of branches {}", num_branches - 1)
+                            }
+                        } else {
+                            let in_ranges_to_output: &[WireRange] = branch_inputs
+                                .chunks_exact(num_ranges_per_branch)
+                                .collect::<Vec<_>>()[cond];
+                            for (in_wr, out_wr) in
+                                in_ranges_to_output.iter().zip(self.out_ranges)
+                            {
+                                debug_assert_eq!(in_wr.len(), out_wr.len());
+                                for (in_w, out_w) in (in_wr.start..=in_wr.inclusive_end)
+                                    .zip(out_wr.start..=out_wr.inclusive_end)
                                 {
-                                    debug_assert_eq!(in_wr.len(), out_wr.len());
-                                    for (in_w, out_w) in (in_wr.start..=in_wr.inclusive_end)
-                                        .zip(out_wr.start..=out_wr.inclusive_end)
-                                    {
-                                        let src = *wm.get(in_w)?;
-                                        put(wm, out_w, src)?;
-                                    }
+                                    let src = *wm.get(in_w)?;
+                                    put(wm, out_w, src)?;
                                 }
                             }
                         }
+
                         Ok(())
                     }
                 }
 
-                wm.as_mut().map_result(&mut V {
-                    field_type,
+                field_type.visit(&mut V {
+                    wm,
                     permissiveness,
                     in_ranges,
                     out_ranges,
