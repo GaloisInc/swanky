@@ -675,9 +675,19 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                             // For strict mode, assert sum(g_i) = 1
                             if let Permissiveness::Strict = self.permissiveness {
-                                for (g_i, g_i_v) in g {
-                                    todo!("fold up with linear, subtract one, assert zero")
+                                let (mut sum, _) = g.get(0).context("Mux has no branches")?;
+
+                                // sum(g_i)
+                                for &(g_i, _) in &g[1..] {
+                                    sum = cm.linear(self.cb, sum, FE::ONE, g_i, FE::ONE)?;
                                 }
+
+                                // sum(g_i) - 1
+                                let one = cm.constant(self.cb, FE::ONE)?;
+                                let sum_minus_one = cm.linear(self.cb, sum, FE::ONE, one, FE::ONE)?;
+
+                                // AsserZero(sum(g_i) - 1)
+                                cm.assert_zero(self.cb, sum_minus_one)?;
                             }
 
                             // Output g \cdot x (where x is input values)
