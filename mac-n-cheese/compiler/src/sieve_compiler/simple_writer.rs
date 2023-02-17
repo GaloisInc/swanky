@@ -600,15 +600,23 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                     out_ranges: &'a Vec<WireRange>,
                     phantom: PhantomData<P>,
                 }
-                impl<'a, 'b, 'c, P: Party> CompilerFieldVisitor<&'b mut WireMap<'c, ValuedWire<P>>>
+                impl<'a, 'b, 'c, 'd, P: Party> CompilerFieldVisitor<&'c mut WireMap<'d, ValuedWire<P>>>
                     for &'_ mut V<'a, 'b, '_, P>
                 {
                     type Output = eyre::Result<()>;
                     fn visit<FE: CompilerField>(
                         self,
-                        wm: &'b mut WireMap<'c, (WireRef, ProverPrivateCopy<P, FE>)>,
+                        wm: &'c mut WireMap<'d, (WireRef, ProverPrivateCopy<P, FE>)>,
                     ) -> eyre::Result<()> {
                         if FE::FIELD_TYPE == *self.field_type {
+                            fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
+                                Ok(match FE::PrimeField::try_from(x as u128) {
+                                    Ok(x) => x,
+                                    Err(_) => eyre::bail!("Value larger than prime field modulus"),
+                                }
+                                .into())
+                            }
+
                             let cm = self.cm.as_mut().get::<FE>();
 
                             for range in self.out_ranges.iter() {
@@ -637,13 +645,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     debug_assert_eq!(cond_wire_range.len(), 1);
                                     let mut g = Vec::with_capacity(num_branches);
                                     for i in 0..num_branches {
-                                        let i: FE = match FE::PrimeField::try_from(i as u128) {
-                                            Ok(i) => i,
-                                            Err(_) => eyre::bail!(
-                                                "Counter larger than prime field modulus"
-                                            ),
-                                        }
-                                        .into();
+                                        let i = to_fe(i)?;
 
                                         let g_i_v =
                                             cond_v.map(|c| if c == i { FE::ONE } else { FE::ZERO });
@@ -654,14 +656,8 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                             }
 
                             // AssertNeqZero(c - i, 1 - g_i)
-                            for i in 0..num_branches {
-                                let i: FE = match FE::PrimeField::try_from(i as u128) {
-                                    Ok(i) => i,
-                                    Err(_) => {
-                                        eyre::bail!("Counter larger than prime field modulus")
-                                    }
-                                }
-                                .into();
+                            for (i, &(g_i, _)) in g.iter().enumerate() {
+                                let i = to_fe(i)?;
 
                                 let one = cm.constant(self.cb, FE::ONE)?;
 
@@ -672,7 +668,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     x_v.map(|x| if x != FE::ZERO { x.inverse() } else { FE::ZERO });
                                 let x_prime = cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
 
-                                let (g_i, g_i_v) = g[i];
                                 let b = cm.linear(self.cb, one, FE::ONE, g_i, -FE::ONE)?;
 
                                 cm.assert_multiply(self.cb, x, x_prime, b)?;
@@ -692,6 +687,17 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         Ok(())
                     }
                 }
+                wm.as_mut().map_result(&mut V {
+                    cb,
+                    vs,
+                    pb,
+                    cm,
+                    field_type,
+                    permissiveness,
+                    in_ranges,
+                    out_ranges,
+                    phantom: PhantomData,
+                })?;
             }
         }
     }
