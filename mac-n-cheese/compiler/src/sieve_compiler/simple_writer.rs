@@ -600,13 +600,9 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                     out_ranges: &'a Vec<WireRange>,
                     phantom: PhantomData<P>,
                 }
-                impl<'a, 'b, P: Party> CompilerFieldVisitor for &'_ mut V<'a, 'b, '_, '_, P>
-                {
+                impl<'a, 'b, P: Party> CompilerFieldVisitor for &'_ mut V<'a, 'b, '_, '_, P> {
                     type Output = InvariantType<eyre::Result<()>>;
-                    fn visit<FE: CompilerField>(
-                        self,
-                        _arg: (),
-                    ) -> eyre::Result<()> {
+                    fn visit<FE: CompilerField>(self, _arg: ()) -> eyre::Result<()> {
                         fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
                             Ok(match FE::PrimeField::try_from(x as u128) {
                                 Ok(x) => x,
@@ -691,7 +687,9 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                         // Output g \cdot x (where x is input values)
                         for out_range in self.out_ranges {
-                            for (i, out_wire) in (out_range.start..=out_range.inclusive_end).enumerate() {
+                            for (i, out_wire) in
+                                (out_range.start..=out_range.inclusive_end).enumerate()
+                            {
                                 todo!("compute dot product of g with the ith wire of each input branch, output to out_wire")
                             }
                         }
