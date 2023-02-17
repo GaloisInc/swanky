@@ -30,7 +30,7 @@ use super::{
     Inputs, SieveArgs,
 };
 use crate::sieve_compiler::{
-    circuit_ir::{CircuitChunk, Instruction, WireRange},
+    circuit_ir::{CircuitChunk, Instruction, Permissiveness, WireRange},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct,
         FieldGenericType, FieldIndexedArray,
@@ -588,7 +588,101 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 field_type,
                 out_ranges,
                 in_ranges,
-            } => todo!(),
+            } => {
+                struct V<'a, 'b, 'c, P: Party> {
+                    cb: &'a mut CircuitBuilder<'b>,
+                    vs: &'a mut VoleSupplier,
+                    pb: &'a mut ProverPrivate<P, &'c mut PrivateBuilder>,
+                    cm: &'a mut FieldGenericProduct<CircuitMakerTy<P>>,
+                    field_type: &'a FieldType,
+                    permissiveness: &'a Permissiveness,
+                    in_ranges: &'a Vec<WireRange>,
+                    out_ranges: &'a Vec<WireRange>,
+                    phantom: PhantomData<P>,
+                }
+                impl<'a, 'b, 'c, P: Party> CompilerFieldVisitor<&'b mut WireMap<'c, ValuedWire<P>>>
+                    for &'_ mut V<'a, 'b, '_, P>
+                {
+                    type Output = eyre::Result<()>;
+                    fn visit<FE: CompilerField>(
+                        self,
+                        wm: &'b mut WireMap<'c, (WireRef, ProverPrivateCopy<P, FE>)>,
+                    ) -> eyre::Result<()> {
+                        if FE::FIELD_TYPE == *self.field_type {
+                            let cm = self.cm.as_mut().get::<FE>();
+
+                            for range in self.out_ranges.iter() {
+                                wm.alloc_range_if_unallocated(range.start, range.inclusive_end)?;
+                            }
+
+                            debug_assert_ne!(self.in_ranges.len(), 0);
+
+                            let cond_wire_range = self.in_ranges[0];
+                            let branch_inputs = &self.in_ranges[1..];
+                            let num_ranges_per_branch = self.out_ranges.len();
+                            debug_assert_eq!(branch_inputs.len() % num_ranges_per_branch, 0);
+
+                            // N
+                            let num_branches = branch_inputs.len() / num_ranges_per_branch;
+
+                            // c
+                            let (cond, cond_v) = *wm.get(cond_wire_range.start)?;
+
+                            // Build one-hot selecting vector. F2 has special behavior.
+                            let mut g: Vec<(WireRef, ProverPrivateCopy<P, FE>)> =
+                                Vec::with_capacity(num_branches);
+                            match FE::FIELD_TYPE {
+                                FieldType::F2 => todo!(),
+                                _ => {
+                                    debug_assert_eq!(cond_wire_range.len(), 1);
+                                    let mut g = Vec::with_capacity(num_branches);
+                                    for i in 0..num_branches {
+                                        let g_i_v = cond_v.map(|c| {
+                                            if todo!("c == i") {
+                                                FE::ONE
+                                            } else {
+                                                FE::ZERO
+                                            }
+                                        });
+                                        let g_i = cm.fix(self.cb, self.vs, self.pb, g_i_v)?;
+                                        g.push((g_i, g_i_v));
+                                    }
+                                }
+                            }
+
+                            // AssertNeqZero(c - i, 1 - g_i)
+                            for i in 0..num_branches {
+                                let one = cm.constant(self.cb, FE::ONE)?;
+
+                                let x_v = cond_v.map(|c| c - todo!("i"));
+                                let x = cm.linear(self.cb, cond, FE::ONE, one, todo!("-i"))?;
+
+                                let x_prime_v =
+                                    x_v.map(|x| if x != FE::ZERO { x.inverse() } else { FE::ZERO });
+                                let x_prime = cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
+
+                                let (g_i, g_i_v) = g[i];
+                                let b =
+                                    cm.linear(self.cb, one, FE::ONE, g_i, FE::ZERO - FE::ONE)?;
+
+                                cm.assert_multiply(self.cb, x, x_prime, b)?;
+                                cm.assert_multiply(self.cb, x, b, x)?;
+                            }
+
+                            // For strict mode, assert sum(g_i) = 1
+                            if let Permissiveness::Strict = self.permissiveness {
+                                for (g_i, g_i_v) in g {
+                                    todo!("fold up with linear, subtract one, assert zero")
+                                }
+                            }
+
+                            // Output g \cdot x (where x is input values)
+                            todo!("some intense loop shenanigans to get this right")
+                        }
+                        Ok(())
+                    }
+                }
+            }
         }
     }
     Ok(())
