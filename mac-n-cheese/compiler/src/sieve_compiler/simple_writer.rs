@@ -589,123 +589,123 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 out_ranges,
                 in_ranges,
             } => {
-                struct V<'a, 'b, 'c, P: Party> {
-                    cb: &'a mut CircuitBuilder<'b>,
+                struct V<'a, 'b, 'c, 'd, P: Party> {
+                    wm: &'a mut FieldGenericProduct<WireMap<'b, ValuedWire<P>>>,
+                    cb: &'a mut CircuitBuilder<'c>,
                     vs: &'a mut VoleSupplier,
-                    pb: &'a mut ProverPrivate<P, &'c mut PrivateBuilder>,
+                    pb: &'a mut ProverPrivate<P, &'d mut PrivateBuilder>,
                     cm: &'a mut FieldGenericProduct<CircuitMakerTy<P>>,
-                    field_type: &'a FieldType,
                     permissiveness: &'a Permissiveness,
                     in_ranges: &'a Vec<WireRange>,
                     out_ranges: &'a Vec<WireRange>,
                     phantom: PhantomData<P>,
                 }
-                impl<'a, 'b, 'c, 'd, P: Party> CompilerFieldVisitor<&'c mut WireMap<'d, ValuedWire<P>>>
-                    for &'_ mut V<'a, 'b, '_, P>
+                impl<'a, 'b, P: Party> CompilerFieldVisitor for &'_ mut V<'a, 'b, '_, '_, P>
                 {
-                    type Output = eyre::Result<()>;
+                    type Output = InvariantType<eyre::Result<()>>;
                     fn visit<FE: CompilerField>(
                         self,
-                        wm: &'c mut WireMap<'d, (WireRef, ProverPrivateCopy<P, FE>)>,
+                        _arg: (),
                     ) -> eyre::Result<()> {
-                        if FE::FIELD_TYPE == *self.field_type {
-                            fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
-                                Ok(match FE::PrimeField::try_from(x as u128) {
-                                    Ok(x) => x,
-                                    Err(_) => eyre::bail!("Value larger than prime field modulus"),
-                                }
-                                .into())
+                        fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
+                            Ok(match FE::PrimeField::try_from(x as u128) {
+                                Ok(x) => x,
+                                Err(_) => eyre::bail!("Value larger than prime field modulus"),
                             }
+                            .into())
+                        }
 
-                            let cm = self.cm.as_mut().get::<FE>();
+                        let wm = self.wm.as_mut().get::<FE>();
+                        let cm = self.cm.as_mut().get::<FE>();
 
-                            for range in self.out_ranges.iter() {
-                                wm.alloc_range_if_unallocated(range.start, range.inclusive_end)?;
-                            }
+                        for range in self.out_ranges.iter() {
+                            wm.alloc_range_if_unallocated(range.start, range.inclusive_end)?;
+                        }
 
-                            debug_assert_ne!(self.in_ranges.len(), 0);
+                        debug_assert_ne!(self.in_ranges.len(), 0);
 
-                            let cond_wire_range = self.in_ranges[0];
-                            let branch_inputs = &self.in_ranges[1..];
-                            let num_ranges_per_branch = self.out_ranges.len();
-                            debug_assert_eq!(branch_inputs.len() % num_ranges_per_branch, 0);
+                        let cond_wire_range = self.in_ranges[0];
+                        let branch_inputs = &self.in_ranges[1..];
+                        let num_ranges_per_branch = self.out_ranges.len();
+                        debug_assert_eq!(branch_inputs.len() % num_ranges_per_branch, 0);
 
-                            // N
-                            let num_branches = branch_inputs.len() / num_ranges_per_branch;
+                        // N
+                        let num_branches = branch_inputs.len() / num_ranges_per_branch;
 
-                            // c
-                            let (cond, cond_v) = *wm.get(cond_wire_range.start)?;
+                        // c
+                        let (cond, cond_v) = *wm.get(cond_wire_range.start)?;
 
-                            // Build one-hot selecting vector. F2 has special behavior.
-                            let mut g: Vec<(WireRef, ProverPrivateCopy<P, FE>)> =
-                                Vec::with_capacity(num_branches);
-                            match FE::FIELD_TYPE {
-                                FieldType::F2 => todo!(),
-                                _ => {
-                                    debug_assert_eq!(cond_wire_range.len(), 1);
-                                    for i in 0..num_branches {
-                                        let i = to_fe(i)?;
+                        // Build one-hot selecting vector. F2 has special behavior.
+                        let mut g: Vec<(WireRef, ProverPrivateCopy<P, FE>)> =
+                            Vec::with_capacity(num_branches);
+                        match FE::FIELD_TYPE {
+                            FieldType::F2 => todo!(),
+                            _ => {
+                                debug_assert_eq!(cond_wire_range.len(), 1);
+                                for i in 0..num_branches {
+                                    let i = to_fe(i)?;
 
-                                        let g_i_v =
-                                            cond_v.map(|c| if c == i { FE::ONE } else { FE::ZERO });
-                                        let g_i = cm.fix(self.cb, self.vs, self.pb, g_i_v)?;
-                                        g.push((g_i, g_i_v));
-                                    }
-                                }
-                            }
-
-                            // AssertNeqZero(c - i, 1 - g_i)
-                            for (i, &(g_i, _)) in g.iter().enumerate() {
-                                let i = to_fe(i)?;
-
-                                let one = cm.constant(self.cb, FE::ONE)?;
-
-                                let x_v = cond_v.map(|c| c - i);
-                                let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
-
-                                let x_prime_v =
-                                    x_v.map(|x| if x != FE::ZERO { x.inverse() } else { FE::ZERO });
-                                let x_prime = cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
-
-                                let b = cm.linear(self.cb, one, FE::ONE, g_i, -FE::ONE)?;
-
-                                cm.assert_multiply(self.cb, x, x_prime, b)?;
-                                cm.assert_multiply(self.cb, x, b, x)?;
-                            }
-
-                            // For strict mode, assert sum(g_i) = 1
-                            if let Permissiveness::Strict = self.permissiveness {
-                                let (mut sum, _) = g.get(0).context("Mux has no branches")?;
-
-                                // sum(g_i)
-                                for &(g_i, _) in &g[1..] {
-                                    sum = cm.linear(self.cb, sum, FE::ONE, g_i, FE::ONE)?;
-                                }
-
-                                // sum(g_i) - 1
-                                let one = cm.constant(self.cb, FE::ONE)?;
-                                let sum_minus_one = cm.linear(self.cb, sum, FE::ONE, one, -FE::ONE)?;
-
-                                // AsserZero(sum(g_i) - 1)
-                                cm.assert_zero(self.cb, sum_minus_one)?;
-                            }
-
-                            // Output g \cdot x (where x is input values)
-                            for out_range in self.out_ranges {
-                                for (i, out_wire) in (out_range.start..=out_range.inclusive_end).enumerate() {
-                                    todo!("compute dot product of g with the ith wire of each input branch, output to out_wire")
+                                    let g_i_v =
+                                        cond_v.map(|c| if c == i { FE::ONE } else { FE::ZERO });
+                                    let g_i = cm.fix(self.cb, self.vs, self.pb, g_i_v)?;
+                                    g.push((g_i, g_i_v));
                                 }
                             }
                         }
+
+                        // AssertNeqZero(c - i, 1 - g_i)
+                        for (i, &(g_i, _)) in g.iter().enumerate() {
+                            let i = to_fe(i)?;
+
+                            let one = cm.constant(self.cb, FE::ONE)?;
+
+                            let x_v = cond_v.map(|c| c - i);
+                            let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
+
+                            let x_prime_v =
+                                x_v.map(|x| if x != FE::ZERO { x.inverse() } else { FE::ZERO });
+                            let x_prime = cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
+
+                            let b = cm.linear(self.cb, one, FE::ONE, g_i, -FE::ONE)?;
+
+                            cm.assert_multiply(self.cb, x, x_prime, b)?;
+                            cm.assert_multiply(self.cb, x, b, x)?;
+                        }
+
+                        // For strict mode, assert sum(g_i) = 1
+                        if let Permissiveness::Strict = self.permissiveness {
+                            let (mut sum, _) = g.get(0).context("Mux has no branches")?;
+
+                            // sum(g_i)
+                            for &(g_i, _) in &g[1..] {
+                                sum = cm.linear(self.cb, sum, FE::ONE, g_i, FE::ONE)?;
+                            }
+
+                            // sum(g_i) - 1
+                            let one = cm.constant(self.cb, FE::ONE)?;
+                            let sum_minus_one = cm.linear(self.cb, sum, FE::ONE, one, -FE::ONE)?;
+
+                            // AsserZero(sum(g_i) - 1)
+                            cm.assert_zero(self.cb, sum_minus_one)?;
+                        }
+
+                        // Output g \cdot x (where x is input values)
+                        for out_range in self.out_ranges {
+                            for (i, out_wire) in (out_range.start..=out_range.inclusive_end).enumerate() {
+                                todo!("compute dot product of g with the ith wire of each input branch, output to out_wire")
+                            }
+                        }
+
                         Ok(())
                     }
                 }
-                wm.as_mut().map_result(&mut V {
+
+                field_type.visit(&mut V {
+                    wm,
                     cb,
                     vs,
                     pb,
                     cm,
-                    field_type,
                     permissiveness,
                     in_ranges,
                     out_ranges,
