@@ -637,13 +637,16 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     debug_assert_eq!(cond_wire_range.len(), 1);
                                     let mut g = Vec::with_capacity(num_branches);
                                     for i in 0..num_branches {
-                                        let g_i_v = cond_v.map(|c| {
-                                            if todo!("c == i") {
-                                                FE::ONE
-                                            } else {
-                                                FE::ZERO
-                                            }
-                                        });
+                                        let i: FE = match FE::PrimeField::try_from(i as u128) {
+                                            Ok(i) => i,
+                                            Err(_) => eyre::bail!(
+                                                "Counter larger than prime field modulus"
+                                            ),
+                                        }
+                                        .into();
+
+                                        let g_i_v =
+                                            cond_v.map(|c| if c == i { FE::ONE } else { FE::ZERO });
                                         let g_i = cm.fix(self.cb, self.vs, self.pb, g_i_v)?;
                                         g.push((g_i, g_i_v));
                                     }
@@ -652,18 +655,25 @@ fn eval<P: Party, VSR: ValueStreamReader>(
 
                             // AssertNeqZero(c - i, 1 - g_i)
                             for i in 0..num_branches {
+                                let i: FE = match FE::PrimeField::try_from(i as u128) {
+                                    Ok(i) => i,
+                                    Err(_) => {
+                                        eyre::bail!("Counter larger than prime field modulus")
+                                    }
+                                }
+                                .into();
+
                                 let one = cm.constant(self.cb, FE::ONE)?;
 
-                                let x_v = cond_v.map(|c| c - todo!("i"));
-                                let x = cm.linear(self.cb, cond, FE::ONE, one, todo!("-i"))?;
+                                let x_v = cond_v.map(|c| c - i);
+                                let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
 
                                 let x_prime_v =
                                     x_v.map(|x| if x != FE::ZERO { x.inverse() } else { FE::ZERO });
                                 let x_prime = cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
 
                                 let (g_i, g_i_v) = g[i];
-                                let b =
-                                    cm.linear(self.cb, one, FE::ONE, g_i, FE::ZERO - FE::ONE)?;
+                                let b = cm.linear(self.cb, one, FE::ONE, g_i, -FE::ONE)?;
 
                                 cm.assert_multiply(self.cb, x, x_prime, b)?;
                                 cm.assert_multiply(self.cb, x, b, x)?;
