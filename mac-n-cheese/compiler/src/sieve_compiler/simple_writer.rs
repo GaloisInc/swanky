@@ -691,7 +691,11 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                             }
 
                             // Output g \cdot x (where x is input values)
-                            todo!("some intense loop shenanigans to get this right")
+                            for out_range in self.out_ranges {
+                                for (i, out_wire) in (out_range.start..=out_range.inclusive_end).enumerate() {
+                                    todo!("compute dot product of g with the ith wire of each input branch, output to out_wire")
+                                }
+                            }
                         }
                         Ok(())
                     }
