@@ -628,44 +628,52 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         // N
                         let num_branches = branch_inputs.len() / num_ranges_per_branch;
 
-                        // c
-                        let (cond, cond_v) = *wm.get(cond_wire_range.start)?;
-
-                        // Build one-hot selecting vector. F2 has special behavior.
+                        // Build one-hot selecting vector, convince verifier it's correct. F2 has special behavior.
                         let mut g: Vec<(WireRef, ProverPrivateCopy<P, FE>)> =
                             Vec::with_capacity(num_branches);
                         match FE::FIELD_TYPE {
                             FieldType::F2 => todo!(),
                             _ => {
                                 debug_assert_eq!(cond_wire_range.len(), 1);
+
+                                // c
+                                let (cond, cond_v) = *wm.get(cond_wire_range.start)?;
+
                                 for i in 0..num_branches {
                                     let i = to_fe(i)?;
 
+                                    // g
                                     let g_i_v =
                                         cond_v.map(|c| if c == i { FE::ONE } else { FE::ZERO });
                                     let g_i = cm.fix(self.cb, self.vs, self.pb, g_i_v)?;
                                     g.push((g_i, g_i_v));
+
+                                    // AssertNeqZero(c - i, 1 - g_i)
+                                    for (i, &(g_i, _)) in g.iter().enumerate() {
+                                        let i = to_fe(i)?;
+
+                                        let one = cm.constant(self.cb, FE::ONE)?;
+
+                                        let x_v = cond_v.map(|c| c - i);
+                                        let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
+
+                                        let x_prime_v = x_v.map(|x| {
+                                            if x != FE::ZERO {
+                                                x.inverse()
+                                            } else {
+                                                FE::ZERO
+                                            }
+                                        });
+                                        let x_prime =
+                                            cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
+
+                                        let b = cm.linear(self.cb, one, FE::ONE, g_i, -FE::ONE)?;
+
+                                        cm.assert_multiply(self.cb, x, x_prime, b)?;
+                                        cm.assert_multiply(self.cb, x, b, x)?;
+                                    }
                                 }
                             }
-                        }
-
-                        // AssertNeqZero(c - i, 1 - g_i)
-                        for (i, &(g_i, _)) in g.iter().enumerate() {
-                            let i = to_fe(i)?;
-
-                            let one = cm.constant(self.cb, FE::ONE)?;
-
-                            let x_v = cond_v.map(|c| c - i);
-                            let x = cm.linear(self.cb, cond, FE::ONE, one, -i)?;
-
-                            let x_prime_v =
-                                x_v.map(|x| if x != FE::ZERO { x.inverse() } else { FE::ZERO });
-                            let x_prime = cm.fix(self.cb, self.vs, self.pb, x_prime_v)?;
-
-                            let b = cm.linear(self.cb, one, FE::ONE, g_i, -FE::ONE)?;
-
-                            cm.assert_multiply(self.cb, x, x_prime, b)?;
-                            cm.assert_multiply(self.cb, x, b, x)?;
                         }
 
                         // For strict mode, assert sum(g_i) = 1
