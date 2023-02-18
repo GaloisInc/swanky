@@ -712,7 +712,29 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                             cm.assert_zero(self.cb, sum_minus_one)?;
                         }
 
-                        // Output g \cdot x (where x is input values)
+                        // Expanded input wire ranges, chunked by branch
+                        let branch_input_wires = branch_inputs
+                            .chunks_exact(num_ranges_per_branch)
+                            .map(|branch_ranges| {
+                                let mut v = Vec::new();
+                                for range in branch_ranges {
+                                    for w in range.start..=range.inclusive_end {
+                                        v.push(w)
+                                    }
+                                }
+                                // This property guarantees that the indexing done later is safe
+                                debug_assert_eq!(
+                                    v.len(),
+                                    self.out_ranges
+                                        .iter()
+                                        .fold(0, |acc, range| { acc + range.len() as usize })
+                                );
+                                v
+                            })
+                            .collect::<Vec<_>>();
+
+                        // Output wires computed by dot product of g and the
+                        // vector of all branch wires in that position
                         for out_range in self.out_ranges {
                             for (i, out_wire) in
                                 (out_range.start..=out_range.inclusive_end).enumerate()
