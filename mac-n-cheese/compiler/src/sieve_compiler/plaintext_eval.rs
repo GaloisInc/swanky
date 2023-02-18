@@ -189,10 +189,7 @@ fn eval<VSR: ValueStreamReader>(
                 }
                 impl<'a, 'b> CompilerFieldVisitor for &'_ mut V<'a, 'b> {
                     type Output = InvariantType<eyre::Result<()>>;
-                    fn visit<FE: CompilerField>(
-                        self,
-                        _arg: (),
-                    ) -> eyre::Result<()> {
+                    fn visit<FE: CompilerField>(self, _arg: ()) -> eyre::Result<()> {
                         let wm = self.wm.as_mut().get::<FE>();
 
                         for range in self.out_ranges.iter() {
@@ -260,9 +257,7 @@ fn eval<VSR: ValueStreamReader>(
                             let in_ranges_to_output: &[WireRange] = branch_inputs
                                 .chunks_exact(num_ranges_per_branch)
                                 .collect::<Vec<_>>()[cond];
-                            for (in_wr, out_wr) in
-                                in_ranges_to_output.iter().zip(self.out_ranges)
-                            {
+                            for (in_wr, out_wr) in in_ranges_to_output.iter().zip(self.out_ranges) {
                                 debug_assert_eq!(in_wr.len(), out_wr.len());
                                 for (in_w, out_w) in (in_wr.start..=in_wr.inclusive_end)
                                     .zip(out_wr.start..=out_wr.inclusive_end)
