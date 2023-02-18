@@ -365,6 +365,20 @@ impl<P: Party, FE: CompilerField> CircuitMaker<P, FE> {
 field_generic_type!(CircuitMakerTy<P: Party, FE: CompilerField> => CircuitMaker<P, FE>);
 field_generic_type!(ValuedWire<P: Party, FE: CompilerField> => (WireRef, ProverPrivateCopy<P, FE>));
 
+fn mul<P: Party, FE: CompilerField>(
+    cb: &mut CircuitBuilder,
+    vs: &mut VoleSupplier,
+    pb: &mut ProverPrivate<P, &mut PrivateBuilder>,
+    cm: &mut CircuitMaker<P, FE>,
+    (left, left_v): (WireRef, ProverPrivateCopy<P, FE>),
+    (right, right_v): (WireRef, ProverPrivateCopy<P, FE>),
+) -> eyre::Result<(WireRef, ProverPrivateCopy<P, FE>)> {
+    let product_v = left_v.zip(right_v).map(|(a, b)| a * b);
+    let product = cm.fix(cb, vs, pb, product_v)?;
+    cm.assert_multiply(cb, left, right, product)?;
+    Ok((product, product_v))
+}
+
 struct EvaluateFieldInstructions<'a, 'b, 'c, 'd, P: Party, VSR: ValueStreamReader> {
     wm: &'a mut FieldGenericProduct<WireMap<'b, ValuedWire<P>>>,
     cb: &'a mut CircuitBuilder<'c>,
@@ -430,10 +444,15 @@ impl<'a, 'b, 'c, P: Party, VSR: ValueStreamReader> CompilerFieldVisitor<&'c Fiel
                 FieldInstruction::Mul { dst, left, right } => {
                     let (left, left_v) = *wm.get(left)?;
                     let (right, right_v) = *wm.get(right)?;
-                    let product_v = left_v.zip(right_v).map(|(a, b)| a * b);
-                    let product = cm.fix(self.cb, self.vs, self.pb, product_v)?;
+                    let (product, product_v) = mul(
+                        self.cb,
+                        self.vs,
+                        self.pb,
+                        cm,
+                        (left, left_v),
+                        (right, right_v),
+                    )?;
                     put(wm, dst, (product, product_v))?;
-                    cm.assert_multiply(self.cb, left, right, product)?;
                 }
                 FieldInstruction::AddConstant { dst, left, right } => {
                     let (left, left_v) = *wm.get(left)?;
