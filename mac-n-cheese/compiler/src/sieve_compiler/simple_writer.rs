@@ -739,7 +739,33 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                             for (j, out_wire) in
                                 (out_range.start..=out_range.inclusive_end).enumerate()
                             {
-                                todo!("compute dot product of g with the ith wire of each input branch, output to out_wire")
+                                // Get the jth wire of every branch's input range
+                                let mut jth_branch_wires =
+                                    branch_input_wires.iter().map(|branch| branch[j]);
+                                debug_assert_eq!(jth_branch_wires.len(), num_branches);
+
+                                // The first product is computed outside the loop
+                                let &g_0 = g.get(0).context("Mux has no branches")?;
+
+                                // b_i_j is the jth wire of input branch i
+                                let b_0_j = *wm.get(
+                                    jth_branch_wires
+                                        .nth(0)
+                                        .context("Mux has no input branches")?,
+                                )?;
+
+                                let (mut sum, mut sum_v) =
+                                    mul(self.cb, self.vs, self.pb, cm, g_0, b_0_j)?;
+
+                                for (b_i_j, &g_i) in jth_branch_wires.zip(&g[1..]) {
+                                    let b_i_j = *wm.get(b_i_j)?;
+                                    let (prod, prod_v) =
+                                        mul(self.cb, self.vs, self.pb, cm, g_i, b_i_j)?;
+                                    sum = cm.linear(self.cb, sum, FE::ONE, prod, FE::ONE)?;
+                                    sum_v = sum_v.zip(prod_v).map(|(s, p)| s + p);
+                                }
+
+                                put(wm, out_wire, (sum, sum_v))?;
                             }
                         }
 
