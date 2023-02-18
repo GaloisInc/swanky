@@ -736,7 +736,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         // Output wires computed by dot product of g and the
                         // vector of all branch wires in that position
                         for out_range in self.out_ranges {
-                            for (i, out_wire) in
+                            for (j, out_wire) in
                                 (out_range.start..=out_range.inclusive_end).enumerate()
                             {
                                 todo!("compute dot product of g with the ith wire of each input branch, output to out_wire")
