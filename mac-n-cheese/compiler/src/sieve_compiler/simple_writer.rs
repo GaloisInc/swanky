@@ -653,7 +653,10 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         match FE::FIELD_TYPE {
                             FieldType::F2 => {
                                 // Convert x to a k-bit litle-endian number, inverting all bits
-                                fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+                                fn to_k_flipped_bits<FE: CompilerField>(
+                                    x: usize,
+                                    k: usize,
+                                ) -> eyre::Result<Vec<FE>> {
                                     let mut bits = Vec::with_capacity(k);
 
                                     let mut quot = x;
