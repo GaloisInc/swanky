@@ -651,7 +651,25 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         let mut g: Vec<(WireRef, ProverPrivateCopy<P, FE>)> =
                             Vec::with_capacity(num_branches);
                         match FE::FIELD_TYPE {
-                            FieldType::F2 => todo!(),
+                            FieldType::F2 => {
+                                // Little-endian
+                                fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+                                    let mut bits = Vec::with_capacity(k);
+
+                                    let mut quot = x;
+                                    while quot != 0 {
+                                        bits.push(if quot % 2 == 0 { FE::ZERO } else { FE::ONE });
+                                        quot /= 2;
+                                    }
+
+                                    if bits.len() > k {
+                                        eyre::bail!("{x} cannot be expressed in {k} bits");
+                                    } else {
+                                        bits.append(&mut vec![FE::ZERO; k - bits.len()]);
+                                        Ok(bits)
+                                    }
+                                }
+                            }
                             _ => {
                                 debug_assert_eq!(cond_wire_range.len(), 1);
 
