@@ -622,14 +622,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 impl<'a, 'b, P: Party> CompilerFieldVisitor for &'_ mut V<'a, 'b, '_, '_, P> {
                     type Output = InvariantType<eyre::Result<()>>;
                     fn visit<FE: CompilerField>(self, _arg: ()) -> eyre::Result<()> {
-                        fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
-                            Ok(match FE::PrimeField::try_from(x as u128) {
-                                Ok(x) => x,
-                                Err(_) => eyre::bail!("Value larger than prime field modulus"),
-                            }
-                            .into())
-                        }
-
                         let wm = self.wm.as_mut().get::<FE>();
                         let cm = self.cm.as_mut().get::<FE>();
 
@@ -674,6 +666,16 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 }
                             }
                             _ => {
+                                fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
+                                    Ok(match FE::PrimeField::try_from(x as u128) {
+                                        Ok(x) => x,
+                                        Err(_) => {
+                                            eyre::bail!("Value larger than prime field modulus")
+                                        }
+                                    }
+                                    .into())
+                                }
+
                                 debug_assert_eq!(cond_wire_range.len(), 1);
 
                                 // c
