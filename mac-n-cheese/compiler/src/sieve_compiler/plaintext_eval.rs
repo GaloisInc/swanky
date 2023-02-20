@@ -251,7 +251,7 @@ fn eval<VSR: ValueStreamReader>(
                                         }
                                     }
                                 }
-                                Permissiveness::Strict => eyre::bail!("Strict mux failed: selector value {cond} >= number of branches {}", num_branches - 1)
+                                Permissiveness::Strict => eyre::bail!("Strict mux failed: selector value {cond} >= number of branches {}", num_branches)
                             }
                         } else {
                             let in_ranges_to_output: &[WireRange] = branch_inputs
