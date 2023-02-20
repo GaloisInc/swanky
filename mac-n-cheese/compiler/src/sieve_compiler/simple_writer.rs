@@ -664,6 +664,46 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         Ok(bits)
                                     }
                                 }
+
+                                let mut cond_wires =
+                                    Vec::with_capacity(cond_wire_range.len() as usize);
+                                for w in cond_wire_range.start..=cond_wire_range.inclusive_end {
+                                    cond_wires.push(*wm.get(w)?);
+                                }
+
+                                for i in 0..num_branches {
+                                    let i: Vec<FE> = to_k_flipped_bits(i, cond_wires.len())?;
+
+                                    // TODO: Move to inner loop?
+                                    let one = cm.constant(self.cb, FE::ONE)?;
+
+                                    // Xor corresponding bits
+                                    let mut xors = Vec::with_capacity(cond_wires.len());
+                                    for (i_j, &(c_j, c_j_v)) in
+                                        i.into_iter().rev().zip(cond_wires.iter())
+                                    {
+                                        xors.push((
+                                            cm.linear(self.cb, c_j, FE::ONE, one, i_j)?,
+                                            c_j_v.map(|x| x + i_j),
+                                        ));
+                                    }
+
+                                    // Multiply the results
+                                    let (mut g_i, mut g_i_v) =
+                                        xors.get(0).context("Mux condition empty")?;
+                                    for &(xor, xor_v) in &xors[1..] {
+                                        (g_i, g_i_v) = mul(
+                                            self.cb,
+                                            self.vs,
+                                            self.pb,
+                                            cm,
+                                            (g_i, g_i_v),
+                                            (xor, xor_v),
+                                        )?;
+                                    }
+
+                                    g.push((g_i, g_i_v));
+                                }
                             }
                             _ => {
                                 fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
