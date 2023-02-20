@@ -652,20 +652,20 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                             Vec::with_capacity(num_branches);
                         match FE::FIELD_TYPE {
                             FieldType::F2 => {
-                                // Little-endian
-                                fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+                                // Convert x to a k-bit litle-endian number, inverting all bits
+                                fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
                                     let mut bits = Vec::with_capacity(k);
 
                                     let mut quot = x;
                                     while quot != 0 {
-                                        bits.push(if quot % 2 == 0 { FE::ZERO } else { FE::ONE });
+                                        bits.push(if quot % 2 == 0 { FE::ONE } else { FE::ZERO });
                                         quot /= 2;
                                     }
 
                                     if bits.len() > k {
                                         eyre::bail!("{x} cannot be expressed in {k} bits");
                                     } else {
-                                        bits.append(&mut vec![FE::ZERO; k - bits.len()]);
+                                        bits.append(&mut vec![FE::ONE; k - bits.len()]);
                                         Ok(bits)
                                     }
                                 }
