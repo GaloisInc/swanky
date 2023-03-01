@@ -27,7 +27,7 @@ use super::{
 };
 
 fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
-    mut relation: PathBuf,
+    relation: PathBuf,
     public_inputs: Vec<PathBuf>,
     out: &flume::Sender<eyre::Result<CircuitChunk>>,
 ) -> eyre::Result<()> {
@@ -43,9 +43,9 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
             mac_n_cheese_sieve_parser::Type::PluginType(PluginType {
                 name,
                 operation,
-                args,
+                args: _,
             }) => match name.as_bytes() {
-                variant @ (b"ram_v0" | b"ram_arith_v0") => match operation.as_bytes() {
+                b"ram_v0" | b"ram_arith_v0" => match operation.as_bytes() {
                     b"ram" => todo!("Check args based on variant, put the type somewhere useful"),
                     _ => eyre::bail!("Plugin {name} has no {operation} type"),
                 },
@@ -621,7 +621,7 @@ impl InstructionSink for FunctionBuildingSink<'_> {
         eyre::bail!("Functions cannot be nested")
     }
 
-    fn add_iter(&mut self, defn: MapDefinition) -> eyre::Result<()> {
+    fn add_iter(&mut self, _defn: MapDefinition) -> eyre::Result<()> {
         eyre::bail!("Functions cannot be nested")
     }
 
