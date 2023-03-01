@@ -6,9 +6,9 @@ use std::{
 use color_eyre::Help;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_sieve_parser::{
-    FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType, RelationReader,
-    RelationVisitor, TypeId, TypedWireRange, ValueStreamKind, ValueStreamReader, WireId,
-    WireRange as ParserWireRange,
+    FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType, PluginTypeArg,
+    RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind, ValueStreamReader,
+    WireId, WireRange as ParserWireRange,
 };
 use rustc_hash::FxHashMap;
 
@@ -106,6 +106,7 @@ trait InstructionSink {
     fn functions(&self) -> &FunctionDefinitions;
     fn add_function(&mut self, defn: FunctionDefinition) -> eyre::Result<()>;
     fn add_mux(&mut self, defn: MuxDefinition) -> eyre::Result<()>;
+    fn add_iter(&mut self, defn: MapDefinition) -> eyre::Result<()>;
     fn update_size_hint(&mut self, delta: SizeHint) -> eyre::Result<()>;
 }
 
@@ -536,7 +537,50 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 })?;
             }
             b"ram_v0" | b"ram_arith_v0" => todo!(),
-            b"iter_v0" => todo!(),
+            b"iter_v0" => {
+                // 3 args: function name, number of closure wire ranges, number of iterations
+                eyre::ensure!(
+                    args.len() == 3,
+                    "map and map_enumerated expect exactly 3 arguments"
+                );
+
+                eyre::ensure!(
+                    private_counts.is_empty(),
+                    "map and map_enumerated do not read private inputs"
+                );
+                eyre::ensure!(
+                    public_counts.is_empty(),
+                    "map and map_enumerated do not read public inputs"
+                );
+
+                let PluginTypeArg::String(func_name) = args[0].clone() else {
+                    eyre::bail!("map and map_enumerated expect a function name as the first plugin-binding argument")
+                };
+
+                let num_env = match args[1] {
+                    PluginTypeArg::Number(x) => x,
+                    _ => eyre::bail!("map and map_enumerated a number (the number of closure wire ranges) as the second plugin-binding argument")
+                };
+
+                let iter_count = match args[2] {
+                    PluginTypeArg::Number(x) => x,
+                    _ => eyre::bail!("map and map_enumerated expects a number (the number of iterations) as the second plugin-binding argument")
+                };
+
+                let enumerated = match operation.as_bytes() {
+                    b"map" => false,
+                    b"map_enumerated" => true,
+                    _ => eyre::bail!("Invalid mapping style {operation}"),
+                };
+
+                self.sink.add_iter(MapDefinition {
+                    name,
+                    func_name,
+                    num_env,
+                    iter_count,
+                    enumerated,
+                })?;
+            }
             _ => eyre::bail!("Unknown plugin {plugin_name}"),
         }
 
@@ -574,6 +618,10 @@ impl InstructionSink for FunctionBuildingSink<'_> {
     }
 
     fn add_mux(&mut self, _defn: MuxDefinition) -> eyre::Result<()> {
+        eyre::bail!("Functions cannot be nested")
+    }
+
+    fn add_iter(&mut self, defn: MapDefinition) -> eyre::Result<()> {
         eyre::bail!("Functions cannot be nested")
     }
 
@@ -659,6 +707,15 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
         let old = self
             .functions
             .insert(defn.name.as_bytes().to_vec(), Def::Mux(defn.clone()));
+        eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
+        Ok(())
+    }
+
+    fn add_iter(&mut self, defn: MapDefinition) -> eyre::Result<()> {
+        let defn = Arc::new(defn);
+        let old = self
+            .functions
+            .insert(defn.name.as_bytes().to_vec(), Def::Map(defn.clone()));
         eyre::ensure!(old.is_none(), "{:?} has duplicate definitions", defn.name);
         Ok(())
     }
