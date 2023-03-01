@@ -570,7 +570,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 let enumerated = match operation.as_bytes() {
                     b"map" => false,
                     b"map_enumerated" => true,
-                    _ => eyre::bail!("Invalid mapping style {operation}"),
+                    _ => eyre::bail!("Invalid iter operation {operation}"),
                 };
 
                 self.sink.add_iter(MapDefinition {
