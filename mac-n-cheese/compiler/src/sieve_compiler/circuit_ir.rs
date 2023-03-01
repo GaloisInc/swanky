@@ -3,7 +3,7 @@ use crate::sieve_compiler::supported_fields::CompilerFieldVisitor;
 use super::supported_fields::FieldIndexedArray;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamReader};
+use mac_n_cheese_sieve_parser::{Number, RelationReader, ValueStreamReader};
 use mac_n_cheese_wire_map::WireId;
 use rustc_hash::FxHashMap;
 use scuttlebutt::field::FiniteField;
@@ -226,8 +226,8 @@ pub struct MuxDefinition {
 pub struct MapDefinition {
     name: String,
     func_name: String,
-    num_env: u64,
-    iter_count: u64,
+    num_env: Number,
+    iter_count: Number,
     enumerated: bool,
 }
 
