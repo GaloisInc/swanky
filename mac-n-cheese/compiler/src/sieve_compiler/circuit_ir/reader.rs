@@ -22,8 +22,8 @@ use crate::sieve_compiler::{
 };
 
 use super::{
-    CircuitChunk, FieldInstructionsTy, FunctionDefinition, Instruction, MuxDefinition,
-    Permissiveness, PublicInputsNeeded, SizeHint, UserDefinedFunctonId,
+    CircuitChunk, FieldInstructionsTy, FunctionDefinition, Instruction, MapDefinition,
+    MuxDefinition, Permissiveness, PublicInputsNeeded, SizeHint, UserDefinedFunctonId,
 };
 
 fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
@@ -92,6 +92,7 @@ pub(super) fn read_circuit<
 enum Def {
     FunctionDefinition(UserDefinedFunctonId, Arc<FunctionDefinition>),
     Mux(Arc<MuxDefinition>),
+    Map(Arc<MapDefinition>),
 }
 
 type FunctionDefinitions = FxHashMap<Vec<u8>, Def>;
@@ -390,6 +391,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                 })?;
                 self.sink.update_size_hint(1)?;
             }
+            Def::Map(definition) => todo!(),
         }
         Ok(())
     }

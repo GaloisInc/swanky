@@ -222,6 +222,15 @@ pub struct MuxDefinition {
     branch_sizes: Vec<u64>,
 }
 
+#[derive(Debug)]
+pub struct MapDefinition {
+    name: String,
+    func_name: String,
+    num_env: u64,
+    iter_count: u64,
+    enumerated: bool,
+}
+
 pub type NewFunctions = Vec<(UserDefinedFunctonId, Arc<FunctionDefinition>)>;
 
 #[derive(Default, Debug)]
