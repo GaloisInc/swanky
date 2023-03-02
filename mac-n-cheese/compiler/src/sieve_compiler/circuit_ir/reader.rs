@@ -789,7 +789,15 @@ impl<VSR: ValueStreamReader> InstructionSink for GlobalSink<VSR> {
 
     fn add_function(&mut self, defn: FunctionDefinition) -> eyre::Result<()> {
         let defn = Arc::new(defn);
-        let id = self.functions.len();
+        let id = self
+            .functions
+            .iter()
+            .filter(|(_, d)| match d {
+                Def::FunctionDefinition(_, _) => true,
+                _ => false,
+            })
+            .collect::<Vec<_>>()
+            .len();
         let old = self.functions.insert(
             defn.name.as_bytes().to_vec(),
             Def::FunctionDefinition(id, defn.clone()),
