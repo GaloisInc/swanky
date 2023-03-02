@@ -568,6 +568,46 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     _ => eyre::bail!("map and map_enumerated expects a number (the number of iterations) as the second plugin-binding argument")
                 };
 
+                // Check basic input/output compatibility
+                let Def::FunctionDefinition(_, func) = self.sink.functions().get(name.as_bytes()).context("Function to be iterated has not been defined")? else {
+                    eyre::bail!("map and map_enumerated only support iterating user-defined functions")
+                };
+
+                eyre::ensure!(
+                    outputs.len() == func.output_sizes.len(),
+                    "the number of iteration outputs must match the number of closure outputs"
+                );
+
+                for (plugin_output, (_, func_output_count)) in
+                    outputs.iter().zip(func.output_sizes.iter())
+                {
+                    // TODO: Would be nice to check the types here, too, but
+                    // that's expensive / hard since we can't compare `Type`s
+                    // directly. We'll let that be taken care of down-stream.
+                    // For now, checking counts alone is a nice 'early-exit'
+                    // condition to have here.
+
+                    // plugin_output_count should be iter_count * func_output_count
+                    eyre::ensure!(plugin_output.count == func_output_count * iter_count, "map and map enumerated expect that each output count is #iterations * closure output count");
+                }
+
+                eyre::ensure!(
+                    inputs.len() == func.input_sizes.len(),
+                    "the number of iteration inputs must match the number of closure inputs"
+                );
+
+                for (i, (plugin_input, (_, func_input_count))) in
+                    inputs.iter().zip(func.input_sizes.iter()).enumerate()
+                {
+                    // For the first num_env, the counts should match exactly.
+                    // For the rest, counts should be multiples as for outputs.
+                    if i < num_env as usize {
+                        eyre::ensure!(plugin_input.count == *func_input_count, "map and map enumerated expect that each environment wire range count is closure input count");
+                    } else {
+                        eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
+                    }
+                }
+
                 let enumerated = match operation.as_bytes() {
                     b"map" => false,
                     b"map_enumerated" => true,
