@@ -168,14 +168,10 @@ impl<FE: FiniteField> Sender<FE> {
             // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
             let mut x = e;
             let mut z = c;
-            x += indices
-                .iter()
-                .map(|(j, a)| self.base_voles[*j].0 * *a)
-                .sum();
-            z += indices
-                .iter()
-                .map(|(j, a)| *a * self.base_voles[*j].1)
-                .sum();
+            for (j, a) in indices.iter() {
+                x += self.base_voles[*j].0 * *a;
+                z += *a * self.base_voles[*j].1;
+            }
 
             if i < num_saved {
                 base_voles.push((x, z));
