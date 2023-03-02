@@ -231,9 +231,11 @@ fn eval<VSR: ValueStreamReader>(
                             }
                             _ => {
                                 debug_assert_eq!(cond_wire_range.len(), 1);
-                                bits_to_usize(FE::bit_decomposition(
-                                    wm.get(cond_wire_range.start)?,
-                                ))?
+                                bits_to_usize(
+                                    FE::bit_decomposition(wm.get(cond_wire_range.start)?)
+                                        .into_iter()
+                                        .rev(),
+                                )?
                             }
                         };
 
