@@ -225,7 +225,7 @@ pub struct MuxDefinition {
 #[derive(Debug)]
 pub struct MapDefinition {
     name: String,
-    func_name: String,
+    func: (UserDefinedFunctonId, Arc<FunctionDefinition>),
     num_env: u64,
     iter_count: u64,
     enumerated: bool,

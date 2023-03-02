@@ -616,7 +616,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
 
                 self.sink.add_iter(MapDefinition {
                     name,
-                    func_id: *id,
+                    func: (*id, func.clone()),
                     num_env,
                     iter_count,
                     enumerated,
