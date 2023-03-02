@@ -553,7 +553,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     "map and map_enumerated do not read public inputs"
                 );
 
-                let PluginTypeArg::String(func_name) = args[0].clone() else {
+                let PluginTypeArg::String(_) = args[0].clone() else {
                     eyre::bail!("map and map_enumerated expect a function name as the first plugin-binding argument")
                 };
 
@@ -569,7 +569,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 };
 
                 // Check basic input/output compatibility
-                let Def::FunctionDefinition(_, func) = self.sink.functions().get(name.as_bytes()).context("Function to be iterated has not been defined")? else {
+                let Def::FunctionDefinition(id, func) = self.sink.functions().get(name.as_bytes()).context("Function to be iterated has not been defined")? else {
                     eyre::bail!("map and map_enumerated only support iterating user-defined functions")
                 };
 
@@ -616,7 +616,7 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
 
                 self.sink.add_iter(MapDefinition {
                     name,
-                    func_name,
+                    func_id: *id,
                     num_env,
                     iter_count,
                     enumerated,
