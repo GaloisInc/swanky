@@ -557,13 +557,14 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     eyre::bail!("map and map_enumerated expect a function name as the first plugin-binding argument")
                 };
 
+                // NOTE: We assume the Number arguments fit in u64s for iter
                 let num_env = match args[1] {
-                    PluginTypeArg::Number(x) => x,
+                    PluginTypeArg::Number(x) => x.as_words()[0],
                     _ => eyre::bail!("map and map_enumerated a number (the number of closure wire ranges) as the second plugin-binding argument")
                 };
 
                 let iter_count = match args[2] {
-                    PluginTypeArg::Number(x) => x,
+                    PluginTypeArg::Number(x) => x.as_words()[0],
                     _ => eyre::bail!("map and map_enumerated expects a number (the number of iterations) as the second plugin-binding argument")
                 };
 

@@ -226,8 +226,8 @@ pub struct MuxDefinition {
 pub struct MapDefinition {
     name: String,
     func_name: String,
-    num_env: Number,
-    iter_count: Number,
+    num_env: u64,
+    iter_count: u64,
     enumerated: bool,
 }
 
