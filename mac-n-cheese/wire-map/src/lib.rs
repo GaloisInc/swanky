@@ -288,47 +288,62 @@ impl<'parent, T> WireMap<'parent, T> {
         }
     }
     pub fn free(&mut self, start: WireId, inclusive_end: WireId) -> eyre::Result<()> {
-        if let Some(len) = inclusive_end.checked_sub(start) {
-            let len = len as usize + 1;
-            // We first check the cache, since some allocations might live exclusively in the cache.
-            let was_in_cache = if let Some((idx, _hit)) = self.check_cache_for_wire(start) {
+        let mut curr_start = start;
+        while curr_start <= inclusive_end {
+            let mut alloc_len = 0;
+
+            let was_in_cache = if let Some((idx, _hit)) = self.check_cache_for_wire(curr_start) {
                 let allocation = &mut self.cached_allocations[idx];
-                debug_assert!(allocation.len() > 0);
+                alloc_len = allocation.len();
+                debug_assert!(alloc_len > 0);
+
                 let found_start = self.cache_starts.as_array()[idx];
                 eyre::ensure!(
-                    found_start == start && allocation.len() == len,
-                    "Allocation {start}..={inclusive_end} not found. Found {found_start}..={}",
-                    found_start + (allocation.len() as u64 - 1)
+                    found_start == curr_start,
+                    "Allocation starting with {curr_start} not found. Found an allocation starting with {found_start}."
                 );
+
+                let found_end = found_start + (alloc_len as u64 - 1);
+                eyre::ensure!(
+                    found_end <= inclusive_end,
+                    "Allocation {found_start}..={found_end} extends past {inclusive_end}."
+                );
+
                 let mut cache_lens_and_last_useds = self.cache_lens_and_last_useds.as_array();
                 cache_lens_and_last_useds[idx] = EMPTY_AGE_AND_LAST_USED;
                 self.cache_lens_and_last_useds = cache_lens_and_last_useds.into();
                 std::mem::take(allocation);
+
                 true
             } else {
                 false
             };
-            match self.storage.remove(&start) {
+            match self.storage.remove(&curr_start) {
                 Some(cell) => {
-                    if cell.len() != len {
-                        // If the length doesn't match what's expected, then re-insert the cell
-                        // that we just removed and return an error.
-                        let cell_len = cell.len();
-                        self.storage.insert(start, cell);
+                    alloc_len = cell.len();
+                    let found_end = curr_start + (alloc_len as u64 - 1);
+
+                    // If the allocation extends past inclusive_end, then
+                    // re-insert the cell that we removed and return an error.
+                    if found_end > inclusive_end {
+                        self.storage.insert(curr_start, cell);
                         eyre::bail!(
-                            "Allocation starting at {start} has length {}, not {len}",
-                            cell_len
+                            "Cannot free {curr_start}..={found_end}, which extends beyond {inclusive_end}."
                         );
                     }
                 }
+
                 // It's okay if the allocation wasn't found in the BTreeMap, but only if it _was_
                 // found in the cache.
                 None => eyre::ensure!(
                     was_in_cache,
-                    "Attemping to free non-existant allocation (no allcation starts at {start})",
+                    "Attemping to free non-existent allocation (no allocation starts at {curr_start})",
                 ),
             }
+
+            curr_start += alloc_len as u64;
         }
+
         Ok(())
     }
     // panics if allocation isn't mutable
