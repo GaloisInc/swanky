@@ -292,6 +292,7 @@ impl<'parent, T> WireMap<'parent, T> {
         while curr_start <= inclusive_end {
             let mut alloc_len = 0;
 
+            // We first check the cache, since some allocations might live exclusively in the cache.
             let was_in_cache = if let Some((idx, _hit)) = self.check_cache_for_wire(curr_start) {
                 let allocation = &mut self.cached_allocations[idx];
                 alloc_len = allocation.len();
