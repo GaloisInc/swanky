@@ -96,16 +96,20 @@ fn lpn_mtx_indices<FE: FiniteField>(
     distribution: &Uniform<u32>,
     mut rng: &mut AesRng,
 ) -> [(usize, FE::PrimeField); LPN_PARAMS_D] {
-    let mut indices = [(0u32, FE::PrimeField::ONE); LPN_PARAMS_D];
+    let mut indices = [0u32; LPN_PARAMS_D];
     for i in 0..LPN_PARAMS_D {
         let mut rand_idx = distribution.sample(&mut rng);
-        while indices.iter().any(|&x| x.0 == rand_idx) {
+        while indices[0..i].iter().any(|&x| x == rand_idx) {
             rand_idx = distribution.sample(&mut rng);
         }
-        indices[i].0 = rand_idx;
-        indices[i].1 = FE::PrimeField::random_nonzero(&mut rng);
+        indices[i] = rand_idx;
     }
-    indices.map(|(x, y)| (x.try_into().unwrap(), y))
+    let mut out_indices = [(0, FE::PrimeField::ONE); LPN_PARAMS_D];
+    for i in 0..LPN_PARAMS_D {
+        out_indices[i].0 = indices[i].try_into().unwrap();
+        out_indices[i].1 = FE::PrimeField::random_nonzero(&mut rng);
+    }
+    out_indices
 }
 
 /// Subfield VOLE sender.
@@ -164,14 +168,10 @@ impl<FE: FiniteField> Sender<FE> {
             // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
             let mut x = e;
             let mut z = c;
-            x += indices
-                .iter()
-                .map(|(j, a)| self.base_voles[*j].0 * *a)
-                .sum();
-            z += indices
-                .iter()
-                .map(|(j, a)| *a * self.base_voles[*j].1)
-                .sum();
+            for (j, a) in indices.iter() {
+                x += self.base_voles[*j].0 * *a;
+                z += *a * self.base_voles[*j].1;
+            }
 
             if i < num_saved {
                 base_voles.push((x, z));
