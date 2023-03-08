@@ -140,6 +140,7 @@ pub enum Instruction {
         function_id: FunctionId,
         out_ranges: FieldIndexedArray<Vec<WireRange>>,
         in_ranges: FieldIndexedArray<Vec<WireRange>>,
+        counter_value: Option<u64>,
     },
     // TODO: It would be better if we could make this a FieldInstruction
     MuxCall {

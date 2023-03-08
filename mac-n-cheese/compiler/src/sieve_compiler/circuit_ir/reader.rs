@@ -334,6 +334,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                     function_id: FunctionId::UserDefined(*id),
                     out_ranges,
                     in_ranges,
+                    counter_value: None,
                 })?;
                 for field in FieldType::ALL {
                     self.sink
@@ -438,6 +439,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             function_id: FunctionId::UserDefined(id),
                             out_ranges,
                             in_ranges,
+                            counter_value: None,
                         })?;
                         for field in FieldType::ALL {
                             self.sink
