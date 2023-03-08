@@ -594,6 +594,12 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
             }
             b"ram_v0" | b"ram_arith_v0" => todo!(),
             b"iter_v0" => {
+                let enumerated = match operation.as_bytes() {
+                    b"map" => false,
+                    b"map_enumerated" => true,
+                    _ => eyre::bail!("Invalid iter operation {operation}"),
+                };
+
                 // 3 args: function name, number of closure wire ranges, number of iterations
                 eyre::ensure!(
                     args.len() == 3,
@@ -659,16 +665,12 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     // For the rest, counts should be multiples as for outputs.
                     if i < num_env as usize {
                         eyre::ensure!(plugin_input.count == *func_input_count, "map and map enumerated expect that each environment wire range count is closure input count");
+                    } else if i == num_env as usize && enumerated {
+                        eyre::ensure!(plugin_input.count == *func_input_count, "map enumerated expects that the index wire range count is closure input count")
                     } else {
                         eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
                     }
                 }
-
-                let enumerated = match operation.as_bytes() {
-                    b"map" => false,
-                    b"map_enumerated" => true,
-                    _ => eyre::bail!("Invalid iter operation {operation}"),
-                };
 
                 self.sink.add_iter(MapDefinition {
                     name,
