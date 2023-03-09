@@ -137,7 +137,7 @@ pub enum FunctionId {
 pub struct CounterInfo {
     pub num_env: u64,
     pub field_type: FieldType,
-    pub num_wires: u64,
+    pub num_wires: usize,
     pub value: usize,
 }
 

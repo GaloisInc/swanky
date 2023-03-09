@@ -451,13 +451,16 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                         };
 
                         if field_type != FieldType::F2 {
-                            eyre::ensure!(num_wires == 1, "only one wire can be used for non-binary counter values");
+                            eyre::ensure!(
+                                num_wires == 1,
+                                "only one wire can be used for non-binary counter values"
+                            );
                         }
 
                         Some(CounterInfo {
                             num_env,
                             field_type,
-                            num_wires,
+                            num_wires: num_wires as usize,
                             value: i as usize,
                         })
                     } else {

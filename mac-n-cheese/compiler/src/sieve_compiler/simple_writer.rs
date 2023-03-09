@@ -600,7 +600,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     }) = self.counter_info
                                     {
                                         if field_type == FE::FIELD_TYPE && i == num_env as usize {
-                                            input_pos += num_wires
+                                            input_pos += num_wires as u64
                                         }
                                     }
 
