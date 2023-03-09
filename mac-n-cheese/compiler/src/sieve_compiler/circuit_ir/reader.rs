@@ -452,14 +452,9 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
 
                         let num_env_for_field = (&func).input_sizes[..num_env as usize]
                             .iter()
-                            .enumerate()
-                            .filter(|&(i, (t, _))| {
-                                if i < num_env as usize {
-                                    if let &Type::Field(ft) = t {
-                                        ft == field_type
-                                    } else {
-                                        false
-                                    }
+                            .filter(|&(t, _)| {
+                                if let &Type::Field(ft) = t {
+                                    ft == field_type
                                 } else {
                                     false
                                 }
