@@ -454,7 +454,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             num_env,
                             field_type,
                             num_wires,
-                            value: i,
+                            value: i as usize,
                         })
                     } else {
                         None
