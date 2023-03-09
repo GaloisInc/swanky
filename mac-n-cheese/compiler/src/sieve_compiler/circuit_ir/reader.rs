@@ -394,61 +394,67 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                 self.sink.update_size_hint(1)?;
             }
             Def::Map(definition) => {
-                if !definition.enumerated {
-                    let iter_count = definition.iter_count;
-                    let num_env = definition.num_env;
-                    let (id, func) = definition.func.clone();
+                let enumerated = definition.enumerated;
+                let iter_count = definition.iter_count;
+                let num_env = definition.num_env;
+                let (id, func) = definition.func.clone();
 
-                    for i in 0..iter_count {
-                        let dst: Vec<ParserWireRange> = dst
-                            .iter()
-                            .map(|wr| {
+                for i in 0..iter_count {
+                    let dst: Vec<ParserWireRange> = dst
+                        .iter()
+                        .map(|wr| {
+                            let window_size = wr.len() / iter_count;
+                            ParserWireRange {
+                                start: wr.start + i * window_size,
+                                end: wr.end - (iter_count - (i + 1)) * window_size,
+                            }
+                        })
+                        .collect();
+
+                    let args: Vec<ParserWireRange> = args
+                        .iter()
+                        .enumerate()
+                        .map(|(j, wr)| {
+                            if j < num_env as usize {
+                                *wr
+                            } else {
                                 let window_size = wr.len() / iter_count;
                                 ParserWireRange {
                                     start: wr.start + i * window_size,
                                     end: wr.end - (iter_count - (i + 1)) * window_size,
                                 }
-                            })
-                            .collect();
+                            }
+                        })
+                        .collect();
 
-                        let args: Vec<ParserWireRange> = args
-                            .iter()
-                            .enumerate()
-                            .map(|(j, wr)| {
-                                if j < num_env as usize {
-                                    *wr
-                                } else {
-                                    let window_size = wr.len() / iter_count;
-                                    ParserWireRange {
-                                        start: wr.start + i * window_size,
-                                        end: wr.end - (iter_count - (i + 1)) * window_size,
-                                    }
-                                }
-                            })
-                            .collect();
+                    // If this is an enumerated map, we want to ignore the
+                    // index wire range intentionally when making the ranges
+                    // for the calls we will emit.
+                    let in_fn_sizes: Vec<_> = func
+                        .input_sizes
+                        .iter()
+                        .enumerate()
+                        .filter(|&(i, _)| !enumerated || i != num_env as usize)
+                        .map(|(_, &v)| v)
+                        .collect();
 
-                        // TODO: This is nearly identical to the FunctionDefinition
-                        // case above. Should probably refactor to stay DRY.
-                        let out_ranges = make_ranges("output", &func.output_sizes, &dst)
-                            .with_note(|| format!("When calling {:?}", name_str()))?;
-                        let in_ranges = make_ranges("input", &func.input_sizes, &args)
-                            .with_note(|| format!("When calling {:?}", name_str()))?;
-                        let public_input_needs = func.public_inputs_needed;
-                        let size_hint = func.size_hint;
-                        self.sink.push(Instruction::FunctionCall {
-                            function_id: FunctionId::UserDefined(id),
-                            out_ranges,
-                            in_ranges,
-                            counter_value: None,
-                        })?;
-                        for field in FieldType::ALL {
-                            self.sink
-                                .needs_public_input(*field, public_input_needs[*field])?;
-                        }
-                        self.sink.update_size_hint(size_hint + 1)?;
+                    let out_ranges = make_ranges("output", &func.output_sizes, &dst)
+                        .with_note(|| format!("When calling {:?}", name_str()))?;
+                    let in_ranges = make_ranges("input", &in_fn_sizes, &args)
+                        .with_note(|| format!("When calling {:?}", name_str()))?;
+                    let public_input_needs = func.public_inputs_needed;
+                    let size_hint = func.size_hint;
+                    self.sink.push(Instruction::FunctionCall {
+                        function_id: FunctionId::UserDefined(id),
+                        out_ranges,
+                        in_ranges,
+                        counter_value: if enumerated { Some(i) } else { None },
+                    })?;
+                    for field in FieldType::ALL {
+                        self.sink
+                            .needs_public_input(*field, public_input_needs[*field])?;
                     }
-                } else {
-                    todo!("Handle map_enumerated")
+                    self.sink.update_size_hint(size_hint + 1)?;
                 }
             }
         }
