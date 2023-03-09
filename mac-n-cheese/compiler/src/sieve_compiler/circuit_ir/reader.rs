@@ -450,6 +450,10 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             eyre::bail!("iteration index wire range must have field type")
                         };
 
+                        if field_type != FieldType::F2 {
+                            eyre::ensure!(num_wires == 1, "only one wire can be used for non-binary counter values");
+                        }
+
                         Some(CounterInfo {
                             num_env,
                             field_type,
