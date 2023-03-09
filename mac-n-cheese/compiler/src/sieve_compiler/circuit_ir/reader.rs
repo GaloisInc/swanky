@@ -685,21 +685,41 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 }
 
                 eyre::ensure!(
-                    inputs.len() == func.input_sizes.len(),
+                    inputs.len() + if enumerated { 1 } else { 0 } == func.input_sizes.len(),
                     "the number of iteration inputs must match the number of closure inputs"
                 );
 
-                for (i, (plugin_input, (_, func_input_count))) in
-                    inputs.iter().zip(func.input_sizes.iter()).enumerate()
-                {
-                    // For the first num_env, the counts should match exactly.
-                    // For the rest, counts should be multiples as for outputs.
-                    if i < num_env as usize {
+                if enumerated {
+                    for (plugin_input, (_, func_input_count)) in inputs[..num_env as usize]
+                        .iter()
+                        .zip(&func.input_sizes[..num_env as usize])
+                    {
                         eyre::ensure!(plugin_input.count == *func_input_count, "map and map enumerated expect that each environment wire range count is closure input count");
-                    } else if i == num_env as usize && enumerated {
-                        eyre::ensure!(plugin_input.count == *func_input_count, "map enumerated expects that the index wire range count is closure input count")
-                    } else {
+                    }
+
+                    for (plugin_input, (_, func_input_count)) in inputs[num_env as usize..]
+                        .iter()
+                        .zip(&func.input_sizes[num_env as usize + 1..])
+                    {
+                        println!(
+                            "Plugin input count: {}\tFunction input count: {}",
+                            plugin_input.count, func_input_count
+                        );
                         eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
+                    }
+                } else {
+                    for (i, (plugin_input, (_, func_input_count))) in
+                        inputs.iter().zip(func.input_sizes.iter()).enumerate()
+                    {
+                        // For the first num_env, the counts should match exactly.
+                        // For the rest, counts should be multiples as for outputs.
+                        if i < num_env as usize {
+                            eyre::ensure!(plugin_input.count == *func_input_count, "map and map enumerated expect that each environment wire range count is closure input count");
+                        } else if i == num_env as usize && enumerated {
+                            eyre::ensure!(plugin_input.count == *func_input_count, "map enumerated expects that the index wire range count is closure input count")
+                        } else {
+                            eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
+                        }
                     }
                 }
 
