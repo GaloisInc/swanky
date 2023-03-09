@@ -618,9 +618,9 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                             let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
 
                                             let start =
-                                                total_outputs + u64::try_from(num_env_for_field)?;
+                                                total_outputs + num_env_for_field as u64;
                                             let inclusive_end =
-                                                start + u64::try_from(num_wires)? - 1;
+                                                start + num_wires as u64 - 1;
                                             out.alloc(start, inclusive_end)?;
 
                                             for (w, &b) in (start..=inclusive_end)
@@ -636,7 +636,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                             debug_assert_eq!(num_wires, 1);
 
                                             let start =
-                                                total_outputs + u64::try_from(num_env_for_field)?;
+                                                total_outputs + num_env_for_field as u64;
                                             out.alloc(start, start)?;
 
                                             let counter = to_fe(value)?;
