@@ -585,10 +585,8 @@ fn eval<P: Party, VSR: ValueStreamReader>(
             } => {
                 let function = &functions[*function_id];
                 let mut child_wire_maps = {
-                    struct V<'a, 'b, 'c, P: Party> {
+                    struct V<'a, 'b, P: Party> {
                         cb: &'a mut CircuitBuilder<'b>,
-                        vs: &'a mut VoleSupplier,
-                        pb: &'a mut ProverPrivate<P, &'c mut PrivateBuilder>,
                         cm: &'a mut FieldGenericProduct<CircuitMakerTy<P>>,
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
                         out_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
@@ -597,7 +595,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                     }
                     impl<'a, 'b, 'c, P: Party>
                         CompilerFieldVisitor<&'b mut WireMap<'c, ValuedWire<P>>>
-                        for &'_ mut V<'a, '_, '_, P>
+                        for &'_ mut V<'a, '_, P>
                     {
                         type Output = eyre::Result<WireMap<'b, ValuedWire<P>>>;
                         fn visit<FE: CompilerField>(
@@ -705,8 +703,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                     }
                     wm.as_mut().map_result(&mut V::<P> {
                         cb,
-                        vs,
-                        pb,
                         cm,
                         in_ranges,
                         out_ranges,
