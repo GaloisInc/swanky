@@ -30,7 +30,7 @@ use super::{
     Inputs, SieveArgs,
 };
 use crate::sieve_compiler::{
-    circuit_ir::{CircuitChunk, Instruction, Permissiveness, WireRange},
+    circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct,
         FieldGenericType, FieldIndexedArray,
@@ -536,14 +536,19 @@ fn eval<P: Party, VSR: ValueStreamReader>(
             } => {
                 let function = &functions[*function_id];
                 let mut child_wire_maps = {
-                    struct V<'a, P: Party> {
+                    struct V<'a, 'b, 'c, P: Party> {
+                        cb: &'a mut CircuitBuilder<'b>,
+                        vs: &'a mut VoleSupplier,
+                        pb: &'a mut ProverPrivate<P, &'c mut PrivateBuilder>,
+                        cm: &'a mut FieldGenericProduct<CircuitMakerTy<P>>,
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
                         out_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
+                        counter_info: &'a Option<CounterInfo>,
                         phantom: PhantomData<P>,
                     }
                     impl<'a, 'b, 'c, P: Party>
                         CompilerFieldVisitor<&'b mut WireMap<'c, ValuedWire<P>>>
-                        for &'_ mut V<'a, P>
+                        for &'_ mut V<'a, '_, '_, P>
                     {
                         type Output = eyre::Result<WireMap<'b, ValuedWire<P>>>;
                         fn visit<FE: CompilerField>(
@@ -551,6 +556,8 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                             parent: &'b mut WireMap<'c, (WireRef, ProverPrivateCopy<P, FE>)>,
                         ) -> eyre::Result<WireMap<'b, (WireRef, ProverPrivateCopy<P, FE>)>>
                         {
+                            let cm = self.cm.as_mut().get::<FE>();
+
                             let in_ranges = &self.in_ranges[FE::FIELD_TYPE];
                             let out_ranges = &self.out_ranges[FE::FIELD_TYPE];
                             for range in out_ranges.iter() {
@@ -571,7 +578,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         dst_start,
                                     }
                                 }),
-                                in_ranges.iter().map(|range| {
+                                in_ranges.iter().enumerate().map(|(i, range)| {
                                     let dst_start = input_pos;
                                     input_pos += range.len();
                                     mac_n_cheese_wire_map::DestinationRange {
@@ -586,8 +593,13 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                         }
                     }
                     wm.as_mut().map_result(&mut V::<P> {
+                        cb,
+                        vs,
+                        pb,
+                        cm,
                         in_ranges,
                         out_ranges,
+                        counter_info,
                         phantom: PhantomData,
                     })?
                 };
