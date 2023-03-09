@@ -135,10 +135,10 @@ pub enum FunctionId {
 
 #[derive(Debug)]
 pub struct CounterInfo {
-    num_env: u64,
-    field_type: FieldType,
-    num_wires: u64,
-    value: u64,
+    pub num_env: u64,
+    pub field_type: FieldType,
+    pub num_wires: u64,
+    pub value: u64,
 }
 
 #[derive(Debug)]
