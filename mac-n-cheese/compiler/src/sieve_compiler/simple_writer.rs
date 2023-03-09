@@ -682,7 +682,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                             }
                                         }
                                         _ => {
-                                            debug_assert!(num_wires == 1);
+                                            debug_assert_eq!(num_wires, 1);
 
                                             let start =
                                                 total_outputs + u64::try_from(num_env_for_field)?;
