@@ -5,11 +5,11 @@ use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamRead
 use mac_n_cheese_wire_map::WireMap;
 
 use crate::sieve_compiler::{
-    circuit_ir::{CircuitChunk, Instruction, Permissiveness, WireRange},
+    circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct,
         FieldGenericType, FieldIndexedArray,
-    },
+    }, to_fe, to_k_bits,
 };
 
 use super::{
@@ -121,6 +121,7 @@ fn eval<VSR: ValueStreamReader>(
                     struct V<'a> {
                         in_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
                         out_ranges: &'a FieldIndexedArray<Vec<WireRange>>,
+                        counter_info: &'a Option<CounterInfo>,
                     }
                     impl<'a, 'b, 'c> CompilerFieldVisitor<&'b mut WireMap<'c, FieldGenericIdentity>> for &'_ mut V<'a> {
                         type Output = eyre::Result<WireMap<'b, FieldGenericIdentity>>;
@@ -138,7 +139,7 @@ fn eval<VSR: ValueStreamReader>(
                                 out_ranges.iter().map(|range| range.len()).sum::<u64>();
                             let mut input_pos = total_outputs;
                             let mut output_pos = 0;
-                            let out = parent.borrow_child(
+                            let mut out = parent.borrow_child(
                                 out_ranges.iter().map(|range| {
                                     let dst_start = output_pos;
                                     output_pos += range.len();
@@ -148,7 +149,24 @@ fn eval<VSR: ValueStreamReader>(
                                         dst_start,
                                     }
                                 }),
-                                in_ranges.iter().map(|range| {
+                                in_ranges.iter().enumerate().map(|(i, range)| {
+                                    // If this is a call created by map_enumerated, we adjust
+                                    // input_pos by num_wires to leave room for us to allocate the
+                                    // wires needed for the iteration counter value.
+                                    if let &Some(CounterInfo {
+                                        num_env_for_field,
+                                        field_type,
+                                        num_wires,
+                                        ..
+                                    }) = self.counter_info
+                                    {
+                                        if field_type == FE::FIELD_TYPE
+                                            && i == num_env_for_field as usize
+                                        {
+                                            input_pos += num_wires as u64
+                                        }
+                                    }
+
                                     let dst_start = input_pos;
                                     input_pos += range.len();
                                     mac_n_cheese_wire_map::DestinationRange {
@@ -159,12 +177,52 @@ fn eval<VSR: ValueStreamReader>(
                                 }),
                             )?;
                             debug_assert_eq!(output_pos, total_outputs);
+
+                            if let &Some(CounterInfo {
+                                num_env_for_field,
+                                field_type,
+                                num_wires,
+                                value,
+                            }) = self.counter_info
+                            {
+                                if field_type == FE::FIELD_TYPE {
+                                    match FE::FIELD_TYPE {
+                                        FieldType::F2 => {
+                                            let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
+
+                                            let start =
+                                                total_outputs + num_env_for_field as u64;
+                                            let inclusive_end =
+                                                start + num_wires as u64 - 1;
+                                            out.alloc(start, inclusive_end)?;
+
+                                            for (w, &b) in (start..=inclusive_end)
+                                                .zip(value_le_bits.iter().rev())
+                                            {
+                                                put(&mut out, w, b)?;
+                                            }
+                                        }
+                                        _ => {
+                                            debug_assert_eq!(num_wires, 1);
+
+                                            let start = total_outputs + num_env_for_field as u64;
+                                            out.alloc(start, start)?;
+
+                                            let counter = to_fe(value)?;
+
+                                            put(&mut out, start, counter)?;
+                                        }
+                                    }
+                                }
+                            }
+
                             Ok(out)
                         }
                     }
                     wm.as_mut().map_result(&mut V {
                         in_ranges,
                         out_ranges,
+                        counter_info,
                     })?
                 };
                 eval(
