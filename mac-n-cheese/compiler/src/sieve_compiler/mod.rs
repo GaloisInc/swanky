@@ -57,6 +57,52 @@ pub enum Command {
     CompileVerifier,
 }
 
+fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
+    Ok(match FE::PrimeField::try_from(x as u128) {
+        Ok(x) => x,
+        Err(_) => {
+            eyre::bail!("Value larger than prime field modulus")
+        }
+    }
+    .into())
+}
+
+// Convert x to a k-bit little-endian number
+fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+    let mut bits = Vec::with_capacity(k);
+
+    let mut quot = x;
+    while quot != 0 {
+        bits.push(if quot % 2 == 0 { FE::ZERO } else { FE::ONE });
+        quot /= 2;
+    }
+
+    if bits.len() > k {
+        eyre::bail!("{x} cannot be expressed in {k} bits");
+    } else {
+        bits.append(&mut vec![FE::ZERO; k - bits.len()]);
+        Ok(bits)
+    }
+}
+
+// Convert x to a k-bit litle-endian number, inverting all bits
+fn to_k_flipped_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
+    let mut bits = Vec::with_capacity(k);
+
+    let mut quot = x;
+    while quot != 0 {
+        bits.push(if quot % 2 == 0 { FE::ONE } else { FE::ZERO });
+        quot /= 2;
+    }
+
+    if bits.len() > k {
+        eyre::bail!("{x} cannot be expressed in {k} bits");
+    } else {
+        bits.append(&mut vec![FE::ONE; k - bits.len()]);
+        Ok(bits)
+    }
+}
+
 fn put<T>(wm: &mut WireMap<T>, wire: mac_n_cheese_wire_map::WireId, value: T) -> eyre::Result<()> {
     match wm.insert(wire, value) {
         mac_n_cheese_wire_map::InsertResult::NotAllocated(value) => {

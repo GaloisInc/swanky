@@ -27,7 +27,7 @@ use super::{
     },
     put,
     supported_fields::{FieldType, InvariantType},
-    Inputs, SieveArgs,
+    to_fe, to_k_bits, to_k_flipped_bits, Inputs, SieveArgs,
 };
 use crate::sieve_compiler::{
     circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},
@@ -515,55 +515,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
     functions: &[Arc<FunctionDefinition>],
 ) -> eyre::Result<()> {
-    fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
-        Ok(match FE::PrimeField::try_from(x as u128) {
-            Ok(x) => x,
-            Err(_) => {
-                eyre::bail!("Value larger than prime field modulus")
-            }
-        }
-        .into())
-    }
-
-    // Convert x to a k-bit little-endian number
-    fn to_k_bits<FE: CompilerField>(x: usize, k: usize) -> eyre::Result<Vec<FE>> {
-        let mut bits = Vec::with_capacity(k);
-
-        let mut quot = x;
-        while quot != 0 {
-            bits.push(if quot % 2 == 0 { FE::ZERO } else { FE::ONE });
-            quot /= 2;
-        }
-
-        if bits.len() > k {
-            eyre::bail!("{x} cannot be expressed in {k} bits");
-        } else {
-            bits.append(&mut vec![FE::ZERO; k - bits.len()]);
-            Ok(bits)
-        }
-    }
-
-    // Convert x to a k-bit litle-endian number, inverting all bits
-    fn to_k_flipped_bits<FE: CompilerField>(
-        x: usize,
-        k: usize,
-    ) -> eyre::Result<Vec<FE>> {
-        let mut bits = Vec::with_capacity(k);
-
-        let mut quot = x;
-        while quot != 0 {
-            bits.push(if quot % 2 == 0 { FE::ONE } else { FE::ZERO });
-            quot /= 2;
-        }
-
-        if bits.len() > k {
-            eyre::bail!("{x} cannot be expressed in {k} bits");
-        } else {
-            bits.append(&mut vec![FE::ONE; k - bits.len()]);
-            Ok(bits)
-        }
-    }
-
     for instruction in instructions {
         match instruction {
             Instruction::FieldInstructions(instructions) => {
