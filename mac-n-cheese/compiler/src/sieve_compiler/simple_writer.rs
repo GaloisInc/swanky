@@ -515,6 +515,16 @@ fn eval<P: Party, VSR: ValueStreamReader>(
     public_inputs: &mut FieldGenericProduct<std::vec::IntoIter<FieldGenericIdentity>>,
     functions: &[Arc<FunctionDefinition>],
 ) -> eyre::Result<()> {
+    fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
+        Ok(match FE::PrimeField::try_from(x as u128) {
+            Ok(x) => x,
+            Err(_) => {
+                eyre::bail!("Value larger than prime field modulus")
+            }
+        }
+        .into())
+    }
+
     for instruction in instructions {
         match instruction {
             Instruction::FieldInstructions(instructions) => {
@@ -734,16 +744,6 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 }
                             }
                             _ => {
-                                fn to_fe<FE: CompilerField>(x: usize) -> eyre::Result<FE> {
-                                    Ok(match FE::PrimeField::try_from(x as u128) {
-                                        Ok(x) => x,
-                                        Err(_) => {
-                                            eyre::bail!("Value larger than prime field modulus")
-                                        }
-                                    }
-                                    .into())
-                                }
-
                                 debug_assert_eq!(cond_wire_range.len(), 1);
 
                                 // c
