@@ -13,7 +13,7 @@ use mac_n_cheese_sieve_parser::{
 use rustc_hash::FxHashMap;
 
 use crate::sieve_compiler::{
-    circuit_ir::{FieldInstruction, FieldInstructions, FunctionId, Type, WireRange},
+    circuit_ir::{CounterInfo, FieldInstruction, FieldInstructions, FunctionId, Type, WireRange},
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericCoproduct, FieldIndexedArray, FieldType,
         InvariantType,
@@ -334,7 +334,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                     function_id: FunctionId::UserDefined(*id),
                     out_ranges,
                     in_ranges,
-                    counter_value: None,
+                    counter_info: None,
                 })?;
                 for field in FieldType::ALL {
                     self.sink
@@ -444,11 +444,27 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                         .with_note(|| format!("When calling {:?}", name_str()))?;
                     let public_input_needs = func.public_inputs_needed;
                     let size_hint = func.size_hint;
+
+                    let counter_info = if enumerated {
+                        let (Type::Field(field_type), num_wires) = func.input_sizes[num_env as usize] else {
+                            eyre::bail!("iteration index wire range must have field type")
+                        };
+
+                        Some(CounterInfo {
+                            num_env,
+                            field_type,
+                            num_wires,
+                            value: i,
+                        })
+                    } else {
+                        None
+                    };
+
                     self.sink.push(Instruction::FunctionCall {
                         function_id: FunctionId::UserDefined(id),
                         out_ranges,
                         in_ranges,
-                        counter_value: if enumerated { Some(i) } else { None },
+                        counter_info,
                     })?;
                     for field in FieldType::ALL {
                         self.sink

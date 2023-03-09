@@ -134,13 +134,21 @@ pub enum FunctionId {
 }
 
 #[derive(Debug)]
+pub struct CounterInfo {
+    num_env: u64,
+    field_type: FieldType,
+    num_wires: u64,
+    value: u64,
+}
+
+#[derive(Debug)]
 pub enum Instruction {
     FieldInstructions(FieldGenericCoproduct<FieldInstructionsTy>),
     FunctionCall {
         function_id: FunctionId,
         out_ranges: FieldIndexedArray<Vec<WireRange>>,
         in_ranges: FieldIndexedArray<Vec<WireRange>>,
-        counter_value: Option<u64>,
+        counter_info: Option<CounterInfo>,
     },
     // TODO: It would be better if we could make this a FieldInstruction
     MuxCall {

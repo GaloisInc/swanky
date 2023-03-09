@@ -532,7 +532,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                 function_id: FunctionId::UserDefined(function_id),
                 out_ranges,
                 in_ranges,
-                counter_value,
+                counter_info,
             } => {
                 let function = &functions[*function_id];
                 let mut child_wire_maps = {
