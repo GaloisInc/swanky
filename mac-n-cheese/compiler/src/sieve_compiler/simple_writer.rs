@@ -617,7 +617,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 out_ranges.iter().map(|range| range.len()).sum::<u64>();
                             let mut input_pos = total_outputs;
                             let mut output_pos = 0;
-                            let out = parent.borrow_child(
+                            let mut out = parent.borrow_child(
                                 out_ranges.iter().map(|range| {
                                     let dst_start = output_pos;
                                     output_pos += range.len();
@@ -655,6 +655,51 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 }),
                             )?;
                             debug_assert_eq!(output_pos, total_outputs);
+
+                            if let &Some(CounterInfo {
+                                num_env_for_field,
+                                field_type,
+                                num_wires,
+                                value,
+                            }) = self.counter_info
+                            {
+                                if field_type == FE::FIELD_TYPE {
+                                    match FE::FIELD_TYPE {
+                                        FieldType::F2 => {
+                                            let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
+
+                                            let start =
+                                                total_outputs + u64::try_from(num_env_for_field)?;
+                                            let inclusive_end =
+                                                start + u64::try_from(num_wires)? - 1;
+                                            out.alloc(start, inclusive_end)?;
+
+                                            for (w, &b) in (start..=inclusive_end)
+                                                .zip(value_le_bits.iter().rev())
+                                            {
+                                                let counter_b_v = ProverPrivateCopy::new(b);
+                                                let counter_b = cm.constant(self.cb, b)?;
+
+                                                put(&mut out, w, (counter_b, counter_b_v))?;
+                                            }
+                                        }
+                                        _ => {
+                                            debug_assert!(num_wires == 1);
+
+                                            let start =
+                                                total_outputs + u64::try_from(num_env_for_field)?;
+                                            out.alloc(start, start)?;
+
+                                            let counter = to_fe(value)?;
+                                            let counter_v = ProverPrivateCopy::new(counter);
+                                            let counter = cm.constant(self.cb, counter)?;
+
+                                            put(&mut out, start, (counter, counter_v))?;
+                                        }
+                                    }
+                                }
+                            }
+
                             Ok(out)
                         }
                     }
