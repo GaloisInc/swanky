@@ -593,13 +593,15 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     // input_pos by num_wires to leave room for us to allocate the
                                     // wires needed for the iteration counter value.
                                     if let &Some(CounterInfo {
-                                        num_env,
+                                        num_env_for_field,
                                         field_type,
                                         num_wires,
                                         ..
                                     }) = self.counter_info
                                     {
-                                        if field_type == FE::FIELD_TYPE && i == num_env as usize {
+                                        if field_type == FE::FIELD_TYPE
+                                            && i == num_env_for_field as usize
+                                        {
                                             input_pos += num_wires as u64
                                         }
                                     }

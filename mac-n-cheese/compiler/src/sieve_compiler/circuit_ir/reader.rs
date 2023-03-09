@@ -450,6 +450,23 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             eyre::bail!("iteration index wire range must have field type")
                         };
 
+                        let num_env_for_field = (&func).input_sizes[..num_env as usize]
+                            .iter()
+                            .enumerate()
+                            .filter(|&(i, (t, _))| {
+                                if i < num_env as usize {
+                                    if let &Type::Field(ft) = t {
+                                        ft == field_type
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .len();
+
                         if field_type != FieldType::F2 {
                             eyre::ensure!(
                                 num_wires == 1,
@@ -458,7 +475,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                         }
 
                         Some(CounterInfo {
-                            num_env,
+                            num_env_for_field,
                             field_type,
                             num_wires: num_wires as usize,
                             value: i as usize,
