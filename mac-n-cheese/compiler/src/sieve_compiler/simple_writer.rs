@@ -579,6 +579,21 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                     }
                                 }),
                                 in_ranges.iter().enumerate().map(|(i, range)| {
+                                    // If this is a call created by map_enumerated, we adjust
+                                    // input_pos by num_wires to leave room for us to allocate the
+                                    // wires needed for the iteration counter value.
+                                    if let &Some(CounterInfo {
+                                        num_env,
+                                        field_type,
+                                        num_wires,
+                                        ..
+                                    }) = self.counter_info
+                                    {
+                                        if field_type == FE::FIELD_TYPE && i == num_env as usize {
+                                            input_pos += num_wires
+                                        }
+                                    }
+
                                     let dst_start = input_pos;
                                     input_pos += range.len();
                                     mac_n_cheese_wire_map::DestinationRange {
