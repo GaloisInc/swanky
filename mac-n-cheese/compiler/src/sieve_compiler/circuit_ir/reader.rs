@@ -701,10 +701,6 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                         .iter()
                         .zip(&func.input_sizes[num_env as usize + 1..])
                     {
-                        println!(
-                            "Plugin input count: {}\tFunction input count: {}",
-                            plugin_input.count, func_input_count
-                        );
                         eyre::ensure!(plugin_input.count == func_input_count * iter_count, "map and map enumerated expext that each non-environment input count is #iterations * closure input count");
                     }
                 } else {
