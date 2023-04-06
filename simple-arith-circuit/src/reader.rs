@@ -164,10 +164,10 @@ impl Circuit<F2> {
         }
 
         // Line 4: <empty>
-        /*line_to_nums(&mut reader, &mut line, &mut nums)?;
+        line_to_nums(&mut reader, &mut line, &mut nums)?;
         if !nums.is_empty() {
             return fail(4, "expected empty line");
-        }*/
+        }
 
         // We establish a mapping from the output wire labels as denoted
         // in the Bristol Fashion circuit to labels that are named
