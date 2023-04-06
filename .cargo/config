@@ -6,13 +6,3 @@ rustflags = [
     # See https://lemire.me/blog/2018/09/07/avx-512-when-and-how-to-use-these-new-instructions/
     "-C", "target-feature=-avx512bf16,-avx512bitalg,-avx512bw,-avx512cd,-avx512dq,-avx512er,-avx512f,-avx512ifma,-avx512pf,-avx512vbmi,-avx512vbmi2,-avx512vl,-avx512vnni,-avx512vp2intersect,-avx512vpopcntdq",
 ]
-
-# TODO: don't push this to master
-#[target.x86_64-unknown-linux-gnu]
-#linker = "/run/current-system/sw/bin/clang"
-#rustflags = ["-C", "link-arg=--ld-path=/run/current-system/sw/bin/mold"]
-[target.'cfg(target_arch="aarch64")']
-rustflags = [
-    "--cfg", "aes_armv8"
-]
-
