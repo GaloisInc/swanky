@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use mac_n_cheese_ir::compilation_format::{wire_format::LinearPrototypeWireFormat, FieldMacType};
+use mac_n_cheese_ir::compilation_format::{wire_format::LinearPrototypeWireFormat};
 use mac_n_cheese_party::Party;
-use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
+use mac_n_cheese_vole::mac::{Mac, MacTypes};
 
-use crate::task_framework::{GlobalVolesNeeded, NoContinuation, TaskDefinition};
+use crate::task_framework::{NoContinuation, TaskDefinition};
 
 pub struct LinearTask<P: Party, T: MacTypes> {
     phantom: PhantomData<(P, T)>,

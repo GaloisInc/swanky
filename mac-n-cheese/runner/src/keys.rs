@@ -1,14 +1,13 @@
 use std::{
-    io::{Read, Write},
     marker::PhantomData,
 };
 
 // We use the aes_gcm library because ring doesn't have an API to provide a separate tag on decrypt
 use aes_gcm::{AeadInPlace, Aes128Gcm, KeyInit};
-use mac_n_cheese_ir::compilation_format::{TaskId, TaskPriority};
+use mac_n_cheese_ir::compilation_format::{TaskId};
 use mac_n_cheese_party::{Party, WhichParty};
-use rand::{thread_rng, RngCore};
-use vectoreyes::{Aes128, AesBlockCipher, AesBlockCipherDecrypt, U64x2, U8x16};
+use rand::{RngCore};
+use vectoreyes::{Aes128, AesBlockCipher, AesBlockCipherDecrypt, U8x16};
 
 #[repr(C)]
 #[derive(bytemuck::Zeroable, bytemuck::Pod, Clone, Copy, Debug)]

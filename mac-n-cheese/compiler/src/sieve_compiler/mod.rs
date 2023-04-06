@@ -1,28 +1,23 @@
 use std::{
     fs::File,
-    path::{Path, PathBuf},
-    thread::JoinHandle,
+    path::{PathBuf},
     time::Instant,
 };
 
 use clap::{Args, Subcommand};
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::{
-    circuit_builder::{build_circuit, build_privates},
-    compilation_format::FieldMacType,
+    circuit_builder::{build_privates},
 };
 use mac_n_cheese_party::{private::ProverPrivate, Party, WhichParty, IS_VERIFIER};
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
-use rustc_hash::FxHashMap;
 
-use crate::sieve_compiler::{
-    circuit_ir::Instruction,
-    supported_fields::{CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct},
-};
+
+
 
 use self::{
-    circuit_ir::{CircuitChunk, FunctionId, Type},
+    circuit_ir::{CircuitChunk},
     supported_fields::{CompilerField, FieldIndexedArray, FieldType},
 };
 

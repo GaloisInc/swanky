@@ -1,5 +1,4 @@
 use std::{
-    collections::VecDeque,
     fs::File,
     io::{Read, Seek},
     path::{Path, PathBuf},

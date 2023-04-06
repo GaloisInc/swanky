@@ -1,5 +1,5 @@
 use std::{
-    io::{Cursor, Read},
+    io::{Read},
     path::Path,
 };
 

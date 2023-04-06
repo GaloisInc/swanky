@@ -1,17 +1,16 @@
-use crypto_bigint::ArrayEncoding;
-use eyre::{Context, ContextCompat};
-use lazy_static::lazy_static;
+
+
+
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_sieve_parser::Number;
 use mac_n_cheese_wire_map::WireMap;
-use rustc_hash::{FxHashMap, FxHashSet};
+
 use scuttlebutt::{
     field::{F128p, F61p, FiniteField, F2},
     ring::FiniteRing,
-    serialization::CanonicalSerialize,
 };
 use std::ops::{Deref, DerefMut, Index};
-use std::{collections::VecDeque, marker::PhantomData, str::FromStr};
+use std::{collections::VecDeque, marker::PhantomData};
 use std::{fmt::Debug, ops::IndexMut};
 
 pub trait ValueParseableFiniteField: FiniteField {

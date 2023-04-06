@@ -1,12 +1,11 @@
 use std::{
-    any::{Any, TypeId},
-    io::{BufRead, Cursor, Write},
+    io::{Cursor, Write},
     marker::PhantomData,
     sync::Arc,
 };
 
-use bumpalo::Bump;
-use bytemuck::{TransparentWrapper, Zeroable};
+
+
 use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::{
     fb::{Task, TaskPrototype},
@@ -45,8 +44,7 @@ use crate::{
     base_vole::VoleContexts,
     flatbuffers_ext::FbVectorExt,
     tls::TlsConnection,
-    type_map::SmallTypeMap,
-    types::{assert_type_is, visit_type, TypeVisitor},
+    types::{assert_type_is},
 };
 
 pub enum NoContinuation {}
@@ -286,7 +284,7 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         format: simple::WireFormat<Data, NARGS>,
-        mut f: impl FnMut([(T, Data); NARGS]) -> eyre::Result<[T; NOUTPUT]>,
+        f: impl FnMut([(T, Data); NARGS]) -> eyre::Result<[T; NOUTPUT]>,
     ) -> eyre::Result<TaskResult<P, NoContinuation>>
     where
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
@@ -309,7 +307,7 @@ impl<P: Party> TaskInput<P> {
     >(
         &self,
         ctx: &TaskContext,
-        format: simd_batched::WireFormat<NARGS>,
+        _format: simd_batched::WireFormat<NARGS>,
         mut f: impl FnMut([U64x4; NARGS]) -> eyre::Result<[U64x4; NOUTPUT]>,
     ) -> eyre::Result<TaskResult<P, NoContinuation>>
     where
@@ -459,7 +457,7 @@ impl<P: Party> TaskInput<P> {
         &self,
         ctx: &TaskContext,
         format: simd_batched::WireFormat<NARGS>,
-        mut f: impl FnMut([U64x4; NARGS]) -> eyre::Result<[U64x4; NOUTPUT]>,
+        f: impl FnMut([U64x4; NARGS]) -> eyre::Result<[U64x4; NOUTPUT]>,
     ) -> eyre::Result<TaskResult<P, NoContinuation>>
     where
         T::TF: SmallBinaryField,

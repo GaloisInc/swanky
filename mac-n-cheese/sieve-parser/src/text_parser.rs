@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader, Read, Seek},
 };
 
-use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, Uint, U64};
+use crypto_bigint::{CheckedAdd, CheckedMul, Limb, Uint, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
@@ -299,7 +299,7 @@ pub struct RelationReader<T: Read + Seek> {
 }
 impl<T: Read + Seek> RelationReader<T> {
     pub fn new(inner: T) -> eyre::Result<Self> {
-        let mut ps = ParseState {
+        let ps = ParseState {
             inner: BufReader::with_capacity(1024 * 1024 * 4, inner),
         };
         let mut out = Self {

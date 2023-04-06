@@ -1,24 +1,21 @@
 use std::{
-    collections::VecDeque,
     fs::File,
     hash::BuildHasherDefault,
     io::{Read, Write},
-    marker::PhantomData,
     net::TcpStream,
     os::unix::prelude::FileExt,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
     },
     time::Duration,
 };
 
 use aes_gcm::{AeadCore, AeadInPlace, Aes128Gcm, Nonce};
-use arrayvec::ArrayVec;
+
 use bytemuck::Zeroable;
 use generic_array::GenericArray;
 use mac_n_cheese_ir::compilation_format::{
-    fb::DataChunkAddress, Manifest, PrivateDataAddress, PrivatesManifest, TaskId, TaskPriority,
+    fb::DataChunkAddress, Manifest, PrivateDataAddress, TaskId, TaskPriority,
 };
 use mac_n_cheese_party::{either::PartyEither, private::ProverPrivate, Party, WhichParty};
 use moka::sync::SegmentedCache;
@@ -27,7 +24,7 @@ use rand::RngCore;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    alloc::{BytesFromDisk, OwnedAligned, OwnedAlignedBytes},
+    alloc::{BytesFromDisk, OwnedAlignedBytes},
     bounded_queue::Queue,
     event_log,
     keys::{Keys, TaskDataHeader},
@@ -37,7 +34,6 @@ use crate::{
         RunningTaskId, TaskQueue, TaskQueueEntry, QUEUE_NAME_THREAD_POOL_FILE_READ_REQUEST,
     },
     thread_spawner::ThreadSpawner,
-    tls::TlsConnection,
 };
 
 use super::{Reactor, ReactorRequest, ReactorResponse, RunQueue};

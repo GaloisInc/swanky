@@ -1,24 +1,21 @@
-use crate::sieve_compiler::supported_fields::CompilerFieldVisitor;
+
 
 use super::supported_fields::FieldIndexedArray;
-use eyre::{Context, ContextCompat};
-use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_sieve_parser::{Number, RelationReader, ValueStreamReader};
+
+
+use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_wire_map::WireId;
-use rustc_hash::FxHashMap;
-use scuttlebutt::field::FiniteField;
+
+
 use std::{
-    any::Any,
     fmt::Debug,
-    iter::Peekable,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use vectoreyes::array_utils::ArrayUnrolledExt;
+
 
 use super::supported_fields::{
     CompilerField, FieldGenericCoproduct, FieldGenericIdentity, FieldGenericProduct, FieldType,
-    InvariantType,
 };
 
 mod reader;

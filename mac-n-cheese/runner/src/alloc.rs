@@ -15,7 +15,7 @@ use std::{
 
 use bytemuck::{TransparentWrapper, Zeroable};
 use crossbeam_queue::ArrayQueue;
-use parking_lot::Mutex;
+
 use rustc_hash::FxHashMap;
 
 use crate::event_log;

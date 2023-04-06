@@ -7,7 +7,7 @@ use smallvec::SmallVec;
 use std::any::TypeId;
 use std::fs::File;
 use std::io::{BufWriter, Seek, Write};
-use std::marker::PhantomData;
+
 use std::ops::RangeBounds;
 use std::path::Path;
 

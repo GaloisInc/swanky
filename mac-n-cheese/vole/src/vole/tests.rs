@@ -1,5 +1,5 @@
 use keyed_arena::KeyedArena;
-use mac_n_cheese_party::{either::PartyEitherCopy, IS_PROVER, IS_VERIFIER};
+use mac_n_cheese_party::{IS_PROVER, IS_VERIFIER};
 use rand::SeedableRng;
 use scuttlebutt::{
     field::{F128p, F56b, F61p, F63b, FiniteField, IsSubFieldOf, F2},

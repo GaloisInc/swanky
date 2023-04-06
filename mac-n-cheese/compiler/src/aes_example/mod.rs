@@ -1,17 +1,17 @@
 use clap::Args;
 use mac_n_cheese_ir::circuit_builder::vole_supplier::VoleSupplier;
 use mac_n_cheese_ir::circuit_builder::{
-    build_circuit, build_privates, CircuitBuilder, TaskPrototypeRef, WireSlice,
+    build_circuit, build_privates,
 };
 use mac_n_cheese_ir::compilation_format::wire_format::Wire;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
 use rand::RngCore;
-use rustc_hash::FxHashMap;
-use scuttlebutt::field::{FiniteField, F2};
+
+use scuttlebutt::field::{F2};
 use scuttlebutt::ring::FiniteRing;
 use std::{
     cmp::Reverse,
-    collections::{hash_map, BinaryHeap},
+    collections::{BinaryHeap},
     str::FromStr,
 };
 use vectoreyes::{

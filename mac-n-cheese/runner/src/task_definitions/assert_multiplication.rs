@@ -18,9 +18,9 @@ use scuttlebutt::generic_array_length::Arr;
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::AesRng;
-use std::fs::File;
+
 use std::io::Write;
-use std::io::{BufWriter, Read};
+use std::io::{Read};
 use std::ops::AddAssign;
 use vectoreyes::array_utils::ArrayUnrolledExt;
 use vectoreyes::{SimdBase, U64x2};

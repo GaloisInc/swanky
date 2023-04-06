@@ -2,11 +2,10 @@ use mac_n_cheese_ir::{
     circuit_builder::{build_circuit, build_privates, vole_supplier::VoleSupplier},
     compilation_format::{wire_format::Wire, FieldMacType, Type},
 };
-use rand::SeedableRng;
+
 use scuttlebutt::{
     field::{F61p, F2},
     ring::FiniteRing,
-    AesRng,
 };
 
 fn main() -> eyre::Result<()> {

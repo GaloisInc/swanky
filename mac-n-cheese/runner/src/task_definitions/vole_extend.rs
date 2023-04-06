@@ -1,7 +1,7 @@
-use std::{any::TypeId, marker::PhantomData, sync::Arc};
+use std::{any::TypeId, sync::Arc};
 
 use bytemuck::TransparentWrapper;
-use keyed_arena::{KeyedArena, KeyedArenaFromPool, KeyedArenaPool};
+use keyed_arena::{KeyedArenaFromPool, KeyedArenaPool};
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_party::{either::PartyEither, Party, WhichParty};
 use mac_n_cheese_vole::{

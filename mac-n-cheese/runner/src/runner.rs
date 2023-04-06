@@ -2,9 +2,8 @@ use std::{
     any::{type_name, Any},
     hash::BuildHasherDefault,
     io::Write,
-    marker::PhantomData,
     sync::{
-        atomic::{AtomicU32, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -28,7 +27,7 @@ use crate::{
     reactor::{Reactor, ReactorRequest, ReactorResponse},
     task_definitions::{visit_task_definition, TaskDefinitionVisitor},
     task_framework::{
-        GlobalVolesNeeded, TaskContext, TaskDefinition, TaskDependencies, TaskInput, TaskOutput,
+        GlobalVolesNeeded, TaskContext, TaskDefinition, TaskInput, TaskOutput,
         TaskResult,
     },
     task_queue::{RunningTaskId, TaskQueue, TaskQueueEntry},

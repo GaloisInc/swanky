@@ -1,10 +1,10 @@
-use std::{collections::BinaryHeap, marker::PhantomData, ops::DerefMut};
+use std::{collections::BinaryHeap, ops::DerefMut};
 
 use mac_n_cheese_ir::compilation_format::{TaskId, TaskPriority};
-use mac_n_cheese_party::Party;
+
 use parking_lot::{Condvar, Mutex};
 
-use crate::{event_log, reactor::ReactorResponse, task_framework::TaskOutput};
+use crate::{event_log};
 
 pub type QueueName = u8;
 pub const QUEUE_NAME_RUN_QUEUE: u8 = 1;

@@ -207,7 +207,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
         sender: &VoleSender<T>,
         arena: &KeyedArena,
         base_voles: &[Mac<party::Prover, T>],
-        mut result: &mut [Mac<party::Prover, T>],
+        result: &mut [Mac<party::Prover, T>],
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
     ) -> eyre::Result<VoleSenderStep5<T>> {
@@ -310,7 +310,7 @@ pub struct VoleSenderStep5<T: MacTypes> {
 }
 impl<T: MacTypes> VoleSenderStep5<T> {
     pub fn stage3(
-        mut self,
+        self,
         sender: &VoleSender<T>,
         _arena: &KeyedArena,
         base_voles: &[Mac<party::Prover, T>],
@@ -414,7 +414,7 @@ impl<T: MacTypes> VoleReceiver<T> {
         debug_assert_eq!(keys.capacity(), T::VS.ot_num_choices);
         // This is called n in some places in the original spsvole code, and m in others.
         let m = T::LPN.m();
-        let mut result = output_voles;
+        let result = output_voles;
         debug_assert_eq!(base_voles.sps_base_voles().len() * m, result.len());
         let mut ggm_temporary_storage = arena
             .alloc_slice_fill_with(ggm_temporary_storage_size(T::LPN.log2m), |_| {
@@ -536,7 +536,7 @@ pub struct VoleReceiverStep6<T: MacTypes> {
 }
 impl<'a, T: MacTypes> VoleReceiverStep6<T> {
     pub fn stage3(
-        mut self,
+        self,
         receiver: &VoleReceiver<T>,
         _arena: &KeyedArena,
         base_voles: &[Mac<party::Verifier, T>],

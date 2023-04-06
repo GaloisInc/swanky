@@ -5,15 +5,14 @@ use crate::{
     keys::Keys,
     runner::{ReactorCallback, RunQueue},
     task_framework::Challenge,
-    task_queue::{RunningTaskId, TaskQueue},
+    task_queue::{RunningTaskId},
     thread_spawner::ThreadSpawner,
-    tls::TlsConnection,
 };
 use mac_n_cheese_ir::compilation_format::{
-    fb::DataChunkAddress, Manifest, PrivateDataAddress, PrivatesManifest, TaskId,
+    fb::DataChunkAddress, Manifest, PrivateDataAddress,
 };
 use mac_n_cheese_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
+    private::{ProverPrivate},
     Party,
 };
 use std::fs::File;

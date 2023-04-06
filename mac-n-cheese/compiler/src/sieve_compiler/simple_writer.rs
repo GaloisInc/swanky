@@ -2,7 +2,7 @@ use std::{
     any::TypeId,
     collections::BTreeMap,
     marker::PhantomData,
-    path::{Path, PathBuf},
+    path::{Path},
     sync::Arc,
     time::Instant,
 };
@@ -16,7 +16,7 @@ use mac_n_cheese_party::{
     private::{ProverPrivate, ProverPrivateCopy},
     Party, WhichParty,
 };
-use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
+use mac_n_cheese_sieve_parser::{ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use scuttlebutt::field::F2;
@@ -27,7 +27,7 @@ use super::{
     },
     put,
     supported_fields::{FieldType, InvariantType},
-    to_fe, to_k_bits, to_k_flipped_bits, Inputs, SieveArgs,
+    to_fe, to_k_bits, to_k_flipped_bits, Inputs,
 };
 use crate::sieve_compiler::{
     circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},

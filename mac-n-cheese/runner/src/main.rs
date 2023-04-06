@@ -3,7 +3,7 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
-use std::os::unix::prelude::FileExt;
+
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
@@ -13,7 +13,7 @@ use clap::Parser;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::compilation_format::fb::{self, DataChunkAddress};
 use mac_n_cheese_ir::compilation_format::{
-    read_private_manifest, AtomicGraphDegreeCount, Manifest, TaskKind, Type,
+    read_private_manifest, AtomicGraphDegreeCount, Manifest, Type,
 };
 use mac_n_cheese_party as party;
 use mac_n_cheese_party::Party;
@@ -25,8 +25,8 @@ use scuttlebutt::AesRng;
 use types::visit_type;
 
 use crate::runner::RunQueue;
-use crate::task_definitions::{visit_task_definition, TaskDefinitionVisitor};
-use crate::task_framework::{GlobalVolesNeeded, TaskDefinition};
+
+
 use crate::task_queue::{TaskQueue, QUEUE_NAME_RUN_QUEUE};
 use crate::thread_spawner::ThreadSpawner;
 use crate::types::TypeVisitor;
@@ -127,8 +127,8 @@ fn party_main<P: Party>(
     private_data: ProverPrivateCopy<P, &Path>,
     num_connections: PartyEitherCopy<P, (), usize>,
 ) -> eyre::Result<()> {
-    let mut rng = AesRng::from_rng(rand::rngs::OsRng).unwrap();
-    let mut circuit_file =
+    let rng = AesRng::from_rng(rand::rngs::OsRng).unwrap();
+    let circuit_file =
         File::open(&opt.circuit).with_context(|| format!("Opening circuit {:?}", opt.circuit))?;
     let span = event_log::ReadingCircuit.start();
     let circuit_manifest = Manifest::read(circuit_file)
