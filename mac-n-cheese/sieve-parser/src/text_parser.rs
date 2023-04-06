@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader, Read, Seek},
 };
 
-use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, UInt, U64};
+use crypto_bigint::{CheckedAdd, CheckedMul, Encoding, Limb, Uint, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
@@ -235,16 +235,16 @@ impl<T: Read + Seek> ParseState<T> {
             _ => None,
         }
     }
-    fn parse_uint_generic<const LIMBS: usize>(&mut self) -> eyre::Result<UInt<LIMBS>> {
+    fn parse_uint_generic<const LIMBS: usize>(&mut self) -> eyre::Result<Uint<LIMBS>> {
         match self.number_format()? {
             NumberFormat::Dec => {
-                let mut out = UInt::<LIMBS>::default();
+                let mut out = Uint::<LIMBS>::default();
                 self.read_while(|byte| {
                     if byte.is_ascii_digit() {
-                        out = Option::<_>::from(out.checked_mul(&UInt::<LIMBS>::from_u8(10)))
+                        out = Option::<_>::from(out.checked_mul(&Uint::<LIMBS>::from_u8(10)))
                             .context("number too big")?;
                         out = Option::<_>::from(
-                            out.checked_add(&UInt::<LIMBS>::from_u8(byte - b'0')),
+                            out.checked_add(&Uint::<LIMBS>::from_u8(byte - b'0')),
                         )
                         .context("number too big")?;
                         Ok(true)
@@ -256,16 +256,16 @@ impl<T: Read + Seek> ParseState<T> {
             }
             NumberFormat::Oct => todo!("support octal"),
             NumberFormat::Hex => {
-                let mut out = UInt::<LIMBS>::default();
+                let mut out = Uint::<LIMBS>::default();
                 let mut num_nibbles = 0;
                 self.read_while(|byte| {
                     if let Some(new_nibble) = Self::decode_hex_nibble(byte) {
                         num_nibbles += 1;
-                        if num_nibbles > LIMBS * (Limb::BIT_SIZE / 4) {
+                        if num_nibbles > LIMBS * (Limb::BITS / 4) {
                             eyre::bail!("hex number overflow");
                         }
                         out <<= 4;
-                        out |= UInt::<LIMBS>::from_u8(new_nibble);
+                        out |= Uint::<LIMBS>::from_u8(new_nibble);
                         Ok(true)
                     } else {
                         Ok(false)

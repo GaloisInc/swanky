@@ -200,7 +200,7 @@ impl<T: Write> PrintingVisitor<T> {
         impl std::fmt::Display for Hex<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "0x")?;
-                let mut limbs = self.0.limbs().iter().rev().skip_while(|x| x.0 == 0);
+                let mut limbs = self.0.as_limbs().iter().rev().skip_while(|x| x.0 == 0);
                 if let Some(most_significant) = limbs.next() {
                     write!(f, "{:x}", most_significant.0)?;
                     for limb in limbs {
