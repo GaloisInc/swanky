@@ -1,18 +1,13 @@
-
-
 use super::supported_fields::FieldIndexedArray;
-
 
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_wire_map::WireId;
-
 
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
     sync::Arc,
 };
-
 
 use super::supported_fields::{
     CompilerField, FieldGenericCoproduct, FieldGenericIdentity, FieldGenericProduct, FieldType,

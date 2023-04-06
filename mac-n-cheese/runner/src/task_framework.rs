@@ -4,8 +4,6 @@ use std::{
     sync::Arc,
 };
 
-
-
 use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::{
     fb::{Task, TaskPrototype},
@@ -44,7 +42,7 @@ use crate::{
     base_vole::VoleContexts,
     flatbuffers_ext::FbVectorExt,
     tls::TlsConnection,
-    types::{assert_type_is},
+    types::assert_type_is,
 };
 
 pub enum NoContinuation {}

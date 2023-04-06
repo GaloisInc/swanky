@@ -1,7 +1,5 @@
 #![deny(unused_must_use)]
 
-
-
 use clap::{Parser, Subcommand};
 
 #[global_allocator]

@@ -1,8 +1,7 @@
-
 use std::{fs::File, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use eyre::{Context};
+use eyre::Context;
 use mac_n_cheese_event_log::{EventLogEntry, EventLogReader, EventLogSchema};
 use mac_n_cheese_ir::compilation_format::{GraphDegreeCount, Manifest, TaskKind, Type};
 use std::fmt::Write as _;

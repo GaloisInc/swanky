@@ -1,7 +1,4 @@
-use std::{
-    io::{Read},
-    path::Path,
-};
+use std::{io::Read, path::Path};
 
 use mac_n_cheese_sieve_parser::{fb_reader, PrintingVisitor, RelationReader};
 

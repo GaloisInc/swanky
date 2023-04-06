@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use mac_n_cheese_ir::compilation_format::{wire_format::LinearPrototypeWireFormat};
+use mac_n_cheese_ir::compilation_format::wire_format::LinearPrototypeWireFormat;
 use mac_n_cheese_party::Party;
 use mac_n_cheese_vole::mac::{Mac, MacTypes};
 

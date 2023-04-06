@@ -1,19 +1,13 @@
 use clap::Args;
 use mac_n_cheese_ir::circuit_builder::vole_supplier::VoleSupplier;
-use mac_n_cheese_ir::circuit_builder::{
-    build_circuit, build_privates,
-};
+use mac_n_cheese_ir::circuit_builder::{build_circuit, build_privates};
 use mac_n_cheese_ir::compilation_format::wire_format::Wire;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
 use rand::RngCore;
 
-use scuttlebutt::field::{F2};
+use scuttlebutt::field::F2;
 use scuttlebutt::ring::FiniteRing;
-use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap},
-    str::FromStr,
-};
+use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 use vectoreyes::{
     array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16,
 };

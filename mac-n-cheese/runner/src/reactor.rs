@@ -5,16 +5,11 @@ use crate::{
     keys::Keys,
     runner::{ReactorCallback, RunQueue},
     task_framework::Challenge,
-    task_queue::{RunningTaskId},
+    task_queue::RunningTaskId,
     thread_spawner::ThreadSpawner,
 };
-use mac_n_cheese_ir::compilation_format::{
-    fb::DataChunkAddress, Manifest, PrivateDataAddress,
-};
-use mac_n_cheese_party::{
-    private::{ProverPrivate},
-    Party,
-};
+use mac_n_cheese_ir::compilation_format::{fb::DataChunkAddress, Manifest, PrivateDataAddress};
+use mac_n_cheese_party::{private::ProverPrivate, Party};
 use std::fs::File;
 
 #[derive(Clone, Copy, Default, Debug)]

@@ -4,9 +4,7 @@ use std::{
     io::{Read, Write},
     net::TcpStream,
     os::unix::prelude::FileExt,
-    sync::{
-        Arc,
-    },
+    sync::Arc,
     time::Duration,
 };
 

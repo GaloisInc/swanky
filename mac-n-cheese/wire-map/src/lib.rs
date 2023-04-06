@@ -345,7 +345,10 @@ impl<'parent, T> WireMap<'parent, T> {
             curr_start += alloc_len as u64;
         }
 
-        eyre::ensure!(curr_start == inclusive_end + 1, "The range {start}...{inclusive_end} does not fully cover all allocations it overlaps.");
+        eyre::ensure!(
+            curr_start == inclusive_end + 1,
+            "The range {start}...{inclusive_end} does not fully cover all allocations it overlaps."
+        );
 
         Ok(())
     }

@@ -114,9 +114,9 @@ pub fn initiate_tls<P: Party>(
                 .with_safe_default_kx_groups()
                 .with_protocol_versions(&[&rustls::version::TLS13])
                 .expect("building rustls server config")
-                .with_client_cert_verifier(Arc::new(rustls::server::AllowAnyAuthenticatedClient::new(
-                    tls_root_store,
-                )))
+                .with_client_cert_verifier(Arc::new(
+                    rustls::server::AllowAnyAuthenticatedClient::new(tls_root_store),
+                ))
                 .with_single_cert(tls_certs, tls_private_key)
                 .context("building rustls client config")?;
             let listener = TcpListener::bind(&address)

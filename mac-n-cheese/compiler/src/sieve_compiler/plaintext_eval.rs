@@ -9,7 +9,8 @@ use crate::sieve_compiler::{
     supported_fields::{
         CompilerField, CompilerFieldVisitor, FieldGenericIdentity, FieldGenericProduct,
         FieldGenericType, FieldIndexedArray,
-    }, to_fe, to_k_bits,
+    },
+    to_fe, to_k_bits,
 };
 
 use super::{
@@ -190,10 +191,8 @@ fn eval<VSR: ValueStreamReader>(
                                         FieldType::F2 => {
                                             let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
 
-                                            let start =
-                                                total_outputs + num_env_for_field as u64;
-                                            let inclusive_end =
-                                                start + num_wires as u64 - 1;
+                                            let start = total_outputs + num_env_for_field as u64;
+                                            let inclusive_end = start + num_wires as u64 - 1;
                                             out.alloc(start, inclusive_end)?;
 
                                             for (w, &b) in (start..=inclusive_end)

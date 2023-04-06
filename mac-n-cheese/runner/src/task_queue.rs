@@ -4,7 +4,7 @@ use mac_n_cheese_ir::compilation_format::{TaskId, TaskPriority};
 
 use parking_lot::{Condvar, Mutex};
 
-use crate::{event_log};
+use crate::event_log;
 
 pub type QueueName = u8;
 pub const QUEUE_NAME_RUN_QUEUE: u8 = 1;

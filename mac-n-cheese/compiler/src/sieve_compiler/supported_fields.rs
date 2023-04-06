@@ -1,6 +1,3 @@
-
-
-
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_sieve_parser::Number;
 use mac_n_cheese_wire_map::WireMap;

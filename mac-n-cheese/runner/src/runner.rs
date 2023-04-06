@@ -27,8 +27,7 @@ use crate::{
     reactor::{Reactor, ReactorRequest, ReactorResponse},
     task_definitions::{visit_task_definition, TaskDefinitionVisitor},
     task_framework::{
-        GlobalVolesNeeded, TaskContext, TaskDefinition, TaskInput, TaskOutput,
-        TaskResult,
+        GlobalVolesNeeded, TaskContext, TaskDefinition, TaskInput, TaskOutput, TaskResult,
     },
     task_queue::{RunningTaskId, TaskQueue, TaskQueueEntry},
     thread_spawner::ThreadSpawner,

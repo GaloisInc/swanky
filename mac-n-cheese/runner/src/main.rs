@@ -26,7 +26,6 @@ use types::visit_type;
 
 use crate::runner::RunQueue;
 
-
 use crate::task_queue::{TaskQueue, QUEUE_NAME_RUN_QUEUE};
 use crate::thread_spawner::ThreadSpawner;
 use crate::types::TypeVisitor;

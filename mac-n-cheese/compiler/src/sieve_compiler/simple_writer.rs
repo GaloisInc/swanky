@@ -1,10 +1,5 @@
 use std::{
-    any::TypeId,
-    collections::BTreeMap,
-    marker::PhantomData,
-    path::{Path},
-    sync::Arc,
-    time::Instant,
+    any::TypeId, collections::BTreeMap, marker::PhantomData, path::Path, sync::Arc, time::Instant,
 };
 
 use eyre::{Context, ContextCompat};
@@ -16,7 +11,7 @@ use mac_n_cheese_party::{
     private::{ProverPrivate, ProverPrivateCopy},
     Party, WhichParty,
 };
-use mac_n_cheese_sieve_parser::{ValueStreamReader};
+use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use scuttlebutt::field::F2;
@@ -617,10 +612,8 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         FieldType::F2 => {
                                             let value_le_bits = to_k_bits::<FE>(value, num_wires)?;
 
-                                            let start =
-                                                total_outputs + num_env_for_field as u64;
-                                            let inclusive_end =
-                                                start + num_wires as u64 - 1;
+                                            let start = total_outputs + num_env_for_field as u64;
+                                            let inclusive_end = start + num_wires as u64 - 1;
                                             out.alloc(start, inclusive_end)?;
 
                                             for (w, &b) in (start..=inclusive_end)
@@ -635,8 +628,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         _ => {
                                             debug_assert_eq!(num_wires, 1);
 
-                                            let start =
-                                                total_outputs + num_env_for_field as u64;
+                                            let start = total_outputs + num_env_for_field as u64;
                                             out.alloc(start, start)?;
 
                                             let counter = to_fe(value)?;
