@@ -24,28 +24,6 @@ use vectoreyes::{SimdBase, SimdBase8, U64x2, U8x16};
 #[repr(transparent)]
 pub struct Block(pub U8x16);
 
-/*#[test]
-fn test_block_blarg_clmul() {
-    let a = Block(U8x16::from(
-        0x482FD458CC4F4A74A0400BEBA61B8763_u128.to_le_bytes(),
-    ));
-    let b = Block(U8x16::from(
-        0x00CDC568066293988A1270EBB0BA23AD_u128.to_le_bytes(),
-    ));
-    let out = a.clmul(b);
-    assert_eq!(
-        out,
-        (
-            Block(U8x16::from(
-                0x0028F69DCB9DF00A77D080B08E8E263C_u128.to_le_bytes()
-            )),
-            Block(U8x16::from(
-                0xEBCEE9BC4CAD5F1D4CFFDD7E0E214E3F_u128.to_le_bytes()
-            )),
-        )
-    );
-}*/
-
 impl Block {
     /// Carryless multiplication.
     ///
