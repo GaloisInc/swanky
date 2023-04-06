@@ -434,7 +434,7 @@ fn no_duplicate_moduli() {
             .iter()
             .copied()
             .map(|x| x.0)
-            .collect::<FxHashSet<Number>>()
+            .collect::<rustc_hash::FxHashSet<Number>>()
             .len()
     );
 }
