@@ -18,7 +18,13 @@ variables:
   SWANKY_CACHE_DIR: /var/lib/swanky-sccache/
 
 normal-test:
-  script: ["true", "true"]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
+  script:
+    - pwd
+    - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py
 
 nightly-test:
   rules:
