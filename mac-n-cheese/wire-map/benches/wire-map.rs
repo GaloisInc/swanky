@@ -14,7 +14,7 @@ fn main() {
     ];
     let start = Instant::now();
     for base in bases {
-        wm.alloc(base, len);
+        wm.alloc(base, len).unwrap();
     }
     let len = len as u64;
     for i in 0..len {
