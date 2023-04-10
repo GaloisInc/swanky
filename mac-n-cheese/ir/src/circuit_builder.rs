@@ -210,9 +210,6 @@ impl PrototypeBuilder<'_, '_> {
         assert_ne!(size, 0);
         self.tpr.multi_array_inputs.push(Shape::new(ty, size));
     }
-    pub(crate) fn bytes_written(&self) -> usize {
-        self.bytes_written
-    }
 }
 impl Write for PrototypeBuilder<'_, '_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {

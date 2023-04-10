@@ -1,5 +1,4 @@
 use std::any::TypeId;
-use std::io::Write;
 
 use arrayvec::ArrayVec;
 use mac_n_cheese_vole::specialization::FiniteFieldSpecialization;

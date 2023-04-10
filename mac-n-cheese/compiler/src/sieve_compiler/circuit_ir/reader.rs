@@ -279,7 +279,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()> {
+    fn convert(&mut self, _dst: TypedWireRange, _src: TypedWireRange) -> eyre::Result<()> {
         todo!()
     }
     fn call(

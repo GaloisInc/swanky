@@ -7,6 +7,7 @@ use std::{
 use crypto_bigint::ArrayEncoding;
 use eyre::{Context, ContextCompat};
 
+#[allow(unused_imports)]
 #[path = "sieve_ir_generated.rs"]
 mod sieve_ir_generated;
 use generic_array::GenericArray;

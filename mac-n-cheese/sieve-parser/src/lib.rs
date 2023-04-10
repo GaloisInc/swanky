@@ -287,7 +287,7 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
         Ok(writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")?)
     }
-    fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()> {
+    fn convert(&mut self, _dst: TypedWireRange, _src: TypedWireRange) -> eyre::Result<()> {
         todo!()
     }
     fn call(

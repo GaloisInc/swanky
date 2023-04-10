@@ -28,8 +28,8 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AddTask<P, T> {
 
     fn finalize(
         self,
-        c: &mut crate::tls::TlsConnection<P>,
-        rng: &mut scuttlebutt::AesRng,
+        _c: &mut crate::tls::TlsConnection<P>,
+        _rng: &mut scuttlebutt::AesRng,
     ) -> eyre::Result<()> {
         Ok(())
     }

@@ -3,7 +3,7 @@ use eyre::WrapErr;
 use mac_n_cheese_vole::specialization::{
     FiniteFieldSpecialization, NoSpecialization, SmallBinaryFieldSpecialization,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use scuttlebutt::field::{F128p, F61p, F63b, FiniteField, IsSubFieldOf, SmallBinaryField, F2};
 use std::{
     any::{type_name, TypeId},
@@ -252,6 +252,7 @@ field_mac_type! {
 
 #[test]
 fn no_field_is_registered_twice() {
+    use rustc_hash::FxHashSet;
     let mut seen_types = FxHashSet::<(TypeId, TypeId)>::default();
     struct V<'a>(&'a mut FxHashSet<(TypeId, TypeId)>);
     impl FieldTypeMacVisitor for &'_ mut V<'_> {
@@ -407,6 +408,7 @@ pub type WireSize = u32;
 
 /// The generated flatbuffers structures.
 #[rustfmt::skip]
+#[allow(unused_imports)]
 #[path = "compilation_format_generated.rs"]
 pub mod fb;
 

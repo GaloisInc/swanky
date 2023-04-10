@@ -31,12 +31,14 @@ macro_rules! define_field_instruction {
         pub enum $FieldInstruction<$FE: CompilerField> {
             $($variant { $($field:$ty),* }),*
         }
+        #[allow(non_snake_case)]
         #[derive(Clone, Default)]
         pub struct FieldInstructions<$FE: CompilerField> {
             opcodes: Vec<u8>,
             WireId: Vec<WireId>,
             $FE: Vec<$FE>,
         }
+        #[allow(non_snake_case)]
         impl<$FE: CompilerField> FieldInstructions<$FE> {
             pub fn push(&mut self, insn: &$FieldInstruction<$FE>) {
                 let opcode = 0;
@@ -51,6 +53,7 @@ macro_rules! define_field_instruction {
                 let _ = opcode;
                 unreachable!()
             }
+            #[allow(unused)]
             pub fn len(&self) -> usize {
                 self.opcodes.len()
             }
@@ -155,6 +158,7 @@ pub enum Instruction {
 #[derive(Clone, Copy, Debug)]
 pub enum Type {
     Field(FieldType),
+    #[allow(unused)]
     Ram {
         field: FieldType,
         addr_count: usize,
@@ -166,12 +170,6 @@ pub enum Type {
 }
 
 pub type PublicInputsNeeded = FieldIndexedArray<u64>;
-fn add_public_inputs_needed(dst: &mut PublicInputsNeeded, src: &PublicInputsNeeded) {
-    for field in FieldType::ALL.iter().copied() {
-        dst[field] += src[field];
-    }
-}
-
 pub type SizeHint = u64;
 
 #[derive(Default, Debug)]
@@ -182,28 +180,6 @@ pub struct FunctionDefinition {
     pub body: Vec<Instruction>,
     pub public_inputs_needed: PublicInputsNeeded,
     pub size_hint: SizeHint,
-}
-impl FunctionDefinition {
-    pub fn num_inputs(&self) -> FieldIndexedArray<u64> {
-        let mut out = FieldIndexedArray::<u64>::default();
-        for (ty, count) in self.input_sizes.iter() {
-            if let Type::Field(f) = ty {
-                out[*f] += *count;
-            }
-            // TODO: What, if anything, should this do for RAM?
-        }
-        out
-    }
-    pub fn num_outputs(&self) -> FieldIndexedArray<u64> {
-        let mut out = FieldIndexedArray::<u64>::default();
-        for (ty, count) in self.output_sizes.iter() {
-            if let Type::Field(f) = ty {
-                out[*f] += *count;
-            }
-            // TODO: What, if anything, should this do for RAM?
-        }
-        out
-    }
 }
 
 #[derive(Debug, Clone, Copy)]

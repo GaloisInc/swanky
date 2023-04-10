@@ -27,6 +27,7 @@ mac_n_cheese_event_log::define_events! {
         oneoff ReadIncomingData {
             task_id: TaskId,
             length: u32,
+            connection_idx: u64,
         },
         oneoff ProvidedReactorRequest { task_id: TaskId, priority: TaskPriority },
         span SendingChallenge { task_id: TaskId },

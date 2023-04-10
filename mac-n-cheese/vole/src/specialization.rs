@@ -3,12 +3,11 @@ use scuttlebutt::field::{Degree, DegreeModulo, IsSubFieldOf, SmallBinaryField};
 use scuttlebutt::generic_array_length::Arr;
 use scuttlebutt::{
     field::{FiniteField, F2},
-    ring::FiniteRing,
     AesRng,
 };
-use std::{convert::TryFrom, io::Read};
+use std::convert::TryFrom;
 use vectoreyes::{
-    array_utils::{ArrayUnrolledExt, EvenArrayAdjacentPairs, UnrollableArraySize},
+    array_utils::{ArrayUnrolledExt, EvenArrayAdjacentPairs},
     ExtendingCast, I32x4, SimdBase, SimdBase32, SimdBaseGatherable, U16x8, U32x4, U32x8, U64x2,
     U64x4, U8x16,
 };
@@ -460,7 +459,7 @@ where
 }
 
 #[test]
-fn test_F40b_lpn() {
+fn test_f40b_lpn() {
     small_binary_lpn_test::<scuttlebutt::field::F40b>();
 }
 

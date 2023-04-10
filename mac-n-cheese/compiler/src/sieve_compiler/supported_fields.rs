@@ -184,6 +184,7 @@ macro_rules! supported_fields {
                 )*}
             }
         }
+        #[allow(non_snake_case)]
         pub struct FieldGenericProduct<T: FieldGenericType> {
             $($vf: T::Out<$vf>),*
         }
@@ -217,7 +218,9 @@ macro_rules! supported_fields {
                     .finish()
             }
         }
+        #[allow(non_snake_case)]
         impl<T: FieldGenericType> FieldGenericProduct<T> {
+            #[allow(unused)]
             pub fn as_ref(&self) -> FieldGenericProduct<&T> {
                 FieldGenericProduct {
                     $($vf: &self.$vf),*
@@ -242,6 +245,7 @@ macro_rules! supported_fields {
                 $(let $vf = v.visit::<$vf>(self.$vf)?;)*
                 Ok(FieldGenericProduct { $($vf),* })
             }
+            #[allow(unused)]
             pub fn zip<U: FieldGenericType>(self, other: FieldGenericProduct<U>) -> FieldGenericProduct<(T, U)> {
                 FieldGenericProduct {
                     $($vf: (self.$vf, other.$vf)),*
@@ -263,25 +267,6 @@ macro_rules! supported_fields {
                 }
             }
         }
-        impl<T: FieldGenericType> Debug for SparseFieldGenericProduct<T>
-            where $(T::Out::<$vf>: Debug),*
-        {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                todo!()
-            }
-        }
-        impl<T: FieldGenericType> Clone for SparseFieldGenericProduct<T>
-            where $(T::Out::<$vf>: Clone),*
-        {
-            fn clone(&self) -> Self {
-                use SparseFieldGenericProductInner::*;
-                Self(match &self.0 {
-                    Empty => Empty,
-                    Single(x) => Single(x.clone()),
-                    Several(x) => Several(x.clone()),
-                })
-            }
-        }
     };
 }
 impl<T: FieldGenericType> FieldGenericCoproduct<T> {
@@ -293,7 +278,7 @@ impl<T: FieldGenericType> FieldGenericCoproduct<T> {
     }
 }
 impl<T: FieldGenericType> FieldGenericProduct<T> {
-    // TODO: V ought to be able to be mut.
+    #[allow(unused)]
     pub fn new<V>(v: &mut V) -> Self
     where
         for<'a> &'a mut V: CompilerFieldVisitor<(), Output = T>,
@@ -326,89 +311,6 @@ impl<T> Index<FieldType> for FieldIndexedArray<T> {
 impl<T> IndexMut<FieldType> for FieldIndexedArray<T> {
     fn index_mut(&mut self, index: FieldType) -> &mut Self::Output {
         &mut self.0[index as usize]
-    }
-}
-
-enum SparseFieldGenericProductInner<T: FieldGenericType> {
-    Empty,
-    Single(FieldGenericCoproduct<T>),
-    Several(Box<FieldGenericProduct<Option<T>>>),
-}
-impl<T: FieldGenericType> SparseFieldGenericProductInner<T> {
-    fn upgrade_to_several(&mut self) -> &mut FieldGenericProduct<Option<T>> {
-        use SparseFieldGenericProductInner::*;
-        *self = Several(match std::mem::replace(self, Empty) {
-            Empty => Default::default(),
-            Single(x) => {
-                struct V<T: FieldGenericType>(PhantomData<T>);
-                impl<T: FieldGenericType> CompilerFieldVisitor<T> for V<T> {
-                    type Output = InvariantType<Box<FieldGenericProduct<Option<T>>>>;
-                    fn visit<FE: CompilerField>(
-                        self,
-                        x: T::Out<FE>,
-                    ) -> Box<FieldGenericProduct<Option<T>>> {
-                        let mut out = Box::<FieldGenericProduct<Option<T>>>::default();
-                        *out.deref_mut().as_mut().get::<FE>() = Some(x);
-                        out
-                    }
-                }
-                x.visit(V(PhantomData))
-            }
-            Several(x) => x,
-        });
-        match self {
-            Several(x) => x,
-            _ => unreachable!(),
-        }
-    }
-}
-/// `FieldGenericProduct<Option<T>>` which is more efficient if, usually, only one field will be
-/// `Some`.
-pub struct SparseFieldGenericProduct<T: FieldGenericType>(SparseFieldGenericProductInner<T>);
-impl<T: FieldGenericType> SparseFieldGenericProduct<T> {
-    pub fn get_mut_or_insert_with<'a, FE: CompilerField>(
-        &'a mut self,
-        f: impl FnOnce() -> T::Out<FE>,
-    ) -> &'a mut T::Out<FE> {
-        use SparseFieldGenericProductInner::*;
-        // We check whether we need to upgrade the Single case, first, due to
-        // https://github.com/rust-lang/rust/issues/21906, the longstanding bane of my existence :)
-        if let Single(x) = &self.0 {
-            if x.as_ref().get::<FE>().is_none() {
-                self.0.upgrade_to_several();
-            }
-        }
-        match &mut self.0 {
-            x @ Empty => {
-                *x = Single(FieldGenericCoproduct::new(f()));
-                match x {
-                    Single(x) => x.as_mut().get::<FE>().unwrap(),
-                    _ => unreachable!(),
-                }
-            }
-            Single(x) => x.as_mut().get::<FE>().unwrap(),
-            Several(x) => x.deref_mut().as_mut().get::<FE>().get_or_insert_with(f),
-        }
-    }
-    // We don't have as_ref and as_mut, since those aren't free (they might allocate), so we prefer
-    // to write combination of functions manually.
-    pub fn visit_mut<'a, V>(&'a mut self, v: &mut V) -> eyre::Result<()>
-    where
-        for<'b> &'b mut V:
-            CompilerFieldVisitor<&'a mut T, Output = InvariantType<eyre::Result<()>>>,
-    {
-        use SparseFieldGenericProductInner::*;
-        match &mut self.0 {
-            Empty => {}
-            Single(x) => x.as_mut().visit(v)?,
-            Several(x) => todo!(),
-        }
-        Ok(())
-    }
-}
-impl<T: FieldGenericType> Default for SparseFieldGenericProduct<T> {
-    fn default() -> Self {
-        Self(SparseFieldGenericProductInner::Empty)
     }
 }
 

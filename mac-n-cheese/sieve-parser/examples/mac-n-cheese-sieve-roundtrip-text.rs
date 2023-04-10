@@ -1,6 +1,6 @@
 use std::io::{Cursor, Read};
 
-use mac_n_cheese_sieve_parser::{PrintingVisitor, RelationReader};
+use mac_n_cheese_sieve_parser::PrintingVisitor;
 
 fn main() -> eyre::Result<()> {
     let mut input = Vec::new();

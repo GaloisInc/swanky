@@ -127,11 +127,7 @@ impl<P: Party> ThreadPoolReactor<P> {
         f: impl for<'a> FnOnce(&'a mut IncomingSlotData<P>),
     ) {
         let (incoming_slot, fresh) = self.get_incoming_slot(task_id);
-        let mut guard = event_log::IncomingSlotLock {
-            task_id: task_id,
-            fresh,
-        }
-        .lock(&incoming_slot.data);
+        let mut guard = event_log::IncomingSlotLock { task_id, fresh }.lock(&incoming_slot.data);
         let data = guard.as_mut().expect("task was not already launched");
         f(data);
         self.maybe_launch_incoming(task_id, &mut guard);
@@ -173,6 +169,7 @@ impl<P: Party> ThreadPoolReactor<P> {
             event_log::ReadIncomingData {
                 task_id: tdh.task_id,
                 length: tdh.length,
+                connection_idx,
             }
             .submit();
             self.update_incoming_slot(tdh.task_id, move |data| {
