@@ -82,13 +82,16 @@ impl MessageReader {
                 self.buf[..4].copy_from_slice(&len_buf);
                 file.read_exact(&mut self.buf[4..])
                     .context("Reading flatbuffer root message")?;
-                return Ok(Some(fb::size_prefixed_root_as_root_with_opts(
-                    &flatbuffers::VerifierOptions {
-                        max_tables: 1000000000000,
-                        ..flatbuffers::VerifierOptions::default()
-                    },
-                    &self.buf,
-                )));
+                return Ok(Some(
+                    fb::size_prefixed_root_as_root_with_opts(
+                        &flatbuffers::VerifierOptions {
+                            max_tables: 1000000000000,
+                            ..flatbuffers::VerifierOptions::default()
+                        },
+                        &self.buf,
+                    )
+                    .context("failed to verify flatbuffer root buffer")?,
+                ));
             } else {
                 // If current_file is None, then paths can't be empty, by the above condition.
                 let path = self.paths.pop().unwrap();
