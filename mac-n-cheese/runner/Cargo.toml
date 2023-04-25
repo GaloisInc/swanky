@@ -10,8 +10,6 @@ version.workspace = true
 aes-gcm.workspace = true
 arc-swap.workspace = true
 arrayvec.workspace = true
-bincode.workspace = true
-bitpacking.workspace = true
 blake3.workspace = true
 bumpalo.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
@@ -27,7 +25,6 @@ mac-n-cheese-vole.workspace = true
 mac-n-cheese-event-log.workspace = true
 libc.workspace = true
 moka.workspace = true
-nix.workspace = true
 num_cpus.workspace = true
 ocelot.workspace = true
 parking_lot.workspace = true
@@ -37,8 +34,6 @@ rustc-hash.workspace = true
 rustls-pemfile.workspace = true
 rustls.workspace = true
 scuttlebutt.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
 smallvec.workspace = true
 subtle.workspace = true
 vectoreyes.workspace = true
@@ -66,9 +61,6 @@ features = ["native-cpu", "build_cc"]
 default = ["mimalloc"]
 jemalloc = ["jemallocator"]
 snmalloc = ["snmalloc-rs"]
-
-[target.'cfg(target_os="linux")'.dependencies]
-io-uring.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
