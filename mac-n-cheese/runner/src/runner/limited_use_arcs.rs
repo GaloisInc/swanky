@@ -25,6 +25,7 @@ impl<T: 'static + Send + Sync> LimitedUseArcs<T> {
             phantom: PhantomData,
         }
     }
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         debug_assert_eq!(self.remaining_uses.len(), self.contents.len());
         self.remaining_uses.len()

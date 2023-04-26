@@ -1,3 +1,5 @@
+#![allow(unused)] // TODO: re-enable the allocation system
+
 use std::{
     alloc::Layout,
     any::TypeId,
@@ -366,6 +368,7 @@ impl<T: Sync + Send + Copy> OwnedAligned<T> {
             self.set_len(self.len + 1);
         }
     }
+    #[allow(unused)]
     pub fn truncate(&mut self, len: usize) {
         assert!(len <= self.len);
         unsafe {

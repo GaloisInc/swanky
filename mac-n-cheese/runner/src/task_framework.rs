@@ -1,8 +1,4 @@
-use std::{
-    io::{Cursor, Write},
-    marker::PhantomData,
-    sync::Arc,
-};
+use std::{io::Cursor, marker::PhantomData, sync::Arc};
 
 use eyre::ContextCompat;
 use mac_n_cheese_ir::compilation_format::{
@@ -61,6 +57,7 @@ impl<P: Party> TaskOutput<P> {
         out.insert(x);
         out
     }
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.contents.len()
     }
@@ -129,7 +126,7 @@ impl<P: Party> TaskInput<P> {
         {
             assert_type_is::<P, T>(Type::try_from(*input.ty())?);
         }
-        let mut out = ctx.arena.alloc_slice_fill_default(input.inputs().len());
+        let out = ctx.arena.alloc_slice_fill_default(input.inputs().len());
         for (tributary, out) in input.inputs().iter().zip(out.iter_mut()) {
             let dependency_output = self
                 .task_dependencies

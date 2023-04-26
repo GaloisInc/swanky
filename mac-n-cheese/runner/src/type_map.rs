@@ -7,6 +7,7 @@ pub struct SmallTypeMap<const INLINE: usize> {
     contents: SmallVec<[Box<dyn Any + Send + Sync>; INLINE]>,
 }
 
+#[allow(unused)]
 impl<const INLINE: usize> SmallTypeMap<INLINE> {
     pub fn new() -> Self {
         Default::default()
