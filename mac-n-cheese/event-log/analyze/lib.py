@@ -188,6 +188,7 @@ class EventLog:
                 return True
         return False
 
+
 def visualize_lock_evts(title, evts):
     data = defaultdict(lambda: [])
     for evt in evts:
