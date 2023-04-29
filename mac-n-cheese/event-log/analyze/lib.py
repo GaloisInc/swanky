@@ -1,9 +1,10 @@
-import subprocess
-import cbor2
-from pathlib import Path
 import dataclasses
-import plotly.express as px
+import subprocess
 from collections import defaultdict
+from pathlib import Path
+
+import cbor2
+import plotly.express as px
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
