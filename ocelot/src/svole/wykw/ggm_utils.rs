@@ -5,6 +5,7 @@ use vectoreyes::{
     array_utils::ArrayUnrolledExt, Aes128EncryptOnly, AesBlockCipher, SimdBase, U8x16,
 };
 
+/// How many `U8x16`s must fit in the `tmp_storage` slice?
 pub const fn ggm_temporary_storage_size(depth: usize) -> usize {
     1 << (depth + 1)
 }
@@ -122,6 +123,7 @@ pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
     }
 }
 
+/// How many `U8x16`s must fit in the `tmp_storage` slice?
 pub fn ggm_prime_temporary_storage_size(depth: usize) -> usize {
     let leaves = 1 << depth;
     2 * leaves - 2

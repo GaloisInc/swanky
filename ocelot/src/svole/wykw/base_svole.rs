@@ -14,17 +14,20 @@ use scuttlebutt::{
     AbstractChannel, AesRng,
 };
 
+/// The base VOLE sender
 pub struct Sender<FE: FF> {
     copee: CopeeSender<FE>,
     pows: Powers<FE>,
 }
 
+/// The base VOLE receiver
 pub struct Receiver<FE: FF> {
     copee: CopeeReceiver<FE>,
     pows: Powers<FE>,
 }
 
 impl<FE: FF> Sender<FE> {
+    /// Initalize the base vole sender
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -34,6 +37,7 @@ impl<FE: FF> Sender<FE> {
         Ok(Self { copee, pows })
     }
 
+    /// Recieve `n` `(x, beta)` pairs such that $`T = \beta - x \cdot \Delta`$
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -69,6 +73,7 @@ impl<FE: FF> Sender<FE> {
 }
 
 impl<FE: FF> Receiver<FE> {
+    /// Initalize the base vole receiver with a random `delta`
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -77,6 +82,7 @@ impl<FE: FF> Receiver<FE> {
         let cp = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee: cp, pows })
     }
+    /// Initalize the base vole receiver with a supplied `delta`
     pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -86,9 +92,11 @@ impl<FE: FF> Receiver<FE> {
         let cp = CopeeReceiver::<FE>::init_with_picked_delta(channel, pows.clone(), rng, delta)?;
         Ok(Self { copee: cp, pows })
     }
+    /// Return the `delta` associated with this receiver
     pub fn delta(&self) -> FE {
         self.copee.delta()
     }
+    /// Recieve `len` base VOLE `T` values where $`T = \beta - x \cdot \Delta`$
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,

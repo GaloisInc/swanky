@@ -1,3 +1,8 @@
+//! This is an implementation of the KOS oblivious transfer protocol, written so that each stage
+//! and round of the protocol is written out as an explicit function. That is, all steps of this
+//! implementation of the protocol involve pure computation, and the caller must handle all network
+//! I/O.
+
 use crate::Error;
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
@@ -191,6 +196,7 @@ pub struct KosSender {
     alsz: AlszSender,
 }
 impl KosSender {
+    /// Initialize the KOS OT protocol on the provided channel.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -200,6 +206,7 @@ impl KosSender {
         })
     }
 
+    /// How many incoming bytes is this stage expecting, for the given `num_inputs`
     pub const fn send_incoming_bytes(num_inputs: usize) -> usize {
         let m = if num_inputs % 8 != 0 {
             num_inputs + (8 - num_inputs % 8)
@@ -210,10 +217,19 @@ impl KosSender {
         let alsz_bytes = AlszSender::send_setup_input_bytes(ncols);
         alsz_bytes + 32 /* cointoss commitment */
     }
+    /// How many incoming bytes will this stage emit expecting, for the given `num_inputs`
     pub const fn send_outgoing_bytes(num_inputs: usize) -> usize {
         16 /* cointoss random */ + 32 * num_inputs
     }
 
+    /// Start an OT.
+    ///
+    /// The `incoming_bytes` should've been populated with data sent by the KosReceiver.
+    /// `outgoing_bytes` will be populated with the outgoing data to send to the `KosReceiver`. The
+    /// `selector` must be consistent between the sender and receiver and MUST NOT BE REPEATED
+    /// for the same `init` step. Because `selector` is only 64-bits, it's too small to be randomly
+    /// selected (safely) and it's recommended that some sort of monotonic counter be used instead.
+    ///
     /// The inputs will be sent _before_ it's been shown that the receiver wasn't cheating.
     /// This might not be secure for all applications.
     pub fn send(
@@ -276,7 +292,7 @@ impl KosSender {
         })
     }
 }
-
+/// The second communicattion round of the `KosSender`
 pub struct KosSenderStage2 {
     incoming_commitment: [u8; 32],
     our_seed: [u8; 16],
@@ -285,7 +301,10 @@ pub struct KosSenderStage2 {
     ot_s: Block,
 }
 impl KosSenderStage2 {
+    /// How many incoming bytes is this round expecting?
     pub const INCOMING_BYTES: usize = 16 * 4; // cointoss reveal, x, t0, t1
+    /// Execute round two of the `KosSender` protocol. `incoming` contains the incoming bytes sent
+    /// from the receiver. `arena` must be the same arena passed to the `send` function.
     pub fn stage2(self, arena: &KeyedArena, incoming: &[u8]) -> Result<(), Error> {
         if incoming.len() != Self::INCOMING_BYTES {
             return Err(Error::Other(format!(
@@ -336,6 +355,7 @@ pub struct KosReceiver {
     alsz: AlszReceiver,
 }
 impl KosReceiver {
+    /// Initialize a fresh receiver state.
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
@@ -345,10 +365,12 @@ impl KosReceiver {
         })
     }
 
+    /// How many outgoing bytes will be sent from the receiver in the first stage?
     pub const fn receive_outgoing_bytes(nchoices: usize) -> usize {
         KosSender::send_incoming_bytes(nchoices)
     }
 
+    /// Setup a receive operation. See [`KosSender::send`] for more info.
     pub fn receive<RNG: CryptoRng + Rng>(
         &self,
         arena: &KeyedArena,
@@ -402,6 +424,7 @@ impl KosReceiver {
     }
 }
 
+/// The state for the second round of the Kos receiver
 pub struct KosReceiverStage2 {
     our_seed: Block,
     choices: AllocationKey<bool>,
@@ -409,11 +432,13 @@ pub struct KosReceiverStage2 {
     r_: AllocationKey<bool>,
 }
 impl KosReceiverStage2 {
+    /// How many bytes will the receiver send this round?
     pub const OUTGOING_BYTES: usize = KosSenderStage2::INCOMING_BYTES;
+    /// How many bytes will the reciever expect to receive this round?
     pub fn incoming_bytes(nchoices: usize) -> usize {
         KosSender::send_outgoing_bytes(nchoices)
     }
-
+    /// Execute this round of the protocol.
     pub fn stage2<'a>(
         self,
         arena: &'a KeyedArena,
@@ -543,7 +568,7 @@ fn test_kos_ot() {
         }
     };
     run_test(vec![], vec![], 100000000);
-    /*run_test(
+    run_test(
         vec![(Block::from(1), Block::from(2))],
         vec![true],
         100000001,
@@ -560,5 +585,5 @@ fn test_kos_ot() {
             .map(|_| (rng.gen::<Block>(), rng.gen::<Block>()))
             .collect();
         run_test(inputs, choices, i as u64);
-    }*/
+    }
 }
