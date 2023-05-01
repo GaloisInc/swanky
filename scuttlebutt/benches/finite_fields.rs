@@ -103,6 +103,10 @@ finite_field_benchmarks!(f400p, scuttlebutt::field::F400p,);
 finite_field_benchmarks!(fbls12381, scuttlebutt::field::Fbls12381,);
 #[cfg(feature = "ff")]
 finite_field_benchmarks!(fbn254, scuttlebutt::field::Fbn254,);
+#[cfg(feature = "ff")]
+finite_field_benchmarks!(secp256k1, scuttlebutt::field::Secp256k1,);
+#[cfg(feature = "ff")]
+finite_field_benchmarks!(secp256k1order, scuttlebutt::field::Secp256k1order,);
 
 // XXX: Is there a better way to do this?
 #[cfg(not(feature = "ff"))]
@@ -134,5 +138,7 @@ criterion::criterion_main!(
     f384q::f384q,
     f400p::f400p,
     fbls12381::fbls12381,
-    fbn254::fbn254
+    fbn254::fbn254,
+    secp256k1::secp256k1,
+    secp256k1order::secp256k1order,
 );

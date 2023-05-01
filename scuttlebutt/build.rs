@@ -62,6 +62,20 @@ fn main() {
                     endianness: Little,
                 },
                 PrimeFieldCodegen {
+                    ident: "Secp256k1",
+                    is_pub: true,
+                    modulus: "115792089237316195423570985008687907853269984665640564039457584007908834671663",
+                    generator: "3",
+                    endianness: Little,
+                },
+                PrimeFieldCodegen {
+                    ident: "Secp256k1order",
+                    is_pub: true,
+                    modulus: "115792089237316195423570985008687907852837564279074904382605163141518161494337",
+                    generator: "7",
+                    endianness: Little,
+                },
+                PrimeFieldCodegen {
                     ident: "F256p",
                     is_pub: true,
                     modulus: "115792089210356248762697446949407573530086143415290314195533631308867097853951",
