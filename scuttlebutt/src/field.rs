@@ -214,7 +214,9 @@ pub use f61p::F61p;
 #[cfg(feature = "ff")]
 mod prime_field_using_ff;
 #[cfg(feature = "ff")]
-pub use prime_field_using_ff::{F128p, F256p, F384p, F384q, F400p, Fbls12381, Fbn254};
+pub use prime_field_using_ff::{
+    F128p, F256p, F384p, F384q, F400p, Fbls12381, Fbn254, Secp256k1, Secp256k1order,
+};
 #[cfg(feature = "ff")]
 mod f2e19x3e26;
 #[cfg(feature = "ff")]

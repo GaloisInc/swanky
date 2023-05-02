@@ -370,6 +370,35 @@ prime_field_using_ff!(
 );
 
 prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{256} - 2^{32} - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
+    ///     = 115792089237316195423570985008687907853269984665640564039457584007908834671663`$.
+    /// This field is used in the secp256k1 curve.
+    Secp256k1,
+    secp256k1,
+    modulus = "115792089237316195423570985008687907853269984665640564039457584007908834671663",
+    generator = "3",
+    limbs = 5,
+    actual_limbs = 4,
+    num_bytes = generic_array::typenum::U32,
+    num_bits = generic_array::typenum::U256,
+);
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 115792089237316195423570985008687907852837564279074904382605163141518161494337`$.
+    /// This prime is the order of the secp256k1 curve.
+    Secp256k1order,
+    secp256k1order,
+    modulus = "115792089237316195423570985008687907852837564279074904382605163141518161494337",
+    generator = "7",
+    limbs = 5,
+    actual_limbs = 4,
+    num_bytes = generic_array::typenum::U32,
+    num_bits = generic_array::typenum::U256,
+);
+
+prime_field_using_ff!(
     /// The BLS12-381 finite field.
     Fbls12381,
     fbls12381,
