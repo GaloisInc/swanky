@@ -3,7 +3,8 @@
 This is a wrapper around `cargo doc` which sets some additional parameters. As a result, it accepts
 all the same options as `cargo doc`.
 
-In order to run this script, you need to have python3 installed, along with the toml package.
+In order to run this script, you need to have python3 installed. If python <3.11 is installed, the
+toml package is also required.
 """
 
 import os
@@ -12,7 +13,10 @@ import shutil
 import sys
 from pathlib import Path
 
-import toml
+try:
+    import tomllib as toml
+except ImportError:
+    import toml
 
 ROOT = Path(__file__).resolve().parent.parent
 cargo_config = toml.loads((ROOT / ".cargo/config").read_text())

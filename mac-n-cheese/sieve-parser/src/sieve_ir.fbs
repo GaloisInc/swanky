@@ -1,0 +1,259 @@
+// This is a FlatBuffers schema.
+// See https://google.github.io/flatbuffers/
+namespace sieve_ir;
+
+// REGEX used:
+// - VERSION_REGEX = "^\d+.\d+.\d+$"
+// - STRING_REGEX = "^[a-zA-Z_][\w]*((\.|::)[a-zA-Z_][\w]*)*$"
+// - NUMBER_REGEX = "^((\d+)|(0x[0-9a-fA-F]+))$"
+
+// ==== Message types that can be exchanged. ====
+union Message {
+  Relation,
+  PublicInputs,
+  PrivateInputs,
+}
+
+// The 'version' field must match VERSION_REGEX
+// Each string in the 'plugins' list must match STRING_REGEX
+table Relation {
+  version      :string;
+  plugins      :[string];
+  types        :[Type];
+  conversions  :[Conversion];
+  directives   :[Directive];
+}
+
+// The 'version' field must match VERSION_REGEX
+table PublicInputs {
+  version  :string;
+  type     :Type;
+  inputs   :[Value];
+}
+
+// The 'version' field must match VERSION_REGEX
+table PrivateInputs {
+  version  :string;
+  type     :Type;
+  inputs   :[Value];
+}
+
+// ==== Helper types ====
+// Type element is encoded in a vector of bytes in little-endian
+// order. There is no minimum or maximum length; trailing zeros
+// may be omitted.
+table Value {
+  value  :[ubyte];
+}
+
+struct Count {
+  type_id  :ubyte;
+  count    :uint64;
+}
+
+// ==== Directive ====
+union DirectiveSet {
+  Gate,
+  Function,
+}
+
+table Directive {
+  directive  :DirectiveSet;
+}
+
+// ==== Conversion ====
+struct Conversion {
+  output_count  :Count;
+  input_count   :Count;
+}
+
+// ==== Type ====
+union TypeU {
+  Field,
+  PluginType
+}
+
+table Type {
+  element  :TypeU;
+}
+
+table Field {
+  modulo  :Value;
+}
+
+// 'name' and 'operation' must match STRING_REGEX
+// Strings of the 'params' list must match either
+// STRING_REGEX or NUMBER_REGEX
+table PluginType {
+  name       :string;
+  operation  :string;
+  params     :[string];
+}
+
+// ==== Gate types ====
+table GateConstant {
+  type_id   :ubyte;
+  out_id    :uint64;
+  // 'constant' is encoded in a vector of bytes in little-endian
+  // order. There is no minimum or maximum length; trailing zeros
+  // may be omitted.
+  constant  :[ubyte];
+}
+
+table GateAssertZero {
+  type_id  :ubyte;
+  in_id    :uint64;
+}
+
+table GateCopy {
+  type_id  :ubyte;
+  out_id   :uint64;
+  in_id    :uint64;
+}
+
+table GateAdd {
+  type_id  :ubyte;
+  out_id   :uint64;
+  left_id  :uint64;
+  right_id :uint64;
+}
+
+table GateMul {
+  type_id  :ubyte;
+  out_id   :uint64;
+  left_id  :uint64;
+  right_id :uint64;
+}
+
+table GateAddConstant {
+  type_id   :ubyte;
+  out_id    :uint64;
+  in_id     :uint64;
+  // 'constant' is encoded in a vector of bytes in little-endian
+  // order. There is no minimum or maximum length; trailing zeros
+  // may be omitted.
+  constant  :[ubyte];
+}
+
+table GateMulConstant {
+  type_id   :ubyte;
+  out_id    :uint64;
+  in_id     :uint64;
+  // 'constant' is encoded in a vector of bytes in little-endian
+  // order. There is no minimum or maximum length; trailing zeros
+  // may be omitted.
+  constant  :[ubyte];
+}
+
+table GatePublic {
+  type_id  :ubyte;
+  out_id   :uint64;
+}
+
+table GatePrivate {
+  type_id  :ubyte;
+  out_id   :uint64;
+}
+
+// To allocate in a contiguous space all wires between
+// first_id and last_id inclusive.
+table GateNew {
+  type_id   :ubyte;
+  first_id  :uint64;
+  last_id   :uint64;
+}
+
+table GateDelete {
+  type_id   :ubyte;
+  first_id  :uint64;
+  last_id   :uint64;
+}
+
+table GateConvert {
+  out_type_id   :ubyte;
+  out_first_id  :uint64;
+  out_last_id   :uint64;
+  in_type_id    :ubyte;
+  in_first_id   :uint64;
+  in_last_id    :uint64;
+}
+
+// ==== Function declaration ====
+union FunctionBody {
+  Gates,
+  PluginBody,
+}
+
+table Gates {
+  gates  :[Gate];
+}
+
+// 'name' and 'operation' must match STRING_REGEX
+// Strings of the 'params' list must match either
+// STRING_REGEX or NUMBER_REGEX
+table PluginBody {
+  name           :string;
+  operation      :string;
+  params         :[string];
+  public_count   :[Count]; // Each type_id must be unique
+  private_count  :[Count]; // Each type_id must be unique
+}
+
+// Declare a Function gate as a custom computation or from a plugin
+// The 'name' must match STRING_REGEX
+table Function {
+  name          :string;
+  output_count  :[Count];
+  input_count   :[Count];
+  body          :FunctionBody;
+}
+
+struct WireRange {
+  first_id  :uint64;
+  last_id   :uint64;
+}
+
+// Invokes a previously defined Function gate
+// The 'name' must match STRING_REGEX
+table GateCall {
+  name    :string;
+  out_ids :[WireRange];
+  in_ids  :[WireRange];
+}
+
+union GateSet {
+  GateConstant,
+  GateAssertZero,
+  GateCopy,
+  GateAdd,
+  GateMul,
+  GateAddConstant,
+  GateMulConstant,
+  GatePublic,
+  GatePrivate,
+  GateNew,
+  GateDelete,
+  GateConvert,
+  GateCall,
+}
+
+table Gate {
+  gate  :GateSet;
+}
+
+// ==== Flatbuffers details ====
+// All message types are encapsulated in the FlatBuffers root table.
+table Root {
+  message  :Message;
+}
+root_type Root;
+
+// When storing messages to files, this extension and identifier
+// should be used.
+file_extension "sieve";
+file_identifier "siev"; // a.k.a. magic bytes.
+
+// Message framing:
+//
+// All messages must be prefixed by its size in bytes,
+// as a 4-bytes little-endian unsigned integer.

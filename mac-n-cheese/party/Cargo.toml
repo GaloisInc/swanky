@@ -1,0 +1,10 @@
+[package]
+name = "mac-n-cheese-party"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+bytemuck = { workspace = true, features = ["derive"] }

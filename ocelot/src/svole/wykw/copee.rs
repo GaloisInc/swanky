@@ -100,14 +100,14 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
 }
 
 impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
+        delta: FE,
     ) -> Result<Self, Error> {
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let mut ot = ROT::init(channel, &mut rng)?;
-        let delta = FE::random(&mut rng);
         let choices = delta.bit_decomposition();
         let mut acc = FE::ONE;
         let two = FE::ONE + FE::ONE;
@@ -128,6 +128,14 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             nbits,
             counter: 0,
         })
+    }
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        pows: Powers<FE>,
+        mut rng: &mut RNG,
+    ) -> Result<Self, Error> {
+        let delta = FE::random(&mut rng);
+        Self::init_with_picked_delta(channel, pows, rng, delta)
     }
 
     pub fn delta(&self) -> FE {

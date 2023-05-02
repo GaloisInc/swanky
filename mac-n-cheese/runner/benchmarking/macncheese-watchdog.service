@@ -1,0 +1,8 @@
+[Unit]
+Description=Mac n Cheese Watchdog
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+ExecStart=/usr/bin/env python3 /home/ec2-user/watchdog.py daemon

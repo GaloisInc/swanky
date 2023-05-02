@@ -1,8 +1,7 @@
 //! Implementation of single-point sVOLE.
 
 use super::{
-    ggm_utils::{ggm, ggm_prime, GgmTemporaryStorage},
-    specialization::NoSpecialization,
+    ggm_utils::{ggm, ggm_prime, ggm_prime_temporary_storage_size, ggm_temporary_storage_size},
     utils::Powers,
 };
 use crate::{
@@ -21,12 +20,13 @@ use scuttlebutt::{
     utils::unpack_bits,
     AbstractChannel, AesRng, Block, Malicious,
 };
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
     ot: OT,
     pows: Powers<FE>,
     ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
+    ggm_temporary_storage: Vec<U8x16>,
 }
 
 pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF> {
@@ -34,7 +34,7 @@ pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF> {
     delta: FE,
     pows: Powers<FE>,
     ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
-    ggm_temporary_storage: GgmTemporaryStorage,
+    ggm_temporary_storage: Vec<U8x16>,
 }
 
 pub(super) type SpsSender<FE> = Sender<KosReceiver, FE>;
@@ -105,6 +105,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             pows,
             ot,
             ggm_seeds: (aes0, aes1),
+            ggm_temporary_storage: Default::default(),
         })
     }
 
@@ -151,18 +152,23 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         }
 
         let keys = self.ot.receive(channel, &choices, rng)?;
-
         for (i, ((_, w), (alpha, beta))) in base_uws
             .iter()
             .copied()
             .zip(alphas.iter().zip(betas.into_iter()))
             .enumerate()
         {
-            let sum = ggm_prime::<FE, NoSpecialization>(
+            let ot_output = bytemuck::cast_slice(&keys[i * nbits..(i + 1) * nbits]);
+            self.ggm_temporary_storage.resize(
+                ggm_prime_temporary_storage_size(ot_output.len()),
+                U8x16::default(),
+            );
+            let sum = ggm_prime::<FE::PrimeField, FE, (FE::PrimeField, FE)>(
                 *alpha,
-                bytemuck::cast_slice(&keys[i * nbits..(i + 1) * nbits]),
+                ot_output,
                 &self.ggm_seeds,
                 &mut result[i * n..(i + 1) * n],
+                &mut self.ggm_temporary_storage,
             );
             let d: FE = channel.read_serializable()?;
             result[i * n + alpha] = (beta, w - (d + sum));
@@ -234,6 +240,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             ot,
             pows: self.pows.clone(),
             ggm_seeds: self.ggm_seeds.clone(),
+            ggm_temporary_storage: Default::default(),
         })
     }
 }
@@ -283,6 +290,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
             let seed = rng.gen::<Block>().0;
+            self.ggm_temporary_storage
+                .resize(ggm_temporary_storage_size(nbits), U8x16::default());
             ggm(
                 nbits,
                 seed,
@@ -360,7 +369,6 @@ mod test {
     use super::{
         super::{
             base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
-            specialization::NoSpecialization,
             utils::Powers,
         },
         SpsReceiver, SpsSender,
@@ -385,9 +393,7 @@ mod test {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let pows = <Powers<_> as Default>::default();
-            let mut base =
-                BaseSender::<FE, NoSpecialization>::init(&mut channel, pows.clone(), &mut rng)
-                    .unwrap();
+            let mut base = BaseSender::<FE>::init(&mut channel, pows.clone(), &mut rng).unwrap();
             let uw = base.send(&mut channel, weight + r, &mut rng).unwrap();
             let mut spsvole = SpsSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             spsvole

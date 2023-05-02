@@ -1,0 +1,52 @@
+#cloud-config
+
+ssh_deletekeys: true
+ssh_quiet_keygen: false
+ssh_publish_hostkeys:
+  enabled: true
+ssh_keys:
+  rsa_private: ${jsonencode(priv_key)}
+  rsa_public: ${jsonencode(pub_key)}
+
+package_upgrade: true
+packages:
+  - tmux
+  - htop
+  - git
+  - curl
+  - python3
+  - zstd
+  - tree
+  - wget
+  - gcc
+  - gcc-c++
+  - make
+  - autoconf
+  - automake
+  - bison
+  - flex
+  - pkgconfig
+  - rsync
+  - perf
+  - kernel-devel
+  - kernel-headers
+  - gdb
+  - gperftools
+  - fuse
+  - fuse-devel
+  - fuse-libs
+
+runcmd:
+  - echo 'LANG=en_US.utf-8' >> /etc/environment
+  - echo 'LC_ALL=en_US.utf-8' >> /etc/environment
+  - echo '' >> /etc/motd.mc
+  - echo 'Mac n Cheese Info Below:' >> /etc/motd.mc
+  - echo 'Installation logs live at /var/log/cloud-init-output.log' >> /etc/motd.mc
+  - echo 'Long-running commands are running via tmux. Run `tmux a` to attach to running sessions.' >> /etc/motd.mc
+  - echo '#!/bin/sh' >> /etc/update-motd.d/99-mac-n-cheese
+  - echo 'cat /etc/motd.mc' >> /etc/update-motd.d/99-mac-n-cheese
+  - chmod +x /etc/update-motd.d/99-mac-n-cheese
+  - systemctl --quiet restart update-motd
+  - su ec2-user -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > /tmp/rustup.sh"
+  - su ec2-user -c "sh /tmp/rustup.sh --default-toolchain none -y"
+  - touch /home/ec2-user/.mnc-cloud-init-finished

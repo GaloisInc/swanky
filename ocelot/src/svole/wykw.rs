@@ -1,10 +1,9 @@
 //! Implementation of the Weng-Yang-Katz-Wang random subfield VOLE protocol (cf.
 //! <https://eprint.iacr.org/2020/925>).
 
-mod base_svole;
+pub mod base_svole;
 mod copee;
-mod ggm_utils;
-mod specialization;
+pub mod ggm_utils;
 mod spsvole;
 mod svole;
 mod utils;

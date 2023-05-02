@@ -1,0 +1,66 @@
+[package]
+name = "mac-n-cheese-runner"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+aes-gcm.workspace = true
+arc-swap.workspace = true
+arrayvec.workspace = true
+blake3.workspace = true
+bumpalo.workspace = true
+bytemuck = { workspace = true, features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
+color-eyre.workspace = true
+eyre.workspace = true
+generic-array.workspace = true
+keyed_arena.workspace = true
+lz4.workspace = true
+mac-n-cheese-ir.workspace = true
+mac-n-cheese-party.workspace = true
+mac-n-cheese-vole.workspace = true
+mac-n-cheese-event-log.workspace = true
+libc.workspace = true
+moka.workspace = true
+num_cpus.workspace = true
+ocelot.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+ring.workspace = true
+rustc-hash.workspace = true
+rustls-pemfile.workspace = true
+rustls.workspace = true
+scuttlebutt.workspace = true
+smallvec.workspace = true
+subtle.workspace = true
+vectoreyes.workspace = true
+bufstream.workspace = true
+flatbuffers.workspace = true
+crossbeam-queue.workspace = true
+
+# Memory allocators
+jemallocator = { workspace = true, optional = true }
+# we disble "secure" mode with no-default-features
+mimalloc = { workspace = true, optional = true }
+rpmalloc = { workspace = true, optional = true }
+
+# Memory profiling
+dhat = { workspace = true, optional = true }
+
+[dependencies.snmalloc-rs]
+workspace = true
+optional = true
+default-features = false
+features = ["native-cpu", "build_cc"]
+
+[features]
+# You can enable jemalloc, snmalloc, or mimalloc memory allocators
+default = ["mimalloc"]
+jemalloc = ["jemallocator"]
+snmalloc = ["snmalloc-rs"]
+
+[dev-dependencies]
+proptest.workspace = true

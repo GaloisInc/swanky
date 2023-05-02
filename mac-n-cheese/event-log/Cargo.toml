@@ -1,0 +1,22 @@
+[package]
+name = "mac-n-cheese-event-log"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+ciborium.workspace = true
+parking_lot.workspace = true
+lz4.workspace = true
+serde = { workspace = true, features = ["derive"] }
+eyre.workspace = true
+crossbeam-queue.workspace = true
+rustc-hash.workspace = true
+smallvec = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+

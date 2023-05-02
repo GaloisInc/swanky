@@ -6,7 +6,6 @@ use super::{
     utils::Powers,
 };
 use crate::errors::Error;
-use crate::svole::wykw::specialization::FiniteFieldSpecialization;
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
@@ -14,44 +13,42 @@ use scuttlebutt::{
     ring::FiniteRing,
     AbstractChannel, AesRng,
 };
-use std::marker::PhantomData;
 
-pub(super) struct Sender<FE: FF, S: FiniteFieldSpecialization<FE>> {
+/// The base VOLE sender
+pub struct Sender<FE: FF> {
     copee: CopeeSender<FE>,
     pows: Powers<FE>,
-    phantom: PhantomData<S>,
 }
 
+/// The base VOLE receiver
 pub struct Receiver<FE: FF> {
     copee: CopeeReceiver<FE>,
     pows: Powers<FE>,
 }
 
-impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
+impl<FE: FF> Sender<FE> {
+    /// Initalize the base vole sender
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
         let copee = CopeeSender::<FE>::init(channel, pows.clone(), rng)?;
-        Ok(Self {
-            copee,
-            pows,
-            phantom: PhantomData,
-        })
+        Ok(Self { copee, pows })
     }
 
+    /// Recieve `n` `(x, beta)` pairs such that $`T = \beta - x \cdot \Delta`$
     pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         n: usize,
         mut rng: &mut RNG,
-    ) -> Result<Vec<S::SenderPairContents>, Error> {
+    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
         let mut uws = Vec::with_capacity(n);
         for _ in 0..n {
             let u = FE::PrimeField::random(&mut rng);
             let w = self.copee.send(channel, &u)?;
-            uws.push(S::new_sender_pair(u, w));
+            uws.push((u, w));
         }
         let mut z: FE = FE::ZERO;
         let mut x: FE = FE::ZERO;
@@ -64,7 +61,7 @@ impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
         channel.flush()?;
         let seed = channel.read_block()?;
         let mut rng_chi = AesRng::from_seed(seed);
-        for (u, w) in uws.iter().copied().map(S::extract_sender_pair) {
+        for (u, w) in uws.iter().copied() {
             let chi = FE::random(&mut rng_chi);
             z += chi * w;
             x += u * chi;
@@ -76,6 +73,7 @@ impl<FE: FF, S: FiniteFieldSpecialization<FE>> Sender<FE, S> {
 }
 
 impl<FE: FF> Receiver<FE> {
+    /// Initalize the base vole receiver with a random `delta`
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -84,9 +82,21 @@ impl<FE: FF> Receiver<FE> {
         let cp = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee: cp, pows })
     }
+    /// Initalize the base vole receiver with a supplied `delta`
+    pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
+        channel: &mut C,
+        pows: Powers<FE>,
+        rng: &mut RNG,
+        delta: FE,
+    ) -> Result<Self, Error> {
+        let cp = CopeeReceiver::<FE>::init_with_picked_delta(channel, pows.clone(), rng, delta)?;
+        Ok(Self { copee: cp, pows })
+    }
+    /// Return the `delta` associated with this receiver
     pub fn delta(&self) -> FE {
         self.copee.delta()
     }
+    /// Recieve `len` base VOLE `T` values where $`T = \beta - x \cdot \Delta`$
     pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
@@ -125,7 +135,6 @@ impl<FE: FF> Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
-    use crate::svole::wykw::specialization::{FiniteFieldSpecialization, NoSpecialization};
     use scuttlebutt::{
         field::{F128b, F40b, F61p, FiniteField as FF},
         AesRng, Channel,
@@ -135,7 +144,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_base_svole<FE: FF, S: FiniteFieldSpecialization<FE>>(len: usize) {
+    fn test_base_svole<FE: FF>(len: usize) {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -143,7 +152,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
             let pows = <Powers<_> as Default>::default();
-            let mut vole = Sender::<FE, S>::init(&mut channel, pows, &mut rng).unwrap();
+            let mut vole = Sender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
             vole.send(&mut channel, len, &mut rng).unwrap()
         });
         let mut rng = AesRng::new();
@@ -156,16 +165,16 @@ mod tests {
         let delta = vole.delta();
         let uw_s = handle.join().unwrap();
         for i in 0..len {
-            let mut right = S::extract_sender_pair(uw_s[i]).0 * delta;
+            let mut right = uw_s[i].0 * delta;
             right += vs[i];
-            assert_eq!(S::extract_sender_pair(uw_s[i]).1, right);
+            assert_eq!(uw_s[i].1, right);
         }
     }
 
     fn test_base_vole_setup_params_all_fields(len: usize) {
-        test_base_svole::<F128b, NoSpecialization>(len);
-        test_base_svole::<F61p, NoSpecialization>(len);
-        test_base_svole::<F40b, NoSpecialization>(len);
+        test_base_svole::<F128b>(len);
+        test_base_svole::<F61p>(len);
+        test_base_svole::<F40b>(len);
     }
 
     #[test]

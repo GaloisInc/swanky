@@ -1,0 +1,30 @@
+[package]
+name = "mac-n-cheese-vole"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+scuttlebutt.workspace = true
+ocelot.workspace = true
+vectoreyes.workspace = true
+generic-array.workspace = true
+bytemuck.workspace = true
+mac-n-cheese-party.workspace = true
+eyre.workspace = true
+rand.workspace = true
+keyed_arena.workspace = true
+blake3.workspace = true
+arrayvec.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
+scuttlebutt = { workspace = true, features = ["ff"] }
+mimalloc.workspace = true
+
+[[bench]]
+name = "vole"
+harness = false
+

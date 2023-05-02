@@ -1,0 +1,18 @@
+{% if ty.ty.bits == 8 or ty.ty.bits == 16 %}
+    impl crate::SimdSaturatingArithmetic for {{ty}} {
+        {% for op in ["add", "sub"] %}
+            {% call(scalar, avx2) fn("saturating_" ~ op, {"&self": ty, "other": ty}, returns=ty) %}
+                {% call scalar() %}
+                    let mut out = self.as_array();
+                    for (dst, src) in out.iter_mut().zip(other.as_array().iter()) {
+                        *dst = dst.saturating_{{op}}(*src);
+                    }
+                    Self::from(out)
+                {% endcall %}
+                {% call(avx2i) avx2() %}
+                    Self({{avx2i(ty, op ~ "s")}}(self.0, other.0))
+                {% endcall %}
+            {% endcall %}
+        {% endfor %}
+    }
+{% endif %}

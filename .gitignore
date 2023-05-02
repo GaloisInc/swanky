@@ -2,3 +2,14 @@
 /.idea
 .tags*
 /.vscode
+*.bin
+*.dot
+*.mclog
+__pycache__/
+.ipynb_checkpoints/
+aes.bin
+aes.priv.bin
+aes.dot
+circ.bin
+circ.priv.bin
+circ.dot

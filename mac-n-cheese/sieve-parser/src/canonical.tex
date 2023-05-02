@@ -1,0 +1,275 @@
+
+\begin{appendices}
+
+\section{Textual Syntax}\label{text_syntax}
+This appendix uses a right-recursive BNF grammar to define the exact syntax of the text format.\\
+
+\newcommand{\nterm}[1]{$\langle$#1$\rangle$}
+\newcommand{\term}[1]{`#1'}
+
+\subsection{Special Tokens} \label{appendix_special_tokens}
+The following special tokens are defined by regular expressions.
+
+\begin{alltt}
+  \nterm{number} => 0 ;
+  \nterm{number} => [1-9][0-9]* ;
+  \nterm{number} => 0x[0-9a-fA-F]+ ;
+  \nterm{number} => 0X[0-9a-fA-F]+ ;
+  \nterm{number} => 0o[0-7]+ ;
+  \nterm{number} => 0O[0-7]+ ;
+  \nterm{number} => 0b[0-1]+ ;
+  \nterm{number} => 0B[0-1]+ ;
+
+  // interpret `$' as a literal dollar sign (U+0024)
+  \nterm{wire-number} => $[1-9][0-9]* ;
+  \nterm{wire-number} => $0x[0-9a-fA-F]+ ;
+  \nterm{wire-number} => $0X[0-9a-fA-F]+ ;
+  \nterm{wire-number} => $0o[0-7]+ ;
+  \nterm{wire-number} => $0O[0-7]+ ;
+  \nterm{wire-number} => $0b[0-1]+ ;
+  \nterm{wire-number} => $0B[0-1]+ ;
+
+  // interpret `.' as a literal point or dot (U+002E)
+  \nterm{identifier} => [a-zA-Z_][a-zA-Z0-9_]*((.|::)[a-zA-Z_][a-zA-Z0-9_]*)* ;
+\end{alltt}
+
+\subsection{Header}
+The following grammar is given for the IR Header.
+
+\begin{alltt}
+\nterm{header} => \nterm{version-spec} \nterm{resource-id} ;
+
+\nterm{version-spec} => \term{version} \nterm{number} \term{.} \nterm{number} \term{.} \nterm{number} \term{;} ;
+
+\nterm{resource-id} => \term{circuit} \term{;} ;
+\nterm{resource-id} => \term{translation} \term{;} ;
+\nterm{resource-id} => \term{public_input} \term{;} ;
+\nterm{resource-id} => \term{private_input} \term{;} ;
+\nterm{resource-id} => \term{configuration} \term{;} ;
+\end{alltt}
+
+\subsection{Circuit-IR}
+The following grammar is given for the Circuit-IR (resource id \texttt{circuit}).
+
+\begin{alltt}
+\nterm{circuit} => \nterm{header} \nterm{circuit-header} \nterm{circuit-body} EOF ;
+
+\nterm{circuit-header} => \nterm{type-list} ;
+\nterm{circuit-header} => \nterm{type-list} \nterm{conversion-list} ;
+
+\nterm{type-list} => \nterm{type} \nterm{type-list} ;
+\nterm{type-list} => \nterm{type} ;
+\nterm{type} => \term{@type} \term{field} \nterm{number} \term{;} ;
+
+\nterm{conversion-list} => \nterm{conversion} \nterm{conversion-list} ;
+\nterm{conversion-list} => \nterm{conversion} ;
+\nterm{conversion} => \term{@convert} \term{(}
+    \term{@out} \term{:} \nterm{number} \term{:} \nterm{number} \term{,}
+    \term{@in} \term{:} \nterm{number} \term{:} \nterm{number} \term{,}
+    \term{)} \term{;} ;
+
+\nterm{circuit-body} => \term{@begin} \nterm{top-scope} \term{@end} ;
+
+\nterm{top-scope} => \nterm{top-scope-item} \nterm{top-scope} ;
+\nterm{top-scope} => \nterm{top-scope-item} ;
+
+\nterm{top-scope-item} => \nterm{function-declaration} ;
+\nterm{top-scope-item} => \nterm{directive} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier}
+    \term{@out} \term{:} \nterm{parameter-list} \term{,}
+    \term{@in} \term{:} \nterm{parameter-list} \term{)}
+      \nterm{function-scope}
+    \term{@end} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier}
+    \term{@in} \term{:} \nterm{parameter-list} \term{)}
+      \nterm{function-scope}
+    \term{@end} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier}
+    \term{@out} \term{:} \nterm{parameter-list} \term{)}
+      \nterm{function-scope}
+    \term{@end} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier} \term{)}
+      \nterm{function-scope}
+    \term{@end} ;
+
+\nterm{parameter-list} => \nterm{parameter} \term{,} \nterm{parameter-list} ;
+\nterm{parameter-list} => \nterm{parameter} ;
+
+\nterm{function-scope} => \nterm{function-scope-item} \nterm{function-scope} ;
+\nterm{function-scope} => \nterm{function-scope-item} ;
+\nterm{function-scope-item} => \nterm{directive} ;
+
+\nterm{directive} => \nterm{new-directive} ;
+\nterm{directive} => \nterm{delete-directive}
+\nterm{directive} => \nterm{binary-gate} ;
+\nterm{directive} => \nterm{binary-const-gate} ;
+\nterm{directive} => \nterm{copy-directive} ;
+\nterm{directive} => \nterm{assign-directive} ;
+\nterm{directive} => \nterm{input-gate} ;
+\nterm{directive} => \nterm{assert-zero-directive} ;
+\nterm{directive} => \nterm{convert-gate} ;
+\nterm{directive} => \nterm{call-directive} ;
+
+\nterm{new-directive} => \term{@new} \term{(}
+   \nterm{number} \term{:} \nterm{wire-number} \term{...} \nterm{wire-number} \term{)} \term{;} ;
+\nterm{new-directive} => \term{@new} \term{(}
+    \nterm{wire-number} \term{...} \nterm{wire-number} \term{)} \term{;} ;
+
+\nterm{delete-directive} => \term{@delete} \term{(}
+    \nterm{number} \term{:} \nterm{wire-number} \term{...} \nterm{wire-number} \term{)} \term{;} ;
+\nterm{delete-directive} => \term{@delete} \term{(}
+    \nterm{wire-number} \term{...} \nterm{wire-number} \term{)} \term{;} ;
+
+\nterm{binary-gate} => \nterm{wire-number} \term{<-} \nterm{binary-gate-operation} \term{(}
+    \nterm{number} \term{:} \nterm{wire-number} \term{,} \nterm{wire-number} \term{)} \term{;} ;
+\nterm{binary-gate} => \nterm{wire-number} \term{<-} \nterm{binary-gate-operation} \term{(}
+    \nterm{wire-number} \term{,} \nterm{wire-number} \term{)} \term{;} ;
+
+\nterm{binary-gate-operation} => \term{@add} ;
+\nterm{binary-gate-operation} => \term{@mul} ;
+
+\nterm{binary-const-gate} => \nterm{wire-number} \term{<-} \nterm{binary-const-gate-operation} \term{(}
+    \nterm{number} \term{:} \nterm{wire-number} \term{,} \term{<} \nterm{number} \term{>} \term{)} \term{;} ;
+\nterm{binary-const-gate} => \nterm{wire-number} \term{<-} \nterm{binary-const-gate-operation} \term{(}
+    \nterm{wire-number} \term{,} \term{<} \nterm{number} \term{>}  \term{)} \term{;} ;
+
+\nterm{binary-const-gate-operation} => \term{@addc} ;
+\nterm{binary-const-gate-operation} => \term{@mulc} ;
+
+\nterm{copy-directive} => \nterm{wire-number} \term{<-} \nterm{number} \term{:} \nterm{wire-number} \term{;} ;
+\nterm{copy-directive} => \nterm{wire-number} \term{<-} \nterm{wire-number} \term{;} ;
+\nterm{assign-directive} => \nterm{wire-number} \term{<-} \nterm{number} \term{:} \term{<} \nterm{number} \term{>} \term{;} ;
+\nterm{assign-directive} => \nterm{wire-number} \term{<-} \term{<} \nterm{number} \term{>} \term{;} ;
+
+\nterm{input-gate} => \nterm{wire-number} \term{<-} \nterm{input-gate-operation} \term{(}
+    \nterm{number} \term{)} \term{;} ;
+\nterm{input-gate} => \nterm{wire-number} \term{<-} \nterm{input-gate-operation} \term{(} \term{)} \term{;} ;
+
+\nterm{input-gate-operation} => \term{@public} ;
+\nterm{input-gate-operation} => \term{@private} ;
+
+\nterm{assert-zero-directive} => \term{@assert_zero} \term{(}
+    \nterm{number} \term{:} \nterm{wire-number} \term{)} \term{;} ;
+\nterm{assert-zero-directive} => \term{@assert_zero} \term{(} \nterm{wire-number} \term{)} \term{;} ;
+
+\nterm{convert-gate} => \nterm{number} \term{:} \nterm{wire-range} \term{<-} \term{@convert} \term{(}
+    \nterm{number} \term{:} \nterm{wire-range} \term{)} \term{;} ;
+
+\nterm{wire-range} => \nterm{wire-number} ;
+\nterm{wire-range} => \nterm{wire-number} \term{...} \nterm{wire-number} ;
+
+\nterm{call-directive} => \nterm{wire-range-list} \term{<-} \term{@call} \term{(}
+    \nterm{identifier} \nterm{wire-range-list} \term{)} \term{;} ;
+\nterm{call-directive} => \term{@call} \term{(} \nterm{identifier} \nterm{wire-range-list} \term{)} \term{;} ;
+\nterm{call-directive} => \nterm{wire-range-list} \term{<-} \term{@call} \term{(} \nterm{identifier} \term{)} \term{;} ;
+\nterm{call-directive} => \term{@call} \term{(} \nterm{identifier} \term{)} \term{;} ;
+
+\nterm{wire-range-list} => \nterm{wire-range} \term{,} \nterm{wire-range-list} ;
+\nterm{wire-range-list} => \nterm{wire-range} ;
+\end{alltt}
+
+\subsection{Input Streams}
+The following grammar is given for input streams (resources \texttt{private\_input} and \texttt{public\_input}).
+
+\begin{alltt}
+\nterm{stream} => \nterm{header} \nterm{stream-header} \nterm{stream-body} EOF ;
+
+\nterm{stream-header} => \term{@type} \term{field} \nterm{number} \term{;} ;
+
+\nterm{stream-body} => \term{@begin} \nterm{stream-list} \term{@end} ;
+\nterm{stream-body} => \term{@begin} \term{@end} ;
+
+\nterm{stream-list} => \nterm{stream-item} \nterm{stream-list} ;
+\nterm{stream-list} => \nterm{stream-item} ;
+
+\nterm{stream-item} => \term{<} \nterm{number} \term{>} \term{;} ;
+\end{alltt}
+
+\subsection{Circuit Plugins}
+The following additions to the Circuit-IR grammar will enable plugins.
+
+\begin{alltt}
+\nterm{circuit-header} => \nterm{plugin-list} \nterm{type-list} ;
+\nterm{circuit-header} => \nterm{plugin-list} \nterm{type-list} \nterm{conversion-list} ;
+
+\nterm{plugin-list} => \nterm{plugin} \nterm{plugin-list} ;
+\nterm{plugin-list} => \nterm{plugin} ;
+\nterm{plugin} => \term{@plugin} \nterm{identifier} \term{;} ;
+
+\nterm{type} => \term{@type} \nterm{plugin-binding} \term{;} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier}
+    \term{@out} \term{:} \nterm{parameter-list} \term{,}
+    \term{@in} \term{:} \nterm{parameter-list} \term{)}
+    \nterm{plugin-binding} \term{;} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier}
+    \term{@in} \term{:} \nterm{parameter-list} \term{)}
+    \nterm{plugin-binding} \term{;} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier}
+    \term{@out} \term{:} \nterm{parameter-list} \term{)}
+    \nterm{plugin-binding} \term{;} ;
+
+\nterm{function-declaration} => \term{@function} \term{(} \nterm{identifier} \term{)}
+    \nterm{plugin-binding} \term{;} ;
+
+\nterm{plugin-binding} => \term{@plugin} \term{(} \nterm{identifier} \term{,} \nterm{identifier}
+    \term{,} \nterm{plugin-arguments} \nterm{stream-count} \term{)} ;
+\nterm{plugin-binding} => \term{@plugin} \term{(} \nterm{identifier} \term{,} \nterm{identifier}
+    \nterm{stream-count} \term{)} ;
+
+\nterm{plugin-arguments} => \nterm{plugin-argument} \nterm{plugin-arguments} ;
+\nterm{plugin-arguments} => \nterm{plugin-argument} ;
+
+\nterm{plugin-argument} => \nterm{number} ;
+\nterm{plugin-argument} => \nterm{identifier} ;
+
+\nterm{stream-count} => \term{,} \term{@private} \term{:} \nterm{stream-count-items} ;
+\nterm{stream-count} => \term{,} \term{@public} \term{:} \nterm{stream-count-items} ;
+\nterm{stream-count} => \term{,} \term{@private} \term{:} \nterm{stream-count-items} \term{,}
+    \term{@public} \term{:} \nterm{stream-count-items} ;
+\nterm{stream-count} => NULL ;
+
+\nterm{stream-count-items} => \nterm{stream-count-item} \term{,} \nterm{stream-count-items} ;
+\nterm{stream-count-items} => \nterm{stream-count-item} ;
+\nterm{stream-count-item} => \nterm{number} \term{:} \nterm{number} ;
+\end{alltt}
+
+\section{Binary Syntax}\label{binary_syntax}
+The binary serialization of Circuit-IR will be described here using the \href{https://google.github.io/flatbuffers/}{open-source FlatBuffers cross-platform serialization library}, originally developed by Google.
+FlatBuffers is a metaformat that specifies the superficial aspects of the syntax, such as representations of literals, structured data and arrays.
+It moreover supports formal schemas that concretely define what elements (e.g., structures and arrays) can appear in the specific format.
+FlatBuffers was chosen for the following reasons:
+\begin{itemize}
+\item It offers an existing compact encoding of the format with efficient (de)serialization.
+\item It is supported by a wide-range of community-based tools and libraries for the most common languages (and is also easy to parse from scratch).
+\end{itemize}
+
+We will use the below FlatBuffers schema to represent \texttt{circuit}, \texttt{public\_input}, and \texttt{private\_input} ressources. This schema is isomorphic to the Circuit-IR representation presented in Section~\ref{sec:circuitir}.
+
+\lstinputlisting[language=flatbuffer]{sieve_ir.fbs}
+
+As a structured format, the FlatBuffers schema provides a concrete, readable and typed syntax,
+ensuring syntactic validity.
+However, it does not provide resource or evaluation validity as it is not a language.
+Refer to Section~\ref{circuit_ir_validity} to a description of syntactic, resource and evaluation validity.
+
+\subsection{Multi Gigabyte Flatbuffer Limitations}
+\kimee{Wizkit encountered this limitation early in Phase I, this is more-or-less the same workaround we used for IR1}
+A limitation of the Flatbuffer technology is its 32-bit internal pointer representation, which prevents it from storing buffers larger than approximately 2GB.
+The IR specifies the following workaround for this limitation.
+
+\begin{itemize}
+  \item The \texttt{Root} message may be repeated within a file or stream as manytimes as is necessary: each message holding a portion of the IR resource.
+  \item Each message must be prefixed by its length in bytes, as a 4-byte unsigned little-endian number. (See \href{https://google.github.io/flatbuffers/class_flat_buffers_1_1_flat_buffer_builder.html#a425ab2bd13a0e4331a7190ec2d17c3b2}{FinishSizePrefix}).
+  \item Each message's \texttt{version} attribute must be the same as the first message's \texttt{version}. All other attributes must be empty except for the resource's body.
+\end{itemize}
+
+Unfortunately, there is no way for a Flatbuffer to hold a single function which is larger than 2GB.
+
+\end{appendices}

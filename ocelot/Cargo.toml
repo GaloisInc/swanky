@@ -14,18 +14,24 @@ version.workspace = true
 [lib]
 
 [features]
-nightly = ["curve25519-dalek/nightly", "curve25519-dalek/simd_backend", "scuttlebutt/nightly"]
+nightly = [
+  "curve25519-dalek/nightly",
+  "curve25519-dalek/simd_backend",
+  "scuttlebutt/nightly",
+]
 
 
 [dependencies]
 blake3.workspace = true
-curve25519-dalek = { package = "curve25519-dalek-ng", workspace = true }
+curve25519-dalek = { workspace = true }
 rand.workspace = true
 scuttlebutt = { workspace = true, features = ["curve25519-dalek"] }
 vectoreyes.workspace = true
 generic-array.workspace = true
 subtle.workspace = true
 bytemuck.workspace = true
+keyed_arena.workspace = true
+arrayvec.workspace = true
 
 [build-dependencies]
 cc.workspace = true

@@ -17,7 +17,7 @@ unstable = []
 serde = []
 
 [dependencies]
-curve25519-dalek = { package = "curve25519-dalek-ng", workspace = true, optional = true }
+curve25519-dalek = { workspace = true, optional = true }
 rand.workspace = true
 rand_core.workspace = true
 rand_chacha = { workspace = true, optional = true }

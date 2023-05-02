@@ -4,7 +4,7 @@
             {% call(scalar, avx2) fn(
                 "shift_bytes_" ~ direction,
                 {"&self": ty}, returns=ty,
-                const_args={"AMOUNT": "usize"}
+                const_args={"AMOUNT": "usize"},
             ) %}
                 {% call scalar() %}
                     let mut out = [0; {{ty.count}}];
@@ -36,6 +36,32 @@
             {% endcall %}
             {% call(avx2i) avx2() %}
                 {{avx2i(ty, "movemask")}}(self.0) as u32
+            {% endcall %}
+        {% endcall %} 
+    }
+    impl {{ty}} {
+        {% call(scalar, avx2) fn("shuffle", {"&self": ty, "order": ty.unsigned}, returns = ty, pub=True) %}
+            {% call scalar() %}
+                let mut arr = [0; {{ty.count}}];
+                for (lane_dst, (lane_src, order)) in
+                    arr.chunks_exact_mut(16).zip(
+                        self.as_array().chunks_exact(16)
+                        .zip(order.as_array().chunks_exact(16))
+                    )
+                {
+                    for (dst, idx) in lane_dst.iter_mut().zip(order) {
+                        let idx = *idx;
+                        *dst = if (idx >> 7) == 1 {
+                            0
+                        } else {
+                            lane_src[(idx as usize) % 16]
+                        };
+                    }
+                }
+                arr.into()
+            {% endcall %}
+            {% call(avx2i) avx2() %}
+                Self({{avx2i(ty, "shuffle")}}(self.0, order.0))
             {% endcall %}
         {% endcall %}
     }

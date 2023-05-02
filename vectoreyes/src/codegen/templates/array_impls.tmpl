@@ -89,6 +89,26 @@ use crate::array_utils::*;
                 ]
             {% endcall %}
         }
+        #[inline(always)]
+        fn array_as_ref<T>(arr: &[T; {{count}}]) -> [&T; {{count}}] {
+            {% call extract_elems("arr") %}
+                [
+                    {% for i in range(count) %}
+                        arr_{{i}},
+                    {% endfor %}
+                ]
+            {% endcall %}
+        }
+        #[inline(always)]
+        fn array_as_mut<T>(arr: &mut [T; {{count}}]) -> [&mut T; {{count}}] {
+            {% call extract_elems("arr") %}
+                [
+                    {% for i in range(count) %}
+                        arr_{{i}},
+                    {% endfor %}
+                ]
+            {% endcall %}
+        }
     }
     
     impl<T> ArrayAdjacentPairs for [T; {{count}}] {

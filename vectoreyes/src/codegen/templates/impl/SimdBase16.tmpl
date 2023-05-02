@@ -1,0 +1,70 @@
+{% if ty.ty.bits == 16 %}
+    impl crate::SimdBase16 for {{ty}} {
+        {% call(scalar, avx2) fn(
+            "shuffle_lo",
+            {"&self": ty},
+            returns=ty,
+            const_args = {
+                "I3": "usize",
+                "I2": "usize",
+                "I1": "usize",
+                "I0": "usize",
+            },
+        ) %}
+        {% call scalar() %}
+            {{ty}}::from([
+            {% for lane in range(ty.bits // 128) %}
+                // 128-bit Lane #{{lane}}
+            {% for i in range(4) %}
+                self.as_array()[I{{i}} + {{lane}} * 8],
+            {% endfor %}
+            {% for i in range(4) %}
+                self.as_array()[{{i + 4}} + {{lane}} * 8],
+            {% endfor %}
+            {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            const USELESS_ARRAY: [u8; 4] = [0; 4];
+            {% for i in range(4) %}
+                let _assert_bits_in_range_i: u8 = USELESS_ARRAY[I{{i}}];
+            {% endfor %}
+            Self({{avx2i(ty, "shuffle_lo16")}}::<I3, I2, I1, I0>(self.0))
+        {% endcall %}
+        {% endcall %}
+      {% call(scalar, avx2) fn(
+            "shuffle_hi",
+            {"&self": ty},
+            returns=ty,
+            const_args = {
+                "I3": "usize",
+                "I2": "usize",
+                "I1": "usize",
+                "I0": "usize",
+            },
+        ) %}
+        {% call scalar() %}
+            {{ty}}::from([
+            {% for lane in range(ty.bits // 128) %}
+                // 128-bit Lane #{{lane}}
+            {% for i in range(4) %}
+                self.as_array()[{{i}} + {{lane}} * 8],
+            {% endfor %}
+            {% for i in range(4) %}
+                self.as_array()[I{{i}} + 4 + {{lane}} * 8],
+            {% endfor %}
+            {% endfor %}
+            ])
+        {% endcall %}
+        {% call(avx2i) avx2() %}
+            {% for i in range(4) %}
+                if I{{i}} > 4 {
+                    panic!("I{{i}} ({}) > 4", I{{i}});
+                }
+            {% endfor %}
+            Self({{avx2i(ty, "shuffle_hi16")}}::<I3, I2, I1, I0>(self.0))
+        {% endcall %}
+        {% endcall %}
+
+    }
+{% endif %}

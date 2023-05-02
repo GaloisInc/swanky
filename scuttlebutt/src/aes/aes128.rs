@@ -6,7 +6,7 @@ use vectoreyes::{
 
 /// AES-128, encryption only.
 #[derive(Clone)]
-pub struct Aes128(Aes128EncryptOnly);
+pub struct Aes128(pub Aes128EncryptOnly);
 
 impl Aes128 {
     /// Create a new `Aes128` object, using `key` as the AES key.
