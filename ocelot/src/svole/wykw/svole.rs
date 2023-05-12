@@ -43,6 +43,19 @@ pub struct LpnParams {
 //     rows: 1_220,
 // };
 
+/// Extra Small LPN parameters for setup phase.
+pub const LPN_SETUP_EXTRASMALL: LpnParams = LpnParams {
+    weight: 600,
+    cols: 2_400, // cols / weight = 4
+    rows: 1_220,
+};
+/// Extra Small LPN parameters for extend phase.
+pub const LPN_EXTEND_EXTRASMALL: LpnParams = LpnParams {
+    weight: 600,
+    cols: 2_400, // cols / weight = 4
+    rows: 1_220,
+};
+
 /// Small LPN parameters for setup phase.
 pub const LPN_SETUP_SMALL: LpnParams = LpnParams {
     weight: 600,
