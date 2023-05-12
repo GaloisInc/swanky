@@ -300,7 +300,7 @@ pub trait CrtGadgets:
         xs: &[CrtBundle<Self::Item>],
         accuracy: &str,
     ) -> Result<CrtBundle<Self::Item>, Self::Error> {
-        if xs.len() < 1 {
+        if xs.is_empty() {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: xs.len(),
                 needed: 1,
@@ -447,11 +447,11 @@ pub trait CrtGadgets:
                 pb -= 1;
             }
 
-            let tmp = self.crt_cmul(&y, b)?;
+            let tmp = self.crt_cmul(y, b)?;
             let c1 = self.pmr_geq(&a, &tmp)?;
 
             let pb_crt = self.crt_constant_bundle(pb, q)?;
-            let c2 = self.pmr_geq(&pb_crt, &y)?;
+            let c2 = self.pmr_geq(&pb_crt, y)?;
 
             let c = self.and(&c1, &c2)?;
 

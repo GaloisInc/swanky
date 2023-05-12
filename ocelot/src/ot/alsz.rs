@@ -69,10 +69,10 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         let zero = vec![0u8; ncols / 8];
         for (j, (b, rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut q = &mut qs[range];
+            let q = &mut qs[range];
             channel.read_bytes(&mut u)?;
-            rng.fill_bytes(&mut q);
-            scutils::xor_inplace(&mut q, if *b { &u } else { &zero });
+            rng.fill_bytes(q);
+            scutils::xor_inplace(q, if *b { &u } else { &zero });
         }
         Ok(utils::transpose(&qs, nrows, ncols))
     }
@@ -180,11 +180,11 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
         let mut g = vec![0u8; ncols / 8];
         for j in 0..self.rngs.len() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut t = &mut ts[range];
-            self.rngs[j].0.fill_bytes(&mut t);
+            let t = &mut ts[range];
+            self.rngs[j].0.fill_bytes(t);
             self.rngs[j].1.fill_bytes(&mut g);
-            scutils::xor_inplace(&mut g, &t);
-            scutils::xor_inplace(&mut g, &r);
+            scutils::xor_inplace(&mut g, t);
+            scutils::xor_inplace(&mut g, r);
             channel.write_bytes(&g)?;
         }
         channel.flush()?;
@@ -204,8 +204,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         let mut k0 = Block::default();
         let mut k1 = Block::default();
         for _ in 0..128 {
-            rng.fill_bytes(&mut k0.as_mut());
-            rng.fill_bytes(&mut k1.as_mut());
+            rng.fill_bytes(k0.as_mut());
+            rng.fill_bytes(k1.as_mut());
             ks.push((k0, k1));
         }
         ot.send(channel, &ks, rng)?;

@@ -284,7 +284,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
             // add in the carry
             let sum_with_carry = opt_carry
                 .as_ref()
-                .map_or(Ok(sum.clone()), |c| self.add(&sum, &c))?;
+                .map_or(Ok(sum.clone()), |c| self.add(&sum, c))?;
 
             // carry now contains the carry information, we just have to project it to
             // the correct moduli for the next iteration. It will either be used to
@@ -305,7 +305,7 @@ pub trait ArithmeticBundleGadgets: FancyArithmetic {
         let digit_sum = self.add_many(&ds)?;
         opt_carry
             .as_ref()
-            .map_or(Ok(digit_sum.clone()), |d| self.add(&digit_sum, &d))
+            .map_or(Ok(digit_sum.clone()), |d| self.add(&digit_sum, d))
     }
 
     /// If b=0 then return 0, else return x.

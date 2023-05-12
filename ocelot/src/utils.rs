@@ -73,7 +73,7 @@ pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
             nrows as u64,
             ncols as u64,
         );
-        return m_;
+        m_
     }
 }
 

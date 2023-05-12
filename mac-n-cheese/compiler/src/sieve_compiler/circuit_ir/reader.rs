@@ -450,7 +450,7 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                             eyre::bail!("iteration index wire range must have field type")
                         };
 
-                        let num_env_for_field = (&func).input_sizes[..num_env as usize]
+                        let num_env_for_field = func.input_sizes[..num_env as usize]
                             .iter()
                             .filter(|&(t, _)| {
                                 if let &Type::Field(ft) = t {

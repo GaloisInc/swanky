@@ -441,7 +441,7 @@ impl Manifest {
     pub fn read(mut f: File) -> eyre::Result<Self> {
         f.seek(std::io::SeekFrom::End(-8 * 4))?;
         let mut footer = [0_u64; 4];
-        f.read_exact(&mut bytemuck::bytes_of_mut(&mut footer))?;
+        f.read_exact(bytemuck::bytes_of_mut(&mut footer))?;
         let [manifest_start, manifest_decompressed_len, manifest_hash, version] = footer;
         eyre::ensure!(
             version == MAC_N_CHEESE_VERSION,

@@ -27,7 +27,7 @@ fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
             }
         }
         if input.is_dir() {
-            for item in std::fs::read_dir(&input)
+            for item in std::fs::read_dir(input)
                 .with_context(|| format!("Unable to open directory {input:?}"))?
             {
                 let item = item?;
@@ -236,11 +236,11 @@ impl RelationReader {
                 });
             }
             v.call(
-                &func_out_buf,
+                func_out_buf,
                 x.name()
                     .context("function calls need the name of the funciton to call")?
                     .as_bytes(),
-                &func_in_buf,
+                func_in_buf,
             )?;
         } else {
             eyre::bail!("Unknown gate type {:?}", gate.gate_type());
@@ -287,7 +287,7 @@ impl super::RelationReader for RelationReader {
                         .params()
                         .into_iter()
                         .flat_map(|x| x.iter())
-                        .map(|x| PluginTypeArg::from_str(x))
+                        .map(PluginTypeArg::from_str)
                         .collect::<Result<Vec<_>, _>>()?,
                 );
                 header.types.push(Type::PluginType(PluginType {
@@ -381,7 +381,7 @@ impl super::RelationReader for RelationReader {
                                 .params()
                                 .into_iter()
                                 .flat_map(|x| x.iter())
-                                .map(|x| PluginTypeArg::from_str(x))
+                                .map(PluginTypeArg::from_str)
                                 .collect::<Result<Vec<_>, _>>()?,
                         );
 
@@ -496,10 +496,8 @@ impl super::ValueStreamReader for ValueStreamReader {
                                     chunk = Vec::with_capacity(CHUNK_SIZE);
                                 }
                             }
-                            if !chunk.is_empty() {
-                                if s.send(Ok(chunk)).is_err() {
-                                    return Ok(());
-                                }
+                            if !chunk.is_empty() && s.send(Ok(chunk)).is_err() {
+                                return Ok(());
                             }
                         } else {
                             return Ok(());
@@ -511,7 +509,7 @@ impl super::ValueStreamReader for ValueStreamReader {
             })
             .unwrap();
         Ok(Self {
-            modulus: modulus,
+            modulus,
             buf: Vec::new(),
             recv: r,
             pos: 0,

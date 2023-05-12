@@ -525,12 +525,9 @@ pub struct GateSetUnionTableOffset {}
 // struct Count, aligned to 8
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
+#[derive(Default)]
 pub struct Count(pub [u8; 16]);
-impl Default for Count { 
-  fn default() -> Self { 
-    Self([0; 16])
-  }
-}
+
 impl core::fmt::Debug for Count {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("Count")
@@ -649,12 +646,9 @@ impl<'a> Count {
 // struct Conversion, aligned to 8
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
+#[derive(Default)]
 pub struct Conversion(pub [u8; 32]);
-impl Default for Conversion { 
-  fn default() -> Self { 
-    Self([0; 32])
-  }
-}
+
 impl core::fmt::Debug for Conversion {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("Conversion")
@@ -739,12 +733,9 @@ impl<'a> Conversion {
 // struct WireRange, aligned to 8
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
+#[derive(Default)]
 pub struct WireRange(pub [u8; 16]);
-impl Default for WireRange { 
-  fn default() -> Self { 
-    Self([0; 16])
-  }
-}
+
 impl core::fmt::Debug for WireRange {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("WireRange")
@@ -954,6 +945,7 @@ impl flatbuffers::Verifiable for Relation<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct RelationArgs<'a> {
     pub version: Option<flatbuffers::WIPOffset<&'a str>>,
     pub plugins: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
@@ -961,18 +953,7 @@ pub struct RelationArgs<'a> {
     pub conversions: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, Conversion>>>,
     pub directives: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Directive<'a>>>>>,
 }
-impl<'a> Default for RelationArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    RelationArgs {
-      version: None,
-      plugins: None,
-      types: None,
-      conversions: None,
-      directives: None,
-    }
-  }
-}
+
 
 pub struct RelationBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1099,21 +1080,13 @@ impl flatbuffers::Verifiable for PublicInputs<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct PublicInputsArgs<'a> {
     pub version: Option<flatbuffers::WIPOffset<&'a str>>,
     pub type_: Option<flatbuffers::WIPOffset<Type<'a>>>,
     pub inputs: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Value<'a>>>>>,
 }
-impl<'a> Default for PublicInputsArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    PublicInputsArgs {
-      version: None,
-      type_: None,
-      inputs: None,
-    }
-  }
-}
+
 
 pub struct PublicInputsBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1230,21 +1203,13 @@ impl flatbuffers::Verifiable for PrivateInputs<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct PrivateInputsArgs<'a> {
     pub version: Option<flatbuffers::WIPOffset<&'a str>>,
     pub type_: Option<flatbuffers::WIPOffset<Type<'a>>>,
     pub inputs: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Value<'a>>>>>,
 }
-impl<'a> Default for PrivateInputsArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    PrivateInputsArgs {
-      version: None,
-      type_: None,
-      inputs: None,
-    }
-  }
-}
+
 
 pub struct PrivateInputsBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1341,17 +1306,11 @@ impl flatbuffers::Verifiable for Value<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct ValueArgs<'a> {
     pub value: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
 }
-impl<'a> Default for ValueArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    ValueArgs {
-      value: None,
-    }
-  }
-}
+
 
 pub struct ValueBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1774,17 +1733,11 @@ impl flatbuffers::Verifiable for Field<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct FieldArgs<'a> {
     pub modulo: Option<flatbuffers::WIPOffset<Value<'a>>>,
 }
-impl<'a> Default for FieldArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    FieldArgs {
-      modulo: None,
-    }
-  }
-}
+
 
 pub struct FieldBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1891,21 +1844,13 @@ impl flatbuffers::Verifiable for PluginType<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct PluginTypeArgs<'a> {
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub operation: Option<flatbuffers::WIPOffset<&'a str>>,
     pub params: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
 }
-impl<'a> Default for PluginTypeArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    PluginTypeArgs {
-      name: None,
-      operation: None,
-      params: None,
-    }
-  }
-}
+
 
 pub struct PluginTypeBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2022,21 +1967,13 @@ impl flatbuffers::Verifiable for GateConstant<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateConstantArgs<'a> {
     pub type_id: u8,
     pub out_id: u64,
     pub constant: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
 }
-impl<'a> Default for GateConstantArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    GateConstantArgs {
-      type_id: 0,
-      out_id: 0,
-      constant: None,
-    }
-  }
-}
+
 
 pub struct GateConstantBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2143,19 +2080,12 @@ impl flatbuffers::Verifiable for GateAssertZero<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateAssertZeroArgs {
     pub type_id: u8,
     pub in_id: u64,
 }
-impl<'a> Default for GateAssertZeroArgs {
-  #[inline]
-  fn default() -> Self {
-    GateAssertZeroArgs {
-      type_id: 0,
-      in_id: 0,
-    }
-  }
-}
+
 
 pub struct GateAssertZeroBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2267,21 +2197,13 @@ impl flatbuffers::Verifiable for GateCopy<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateCopyArgs {
     pub type_id: u8,
     pub out_id: u64,
     pub in_id: u64,
 }
-impl<'a> Default for GateCopyArgs {
-  #[inline]
-  fn default() -> Self {
-    GateCopyArgs {
-      type_id: 0,
-      out_id: 0,
-      in_id: 0,
-    }
-  }
-}
+
 
 pub struct GateCopyBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2408,23 +2330,14 @@ impl flatbuffers::Verifiable for GateAdd<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateAddArgs {
     pub type_id: u8,
     pub out_id: u64,
     pub left_id: u64,
     pub right_id: u64,
 }
-impl<'a> Default for GateAddArgs {
-  #[inline]
-  fn default() -> Self {
-    GateAddArgs {
-      type_id: 0,
-      out_id: 0,
-      left_id: 0,
-      right_id: 0,
-    }
-  }
-}
+
 
 pub struct GateAddBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2556,23 +2469,14 @@ impl flatbuffers::Verifiable for GateMul<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateMulArgs {
     pub type_id: u8,
     pub out_id: u64,
     pub left_id: u64,
     pub right_id: u64,
 }
-impl<'a> Default for GateMulArgs {
-  #[inline]
-  fn default() -> Self {
-    GateMulArgs {
-      type_id: 0,
-      out_id: 0,
-      left_id: 0,
-      right_id: 0,
-    }
-  }
-}
+
 
 pub struct GateMulBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2704,23 +2608,14 @@ impl flatbuffers::Verifiable for GateAddConstant<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateAddConstantArgs<'a> {
     pub type_id: u8,
     pub out_id: u64,
     pub in_id: u64,
     pub constant: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
 }
-impl<'a> Default for GateAddConstantArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    GateAddConstantArgs {
-      type_id: 0,
-      out_id: 0,
-      in_id: 0,
-      constant: None,
-    }
-  }
-}
+
 
 pub struct GateAddConstantBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2852,23 +2747,14 @@ impl flatbuffers::Verifiable for GateMulConstant<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateMulConstantArgs<'a> {
     pub type_id: u8,
     pub out_id: u64,
     pub in_id: u64,
     pub constant: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
 }
-impl<'a> Default for GateMulConstantArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    GateMulConstantArgs {
-      type_id: 0,
-      out_id: 0,
-      in_id: 0,
-      constant: None,
-    }
-  }
-}
+
 
 pub struct GateMulConstantBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -2980,19 +2866,12 @@ impl flatbuffers::Verifiable for GatePublic<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GatePublicArgs {
     pub type_id: u8,
     pub out_id: u64,
 }
-impl<'a> Default for GatePublicArgs {
-  #[inline]
-  fn default() -> Self {
-    GatePublicArgs {
-      type_id: 0,
-      out_id: 0,
-    }
-  }
-}
+
 
 pub struct GatePublicBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -3094,19 +2973,12 @@ impl flatbuffers::Verifiable for GatePrivate<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GatePrivateArgs {
     pub type_id: u8,
     pub out_id: u64,
 }
-impl<'a> Default for GatePrivateArgs {
-  #[inline]
-  fn default() -> Self {
-    GatePrivateArgs {
-      type_id: 0,
-      out_id: 0,
-    }
-  }
-}
+
 
 pub struct GatePrivateBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -3218,21 +3090,13 @@ impl flatbuffers::Verifiable for GateNew<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateNewArgs {
     pub type_id: u8,
     pub first_id: u64,
     pub last_id: u64,
 }
-impl<'a> Default for GateNewArgs {
-  #[inline]
-  fn default() -> Self {
-    GateNewArgs {
-      type_id: 0,
-      first_id: 0,
-      last_id: 0,
-    }
-  }
-}
+
 
 pub struct GateNewBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -3349,21 +3213,13 @@ impl flatbuffers::Verifiable for GateDelete<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateDeleteArgs {
     pub type_id: u8,
     pub first_id: u64,
     pub last_id: u64,
 }
-impl<'a> Default for GateDeleteArgs {
-  #[inline]
-  fn default() -> Self {
-    GateDeleteArgs {
-      type_id: 0,
-      first_id: 0,
-      last_id: 0,
-    }
-  }
-}
+
 
 pub struct GateDeleteBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -3510,6 +3366,7 @@ impl flatbuffers::Verifiable for GateConvert<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateConvertArgs {
     pub out_type_id: u8,
     pub out_first_id: u64,
@@ -3518,19 +3375,7 @@ pub struct GateConvertArgs {
     pub in_first_id: u64,
     pub in_last_id: u64,
 }
-impl<'a> Default for GateConvertArgs {
-  #[inline]
-  fn default() -> Self {
-    GateConvertArgs {
-      out_type_id: 0,
-      out_first_id: 0,
-      out_last_id: 0,
-      in_type_id: 0,
-      in_first_id: 0,
-      in_last_id: 0,
-    }
-  }
-}
+
 
 pub struct GateConvertBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -3642,17 +3487,11 @@ impl flatbuffers::Verifiable for Gates<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GatesArgs<'a> {
     pub gates: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Gate<'a>>>>>,
 }
-impl<'a> Default for GatesArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    GatesArgs {
-      gates: None,
-    }
-  }
-}
+
 
 pub struct GatesBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -3779,6 +3618,7 @@ impl flatbuffers::Verifiable for PluginBody<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct PluginBodyArgs<'a> {
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub operation: Option<flatbuffers::WIPOffset<&'a str>>,
@@ -3786,18 +3626,7 @@ pub struct PluginBodyArgs<'a> {
     pub public_count: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, Count>>>,
     pub private_count: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, Count>>>,
 }
-impl<'a> Default for PluginBodyArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    PluginBodyArgs {
-      name: None,
-      operation: None,
-      params: None,
-      public_count: None,
-      private_count: None,
-    }
-  }
-}
+
 
 pub struct PluginBodyBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -4143,21 +3972,13 @@ impl flatbuffers::Verifiable for GateCall<'_> {
     Ok(())
   }
 }
+#[derive(Default)]
 pub struct GateCallArgs<'a> {
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub out_ids: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, WireRange>>>,
     pub in_ids: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, WireRange>>>,
 }
-impl<'a> Default for GateCallArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    GateCallArgs {
-      name: None,
-      out_ids: None,
-      in_ids: None,
-    }
-  }
-}
+
 
 pub struct GateCallBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -4887,14 +4708,14 @@ pub fn root_size_prefixed_buffer_has_identifier(buf: &[u8]) -> bool {
 pub const ROOT_EXTENSION: &str = "sieve";
 
 #[inline]
-pub fn finish_root_buffer<'a, 'b>(
-    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub fn finish_root_buffer<'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a>,
     root: flatbuffers::WIPOffset<Root<'a>>) {
   fbb.finish(root, Some(ROOT_IDENTIFIER));
 }
 
 #[inline]
-pub fn finish_size_prefixed_root_buffer<'a, 'b>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<Root<'a>>) {
+pub fn finish_size_prefixed_root_buffer<'a>(fbb: &mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<Root<'a>>) {
   fbb.finish_size_prefixed(root, Some(ROOT_IDENTIFIER));
 }
 }  // pub mod sieve_ir

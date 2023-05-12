@@ -481,7 +481,7 @@ mod tests {
         wires
     }
 
-    fn eval_and_check(circuit: &Circuit<F2>, wires_in: Vec<F2>, wires_out: Vec<F2>) -> () {
+    fn eval_and_check(circuit: &Circuit<F2>, wires_in: Vec<F2>, wires_out: Vec<F2>) {
         let mut eval_out: Vec<F2> = Vec::new();
         let _ = circuit.eval(&wires_in, &mut eval_out);
         let eval_len = eval_out.len();
@@ -498,7 +498,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn eval_and_print(circuit: &Circuit<F2>, wires_in: Vec<F2>, nouts: usize) -> () {
+    fn eval_and_print(circuit: &Circuit<F2>, wires_in: Vec<F2>, nouts: usize) {
         let mut eval_out: Vec<F2> = Vec::new();
         let _ = circuit.eval(&wires_in, &mut eval_out);
         let eval_len = eval_out.len();

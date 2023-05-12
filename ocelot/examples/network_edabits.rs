@@ -112,7 +112,7 @@ fn run(
                 channel.clear();
 
                 let start = Instant::now();
-                let _r = fconv
+                fconv
                     .conv(
                         &mut channel,
                         &mut rng,
@@ -210,7 +210,7 @@ fn run(
         println!("Prover time (input random edabits): {:?}", start.elapsed());
 
         let start = Instant::now();
-        let _ = fconv
+        fconv
             .conv(
                 &mut channel,
                 &mut rng,
@@ -291,11 +291,11 @@ fn main() -> std::io::Result<()> {
         whoami = PROVER;
     }
     let connection_addr = &matches.get_one::<String>("addr").unwrap();
-    let num_bucket = usize::from_str_radix(&matches.get_one::<String>("bucket").unwrap(), 10)
+    let num_bucket = usize::from_str_radix(matches.get_one::<String>("bucket").unwrap(), 10)
         .unwrap_or(usize::from_str_radix(DEFAULT_NUM_BUCKET, 10).unwrap());
-    let nb_bits = usize::from_str_radix(&matches.get_one::<String>("nb_bits").unwrap(), 10)
+    let nb_bits = usize::from_str_radix(matches.get_one::<String>("nb_bits").unwrap(), 10)
         .unwrap_or(usize::from_str_radix(DEFAULT_NB_BITS, 10).unwrap());
-    let num_edabits = usize::from_str_radix(&matches.get_one::<String>("num_edabits").unwrap(), 10)
+    let num_edabits = usize::from_str_radix(matches.get_one::<String>("num_edabits").unwrap(), 10)
         .unwrap_or(usize::from_str_radix(DEFAULT_NUM_EDABITS, 10).unwrap());
 
     let multithreaded = matches.contains_id("multithreaded");

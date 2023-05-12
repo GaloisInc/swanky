@@ -25,12 +25,12 @@ fn copy_edabits_prover<FE: FiniteField>(edabits: &EdabitsProver<FE>) -> EdabitsP
     let num_bits = edabits.bits.len();
     let mut bits_par = Vec::with_capacity(num_bits);
     for j in 0..num_bits {
-        bits_par.push(edabits.bits[j].clone());
+        bits_par.push(edabits.bits[j]);
     }
-    return EdabitsProver {
+    EdabitsProver {
         bits: bits_par,
-        value: edabits.value.clone(),
-    };
+        value: edabits.value,
+    }
 }
 
 /// EdabitsVerifier struct
@@ -44,12 +44,12 @@ fn copy_edabits_verifier<FE: FiniteField>(edabits: &EdabitsVerifier<FE>) -> Edab
     let num_bits = edabits.bits.len();
     let mut bits_par = Vec::with_capacity(num_bits);
     for j in 0..num_bits {
-        bits_par.push(edabits.bits[j].clone());
+        bits_par.push(edabits.bits[j]);
     }
-    return EdabitsVerifier {
+    EdabitsVerifier {
         bits: bits_par,
-        value: edabits.value.clone(),
-    };
+        value: edabits.value,
+    }
 }
 
 /// DabitProver struct
@@ -106,7 +106,7 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut Vec<T>) -> () {
+fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut Vec<T>) {
     let size = v.len();
     if size == 0 {
         return;
@@ -204,7 +204,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         for i in 0..n {
             c_batch.push(self.fcom_f2.add(r_batch[i].bit, x_batch[i]));
         }
-        self.fcom_f2.open(channel, &c_batch)?;
+        self.fcom_f2.open(channel, c_batch)?;
 
         for i in 0..n {
             let MacProver(c, _) = c_batch[i];
@@ -309,12 +309,12 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 
         // check all the multiplications in one batch
         channel.flush()?;
-        if random_triples.len() == 0 {
+        if random_triples.is_empty() {
             self.fcom_f2
                 .quicksilver_check_multiply(channel, rng, &triples)?;
         } else {
             self.fcom_f2
-                .wolverine_check_multiply(channel, &triples, &random_triples)?;
+                .wolverine_check_multiply(channel, &triples, random_triples)?;
         }
 
         // reconstruct the solution
@@ -537,7 +537,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         }
 
         // step 5) TODO: move this to the end
-        let _ = self.fcom_f2.open(channel, &r_batch)?;
+        self.fcom_f2.open(channel, &r_batch)?;
 
         // step 6)
         let mut r_prime_batch = Vec::with_capacity(s);
@@ -578,7 +578,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             tau_batch.push(MacProver(tau, tau_mac));
         }
 
-        let _ = self.fcom.open(channel, &tau_batch)?;
+        self.fcom.open(channel, &tau_batch)?;
 
         // step 8)
         for k in 0..s {
@@ -588,7 +588,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
                 // mod2 is computed using the first bit of the bit decomposition.
                 // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
                 (r_batch[k].0 == F2::ONE) == tau_batch[k].0.bit_decomposition()[0];
-            res = res & b;
+            res &= b;
         }
         self.fcom
             .quicksilver_check_multiply(channel, rng, &triples)?;
@@ -615,17 +615,17 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         let nb_bits = edabits_vector[0].bits.len();
         let power_two_nb_bits = power_two::<FE::PrimeField>(nb_bits);
         // step 6)b) batched and moved up
-        let e_batch = self.bit_add_carry(channel, rng, &edabits_vector, &r, &random_triples)?;
+        let e_batch = self.bit_add_carry(channel, rng, edabits_vector, r, random_triples)?;
 
         // step 6)c) batched and moved up
         let mut e_carry_batch = Vec::with_capacity(n);
         for (_, e_carry) in e_batch.iter() {
-            e_carry_batch.push(e_carry.clone());
+            e_carry_batch.push(*e_carry);
         }
 
         self.convert_bit_2_field(
             channel,
-            &dabits,
+            dabits,
             &e_carry_batch,
             convert_bit_2_field_aux,
             e_m_batch,
@@ -724,7 +724,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
             let base = n * num_bucket * nb_bits;
             for i in 0..num_cut * nb_bits {
                 let (x, y, z) = random_triples[base + i];
-                let _res = self.fcom_f2.open(channel, &[x, y])?;
+                self.fcom_f2.open(channel, &[x, y])?;
                 let v = self.fcom_f2.affine_add_cst(-(x.0 * y.0), z);
                 self.fcom_f2.check_zero(channel, &[v])?;
             }
@@ -742,7 +742,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
                     self.conv_loop(
                         channel,
                         rng,
-                        &edabits_vector,
+                        edabits_vector,
                         &r[idx_base..idx_base + n],
                         &dabits[idx_base..idx_base + n],
                         &mut convert_bit_2_field_aux,
@@ -753,7 +753,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
                     self.conv_loop(
                         channel,
                         rng,
-                        &edabits_vector,
+                        edabits_vector,
                         &r[idx_base..idx_base + n],
                         &dabits[idx_base..idx_base + n],
                         &mut convert_bit_2_field_aux,
@@ -789,7 +789,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
                     for elm in
                         random_triples[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits].iter()
                     {
-                        random_triples_par.push(elm.clone());
+                        random_triples_par.push(*elm);
                     }
                 }
 
@@ -874,7 +874,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         for i in 0..n {
             r_mac_plus_x_mac.push(self.fcom_f2.add(r_batch[i].bit, x_batch[i]));
         }
-        self.fcom_f2.open(channel, &r_mac_plus_x_mac, c_batch)?;
+        self.fcom_f2.open(channel, r_mac_plus_x_mac, c_batch)?;
 
         for i in 0..n {
             let c = c_batch[i];
@@ -955,12 +955,12 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
             }
         }
         // check all the multiplications in one batch
-        if random_triples.len() == 0 {
+        if random_triples.is_empty() {
             self.fcom_f2
                 .quicksilver_check_multiply(channel, rng, &triples)?;
         } else {
             self.fcom_f2
-                .wolverine_check_multiply(channel, rng, &triples, &random_triples)?;
+                .wolverine_check_multiply(channel, rng, &triples, random_triples)?;
         }
         // reconstruct the solution
         let mut res = Vec::with_capacity(num);
@@ -1165,7 +1165,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
                 // mod2 is computed using the first bit of the bit decomposition.
                 // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
                 (r_batch[k] == F2::ONE) == tau_batch[k].bit_decomposition()[0];
-            res = res & b;
+            res &= b;
         }
         self.fcom
             .quicksilver_check_multiply(channel, rng, &triples)?;
@@ -1198,7 +1198,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         print!("ADD< ... ");
         let start = Instant::now();
         let e_batch =
-            self.bit_add_carry(channel, rng, edabits_vector_mac, &r_mac, &random_triples)?;
+            self.bit_add_carry(channel, rng, edabits_vector_mac, r_mac, random_triples)?;
         println!("ADD> {:?}", start.elapsed());
 
         // step 6)c) batched and moved up
@@ -1206,12 +1206,12 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         let start = Instant::now();
         let mut e_carry_mac_batch = Vec::with_capacity(n);
         for (_, e_carry) in e_batch.iter() {
-            e_carry_mac_batch.push(e_carry.clone());
+            e_carry_mac_batch.push(*e_carry);
         }
 
         self.convert_bit_2_field(
             channel,
-            &dabits_mac,
+            dabits_mac,
             &e_carry_mac_batch,
             convert_bit_2_field_aux1,
             convert_bit_2_field_aux2,
@@ -1375,7 +1375,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
                     self.conv_loop(
                         channel,
                         rng,
-                        &edabits_vector_mac,
+                        edabits_vector_mac,
                         &r_mac[idx_base..idx_base + n],
                         &dabits_mac[idx_base..idx_base + n],
                         &mut convert_bit_2_field_aux1,
@@ -1388,7 +1388,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
                     self.conv_loop(
                         channel,
                         rng,
-                        &edabits_vector_mac,
+                        edabits_vector_mac,
                         &r_mac[idx_base..idx_base + n],
                         &dabits_mac[idx_base..idx_base + n],
                         &mut convert_bit_2_field_aux1,
@@ -1428,7 +1428,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
                     for elm in
                         random_triples[idx_base * nb_bits..idx_base * nb_bits + n * nb_bits].iter()
                     {
-                        random_triples_par.push(elm.clone());
+                        random_triples_par.push(*elm);
                     }
                 }
 

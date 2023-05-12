@@ -344,7 +344,7 @@ impl<P: Party> Reactor<P> for ThreadPoolReactor<P> {
         let length = payload.len();
         let od = OutgoingData { task_id, payload };
         let span = event_log::EnqueuingOutgoingData {
-            task_id: task_id,
+            task_id,
             length: length as u64,
         }
         .start();

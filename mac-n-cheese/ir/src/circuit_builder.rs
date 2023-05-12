@@ -482,7 +482,7 @@ impl CircuitBuilder<'_> {
                     task.inferred_dependents
                         .iter()
                         .copied()
-                        .map(|x| fb::TaskId::new(x)),
+                        .map(fb::TaskId::new),
                 );
                 fb::Task::create(
                     &mut self.builder,
@@ -605,8 +605,8 @@ impl Write for DataChunkWriter<'_, '_> {
         self.t.flush()
     }
 }
-pub(crate) fn write_data_chunk<'a, F>(
-    t: &'a mut BufWriter<File>,
+pub(crate) fn write_data_chunk<F>(
+    t: &mut BufWriter<File>,
     f: F,
 ) -> eyre::Result<fb::DataChunkAddress>
 where

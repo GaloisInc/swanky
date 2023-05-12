@@ -79,5 +79,5 @@ fn main() {
         NINPUTS, NBYTES, PAYLOAD_SIZE
     );
     let rs = rand_vec_vec(NINPUTS, NBYTES);
-    psz_payload(rs.clone(), rs.clone());
+    psz_payload(rs.clone(), rs);
 }

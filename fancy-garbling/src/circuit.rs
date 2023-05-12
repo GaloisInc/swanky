@@ -989,7 +989,7 @@ mod plaintext {
             }
             let res = inps.iter().fold(1, |acc, &x| x & acc);
             let out = eval_plain(&c, &[], &inps).unwrap()[0];
-            if !(out == res) {
+            if out != res {
                 println!("{:?} {} {}", inps, out, res);
                 panic!("incorrect output n={}", n);
             }
@@ -1013,7 +1013,7 @@ mod plaintext {
             }
             let res = inps.iter().fold(0, |acc, &x| x | acc);
             let out = eval_plain(&c, &[], &inps).unwrap()[0];
-            if !(out == res) {
+            if out != res {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
             }
@@ -1037,7 +1037,7 @@ mod plaintext {
             }
             let res = inps.iter().fold(0, |acc, &x| x | acc);
             let out = eval_plain(&c, &[], &inps).unwrap()[0];
-            if !(out == res) {
+            if out != res {
                 println!("{:?} {} {}", inps, out, res);
                 panic!();
             }

@@ -194,7 +194,7 @@ pub fn ggm_prime<
         let mut level_xor = ot_output[level - 1];
         let mut prev_level = prev_level.chunks_exact(Aes128EncryptOnly::BLOCK_COUNT_HINT);
         let mut i = 0;
-        while let Some(parents) = prev_level.next() {
+        for parents in prev_level.by_ref() {
             let parents = <&[U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT]>::try_from(parents)
                 .expect("The chunk size matches");
             let parents = parents.array_enumerate().array_map(

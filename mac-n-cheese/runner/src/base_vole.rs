@@ -143,7 +143,7 @@ pub fn init_base_vole<P: Party, C: Read + Write>(
         *total_gvn.entry(*ty).or_default() += count;
     }
     let mut outs = Vec::with_capacity(gvn.len());
-    outs.resize_with(gvn.len(), || SmallTypeMap::default());
+    outs.resize_with(gvn.len(), SmallTypeMap::default);
     for (ty, count) in total_gvn.iter() {
         ty.visit(V::<P, C> {
             rng,

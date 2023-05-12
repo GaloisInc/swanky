@@ -97,16 +97,16 @@ impl<FE: FiniteField> FComProver<FE> {
     ) -> Result<MacProver<FE>, Error> {
         match self.voles.pop() {
             Some(e) => {
-                return Ok(MacProver(e.0, e.1));
+                Ok(MacProver(e.0, e.1))
             }
             None => {
                 self.svole_sender.send(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => {
-                        return Ok(MacProver(e.0, e.1));
+                        Ok(MacProver(e.0, e.1))
                     }
                     None => {
-                        return Err(Error::Other("svole failed for random".to_string()));
+                        Err(Error::Other("svole failed for random".to_string()))
                     }
                 }
             }
@@ -159,13 +159,13 @@ impl<FE: FiniteField> FComProver<FE> {
     /// Add a constant to a Mac.
     #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
-        return MacProver(cst + x.0, x.1);
+        MacProver(cst + x.0, x.1)
     }
 
     /// Multiply by a constant a Mac.
     #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
-        return MacProver(cst * x.0, cst * (x.1));
+        MacProver(cst * x.0, cst * (x.1))
     }
 
     /// Add two Macs.
@@ -173,14 +173,14 @@ impl<FE: FiniteField> FComProver<FE> {
     pub fn add(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
-        return MacProver(a + b, a_mac + b_mac);
+        MacProver(a + b, a_mac + b_mac)
     }
 
     /// Negative Mac.
     #[inline]
     pub fn neg(&self, a: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
-        return MacProver(-a, -a_mac);
+        MacProver(-a, -a_mac)
     }
 
     /// Subtraction of two Macs.
@@ -188,7 +188,7 @@ impl<FE: FiniteField> FComProver<FE> {
     pub fn sub(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
-        return MacProver(a - b, a_mac - b_mac);
+        MacProver(a - b, a_mac - b_mac)
     }
 
     /// Check that a batch of Macs are zero.
@@ -391,7 +391,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
     ) -> Result<MacVerifier<FE>, Error> {
         match self.voles.pop() {
             Some(e) => {
-                return Ok(MacVerifier(e));
+                Ok(MacVerifier(e))
             }
             None => {
                 let _start = Instant::now();
@@ -399,10 +399,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
                 println!("SVOLE<{:?}>", _start.elapsed());
                 match self.voles.pop() {
                     Some(e) => {
-                        return Ok(MacVerifier(e));
+                        Ok(MacVerifier(e))
                     }
                     None => {
-                        return Err(Error::Other("svole failed for random".to_string()));
+                        Err(Error::Other("svole failed for random".to_string()))
                     }
                 }
             }
@@ -452,13 +452,13 @@ impl<FE: FiniteField> FComVerifier<FE> {
     /// Add a constant to a Mac.
     #[inline]
     pub fn affine_add_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
-        return MacVerifier(x_mac.0 - cst * self.delta);
+        MacVerifier(x_mac.0 - cst * self.delta)
     }
 
     /// Multiply a Mac by a constant.
     #[inline]
     pub fn affine_mult_cst(&self, cst: FE::PrimeField, x_mac: MacVerifier<FE>) -> MacVerifier<FE> {
-        return MacVerifier(cst * x_mac.0);
+        MacVerifier(cst * x_mac.0)
     }
 
     /// Add two Macs.
@@ -466,14 +466,14 @@ impl<FE: FiniteField> FComVerifier<FE> {
     pub fn add(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
         let MacVerifier(b_mac) = b;
-        return MacVerifier(a_mac + b_mac);
+        MacVerifier(a_mac + b_mac)
     }
 
     /// Negative of a Mac.
     #[inline]
     pub fn neg(&self, a: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
-        return MacVerifier(-a_mac);
+        MacVerifier(-a_mac)
     }
 
     /// Subtraction of two Macs.
@@ -481,7 +481,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
     pub fn sub(&self, a: MacVerifier<FE>, b: MacVerifier<FE>) -> MacVerifier<FE> {
         let MacVerifier(a_mac) = a;
         let MacVerifier(b_mac) = b;
-        return MacVerifier(a_mac - b_mac);
+        MacVerifier(a_mac - b_mac)
     }
 
     /// Check that a batch of Macs are zero.
@@ -569,7 +569,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             let b = (*x_mac) * (*y_mac) + self.delta * *z_mac;
 
             sum_b += b * power_chi;
-            power_chi = power_chi * chi;
+            power_chi *= chi;
         }
 
         // The following block implements VOPE(1)

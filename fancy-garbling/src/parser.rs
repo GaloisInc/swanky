@@ -29,7 +29,7 @@ fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType, Error> {
 }
 
 fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>, Error> {
-    re.captures(&line)
+    re.captures(line)
         .ok_or_else(|| Error::ParseLineError(line.to_string()))
 }
 

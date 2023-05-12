@@ -353,7 +353,7 @@ impl<'parent, T> WireMap<'parent, T> {
         Ok(())
     }
     // panics if allocation isn't mutable
-    pub fn get_mut<'a>(&'a mut self, wire: WireId) -> Result<&'a mut T, WireNotFound> {
+    pub fn get_mut(&mut self, wire: WireId) -> Result<&mut T, WireNotFound> {
         if let Some(WirePosition {
             allocation,
             pos_in_allocation,
@@ -368,7 +368,7 @@ impl<'parent, T> WireMap<'parent, T> {
             Err(WireNotFound::NotAllocated)
         }
     }
-    pub fn get<'a>(&'a mut self, wire: WireId) -> Result<&'a T, WireNotFound> {
+    pub fn get(&mut self, wire: WireId) -> Result<&T, WireNotFound> {
         if let Some(WirePosition {
             allocation,
             pos_in_allocation,
@@ -489,11 +489,11 @@ impl<'parent, T> WireMap<'parent, T> {
         Ok(())
     }
     #[inline(never)]
-    pub fn borrow_child<'a>(
-        &'a mut self,
+    pub fn borrow_child(
+        &mut self,
         mutable_ranges: impl IntoIterator<Item = DestinationRange>,
         immutable_ranges: impl IntoIterator<Item = DestinationRange>,
-    ) -> eyre::Result<WireMap<'a, T>> {
+    ) -> eyre::Result<WireMap<'_, T>> {
         let mut out = WireMap {
             storage: Default::default(),
             cache_starts: Default::default(),

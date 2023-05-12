@@ -5,7 +5,7 @@ pub mod serde_index {
     pub fn serialize<S: serde::Serializer>(value: &Index, ser: S) -> Result<S::Ok, S::Error> {
         use serde::ser::Error;
 
-        let value = u32::try_from(*value).map_err(|e| Error::custom(e))?;
+        let value = u32::try_from(*value).map_err(Error::custom)?;
         ser.serialize_u32(value)
     }
 
@@ -38,7 +38,7 @@ mod tests {
     use scuttlebutt::{AesRng, Block};
 
     fn any_seed() -> impl Strategy<Value = Block> {
-        any::<u128>().prop_map(|seed| Block::from(seed))
+        any::<u128>().prop_map(Block::from)
     }
 
     macro_rules! test_serialization {

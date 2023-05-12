@@ -166,14 +166,14 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
         let beta = (q - B.color()) % q;
         let Y1 = B.plus(&D.cmul(beta));
 
-        let AD = A.plus(&D);
-        let BD = B.plus(&D);
+        let AD = A.plus(D);
+        let BD = B.plus(D);
 
         // idx is always boolean for binary gates, so it can be represented as a `u8`
         let a_selector = (A.color() as u8).into();
         let b_selector = (B.color() as u8).into();
 
-        let B = WireMod2::conditional_select(&BD, &B, b_selector);
+        let B = WireMod2::conditional_select(&BD, B, b_selector);
         let newA = WireMod2::conditional_select(&AD, A, a_selector);
         let idx = u8::conditional_select(&(r as u8), &0u8, a_selector);
 
@@ -183,8 +183,8 @@ impl<C: AbstractChannel, RNG: CryptoRng + RngCore, Wire: WireLabel> Garbler<C, R
         let Y = WireMod2::hash_to_mod(hashY, q);
 
         let gate0 =
-            hashA ^ Block::conditional_select(&X.as_block(), &X.plus(&D).as_block(), idx.into());
-        let gate1 = hashB ^ Y.plus(&A).as_block();
+            hashA ^ Block::conditional_select(&X.as_block(), &X.plus(D).as_block(), idx.into());
+        let gate1 = hashB ^ Y.plus(A).as_block();
 
         (gate0, gate1, X.plus_mov(&Y))
     }
@@ -378,7 +378,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
         let mut Y_ = Y.clone();
         precomp.push(Y_.as_block());
         for _ in 1..q {
-            Y_.plus_eq(&A);
+            Y_.plus_eq(A);
             precomp.push(Y_.as_block());
         }
 
@@ -464,7 +464,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel> Fancy
 
     fn constant(&mut self, x: u16, q: u16) -> Result<Wire, GarblerError> {
         let zero = Wire::rand(&mut self.rng, q);
-        let wire = zero.plus(&self.delta(q).cmul_eq(x));
+        let wire = zero.plus(self.delta(q).cmul_eq(x));
         self.send_wire(&wire)?;
         Ok(zero)
     }

@@ -369,12 +369,12 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
 
     fn reconstruct(
         corrections: &[F::PrimeField],
-        mut rngs: &mut [AesRng; N],
+        rngs: &mut [AesRng; N],
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         corrections
             .iter()
             .map(|correction| {
-                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, &mut rngs)
+                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, rngs)
             })
             .collect()
     }

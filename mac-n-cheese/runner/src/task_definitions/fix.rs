@@ -63,7 +63,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for FixTask<P, T> {
             .map(|input| Cursor::new(input.as_ref().map(|x| x.as_slice()).unwrap_or_default()));
         let mut deserializer = cursor
             .as_mut()
-            .map(|cursor| <T::VF as CanonicalSerialize>::Deserializer::new(cursor))
+            .map(<T::VF as CanonicalSerialize>::Deserializer::new)
             .lift_result()?;
         let num_out = ctx.task_prototype.outputs().get(0).count() as usize;
         let mut out = TaskDataBuffer::<Mac<P, T>>::with_capacity(num_out);

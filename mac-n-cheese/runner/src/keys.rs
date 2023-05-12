@@ -111,12 +111,12 @@ impl<P: Party> Keys<P> {
         tdh.tag = Default::default();
         let key = blake3::keyed_hash(&self.task_data_incoming_key, bytemuck::bytes_of(&tdh));
         let key = Aes128Gcm::new_from_slice(&key.as_bytes()[0..16]).unwrap();
-        if let Err(_) = key.decrypt_in_place_detached(
+        if key.decrypt_in_place_detached(
             &Default::default(),
             bytemuck::bytes_of(&tdh),
             payload,
             &tag,
-        ) {
+        ).is_err() {
             eyre::bail!("Failed to decrypt {tdh:?}");
         }
         Ok(())

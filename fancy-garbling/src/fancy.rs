@@ -66,7 +66,7 @@ pub trait FancyBinary: Fancy {
     }
     /// Returns 1 if all wires equal 1.
     fn and_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 1 {
+        if args.is_empty() {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
                 needed: 1,
@@ -79,7 +79,7 @@ pub trait FancyBinary: Fancy {
 
     /// Returns 1 if any wire equals 1.
     fn or_many(&mut self, args: &[Self::Item]) -> Result<Self::Item, Self::Error> {
-        if args.len() < 1 {
+        if args.is_empty() {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: args.len(),
                 needed: 1,

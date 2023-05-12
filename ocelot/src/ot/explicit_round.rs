@@ -83,7 +83,7 @@ impl AlszSender {
         let u_len = ncols / 8;
         for (j, aes) in self.rngs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut q = &mut qs[range];
+            let q = &mut qs[range];
             if incoming_bytes.len() < u_len {
                 return Err(Error::Other(format!(
                     "{} bytes were need for AlszSender::send_setup, but only {} remain",
@@ -97,7 +97,7 @@ impl AlszSender {
             let b = ((self.s >> j) & 1) != 0;
             // TODO: constant-time
             if b {
-                scuttlebutt::utils::xor_inplace(&mut q, &u);
+                scuttlebutt::utils::xor_inplace(q, u);
             }
         }
         if !incoming_bytes.is_empty() {
@@ -160,7 +160,7 @@ impl AlszReceiver {
         let g_len = ncols / 8;
         for (j, (rng0, rng1)) in self.rngs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
-            let mut t = &mut ts[range];
+            let t = &mut ts[range];
             if outgoing_bytes.len() < g_len {
                 return Err(Error::Other(format!(
                     "{} bytes were need for AlszReceiver::receive_setup(), but only {} remain",
@@ -170,10 +170,10 @@ impl AlszReceiver {
             }
             let (g, remaining) = outgoing_bytes.split_at_mut(g_len);
             outgoing_bytes = remaining;
-            fill_rng_with_selector(rng0, selector, &mut t);
+            fill_rng_with_selector(rng0, selector, t);
             fill_rng_with_selector(rng1, selector, g);
-            scuttlebutt::utils::xor_inplace(g, &t);
-            scuttlebutt::utils::xor_inplace(g, &r);
+            scuttlebutt::utils::xor_inplace(g, t);
+            scuttlebutt::utils::xor_inplace(g, r);
         }
         if !outgoing_bytes.is_empty() {
             return Err(Error::Other(format!(
@@ -334,7 +334,7 @@ impl KosSenderStage2 {
         for q in qs.chunks_exact(16) {
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            rng.fill_bytes(&mut chi.as_mut());
+            rng.fill_bytes(chi.as_mut());
             let tmp = q.clmul(chi);
             check = crate::utils::xor_two_blocks(&check, &tmp);
         }
@@ -474,8 +474,8 @@ impl KosReceiverStage2 {
             incoming = &incoming[32..];
             // TODO: constant-time
             let y = if b { y1 } else { y0 };
-            let y = y ^ AES_HASH.tccr_hash(Block::from(j as u128), Block::from(t));
-            y
+            
+            y ^ AES_HASH.tccr_hash(Block::from(j as u128), Block::from(t))
         });
         debug_assert!(incoming.is_empty());
         let mut x = Block::default();
@@ -485,7 +485,7 @@ impl KosReceiverStage2 {
             let tj = &ts[j * 16..(j + 1) * 16];
             let tj: [u8; 16] = tj.try_into().unwrap();
             let tj = Block::from(tj);
-            rng.fill_bytes(&mut chi.as_mut());
+            rng.fill_bytes(chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
             let tmp = tj.clmul(chi);
             t = crate::utils::xor_two_blocks(&t, &tmp);

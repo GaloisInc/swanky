@@ -43,7 +43,7 @@ fn zero_circuit<F: FiniteField>(ninputs: usize, witness: &[F], ops: Vec<Op<F>>) 
     assert_eq!(ninputs, witness.len());
     let circuit = Circuit::new(ninputs, 1, ops);
     let mut wires = Vec::with_capacity(circuit.nwires());
-    let output = circuit.eval(&witness, &mut wires)[0];
+    let output = circuit.eval(witness, &mut wires)[0];
     crate::builder::add_equality_check(circuit, output)
 }
 
@@ -57,8 +57,8 @@ fn binary_zero_circuit(
     assert_eq!(ninputs, witness.len());
     let circuit = Circuit::new(ninputs, noutputs, ops);
     let mut wires = Vec::with_capacity(circuit.nwires());
-    let outputs = circuit.eval(&witness, &mut wires);
-    crate::builder::add_binary_equality_check(circuit, &outputs)
+    let outputs = circuit.eval(witness, &mut wires);
+    crate::builder::add_binary_equality_check(circuit, outputs)
 }
 
 /// Output a circuit evaluating to zero that's just multiply gates.
@@ -208,7 +208,6 @@ pub fn arbitrary_circuit<F: PrimeFiniteField>(
     debug_assert!(ngates > 0);
 
     (1..ngates)
-        .into_iter()
         .fold(pvec(arb_op(0, ninputs), 1).boxed(), |acc, c| {
             (acc, arb_op(0, ninputs + c))
                 .prop_map(|(ops, op)| ops.into_iter().chain(std::iter::once(op)).collect())
@@ -248,7 +247,7 @@ mod tests {
     type TestField = scuttlebutt::field::F2e19x3e26;
 
     fn any_seed() -> impl Strategy<Value = Block> {
-        any::<u128>().prop_map(|seed| Block::from(seed))
+        any::<u128>().prop_map(Block::from)
     }
 
     proptest! {
@@ -312,7 +311,7 @@ mod tests {
         let xwywz = xwyw - z;
 
         let mut wires = Vec::with_capacity(ckt.nwires());
-        let _ = ckt.eval(&vec![w, x, y, z], &mut wires);
+        let _ = ckt.eval(&[w, x, y, z], &mut wires);
         assert_eq!(wires, vec![w, x, y, z, xw, yw, xwyw, xwywz]);
     }
 }

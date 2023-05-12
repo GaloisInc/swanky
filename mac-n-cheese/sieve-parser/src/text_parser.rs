@@ -357,7 +357,7 @@ impl<T: Read + Seek> RelationReader<T> {
                                 // Need to determine whether to try to parse a
                                 // number or a token - just peek for a digit
                                 match self.ps.peek()? {
-                                    Some(x) if matches!(x, b'0'..=b'9') => args
+                                    Some(x) if x.is_ascii_digit() => args
                                         .push(PluginTypeArg::Number(self.ps.parse_uint_generic()?)),
                                     _ => {
                                         self.ps.token(&mut buf)?;
@@ -765,7 +765,7 @@ impl<T: Read + Seek> RelationReader<T> {
             while self.ps.peek()? == Some(b',') {
                 self.ps.expect_byte(b',')?;
                 match self.ps.peek()? {
-                    Some(x) if matches!(x, b'0'..=b'9') => {
+                    Some(x) if x.is_ascii_digit() => {
                         args.push(PluginTypeArg::Number(self.ps.parse_uint_generic()?))
                     }
                     _ => {
@@ -839,7 +839,7 @@ impl<T: Read + Seek> RelationReader<T> {
     fn read_inner(&mut self, rv: &mut impl RelationVisitor) -> eyre::Result<()> {
         self.read_directives(rv, |this, rv| this.read_function(rv))?;
         self.ps.ws()?;
-        eyre::ensure!(self.ps.peek()? == None, "Expected EOF after final end");
+        eyre::ensure!((self.ps.peek()?).is_none(), "Expected EOF after final end");
         Ok(())
     }
     pub fn read(mut self, rv: &mut impl RelationVisitor) -> eyre::Result<()> {
@@ -909,7 +909,7 @@ impl<T: Read + Seek> ValueStreamReader<T> {
                     ps.at()?;
                     ps.expect_token(&mut buf, b"end")?;
                     ps.ws()?;
-                    eyre::ensure!(ps.peek()? == None, "Expected EOF after final end");
+                    eyre::ensure!((ps.peek()?).is_none(), "Expected EOF after final end");
                     self.ps = None;
                     Ok(None)
                 }

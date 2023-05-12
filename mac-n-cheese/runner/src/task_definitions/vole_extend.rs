@@ -193,7 +193,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(states.into_iter())
                     {
                         new_states.push(state.stage2(
-                            &self.initial.as_ref().prover_into(e),
+                            self.initial.as_ref().prover_into(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(
@@ -222,7 +222,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(states.into_iter())
                     {
                         state.stage3(
-                            &self.initial.as_ref().prover_into(e),
+                            self.initial.as_ref().prover_into(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(
@@ -249,7 +249,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                             .zip(states.into_iter())
                     {
                         new_states.push(state.stage2(
-                            &self.initial.as_ref().verifier_into(e),
+                            self.initial.as_ref().verifier_into(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(
@@ -279,7 +279,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
                         .zip(states.into_iter())
                     {
                         state.stage3(
-                            &self.initial.as_ref().verifier_into(e),
+                            self.initial.as_ref().verifier_into(e),
                             &keyed_arena,
                             Mac::cast_slice(e, TransparentWrapper::peel_slice(base_voles)),
                             Mac::cast_slice_mut(

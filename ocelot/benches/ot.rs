@@ -39,7 +39,7 @@ fn _bench_block_ot<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Blo
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    ot.receive(&mut channel, &bs, &mut rng).unwrap();
+    ot.receive(&mut channel, bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
@@ -64,7 +64,7 @@ fn _bench_block_cot<
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    ot.receive_correlated(&mut channel, &bs, &mut rng).unwrap();
+    ot.receive_correlated(&mut channel, bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 
@@ -89,7 +89,7 @@ fn _bench_block_rot<
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    ot.receive_random(&mut channel, &bs, &mut rng).unwrap();
+    ot.receive_random(&mut channel, bs, &mut rng).unwrap();
     handle.join().unwrap();
 }
 

@@ -289,8 +289,8 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         xs: &BinaryBundle<Self::Item>,
         ys: &BinaryBundle<Self::Item>,
     ) -> Result<(BinaryBundle<Self::Item>, Self::Item), Self::Error> {
-        let neg_ys = self.bin_twos_complement(&ys)?;
-        self.bin_addition(&xs, &neg_ys)
+        let neg_ys = self.bin_twos_complement(ys)?;
+        self.bin_addition(xs, &neg_ys)
     }
 
     /// If `x=0` return `c1` as a bundle of constant bits, else return `c2`.
@@ -357,7 +357,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
         let sign = x.wires().last().unwrap();
         let negated = self.bin_twos_complement(x)?;
-        self.bin_multiplex(&sign, x, &negated)
+        self.bin_multiplex(sign, x, &negated)
     }
 
     /// Returns 1 if `x < y` (signed version)
@@ -374,7 +374,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
 
         // broken into cases based on x and y being negative or positive
         // base case: if x and y have the same sign - use unsigned lt
-        let x_lt_y_unsigned = self.bin_lt(&x, &y)?;
+        let x_lt_y_unsigned = self.bin_lt(x, y)?;
 
         // if x is negative and y is positive then x < y
         let tru = self.constant(1, 2)?;
@@ -435,7 +435,7 @@ pub trait BinaryGadgets: FancyBinary + BundleGadgets {
         &mut self,
         xs: &[BinaryBundle<Self::Item>],
     ) -> Result<BinaryBundle<Self::Item>, Self::Error> {
-        if xs.len() < 1 {
+        if xs.is_empty() {
             return Err(Self::Error::from(FancyError::InvalidArgNum {
                 got: xs.len(),
                 needed: 1,

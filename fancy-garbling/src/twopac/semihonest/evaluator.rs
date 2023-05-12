@@ -42,7 +42,7 @@ impl<
 
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, TwopacError> {
         self.ot
-            .receive(&mut self.channel, &inputs, &mut self.rng)
+            .receive(&mut self.channel, inputs, &mut self.rng)
             .map_err(TwopacError::from)
     }
 }
@@ -133,23 +133,23 @@ impl<C: AbstractChannel, RNG, OT, Wire: WireLabel + ArithmeticWire> FancyArithme
     for Evaluator<C, RNG, OT, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.evaluator.add(&x, &y).map_err(Self::Error::from)
+        self.evaluator.add(x, y).map_err(Self::Error::from)
     }
 
     fn sub(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.evaluator.sub(&x, &y).map_err(Self::Error::from)
+        self.evaluator.sub(x, y).map_err(Self::Error::from)
     }
 
     fn cmul(&mut self, x: &Wire, c: u16) -> Result<Self::Item, Self::Error> {
-        self.evaluator.cmul(&x, c).map_err(Self::Error::from)
+        self.evaluator.cmul(x, c).map_err(Self::Error::from)
     }
 
     fn mul(&mut self, x: &Wire, y: &Wire) -> Result<Self::Item, Self::Error> {
-        self.evaluator.mul(&x, &y).map_err(Self::Error::from)
+        self.evaluator.mul(x, y).map_err(Self::Error::from)
     }
 
     fn proj(&mut self, x: &Wire, q: u16, tt: Option<Vec<u16>>) -> Result<Self::Item, Self::Error> {
-        self.evaluator.proj(&x, q, tt).map_err(Self::Error::from)
+        self.evaluator.proj(x, q, tt).map_err(Self::Error::from)
     }
 }
 
@@ -162,7 +162,7 @@ impl<C: AbstractChannel, RNG, OT, Wire: WireLabel> Fancy for Evaluator<C, RNG, O
     }
 
     fn output(&mut self, x: &Wire) -> Result<Option<u16>, Self::Error> {
-        self.evaluator.output(&x).map_err(Self::Error::from)
+        self.evaluator.output(x).map_err(Self::Error::from)
     }
 }
 

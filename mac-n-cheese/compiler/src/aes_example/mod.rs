@@ -67,8 +67,8 @@ fn parse_circuit() -> Circuit {
     // We're parsing the initial version of bristol circuits, not the newer version.
     let mut lines = src.trim().split('\n');
     let hdr = Vec::from_iter(lines.next().unwrap().split_ascii_whitespace());
-    let _num_gates = usize::from_str(&hdr[0]).unwrap();
-    let num_wires = usize::from_str(&hdr[1]).unwrap();
+    let _num_gates = usize::from_str(hdr[0]).unwrap();
+    let num_wires = usize::from_str(hdr[1]).unwrap();
     let mut bristol2wire = vec![None; num_wires];
     let mut circuit = Circuit::default();
     for i in 0..NUM_INPUTS {
@@ -83,9 +83,9 @@ fn parse_circuit() -> Circuit {
             "XOR" => {
                 assert_eq!(buf[0], "2");
                 assert_eq!(buf[1], "1");
-                let in0 = usize::from_str(&buf[2]).unwrap();
-                let in1 = usize::from_str(&buf[3]).unwrap();
-                let output = usize::from_str(&buf[4]).unwrap();
+                let in0 = usize::from_str(buf[2]).unwrap();
+                let in1 = usize::from_str(buf[3]).unwrap();
+                let output = usize::from_str(buf[4]).unwrap();
                 let in0 = bristol2wire[in0].unwrap();
                 let in1 = bristol2wire[in1].unwrap();
                 assert!(bristol2wire[output].is_none());
@@ -94,9 +94,9 @@ fn parse_circuit() -> Circuit {
             "AND" => {
                 assert_eq!(buf[0], "2");
                 assert_eq!(buf[1], "1");
-                let in0 = usize::from_str(&buf[2]).unwrap();
-                let in1 = usize::from_str(&buf[3]).unwrap();
-                let output = usize::from_str(&buf[4]).unwrap();
+                let in0 = usize::from_str(buf[2]).unwrap();
+                let in1 = usize::from_str(buf[3]).unwrap();
+                let output = usize::from_str(buf[4]).unwrap();
                 let in0 = bristol2wire[in0].unwrap();
                 let in1 = bristol2wire[in1].unwrap();
                 assert!(bristol2wire[output].is_none());
@@ -105,8 +105,8 @@ fn parse_circuit() -> Circuit {
             "INV" => {
                 assert_eq!(buf[0], "1");
                 assert_eq!(buf[1], "1");
-                let input = usize::from_str(&buf[2]).unwrap();
-                let output = usize::from_str(&buf[3]).unwrap();
+                let input = usize::from_str(buf[2]).unwrap();
+                let output = usize::from_str(buf[3]).unwrap();
                 let input = bristol2wire[input].unwrap();
                 assert!(bristol2wire[output].is_none());
                 bristol2wire[output] = Some(circuit.add_wire(WireBody::Inv(input)));
@@ -296,7 +296,7 @@ pub fn aes_main(args: AesArgs) -> eyre::Result<()> {
                 }
             }
             while buf.len() < XOR_SIMD_SIZE {
-                let pair = buf.first().unwrap().clone();
+                let pair = *buf.first().unwrap();
                 next_xor += 1;
                 buf.push(pair);
             }
