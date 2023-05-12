@@ -5,7 +5,6 @@ use fancy_garbling::{circuit::BinaryCircuit, classic::garble, AllWire, WireMod2}
 use std::{fs::File, io::BufReader, time::Duration};
 
 fn circuit(fname: &str) -> BinaryCircuit {
-    
     // println!("{}", fname);
     // circ.print_info().unwrap();
     BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()

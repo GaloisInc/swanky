@@ -373,9 +373,7 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
     ) -> Vec<CorrectionSharing<F::PrimeField, N>> {
         corrections
             .iter()
-            .map(|correction| {
-                CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, rngs)
-            })
+            .map(|correction| CorrectionSharing::<F::PrimeField, N>::from_rngs(*correction, rngs))
             .collect()
     }
 }

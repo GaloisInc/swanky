@@ -231,12 +231,9 @@ impl<Field: FieldForLigero> Public<Field> {
             .clone()
             .zip(rshared.rows().into_iter())
             .for_each(|(m_i, row_i)| {
-                self.shared
-                    .clone()
-                    .zip(row_i)
-                    .for_each(|(s_j, &r_ij)| {
-                        self.Padd.add_triplet(m_i, s_j, r_ij);
-                    });
+                self.shared.clone().zip(row_i).for_each(|(s_j, &r_ij)| {
+                    self.Padd.add_triplet(m_i, s_j, r_ij);
+                });
                 self.Padd.add_triplet(m_i, m_i, Field::ONE);
             });
 

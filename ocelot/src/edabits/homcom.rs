@@ -96,18 +96,12 @@ impl<FE: FiniteField> FComProver<FE> {
         rng: &mut RNG,
     ) -> Result<MacProver<FE>, Error> {
         match self.voles.pop() {
-            Some(e) => {
-                Ok(MacProver(e.0, e.1))
-            }
+            Some(e) => Ok(MacProver(e.0, e.1)),
             None => {
                 self.svole_sender.send(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
-                    Some(e) => {
-                        Ok(MacProver(e.0, e.1))
-                    }
-                    None => {
-                        Err(Error::Other("svole failed for random".to_string()))
-                    }
+                    Some(e) => Ok(MacProver(e.0, e.1)),
+                    None => Err(Error::Other("svole failed for random".to_string())),
                 }
             }
         }
@@ -390,20 +384,14 @@ impl<FE: FiniteField> FComVerifier<FE> {
         rng: &mut RNG,
     ) -> Result<MacVerifier<FE>, Error> {
         match self.voles.pop() {
-            Some(e) => {
-                Ok(MacVerifier(e))
-            }
+            Some(e) => Ok(MacVerifier(e)),
             None => {
                 let _start = Instant::now();
                 self.svole_receiver.receive(channel, rng, &mut self.voles)?;
                 println!("SVOLE<{:?}>", _start.elapsed());
                 match self.voles.pop() {
-                    Some(e) => {
-                        Ok(MacVerifier(e))
-                    }
-                    None => {
-                        Err(Error::Other("svole failed for random".to_string()))
-                    }
+                    Some(e) => Ok(MacVerifier(e)),
+                    None => Err(Error::Other("svole failed for random".to_string())),
                 }
             }
         }

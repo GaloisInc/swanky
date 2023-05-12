@@ -161,9 +161,7 @@ fn eval<VSR: ValueStreamReader>(
                                         ..
                                     }) = self.counter_info
                                     {
-                                        if field_type == FE::FIELD_TYPE
-                                            && i == num_env_for_field
-                                        {
+                                        if field_type == FE::FIELD_TYPE && i == num_env_for_field {
                                             input_pos += num_wires as u64
                                         }
                                     }

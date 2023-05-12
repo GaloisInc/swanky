@@ -60,8 +60,6 @@ struct Monitor {
     monitor_zk_mult_check: usize,
 }
 
-
-
 impl Monitor {
     fn tick(&mut self) {
         self.tick += 1;

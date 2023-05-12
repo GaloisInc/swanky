@@ -474,7 +474,7 @@ impl KosReceiverStage2 {
             incoming = &incoming[32..];
             // TODO: constant-time
             let y = if b { y1 } else { y0 };
-            
+
             y ^ AES_HASH.tccr_hash(Block::from(j as u128), Block::from(t))
         });
         debug_assert!(incoming.is_empty());

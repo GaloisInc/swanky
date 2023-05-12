@@ -83,7 +83,6 @@ impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
             2,
         );
 
-        
         L.plus_mov(&R.plus_mov(&A.cmul(B.color())))
     }
 }

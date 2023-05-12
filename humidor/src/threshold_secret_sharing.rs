@@ -183,7 +183,7 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGe
         // let poly = NewtonPolynomial::init(&points, &values);
         // evaluate at omega_secrets points to recover secrets
         // TODO optimise to avoid re-computation of power
-        
+
         (1..self.reconstruct_limit())
             .map(|e| self.omega_secrets.pow(e as u128))
             .map(|point| poly.eval(&values, point))
