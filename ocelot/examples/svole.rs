@@ -58,7 +58,7 @@ impl<S: Read + Write> AbstractChannel for OurTrackChannel<S> {
     }
 
     #[inline(always)]
-    fn read_bytes(&mut self, mut bytes: &mut [u8]) -> std::io::Result<()> {
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> std::io::Result<()> {
         self.bytes_read += bytes.len() as u64;
         self.stream_r.read_exact(bytes)
     }
