@@ -409,6 +409,7 @@ pub type WireSize = u32;
 /// The generated flatbuffers structures.
 #[rustfmt::skip]
 #[allow(unused_imports)]
+#[allow(clippy::all)]
 #[path = "compilation_format_generated.rs"]
 pub mod fb;
 
