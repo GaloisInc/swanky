@@ -99,7 +99,11 @@ impl flatbuffers::SimpleToVerifyInSlice for TaskCommuniqueSender {}
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct Type(pub [u8; 2]);
-
+impl Default for Type { 
+  fn default() -> Self { 
+    Self([0; 2])
+  }
+}
 impl core::fmt::Debug for Type {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("Type")
@@ -186,9 +190,12 @@ impl<'a> Type {
 // struct TaskId, aligned to 4
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-#[derive(Default)]
 pub struct TaskId(pub [u8; 4]);
-
+impl Default for TaskId { 
+  fn default() -> Self { 
+    Self([0; 4])
+  }
+}
 impl core::fmt::Debug for TaskId {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("TaskId")
@@ -275,9 +282,12 @@ impl<'a> TaskId {
 // struct DataChunkAddress, aligned to 8
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-#[derive(Default)]
 pub struct DataChunkAddress(pub [u8; 32]);
-
+impl Default for DataChunkAddress { 
+  fn default() -> Self { 
+    Self([0; 32])
+  }
+}
 impl core::fmt::Debug for DataChunkAddress {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("DataChunkAddress")
@@ -460,9 +470,12 @@ impl<'a> DataChunkAddress {
 // struct Shape, aligned to 4
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-#[derive(Default)]
 pub struct Shape(pub [u8; 8]);
-
+impl Default for Shape { 
+  fn default() -> Self { 
+    Self([0; 8])
+  }
+}
 impl core::fmt::Debug for Shape {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("Shape")
@@ -564,9 +577,12 @@ impl<'a> Shape {
 // struct TaskCommunicationRound, aligned to 4
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-#[derive(Default)]
 pub struct TaskCommunicationRound(pub [u8; 8]);
-
+impl Default for TaskCommunicationRound { 
+  fn default() -> Self { 
+    Self([0; 8])
+  }
+}
 impl core::fmt::Debug for TaskCommunicationRound {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("TaskCommunicationRound")
@@ -685,9 +701,12 @@ impl<'a> TaskCommunicationRound {
 // struct TaskInput, aligned to 4
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-#[derive(Default)]
 pub struct TaskInput(pub [u8; 16]);
-
+impl Default for TaskInput { 
+  fn default() -> Self { 
+    Self([0; 16])
+  }
+}
 impl core::fmt::Debug for TaskInput {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("TaskInput")
@@ -836,9 +855,12 @@ impl<'a> TaskInput {
 // struct TaskInputTributary, aligned to 4
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-#[derive(Default)]
 pub struct TaskInputTributary(pub [u8; 12]);
-
+impl Default for TaskInputTributary { 
+  fn default() -> Self { 
+    Self([0; 12])
+  }
+}
 impl core::fmt::Debug for TaskInputTributary {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     f.debug_struct("TaskInputTributary")
@@ -1254,12 +1276,19 @@ impl flatbuffers::Verifiable for MultiArrayTaskInput<'_> {
     Ok(())
   }
 }
-#[derive(Default)]
 pub struct MultiArrayTaskInputArgs<'a> {
     pub ty: Option<&'a Type>,
     pub inputs: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, TaskInputTributary>>>,
 }
-
+impl<'a> Default for MultiArrayTaskInputArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    MultiArrayTaskInputArgs {
+      ty: None, // required field
+      inputs: None, // required field
+    }
+  }
+}
 
 pub struct MultiArrayTaskInputBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1403,7 +1432,6 @@ impl flatbuffers::Verifiable for Task<'_> {
     Ok(())
   }
 }
-#[derive(Default)]
 pub struct TaskArgs<'a> {
     pub prototype_id: u32,
     pub single_array_inputs: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, TaskInput>>>,
@@ -1412,7 +1440,19 @@ pub struct TaskArgs<'a> {
     pub inferred_dependents: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, TaskId>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
 }
-
+impl<'a> Default for TaskArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    TaskArgs {
+      prototype_id: 0,
+      single_array_inputs: None, // required field
+      multi_array_inputs: None, // required field
+      inferred_priority: 0,
+      inferred_dependents: None, // required field
+      name: None,
+    }
+  }
+}
 
 pub struct TaskBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1537,12 +1577,19 @@ impl flatbuffers::Verifiable for AllocationSize<'_> {
     Ok(())
   }
 }
-#[derive(Default)]
 pub struct AllocationSizeArgs<'a> {
     pub type_: Option<&'a Type>,
     pub count: u32,
 }
-
+impl<'a> Default for AllocationSizeArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    AllocationSizeArgs {
+      type_: None,
+      count: 0,
+    }
+  }
+}
 
 pub struct AllocationSizeBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1695,7 +1742,6 @@ impl flatbuffers::Verifiable for Manifest<'_> {
     Ok(())
   }
 }
-#[derive(Default)]
 pub struct ManifestArgs<'a> {
     pub tasks: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Task<'a>>>>>,
     pub prototypes: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<TaskPrototype<'a>>>>>,
@@ -1705,7 +1751,20 @@ pub struct ManifestArgs<'a> {
     pub allocation_sizes: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AllocationSize<'a>>>>>,
     pub task_kinds_used: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u16>>>,
 }
-
+impl<'a> Default for ManifestArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    ManifestArgs {
+      tasks: None, // required field
+      prototypes: None, // required field
+      initially_ready_tasks: None, // required field
+      dependent_counts: None, // required field
+      dependency_counts: None, // required field
+      allocation_sizes: None, // required field
+      task_kinds_used: None, // required field
+    }
+  }
+}
 
 pub struct ManifestBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -1836,14 +1895,14 @@ pub unsafe fn size_prefixed_root_as_manifest_unchecked(buf: &[u8]) -> Manifest {
   flatbuffers::size_prefixed_root_unchecked::<Manifest>(buf)
 }
 #[inline]
-pub fn finish_manifest_buffer<'a>(
-    fbb: &mut flatbuffers::FlatBufferBuilder<'a>,
+pub fn finish_manifest_buffer<'a, 'b>(
+    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     root: flatbuffers::WIPOffset<Manifest<'a>>) {
   fbb.finish(root, None);
 }
 
 #[inline]
-pub fn finish_size_prefixed_manifest_buffer<'a>(fbb: &mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<Manifest<'a>>) {
+pub fn finish_size_prefixed_manifest_buffer<'a, 'b>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<Manifest<'a>>) {
   fbb.finish_size_prefixed(root, None);
 }
 
