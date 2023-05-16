@@ -404,5 +404,6 @@ pub trait AesBlockCipherDecrypt: AesBlockCipher {
 }
 
 pub mod array_utils;
+#[allow(clippy::all)]
 mod generated;
 pub use generated::implementation::*;

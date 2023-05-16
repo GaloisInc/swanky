@@ -189,7 +189,7 @@ fn party_main<P: Party>(
     )?;
     // Finally we can kick things off with the task graph.
     runner::run_proof_background(
-        opt.num_threads.unwrap_or_else(|| num_cpus::get()),
+        opt.num_threads.unwrap_or_else(num_cpus::get),
         rng,
         &mut ts,
         root_conn,
@@ -258,7 +258,7 @@ fn main() -> eyre::Result<()> {
     let party_main_result = match &opt.cmd {
         Command::Prove { private_data } => party_main::<party::Prover>(
             &opt,
-            ProverPrivateCopy::new(&private_data),
+            ProverPrivateCopy::new(private_data),
             PartyEitherCopy::prover_new(IS_PROVER, ()),
         ),
         Command::Verify { num_connections } => {

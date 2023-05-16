@@ -156,7 +156,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 let h = hash_input_keyed(key, *x, params.m1);
                 // Only add the point if it doesn't already exist in the `h`th
                 // bin.
-                if hs.iter().find(|&&h_| h_ == h).is_none() {
+                if !hs.iter().any(|&h_| h_ == h) {
                     bins[h].push((*x, *y));
                     hs.push(h);
                 }
@@ -166,7 +166,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 let h = hash_input_keyed(key, *x, params.m2);
                 // Only add the point if it doesn't already exist in the `h`th
                 // bin.
-                if hs.iter().find(|&&h_| h_ == h).is_none() {
+                if !hs.iter().any(|&h_| h_ == h) {
                     bins[params.m1 + h].push((*x, *y));
                     hs.push(h);
                 }

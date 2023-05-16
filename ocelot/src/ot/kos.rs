@@ -40,7 +40,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         let qs = self.ot.send_setup(channel, ncols)?;
         // Check correlation
         let mut seed = Block::default();
-        rng.fill_bytes(&mut seed.as_mut());
+        rng.fill_bytes(seed.as_mut());
         let seed = cointoss::send(channel, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
         let mut check = (Block::default(), Block::default());
@@ -49,7 +49,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
-            rng.fill_bytes(&mut chi.as_mut());
+            rng.fill_bytes(chi.as_mut());
             let tmp = q.clmul(chi);
             check = utils::xor_two_blocks(&check, &tmp);
         }
@@ -183,7 +183,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let ts = self.ot.receive_setup(channel, &r, m_)?;
         // Check correlation
         let mut seed = Block::default();
-        rng.fill_bytes(&mut seed.as_mut());
+        rng.fill_bytes(seed.as_mut());
         let seed = cointoss::receive(channel, &[seed])?;
         let mut rng = AesRng::from_seed(seed[0]);
         let mut x = Block::default();
@@ -194,7 +194,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             let tj = &ts[j * 16..(j + 1) * 16];
             let tj: [u8; 16] = tj.try_into().unwrap();
             let tj = Block::from(tj);
-            rng.fill_bytes(&mut chi.as_mut());
+            rng.fill_bytes(chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
             let tmp = tj.clmul(chi);
             t = utils::xor_two_blocks(&t, &tmp);

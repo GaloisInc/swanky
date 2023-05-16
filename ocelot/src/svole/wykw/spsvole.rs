@@ -174,7 +174,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             result[i * n + alpha] = (beta, w - (d + sum));
         }
 
-        self.send_batch_consistency_check(channel, &result, &base_consistency, rng)?;
+        self.send_batch_consistency_check(channel, &result, base_consistency, rng)?;
 
         Ok(result)
     }
@@ -304,12 +304,12 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         debug_assert_eq!(keys.len(), t * nbits);
         self.ot.send(channel, &keys, rng)?;
         for (i, gamma) in gammas.into_iter().enumerate() {
-            let d = gamma - result[i * n..(i + 1) * n].iter().map(|v| *v).sum();
+            let d = gamma - result[i * n..(i + 1) * n].iter().copied().sum();
             channel.write_serializable(&d)?;
         }
         channel.flush()?;
 
-        self.receive_batch_consistency_check(channel, &result, &base_consistency, rng)?;
+        self.receive_batch_consistency_check(channel, &result, base_consistency, rng)?;
         Ok(result)
     }
 

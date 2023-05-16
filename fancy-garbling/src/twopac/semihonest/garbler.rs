@@ -58,7 +58,7 @@ impl<
         let inputs = (0..len)
             .map(|i| {
                 let zero = Wire::rand(&mut self.rng, q);
-                let one = zero.plus(&delta);
+                let one = zero.plus(delta);
                 wire = wire.plus(&zero.cmul(1 << i));
                 (zero.as_block(), one.as_block())
             })

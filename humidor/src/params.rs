@@ -89,14 +89,12 @@ impl<Field: FieldForLigero> Params<Field> {
         // avoid this at the cost of some performance by using fft3 instead.
         let t = Field::FIELD_SIZE;
         let (kexp, nexp, k, l, n, m) = (0..<Field as FieldForFFT<2>>::PHI_EXP as u32)
-            .into_iter()
             .map(|kexp| (kexp, 2usize.pow(kexp) - 1))
-            .filter(|&(_, k)| k as usize > t)
+            .filter(|&(_, k)| k > t)
             .filter_map(|(kexp, k)| {
                 let (nexp, n) = (0..=<Field as FieldForFFT<3>>::PHI_EXP as u32)
-                    .into_iter()
                     .map(|nexp| (nexp, 3usize.pow(nexp) - 1))
-                    .find(|&(_, n)| n as usize > k)?;
+                    .find(|&(_, n)| n > k)?;
                 let l = k - t;
                 let m = (size + l - 1) / l;
 
@@ -176,8 +174,8 @@ impl<Field: FieldForLigero> Params<Field> {
             .collect::<Vec<_>>();
         fft::fft3_inverse_in_place(&mut coeffs0, self.pss.omega_shares());
 
-        let (mut points, zeros) = coeffs0[..].split_at_mut(self.k + 1);
-        fft::fft2_in_place(&mut points, self.pss.omega_secrets());
+        let (points, zeros) = coeffs0[..].split_at_mut(self.k + 1);
+        fft::fft2_in_place(points, self.pss.omega_secrets());
 
         points[0] == Field::ZERO && zeros.iter().all(|&f| f == Field::ZERO)
     }
@@ -527,7 +525,7 @@ proptest! {
 
         let coeffs = p.fft2_inverse(a.slice(ndarray::s![1..=len]));
 
-        fft::fft2_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_inverse_in_place(a.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let coeffs_ref = a;
 
         prop_assert_eq!(coeffs.len(), coeffs_ref.len());
@@ -547,7 +545,7 @@ proptest! {
 
         let points = p.fft2(a.slice(ndarray::s![0..len]));
 
-        fft::fft2_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_in_place(a.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let points_ref = a.slice(ndarray::s![1..]);
 
         prop_assert_eq!(points.len(), points_ref.len());
@@ -581,8 +579,8 @@ proptest! {
 
         let coeffs = p.fft2_inverse_rows(points.view());
 
-        fft::fft2_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
-        fft::fft2_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_inverse_in_place(a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_inverse_in_place(a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let coeffs_ref = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
 
         prop_assert_eq!(coeffs.dim(), coeffs_ref.dim());
@@ -612,8 +610,8 @@ proptest! {
 
         let points = p.fft2_rows(coeffs.view());
 
-        fft::fft2_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
-        fft::fft2_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_in_place(a1.as_slice_mut().unwrap(), p.pss.omega_secrets);
+        fft::fft2_in_place(a2.as_slice_mut().unwrap(), p.pss.omega_secrets);
         let points_ref0 = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
         let points_ref = points_ref0.slice(ndarray::s![.., 1..]);
 
@@ -635,7 +633,7 @@ proptest! {
 
         let coeffs = p.fft3_inverse(a.slice(ndarray::s![1..=len]));
 
-        fft::fft3_inverse_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_inverse_in_place(a.as_slice_mut().unwrap(), p.pss.omega_shares);
         let coeffs_ref = a;
 
         prop_assert_eq!(coeffs.len(), coeffs_ref.len());
@@ -655,7 +653,7 @@ proptest! {
 
         let points = p.fft3(a.slice(ndarray::s![0..len]));
 
-        fft::fft3_in_place(&mut a.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_in_place(a.as_slice_mut().unwrap(), p.pss.omega_shares);
         let points_ref = a.slice(ndarray::s![1..]);
 
         prop_assert_eq!(points.len(), points_ref.len());
@@ -689,8 +687,8 @@ proptest! {
 
         let coeffs = p.fft3_inverse_rows(points.view());
 
-        fft::fft3_inverse_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
-        fft::fft3_inverse_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_inverse_in_place(a1.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_inverse_in_place(a2.as_slice_mut().unwrap(), p.pss.omega_shares);
         let coeffs_ref = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
 
         prop_assert_eq!(coeffs.dim(), coeffs_ref.dim());
@@ -720,8 +718,8 @@ proptest! {
 
         let points = p.fft3_rows(coeffs.view());
 
-        fft::fft3_in_place(&mut a1.as_slice_mut().unwrap(), p.pss.omega_shares);
-        fft::fft3_in_place(&mut a2.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_in_place(a1.as_slice_mut().unwrap(), p.pss.omega_shares);
+        fft::fft3_in_place(a2.as_slice_mut().unwrap(), p.pss.omega_shares);
         let points_ref0 = ndarray::stack(Axis(0), &[a1.view(), a2.view()]).unwrap();
         let points_ref = points_ref0.slice(ndarray::s![.., 1..]);
 
@@ -826,7 +824,7 @@ proptest! {
         for i in 0 .. v.len() {
             prop_assert_eq!(
                 p.peval2(v_coeffs.view(), i),
-                TestField::from(v[i])
+                v[i]
             );
         }
     }

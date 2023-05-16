@@ -64,7 +64,7 @@ impl Sender {
                 self.oprf.encode(inputs[j], &mut encoded);
                 encoded ^= seeds[bin];
 
-                channel.write_bytes(&encoded.prefix(masksize))?;
+                channel.write_bytes(encoded.prefix(masksize))?;
             }
         }
         channel.flush()?;
@@ -317,7 +317,7 @@ mod tests {
         let mut sender_inputs = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
         let mut receiver_inputs = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
         sender_inputs.extend(intersection.clone());
-        receiver_inputs.extend(intersection.clone());
+        receiver_inputs.extend(intersection);
 
         let thread_sender_inputs = sender_inputs.clone();
         let handle = std::thread::spawn(move || {

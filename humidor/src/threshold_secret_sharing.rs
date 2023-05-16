@@ -183,12 +183,12 @@ impl<Field: FiniteField + FieldForFFT<2> + FieldForFFT<3>> PackedSecretSharingGe
         // let poly = NewtonPolynomial::init(&points, &values);
         // evaluate at omega_secrets points to recover secrets
         // TODO optimise to avoid re-computation of power
-        let secrets = (1..self.reconstruct_limit())
+
+        (1..self.reconstruct_limit())
             .map(|e| self.omega_secrets.pow(e as u128))
             .map(|point| poly.eval(&values, point))
             .take(self.secret_count)
-            .collect();
-        secrets
+            .collect()
     }
 }
 
@@ -216,13 +216,12 @@ mod tests {
             // implementation configuration
             /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
             /// must be a power of 2.
-            omega_secrets: TestField::from(<TestField as FieldForFFT<2>>::roots(6)),
+            omega_secrets: <TestField as FieldForFFT<2>>::roots(6),
             /// `n`-th principal root of unity in Zp, where `n = share_count + 1` must be a power of 3.
-            omega_shares: TestField::from(<TestField as FieldForFFT<3>>::roots(4)),
+            omega_shares: <TestField as FieldForFFT<3>>::roots(4),
         };
 
         let secrets = (0..pss.secret_count as u64)
-            .into_iter()
             .map(|n| {
                 (n as u128)
                     .try_into()

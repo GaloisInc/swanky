@@ -126,8 +126,7 @@ pub trait FancyInput {
         let nmods = mods.len();
         let xs = values
             .iter()
-            .map(|x| util::crt(*x, &mods))
-            .flatten()
+            .flat_map(|x| util::crt(*x, &mods))
             .collect_vec();
         let qs = itertools::repeat_n(mods, values.len())
             .flatten()
@@ -185,8 +184,7 @@ pub trait FancyInput {
     ) -> Result<Vec<BinaryBundle<Self::Item>>, Self::Error> {
         let xs = values
             .iter()
-            .map(|x| util::u128_to_bits(*x, nbits))
-            .flatten()
+            .flat_map(|x| util::u128_to_bits(*x, nbits))
             .collect_vec();
         let mut wires = self.encode_many(&xs, &vec![2; values.len() * nbits])?;
         let buns = (0..values.len())

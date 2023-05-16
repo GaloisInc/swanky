@@ -57,7 +57,7 @@ macro_rules! define_field_instruction {
             pub fn len(&self) -> usize {
                 self.opcodes.len()
             }
-            pub fn iter<'a>(&'a self) -> impl Iterator<Item = FieldInstruction<$FE>> + 'a {
+            pub fn iter(&self) -> impl Iterator<Item = FieldInstruction<$FE>> + '_ {
                 struct Iters<'a, $FE: CompilerField> {
                     WireId: std::slice::Iter<'a, WireId>,
                     $FE: std::slice::Iter<'a, $FE>,

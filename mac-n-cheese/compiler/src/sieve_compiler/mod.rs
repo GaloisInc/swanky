@@ -167,7 +167,7 @@ fn sieve_compiler_main_party<
         .lift_result()?;
     let chunks = CircuitChunk::stream::<RR, VSR>(&args.relation, &args.public_inputs);
     match P::WHICH {
-        WhichParty::Prover(_) => build_privates(&args.out.with_extension("priv"), |pb| {
+        WhichParty::Prover(_) => build_privates(args.out.with_extension("priv"), |pb| {
             simple_writer::write_circuit(&args.out, chunks, witnesses, ProverPrivate::new(pb))
         }),
         WhichParty::Verifier(e) => simple_writer::write_circuit::<P, VSR>(
@@ -188,7 +188,7 @@ pub fn sieve_compiler_main(args: SieveArgs) -> eyre::Result<()> {
         .spawn::<_, eyre::Result<()>>(move || {
             match &args.command {
                 Command::CompileProver { witness } => {
-                    let witness_path: ProverPrivate<_, &[PathBuf]> = ProverPrivate::new(&witness);
+                    let witness_path: ProverPrivate<_, &[PathBuf]> = ProverPrivate::new(witness);
                     if args.text {
                         sieve_compiler_main_party::<
                             mac_n_cheese_party::Prover,

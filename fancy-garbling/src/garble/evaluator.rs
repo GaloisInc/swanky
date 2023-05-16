@@ -83,15 +83,14 @@ impl<C: AbstractChannel, Wire: WireLabel> Evaluator<C, Wire> {
             2,
         );
 
-        let res = L.plus_mov(&R.plus_mov(&A.cmul(B.color())));
-        res
+        L.plus_mov(&R.plus_mov(&A.cmul(B.color())))
     }
 }
 
 impl<C: AbstractChannel> FancyBinary for Evaluator<C, WireMod2> {
     /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Result<Self::Item, Self::Error> {
-        Ok(x.clone())
+        Ok(*x)
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Result<Self::Item, Self::Error> {

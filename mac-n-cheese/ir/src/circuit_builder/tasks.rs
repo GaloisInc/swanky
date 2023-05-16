@@ -254,7 +254,7 @@ impl<'a> super::CircuitBuilder<'a> {
                 if let Some(last_chunk) = buf.last().copied() {
                     debug_assert!(!buf.is_empty());
                     debug_assert!(!buf.is_full()); // otherwise the above loop would've emptied it
-                    while let Ok(_) = buf.try_push(last_chunk) {}
+                    while buf.try_push(last_chunk).is_ok() {}
                     let chunks = buf.into_inner().expect("exactly four chunks");
                     ww.write_wires(chunks)?;
                 }

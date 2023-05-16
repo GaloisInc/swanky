@@ -259,9 +259,9 @@ pub mod simd_batched {
         pub which_wire: U32x4,
     }
     // This iterator should be TrustedLen
-    pub fn read<'a, const NARGS: usize>(
-        buf: &'a [U32x4],
-    ) -> eyre::Result<impl 'a + Iterator<Item = [ReadWire; NARGS]> + ExactSizeIterator>
+    pub fn read<const NARGS: usize>(
+        buf: &[U32x4],
+    ) -> eyre::Result<impl '_ + Iterator<Item = [ReadWire; NARGS]> + ExactSizeIterator>
     where
         ArrayUnrolledOps: UnrollableArraySize<NARGS>,
     {

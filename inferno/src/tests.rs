@@ -24,7 +24,7 @@ fn test<F: FiniteField>(
 }
 
 fn any_seed() -> impl Strategy<Value = Block> {
-    any::<u128>().prop_map(|seed| Block::from(seed))
+    any::<u128>().prop_map(Block::from)
 }
 
 macro_rules! test_circuits {
@@ -95,7 +95,7 @@ fn test_bristol() {
             .collect();
         let mut wires = Vec::with_capacity(circuit.nwires());
         let outputs = circuit.eval(&witness, &mut wires);
-        let circuit = simple_arith_circuit::builder::add_binary_equality_check(circuit, &outputs);
+        let circuit = simple_arith_circuit::builder::add_binary_equality_check(circuit, outputs);
         eprintln!("# inputs = {}", circuit.ninputs());
         eprintln!("# mults = {}", circuit.nmuls());
         let time = std::time::Instant::now();

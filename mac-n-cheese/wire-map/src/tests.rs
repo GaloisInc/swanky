@@ -184,8 +184,8 @@ fn random_tests() {
             let mut rng = rand::rngs::StdRng::seed_from_u64(trial);
             let mut allocations = vec![
                 (0, 12, false),
-                (0 + 13, 45, false),
-                (0 + 13 + 46, 67, false),
+                (13, 45, false),
+                (13 + 46, 67, false),
                 (u64::MAX - 127, 128, false),
             ];
             while allocations.len() < 16 {
@@ -213,7 +213,7 @@ fn random_tests() {
                         // This distribution isn't weigthed by the size of each allocation.
                         let (start, len, _alloc) = allocations[rng.gen_range(0..allocations.len())];
                         // We don't care whether it's allocated or not.
-                        rng.gen_range(start..=start + (len as u64 - 1))
+                        rng.gen_range(start..=start + (len - 1))
                     };
                     if rng.gen_ratio(1, 2) {
                         wm.insert(idx);

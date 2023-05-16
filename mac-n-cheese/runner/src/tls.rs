@@ -48,7 +48,7 @@ impl<P: Party> Read for TlsConnection<P> {
     }
 }
 
-const PURPORTED_TLS_HOST_NAME: &'static str = "galois.macncheese.example.com";
+const PURPORTED_TLS_HOST_NAME: &str = "galois.macncheese.example.com";
 
 const BUF_SIZE: usize = 16 * 1024; // Max TLS record size
 
@@ -119,7 +119,7 @@ pub fn initiate_tls<P: Party>(
                 ))
                 .with_single_cert(tls_certs, tls_private_key)
                 .context("building rustls client config")?;
-            let listener = TcpListener::bind(&address)
+            let listener = TcpListener::bind(address)
                 .with_context(|| format!("Tcp binding to {:?}", address))?;
             eprintln!("Waiting for connection on {address:?}");
             let (root_conn, _) = listener.accept().context("Accepting connection")?;
@@ -232,7 +232,7 @@ pub fn initiate_tls<P: Party>(
             let keys = Keys::from_base_key(&base_key);
             let mut connections = Vec::with_capacity(num_connections);
             for _ in 0..num_connections {
-                let c = TcpStream::connect(&address)?;
+                let c = TcpStream::connect(address)?;
                 c.set_nodelay(true)?;
                 connections.push(c);
             }

@@ -69,7 +69,7 @@ fn test_shared_witness_size(
     println!("Total time: {:?}", prover_time + verifier_time);
     println!("Proof size: {}kb", proof_size as f64 / 1024f64);
     println!("Expected size: {}kb", expected_size as f64 / 1024f64);
-    println!("");
+    println!();
 
     (proof_size, expected_size, prover_time, verifier_time)
 }

@@ -229,22 +229,17 @@ impl<Field: FieldForLigero> Public<Field> {
 
         self.shared_mask
             .clone()
-            .into_iter()
             .zip(rshared.rows().into_iter())
             .for_each(|(m_i, row_i)| {
-                self.shared
-                    .clone()
-                    .into_iter()
-                    .zip(row_i)
-                    .for_each(|(s_j, &r_ij)| {
-                        self.Padd.add_triplet(m_i, s_j, r_ij);
-                    });
+                self.shared.clone().zip(row_i).for_each(|(s_j, &r_ij)| {
+                    self.Padd.add_triplet(m_i, s_j, r_ij);
+                });
                 self.Padd.add_triplet(m_i, m_i, Field::ONE);
             });
 
         self.badd
             .slice_mut(ndarray::s![self.shared_mask.clone()])
-            .assign(&qshared);
+            .assign(qshared);
     }
 }
 
@@ -309,10 +304,10 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
     ) -> Self {
         debug_assert_eq!(c.ninputs(), inp.len());
 
-        let public = Public::new(&c, shared);
+        let public = Public::new(c, shared);
 
         let mut ext_witness = Vec::new();
-        c.eval(&inp, &mut ext_witness);
+        c.eval(inp, &mut ext_witness);
         let ext_witness = Array1::from_shape_vec(c.nwires(), ext_witness).unwrap();
         let mask_range = public.shared_mask.clone();
         let mask = Array1::from_shape_fn(mask_range.len(), |_| Field::random(rng));
@@ -461,7 +456,7 @@ proptest! {
         (c, i) in simple_arith_circuit::circuitgen::arbitrary_circuit(20, 50).prop_flat_map(|c| {
             (Just(c), pvec(arb_test_field(), 20))
         }),
-        rshared_vec in pvec(arb_test_field(), 1 * 10),
+        rshared_vec in pvec(arb_test_field(), 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
@@ -508,7 +503,7 @@ proptest! {
         (c, i) in simple_arith_circuit::circuitgen::arbitrary_zero_circuit(20, 50).prop_flat_map(|(c,i)| {
             (Just(c), Just(i))
         }),
-        rshared_vec in pvec(arb_test_field(), 1 * 10),
+        rshared_vec in pvec(arb_test_field(), 10),
         seed: [u8;16],
     ) {
         let mut rng = AesRng::from_seed(Block::from(seed));
@@ -719,7 +714,7 @@ fn verify<Field: FieldForLigero, H: CryptoDigest>(
 ) -> bool {
     use ndarray::s;
 
-    let params = public.params.clone();
+    let params = public.params;
 
     public.finalize_Padd(&r1.rshared, &r2.qshared);
 
@@ -730,8 +725,8 @@ fn verify<Field: FieldForLigero, H: CryptoDigest>(
     let rz = params.fft3_rows(make_ra_Iml_Pa_neg(&params, &r1.rz, &public.Pz).view());
 
     let U = r4.U_lemma.columns.view();
-    let Uw = U.slice(s![0 * params.m..1 * params.m, ..]);
-    let Ux = U.slice(s![1 * params.m..2 * params.m, ..]);
+    let Uw = U.slice(s![0 * params.m..params.m, ..]);
+    let Ux = U.slice(s![params.m..2 * params.m, ..]);
     let Uy = U.slice(s![2 * params.m..3 * params.m, ..]);
     let Uz = U.slice(s![3 * params.m..4 * params.m, ..]);
 
@@ -866,7 +861,7 @@ fn make_qadd<Field: FieldForLigero, H: CryptoDigest>(
 ) -> Array1<Field> {
     let params = &s.public.params;
 
-    let radd = make_ra(&params, &r1_radd, &Padd); // deg < l
+    let radd = make_ra(params, &r1_radd, Padd); // deg < l
     let radd_blind = params.fft3_inverse(s.uadd.view()); // deg < k + l
                                                          //    .slice(ndarray::s![0 .. params.k+params.l])
                                                          //    .to_owned();
@@ -896,7 +891,7 @@ fn make_qa<Field: FieldForLigero>(
     ua: &Array1<Field>,
     r1_ra: Array1<Field>,
 ) -> Array1<Field> {
-    let ra = make_ra_Iml_Pa_neg(&params, &r1_ra, &Pa); // each row deg < l
+    let ra = make_ra_Iml_Pa_neg(params, &r1_ra, Pa); // each row deg < l
     let pa = params.fft3_inverse_rows(Ua.view()); // each row deg < k + 1
     let ra_blind = params.fft3_inverse(ua.view()); // deg < k + l
                                                    //.slice(ndarray::s![0 .. params.k+params.l])
@@ -1041,7 +1036,7 @@ pub mod interactive {
         /// Generate round-2 prover message.
         #[allow(non_snake_case)]
         pub fn round2(&mut self, r1: Round1<Field>) -> Round2<Field> {
-            let params = self.secret.public.params.clone();
+            let params = self.secret.public.params;
 
             // Testing interleaved Reed-Solomon codes
             let U: Array2<Field> = concatenate![
@@ -1160,7 +1155,7 @@ pub mod interactive {
             Self {
                 phantom: std::marker::PhantomData,
 
-                public: Public::new(&c, shared),
+                public: Public::new(c, shared),
                 r0: None,
                 r1: None,
                 r2: None,
@@ -1236,7 +1231,7 @@ pub mod interactive {
             let r2 = self.r2.clone().expect("Round 2 skipped");
             let r3 = self.r3.clone().expect("Round 3 skipped");
 
-            verify(&mut self.public, &r0, r1, r2, r3, r4)
+            verify(&mut self.public, r0, r1, r2, r3, r4)
         }
     }
 
@@ -1390,7 +1385,7 @@ pub mod noninteractive {
         other_commit: &[u8], // Commitment of shared witness and mask from other proof system
     ) -> (Round1<Field>, HashOutput<H>) {
         let mut hash = H::new();
-        hash.update(&state.to_vec());
+        hash.update(state);
         hash.update(&r0.U_root);
         hash.update(other_commit);
 
@@ -1415,7 +1410,7 @@ pub mod noninteractive {
     ) -> Round3<Field> {
         let mut hash = H::new();
 
-        hash.update(&state.to_vec());
+        hash.update(state);
         r2.p0
             .clone()
             .into_iter()
@@ -1532,7 +1527,7 @@ pub mod noninteractive {
 
         /// Generate the proof message
         pub fn make_proof(&mut self) -> Proof<Field, H> {
-            self.make_proof_and_shared_check(&vec![]).0
+            self.make_proof_and_shared_check(&[]).0
         }
     }
 
@@ -1606,7 +1601,7 @@ pub mod noninteractive {
 
         /// Run the final verification procedure.
         pub fn verify(&mut self, p: Proof<Field, H>) -> bool {
-            self.verify_with_shared(p, &vec![]).0
+            self.verify_with_shared(p, &[]).0
         }
     }
 
@@ -1679,8 +1674,8 @@ pub mod noninteractive {
             let mut v = Verifier::new(&ckt, Some(0..10));
 
             let mut hash = Sha256::new();
-            p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
-            p.ip.shared_mask().iter().for_each(|f| hash.update(&f.to_bytes()));
+            p.ip.shared_witness().iter().for_each(|f| hash.update(f.to_bytes()));
+            p.ip.shared_mask().iter().for_each(|f| hash.update(f.to_bytes()));
 
             let other_commit = hash.finalize();
 
@@ -1705,8 +1700,8 @@ pub mod noninteractive {
             let mut v = Verifier::new(&ckt, Some(0..10));
 
             let mut hash = Sha256::new();
-            p.ip.shared_witness().iter().for_each(|f| hash.update(&f.to_bytes()));
-            p.ip.shared_mask().iter().for_each(|f| hash.update(&f.to_bytes()));
+            p.ip.shared_witness().iter().for_each(|f| hash.update(f.to_bytes()));
+            p.ip.shared_mask().iter().for_each(|f| hash.update(f.to_bytes()));
 
             let other_commit = hash.finalize();
 

@@ -78,7 +78,7 @@ impl ThreadSpawner {
     pub fn wait_on_threads(self) -> eyre::Result<()> {
         let mut guard = self.inner.state.lock();
         loop {
-            if guard.deref() == &None {
+            if guard.deref().is_none() {
                 eyre::bail!("A spawned thread has failed");
             } else if guard.deref() == &Some(0) {
                 return Ok(());

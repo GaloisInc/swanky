@@ -44,6 +44,7 @@ pub fn from_bytes_le<FE: FiniteField>(val: &[u8]) -> Result<FE> {
 const QUEUE_CAPACITY: usize = 3_000_000;
 const TICK_TIMER: usize = 5_000_000;
 
+#[derive(Default)]
 struct Monitor {
     tick: usize,
     monitor_instance: usize,
@@ -59,30 +60,11 @@ struct Monitor {
     monitor_zk_mult_check: usize,
 }
 
-impl Default for Monitor {
-    fn default() -> Monitor {
-        Monitor {
-            tick: 0,
-            monitor_instance: 0,
-            monitor_witness: 0,
-            monitor_mul: 0,
-            monitor_mul_ni: 0,
-            monitor_mulc: 0,
-            monitor_add: 0,
-            monitor_add_ni: 0,
-            monitor_addc: 0,
-            monitor_check_zero: 0,
-            monitor_zk_check_zero: 0,
-            monitor_zk_mult_check: 0,
-        }
-    }
-}
-
 impl Monitor {
     fn tick(&mut self) {
         self.tick += 1;
         if self.tick >= TICK_TIMER {
-            self.tick = self.tick % TICK_TIMER;
+            self.tick %= TICK_TIMER;
             self.log_monitor();
         }
     }
@@ -131,7 +113,7 @@ impl Monitor {
         self.monitor_zk_check_zero += n;
     }
 
-    fn log_monitor(&self) -> () {
+    fn log_monitor(&self) {
         info!(
             "inp:{:<11} witn:{:<11} mult:{:<11} czero:{:<11}",
             self.monitor_instance,
@@ -141,7 +123,7 @@ impl Monitor {
         );
     }
 
-    fn log_final_monitor(&self) -> () {
+    fn log_final_monitor(&self) {
         if self.monitor_mul - self.monitor_mul_ni != self.monitor_zk_mult_check {
             warn!(
                 "diff numb of mult gates {} and mult_check {}",
@@ -206,7 +188,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
             is_ok: true,
             prover: FComProver::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
-            rng: rng,
+            rng,
             mult_check_list: Vec::with_capacity(QUEUE_CAPACITY),
             check_zero_list: Vec::new(),
             monitor: Monitor::default(),
@@ -309,20 +291,20 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         match (a, b) {
             (ValueProver::Public(a1), ValueProver::Public(b1)) => {
                 self.monitor.incr_monitor_add_ni();
-                return Ok(ValueProver::Public(*a1 + *b1));
+                Ok(ValueProver::Public(*a1 + *b1))
             }
             (ValueProver::Public(a1), ValueProver::Private(b1)) => {
                 self.monitor.incr_monitor_add_ni();
                 let tag = self.prover.affine_add_cst(*a1, *b1);
-                return Ok(ValueProver::Private(tag));
+                Ok(ValueProver::Private(tag))
             }
             (ValueProver::Private(a1), ValueProver::Public(b1)) => {
                 self.monitor.incr_monitor_add_ni();
                 let tag = self.prover.affine_add_cst(*b1, *a1);
-                return Ok(ValueProver::Private(tag));
+                Ok(ValueProver::Private(tag))
             }
             (ValueProver::Private(a1), ValueProver::Private(b1)) => {
-                return Ok(ValueProver::Private(self.prover.add(*a1, *b1)));
+                Ok(ValueProver::Private(self.prover.add(*a1, *b1)))
             }
         }
     }
@@ -334,17 +316,17 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         match (a, b) {
             (ValueProver::Public(a1), ValueProver::Public(b1)) => {
                 self.monitor.incr_monitor_mul_ni();
-                return Ok(ValueProver::Public(*a1 * *b1));
+                Ok(ValueProver::Public(*a1 * *b1))
             }
             (ValueProver::Public(a1), ValueProver::Private(b1)) => {
                 self.monitor.incr_monitor_mul_ni();
                 let tag = self.prover.affine_mult_cst(*a1, *b1);
-                return Ok(ValueProver::Private(tag));
+                Ok(ValueProver::Private(tag))
             }
             (ValueProver::Private(a1), ValueProver::Public(b1)) => {
                 self.monitor.incr_monitor_mul_ni();
                 let tag = self.prover.affine_mult_cst(*b1, *a1);
-                return Ok(ValueProver::Private(tag));
+                Ok(ValueProver::Private(tag))
             }
             (ValueProver::Private(a1), ValueProver::Private(b1)) => {
                 let MacProver(a_clr, _a_tag) = a1;
@@ -353,7 +335,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
                 let out = self.input(p)?;
                 self.push_mult_check_list((*a1, *b1, out))?;
-                return Ok(ValueProver::Private(out));
+                Ok(ValueProver::Private(out))
             }
         }
     }
@@ -363,11 +345,11 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
         match a {
-            ValueProver::Public(a1) => return Ok(ValueProver::Public(*a1 + b)),
+            ValueProver::Public(a1) => Ok(ValueProver::Public(*a1 + b)),
 
             ValueProver::Private(a1) => {
                 let tag = self.prover.affine_add_cst(b, *a1);
-                return Ok(ValueProver::Private(tag));
+                Ok(ValueProver::Private(tag))
             }
         }
     }
@@ -378,11 +360,11 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         self.monitor.incr_monitor_mulc();
 
         match a {
-            ValueProver::Public(a1) => return Ok(ValueProver::Public(*a1 * b)),
+            ValueProver::Public(a1) => Ok(ValueProver::Public(*a1 * b)),
 
             ValueProver::Private(a1) => {
                 let tag = self.prover.affine_mult_cst(b, *a1);
-                return Ok(ValueProver::Private(tag));
+                Ok(ValueProver::Private(tag))
             }
         }
     }
@@ -419,7 +401,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         Ok(())
     }
 
-    fn log_final_monitor(&self) -> () {
+    fn log_final_monitor(&self) {
         self.monitor.log_final_monitor();
     }
 }
@@ -428,10 +410,8 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
     for DietMacAndCheeseProver<FE, C, RNG>
 {
     fn drop(&mut self) {
-        if self.is_ok {
-            if (self.check_zero_list.len() != 0) || (self.mult_check_list.len() != 0) {
-                warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
-            }
+        if self.is_ok && (!self.check_zero_list.is_empty() || !self.mult_check_list.is_empty()) {
+            warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
         }
     }
 }
@@ -476,7 +456,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
             is_ok: true,
             verifier: FComVerifier::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
-            rng: rng,
+            rng,
             mult_check_list: Vec::new(),
             check_zero_list: Vec::new(),
             monitor: Monitor::default(),
@@ -583,20 +563,20 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         match (a, b) {
             (ValueVerifier::Public(a1), ValueVerifier::Public(b1)) => {
                 self.monitor.incr_monitor_add_ni();
-                return Ok(ValueVerifier::Public(*a1 + *b1));
+                Ok(ValueVerifier::Public(*a1 + *b1))
             }
             (ValueVerifier::Public(a1), ValueVerifier::Private(b1)) => {
                 self.monitor.incr_monitor_add_ni();
                 let tag = self.verifier.affine_add_cst(*a1, *b1);
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
             (ValueVerifier::Private(a1), ValueVerifier::Public(b1)) => {
                 self.monitor.incr_monitor_add_ni();
                 let tag = self.verifier.affine_add_cst(*b1, *a1);
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
             (ValueVerifier::Private(a1), ValueVerifier::Private(b1)) => {
-                return Ok(ValueVerifier::Private(self.verifier.add(*a1, *b1)));
+                Ok(ValueVerifier::Private(self.verifier.add(*a1, *b1)))
             }
         }
     }
@@ -612,22 +592,22 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         match (a, b) {
             (ValueVerifier::Public(a1), ValueVerifier::Public(b1)) => {
                 self.monitor.incr_monitor_mul_ni();
-                return Ok(ValueVerifier::Public(*a1 * *b1));
+                Ok(ValueVerifier::Public(*a1 * *b1))
             }
             (ValueVerifier::Public(a1), ValueVerifier::Private(b1)) => {
                 self.monitor.incr_monitor_mul_ni();
                 let tag = self.verifier.affine_mult_cst(*a1, *b1);
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
             (ValueVerifier::Private(a1), ValueVerifier::Public(b1)) => {
                 self.monitor.incr_monitor_mul_ni();
                 let tag = self.verifier.affine_mult_cst(*b1, *a1);
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
             (ValueVerifier::Private(a1), ValueVerifier::Private(b1)) => {
                 let tag = self.input()?;
                 self.push_mult_check_list((*a1, *b1, tag))?;
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
         }
     }
@@ -637,11 +617,11 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
         match a {
-            ValueVerifier::Public(a1) => return Ok(ValueVerifier::Public(*a1 + b)),
+            ValueVerifier::Public(a1) => Ok(ValueVerifier::Public(*a1 + b)),
 
             ValueVerifier::Private(a1) => {
                 let tag = self.verifier.affine_add_cst(b, *a1);
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
         }
     }
@@ -652,11 +632,11 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         self.monitor.incr_monitor_mulc();
 
         match a {
-            ValueVerifier::Public(a1) => return Ok(ValueVerifier::Public(*a1 * b)),
+            ValueVerifier::Public(a1) => Ok(ValueVerifier::Public(*a1 * b)),
 
             ValueVerifier::Private(a1) => {
                 let tag = self.verifier.affine_mult_cst(b, *a1);
-                return Ok(ValueVerifier::Private(tag));
+                Ok(ValueVerifier::Private(tag))
             }
         }
     }
@@ -693,7 +673,7 @@ impl<'a, FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         Ok(())
     }
 
-    fn log_final_monitor(&self) -> () {
+    fn log_final_monitor(&self) {
         self.monitor.log_final_monitor();
     }
 }
@@ -702,10 +682,8 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
     for DietMacAndCheeseVerifier<FE, C, RNG>
 {
     fn drop(&mut self) {
-        if self.is_ok {
-            if (self.check_zero_list.len() != 0) || (self.mult_check_list.len() != 0) {
-                warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
-            }
+        if self.is_ok && (!self.check_zero_list.is_empty() || !self.mult_check_list.is_empty()) {
+            warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
         }
     }
 }
@@ -752,7 +730,7 @@ mod tests {
             let two = one + one;
             let three = two + one;
             let one1 = dmc.input_public(one);
-            let one2 = dmc.input_public(one.clone());
+            let one2 = dmc.input_public(one);
             let two_pub = dmc.add(&one1, &one2).unwrap();
             assert_eq!(two_pub, ValueProver::Public(two));
             let three_pub = dmc.addc(&two_pub, FE::PrimeField::ONE).unwrap();
@@ -791,7 +769,7 @@ mod tests {
         let two = one + one;
         let three = two + one;
         let one1 = dmc.input_public(one);
-        let one2 = dmc.input_public(one.clone());
+        let one2 = dmc.input_public(one);
         let two_pub = dmc.add(&one1, &one2).unwrap();
         let three_pub = dmc.addc(&two_pub, FE::PrimeField::ONE).unwrap();
         let two_priv = dmc.input_private().unwrap();
@@ -804,7 +782,7 @@ mod tests {
         dmc.assert_zero(&n24_priv).unwrap();
         assert!(dmc.finalize().is_err());
 
-        let _resprover = handle.join().unwrap();
+        handle.join().unwrap();
     }
 
     #[test]

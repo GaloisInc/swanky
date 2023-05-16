@@ -173,7 +173,7 @@ pub mod internal {
             self.sources_second_buffer
                 .resize_with(self.sources.len(), || Vec::with_capacity(DEFAULT_CAPACITY));
             debug_assert_eq!(self.sources.len(), self.sources_second_buffer.len());
-            for (thread_id, (source, mut second_source)) in self
+            for (thread_id, (source, second_source)) in self
                 .sources
                 .iter()
                 .zip(self.sources_second_buffer.iter_mut())
@@ -182,7 +182,7 @@ pub mod internal {
                 second_source.clear();
                 {
                     let mut guard = source.lock();
-                    std::mem::swap(guard.deref_mut(), &mut second_source);
+                    std::mem::swap(guard.deref_mut(), second_source);
                 }
                 let to_write = second_source;
                 if to_write.is_empty() {
@@ -190,7 +190,7 @@ pub mod internal {
                 }
                 self.dst.write_all(&(thread_id as u64).to_le_bytes())?;
                 self.dst.write_all(&(to_write.len() as u64).to_le_bytes())?;
-                self.dst.write_all(&bytemuck::cast_slice(&to_write))?;
+                self.dst.write_all(bytemuck::cast_slice(to_write))?;
             }
             self.dst.flush()?;
             Ok(())
@@ -273,10 +273,10 @@ pub mod internal {
         }
     }
 
-    pub fn new_event_logging_mutex_guard<'a, S: EventLogStatics, T>(
+    pub fn new_event_logging_mutex_guard<S: EventLogStatics, T>(
         evt_id: u64,
-        guard: MutexGuard<'a, T>,
-    ) -> EventLoggingMutexGuard<'a, S, T> {
+        guard: MutexGuard<'_, T>,
+    ) -> EventLoggingMutexGuard<'_, S, T> {
         EventLoggingMutexGuard {
             evt_id,
             guard,
@@ -295,7 +295,7 @@ pub mod internal {
             panic!("event log has already been opened");
         }
         let mut dst = lz4::EncoderBuilder::new()
-            .build(BufWriter::new(File::create(&dst).wrap_err_with(|| {
+            .build(BufWriter::new(File::create(dst).wrap_err_with(|| {
                 format!("Opening {:?} to create EventLog", dst)
             })?))
             .wrap_err("opening lz4")?;
@@ -334,7 +334,7 @@ pub mod internal {
             {
                 writer
                     .lock()
-                    .flush(&new_buffers)
+                    .flush(new_buffers)
                     .expect("Failed to flush event log");
             } else {
                 break;

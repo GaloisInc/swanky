@@ -5,10 +5,9 @@ use fancy_garbling::{circuit::BinaryCircuit, classic::garble, AllWire, WireMod2}
 use std::{fs::File, io::BufReader, time::Duration};
 
 fn circuit(fname: &str) -> BinaryCircuit {
-    let circ = BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap();
     // println!("{}", fname);
     // circ.print_info().unwrap();
-    circ
+    BinaryCircuit::parse(BufReader::new(File::open(fname).unwrap())).unwrap()
 }
 fn bench_garble_aes_binary(c: &mut Criterion) {
     let circ = circuit("circuits/AES-non-expanded.txt");
@@ -38,7 +37,7 @@ fn bench_eval_sha_1_binary(c: &mut Criterion) {
     let circ = circuit("circuits/sha-1.txt");
     let (en, gc) = garble::<WireMod2, _>(&circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
-    let ev = en.encode_evaluator_inputs(&vec![]);
+    let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-1-binary", move |bench| {
         bench.iter(|| gc.eval(&circ, &gb, &ev));
     });
@@ -55,7 +54,7 @@ fn bench_eval_sha_256_binary(c: &mut Criterion) {
     let circ = circuit("circuits/sha-256.txt");
     let (en, gc) = garble::<WireMod2, _>(&circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
-    let ev = en.encode_evaluator_inputs(&vec![]);
+    let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-256-binary", move |bench| {
         bench.iter(|| gc.eval(&circ, &gb, &ev));
     });
@@ -89,7 +88,7 @@ fn bench_eval_sha_1_arithmetic(c: &mut Criterion) {
     let circ = circuit("circuits/sha-1.txt");
     let (en, gc) = garble::<AllWire, _>(&circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
-    let ev = en.encode_evaluator_inputs(&vec![]);
+    let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-1-arithmetic", move |bench| {
         bench.iter(|| gc.eval(&circ, &gb, &ev));
     });
@@ -106,7 +105,7 @@ fn bench_eval_sha_256_arithmetic(c: &mut Criterion) {
     let circ = circuit("circuits/sha-256.txt");
     let (en, gc) = garble::<AllWire, _>(&circ).unwrap();
     let gb = en.encode_garbler_inputs(&vec![0u16; 512]);
-    let ev = en.encode_evaluator_inputs(&vec![]);
+    let ev = en.encode_evaluator_inputs(&[]);
     c.bench_function("eval::sha-256-arithmetic", move |bench| {
         bench.iter(|| gc.eval(&circ, &gb, &ev));
     });

@@ -276,7 +276,7 @@ impl<P: Party> RunnerThread<P> {
         }
         let expected_to_finish_in_steps = if sender_is::<P>(prototype.party_a()) {
             // We are party a
-            if prototype.rounds().len() == 0 {
+            if prototype.rounds().is_empty() {
                 // Even if there's no communication, we still need to run a single step for the
                 // computation.
                 1

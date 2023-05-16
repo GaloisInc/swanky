@@ -582,9 +582,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                         ..
                                     }) = self.counter_info
                                     {
-                                        if field_type == FE::FIELD_TYPE
-                                            && i == num_env_for_field as usize
-                                        {
+                                        if field_type == FE::FIELD_TYPE && i == num_env_for_field {
                                             input_pos += num_wires as u64
                                         }
                                     }
@@ -845,7 +843,7 @@ fn eval<P: Party, VSR: ValueStreamReader>(
                                 // b_i_j is the jth wire of input branch i
                                 let b_0_j = *wm.get(
                                     jth_branch_wires
-                                        .nth(0)
+                                        .next()
                                         .context("Mux has no input branches")?,
                                 )?;
 
@@ -885,11 +883,11 @@ fn eval<P: Party, VSR: ValueStreamReader>(
     Ok(())
 }
 
-pub(super) fn write_circuit<'a, P: Party, VSR: ValueStreamReader + Send + 'static>(
+pub(super) fn write_circuit<P: Party, VSR: ValueStreamReader + Send + 'static>(
     dst: &Path,
     circuit_chunks: flume::Receiver<eyre::Result<CircuitChunk>>,
     mut witness_reader: ProverPrivate<P, Inputs<VSR>>,
-    mut private_builder: ProverPrivate<P, &'a mut PrivateBuilder>,
+    mut private_builder: ProverPrivate<P, &mut PrivateBuilder>,
 ) -> eyre::Result<()> {
     build_circuit(dst, |cb| {
         let mut functions = Vec::new();

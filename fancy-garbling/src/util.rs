@@ -130,7 +130,7 @@ pub fn from_base_q(ds: &[u16], q: u16) -> u128 {
     let mut x = 0u128;
     for &d in ds.iter().rev() {
         let (xp, overflow) = x.overflowing_mul(q.into());
-        debug_assert_eq!(overflow, false, "overflow!!!! x={}", x);
+        debug_assert!(!overflow, "overflow!!!! x={}", x);
         x = xp + d as u128;
     }
     x
@@ -141,7 +141,7 @@ pub fn from_mixed_radix(digits: &[u16], radii: &[u16]) -> u128 {
     let mut x: u128 = 0;
     for (&d, &q) in digits.iter().zip(radii.iter()).rev() {
         let (xp, overflow) = x.overflowing_mul(q as u128);
-        debug_assert_eq!(overflow, false, "overflow!!!! x={}", x);
+        debug_assert!(!overflow, "overflow!!!! x={}", x);
         x = xp + d as u128;
     }
     x

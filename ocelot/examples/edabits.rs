@@ -9,7 +9,7 @@ type Verifier = VerifierConv<F61p>;
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
     let nb_bits: usize = 8;
-    let n = 1000_000;
+    let n = 1_000_000;
     let num_bucket = 3;
     let num_cut = num_bucket;
     let with_quicksilver = true;
@@ -31,7 +31,7 @@ fn run() {
             .unwrap();
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
-        let _ = fconv_sender
+        fconv_sender
             .conv(
                 &mut sender,
                 &mut rng,

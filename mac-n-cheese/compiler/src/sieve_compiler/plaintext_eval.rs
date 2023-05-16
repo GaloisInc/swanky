@@ -161,9 +161,7 @@ fn eval<VSR: ValueStreamReader>(
                                         ..
                                     }) = self.counter_info
                                     {
-                                        if field_type == FE::FIELD_TYPE
-                                            && i == num_env_for_field as usize
-                                        {
+                                        if field_type == FE::FIELD_TYPE && i == num_env_for_field {
                                             input_pos += num_wires as u64
                                         }
                                     }
@@ -284,7 +282,7 @@ fn eval<VSR: ValueStreamReader>(
                                     .collect::<eyre::Result<Vec<_>>>()?;
 
                                 bits_to_usize(
-                                    le_vals.iter().map(|b| FE::bit_decomposition(b)).flatten(),
+                                    le_vals.iter().flat_map(|b| FE::bit_decomposition(b)),
                                 )?
                             }
                             _ => {

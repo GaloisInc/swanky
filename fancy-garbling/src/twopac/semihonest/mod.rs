@@ -25,7 +25,7 @@ mod tests {
         a: &F::Item,
         b: &F::Item,
     ) -> Result<Option<u16>, F::Error> {
-        let c = f.add(&a, &b)?;
+        let c = f.add(a, b)?;
         f.output(&c)
     }
 
@@ -65,7 +65,7 @@ mod tests {
         for x in xs.iter() {
             let q = x.composite_modulus();
             let c = b.crt_constant_bundle(1, q).unwrap();
-            let y = b.crt_mul(&x, &c).unwrap();
+            let y = b.crt_mul(x, &c).unwrap();
             let z = b.crt_relu(&y, "100%", None).unwrap();
             outputs.push(b.crt_output(&z).unwrap());
         }
