@@ -62,7 +62,7 @@ pub fn transpose_pre_allocated(m: &[u8], dst: &mut [u8], nrows: usize, ncols: us
 pub fn transpose(m: &[u8], nrows: usize, ncols: usize) -> Vec<u8> {
     #[cfg(not(target_arch = "x86_64"))]
     {
-        return transpose_naive(m, nrows, ncols);
+        transpose_naive(m, nrows, ncols)
     }
     #[cfg(target_arch = "x86_64")]
     unsafe {
