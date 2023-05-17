@@ -19,4 +19,4 @@ flume.workspace = true
 color-eyre.workspace = true
 
 [build-dependencies]
-blake3.workspace = true
+swanky-flatbuffer-build.workspace = true

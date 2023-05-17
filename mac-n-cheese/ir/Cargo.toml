@@ -25,7 +25,7 @@ arrayvec.workspace = true
 mac-n-cheese-vole.workspace = true
 
 [build-dependencies]
-blake3.workspace = true
+swanky-flatbuffer-build.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
