@@ -20,6 +20,7 @@ members = [
     "popsicle",
     "scuttlebutt",
     "simple-arith-circuit",
+    "swanky-flatbuffer-build",
     "vectoreyes",
 ]
 
@@ -37,18 +38,19 @@ fancy-garbling = { path = "fancy-garbling" }
 fancy-garbling-base-conversion = { path = "fancy-garbling/base_conversion" }
 humidor = { path = "humidor" }
 keyed_arena = { path = "keyed_arena" }
-mac-n-cheese-ir = { path = "mac-n-cheese/ir" }
 mac-n-cheese-compiler = { path = "mac-n-cheese/compiler" }
 mac-n-cheese-event-log = { path = "mac-n-cheese/event-log" }
-mac-n-cheese-runner = { path = "mac-n-cheese/runner" }
-mac-n-cheese-vole = { path = "mac-n-cheese/vole" }
+mac-n-cheese-ir = { path = "mac-n-cheese/ir" }
 mac-n-cheese-party = { path = "mac-n-cheese/party" }
-mac-n-cheese-wire-map = { path = "mac-n-cheese/wire-map" }
+mac-n-cheese-runner = { path = "mac-n-cheese/runner" }
 mac-n-cheese-sieve-parser = { path = "mac-n-cheese/sieve-parser" }
+mac-n-cheese-vole = { path = "mac-n-cheese/vole" }
+mac-n-cheese-wire-map = { path = "mac-n-cheese/wire-map" }
 ocelot = { path = "ocelot" }
 popsicle = { path = "popsicle" }
 scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
+swanky-flatbuffer-build = { path = "swanky-flatbuffer-build" }
 vectoreyes = { path = "vectoreyes" }
 
 
@@ -84,7 +86,7 @@ crypto-bigint = { version =  "0.5.1", features = ["generic-array"] }
 dhat = "0.3.2"
 digest = "0.10.6"
 eyre = "0.6.8"
-flatbuffers = "23.1.21"
+flatbuffers = "23.1.21" # Keep this version in sync with swanky-flatbuffer-build/src/lib.rs!
 flume = "0.10.14"
 generic-array = "0.14.7"
 hex = "0.4.3"

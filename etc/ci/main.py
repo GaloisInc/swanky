@@ -7,6 +7,7 @@ import contextlib
 import enum
 import itertools
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -178,6 +179,10 @@ def ci(nightly: bool = False):
     os.environ["CARGO_TARGET_X86_64_UNKNOWN_LINUX_LINKER"] = str(
         ROOT / "etc/ci/wrappers/linker.sh"
     )
+    if shutil.which("flatc"):
+        # By ensuring that flatc isn't in PATH, it will make sure that flatbuffers files have been
+        # correctly checked into the repo.
+        raise Exception("flatc SHOULD NOT be in the CI PATH.")
     # Check the Cargo.lock file FIRST so that tools don't have a chance to update it before we can
     # check it.
     with gitlab_ci_section("Check Cargo.lock is up-to-date"):
