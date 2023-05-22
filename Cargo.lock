@@ -3365,3 +3365,17 @@ dependencies = [
  "serde_yaml",
  "structopt",
 ]
+
+[[package]]
+name = "zkv"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "clap 4.2.4",
+ "inferno",
+ "log",
+ "scuttlebutt",
+ "simple-arith-circuit",
+ "simple_logger",
+]

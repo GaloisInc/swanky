@@ -22,6 +22,7 @@ members = [
     "simple-arith-circuit",
     "swanky-flatbuffer-build",
     "vectoreyes",
+    "zkv",
 ]
 
 
@@ -37,6 +38,7 @@ version = "0.5.0"
 fancy-garbling = { path = "fancy-garbling" }
 fancy-garbling-base-conversion = { path = "fancy-garbling/base_conversion" }
 humidor = { path = "humidor" }
+inferno = { path = "inferno" }
 keyed_arena = { path = "keyed_arena" }
 mac-n-cheese-compiler = { path = "mac-n-cheese/compiler" }
 mac-n-cheese-event-log = { path = "mac-n-cheese/event-log" }

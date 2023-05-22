@@ -1,0 +1,21 @@
+[package]
+name = "zkv"
+readme = "README.md"
+description = "Zero knowledge proofs for verilog files generated using saw / abc"
+keywords = ["cryptography", "zero-knowledge"]
+categories = ["cryptography"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+clap.workspace = true
+log.workspace = true
+simple_logger.workspace = true
+inferno.workspace = true
+scuttlebutt = { workspace = true, features = ["serde"] }
+simple-arith-circuit.workspace = true
