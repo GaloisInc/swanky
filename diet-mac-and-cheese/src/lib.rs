@@ -15,13 +15,25 @@ solely on the `input_private()` function. Also the API satisfies the following i
 if any function call returns an error then any subsequent gate function call
 will directly return an error.
 */
+pub mod edabits;
+pub mod homcom;
+
+pub mod backend_trait;
+
+pub mod backend_multifield;
+pub(crate) mod memory;
+
+// mod circuit_multifield;
+#[allow(clippy::all)]
+pub mod read_sieveir_phase2;
+mod sieveir_phase2;
 
 mod backend;
 mod error;
 
-pub use backend::{
-    from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier, ValueProver, ValueVerifier,
-};
+pub mod text_reader;
+
+pub use backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 pub use error::{Error, Result};
 
 #[cfg(feature = "exe")]

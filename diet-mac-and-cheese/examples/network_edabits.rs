@@ -1,5 +1,6 @@
+#[cfg(feature = "exe")]
 use clap::{Arg, ArgAction, Command};
-use ocelot::edabits::{ProverConv, VerifierConv};
+use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::fs;
@@ -28,14 +29,12 @@ fn run(
     num_bucket: usize,
     num_cut: usize,
     multithreaded: bool,
-    with_quicksilver: bool,
 ) -> std::io::Result<()> {
     println!("whoami: {:?}", whoami);
     println!("addr: {:?}", connection_addr);
     println!("nb_bits: {:?}", nb_bits);
     println!("num_edabits: {:?}", num_edabits);
     println!("num_bucket: {:?}", num_bucket);
-    println!("with_quicksilver: {:?}", with_quicksilver);
     println!("multithreaded: {:?}", multithreaded);
 
     if whoami == VERIFIER {
@@ -120,7 +119,6 @@ fn run(
                         num_cut,
                         &edabits,
                         bucket_connections,
-                        with_quicksilver,
                     )
                     .unwrap();
                 let end = start.elapsed();
@@ -218,7 +216,6 @@ fn run(
                 num_cut,
                 &edabits,
                 bucket_connections,
-                with_quicksilver,
             )
             .unwrap();
         println!("Prover time (conv): {:?}", start.elapsed());
@@ -273,12 +270,6 @@ fn main() -> std::io::Result<()> {
                 .default_value(DEFAULT_NUM_EDABITS),
         )
         .arg(
-            Arg::new("with_quicksilver")
-                .long("quicksilver")
-                .help("use quicksilver")
-                .required(false),
-        )
-        .arg(
             Arg::new("multithreaded")
                 .long("multithreaded")
                 .help("Using multithreading on B-loop"),
@@ -300,7 +291,6 @@ fn main() -> std::io::Result<()> {
 
     let multithreaded = matches.contains_id("multithreaded");
     let num_cut = num_bucket;
-    let with_quicksilver = matches.contains_id("with_quicksilver");
     run(
         whoami,
         connection_addr,
@@ -309,6 +299,5 @@ fn main() -> std::io::Result<()> {
         num_bucket,
         num_cut,
         multithreaded,
-        with_quicksilver,
     )
 }

@@ -1,4 +1,4 @@
-use ocelot::edabits::{ProverConv, VerifierConv};
+use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{channel::track_unix_channel_pair, field::F61p, AesRng};
 use std::time::Instant;
@@ -12,7 +12,6 @@ fn run() {
     let n = 1_000_000;
     let num_bucket = 3;
     let num_cut = num_bucket;
-    let with_quicksilver = true;
     let handle = std::thread::spawn(move || {
         #[cfg(target_os = "linux")]
         {
@@ -31,16 +30,8 @@ fn run() {
             .unwrap();
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
-        fconv_sender
-            .conv(
-                &mut sender,
-                &mut rng,
-                num_bucket,
-                num_cut,
-                &edabits,
-                None,
-                with_quicksilver,
-            )
+        let _ = fconv_sender
+            .conv(&mut sender, &mut rng, num_bucket, num_cut, &edabits, None)
             .unwrap();
         println!("Send time (conv): {:?}", start.elapsed());
     });
@@ -87,7 +78,6 @@ fn run() {
             num_cut,
             &edabits_mac,
             None,
-            with_quicksilver,
         )
         .unwrap();
     println!("Receive time (conv): {:?}", start.elapsed());
