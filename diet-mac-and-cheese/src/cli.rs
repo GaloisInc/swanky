@@ -48,7 +48,7 @@ pub enum Prover {
 /// Cli.
 #[derive(Parser)]
 #[clap(name = "Diet Mac'n'Cheese")]
-#[clap(author = "Ben Razet")]
+#[clap(author = "swanky authors <swanky@galois.com>")]
 #[clap(version = "0.1")]
 pub struct Cli {
     /// Set addr for tcp connection
@@ -58,6 +58,14 @@ pub struct Cli {
     /// Select lpn parameter
     #[clap(value_enum, default_value_t = DEFAULT_LPN, long)]
     pub lpn: LpnSize,
+
+    /// Text
+    #[arg(long)]
+    pub text: bool,
+
+    /// No batching for check_zero
+    #[arg(long)]
+    pub nobatching: bool,
 
     /// instance path
     #[clap(long)]

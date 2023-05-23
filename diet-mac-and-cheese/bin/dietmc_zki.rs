@@ -89,6 +89,7 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
     info!("addr: {:?}", args.connection_addr);
     info!("lpn: {:?}", args.lpn);
     info!("instance: {:?}", args.instance);
+    info!("nobatching: {:?}", args.nobatching);
 
     let witness_path;
     if args.command.is_some() {
@@ -166,6 +167,7 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
                     rng,
                     lpn_setup,
                     lpn_extend,
+                    args.nobatching,
                 )
                 .unwrap();
                 info!("init time: {:?}", start.elapsed());
@@ -201,9 +203,14 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
         let rng = AesRng::new();
         let start = Instant::now();
 
-        let mut zkbackend =
-            DietMacAndCheeseProver::<FE, _, _>::init(&mut channel, rng, lpn_setup, lpn_extend)
-                .unwrap();
+        let mut zkbackend = DietMacAndCheeseProver::<FE, _, _>::init(
+            &mut channel,
+            rng,
+            lpn_setup,
+            lpn_extend,
+            args.nobatching,
+        )
+        .unwrap();
         info!("init time: {:?}", start.elapsed());
 
         let start = Instant::now();

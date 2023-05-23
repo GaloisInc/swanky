@@ -20,3 +20,23 @@ cargo run --release --bin dietmc_zki --features "exe" -- \
   prover \
   --witness  <PATH>/*.wit.sieve
 ```
+
+
+# SIEVE IR0+
+
+Diet Mac'n'Cheese provides a program `bin/dietmc_0p.rs` to run SIEVE IR0+ circuits.
+
+```bash
+cargo run --bin dietmc_0p --features=exe --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve
+
+cargo run --bin dietmc_0p --features=exe --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
+  prover --witness <PATH>/*.sieve
+```
+
+
+# Compile flatbuffer sieveir
+
+```bash
+cd src/sieveir_phase2/
+flatc --rust --gen-onefile sieve_ir.fbs
+```

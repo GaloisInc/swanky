@@ -6,8 +6,12 @@ components like `std::io` and `ocelot`.
 */
 #[derive(Debug)]
 pub enum Error {
-    /// Error specific to Diet Mac'c'Cheese.
+    /// Error specific to HomCom
+    HomcomError(String),
+    /// Error specific to Diet Mac'n'Cheese.
     BackendError(String),
+    /// Error specific to edabits.
+    EdabitsError(String),
     /// An I/O error has occurred.
     IoError(std::io::Error),
     /// An Ocelot error has occurred.
@@ -31,7 +35,9 @@ impl From<ocelot::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Error::HomcomError(s) => write!(f, "homcom error: {}", s),
             Error::BackendError(s) => write!(f, "backend error: {}", s),
+            Error::EdabitsError(s) => write!(f, "edabits error: {}", s),
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::OcelotError(e) => write!(f, "Ocelot error: {}", e),
         }
