@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Receiver","Oblivious transfer extension receiver."],["Sender","Oblivious transfer extension sender."]]};

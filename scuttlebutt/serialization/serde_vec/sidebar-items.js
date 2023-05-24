@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["deserialize","Deserializes a vector of elements using `serde`."],["serialize","Serializes a vector of elements using `serde`."]]};

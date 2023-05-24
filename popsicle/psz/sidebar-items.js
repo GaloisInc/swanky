@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Receiver","Private set intersection receiver."],["Sender","Private set intersection sender."]]};

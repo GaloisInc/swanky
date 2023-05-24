@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["garble","Garble a circuit without streaming."]],"struct":[["Encoder","Encode inputs statically."],["GarbledCircuit","Static evaluator for a circuit, created by the `garble` function."],["GarbledReader","Implementation of the `Read` trait for use by the `Evaluator`."],["GarbledWriter","Implementation of the `Write` trait for use by `Garbler`."]]};

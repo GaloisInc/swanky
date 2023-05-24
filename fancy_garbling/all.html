@@ -1,0 +1,63 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="List of all items in this crate"><meta name="keywords" content="rust, rustlang, rust-lang"><title>List of all items in this crate</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../normalize.css"><link rel="stylesheet" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../ayu.css" disabled><link rel="stylesheet" href="../dark.css" disabled><link rel="stylesheet" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"><!-- KaTeX Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.js" integrity="sha512-M7/jkZoKEln1jaaY2roCK9Jt4t+j/iru0e2vInDkVO5LY0EBt3m66tjTT5XFsGH2LJG+VRRL2ueIR3U0frs/GQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.css" integrity="sha512-Yfxo7zXGaQYyzWNxz8r4s8axNfG4jS3dips8p2HA/wNWmuapakkQiki+/XA3o3Ol+i8WI03cRJVDDUElEtED6g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function foreach(dom_array, cb) {
+            // Is NodeList even still a thing...?
+            for (var i = 0; i < dom_array.length; i++) {
+                cb(dom_array[i]);
+            }
+        }
+        function processBlock(elem) {
+            katex.render(elem.textContent, elem, { display: true });
+            elem.style.display = "flex";
+            elem.style.justifyContent = "center";
+            elem.style.alignItems = "center";
+            elem.style.backgroundColor = "transparent";
+            if (elem.parentElement.tagName === "PRE")
+                elem.parentElement.style.backgroundColor = "transparent";
+        }
+        foreach(document.querySelectorAll("code.language-math"), processBlock);
+        foreach(document.querySelectorAll("pre.language-math"), processBlock);
+        foreach(document.querySelectorAll("code"), function (elem) {
+            if (elem.className !== '') return;
+            function checkSibling(sibling, dollarAtEnd) {
+                if (!sibling)
+                    return false;
+                if (!sibling.nodeType === Node.TEXT_NODE)
+                    return false;
+                if (!sibling.textContent)
+                    return false;
+                if (sibling.textContent[dollarAtEnd ? sibling.textContent.length - 1 : 0] != '$')
+                    return false;
+                return true;
+            }
+            function removeSiblingDollarSign(sibling, dollarAtEnd) {
+                sibling.textContent = sibling.textContent.substr(
+                    dollarAtEnd ? 0 : 1,
+                    sibling.textContent.length - 1
+                );
+            }
+            if (!checkSibling(elem.previousSibling, true))
+                return;
+            if (!checkSibling(elem.nextSibling, false))
+                return;
+            removeSiblingDollarSign(elem.previousSibling, true);
+            removeSiblingDollarSign(elem.nextSibling, false);
+            katex.render(elem.textContent, elem, { display: false });
+            elem.style.backgroundColor = 'transparent';
+        });
+    });
+</script>
+
+<!-- Mermaid Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/9.1.2/mermaid.min.js" integrity="sha512-8ZrL1m0+KXHylxkFJdFtFCauQdV/KZMjSBL9iydsyIfiB1LwYBlGegX8dUlLnUtRDrTgWKP6pPVyOqa2VrqoNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        mermaid.init(undefined, "code.language-mermaid");
+    });
+</script>
+
+
+</head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../fancy_garbling/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../fancy_garbling/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location">Crate fancy_garbling</h2></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../fancy_garbling/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><h1 class="fqn"><span class="in-band">List of all items</span></h1><h3 id="Structs">Structs</h3><ul class="structs docblock"><li><a href="struct.BinaryBundle.html">BinaryBundle</a></li><li><a href="struct.Bundle.html">Bundle</a></li><li><a href="struct.CrtBundle.html">CrtBundle</a></li><li><a href="struct.Evaluator.html">Evaluator</a></li><li><a href="struct.Garbler.html">Garbler</a></li><li><a href="struct.WireMod2.html">WireMod2</a></li><li><a href="struct.WireMod3.html">WireMod3</a></li><li><a href="struct.WireModQ.html">WireModQ</a></li><li><a href="circuit/struct.ArithmeticCircuit.html">circuit::ArithmeticCircuit</a></li><li><a href="circuit/struct.BinaryCircuit.html">circuit::BinaryCircuit</a></li><li><a href="circuit/struct.CircuitBuilder.html">circuit::CircuitBuilder</a></li><li><a href="circuit/struct.CircuitRef.html">circuit::CircuitRef</a></li><li><a href="classic/struct.Encoder.html">classic::Encoder</a></li><li><a href="classic/struct.GarbledCircuit.html">classic::GarbledCircuit</a></li><li><a href="classic/struct.GarbledReader.html">classic::GarbledReader</a></li><li><a href="classic/struct.GarbledWriter.html">classic::GarbledWriter</a></li><li><a href="depth_informer/struct.DepthInformer.html">depth_informer::DepthInformer</a></li><li><a href="depth_informer/struct.DepthItem.html">depth_informer::DepthItem</a></li><li><a href="dummy/struct.Dummy.html">dummy::Dummy</a></li><li><a href="dummy/struct.DummyVal.html">dummy::DummyVal</a></li><li><a href="informer/struct.Informer.html">informer::Informer</a></li><li><a href="informer/struct.InformerStats.html">informer::InformerStats</a></li><li><a href="twopac/semihonest/struct.Evaluator.html">twopac::semihonest::Evaluator</a></li><li><a href="twopac/semihonest/struct.Garbler.html">twopac::semihonest::Garbler</a></li></ul><h3 id="Enums">Enums</h3><ul class="enums docblock"><li><a href="enum.AllWire.html">AllWire</a></li><li><a href="circuit/enum.ArithmeticGate.html">circuit::ArithmeticGate</a></li><li><a href="circuit/enum.BinaryGate.html">circuit::BinaryGate</a></li><li><a href="depth_informer/enum.DepthError.html">depth_informer::DepthError</a></li><li><a href="errors/enum.CircuitBuilderError.html">errors::CircuitBuilderError</a></li><li><a href="errors/enum.CircuitParserError.html">errors::CircuitParserError</a></li><li><a href="errors/enum.DummyError.html">errors::DummyError</a></li><li><a href="errors/enum.EvaluatorError.html">errors::EvaluatorError</a></li><li><a href="errors/enum.FancyError.html">errors::FancyError</a></li><li><a href="errors/enum.GarblerError.html">errors::GarblerError</a></li><li><a href="errors/enum.TwopacError.html">errors::TwopacError</a></li></ul><h3 id="Traits">Traits</h3><ul class="traits docblock"><li><a href="trait.ArithmeticBundleGadgets.html">ArithmeticBundleGadgets</a></li><li><a href="trait.ArithmeticWire.html">ArithmeticWire</a></li><li><a href="trait.BinaryBundleGadgets.html">BinaryBundleGadgets</a></li><li><a href="trait.BinaryGadgets.html">BinaryGadgets</a></li><li><a href="trait.BundleGadgets.html">BundleGadgets</a></li><li><a href="trait.CrtGadgets.html">CrtGadgets</a></li><li><a href="trait.Fancy.html">Fancy</a></li><li><a href="trait.FancyArithmetic.html">FancyArithmetic</a></li><li><a href="trait.FancyBinary.html">FancyBinary</a></li><li><a href="trait.FancyInput.html">FancyInput</a></li><li><a href="trait.FancyReveal.html">FancyReveal</a></li><li><a href="trait.HasModulus.html">HasModulus</a></li><li><a href="trait.WireLabel.html">WireLabel</a></li><li><a href="circuit/trait.CircuitInfo.html">circuit::CircuitInfo</a></li><li><a href="circuit/trait.CircuitType.html">circuit::CircuitType</a></li><li><a href="circuit/trait.EvaluableCircuit.html">circuit::EvaluableCircuit</a></li><li><a href="circuit/trait.GateType.html">circuit::GateType</a></li><li><a href="util/trait.RngExt.html">util::RngExt</a></li></ul><h3 id="Functions">Functions</h3><ul class="functions docblock"><li><a href="circuit/fn.eval_plain.html">circuit::eval_plain</a></li><li><a href="classic/fn.garble.html">classic::garble</a></li><li><a href="fn.hash_wires.html">hash_wires</a></li><li><a href="util/fn.as_base_q_u128.html">util::as_base_q_u128</a></li><li><a href="util/fn.as_mixed_radix.html">util::as_mixed_radix</a></li><li><a href="util/fn.base_modulus_with_width.html">util::base_modulus_with_width</a></li><li><a href="util/fn.base_primes_with_width.html">util::base_primes_with_width</a></li><li><a href="util/fn.base_q_add_eq.html">util::base_q_add_eq</a></li><li><a href="util/fn.crt.html">util::crt</a></li><li><a href="util/fn.crt_factor.html">util::crt_factor</a></li><li><a href="util/fn.crt_inv.html">util::crt_inv</a></li><li><a href="util/fn.crt_inv_factor.html">util::crt_inv_factor</a></li><li><a href="util/fn.digits_per_u128.html">util::digits_per_u128</a></li><li><a href="util/fn.factor.html">util::factor</a></li><li><a href="util/fn.from_base_q.html">util::from_base_q</a></li><li><a href="util/fn.from_mixed_radix.html">util::from_mixed_radix</a></li><li><a href="util/fn.generate_deltas.html">util::generate_deltas</a></li><li><a href="util/fn.inv.html">util::inv</a></li><li><a href="util/fn.is_power_of_2.html">util::is_power_of_2</a></li><li><a href="util/fn.modulus_with_nprimes.html">util::modulus_with_nprimes</a></li><li><a href="util/fn.modulus_with_width.html">util::modulus_with_width</a></li><li><a href="util/fn.output_tweak.html">util::output_tweak</a></li><li><a href="util/fn.primes_with_width.html">util::primes_with_width</a></li><li><a href="util/fn.product.html">util::product</a></li><li><a href="util/fn.tweak.html">util::tweak</a></li><li><a href="util/fn.tweak2.html">util::tweak2</a></li><li><a href="util/fn.u128_from_bits.html">util::u128_from_bits</a></li><li><a href="util/fn.u128_to_bits.html">util::u128_to_bits</a></li></ul><h3 id="Constants">Constants</h3><ul class="constants docblock"><li><a href="util/constant.NPRIMES.html">util::NPRIMES</a></li><li><a href="util/constant.PRIMES.html">util::PRIMES</a></li></ul></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="fancy_garbling" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

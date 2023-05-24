@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error","Errors produced by `ocelot`."]],"mod":[["edabits","This is a library implementing the field conversion using edabits"],["oprf","Oblivious PRF traits + instantiations."],["ot","Oblivious transfer traits + instantiations."],["svole","(Random) subfield vector oblivious linear evaluation (sVOLE) traits + instantiations."]]};

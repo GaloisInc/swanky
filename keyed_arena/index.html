@@ -1,0 +1,101 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="`KeyedArena` is a bump allocator which allows for random access to its allocations."><meta name="keywords" content="rust, rustlang, rust-lang, keyed_arena"><title>keyed_arena - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../normalize.css"><link rel="stylesheet" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../ayu.css" disabled><link rel="stylesheet" href="../dark.css" disabled><link rel="stylesheet" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"><!-- KaTeX Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.js" integrity="sha512-M7/jkZoKEln1jaaY2roCK9Jt4t+j/iru0e2vInDkVO5LY0EBt3m66tjTT5XFsGH2LJG+VRRL2ueIR3U0frs/GQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.css" integrity="sha512-Yfxo7zXGaQYyzWNxz8r4s8axNfG4jS3dips8p2HA/wNWmuapakkQiki+/XA3o3Ol+i8WI03cRJVDDUElEtED6g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function foreach(dom_array, cb) {
+            // Is NodeList even still a thing...?
+            for (var i = 0; i < dom_array.length; i++) {
+                cb(dom_array[i]);
+            }
+        }
+        function processBlock(elem) {
+            katex.render(elem.textContent, elem, { display: true });
+            elem.style.display = "flex";
+            elem.style.justifyContent = "center";
+            elem.style.alignItems = "center";
+            elem.style.backgroundColor = "transparent";
+            if (elem.parentElement.tagName === "PRE")
+                elem.parentElement.style.backgroundColor = "transparent";
+        }
+        foreach(document.querySelectorAll("code.language-math"), processBlock);
+        foreach(document.querySelectorAll("pre.language-math"), processBlock);
+        foreach(document.querySelectorAll("code"), function (elem) {
+            if (elem.className !== '') return;
+            function checkSibling(sibling, dollarAtEnd) {
+                if (!sibling)
+                    return false;
+                if (!sibling.nodeType === Node.TEXT_NODE)
+                    return false;
+                if (!sibling.textContent)
+                    return false;
+                if (sibling.textContent[dollarAtEnd ? sibling.textContent.length - 1 : 0] != '$')
+                    return false;
+                return true;
+            }
+            function removeSiblingDollarSign(sibling, dollarAtEnd) {
+                sibling.textContent = sibling.textContent.substr(
+                    dollarAtEnd ? 0 : 1,
+                    sibling.textContent.length - 1
+                );
+            }
+            if (!checkSibling(elem.previousSibling, true))
+                return;
+            if (!checkSibling(elem.nextSibling, false))
+                return;
+            removeSiblingDollarSign(elem.previousSibling, true);
+            removeSiblingDollarSign(elem.nextSibling, false);
+            katex.render(elem.textContent, elem, { display: false });
+            elem.style.backgroundColor = 'transparent';
+        });
+    });
+</script>
+
+<!-- Mermaid Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/9.1.2/mermaid.min.js" integrity="sha512-8ZrL1m0+KXHylxkFJdFtFCauQdV/KZMjSBL9iydsyIfiB1LwYBlGegX8dUlLnUtRDrTgWKP6pPVyOqa2VrqoNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        mermaid.init(undefined, "code.language-mermaid");
+    });
+</script>
+
+
+</head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../keyed_arena/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../keyed_arena/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location"><a href="#">Crate keyed_arena</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.5.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../keyed_arena/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="main-heading"><h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">keyed_arena</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/keyed_arena/lib.rs.html#1-261">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p><code>KeyedArena</code> is a bump allocator which allows for random access to its allocations.</p>
+<h2 id="rationale"><a href="#rationale">Rationale</a></h2>
+<p><a href="https://docs.rs/bumpalo"><code>bumpalo</code></a> is a popular Rust crate which implements a bump allocator.
+The function signature for allocation a slice in <code>bumpalo</code> looks something like:</p>
+<div class="example-wrap"><pre class="language-text"><code>fn alloc_slice_default&lt;&#39;a, T: Default&gt;(&amp;&#39;a self, n: usize) -&gt; &amp;&#39;a [T]</code></pre></div>
+<p>But, now if we want to store the arena alongside references to values allocated into it,
+we have a problem</p>
+
+<div class="example-wrap compile_fail"><div class='tooltip'>ⓘ</div><pre class="rust rust-example-rendered"><code><span class="kw">struct </span>OurFunStruct {
+    arena: bumpalo::Bump,
+    things: <span class="kw-2">&amp;</span><span class="string">&#39;????? [usize], </span><span class="comment">// what lifetime do we want?
+</span>}</code></pre></div>
+<p>The “right” solution to this problem would be to have a self-referential type: a type which
+would expose the lifetime of the arena to be used for its own fields. Unfortunately, this
+isn’t possible in Rust (except through the use of <code>async</code>/<code>await</code>).</p>
+<p>Since we can’t do the “right” thing, we’ll work around it! And that’s the point of <code>KeyedArena</code></p>
+<h2 id="keyedarena"><a href="#keyedarena"><code>KeyedArena</code></a></h2>
+<p>To avoid the need for self-referential types, <code>KeyedArena</code> allocation outputs a key, which can
+be used to retrieve the allocation later.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">struct </span>OurFunStruct {
+    arena: KeyedArena,
+    things: AllocationKey&lt;usize&gt;,
+}
+<span class="kw">impl </span>OurFunStruct {
+    <span class="kw">pub fn </span>new(n: usize) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>arena = KeyedArena::default();
+        <span class="kw">let </span>things = arena.alloc_slice_fill_with(n, |i| i);
+        <span class="comment">// Do stuff with things
+        </span><span class="kw">let </span>key = things.key();
+        std::mem::drop(things);
+        <span class="self">Self </span>{ arena, things: key }
+    }
+    <span class="kw">pub fn </span>step2(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">let </span>things = <span class="self">self</span>.arena.borrow_mut(<span class="self">self</span>.things);
+        things.iter().copied().sum()
+    }
+}</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.AllocationKey.html" title="keyed_arena::AllocationKey struct">AllocationKey</a></div><div class="item-right docblock-short">A key that can be used to retrieve a previous allocation of a slice of type <code>T</code>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.BorrowedAllocation.html" title="keyed_arena::BorrowedAllocation struct">BorrowedAllocation</a></div><div class="item-right docblock-short">A mutable allocation of a slice of type <code>T</code>, borrowed from a <code>KeyedArena</code>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyedArena.html" title="keyed_arena::KeyedArena struct">KeyedArena</a></div><div class="item-right docblock-short">A bump allocating arena where allocations can be indexed with keys.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyedArenaFromPool.html" title="keyed_arena::KeyedArenaFromPool struct">KeyedArenaFromPool</a></div><div class="item-right docblock-short">A wrapper for a <code>KeyedArena</code> which will return it to a <code>KeyedArenaPool</code> on drop.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyedArenaPool.html" title="keyed_arena::KeyedArenaPool struct">KeyedArenaPool</a></div><div class="item-right docblock-short">A thread-safe object pool to cache <code>KeyedArena</code> values.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.KeyedArenaStats.html" title="keyed_arena::KeyedArenaStats struct">KeyedArenaStats</a></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="keyed_arena" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

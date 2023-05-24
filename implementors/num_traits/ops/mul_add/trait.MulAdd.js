@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"scuttlebutt":[["impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/ops/mul_add/trait.MulAdd.html\" title=\"trait num_traits::ops::mul_add::MulAdd\">MulAdd</a>&lt;<a class=\"struct\" href=\"scuttlebutt/field/struct.F2e19x3e26.html\" title=\"struct scuttlebutt::field::F2e19x3e26\">F2e19x3e26</a>, <a class=\"struct\" href=\"scuttlebutt/field/struct.F2e19x3e26.html\" title=\"struct scuttlebutt::field::F2e19x3e26\">F2e19x3e26</a>&gt; for <a class=\"struct\" href=\"scuttlebutt/field/struct.F2e19x3e26.html\" title=\"struct scuttlebutt::field::F2e19x3e26\">F2e19x3e26</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

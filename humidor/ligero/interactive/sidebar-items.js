@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Prover","Interactive Ligero prover."],["Verifier","Ligero interactive verifier."]]};

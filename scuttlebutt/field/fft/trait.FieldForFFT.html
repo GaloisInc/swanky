@@ -1,0 +1,77 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This trait indicates that a finite field is suitable for use in radix-`N` FFT. This means that it must have a power-of-`N` root of unity for any desired FFT size, i.e., a field element `r_p`, such that `r_p^(N^p) = 1`, for a size-`3^p` FFT. The `PHI_EXP` constant is the exponent of the largest FFT size supported, and `root` should return the `N^p`th root of unity."><meta name="keywords" content="rust, rustlang, rust-lang, FieldForFFT"><title>FieldForFFT in scuttlebutt::field::fft - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"><!-- KaTeX Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.js" integrity="sha512-M7/jkZoKEln1jaaY2roCK9Jt4t+j/iru0e2vInDkVO5LY0EBt3m66tjTT5XFsGH2LJG+VRRL2ueIR3U0frs/GQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.css" integrity="sha512-Yfxo7zXGaQYyzWNxz8r4s8axNfG4jS3dips8p2HA/wNWmuapakkQiki+/XA3o3Ol+i8WI03cRJVDDUElEtED6g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function foreach(dom_array, cb) {
+            // Is NodeList even still a thing...?
+            for (var i = 0; i < dom_array.length; i++) {
+                cb(dom_array[i]);
+            }
+        }
+        function processBlock(elem) {
+            katex.render(elem.textContent, elem, { display: true });
+            elem.style.display = "flex";
+            elem.style.justifyContent = "center";
+            elem.style.alignItems = "center";
+            elem.style.backgroundColor = "transparent";
+            if (elem.parentElement.tagName === "PRE")
+                elem.parentElement.style.backgroundColor = "transparent";
+        }
+        foreach(document.querySelectorAll("code.language-math"), processBlock);
+        foreach(document.querySelectorAll("pre.language-math"), processBlock);
+        foreach(document.querySelectorAll("code"), function (elem) {
+            if (elem.className !== '') return;
+            function checkSibling(sibling, dollarAtEnd) {
+                if (!sibling)
+                    return false;
+                if (!sibling.nodeType === Node.TEXT_NODE)
+                    return false;
+                if (!sibling.textContent)
+                    return false;
+                if (sibling.textContent[dollarAtEnd ? sibling.textContent.length - 1 : 0] != '$')
+                    return false;
+                return true;
+            }
+            function removeSiblingDollarSign(sibling, dollarAtEnd) {
+                sibling.textContent = sibling.textContent.substr(
+                    dollarAtEnd ? 0 : 1,
+                    sibling.textContent.length - 1
+                );
+            }
+            if (!checkSibling(elem.previousSibling, true))
+                return;
+            if (!checkSibling(elem.nextSibling, false))
+                return;
+            removeSiblingDollarSign(elem.previousSibling, true);
+            removeSiblingDollarSign(elem.nextSibling, false);
+            katex.render(elem.textContent, elem, { display: false });
+            elem.style.backgroundColor = 'transparent';
+        });
+    });
+</script>
+
+<!-- Mermaid Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/9.1.2/mermaid.min.js" integrity="sha512-8ZrL1m0+KXHylxkFJdFtFCauQdV/KZMjSBL9iydsyIfiB1LwYBlGegX8dUlLnUtRDrTgWKP6pPVyOqa2VrqoNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        mermaid.init(undefined, "code.language-mermaid");
+    });
+</script>
+
+
+</head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../scuttlebutt/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../scuttlebutt/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"><a href="#">FieldForFFT</a></h2><div class="sidebar-elems"><section><div class="block"><h3 class="sidebar-title"><a href="#required-associated-consts">Required Associated Constants</a></h3><ul><li><a href="#associatedconstant.PHI_EXP">PHI_EXP</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#required-methods">Required Methods</a></h3><ul><li><a href="#tymethod.roots">roots</a></li></ul></div><div class="block"><h3 class="sidebar-title"><a href="#implementors">Implementors</a></h3></div></section><h2 class="location"><a href="index.html">In scuttlebutt::field::fft</a></h2></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../scuttlebutt/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="main-heading"><h1 class="fqn"><span class="in-band">Trait <a href="../../index.html">scuttlebutt</a>::<wbr><a href="../index.html">field</a>::<wbr><a href="index.html">fft</a>::<wbr><a class="trait" href="#">FieldForFFT</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../../src/scuttlebutt/field/fft.rs.html#21-31">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><div class="docblock item-decl"><pre class="rust trait"><code>pub trait FieldForFFT&lt;const N:&nbsp;<a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a>&gt;: <a class="trait" href="../trait.FiniteField.html" title="trait scuttlebutt::field::FiniteField">FiniteField</a> + <a class="trait" href="https://doc.rust-lang.org/1.65.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.u128.html">u128</a>&gt; {
+    const <a href="#associatedconstant.PHI_EXP" class="constant">PHI_EXP</a>: <a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a>;
+
+    fn <a href="#tymethod.roots" class="fnname">roots</a>(p: <a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a>) -&gt; Self;
+}</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This trait indicates that a finite field is suitable for use in radix-<code>N</code> FFT.
+This means that it must have a power-of-<code>N</code> root of unity for any desired
+FFT size, i.e., a field element <code>r_p</code>, such that <code>r_p^(N^p) = 1</code>, for a
+size-<code>3^p</code> FFT. The <code>PHI_EXP</code> constant is the exponent of the largest FFT
+size supported, and <code>root</code> should return the <code>N^p</code>th root of unity.</p>
+</div></details><h2 id="required-associated-consts" class="small-section-header">Required Associated Constants<a href="#required-associated-consts" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><div id="associatedconstant.PHI_EXP" class="method has-srclink"><a class="srclink rightside" href="../../../src/scuttlebutt/field/fft.rs.html#23">source</a><h4 class="code-header">const <a href="#associatedconstant.PHI_EXP" class="constant">PHI_EXP</a>: <a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a></h4></div></summary><div class="docblock"><p>Largest integer <code>p</code> such that <code>phi(MODULUS) = N^p * k</code> for integer <code>k</code>.</p>
+</div></details></div><h2 id="required-methods" class="small-section-header">Required Methods<a href="#required-methods" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><div id="tymethod.roots" class="method has-srclink"><a class="srclink rightside" href="../../../src/scuttlebutt/field/fft.rs.html#30">source</a><h4 class="code-header">fn <a href="#tymethod.roots" class="fnname">roots</a>(p: <a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a>) -&gt; Self</h4></div></summary><div class="docblock"><p>For each <code>p</code> such that <code>N^p | phi(MODULUS)</code>, there is a <code>(N^p)</code>th root
+of unity, namely <code>r_p = GENERATOR^(phi(MODULUS) / N^p)</code>, since then
+<code>r_p^(N^p) = GENERATOR^phi(MODULUS) = 1</code>. This function should return
+this <code>r_p</code>, on input <code>p</code>, for <code>p in [0 .. PHI_EXP]</code>.</p>
+</div></details></div><h2 id="implementors" class="small-section-header">Implementors<a href="#implementors" class="anchor"></a></h2><div class="item-list" id="implementors-list"><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-FieldForFFT%3C2%3E-for-F2e19x3e26" class="impl has-srclink"><a class="srclink rightside" href="../../../src/scuttlebutt/field/f2e19x3e26.rs.html#20-51">source</a><a href="#impl-FieldForFFT%3C2%3E-for-F2e19x3e26" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="trait.FieldForFFT.html" title="trait scuttlebutt::field::fft::FieldForFFT">FieldForFFT</a>&lt;2&gt; for <a class="struct" href="../struct.F2e19x3e26.html" title="struct scuttlebutt::field::F2e19x3e26">F2e19x3e26</a></h3></section></summary><div class="impl-items"><section id="associatedconstant.PHI_EXP-1" class="associatedconstant trait-impl has-srclink"><a class="srclink rightside" href="../../../src/scuttlebutt/field/f2e19x3e26.rs.html#21">source</a><a href="#associatedconstant.PHI_EXP-1" class="anchor"></a><h4 class="code-header">const <a href="#associatedconstant.PHI_EXP" class="constant">PHI_EXP</a>: <a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a> = 19usize</h4></section></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-FieldForFFT%3C3%3E-for-F2e19x3e26" class="impl has-srclink"><a class="srclink rightside" href="../../../src/scuttlebutt/field/f2e19x3e26.rs.html#53-91">source</a><a href="#impl-FieldForFFT%3C3%3E-for-F2e19x3e26" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="trait.FieldForFFT.html" title="trait scuttlebutt::field::fft::FieldForFFT">FieldForFFT</a>&lt;3&gt; for <a class="struct" href="../struct.F2e19x3e26.html" title="struct scuttlebutt::field::F2e19x3e26">F2e19x3e26</a></h3></section></summary><div class="impl-items"><section id="associatedconstant.PHI_EXP-2" class="associatedconstant trait-impl has-srclink"><a class="srclink rightside" href="../../../src/scuttlebutt/field/f2e19x3e26.rs.html#54">source</a><a href="#associatedconstant.PHI_EXP-2" class="anchor"></a><h4 class="code-header">const <a href="#associatedconstant.PHI_EXP" class="constant">PHI_EXP</a>: <a class="primitive" href="https://doc.rust-lang.org/1.65.0/std/primitive.usize.html">usize</a> = 26usize</h4></section></div></details></div><script src="../../../implementors/scuttlebutt/field/fft/trait.FieldForFFT.js" async></script></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="scuttlebutt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

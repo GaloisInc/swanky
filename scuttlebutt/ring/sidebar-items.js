@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":[["FiniteRing","Types that implement this trait are finite rings."],["IsSubRingOf","Indicates that `Self` is a sub ring of `R`."]]};

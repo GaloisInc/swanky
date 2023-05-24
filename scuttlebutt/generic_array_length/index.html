@@ -1,0 +1,104 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Helper types to make using the `generic-array` easier."><meta name="keywords" content="rust, rustlang, rust-lang, generic_array_length"><title>scuttlebutt::generic_array_length - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"><!-- KaTeX Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.js" integrity="sha512-M7/jkZoKEln1jaaY2roCK9Jt4t+j/iru0e2vInDkVO5LY0EBt3m66tjTT5XFsGH2LJG+VRRL2ueIR3U0frs/GQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.css" integrity="sha512-Yfxo7zXGaQYyzWNxz8r4s8axNfG4jS3dips8p2HA/wNWmuapakkQiki+/XA3o3Ol+i8WI03cRJVDDUElEtED6g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function foreach(dom_array, cb) {
+            // Is NodeList even still a thing...?
+            for (var i = 0; i < dom_array.length; i++) {
+                cb(dom_array[i]);
+            }
+        }
+        function processBlock(elem) {
+            katex.render(elem.textContent, elem, { display: true });
+            elem.style.display = "flex";
+            elem.style.justifyContent = "center";
+            elem.style.alignItems = "center";
+            elem.style.backgroundColor = "transparent";
+            if (elem.parentElement.tagName === "PRE")
+                elem.parentElement.style.backgroundColor = "transparent";
+        }
+        foreach(document.querySelectorAll("code.language-math"), processBlock);
+        foreach(document.querySelectorAll("pre.language-math"), processBlock);
+        foreach(document.querySelectorAll("code"), function (elem) {
+            if (elem.className !== '') return;
+            function checkSibling(sibling, dollarAtEnd) {
+                if (!sibling)
+                    return false;
+                if (!sibling.nodeType === Node.TEXT_NODE)
+                    return false;
+                if (!sibling.textContent)
+                    return false;
+                if (sibling.textContent[dollarAtEnd ? sibling.textContent.length - 1 : 0] != '$')
+                    return false;
+                return true;
+            }
+            function removeSiblingDollarSign(sibling, dollarAtEnd) {
+                sibling.textContent = sibling.textContent.substr(
+                    dollarAtEnd ? 0 : 1,
+                    sibling.textContent.length - 1
+                );
+            }
+            if (!checkSibling(elem.previousSibling, true))
+                return;
+            if (!checkSibling(elem.nextSibling, false))
+                return;
+            removeSiblingDollarSign(elem.previousSibling, true);
+            removeSiblingDollarSign(elem.nextSibling, false);
+            katex.render(elem.textContent, elem, { display: false });
+            elem.style.backgroundColor = 'transparent';
+        });
+    });
+</script>
+
+<!-- Mermaid Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/9.1.2/mermaid.min.js" integrity="sha512-8ZrL1m0+KXHylxkFJdFtFCauQdV/KZMjSBL9iydsyIfiB1LwYBlGegX8dUlLnUtRDrTgWKP6pPVyOqa2VrqoNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        mermaid.init(undefined, "code.language-mermaid");
+    });
+</script>
+
+
+</head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../scuttlebutt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../scuttlebutt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"><a href="#">Module generic_array_length</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../scuttlebutt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="main-heading"><h1 class="fqn"><span class="in-band">Module <a href="../index.html">scuttlebutt</a>::<wbr><a class="mod" href="#">generic_array_length</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/scuttlebutt/generic_array_length.rs.html#1-85">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Helper types to make using the
+<a href="https://docs.rs/generic-array/latest/generic_array/"><code>generic-array</code></a> easier.</p>
+<p>We use the <code>generic-array</code> crate, so that we can support situations like:</p>
+<div class="example-wrap"><pre class="language-text"><code>trait Foo {
+    const N: usize;
+}
+struct Blarg&lt;F: Foo&gt; {
+    contents: [u8; F::N],
+}</code></pre></div>
+<p>While <em>some</em> of the original use cases for <code>generic-array</code> can be accomplished since the
+stabilization of <code>min_const_generics</code>, other use cases (like the above) remain unstable (as of
+Rust 1.65).</p>
+<p>The <code>generic_array</code> crate uses a <em>type</em>, instead of a constant, to represent the length of the
+array. <code>generic_array</code> exposes the [<code>ArrayLength</code>] trait to denote a type which represents the
+length of an array. Due to internal reasons, <code>ArrayLength</code> is parametrized on the type of an
+<em>element</em> of the array. For example, we would write code like:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">trait </span>MyBlockCipher {
+    <span class="kw">type </span>BlockSize: generic_array::ArrayLength&lt;u8&gt;;
+}
+<span class="kw">fn </span>foo&lt;C: MyBlockCipher&gt;(x: generic_array::GenericArray&lt;u8, C::BlockSize&gt;) {
+    <span class="kw">let _ </span>= x; <span class="comment">// do something!
+</span>}</code></pre></div>
+<p>This code lets us use <code>BlockSize</code> <em>only</em> to create arrays of <code>u8</code>s. If you want to create an
+array of any other size, you’re out of luck.</p>
+<p>In Rust 1.65, Generic Associated Types were stabilized. This provides a solution for us to work
+around this issue, and let us specify array lengths which can be used with any element type.</p>
+<p>Use this module as follows:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">trait </span>MyBlockCipher {
+    <span class="kw">type </span>BlockSize: AnyArrayLength;
+}
+<span class="kw">fn </span>foo&lt;C: MyBlockCipher&gt;(x: Arr&lt;u8, C::BlockSize&gt;) {
+    <span class="kw">let _ </span>= x; <span class="comment">// do something!
+</span>}</code></pre></div>
+<p>Because we’ve used <code>AnyArrayLength</code>, we can instantiate an array of length <code>BlockSize</code> with
+any type that we want! (And we couldn’t do that with the “normal” <code>GenericArray</code> solution.)</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn </span>blarg&lt;C: MyBlockCipher&gt;(x: Arr&lt;(i32, String), C::BlockSize&gt;) {
+    <span class="kw">let _ </span>= x; <span class="comment">// do something!
+</span>}</code></pre></div>
+</div></details><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AnyArrayLength.html" title="scuttlebutt::generic_array_length::AnyArrayLength trait">AnyArrayLength</a></div><div class="item-right docblock-short">A marker type denoting that <code>Self</code> corresponds to an <code>ArrayLength</code> over any type</div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Arr.html" title="scuttlebutt::generic_array_length::Arr type">Arr</a></div><div class="item-right docblock-short">A [<code>GenericArray</code>] of length <code>N</code> containing type <code>T</code></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="scuttlebutt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

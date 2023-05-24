@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["DepthError","Errors thrown by the Fancy computation."]],"struct":[["DepthInformer","Fancy Object which computes information about the circuit of interest to FHE."],["DepthItem","Carries the depth of the computation."]]};

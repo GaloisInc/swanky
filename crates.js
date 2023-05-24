@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["diet_mac_and_cheese","fancy_garbling","fancy_garbling_base_conversion","humidor","inferno","keyed_arena","ocelot","popsicle","scuttlebutt","simple_arith_circuit","vectoreyes"];

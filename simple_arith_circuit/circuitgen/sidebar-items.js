@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["mul_zero_circuit","Output a circuit evaluating to zero that’s just multiply gates."],["random_binary_zero_circuit","Output a random binary circuit with an input that evaluates to zero."],["random_circuit","Output a random circuit."],["random_zero_circuit","Output a random circuit with an input that evaluates to zero."]]};

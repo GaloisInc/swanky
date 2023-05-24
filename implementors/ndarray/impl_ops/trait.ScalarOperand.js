@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"scuttlebutt":[["impl <a class=\"trait\" href=\"https://docs.rs/ndarray/0.15/ndarray/impl_ops/trait.ScalarOperand.html\" title=\"trait ndarray::impl_ops::ScalarOperand\">ScalarOperand</a> for <a class=\"struct\" href=\"scuttlebutt/field/struct.F2e19x3e26.html\" title=\"struct scuttlebutt::field::F2e19x3e26\">F2e19x3e26</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

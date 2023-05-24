@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":[["ligero","This module implements Ligero according to section 4.7 of https://dl.acm.org/doi/pdf/10.1145/3133956.3134104"]]};

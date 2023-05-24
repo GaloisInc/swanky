@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["add_binary_equality_check","Adds an equality check to binary `circuit` such that the new circuit outputs zero if the outputs of the old circuit match `values`."],["add_equality_check","Adds an equality check to `circuit` such that the new circuit outputs zero if the output of the old circuit is `value`."]]};

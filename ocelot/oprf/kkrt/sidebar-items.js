@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Receiver","KKRT oblivious PRF receiver."],["Sender","KKRT oblivious PRF sender."]]};

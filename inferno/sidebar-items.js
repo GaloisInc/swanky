@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Proof","The inferno proof. `N` denotes the number of parties in each MPC execution."]]};

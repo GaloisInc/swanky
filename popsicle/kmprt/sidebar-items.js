@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Receiver","KMPRT receiver - there can only be one of these."],["Sender","KMPRT sender - there can be many of these."]],"type":[["PartyId","The party number for each party."]]};

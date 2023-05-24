@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error","Errors produced by `Circuit::read_bristol_fashion`."]],"struct":[["DebugInfo","Specifies what debug information `Circuit::read_bristol_fashion` emits. When specified, this emits information through `log::debug!`."]]};

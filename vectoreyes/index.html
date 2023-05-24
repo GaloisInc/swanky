@@ -1,0 +1,98 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="VectorEyes is a (almost entirely) safe wrapper library around vectorized operations."><meta name="keywords" content="rust, rustlang, rust-lang, vectoreyes"><title>vectoreyes - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../normalize.css"><link rel="stylesheet" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../ayu.css" disabled><link rel="stylesheet" href="../dark.css" disabled><link rel="stylesheet" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"><!-- KaTeX Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.js" integrity="sha512-M7/jkZoKEln1jaaY2roCK9Jt4t+j/iru0e2vInDkVO5LY0EBt3m66tjTT5XFsGH2LJG+VRRL2ueIR3U0frs/GQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.0/katex.min.css" integrity="sha512-Yfxo7zXGaQYyzWNxz8r4s8axNfG4jS3dips8p2HA/wNWmuapakkQiki+/XA3o3Ol+i8WI03cRJVDDUElEtED6g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function foreach(dom_array, cb) {
+            // Is NodeList even still a thing...?
+            for (var i = 0; i < dom_array.length; i++) {
+                cb(dom_array[i]);
+            }
+        }
+        function processBlock(elem) {
+            katex.render(elem.textContent, elem, { display: true });
+            elem.style.display = "flex";
+            elem.style.justifyContent = "center";
+            elem.style.alignItems = "center";
+            elem.style.backgroundColor = "transparent";
+            if (elem.parentElement.tagName === "PRE")
+                elem.parentElement.style.backgroundColor = "transparent";
+        }
+        foreach(document.querySelectorAll("code.language-math"), processBlock);
+        foreach(document.querySelectorAll("pre.language-math"), processBlock);
+        foreach(document.querySelectorAll("code"), function (elem) {
+            if (elem.className !== '') return;
+            function checkSibling(sibling, dollarAtEnd) {
+                if (!sibling)
+                    return false;
+                if (!sibling.nodeType === Node.TEXT_NODE)
+                    return false;
+                if (!sibling.textContent)
+                    return false;
+                if (sibling.textContent[dollarAtEnd ? sibling.textContent.length - 1 : 0] != '$')
+                    return false;
+                return true;
+            }
+            function removeSiblingDollarSign(sibling, dollarAtEnd) {
+                sibling.textContent = sibling.textContent.substr(
+                    dollarAtEnd ? 0 : 1,
+                    sibling.textContent.length - 1
+                );
+            }
+            if (!checkSibling(elem.previousSibling, true))
+                return;
+            if (!checkSibling(elem.nextSibling, false))
+                return;
+            removeSiblingDollarSign(elem.previousSibling, true);
+            removeSiblingDollarSign(elem.nextSibling, false);
+            katex.render(elem.textContent, elem, { display: false });
+            elem.style.backgroundColor = 'transparent';
+        });
+    });
+</script>
+
+<!-- Mermaid Support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/9.1.2/mermaid.min.js" integrity="sha512-8ZrL1m0+KXHylxkFJdFtFCauQdV/KZMjSBL9iydsyIfiB1LwYBlGegX8dUlLnUtRDrTgWKP6pPVyOqa2VrqoNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        mermaid.init(undefined, "code.language-mermaid");
+    });
+</script>
+
+
+</head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../vectoreyes/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../vectoreyes/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location"><a href="#">Crate vectoreyes</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.5.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../vectoreyes/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="main-heading"><h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">vectoreyes</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/vectoreyes/lib.rs.html#1-387">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.</p>
+<h2 id="backends"><a href="#backends">Backends</a></h2>
+<p>VectorEyes chooses what backend to execute vector operations with at compile-time.</p>
+<h3 id="avx2"><a href="#avx2">AVX2</a></h3>
+<p>CPUs that support the <code>AVX</code>, <code>AVX2</code>, <code>SSE4.1</code>, <code>AES</code>, <code>SSE4.2</code>, and <code>PCLMULQDQ</code> features will
+use the <code>AVX2</code> backend.</p>
+<p>In addition, we have embedded specific latency numbers for:</p>
+<ul>
+<li><code>skylake</code></li>
+<li><code>skylake-avx512</code></li>
+<li><code>cascadelake</code></li>
+<li><code>znver1</code></li>
+<li><code>znver2</code></li>
+<li><code>znver3</code></li>
+</ul>
+<p>As a result, <code>vectoreyes</code> will be more efficient on these platforms. You can add specific
+latency numbers for more targets in <code>avx2.py</code>.</p>
+<h3 id="scalar"><a href="#scalar">Scalar</a></h3>
+<p>At the moment, this is the only alternative to the <code>AVX2</code> backend. It is not particularly
+optimized.</p>
+<h2 id="cargo-configuration"><a href="#cargo-configuration">Cargo Configuration</a></h2><h3 id="native-cpu-setup"><a href="#native-cpu-setup">Native CPU Setup</a></h3>
+<p>Compile on the machine that you’ll be running your code on, and add the
+following to your <code>.cargo/config</code> file:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[build]
+rustflags = [&quot;-C&quot;, &quot;target-cpu=native&quot;, &quot;--cfg=vectoreyes-target-cpu-native&quot;]
+rustdocflags = [&quot;-C&quot;, &quot;target-cpu=native&quot;, &quot;--cfg=vectoreyes-target-cpu-native&quot;]</code></pre></div><h3 id="specific-cpu-selection"><a href="#specific-cpu-selection">Specific CPU Selection</a></h3>
+<p>If you want to compile for some specific CPU</p>
+<div class="example-wrap"><pre class="language-toml"><code>[build]
+rustflags = [&quot;-C&quot;, &quot;target-cpu=TARGET&quot;, &quot;--cfg=vectoreyes-target-cpu=\&quot;TARGET\&quot;&quot;]
+rustdocflags = [&quot;-C&quot;, &quot;target-cpu=TARGET&quot;, &quot;--cfg=vectoreyes-target-cpu=\&quot;TARGET\&quot;&quot;]</code></pre></div><h3 id="maximal-compatibility"><a href="#maximal-compatibility">Maximal Compatibility</a></h3>
+<p>If you do not put any of the above in your <code>.cargo/config</code> file, vectoreyes will always use its
+<code>scalar</code> backend, which does not use vector instructions.</p>
+<p><strong>NOTE:</strong> many functions are currently missing from this library. Please
+consult the Intel documentation to see if a non-implemented intrinsic would
+more directly accomplish your goal, and we can add it!</p>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="array_utils/index.html" title="vectoreyes::array_utils mod">array_utils</a></div><div class="item-right docblock-short">Perform manually unrolled operations on arrays.</div></div></div><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Aes128.html" title="vectoreyes::Aes128 struct">Aes128</a></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Aes128EncryptOnly.html" title="vectoreyes::Aes128EncryptOnly struct">Aes128EncryptOnly</a></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Aes256.html" title="vectoreyes::Aes256 struct">Aes256</a></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Aes256EncryptOnly.html" title="vectoreyes::Aes256EncryptOnly struct">Aes256EncryptOnly</a></div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I8x16.html" title="vectoreyes::I8x16 struct">I8x16</a></div><div class="item-right docblock-short"><code>[i8; 16]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I8x32.html" title="vectoreyes::I8x32 struct">I8x32</a></div><div class="item-right docblock-short"><code>[i8; 32]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I16x8.html" title="vectoreyes::I16x8 struct">I16x8</a></div><div class="item-right docblock-short"><code>[i16; 8]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I16x16.html" title="vectoreyes::I16x16 struct">I16x16</a></div><div class="item-right docblock-short"><code>[i16; 16]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I32x4.html" title="vectoreyes::I32x4 struct">I32x4</a></div><div class="item-right docblock-short"><code>[i32; 4]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I32x8.html" title="vectoreyes::I32x8 struct">I32x8</a></div><div class="item-right docblock-short"><code>[i32; 8]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I64x2.html" title="vectoreyes::I64x2 struct">I64x2</a></div><div class="item-right docblock-short"><code>[i64; 2]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.I64x4.html" title="vectoreyes::I64x4 struct">I64x4</a></div><div class="item-right docblock-short"><code>[i64; 4]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U8x16.html" title="vectoreyes::U8x16 struct">U8x16</a></div><div class="item-right docblock-short"><code>[u8; 16]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U8x32.html" title="vectoreyes::U8x32 struct">U8x32</a></div><div class="item-right docblock-short"><code>[u8; 32]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U16x8.html" title="vectoreyes::U16x8 struct">U16x8</a></div><div class="item-right docblock-short"><code>[u16; 8]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U16x16.html" title="vectoreyes::U16x16 struct">U16x16</a></div><div class="item-right docblock-short"><code>[u16; 16]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U32x4.html" title="vectoreyes::U32x4 struct">U32x4</a></div><div class="item-right docblock-short"><code>[u32; 4]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U32x8.html" title="vectoreyes::U32x8 struct">U32x8</a></div><div class="item-right docblock-short"><code>[u32; 8]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U64x2.html" title="vectoreyes::U64x2 struct">U64x2</a></div><div class="item-right docblock-short"><code>[u64; 2]</code> as a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.U64x4.html" title="vectoreyes::U64x4 struct">U64x4</a></div><div class="item-right docblock-short"><code>[u64; 4]</code> as a vector.</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.MicroArchitecture.html" title="vectoreyes::MicroArchitecture enum">MicroArchitecture</a></div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.VectorBackend.html" title="vectoreyes::VectorBackend enum">VectorBackend</a></div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.VECTOR_BACKEND.html" title="vectoreyes::VECTOR_BACKEND constant">VECTOR_BACKEND</a></div><div class="item-right docblock-short">The backend that is used to evaluate vector operations.</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AesBlockCipher.html" title="vectoreyes::AesBlockCipher trait">AesBlockCipher</a></div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.AesBlockCipherDecrypt.html" title="vectoreyes::AesBlockCipherDecrypt trait">AesBlockCipherDecrypt</a></div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.ExtendingCast.html" title="vectoreyes::ExtendingCast trait">ExtendingCast</a></div><div class="item-right docblock-short">Lossily cast a vector by {zero,sign}-extending its values.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.HasVector.html" title="vectoreyes::HasVector trait">HasVector</a></div><div class="item-right docblock-short">A utility trait you probably won’t need to use. See <a href="type.Simd.html" title="Simd">Simd</a>.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Scalar.html" title="vectoreyes::Scalar trait">Scalar</a></div><div class="item-right docblock-short">A scalar that can live in the lane of a vector.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase.html" title="vectoreyes::SimdBase trait">SimdBase</a></div><div class="item-right docblock-short">A vector equivalent to <code>[T; Self::Lanes]</code>.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase4x.html" title="vectoreyes::SimdBase4x trait">SimdBase4x</a></div><div class="item-right docblock-short">A vector containing 4 lanes.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase4x64.html" title="vectoreyes::SimdBase4x64 trait">SimdBase4x64</a></div><div class="item-right docblock-short">A vector containing 4 64-bit values.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase8.html" title="vectoreyes::SimdBase8 trait">SimdBase8</a></div><div class="item-right docblock-short">A vector containing 8-bit values.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase8x.html" title="vectoreyes::SimdBase8x trait">SimdBase8x</a></div><div class="item-right docblock-short">A vector containing 8 lanes.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase32.html" title="vectoreyes::SimdBase32 trait">SimdBase32</a></div><div class="item-right docblock-short">A vector containing 32-bit values.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBase64.html" title="vectoreyes::SimdBase64 trait">SimdBase64</a></div><div class="item-right docblock-short">A vector containing 64-bit values.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.SimdBaseGatherable.html" title="vectoreyes::SimdBaseGatherable trait">SimdBaseGatherable</a></div></div></div><h2 id="types" class="small-section-header"><a href="#types">Type Definitions</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="type" href="type.Simd.html" title="vectoreyes::Simd type">Simd</a></div><div class="item-right docblock-short">An alternative way of naming SIMD types.</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="vectoreyes" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>
