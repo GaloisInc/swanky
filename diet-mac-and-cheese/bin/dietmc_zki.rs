@@ -1,5 +1,7 @@
+mod cli;
+
 use clap::Parser;
-use diet_mac_and_cheese::cli::{map_lpn_size, Cli, Prover::*};
+use cli::{map_lpn_size, Cli, Prover::*};
 use diet_mac_and_cheese::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use log::info;
 use pretty_env_logger;

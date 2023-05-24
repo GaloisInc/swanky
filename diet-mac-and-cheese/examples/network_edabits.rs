@@ -1,4 +1,3 @@
-#[cfg(feature = "exe")]
 use clap::{Arg, ArgAction, Command};
 use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};

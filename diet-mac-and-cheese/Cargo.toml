@@ -12,14 +12,13 @@ publish.workspace = true
 version.workspace = true
 
 [features]
-exe = ["clap/derive"]
 ff = ["scuttlebutt/ff"]
 secp256 = []
 
 [dependencies]
 blake3.workspace = true
 rand.workspace = true
-clap = {workspace = true, optional = true}
+clap.workspace = true
 eyre.workspace = true
 generic-array.workspace = true
 log.workspace = true
@@ -36,21 +35,16 @@ nix.workspace = true
 
 [[example]]
 name = "network_edabits"
-required-features = ["exe"]
 path = "examples/network_edabits.rs"
 
 [[example]]
 name = "edabits"
-required-features = ["exe"]
 path = "examples/edabits.rs"
-
 
 [[bin]]
 name = "dietmc_zki"
-required-features = ["exe"]
 path = "bin/dietmc_zki.rs"
 
 [[bin]]
 name = "dietmc_0p"
-required-features = ["exe"]
 path = "bin/dietmc_0p.rs"

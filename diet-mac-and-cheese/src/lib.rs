@@ -36,7 +36,4 @@ pub mod text_reader;
 pub use backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 pub use error::{Error, Result};
 
-#[cfg(feature = "exe")]
-mod backend_zki;
-#[cfg(feature = "exe")]
-pub mod cli;
+pub mod backend_zki;
