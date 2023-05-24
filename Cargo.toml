@@ -79,7 +79,7 @@ bytemuck = { version = "1.13.1", features = ["min_const_generics", "extern_crate
 bytes = "1.4.0"
 cc = "1.0.79"
 ciborium = "0.2.0"
-clap = "4.2.4"
+clap = { version = "4.2.4", features = ["derive"] }
 color-eyre = "0.6.2"
 criterion = "0.4.0"
 crossbeam = "0.8.2"

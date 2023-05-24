@@ -1,9 +1,10 @@
-#[cfg(feature = "exe")]
+mod cli;
+
 use clap::Parser;
+use cli::{Cli, LpnSize, Prover::*};
 use diet_mac_and_cheese::backend_multifield::{
     CircInputs, EvaluatorCirc, FieldOrPluginType, Party,
 };
-use diet_mac_and_cheese::cli::{Cli, LpnSize, Prover::*};
 use diet_mac_and_cheese::read_sieveir_phase2::{
     read_private_inputs, read_public_inputs, read_types,
 };

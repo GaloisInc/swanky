@@ -14,14 +14,15 @@ const DEFAULT_LPN: LpnSize = LpnSize::Medium;
 
 /// Lpn params as small, medium or large.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum)]
-pub enum LpnSize {
+pub(crate) enum LpnSize {
     Small,
     Medium,
     Large,
 }
 
 /// Map an `LpnSize` to a pair of Lpn parameters for the init and extension phase.
-pub fn map_lpn_size(lpn_param: &LpnSize) -> (LpnParams, LpnParams) {
+#[allow(dead_code)] // This is _not_ dead code, but the compiler thinks it is (it is used in `dietmc_zki.rs`)
+pub(crate) fn map_lpn_size(lpn_param: &LpnSize) -> (LpnParams, LpnParams) {
     match lpn_param {
         LpnSize::Small => {
             return (LPN_SETUP_SMALL, LPN_EXTEND_SMALL);
@@ -36,7 +37,7 @@ pub fn map_lpn_size(lpn_param: &LpnSize) -> (LpnParams, LpnParams) {
 }
 
 #[derive(Subcommand)]
-pub enum Prover {
+pub(crate) enum Prover {
     /// Set for prover mode
     Prover {
         /// witness path
@@ -50,7 +51,7 @@ pub enum Prover {
 #[clap(name = "Diet Mac'n'Cheese")]
 #[clap(author = "swanky authors <swanky@galois.com>")]
 #[clap(version = "0.1")]
-pub struct Cli {
+pub(crate) struct Cli {
     /// Set addr for tcp connection
     #[clap(default_value_t = DEFAULT_ADDR.to_string(), short, long)]
     pub connection_addr: String,
