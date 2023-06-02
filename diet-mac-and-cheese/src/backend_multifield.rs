@@ -17,6 +17,7 @@ use crate::{
     plugins::PluginBody,
 };
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
+use crypto_bigint::ArrayEncoding;
 use eyre::eyre;
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
@@ -27,11 +28,14 @@ use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM,
 use rand::{CryptoRng, Rng};
 #[cfg(feature = "ff")]
 use scuttlebutt::field::{F384p, F384q};
-use scuttlebutt::field::{F40b, F61p, FiniteField, F2};
 #[cfg(all(feature = "ff", feature = "secp256"))]
 use scuttlebutt::field::{Secp256k1, Secp256k1order};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AbstractChannel;
+use scuttlebutt::{
+    field::{F40b, F61p, FiniteField, F2},
+    AesRng,
+};
 use std::cmp::max;
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt::Debug;
@@ -676,6 +680,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
 
 pub type WireId = u64;
 pub type WireCount = u64;
+/// The type index.
 pub type TypeId = u8;
 pub type FunId = usize;
 pub type WireRange = (WireId, WireId);
@@ -762,16 +767,75 @@ impl GateM {
     }
 }
 
+/// Specifications for Circuit IR types.
 #[derive(Clone, Debug)]
-pub enum FieldOrPluginType {
+pub enum TypeSpecification {
+    /// The field type.
+    ///
+    /// This contains the prime modulus represented as a binary string.
+    // XXX: Do we really need the modulus as a binary string? Could we
+    // store something else, like the modulus as an integer, here?
     Field(Vec<u8>),
+    /// The plugin type.
     Plugin(PluginType),
 }
 
+/// A mapping from [`TypeId`]s to their [`TypeSpecification`]s.
 #[derive(Clone, Default)]
-pub struct TypeStore(pub BTreeMap<u8, FieldOrPluginType>);
+pub struct TypeStore(BTreeMap<TypeId, TypeSpecification>);
 
-/// A mapping of the used / set [`TypeId`]s.
+impl TypeStore {
+    pub(crate) fn insert(&mut self, key: TypeId, value: TypeSpecification) {
+        self.0.insert(key, value);
+    }
+
+    pub fn iter(&self) -> std::collections::btree_map::Iter<TypeId, TypeSpecification> {
+        self.0.iter()
+    }
+}
+
+impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
+    type Error = eyre::Error;
+
+    fn try_from(
+        types: Vec<mac_n_cheese_sieve_parser::Type>,
+    ) -> std::result::Result<Self, Self::Error> {
+        if types.len() > 256 {
+            return Err(eyre!("Too many types specified: {} > 256", types.len()));
+        }
+        let mut store = TypeStore::default();
+        for (i, ty) in types.into_iter().enumerate() {
+            let spec = match ty {
+                mac_n_cheese_sieve_parser::Type::Field { modulus } => {
+                    TypeSpecification::Field(modulus.to_be_byte_array().to_vec())
+                }
+                mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
+                    TypeSpecification::Plugin(PluginType::from(ty))
+                }
+            };
+            store.insert(i as u8, spec);
+        }
+        Ok(store)
+    }
+}
+
+impl TryFrom<Vec<Vec<u8>>> for TypeStore {
+    type Error = eyre::Error;
+
+    fn try_from(fields: Vec<Vec<u8>>) -> std::result::Result<Self, Self::Error> {
+        if fields.len() > 256 {
+            return Err(eyre!("Too many types specified: {} > 256", fields.len()));
+        }
+        let mut store = TypeStore::default();
+        for (i, field) in fields.into_iter().enumerate() {
+            let spec = TypeSpecification::Field(field);
+            store.insert(i as u8, spec);
+        }
+        Ok(store)
+    }
+}
+
+/// A bitmap of the used / set [`TypeId`]s.
 ///
 /// A [`TypeId`] is "set" if it is used in the computation.
 pub(crate) struct TypeIdMapping([bool; 256]);
@@ -953,7 +1017,7 @@ impl FuncDecl {
         input_counts: Vec<(TypeId, WireCount)>,
         plugin_name: String,
         operation: String,
-        _params: Vec<String>,
+        params: Vec<String>,
         _public_count: Vec<(TypeId, WireId)>,
         _private_count: Vec<(TypeId, WireId)>,
     ) -> Result<Self> {
@@ -966,7 +1030,9 @@ impl FuncDecl {
         }
 
         let gates = match plugin_name.as_str() {
-            "mux_v0" => PluginMuxV0::gates_body(&operation, cnt, &input_counts, &output_counts)?,
+            "mux_v0" => {
+                PluginMuxV0::gates_body(&operation, &params, cnt, &input_counts, &output_counts)?
+            }
             name => return Err(Error::EyreError(eyre!("Unsupported plugin: {name}"))),
         };
 
@@ -983,9 +1049,9 @@ impl FuncDecl {
             input_counts,
             compiled_info: CompiledInfo {
                 args_count: Some(cnt),
-                plugin_gates: Some(gates),
                 body_max,
                 type_ids,
+                plugin_gates: Some(gates),
             },
         })
     }
@@ -1335,23 +1401,26 @@ pub enum Party {
     Verifier,
 }
 
-pub struct EvaluatorCirc<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> {
+pub struct EvaluatorCirc<C: AbstractChannel + 'static> {
     inputs: CircInputs,
     fcom_f2_prover: Option<RcRefCell<FComProver<F40b>>>, // RcRefCell because of a unique Homcom functionality F2 shared by all other fields
     fcom_f2_verifier: Option<RcRefCell<FComVerifier<F40b>>>,
+    type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT>>,
     f2_idx: usize,
     party: Party,
-    phantom: PhantomData<(C, RNG)>,
+    rng: AesRng,
+    phantom: PhantomData<C>,
 }
 
-impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc<C, RNG> {
+impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     // TODO: Factorize interface for `new_with_prover` and `new_with_verifier`
     pub fn new(
         party: Party,
         channel: &mut C,
-        rng: &mut RNG,
+        mut rng: AesRng,
         inputs: CircInputs,
+        type_store: TypeStore,
         lpn_small: bool,
     ) -> Result<Self> {
         let lpn_setup;
@@ -1365,7 +1434,7 @@ impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc
         }
         let fcom_f2_prover = if party == Party::Prover {
             Some(RcRefCell::new(FComProver::<F40b>::init(
-                channel, rng, lpn_setup, lpn_extend,
+                channel, &mut rng, lpn_setup, lpn_extend,
             )?))
         } else {
             None
@@ -1373,7 +1442,7 @@ impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc
 
         let fcom_f2_verifier = if party == Party::Verifier {
             Some(RcRefCell::new(FComVerifier::<F40b>::init(
-                channel, rng, lpn_setup, lpn_extend,
+                channel, &mut rng, lpn_setup, lpn_extend,
             )?))
         } else {
             None
@@ -1384,18 +1453,49 @@ impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc
             inputs,
             fcom_f2_prover,
             fcom_f2_verifier,
-            //dmc_f2: Some(dmc_f2),
+            type_store,
             eval: Vec::new(),
             f2_idx: 42,
+            rng,
             phantom: PhantomData,
         })
     }
 
-    pub fn load_backend(
+    pub fn load_backends(
         &mut self,
         channel: &mut C,
-        rng: RNG,
-        rng2: RNG,
+        lpn_small: bool,
+        no_batching: bool,
+    ) -> Result<()> {
+        let type_store = self.type_store.clone();
+        for (idx, spec) in type_store.iter() {
+            match spec {
+                TypeSpecification::Field(field) => {
+                    let rng = self.rng.fork();
+                    let rng2 = self.rng.fork();
+                    self.load_backend(
+                        channel,
+                        rng,
+                        rng2,
+                        field,
+                        *idx as usize,
+                        lpn_small,
+                        no_batching,
+                    )?;
+                }
+                _ => {
+                    todo!("Type not supported yet: {:?}", spec);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn load_backend(
+        &mut self,
+        channel: &mut C,
+        rng: AesRng,
+        rng2: AesRng,
         field: &[u8],
         idx: usize,
         lpn_small: bool,
@@ -1844,7 +1944,7 @@ impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc
 
 #[cfg(test)]
 mod tests {
-    use super::RcRefCell;
+    use super::{RcRefCell, TypeStore};
     use crate::backend_multifield::{
         CircInputs,
         EvaluatorCirc,
@@ -1977,15 +2077,15 @@ mod tests {
         ins: Vec<Vec<Vec<u8>>>,
         wit: Vec<Vec<Vec<u8>>>,
     ) {
-        //setup_logger();
-        let fields_prover = fields.clone();
         let func_store_prover = func_store.clone();
         let gates_prover = gates.clone();
         let ins_prover = ins.clone();
         let wit_prover = wit;
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+        let type_store_prover = type_store.clone();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
+            let rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
@@ -2000,20 +2100,21 @@ mod tests {
                 inputs.ingest_witnesses(id, VecDeque::from(w.clone()));
             }
 
-            let mut eval =
-                EvaluatorCirc::new(Party::Prover, &mut channel, &mut rng, inputs, true).unwrap();
-
-            for (idx, f) in fields_prover.iter().enumerate() {
-                let rng = AesRng::new();
-                let rng2 = AesRng::new();
-                eval.load_backend(&mut channel, rng, rng2, f.as_slice(), idx, true, false)
-                    .unwrap();
-            }
+            let mut eval = EvaluatorCirc::new(
+                Party::Prover,
+                &mut channel,
+                rng,
+                inputs,
+                type_store_prover,
+                true,
+            )
+            .unwrap();
+            eval.load_backends(&mut channel, true, false).unwrap();
             eval.evaluate_gates(&gates_prover, &func_store_prover)
                 .unwrap();
         });
 
-        let mut rng = AesRng::from_seed(Default::default());
+        let rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
@@ -2025,13 +2126,9 @@ mod tests {
         }
 
         let mut eval =
-            EvaluatorCirc::new(Party::Verifier, &mut channel, &mut rng, inputs, true).unwrap();
-        for (idx, f) in fields.iter().enumerate() {
-            let rng = AesRng::new();
-            let rng2 = AesRng::new();
-            eval.load_backend(&mut channel, rng, rng2, f.as_slice(), idx, true, false)
+            EvaluatorCirc::new(Party::Verifier, &mut channel, rng, inputs, type_store, true)
                 .unwrap();
-        }
+        eval.load_backends(&mut channel, true, false).unwrap();
         eval.evaluate_gates(&gates, &func_store).unwrap();
 
         handle.join().unwrap();

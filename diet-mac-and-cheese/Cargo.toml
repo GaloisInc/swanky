@@ -17,6 +17,7 @@ secp256 = []
 
 [dependencies]
 blake3.workspace = true
+crypto-bigint.workspace = true
 rand.workspace = true
 clap.workspace = true
 eyre.workspace = true

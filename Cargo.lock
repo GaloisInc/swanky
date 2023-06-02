@@ -699,6 +699,7 @@ version = "0.5.0"
 dependencies = [
  "blake3",
  "clap 4.3.1",
+ "crypto-bigint",
  "eyre",
  "flatbuffers 23.1.21",
  "generic-array",
