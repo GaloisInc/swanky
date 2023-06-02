@@ -2,9 +2,7 @@ mod cli;
 
 use clap::Parser;
 use cli::{Cli, LpnSize, Prover::*};
-use diet_mac_and_cheese::backend_multifield::{
-    CircInputs, EvaluatorCirc, FieldOrPluginType, Party,
-};
+use diet_mac_and_cheese::backend_multifield::{CircInputs, EvaluatorCirc, Party, TypeStore};
 use diet_mac_and_cheese::read_sieveir_phase2::{
     read_private_inputs, read_public_inputs, read_types,
 };
@@ -13,8 +11,8 @@ use eyre::{Result, WrapErr};
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_sieve_parser::RelationReader as RR;
+use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
-use mac_n_cheese_sieve_parser::{Type, ValueStreamKind};
 use pretty_env_logger;
 use scuttlebutt::{AesRng, Channel};
 use std::collections::VecDeque;
@@ -119,30 +117,21 @@ fn run_text(args: &Cli) -> Result<()> {
                     let mut channel = Channel::new(reader, writer);
 
                     let start = Instant::now();
-                    let mut rng = AesRng::new();
+                    let rng = AesRng::new();
 
-                    let mut evaluator =
-                        EvaluatorCirc::new(Party::Verifier, &mut channel, &mut rng, inputs, false)?;
-                    for (idx, f) in rel.header().types.iter().enumerate() {
-                        match f {
-                            Type::Field { modulus: fi } => {
-                                let rng = AesRng::new();
-                                let rng2 = AesRng::new();
-                                evaluator.load_backend(
-                                    &mut channel,
-                                    rng,
-                                    rng2,
-                                    &number_to_bytes(&fi),
-                                    idx,
-                                    args.lpn == LpnSize::Small,
-                                    args.nobatching,
-                                )?;
-                            }
-                            _ => {
-                                todo!("Type not supported yet: {:?}", f);
-                            }
-                        }
-                    }
+                    let mut evaluator = EvaluatorCirc::new(
+                        Party::Verifier,
+                        &mut channel,
+                        rng,
+                        inputs,
+                        TypeStore::try_from(rel.header().types.clone())?,
+                        false,
+                    )?;
+                    evaluator.load_backends(
+                        &mut channel,
+                        args.lpn == LpnSize::Small,
+                        args.nobatching,
+                    )?;
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
@@ -171,30 +160,17 @@ fn run_text(args: &Cli) -> Result<()> {
             let mut channel = Channel::new(reader, writer);
 
             let start = Instant::now();
-            let mut rng = AesRng::new();
+            let rng = AesRng::new();
 
-            let mut evaluator =
-                EvaluatorCirc::new(Party::Prover, &mut channel, &mut rng, inputs, false)?;
-            for (idx, f) in rel.header().types.iter().enumerate() {
-                match f {
-                    Type::Field { modulus: fi } => {
-                        let rng = AesRng::new();
-                        let rng2 = AesRng::new();
-                        evaluator.load_backend(
-                            &mut channel,
-                            rng,
-                            rng2,
-                            &number_to_bytes(&fi),
-                            idx,
-                            args.lpn == LpnSize::Small,
-                            args.nobatching,
-                        )?;
-                    }
-                    _ => {
-                        todo!("Type not supported yet: {:?}", f);
-                    }
-                }
-            }
+            let mut evaluator = EvaluatorCirc::new(
+                Party::Prover,
+                &mut channel,
+                rng,
+                inputs,
+                TypeStore::try_from(rel.header().types.clone())?,
+                false,
+            )?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small, args.nobatching)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation_text(&relation_path)?;
@@ -262,30 +238,21 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                     let mut channel = Channel::new(reader, writer);
 
                     let start = Instant::now();
-                    let mut rng = AesRng::new();
+                    let rng = AesRng::new();
 
-                    let mut evaluator =
-                        EvaluatorCirc::new(Party::Verifier, &mut channel, &mut rng, inputs, false)?;
-                    for (idx, f) in fields.0.iter().enumerate() {
-                        match &f.1 {
-                            FieldOrPluginType::Field(fi) => {
-                                let rng = AesRng::new();
-                                let rng2 = AesRng::new();
-                                evaluator.load_backend(
-                                    &mut channel,
-                                    rng,
-                                    rng2,
-                                    fi.as_slice(),
-                                    idx,
-                                    args.lpn == LpnSize::Small,
-                                    args.nobatching,
-                                )?;
-                            }
-                            _ => {
-                                todo!("Type not supported yet: {:?}", f);
-                            }
-                        }
-                    }
+                    let mut evaluator = EvaluatorCirc::new(
+                        Party::Verifier,
+                        &mut channel,
+                        rng,
+                        inputs,
+                        fields,
+                        false,
+                    )?;
+                    evaluator.load_backends(
+                        &mut channel,
+                        args.lpn == LpnSize::Small,
+                        args.nobatching,
+                    )?;
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
@@ -314,30 +281,17 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
             let mut channel = Channel::new(reader, writer);
 
             let start = Instant::now();
-            let mut rng = AesRng::new();
+            let rng = AesRng::new();
 
-            let mut evaluator =
-                EvaluatorCirc::new(Party::Prover, &mut channel, &mut rng, inputs, false)?;
-            for (idx, f) in fields.0.iter().enumerate() {
-                match &f.1 {
-                    FieldOrPluginType::Field(fi) => {
-                        let rng = AesRng::new();
-                        let rng2 = AesRng::new();
-                        evaluator.load_backend(
-                            &mut channel,
-                            rng,
-                            rng2,
-                            fi.as_slice(),
-                            idx,
-                            args.lpn == LpnSize::Small,
-                            args.nobatching,
-                        )?;
-                    }
-                    _ => {
-                        todo!("Type not supported yet: {:?}", f);
-                    }
-                }
-            }
+            let mut evaluator = EvaluatorCirc::new(
+                Party::Prover,
+                &mut channel,
+                rng,
+                inputs,
+                fields.clone(),
+                false,
+            )?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small, args.nobatching)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;

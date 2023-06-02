@@ -3,17 +3,27 @@ use eyre::eyre;
 use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
 
 pub(crate) struct PluginMuxV0;
+const PLUGIN_NAME: &str = "mux_v0";
 
 impl PluginMuxV0 {
     pub(crate) fn gates_body(
         operation: &str,
+        params: &[String],
         count: u64,
         input_counts: &[(TypeId, WireCount)],
         output_counts: &[(TypeId, WireCount)],
+        // type_store: &TypeStore,
     ) -> eyre::Result<GatesBody> {
         if operation != "strict" {
             return Err(eyre!(
-                "mux_v0 implementation only handles strict permissiveness: {operation}",
+                "{PLUGIN_NAME}: Implementation only handles strict permissiveness: {operation}",
+            ));
+        }
+
+        if params.len() != 0 {
+            return Err(eyre!(
+                "{PLUGIN_NAME}: Invalid number of params (must be zero): {}",
+                params.len()
             ));
         }
 

@@ -5,7 +5,7 @@ use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::{self as g};
 use crate::{
-    backend_multifield::{FieldOrPluginType, FunStore, FuncDecl, GateM, TypeStore},
+    backend_multifield::{FunStore, FuncDecl, GateM, TypeSpecification, TypeStore},
     plugins::PluginType,
 };
 use crate::{Error::*, Result};
@@ -519,9 +519,9 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                     .unwrap()
                     .value()
                     .unwrap();
-                vout.0.insert(
+                vout.insert(
                     field_id,
-                    FieldOrPluginType::Field(vector_u8_to_vec(field.bytes())),
+                    TypeSpecification::Field(vector_u8_to_vec(field.bytes())),
                 );
                 field_id += 1;
             }
@@ -538,8 +538,7 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                     params.push(param.into());
                 }
                 let plugin_type = PluginType::new(name, operation, params);
-                vout.0
-                    .insert(field_id, FieldOrPluginType::Plugin(plugin_type));
+                vout.insert(field_id, TypeSpecification::Plugin(plugin_type));
                 field_id += 1;
             }
             _ => {}
