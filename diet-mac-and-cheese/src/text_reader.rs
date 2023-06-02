@@ -24,16 +24,6 @@ pub struct TextRelation {
     pub gates: Vec<GateM>,
 }
 
-impl TextRelation {
-    pub fn new() -> Self {
-        Self {
-            type_store: TypeStore::new(),
-            fun_store: FunStore::new(),
-            gates: vec![],
-        }
-    }
-}
-
 pub fn number_to_bytes(n: &Number) -> Vec<u8> {
     let w = n.to_words();
     let mut nb_zeros = 0;
@@ -198,7 +188,7 @@ impl RelationVisitor for TextRelation {
     where
         for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
     {
-        let mut body_struct = TextRelation::new();
+        let mut body_struct = TextRelation::default();
         body(&mut body_struct)?;
 
         let mut output_counts = vec![];
@@ -271,7 +261,8 @@ impl RelationVisitor for TextRelation {
             params,
             vec![], // TODO: Add them !
             vec![], // TODO: Add them!
-        );
+        )
+        .unwrap();
         info!(
             "plugin {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
             name_s,

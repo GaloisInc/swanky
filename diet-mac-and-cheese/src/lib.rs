@@ -37,3 +37,5 @@ pub use backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifie
 pub use error::{Error, Result};
 
 pub mod backend_zki;
+
+pub(crate) mod plugins;
