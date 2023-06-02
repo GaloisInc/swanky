@@ -2,15 +2,22 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
-use crate::backend_trait::BackendT;
-use crate::edabits::RcRefCell;
-use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
-use crate::error::{Error::*, Result};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
 use crate::memory::Memory;
 use crate::read_sieveir_phase2::BufRelation;
+use crate::{backend_trait::BackendT, plugins::mux_v0::PluginMuxV0};
+use crate::{edabits::RcRefCell, Error};
+use crate::{
+    edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv},
+    plugins::PluginType,
+};
+use crate::{
+    error::{Error::*, Result},
+    plugins::PluginBody,
+};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
+use eyre::eyre;
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use ocelot::svole::wykw::LpnParams;
@@ -24,7 +31,6 @@ use scuttlebutt::field::{F40b, F61p, FiniteField, F2};
 #[cfg(all(feature = "ff", feature = "secp256"))]
 use scuttlebutt::field::{Secp256k1, Secp256k1order};
 use scuttlebutt::ring::FiniteRing;
-use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::AbstractChannel;
 use std::cmp::max;
 use std::collections::{BTreeMap, VecDeque};
@@ -757,13 +763,6 @@ impl GateM {
 }
 
 #[derive(Clone, Debug)]
-pub struct PluginType {
-    pub name: String,
-    pub operation: String,
-    pub params: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
 pub enum FieldOrPluginType {
     Field(Vec<u8>),
     Plugin(PluginType),
@@ -771,12 +770,6 @@ pub enum FieldOrPluginType {
 
 #[derive(Clone, Default)]
 pub struct TypeStore(pub BTreeMap<u8, FieldOrPluginType>);
-
-impl TypeStore {
-    pub fn new() -> Self {
-        TypeStore(Default::default())
-    }
-}
 
 /// A mapping of the used / set [`TypeId`]s.
 ///
@@ -876,7 +869,7 @@ pub(crate) struct GatesBody {
 
 impl GatesBody {
     /// Create a new [`GatesBody`].
-    fn new(gates: Vec<GateM>) -> Self {
+    pub(crate) fn new(gates: Vec<GateM>) -> Self {
         Self { gates }
     }
 
@@ -886,18 +879,6 @@ impl GatesBody {
             .iter()
             .fold(None, |acc, x| max(acc, x.out_wire()))
     }
-}
-
-#[derive(Clone)]
-pub struct PluginBody {
-    name: String,
-    operation: String,
-    #[allow(dead_code)]
-    params: Vec<String>,
-    #[allow(dead_code)]
-    public_count: Vec<(TypeId, WireId)>,
-    #[allow(dead_code)]
-    private_count: Vec<(TypeId, WireId)>,
 }
 
 #[derive(Clone)]
@@ -972,10 +953,10 @@ impl FuncDecl {
         input_counts: Vec<(TypeId, WireCount)>,
         plugin_name: String,
         operation: String,
-        params: Vec<String>,
-        public_count: Vec<(TypeId, WireId)>,
-        private_count: Vec<(TypeId, WireId)>,
-    ) -> Self {
+        _params: Vec<String>,
+        _public_count: Vec<(TypeId, WireId)>,
+        _private_count: Vec<(TypeId, WireId)>,
+    ) -> Result<Self> {
         let mut cnt = 0;
         for (_, w) in output_counts.iter() {
             cnt += w;
@@ -984,113 +965,17 @@ impl FuncDecl {
             cnt += w;
         }
 
-        let mut gates = None;
-        if plugin_name == "mux_v0" {
-            // r <- mux(cond, b_0, b_1)
-            // cond_neg = cond + 1
-            // r = b_0 * cond_neg + b_1 * cond
-            // TODO: could minimize the number of multiplication gates
-
-            let field = input_counts[0].0;
-            let callframe_size = cnt;
-
-            let mut vec_gates = vec![];
-
-            // 1) find where the condition is:
-            let mut prev = 0;
-            // assert_eq!(out_ranges.len(), func.output_counts.len());
-            for (_field_idx, count) in &output_counts {
-                prev += *count;
-            }
-
-            // assert_eq!(in_ranges.len(), func.input_counts.len());
-            let cond = prev;
-
-            // 2) MUX dedicated circuit
-
-            // wire_cond_neg <- cond - 1
-            let wire_cond_neg = callframe_size;
-            vec_gates.push(
-                GateM::AddConstant(
-                    field,
-                    wire_cond_neg,
-                    cond,
-                    Box::from(F2::ONE.to_bytes().to_vec()),
-                ), // WARNING only works in F2
-            );
-
-            let middle_index = input_counts.len() / 2; // WARNING: works for F2, Should divide by the number of possibilities
-
-            let mut pos = 0;
-            for i in 0..middle_index {
-                let (field, how_many) = input_counts[1 + i];
-                for idx in 0..how_many {
-                    // Allocate one new wire per input.
-                    //println!("WIRE 0: {:?}", callframe_size + 1 + pos + idx);
-                    //println!("WIRE 0: {:?}", wire_cond_neg);
-                    //println!("WIRE 0: {:?}", cond + 1 + pos + idx);
-                    vec_gates.push(GateM::Mul(
-                        field,
-                        callframe_size + 1 + pos + idx,
-                        wire_cond_neg,
-                        cond + 1 + pos + idx,
-                    ));
-                }
-                pos += how_many;
-            }
-
-            let input_range = pos;
-
-            let mut pos = 0;
-            for i in 0..middle_index {
-                let (field, how_many) = input_counts[1 + middle_index + i];
-                for idx in 0..how_many {
-                    //println!("WIRE 1: {:?}", callframe_size + 1 + input_range + pos + idx);
-                    //println!("WIRE 1: {:?}", cond);
-                    //println!("WIRE 1: {:?}", cond + 1 + input_range + pos + idx);
-                    vec_gates.push(GateM::Mul(
-                        field,
-                        callframe_size + 1 + input_range + pos + idx,
-                        cond,
-                        cond + 1 + input_range + pos + idx,
-                    ));
-                }
-                pos += how_many;
-            }
-
-            let mut pos = 0;
-            for (field, how_many) in &output_counts {
-                for idx in 0..*how_many {
-                    //println!("WIRE 2: {:?}", pos + idx);
-                    //println!("WIRE 2: {:?}", callframe_size + 1 + pos + idx);
-                    //println!("WIRE 2: {:?}", callframe_size + 1 + input_range + pos + idx);
-                    vec_gates.push(GateM::Add(
-                        *field,
-                        pos + idx,
-                        callframe_size + 1 + pos + idx,
-                        callframe_size + 1 + input_range + pos + idx,
-                    ));
-                }
-                pos += how_many;
-            }
-
-            gates = Some(GatesBody::new(vec_gates));
-        }
-
-        let body_max = gates.as_ref().and_then(|x| x.output_wire_max());
-        let type_presence = gates
-            .as_ref()
-            .map_or(Default::default(), |x| TypeIdMapping::from(x));
-        let type_ids = type_presence.to_type_ids();
-        let plugin_body = PluginBody {
-            name: plugin_name,
-            operation,
-            params,
-            public_count,
-            private_count,
+        let gates = match plugin_name.as_str() {
+            "mux_v0" => PluginMuxV0::gates_body(&operation, cnt, &input_counts, &output_counts)?,
+            name => return Err(Error::EyreError(eyre!("Unsupported plugin: {name}"))),
         };
 
-        FuncDecl {
+        let body_max = gates.output_wire_max();
+        let type_presence = TypeIdMapping::from(&gates);
+        let type_ids = type_presence.to_type_ids();
+        let plugin_body = PluginBody::new(plugin_name, operation);
+
+        Ok(FuncDecl {
             name,
             fun_id,
             body: GatesOrPluginBody::Plugin(plugin_body),
@@ -1098,11 +983,11 @@ impl FuncDecl {
             input_counts,
             compiled_info: CompiledInfo {
                 args_count: Some(cnt),
-                plugin_gates: gates,
+                plugin_gates: Some(gates),
                 body_max,
                 type_ids,
             },
-        }
+        })
     }
 }
 
@@ -1110,10 +995,6 @@ impl FuncDecl {
 pub struct FunStore(BTreeMap<String, FuncDecl>);
 
 impl FunStore {
-    pub fn new() -> Self {
-        FunStore(Default::default())
-    }
-
     pub fn insert(&mut self, name: String, func: FuncDecl) {
         self.0.insert(name, func);
     }
@@ -1806,7 +1687,7 @@ impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc
     pub fn evaluate_relation_text(&mut self, path: &PathBuf) -> Result<()> {
         let rel = RelationReader::open(path.as_path()).unwrap();
 
-        let mut buf_rel = TextRelation::new();
+        let mut buf_rel = TextRelation::default();
 
         let r = rel.read(&mut buf_rel);
         match r {
@@ -1842,21 +1723,7 @@ impl<C: AbstractChannel + 'static, RNG: CryptoRng + Rng + 'static> EvaluatorCirc
 
         let gates_body = match &func.body {
             GatesOrPluginBody::Gates(body) => body,
-            GatesOrPluginBody::Plugin(plugin) => {
-                let n = plugin.name.clone();
-                if n == "mux_v0" {
-                    let permissiveness: &String = &plugin.operation;
-                    if permissiveness != "strict" {
-                        panic!(
-                            "mux_v0 plugin only handles strict permissiveness: {:?}",
-                            permissiveness
-                        );
-                    }
-                    func.compiled_info.plugin_gates.as_ref().unwrap()
-                } else {
-                    panic!("plugin not handled: {:?}", n);
-                }
-            }
+            GatesOrPluginBody::Plugin(_) => func.compiled_info.plugin_gates.as_ref().unwrap(),
         };
 
         // 2)
@@ -2173,7 +2040,7 @@ mod tests {
     fn test_conv_00() {
         // Test simple conversion from F61p to F2
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF0, 0),
@@ -2192,7 +2059,7 @@ mod tests {
     fn test_conv_01() {
         // Test simple conversion from F2 to F61p
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF1, 0),
@@ -2212,7 +2079,7 @@ mod tests {
     fn test_conv_02_twoway() {
         // Test that convert from F61p to F2 and from F2 to F61p works
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF0, 0),
@@ -2240,7 +2107,7 @@ mod tests {
     fn test_conv_binary_to_field() {
         // Test conversion from 2 bits to F61p
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF1, 0),
@@ -2260,7 +2127,7 @@ mod tests {
         // Test conversion from F61p to a vec of F2
         // 3 bit decomposition is 11000 on 5 bits, 00011
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF0, 0),
@@ -2283,7 +2150,7 @@ mod tests {
     fn test_conv_publics() {
         // Test conversion from F61p to a vec of F2 on public values
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Instance(FF1, 0),
@@ -2313,7 +2180,7 @@ mod tests {
         // Test conversion and shift
         // 2 = 010000..., shifted as 10+010000...]= 10010000...] = 9, with truncation
         let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let mut gates = vec![
             GateM::New(FF0, 0, 0),
@@ -2484,7 +2351,7 @@ mod tests {
         // tests the simplest function
 
         let fields = vec![F61P_VEC.to_vec()];
-        let mut func_store = FunStore::new();
+        let mut func_store = FunStore::default();
 
         let gates_func = vec![GateM::Add(FF0, 0, 2, 4), GateM::Add(FF0, 1, 3, 5)];
 
@@ -2538,7 +2405,7 @@ mod tests {
         // tests the simplest function with vec
 
         let fields = vec![F61P_VEC.to_vec()];
-        let mut func_store = FunStore::new();
+        let mut func_store = FunStore::default();
 
         let gates_fun = vec![
             GateM::Add(FF0, 6, 2, 4),
@@ -2592,7 +2459,7 @@ mod tests {
         // tests a simple function passing instances in allocated slice and unallocated wire
 
         let fields = vec![F61P_VEC.to_vec()];
-        let mut func_store = FunStore::new();
+        let mut func_store = FunStore::default();
 
         let gates_func = vec![
             GateM::Copy(FF0, 0, 3),
@@ -2656,7 +2523,7 @@ mod tests {
     // Simplest test for mux on f2
     fn test_f2_mux() {
         let fields = vec![F2_VEC.to_vec()];
-        let mut func_store = FunStore::new();
+        let mut func_store = FunStore::default();
 
         let func = FuncDecl::new_plugin(
             "my_mux".into(),
@@ -2668,7 +2535,8 @@ mod tests {
             vec![],
             vec![],
             vec![],
-        );
+        )
+        .unwrap();
 
         func_store.0.insert("my_mux".into(), func);
 
@@ -2718,7 +2586,7 @@ mod tests {
     // More complicated test of mux selecting a triple and a unique element
     fn test_f2_mux_on_slices() {
         let fields = vec![F2_VEC.to_vec()];
-        let mut func_store = FunStore::new();
+        let mut func_store = FunStore::default();
 
         let func = FuncDecl::new_plugin(
             "my_mux".into(),
@@ -2730,7 +2598,8 @@ mod tests {
             vec![],
             vec![],
             vec![],
-        );
+        )
+        .unwrap();
 
         func_store.0.insert("my_mux".into(), func);
 

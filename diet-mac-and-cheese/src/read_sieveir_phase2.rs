@@ -1,12 +1,13 @@
 /*!
 SIEVE IR0+ flatbuffer reader.
 */
-use crate::backend_multifield::{
-    FieldOrPluginType, FunStore, FuncDecl, GateM, PluginType, TypeStore,
-};
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::{self as g};
+use crate::{
+    backend_multifield::{FieldOrPluginType, FunStore, FuncDecl, GateM, TypeStore},
+    plugins::PluginType,
+};
 use crate::{Error::*, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
 use log::info;
@@ -190,8 +191,8 @@ impl BufRelation {
         if md.is_file() {
             let file = std::fs::File::open(path).unwrap();
             let buffer = BufReader::new(file);
-            let type_store = TypeStore::new();
-            let fun_store = FunStore::new();
+            let type_store = TypeStore::default();
+            let fun_store = FunStore::default();
             Ok(BufRelation {
                 type_store,
                 fun_store,
@@ -431,7 +432,8 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             params,
                             public_count,
                             private_count,
-                        );
+                        )
+                        .unwrap();
                         info!(
                             "plugin {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
                             name.clone(),
@@ -500,7 +502,7 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
 
     let v = g::size_prefixed_root_as_root(&buffer_mem).unwrap();
 
-    let mut vout = TypeStore::new();
+    let mut vout = TypeStore::default();
 
     let types = v.message_as_relation().unwrap().types().unwrap();
     let l = types.len();
@@ -530,20 +532,14 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
 
                 let params_ = plugin.params().unwrap();
                 let n = params_.len();
-                let mut params = vec![];
+                let mut params = Vec::with_capacity(n);
                 for i in 0..n {
                     let param = params_.get(i);
                     params.push(param.into());
                 }
-
-                vout.0.insert(
-                    field_id,
-                    FieldOrPluginType::Plugin(PluginType {
-                        name,
-                        operation,
-                        params,
-                    }),
-                );
+                let plugin_type = PluginType::new(name, operation, params);
+                vout.0
+                    .insert(field_id, FieldOrPluginType::Plugin(plugin_type));
                 field_id += 1;
             }
             _ => {}

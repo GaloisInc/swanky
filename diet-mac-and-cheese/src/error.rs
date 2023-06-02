@@ -16,6 +16,8 @@ pub enum Error {
     IoError(std::io::Error),
     /// An Ocelot error has occurred.
     OcelotError(ocelot::Error),
+    /// Error from `eyre` (eventually will replace this)
+    EyreError(eyre::Error),
 }
 
 impl std::error::Error for Error {}
@@ -32,6 +34,12 @@ impl From<ocelot::Error> for Error {
     }
 }
 
+impl From<eyre::Error> for Error {
+    fn from(e: eyre::Error) -> Error {
+        Error::EyreError(e)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -40,6 +48,7 @@ impl std::fmt::Display for Error {
             Error::EdabitsError(s) => write!(f, "edabits error: {}", s),
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::OcelotError(e) => write!(f, "Ocelot error: {}", e),
+            Error::EyreError(e) => write!(f, "Error: {}", e),
         }
     }
 }
