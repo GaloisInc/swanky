@@ -1,5 +1,5 @@
 with import ./pkgs.nix {};
-(mkShell.override { stdenv = llvmPackages_14.stdenv; }) {
+(mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
   shellHook = ''
     export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
     export NIX_SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
