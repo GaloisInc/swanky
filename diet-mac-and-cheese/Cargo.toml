@@ -33,6 +33,9 @@ zki_sieve.workspace = true
 flatbuffers.workspace = true
 nix.workspace = true
 
+[build-dependencies]
+swanky-flatbuffer-build.workspace = true
+
 [[example]]
 name = "network_edabits"
 path = "examples/network_edabits.rs"

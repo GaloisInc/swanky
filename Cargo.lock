@@ -712,6 +712,7 @@ dependencies = [
  "rand 0.8.5",
  "scuttlebutt",
  "subtle",
+ "swanky-flatbuffer-build",
  "zki_sieve",
 ]
 
