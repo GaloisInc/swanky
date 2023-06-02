@@ -8,7 +8,7 @@ with import ./pkgs.nix {};
     (import ./rust-toolchain.nix)
     cargo-nextest
     cargo-deny
-    lld_14
+    lld_16
     git
     (python310.withPackages (py: [
       py.toml
