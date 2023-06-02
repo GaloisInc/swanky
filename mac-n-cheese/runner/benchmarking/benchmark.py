@@ -388,6 +388,7 @@ def benchmark(ctx):
     """
     Run a mac n'cheese benchmark
     """
+
     # TODO: add perf/flamegraph options
     @functools.cache
     def make_it():
