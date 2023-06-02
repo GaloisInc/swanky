@@ -130,7 +130,7 @@ simple_logger = "4.1.0"
 smallvec = { version = "1.10.0" , features = ["const_generics", "union", "const_new"] }
 snafu = "0.7.4"
 snmalloc-rs = { version = "0.3.3", default-features = false, features = ["build_cc", "usecxx17"] }
-sprs = "=0.11.0"
+sprs = "=0.11.0" # See issue #123
 subtle = "2.5.0"
 tempfile = "3.5.0"
 twox-hash = "1.6.3"
