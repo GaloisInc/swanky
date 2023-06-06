@@ -29,7 +29,9 @@ pub mod read_sieveir_phase2;
 mod sieveir_phase2;
 
 mod backend;
+pub mod circuit_ir;
 mod error;
+mod fields;
 
 pub mod text_reader;
 

@@ -1,18 +1,18 @@
-use crate::backend_multifield::{GateM, GatesBody, TypeId, WireCount};
+use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeStore, WireCount};
 use eyre::eyre;
 use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
 
-pub(crate) struct PluginMuxV0;
+pub(crate) struct MuxV0;
 const PLUGIN_NAME: &str = "mux_v0";
 
-impl PluginMuxV0 {
+impl MuxV0 {
     pub(crate) fn gates_body(
         operation: &str,
         params: &[String],
         count: u64,
         input_counts: &[(TypeId, WireCount)],
         output_counts: &[(TypeId, WireCount)],
-        // type_store: &TypeStore,
+        _type_store: &TypeStore,
     ) -> eyre::Result<GatesBody> {
         if operation != "strict" {
             return Err(eyre!(
@@ -26,6 +26,8 @@ impl PluginMuxV0 {
                 params.len()
             ));
         }
+
+        // TODO: Ensure that `F2` is being used.
 
         // r <- mux(cond, b_0, b_1)
         // cond_neg = cond + 1

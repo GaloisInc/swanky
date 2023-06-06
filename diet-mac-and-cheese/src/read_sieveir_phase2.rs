@@ -1,12 +1,14 @@
 /*!
 SIEVE IR0+ flatbuffer reader.
 */
-use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::{self as g};
 use crate::{
-    backend_multifield::{FunStore, FuncDecl, GateM, TypeSpecification, TypeStore},
+    circuit_ir::{FunStore, FuncDecl, GateM, TypeSpecification, TypeStore},
     plugins::PluginType,
+};
+use crate::{
+    fields::modulus_to_type_id, sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds,
 };
 use crate::{Error::*, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
@@ -432,6 +434,7 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             params,
                             public_count,
                             private_count,
+                            &rel.type_store,
                         )
                         .unwrap();
                         info!(
@@ -521,7 +524,7 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                     .unwrap();
                 vout.insert(
                     field_id,
-                    TypeSpecification::Field(vector_u8_to_vec(field.bytes())),
+                    TypeSpecification::Field(modulus_to_type_id(field.bytes()).unwrap()),
                 );
                 field_id += 1;
             }
