@@ -2,7 +2,8 @@ mod cli;
 
 use clap::Parser;
 use cli::{Cli, LpnSize, Prover::*};
-use diet_mac_and_cheese::backend_multifield::{CircInputs, EvaluatorCirc, Party, TypeStore};
+use diet_mac_and_cheese::backend_multifield::{EvaluatorCirc, Party};
+use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::read_sieveir_phase2::{
     read_private_inputs, read_public_inputs, read_types,
 };

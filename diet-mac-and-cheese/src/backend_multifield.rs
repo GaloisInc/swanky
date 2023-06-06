@@ -2,23 +2,16 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
+use crate::circuit_ir::{CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId};
+use crate::edabits::RcRefCell;
+use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
+use crate::error::{Error::*, Result};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
 use crate::memory::Memory;
 use crate::read_sieveir_phase2::BufRelation;
-use crate::{backend_trait::BackendT, plugins::mux_v0::PluginMuxV0};
-use crate::{edabits::RcRefCell, Error};
-use crate::{
-    edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv},
-    plugins::PluginType,
-};
-use crate::{
-    error::{Error::*, Result},
-    plugins::PluginBody,
-};
+use crate::{backend_trait::BackendT, circuit_ir::GatesOrPluginBody};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
-use crypto_bigint::ArrayEncoding;
-use eyre::eyre;
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use ocelot::svole::wykw::LpnParams;
@@ -26,18 +19,19 @@ use ocelot::svole::wykw::LpnParams;
 use ocelot::svole::wykw::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
 use rand::{CryptoRng, Rng};
-#[cfg(feature = "ff")]
-use scuttlebutt::field::{F384p, F384q};
-#[cfg(all(feature = "ff", feature = "secp256"))]
-use scuttlebutt::field::{Secp256k1, Secp256k1order};
-use scuttlebutt::ring::FiniteRing;
-use scuttlebutt::AbstractChannel;
+use scuttlebutt::{
+    field::{F384p, F384q},
+    AbstractChannel,
+};
 use scuttlebutt::{
     field::{F40b, F61p, FiniteField, F2},
     AesRng,
 };
-use std::cmp::max;
-use std::collections::{BTreeMap, VecDeque};
+use scuttlebutt::{
+    field::{Secp256k1, Secp256k1order},
+    ring::FiniteRing,
+};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -63,7 +57,7 @@ use mac_n_cheese_sieve_parser::RelationReader as RR;
 //   Profiler was showing a lot of time on `drop Gate`, which implies not building the intermediate gate
 // * Reduce to one round the `mult_check` and `check_zero`.
 
-// Conversions between fields are batched, and this constant defines the batch size.
+/// Conversions between fields are batched, and this constant defines the batch size.
 const SIZE_CONVERSION_BATCH: usize = 100_000;
 
 #[derive(Clone, Debug)]
@@ -203,9 +197,6 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
         <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::from_bytes_le(val)
-    }
-    fn set_field(&mut self, modulus: &[u8], degree: u32, is_boolean: bool) -> Result<()> {
-        self.dmc.set_field(modulus, degree, is_boolean)
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -477,9 +468,6 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
         <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::from_bytes_le(val)
     }
-    fn set_field(&mut self, modulus: &[u8], degree: u32, is_boolean: bool) -> Result<()> {
-        self.dmc.set_field(modulus, degree, is_boolean)
-    }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
     }
@@ -677,463 +665,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
 }
 
 // II) Instance/Witness/Relation/Gates/FunStore
-
-pub type WireId = u64;
-pub type WireCount = u64;
-/// The type index.
-pub type TypeId = u8;
-pub type FunId = usize;
-pub type WireRange = (WireId, WireId);
-
-// This enum should fit in 32 bytes.
-// Using Box<Vec<u8>> for this reason, beware the size of `Box<[T]>` is not 8, it's 16.
-#[derive(Clone, Debug)]
-pub enum GateM {
-    Constant(TypeId, WireId, Box<Vec<u8>>), // Using Box<Vec<u8>>
-    AssertZero(TypeId, WireId),
-    Copy(TypeId, WireId, WireId),
-    Add(TypeId, WireId, WireId, WireId),
-    Mul(TypeId, WireId, WireId, WireId),
-    AddConstant(TypeId, WireId, WireId, Box<Vec<u8>>),
-    MulConstant(TypeId, WireId, WireId, Box<Vec<u8>>),
-    Instance(TypeId, WireId),
-    Witness(TypeId, WireId),
-    Conv(Box<(TypeId, WireRange, TypeId, WireRange)>),
-    New(TypeId, WireId, WireId),
-    Delete(TypeId, WireId, WireId),
-    Call(Box<(String, Vec<WireRange>, Vec<WireRange>)>),
-    Comment(String),
-}
-
-impl GateM {
-    /// Return the [`TypeId`] associated with this gate.
-    fn type_id(&self) -> TypeId {
-        use GateM::*;
-        match self {
-            Constant(ty, _, _) => *ty,
-            AssertZero(ty, _) => *ty,
-            Copy(ty, _, _) => *ty,
-            Add(ty, _, _, _) => *ty,
-            Mul(ty, _, _, _) => *ty,
-            AddConstant(ty, _, _, _) => *ty,
-            MulConstant(ty, _, _, _) => *ty,
-            New(ty, _, _) => *ty,
-            Delete(ty, _, _) => *ty,
-            Instance(ty, _) => *ty,
-            Witness(ty, _) => *ty,
-            Conv(_) => todo!(),
-            Call(_) => todo!(),
-            Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
-        }
-    }
-
-    /// Return the [`WireId`] associated with the output of this gate, or
-    /// `None` if the gate has no output wire.
-    fn out_wire(&self) -> Option<WireId> {
-        use GateM::*;
-        match self {
-            Constant(_, out, _value) => Some(*out),
-            AssertZero(_, _inp) => None,
-            Copy(_, out, _inp) => Some(*out),
-            Add(_, out, _left, _right) => Some(*out),
-            Mul(_, out, _left, _right) => Some(*out),
-            AddConstant(_, out, _inp, _constant) => Some(*out),
-            MulConstant(_, out, _inp, _constant) => Some(*out),
-            Conv(c) => {
-                let (_, (_, out), _, _) = c.as_ref();
-                Some(*out)
-            }
-            Instance(_, out) => Some(*out),
-            Witness(_, out) => Some(*out),
-            New(_, _, last) => Some(*last),
-            Delete(_, _, _) => None,
-            Call(arg) => {
-                let (_, v, _) = arg.as_ref();
-                let mut out = None;
-                for (_first, last) in v.iter() {
-                    match out {
-                        None => {
-                            out = Some(*last);
-                        }
-                        Some(m) => {
-                            out = Some(max(m, *last));
-                        }
-                    }
-                }
-                out
-            }
-            Comment(_str) => None,
-        }
-    }
-}
-
-/// Specifications for Circuit IR types.
-#[derive(Clone, Debug)]
-pub enum TypeSpecification {
-    /// The field type.
-    ///
-    /// This contains the prime modulus represented as a binary string.
-    // XXX: Do we really need the modulus as a binary string? Could we
-    // store something else, like the modulus as an integer, here?
-    Field(Vec<u8>),
-    /// The plugin type.
-    Plugin(PluginType),
-}
-
-/// A mapping from [`TypeId`]s to their [`TypeSpecification`]s.
-#[derive(Clone, Default)]
-pub struct TypeStore(BTreeMap<TypeId, TypeSpecification>);
-
-impl TypeStore {
-    pub(crate) fn insert(&mut self, key: TypeId, value: TypeSpecification) {
-        self.0.insert(key, value);
-    }
-
-    pub fn iter(&self) -> std::collections::btree_map::Iter<TypeId, TypeSpecification> {
-        self.0.iter()
-    }
-}
-
-impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
-    type Error = eyre::Error;
-
-    fn try_from(
-        types: Vec<mac_n_cheese_sieve_parser::Type>,
-    ) -> std::result::Result<Self, Self::Error> {
-        if types.len() > 256 {
-            return Err(eyre!("Too many types specified: {} > 256", types.len()));
-        }
-        let mut store = TypeStore::default();
-        for (i, ty) in types.into_iter().enumerate() {
-            let spec = match ty {
-                mac_n_cheese_sieve_parser::Type::Field { modulus } => {
-                    TypeSpecification::Field(modulus.to_be_byte_array().to_vec())
-                }
-                mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
-                    TypeSpecification::Plugin(PluginType::from(ty))
-                }
-            };
-            store.insert(i as u8, spec);
-        }
-        Ok(store)
-    }
-}
-
-impl TryFrom<Vec<Vec<u8>>> for TypeStore {
-    type Error = eyre::Error;
-
-    fn try_from(fields: Vec<Vec<u8>>) -> std::result::Result<Self, Self::Error> {
-        if fields.len() > 256 {
-            return Err(eyre!("Too many types specified: {} > 256", fields.len()));
-        }
-        let mut store = TypeStore::default();
-        for (i, field) in fields.into_iter().enumerate() {
-            let spec = TypeSpecification::Field(field);
-            store.insert(i as u8, spec);
-        }
-        Ok(store)
-    }
-}
-
-/// A bitmap of the used / set [`TypeId`]s.
-///
-/// A [`TypeId`] is "set" if it is used in the computation.
-pub(crate) struct TypeIdMapping([bool; 256]);
-
-impl TypeIdMapping {
-    /// Set the associated [`TypeId`].
-    pub(crate) fn set(&mut self, ty: TypeId) {
-        self.0[ty as usize] = true;
-    }
-
-    /// Set the [`TypeId`]s associated with a given [`GateM`].
-    pub(crate) fn set_from_gate(&mut self, gate: &GateM) {
-        use GateM::*;
-        match gate {
-            Constant(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            AssertZero(ty, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Copy(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Add(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Mul(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            AddConstant(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            MulConstant(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Conv(c) => {
-                let (ty1, _, ty2, _) = c.as_ref();
-                self.0[*ty1 as usize] = true;
-                self.0[*ty2 as usize] = true;
-            }
-            Instance(ty, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Witness(ty, _) => {
-                self.0[*ty as usize] = true;
-            }
-            New(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Delete(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Call(_) => {}
-            Comment(_) => {}
-        }
-    }
-
-    /// Convert [`TypeIdMapping`] to a [`Vec`] of the set [`TypeId`]s.
-    fn to_type_ids(self) -> Vec<TypeId> {
-        self.0
-            .iter()
-            .enumerate()
-            .filter_map(|(i, b)| {
-                if *b {
-                    Some(i.try_into().expect("Index should be less than 256"))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
-impl Default for TypeIdMapping {
-    fn default() -> Self {
-        Self([false; 256]) // There are only 256 possible `TypeId`s
-    }
-}
-
-impl From<&GatesBody> for TypeIdMapping {
-    fn from(gates: &GatesBody) -> Self {
-        let mut mapping = TypeIdMapping::default();
-        for g in gates.gates.iter() {
-            mapping.set_from_gate(g);
-        }
-        mapping
-    }
-}
-
-/// A body of computation containing a sequence of [`GateM`]s.
-#[derive(Clone)]
-pub(crate) struct GatesBody {
-    gates: Vec<GateM>,
-}
-
-impl GatesBody {
-    /// Create a new [`GatesBody`].
-    pub(crate) fn new(gates: Vec<GateM>) -> Self {
-        Self { gates }
-    }
-
-    /// Return the maximum [`WireId`] found, or `None` if no [`WireId`] was found.
-    fn output_wire_max(&self) -> Option<WireId> {
-        self.gates
-            .iter()
-            .fold(None, |acc, x| max(acc, x.out_wire()))
-    }
-}
-
-#[derive(Clone)]
-enum GatesOrPluginBody {
-    Gates(GatesBody),
-    Plugin(PluginBody),
-}
-
-#[derive(Clone)]
-pub(crate) struct CompiledInfo {
-    pub(crate) args_count: Option<WireId>, // Count of wires for output/input args to function
-    pub(crate) body_max: Option<WireId>,   // Body max wire
-    pub(crate) type_ids: Vec<TypeId>,      // type_ids encountered in the function body
-    pub(crate) plugin_gates: Option<GatesBody>, // gates associated to plugin if any
-}
-
-#[derive(Clone)]
-pub struct FuncDecl {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    fun_id: FunId,
-    body: GatesOrPluginBody,
-    output_counts: Vec<(TypeId, WireCount)>,
-    input_counts: Vec<(TypeId, WireCount)>,
-    pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
-}
-
-impl FuncDecl {
-    pub fn new_function(
-        name: String,
-        fun_id: FunId,
-        gates: Vec<GateM>,
-        output_counts: Vec<(TypeId, WireCount)>,
-        input_counts: Vec<(TypeId, WireCount)>,
-    ) -> Self {
-        let gates = GatesBody::new(gates);
-        let body_max = gates.output_wire_max();
-        let mut type_presence = TypeIdMapping::from(&gates);
-        let mut args_count = 0;
-        for (ty, wc) in output_counts.iter() {
-            type_presence.set(*ty);
-            args_count += wc;
-        }
-        for (ty, wc) in input_counts.iter() {
-            type_presence.set(*ty);
-            args_count += wc;
-        }
-
-        let body = GatesOrPluginBody::Gates(gates);
-        let type_ids = type_presence.to_type_ids();
-
-        FuncDecl {
-            name,
-            fun_id,
-            body,
-            output_counts,
-            input_counts,
-            compiled_info: CompiledInfo {
-                args_count: Some(args_count),
-                body_max,
-                type_ids,
-                plugin_gates: None,
-            },
-        }
-    }
-
-    pub fn new_plugin(
-        name: String,
-        fun_id: FunId,
-        output_counts: Vec<(TypeId, WireCount)>,
-        input_counts: Vec<(TypeId, WireCount)>,
-        plugin_name: String,
-        operation: String,
-        params: Vec<String>,
-        _public_count: Vec<(TypeId, WireId)>,
-        _private_count: Vec<(TypeId, WireId)>,
-    ) -> Result<Self> {
-        let mut cnt = 0;
-        for (_, w) in output_counts.iter() {
-            cnt += w;
-        }
-        for (_, w) in input_counts.iter() {
-            cnt += w;
-        }
-
-        let gates = match plugin_name.as_str() {
-            "mux_v0" => {
-                PluginMuxV0::gates_body(&operation, &params, cnt, &input_counts, &output_counts)?
-            }
-            name => return Err(Error::EyreError(eyre!("Unsupported plugin: {name}"))),
-        };
-
-        let body_max = gates.output_wire_max();
-        let type_presence = TypeIdMapping::from(&gates);
-        let type_ids = type_presence.to_type_ids();
-        let plugin_body = PluginBody::new(plugin_name, operation);
-
-        Ok(FuncDecl {
-            name,
-            fun_id,
-            body: GatesOrPluginBody::Plugin(plugin_body),
-            output_counts,
-            input_counts,
-            compiled_info: CompiledInfo {
-                args_count: Some(cnt),
-                body_max,
-                type_ids,
-                plugin_gates: Some(gates),
-            },
-        })
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct FunStore(BTreeMap<String, FuncDecl>);
-
-impl FunStore {
-    pub fn insert(&mut self, name: String, func: FuncDecl) {
-        self.0.insert(name, func);
-    }
-
-    pub fn get(&self, name: &String) -> &FuncDecl {
-        self.0
-            .get(name)
-            .unwrap_or_else(|| panic!("missing func:{:?}", name))
-    }
-}
-
-// TODO: add type synonym for Vec<u8> serialized field values,
-//       maybe use Box<[u8]> like in other places.
-#[derive(Default)]
-pub struct CircInputs {
-    pub ins: Vec<VecDeque<Vec<u8>>>,
-    pub wit: Vec<VecDeque<Vec<u8>>>,
-}
-
-impl CircInputs {
-    #[inline]
-    fn adjust_ins_type_idx(&mut self, type_id: usize) {
-        let n = self.ins.len();
-        if n <= type_id {
-            for _i in n..(type_id + 1) {
-                self.ins.push(Default::default());
-            }
-        }
-    }
-    #[inline]
-    fn adjust_wit_type_idx(&mut self, type_id: usize) {
-        let n = self.wit.len();
-        if n <= type_id {
-            for _i in n..(type_id + 1) {
-                self.wit.push(Default::default());
-            }
-        }
-    }
-
-    /// Ingest instance.
-    pub fn ingest_instance(&mut self, type_id: usize, instance: Vec<u8>) {
-        self.adjust_ins_type_idx(type_id);
-        self.ins[type_id].push_back(instance);
-    }
-
-    /// Ingest witness.
-    pub fn ingest_witness(&mut self, type_id: usize, witness: Vec<u8>) {
-        self.adjust_wit_type_idx(type_id);
-        self.wit[type_id].push_back(witness);
-    }
-
-    /// Ingest instances.
-    pub fn ingest_instances(&mut self, type_id: usize, instances: VecDeque<Vec<u8>>) {
-        self.adjust_ins_type_idx(type_id);
-        self.ins[type_id] = instances;
-    }
-
-    /// Ingest witnesses.
-    pub fn ingest_witnesses(&mut self, type_id: usize, witnesses: VecDeque<Vec<u8>>) {
-        self.adjust_wit_type_idx(type_id);
-        self.wit[type_id] = witnesses;
-    }
-
-    pub fn pop_instance(&mut self, type_id: usize) -> Option<Vec<u8>> {
-        self.adjust_ins_type_idx(type_id);
-        self.ins[type_id].pop_front()
-    }
-
-    pub fn pop_witness(&mut self, type_id: usize) -> Option<Vec<u8>> {
-        self.adjust_wit_type_idx(type_id);
-        self.wit[type_id].pop_front()
-    }
-}
+// See circuit_ir.rs
 
 // III Memory layout
 // See memory.rs
@@ -1477,7 +1009,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         channel,
                         rng,
                         rng2,
-                        field,
+                        *field,
                         *idx as usize,
                         lpn_small,
                         no_batching,
@@ -1496,7 +1028,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         channel: &mut C,
         rng: AesRng,
         rng2: AesRng,
-        field: &[u8],
+        field: std::any::TypeId,
         idx: usize,
         lpn_small: bool,
         no_batching: bool,
@@ -1514,210 +1046,198 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             lpn_setup = LPN_SETUP_MEDIUM;
             lpn_extend = LPN_EXTEND_MEDIUM;
         }
-        match field {
-            &[2] => {
-                info!("loading field F2");
+        if field == std::any::TypeId::of::<F2>() {
+            info!("loading field F2");
 
-                // Note for F2 we do not use the backend with Conv, simply dietMC
-                if self.party == Party::Prover {
-                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                    let dmc = DietMacAndCheeseProver::<F40b, _, _>::init_with_fcom(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        no_batching,
-                    )?;
-                    back = Box::new(EvaluatorSingle::new(dmc, true));
-                } else {
-                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                    let dmc = DietMacAndCheeseVerifier::<F40b, _, _>::init_with_fcom(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        no_batching,
-                    )?;
-                    back = Box::new(EvaluatorSingle::new(dmc, true));
-                }
-                self.f2_idx = self.eval.len();
+            // Note for F2 we do not use the backend with Conv, simply dietMC
+            if self.party == Party::Prover {
+                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                let dmc = DietMacAndCheeseProver::<F40b, _, _>::init_with_fcom(
+                    channel,
+                    rng,
+                    fcom_f2,
+                    no_batching,
+                )?;
+                back = Box::new(EvaluatorSingle::new(dmc, true));
+            } else {
+                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                let dmc = DietMacAndCheeseVerifier::<F40b, _, _>::init_with_fcom(
+                    channel,
+                    rng,
+                    fcom_f2,
+                    no_batching,
+                )?;
+                back = Box::new(EvaluatorSingle::new(dmc, true));
             }
-            &[255, 255, 255, 255, 255, 255, 255, 31] => {
-                info!("loading field F61p");
+            self.f2_idx = self.eval.len();
+        } else if field == std::any::TypeId::of::<F61p>() {
+            info!("loading field F61p");
+            if self.party == Party::Prover {
+                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                let dmc = DietMacAndCheeseConvProver::<F61p, _, _>::init(
+                    channel,
+                    rng,
+                    rng2,
+                    fcom_f2,
+                    lpn_setup,
+                    lpn_extend,
+                    no_batching,
+                )?;
+                back = Box::new(EvaluatorSingle::new(dmc, false));
+            } else {
+                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                let dmc = DietMacAndCheeseConvVerifier::<F61p, _, _>::init(
+                    channel,
+                    rng,
+                    rng2,
+                    fcom_f2,
+                    lpn_setup,
+                    lpn_extend,
+                    no_batching,
+                )?;
+                back = Box::new(EvaluatorSingle::new(dmc, false));
+            }
+        } else if field == std::any::TypeId::of::<Secp256k1>() {
+            #[cfg(all(feature = "ff", feature = "secp256"))]
+            {
+                info!("loading field Secp256k1");
                 if self.party == Party::Prover {
                     let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                    let dmc = DietMacAndCheeseConvProver::<F61p, _, _>::init(
+                    let dmc = DietMacAndCheeseConvProver::<Secp256k1, _, _>::init(
                         channel,
                         rng,
                         rng2,
                         fcom_f2,
-                        lpn_setup,
-                        lpn_extend,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
                         no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 } else {
                     let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                    let dmc = DietMacAndCheeseConvVerifier::<F61p, _, _>::init(
+                    let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _, _>::init(
                         channel,
                         rng,
                         rng2,
                         fcom_f2,
-                        lpn_setup,
-                        lpn_extend,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
                         no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
             }
-            &[47, 252, 255, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
+            #[cfg(not(all(feature = "ff", feature = "secp256")))]
             {
-                #[cfg(all(feature = "ff", feature = "secp256"))]
-                {
-                    info!("loading field Secp256k1");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<Secp256k1, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                }
-                #[cfg(not(all(feature = "ff", feature = "secp256")))]
-                {
-                    panic!("Set feature ff and secp256 for Secp256k1")
-                }
+                panic!("Set feature ff and secp256 for Secp256k1")
             }
-            &[65, 65, 54, 208, 140, 94, 210, 191, 59, 160, 72, 175, 230, 220, 174, 186, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
+        } else if field == std::any::TypeId::of::<Secp256k1order>() {
+            #[cfg(all(feature = "ff", feature = "secp256"))]
             {
-                #[cfg(all(feature = "ff", feature = "secp256"))]
-                {
-                    info!("loading field Secp256k1order");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                }
-                #[cfg(not(all(feature = "ff", feature = "secp256")))]
-                {
-                    panic!("Set feature ff and secp256 for Secp256k1order")
+                info!("loading field Secp256k1order");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _, _>::init(
+                        channel,
+                        rng,
+                        rng2,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _, _>::init(
+                        channel,
+                        rng,
+                        rng2,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
             }
-            &[255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
+            #[cfg(not(all(feature = "ff", feature = "secp256")))]
             {
-                #[cfg(feature = "ff")]
-                {
-                    info!("loading field F384p");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<F384p, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<F384p, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                }
-                #[cfg(not(feature = "ff"))]
-                {
-                    panic!("Set feature ff for F384p")
-                }
+                panic!("Set feature ff and secp256 for Secp256k1order")
             }
-            &[115, 41, 197, 204, 106, 25, 236, 236, 122, 167, 176, 72, 178, 13, 26, 88, 223, 45, 55, 244, 129, 77, 99, 199, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
+        } else if field == std::any::TypeId::of::<F384p>() {
+            #[cfg(feature = "ff")]
             {
-                #[cfg(feature = "ff")]
-                {
-                    info!("loading field F384q");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<F384q, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<F384q, _, _>::init(
-                            channel,
-                            rng,
-                            rng2,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                }
-                #[cfg(not(feature = "ff"))]
-                {
-                    panic!("Set feature ff for F384q")
+                info!("loading field F384p");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<F384p, _, _>::init(
+                        channel,
+                        rng,
+                        rng2,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<F384p, _, _>::init(
+                        channel,
+                        rng,
+                        rng2,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
             }
-            x => {
-                return Err(BackendError(format!(
-                    "Unknown or unsupported field {:?}",
-                    x
-                )))
+            #[cfg(not(feature = "ff"))]
+            {
+                panic!("Set feature ff for F384p")
             }
+        } else if field == std::any::TypeId::of::<F384q>() {
+            #[cfg(feature = "ff")]
+            {
+                info!("loading field F384q");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<F384q, _, _>::init(
+                        channel,
+                        rng,
+                        rng2,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<F384q, _, _>::init(
+                        channel,
+                        rng,
+                        rng2,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            }
+            #[cfg(not(feature = "ff"))]
+            {
+                panic!("Set feature ff for F384q")
+            }
+        } else {
+            return Err(BackendError(format!(
+                "Unknown or unsupported field {:?}",
+                field
+            )));
         }
         self.eval.push(back);
         Ok(())
@@ -1783,21 +1303,13 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         Ok(())
     }
 
-    #[allow(clippy::ptr_arg)]
     pub fn evaluate_relation_text(&mut self, path: &PathBuf) -> Result<()> {
         let rel = RelationReader::open(path.as_path()).unwrap();
 
         let mut buf_rel = TextRelation::default();
 
-        let r = rel.read(&mut buf_rel);
-        match r {
-            Err(_) => {
-                return Err(BackendError("at parsing".into()));
-            }
-            Ok(()) => {
-                self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
-            }
-        }
+        rel.read(&mut buf_rel)?;
+        self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
 
         for i in 0..self.eval.len() {
             self.eval[i].finalize()?;
@@ -1819,9 +1331,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         // 4) pop frame
 
         // 1)
-        let func = fun_store.get(name);
+        let func = fun_store.get(name)?;
 
-        let gates_body = match &func.body {
+        let gates_body = match &func.body() {
             GatesOrPluginBody::Gates(body) => body,
             GatesOrPluginBody::Plugin(_) => func.compiled_info.plugin_gates.as_ref().unwrap(),
         };
@@ -1835,26 +1347,28 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         }
 
         let mut prev = 0;
-        assert_eq!(out_ranges.len(), func.output_counts.len());
+        let output_counts = func.output_counts();
+        assert_eq!(out_ranges.len(), output_counts.len());
         #[allow(clippy::needless_range_loop)]
-        for i in 0..func.output_counts.len() {
-            let (field_idx, count) = func.output_counts[i];
+        for i in 0..output_counts.len() {
+            let (field_idx, count) = output_counts[i];
             let (src_first, src_last) = out_ranges[i];
             self.eval[field_idx as usize].allocate_slice(src_first, src_last, prev, count, true);
             prev += count;
         }
 
-        assert_eq!(in_ranges.len(), func.input_counts.len());
+        let input_counts = func.input_counts();
+        assert_eq!(in_ranges.len(), input_counts.len());
         #[allow(clippy::needless_range_loop)]
-        for i in 0..func.input_counts.len() {
-            let (field_idx, count) = func.input_counts[i];
+        for i in 0..input_counts.len() {
+            let (field_idx, count) = input_counts[i];
             let (src_first, src_last) = in_ranges[i];
             self.eval[field_idx as usize].allocate_slice(src_first, src_last, prev, count, false);
             prev += count;
         }
 
         // 3)
-        self.evaluate_gates_passed(&gates_body.gates, fun_store)?;
+        self.evaluate_gates_passed(gates_body.gates(), fun_store)?;
 
         // 4)
         // TODO: dont do the push blindly on all backends
@@ -1946,16 +1460,11 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 mod tests {
     use super::{RcRefCell, TypeStore};
     use crate::backend_multifield::{
-        CircInputs,
         EvaluatorCirc,
-        FunStore,
-        FuncDecl,
         //F2_VEC, F384P_VEC, F384Q_VEC, F61P_VEC,
-        GateM,
         Party,
-        WireId,
-        WireRange,
     };
+    use crate::circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange};
     use crate::homcom::{FComProver, FComVerifier};
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
@@ -2463,7 +1972,7 @@ mod tests {
         // The following instruction disable the vector optimization
         func.compiled_info.body_max = None;
 
-        func_store.0.insert("myadd".into(), func);
+        func_store.insert("myadd".into(), func);
 
         let gates = vec![
             GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
@@ -2517,7 +2026,7 @@ mod tests {
             vec![(FF0, 1), (FF0, 1)],
             vec![(FF0, 2), (FF0, 2)],
         );
-        func_store.0.insert("myadd".into(), func);
+        func_store.insert("myadd".into(), func);
 
         let gates = vec![
             GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
@@ -2574,7 +2083,7 @@ mod tests {
 
         // The following instruction disable the vector optimization
         func.compiled_info.body_max = None;
-        func_store.0.insert("myfun".into(), func);
+        func_store.insert("myfun".into(), func);
 
         let two = into_vec(F61p::ONE + F61p::ONE);
         let minus_four = into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE));
@@ -2621,6 +2130,7 @@ mod tests {
     fn test_f2_mux() {
         let fields = vec![F2_VEC.to_vec()];
         let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
             "my_mux".into(),
@@ -2632,10 +2142,11 @@ mod tests {
             vec![],
             vec![],
             vec![],
+            &type_store,
         )
         .unwrap();
 
-        func_store.0.insert("my_mux".into(), func);
+        func_store.insert("my_mux".into(), func);
 
         let gates = vec![
             GateM::Witness(FF0, 0),
@@ -2684,6 +2195,7 @@ mod tests {
     fn test_f2_mux_on_slices() {
         let fields = vec![F2_VEC.to_vec()];
         let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
             "my_mux".into(),
@@ -2695,10 +2207,11 @@ mod tests {
             vec![],
             vec![],
             vec![],
+            &type_store,
         )
         .unwrap();
 
-        func_store.0.insert("my_mux".into(), func);
+        func_store.insert("my_mux".into(), func);
 
         let gates = vec![
             GateM::New(FF0, 4, 11),

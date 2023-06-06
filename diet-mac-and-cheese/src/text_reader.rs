@@ -1,6 +1,6 @@
 //! SIEVE IR0+ text reader.
 
-use crate::backend_multifield::{FunStore, FuncDecl, GateM, TypeStore};
+use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
 use log::{info, warn};
 use mac_n_cheese_sieve_parser::{
     FunctionBodyVisitor,
@@ -230,13 +230,13 @@ impl RelationVisitor for TextRelation {
         let name_s: String = std::str::from_utf8(name).unwrap().into();
 
         let mut output_counts = vec![];
-        for o in outputs {
-            output_counts.push((o.ty.try_into().unwrap(), o.count));
+        for output in outputs {
+            output_counts.push((output.ty.try_into()?, output.count));
         }
 
         let mut input_counts = vec![];
-        for inp in inputs {
-            input_counts.push((inp.ty.try_into().unwrap(), inp.count));
+        for input in inputs {
+            input_counts.push((input.ty.try_into()?, input.count));
         }
 
         let mut params = vec![];
@@ -261,8 +261,8 @@ impl RelationVisitor for TextRelation {
             params,
             vec![], // TODO: Add them !
             vec![], // TODO: Add them!
-        )
-        .unwrap();
+            &self.type_store,
+        )?;
         info!(
             "plugin {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
             name_s,

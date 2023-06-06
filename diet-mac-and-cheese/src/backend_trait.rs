@@ -14,15 +14,14 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 
-/// Trait providing an interface for basic gates.
-///
-/// This `BackendT` trait is inspired from `ZKBackend` in zkinterface.
+/// An interface for computing over basic gates using a single [`FiniteField`].
 pub trait BackendT {
+    /// The type associated with the input and output wires of the gates.
     type Wire;
+    /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement>;
-    fn set_field(&mut self, modulus: &[u8], degree: u32, is_boolean: bool) -> Result<()>;
     fn one(&self) -> Result<Self::FieldElement>;
     fn zero(&self) -> Result<Self::FieldElement>;
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;
@@ -51,10 +50,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
         from_bytes_le(val)
-    }
-
-    fn set_field(&mut self, _modulus: &[u8], _degree: u32, _is_boolean: bool) -> Result<()> {
-        Ok(())
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
@@ -122,10 +117,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
         from_bytes_le(val)
-    }
-
-    fn set_field(&mut self, _modulus: &[u8], _degree: u32, _is_boolean: bool) -> Result<()> {
-        Ok(())
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {

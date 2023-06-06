@@ -49,5 +49,4 @@ impl PluginBody {
 }
 
 pub(crate) mod mux_v0;
-// #[allow(dead_code)]
 // pub(crate) mod permutation_check_v1;

@@ -1,4 +1,4 @@
-use crate::backend_multifield::WireId;
+use crate::circuit_ir::WireId;
 #[allow(unused_imports)]
 use log::{debug, info};
 use std::cell::RefCell;
