@@ -203,6 +203,9 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     fn zero(&self) -> Result<Self::FieldElement> {
         self.dmc.zero()
     }
+    fn challenge(&mut self) -> Result<Self::Wire> {
+        self.dmc.challenge()
+    }
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.copy(wire)
     }
@@ -475,6 +478,9 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.copy(wire)
+    }
+    fn challenge(&mut self) -> Result<Self::Wire> {
+        self.dmc.challenge()
     }
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.constant(val)
@@ -802,6 +808,10 @@ where
             }
             Conv(_) => {
                 panic!("Conv should be intercepted earlier")
+            }
+            Challenge(_, out) => {
+                let v = self.backend.challenge()?;
+                self.memory.set(*out, &v);
             }
             Comment(_) => {
                 panic!("Comment should be intercepted earlier")

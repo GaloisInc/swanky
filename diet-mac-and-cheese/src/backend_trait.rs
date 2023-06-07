@@ -22,6 +22,7 @@ pub trait BackendT {
     fn one(&self) -> Result<Self::FieldElement>;
     fn zero(&self) -> Result<Self::FieldElement>;
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;
+    fn challenge(&mut self) -> Result<Self::Wire>;
 
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire>;
     fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()>;
@@ -42,7 +43,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
     for DietMacAndCheeseProver<FE, C, RNG>
 {
     type Wire = MacProver<FE>;
-
     type FieldElement = FE::PrimeField;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
@@ -51,6 +51,12 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())
+    }
+
+    fn challenge(&mut self) -> Result<Self::Wire> {
+        self.channel.flush()?;
+        let challenge = self.channel.read_serializable::<FE>()?;
+        Ok(MacProver::new(FE::PrimeField::ZERO, challenge))
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -91,7 +97,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
         if val.is_none() {
-            return Err(eyre!("Should be some"));
+            return Err(eyre!("No private input given to the prover"));
         }
 
         self.input_private(val.unwrap())
@@ -109,7 +115,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
     for DietMacAndCheeseVerifier<FE, C, RNG>
 {
     type Wire = MacVerifier<FE>;
-
     type FieldElement = FE::PrimeField;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
@@ -118,6 +123,12 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())
+    }
+
+    fn challenge(&mut self) -> Result<Self::Wire> {
+        let challenge = FE::random(&mut self.rng);
+        self.channel.write_serializable(&challenge)?;
+        Ok(MacVerifier::new(challenge))
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -158,7 +169,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
         if val.is_some() {
-            return Err(eyre!("Should be none"));
+            return Err(eyre!("Private input given to the verifier"));
         }
 
         self.input_private()
