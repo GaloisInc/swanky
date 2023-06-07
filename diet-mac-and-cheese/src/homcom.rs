@@ -4,9 +4,8 @@
 //! `check_zero`, `open` and `check_multiply`.
 //! These functionalities are used for diet Mac'n'Cheese and in the edabits
 //! conversion protocol for field-switching.
-use crate::error::{Error, Result};
+use eyre::{eyre, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
-#[allow(unused)]
 use log::{debug, info, warn};
 use ocelot::svole::wykw::{LpnParams, Receiver, Sender};
 use ocelot::svole::{SVoleReceiver, SVoleSender};
@@ -340,7 +339,7 @@ impl<FE: FiniteField> FComProver<FE> {
                 self.svole_sender.send(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => Ok(MacProver(e.0, e.1)),
-                    None => Err(Error::HomcomError("svole failed for random".to_string())),
+                    None => Err(eyre!("svole failed for random")),
                 }
             }
         }
@@ -447,7 +446,7 @@ impl<FE: FiniteField> FComProver<FE> {
             Ok(())
         } else {
             warn!("check_zero fails");
-            Err(Error::HomcomError("check_zero failed".to_string()))
+            Err(eyre!("check_zero failed"))
         }
     }
 
@@ -677,7 +676,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
                 );
                 match self.voles.pop() {
                     Some(e) => Ok(MacVerifier(e)),
-                    None => Err(Error::HomcomError("svole failed for random".to_string())),
+                    None => Err(eyre!("svole failed for random")),
                 }
             }
         }
@@ -782,7 +781,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         if b {
             Ok(())
         } else {
-            Err(Error::HomcomError("check_zero failed".to_string()))
+            Err(eyre!("check_zero failed"))
         }
     }
 
@@ -820,7 +819,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             Ok(())
         } else {
             warn!("check_zero fails");
-            Err(Error::HomcomError("open fails".to_string()))
+            Err(eyre!("open fails"))
         }
     }
 
@@ -863,7 +862,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             // - because of delta
             Ok(())
         } else {
-            Err(Error::HomcomError("checkMultiply fails".to_string()))
+            Err(eyre!("checkMultiply fails"))
         }
     }
 
@@ -911,7 +910,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
             Ok(c)
         } else {
             state.reset();
-            Err(Error::HomcomError("checkMultiply fails".to_string()))
+            Err(eyre!("checkMultiply fails"))
         }
     }
 

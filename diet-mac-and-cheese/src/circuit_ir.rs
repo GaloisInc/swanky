@@ -4,10 +4,9 @@
 use crate::{
     fields::modulus_to_type_id,
     plugins::{mux_v0::MuxV0, PluginBody, PluginType},
-    Error, Result,
 };
 use crypto_bigint::ArrayEncoding;
-use eyre::eyre;
+use eyre::{eyre, Result};
 use log::debug;
 use std::{
     cmp::max,
@@ -411,7 +410,7 @@ impl FuncDecl {
             //     &output_counts,
             //     type_store,
             // )?,
-            name => return Err(Error::EyreError(eyre!("Unsupported plugin: {name}"))),
+            name => return Err(eyre!("Unsupported plugin: {name}")),
         };
 
         let body_max = gates.output_wire_max();

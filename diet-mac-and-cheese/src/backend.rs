@@ -1,8 +1,8 @@
 use crate::edabits::RcRefCell;
-use crate::error::{Error::*, Result};
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
+use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use ocelot::svole::wykw::LpnParams;
@@ -26,14 +26,14 @@ fn padded_read<FE: FiniteField>(mut x: &[u8]) -> Result<FE> {
         x = &x[0..x.len() - 1];
     }
     if x.len() > FE::ByteReprLen::USIZE {
-        Err(BackendError("Invalid field element".into()))
+        Err(eyre!("Invalid field element"))
     } else {
         let mut out = GenericArray::default();
         let size = x.len().min(FE::ByteReprLen::USIZE);
         out[0..size].copy_from_slice(&x[0..size]);
         // NOTE: the FE type doesn't require that from_bytes be little-endian. However, we
         // currently implement it that way for all fields.
-        FE::from_bytes(&out).map_err(|_| BackendError("Invalid field element".into()))
+        FE::from_bytes(&out).context("Invalid field element")
     }
 }
 
@@ -196,8 +196,8 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     // this function should be called before every function exposed publicly by the API.
     fn check_is_ok(&self) -> Result<()> {
         if !self.is_ok {
-            return Err(BackendError(
-                "An error occurred earlier. This functionality should not be used further".into(),
+            return Err(eyre!(
+                "An error occurred earlier. This functionality should not be used further"
             ));
         }
         Ok(())
@@ -417,8 +417,8 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     // this function should be called before every function exposed publicly by the API.
     fn check_is_ok(&self) -> Result<()> {
         if !self.is_ok {
-            return Err(BackendError(
-                "An error occurred earlier. This functionality should not be used further".into(),
+            return Err(eyre!(
+                "An error occurred earlier. This functionality should not be used further"
             ));
         }
         Ok(())

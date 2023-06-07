@@ -1,15 +1,12 @@
 #![allow(clippy::clone_on_copy)]
 
-/*!
-Backend trait.
+//! Core backend trait used for Diet Mac'n'Cheese.
 
-*/
-use crate::error::Error::BackendError;
-use crate::error::Result;
 use crate::{
     backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier},
     homcom::{MacProver, MacVerifier},
 };
+use eyre::{eyre, Result};
 use rand::{CryptoRng, Rng};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
@@ -94,7 +91,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
         if val.is_none() {
-            return Err(BackendError("Should be some".into()));
+            return Err(eyre!("Should be some"));
         }
 
         self.input_private(val.unwrap())
@@ -161,7 +158,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
         if val.is_some() {
-            return Err(BackendError("Should be none".into()));
+            return Err(eyre!("Should be none"));
         }
 
         self.input_private()
