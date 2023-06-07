@@ -1442,13 +1442,19 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 #[cfg(test)]
 mod tests {
     use super::{RcRefCell, TypeStore};
-    use crate::backend_multifield::{
-        EvaluatorCirc,
-        //F2_VEC, F384P_VEC, F384Q_VEC, F61P_VEC,
-        Party,
-    };
-    use crate::circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange};
     use crate::homcom::{FComProver, FComVerifier};
+    use crate::{
+        backend_multifield::{
+            EvaluatorCirc,
+            //F2_VEC, F384P_VEC, F384Q_VEC, F61P_VEC,
+            Party,
+        },
+        plugins::MuxV0,
+    };
+    use crate::{
+        circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
+        plugins::Plugin,
+    };
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
     use rand::SeedableRng;
@@ -2128,7 +2134,7 @@ mod tests {
             42,
             vec![(FF0, 1)],
             vec![(FF0, 1), (FF0, 1), (FF0, 1)],
-            "mux_v0".into(),
+            MuxV0::NAME.into(),
             "strict".into(),
             vec![],
             vec![],
@@ -2193,7 +2199,7 @@ mod tests {
             42,
             vec![(FF0, 3), (FF0, 1)],
             vec![(FF0, 1), (FF0, 3), (FF0, 1), (FF0, 3), (FF0, 1)],
-            "mux_v0".into(),
+            MuxV0::NAME.into(),
             "strict".into(),
             vec![],
             vec![],

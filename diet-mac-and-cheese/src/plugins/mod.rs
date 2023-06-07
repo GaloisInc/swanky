@@ -1,3 +1,5 @@
+use crate::circuit_ir::{GatesBody, TypeId, TypeStore, WireCount};
+use eyre::Result;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 
 #[derive(Clone, Debug)]
@@ -48,5 +50,33 @@ impl PluginBody {
     }
 }
 
-pub(crate) mod mux_v0;
+/// This trait defines a Circuit IR plugin.
+pub(crate) trait Plugin {
+    /// The name of the plugin.
+    const NAME: &'static str;
+
+    /// Return the [`GatesBody`] associated with this plugin.
+    ///
+    /// Arguments:
+    /// - `operation`: The name of the operation
+    /// - `params`: Any additional parameters to the operation
+    /// - `count`: The count of input and output wires in the operation
+    ///   signature
+    /// - `output_counts`: A slice containing the outputs given as a tuple of
+    ///   [`TypeId`] and [`WireCount`].
+    /// - `input_counts`: A slice containing the inputs given as a tuple of
+    ///   [`TypeId`] and [`WireCount`].
+    /// - `type_store`: The [`TypeStore`] for this circuit.
+    fn gates_body(
+        operation: &str,
+        params: &[String],
+        count: u64,
+        output_counts: &[(TypeId, WireCount)],
+        input_counts: &[(TypeId, WireCount)],
+        type_store: &TypeStore,
+    ) -> Result<GatesBody>;
+}
+
+mod mux_v0;
+pub(crate) use mux_v0::MuxV0;
 // pub(crate) mod permutation_check_v1;

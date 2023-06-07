@@ -3,7 +3,7 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{mux_v0::MuxV0, PluginBody, PluginType},
+    plugins::{MuxV0, Plugin, PluginBody, PluginType},
 };
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
@@ -130,8 +130,10 @@ impl TypeStore {
         self.0.insert(key, value);
     }
 
-    // pub(crate) fn get(&self, key: &TypeId) -> Option<&TypeSpecification> {
-    //     self.0.get(key)
+    // pub(crate) fn get(&self, key: &TypeId) -> eyre::Result<&TypeSpecification> {
+    //     self.0
+    //         .get(key)
+    //         .ok_or_else(|| eyre!("Type ID {key} not found in `TypeStore`"))
     // }
 
     pub fn iter(&self) -> std::collections::btree_map::Iter<TypeId, TypeSpecification> {
@@ -385,29 +387,30 @@ impl FuncDecl {
         _private_count: Vec<(TypeId, WireId)>,
         type_store: &TypeStore,
     ) -> Result<Self> {
-        let mut cnt = 0;
+        // Count of input and output wires.
+        let mut count = 0;
         for (_, w) in output_counts.iter() {
-            cnt += w;
+            count += w;
         }
         for (_, w) in input_counts.iter() {
-            cnt += w;
+            count += w;
         }
 
         let gates = match plugin_name.as_str() {
-            "mux_v0" => MuxV0::gates_body(
+            MuxV0::NAME => MuxV0::gates_body(
                 &operation,
                 &params,
-                cnt,
-                &input_counts,
+                count,
                 &output_counts,
+                &input_counts,
                 type_store,
             )?,
-            // "permutation_check_v1" => PermutationCheckV1::gates_body(
+            // PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
             //     &operation,
             //     &params,
-            //     cnt,
-            //     &input_counts,
+            //     count,
             //     &output_counts,
+            //     &input_counts,
             //     type_store,
             // )?,
             name => return Err(eyre!("Unsupported plugin: {name}")),
@@ -425,7 +428,7 @@ impl FuncDecl {
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count: Some(cnt),
+                args_count: Some(count),
                 body_max,
                 type_ids,
                 plugin_gates: Some(gates),
