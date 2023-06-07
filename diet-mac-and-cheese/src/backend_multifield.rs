@@ -1084,7 +1084,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 back = Box::new(EvaluatorSingle::new(dmc, false));
             }
         } else if field == std::any::TypeId::of::<Secp256k1>() {
-            #[cfg(all(feature = "ff", feature = "secp256"))]
+            #[cfg(all(feature = "ff"))]
             {
                 info!("loading field Secp256k1");
                 if self.party == Party::Prover {
@@ -1113,12 +1113,12 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
             }
-            #[cfg(not(all(feature = "ff", feature = "secp256")))]
+            #[cfg(not(all(feature = "ff")))]
             {
-                panic!("Set feature ff and secp256 for Secp256k1")
+                panic!("Set feature ff for Secp256k1")
             }
         } else if field == std::any::TypeId::of::<Secp256k1order>() {
-            #[cfg(all(feature = "ff", feature = "secp256"))]
+            #[cfg(all(feature = "ff"))]
             {
                 info!("loading field Secp256k1order");
                 if self.party == Party::Prover {
@@ -1147,9 +1147,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
             }
-            #[cfg(not(all(feature = "ff", feature = "secp256")))]
+            #[cfg(not(all(feature = "ff")))]
             {
-                panic!("Set feature ff and secp256 for Secp256k1order")
+                panic!("Set feature ff for Secp256k1order")
             }
         } else if field == std::any::TypeId::of::<F384p>() {
             #[cfg(feature = "ff")]
@@ -1456,7 +1456,7 @@ mod tests {
     use scuttlebutt::field::{F384p, F384q};
     #[allow(unused_imports)]
     use scuttlebutt::field::{F40b, F2};
-    #[cfg(all(feature = "ff", feature = "secp256"))]
+    #[cfg(all(feature = "ff"))]
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{field::F61p, field::FiniteField, AesRng, Channel};
@@ -1915,7 +1915,7 @@ mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses);
     }
 
-    #[cfg(all(feature = "ff", feature = "secp256"))]
+    #[cfg(all(feature = "ff"))]
     fn test_conv_ff_5() {
         // tests that conversions from big fields secp
         let fields = vec![SECP256K1_VEC.to_vec(), SECP256K1ORDER_VEC.to_vec()];
@@ -2482,7 +2482,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ff", feature = "secp256"))]
+    #[cfg(all(feature = "ff"))]
     fn test_multifield_ff_secp256() {
         test_conv_ff_5();
     }

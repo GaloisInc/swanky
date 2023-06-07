@@ -13,7 +13,6 @@ version.workspace = true
 
 [features]
 ff = ["scuttlebutt/ff"]
-secp256 = []
 
 [dependencies]
 blake3.workspace = true
