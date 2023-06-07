@@ -298,7 +298,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     fn maybe_do_conversion_check(&mut self, id: usize, num: usize) -> Result<()> {
-        if num > SIZE_CONVERSION_BATCH || !self.no_batching {
+        if num > SIZE_CONVERSION_BATCH || self.no_batching {
             let edabits = self.edabits_map.0.get_mut(&id).unwrap();
             self.conv.conv(
                 &mut self.dmc.channel,
@@ -565,7 +565,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     fn maybe_do_conversion_check(&mut self, id: usize, num: usize) -> Result<()> {
-        if num > SIZE_CONVERSION_BATCH || !self.no_batching {
+        if num > SIZE_CONVERSION_BATCH || self.no_batching {
             let edabits = self.edabits_map.0.get_mut(&id).unwrap();
             self.conv.conv(
                 &mut self.dmc.channel,
@@ -942,6 +942,7 @@ pub struct EvaluatorCirc<C: AbstractChannel + 'static> {
     f2_idx: usize,
     party: Party,
     rng: AesRng,
+    no_batching: bool,
     phantom: PhantomData<C>,
 }
 
@@ -954,6 +955,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         inputs: CircInputs,
         type_store: TypeStore,
         lpn_small: bool,
+        no_batching: bool,
     ) -> Result<Self> {
         let lpn_setup;
         let lpn_extend;
@@ -989,31 +991,19 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             eval: Vec::new(),
             f2_idx: 42,
             rng,
+            no_batching,
             phantom: PhantomData,
         })
     }
 
-    pub fn load_backends(
-        &mut self,
-        channel: &mut C,
-        lpn_small: bool,
-        no_batching: bool,
-    ) -> Result<()> {
+    pub fn load_backends(&mut self, channel: &mut C, lpn_small: bool) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
             match spec {
                 TypeSpecification::Field(field) => {
                     let rng = self.rng.fork();
                     let rng2 = self.rng.fork();
-                    self.load_backend(
-                        channel,
-                        rng,
-                        rng2,
-                        *field,
-                        *idx as usize,
-                        lpn_small,
-                        no_batching,
-                    )?;
+                    self.load_backend(channel, rng, rng2, *field, *idx as usize, lpn_small)?;
                 }
                 _ => {
                     todo!("Type not supported yet: {:?}", spec);
@@ -1031,7 +1021,6 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         field: std::any::TypeId,
         idx: usize,
         lpn_small: bool,
-        no_batching: bool,
     ) -> Result<()> {
         // Loading the backends in order
         assert_eq!(idx, self.eval.len());
@@ -1056,7 +1045,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     channel,
                     rng,
                     fcom_f2,
-                    no_batching,
+                    self.no_batching,
                 )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             } else {
@@ -1065,7 +1054,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     channel,
                     rng,
                     fcom_f2,
-                    no_batching,
+                    self.no_batching,
                 )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             }
@@ -1081,7 +1070,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     fcom_f2,
                     lpn_setup,
                     lpn_extend,
-                    no_batching,
+                    self.no_batching,
                 )?;
                 back = Box::new(EvaluatorSingle::new(dmc, false));
             } else {
@@ -1093,7 +1082,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     fcom_f2,
                     lpn_setup,
                     lpn_extend,
-                    no_batching,
+                    self.no_batching,
                 )?;
                 back = Box::new(EvaluatorSingle::new(dmc, false));
             }
@@ -1110,7 +1099,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 } else {
@@ -1122,7 +1111,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
@@ -1144,7 +1133,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 } else {
@@ -1156,7 +1145,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
@@ -1178,7 +1167,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 } else {
@@ -1190,7 +1179,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
@@ -1212,7 +1201,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 } else {
@@ -1224,7 +1213,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         fcom_f2,
                         LPN_SETUP_EXTRASMALL,
                         LPN_EXTEND_EXTRASMALL,
-                        no_batching,
+                        self.no_batching,
                     )?;
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
@@ -1616,9 +1605,10 @@ mod tests {
                 inputs,
                 type_store_prover,
                 true,
+                false,
             )
             .unwrap();
-            eval.load_backends(&mut channel, true, false).unwrap();
+            eval.load_backends(&mut channel, true).unwrap();
             eval.evaluate_gates(&gates_prover, &func_store_prover)
                 .unwrap();
         });
@@ -1634,10 +1624,17 @@ mod tests {
             inputs.ingest_instances(id, VecDeque::from(inst.clone()));
         }
 
-        let mut eval =
-            EvaluatorCirc::new(Party::Verifier, &mut channel, rng, inputs, type_store, true)
-                .unwrap();
-        eval.load_backends(&mut channel, true, false).unwrap();
+        let mut eval = EvaluatorCirc::new(
+            Party::Verifier,
+            &mut channel,
+            rng,
+            inputs,
+            type_store,
+            true,
+            false,
+        )
+        .unwrap();
+        eval.load_backends(&mut channel, true).unwrap();
         eval.evaluate_gates(&gates, &func_store).unwrap();
 
         handle.join().unwrap();
@@ -1824,7 +1821,7 @@ mod tests {
             F384Q_VEC.to_vec(),
             F2_VEC.to_vec(),
         ];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF0, 0),
@@ -1848,7 +1845,7 @@ mod tests {
             F384Q_VEC.to_vec(),
             F2_VEC.to_vec(),
         ];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             //GateM::New(FF3, 4, 4),
@@ -1875,7 +1872,7 @@ mod tests {
             F384Q_VEC.to_vec(),
             F2_VEC.to_vec(),
         ];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF2, 4),
@@ -1903,7 +1900,7 @@ mod tests {
     fn test_conv_ff_4() {
         // test conversion from large field to smaller field
         let fields = vec![F61P_VEC.to_vec(), F384P_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF1, 0),
@@ -1928,7 +1925,7 @@ mod tests {
     fn test_conv_ff_5() {
         // tests that conversions from big fields secp
         let fields = vec![SECP256K1_VEC.to_vec(), SECP256K1ORDER_VEC.to_vec()];
-        let func_store = FunStore::new();
+        let func_store = FunStore::default();
 
         let gates = vec![
             GateM::Witness(FF0, 0),

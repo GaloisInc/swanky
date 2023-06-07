@@ -127,12 +127,9 @@ fn run_text(args: &Cli) -> Result<()> {
                         inputs,
                         TypeStore::try_from(rel.header().types.clone())?,
                         false,
-                    )?;
-                    evaluator.load_backends(
-                        &mut channel,
-                        args.lpn == LpnSize::Small,
                         args.nobatching,
                     )?;
+                    evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
@@ -170,8 +167,9 @@ fn run_text(args: &Cli) -> Result<()> {
                 inputs,
                 TypeStore::try_from(rel.header().types.clone())?,
                 false,
+                args.nobatching,
             )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small, args.nobatching)?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation_text(&relation_path)?;
@@ -248,12 +246,9 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                         inputs,
                         fields,
                         false,
-                    )?;
-                    evaluator.load_backends(
-                        &mut channel,
-                        args.lpn == LpnSize::Small,
                         args.nobatching,
                     )?;
+                    evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
@@ -291,8 +286,9 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                 inputs,
                 fields.clone(),
                 false,
+                args.nobatching,
             )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small, args.nobatching)?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;
