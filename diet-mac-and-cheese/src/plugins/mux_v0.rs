@@ -1,28 +1,32 @@
+use super::Plugin;
 use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeStore, WireCount};
-use eyre::eyre;
+use eyre::{eyre, Result};
 use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
 
 pub(crate) struct MuxV0;
-const PLUGIN_NAME: &str = "mux_v0";
 
-impl MuxV0 {
-    pub(crate) fn gates_body(
+impl Plugin for MuxV0 {
+    const NAME: &'static str = "mux_v0";
+
+    fn gates_body(
         operation: &str,
         params: &[String],
         count: u64,
-        input_counts: &[(TypeId, WireCount)],
         output_counts: &[(TypeId, WireCount)],
+        input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
-    ) -> eyre::Result<GatesBody> {
+    ) -> Result<GatesBody> {
         if operation != "strict" {
             return Err(eyre!(
-                "{PLUGIN_NAME}: Implementation only handles strict permissiveness: {operation}",
+                "{}: Implementation only handles strict permissiveness: {operation}",
+                Self::NAME,
             ));
         }
 
         if params.len() != 0 {
             return Err(eyre!(
-                "{PLUGIN_NAME}: Invalid number of params (must be zero): {}",
+                "{}: Invalid number of params (must be zero): {}",
+                Self::NAME,
                 params.len()
             ));
         }
