@@ -2,7 +2,7 @@ use crate::edabits::RcRefCell;
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
-use eyre::{eyre, Result};
+use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use ocelot::svole::wykw::LpnParams;
@@ -33,7 +33,7 @@ fn padded_read<FE: FiniteField>(mut x: &[u8]) -> Result<FE> {
         out[0..size].copy_from_slice(&x[0..size]);
         // NOTE: the FE type doesn't require that from_bytes be little-endian. However, we
         // currently implement it that way for all fields.
-        FE::from_bytes(&out).map_err(|_| eyre!("Invalid field element"))
+        FE::from_bytes(&out).context("Invalid field element")
     }
 }
 
