@@ -10,7 +10,7 @@ use crate::{
 use crate::{
     fields::modulus_to_type_id, sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds,
 };
-use crate::{Error::*, Result};
+use eyre::{eyre, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
 use log::info;
 use std::collections::VecDeque;
@@ -203,7 +203,7 @@ impl BufRelation {
                 buffer_bytes: Vec::new(),
             })
         } else {
-            Err(BackendError("cannot open file".into()))
+            Err(eyre!("cannot open file"))
         }
     }
 

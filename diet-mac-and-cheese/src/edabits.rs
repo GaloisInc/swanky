@@ -4,8 +4,8 @@
 
 //! Field switching functionality based on protocol with Edabuts.
 
-use crate::error::{Error, Result};
 use crate::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
+use eyre::{eyre, Result};
 use generic_array::typenum::Unsigned;
 #[allow(unused)]
 use log::{debug, info, warn};
@@ -158,12 +158,12 @@ fn check_parameters<FE: FiniteField>(n: usize, gamma: usize) -> Result<()> {
             - usize::try_from(x.leading_zeros()).expect("sizeof(usize) >= sizeof(u32)")
     }
     if log2_floor(n + 1) + gamma >= FE::NumberOfBitsInBitDecomposition::USIZE - 1 {
-        Err(Error::EdabitsError(format!(
+        Err(eyre!(
             "Fdabit invalid parameter configuration: n={}, gamma={}, FE={}",
             n,
             gamma,
             std::any::type_name::<FE>(),
-        )))
+        ))
     } else {
         Ok(())
     }
@@ -307,9 +307,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     ) -> Result<Vec<(Vec<MacProver<F40b>>, MacProver<F40b>)>> {
         let num = x_batch.len();
         if num != y_batch.len() {
-            return Err(Error::EdabitsError(
-                "incompatible input vectors in bit_add_carry".to_string(),
-            ));
+            return Err(eyre!("incompatible input vectors in bit_add_carry"));
         }
 
         let m = x_batch[0].bits.len();
@@ -754,7 +752,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         if res {
             Ok(())
         } else {
-            Err(Error::EdabitsError("fail fdabit prover".to_string()))
+            Err(eyre!("fail fdabit prover"))
         }
     }
 
@@ -1085,9 +1083,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     ) -> Result<Vec<(Vec<MacVerifier<F40b>>, MacVerifier<F40b>)>> {
         let num = x_batch.len();
         if num != y_batch.len() {
-            return Err(Error::EdabitsError(
-                "incompatible input vectors in bit_add_carry".to_string(),
-            ));
+            return Err(eyre!("incompatible input vectors in bit_add_carry"));
         }
 
         let m = x_batch[0].bits.len();
@@ -1418,7 +1414,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         if res {
             Ok(())
         } else {
-            Err(Error::EdabitsError("fail fdabit verifier".to_string()))
+            Err(eyre!("fail fdabit verifier"))
         }
     }
 
@@ -1592,7 +1588,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
                 .get_refmut()
                 .open(channel, &[a_mac.value], &mut a_m)?;
             if convert_bits_to_field::<FE::PrimeField>(&a_vec) != a_m[0] {
-                return Err(Error::EdabitsError("Wrong open random edabit".to_string()));
+                return Err(eyre!("Wrong open random edabit"));
             }
         }
         debug!("{:?}", start.elapsed());

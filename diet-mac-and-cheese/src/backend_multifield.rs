@@ -5,15 +5,18 @@
 use crate::circuit_ir::{CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId};
 use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
-use crate::error::{Error::*, Result};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
 use crate::memory::Memory;
 use crate::read_sieveir_phase2::BufRelation;
+use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::GatesOrPluginBody};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
+use eyre::{eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
+use mac_n_cheese_sieve_parser::text_parser::RelationReader;
+use mac_n_cheese_sieve_parser::RelationReader as RR;
 use ocelot::svole::wykw::LpnParams;
 #[cfg(feature = "ff")]
 use ocelot::svole::wykw::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
@@ -35,10 +38,6 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-
-use crate::text_reader::TextRelation;
-use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use mac_n_cheese_sieve_parser::RelationReader as RR;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
 //
@@ -741,7 +740,7 @@ where
             AssertZero(_, inp) => {
                 let inp_wire = self.memory.get(*inp);
                 if self.backend.assert_zero(inp_wire).is_err() {
-                    return Err(BackendError(format!("Assert zero fails on wire {}", *inp,)));
+                    return Err(eyre!("Assert zero fails on wire {}", *inp,));
                 }
             }
 
@@ -840,9 +839,8 @@ where
                         //return Ok(v);
                     }
 
-                    return Err(BackendError(
+                    return Err(eyre!(
                         "field switching from multiple wires on non-boolean field is not supported"
-                            .into(),
                     ));
                 }
                 let in_wire = self.memory.get(*inp1);
@@ -877,9 +875,8 @@ where
                         return Ok(());
                     }
 
-                    return Err(BackendError(
+                    return Err(eyre!(
                         "field switching to multiple wires on non-boolean field is not supported"
-                            .into(),
                     ));
                 }
                 let v = self.backend.assert_conv_from_bits(bits)?;
@@ -1223,10 +1220,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 panic!("Set feature ff for F384q")
             }
         } else {
-            return Err(BackendError(format!(
-                "Unknown or unsupported field {:?}",
-                field
-            )));
+            return Err(eyre!("Unknown or unsupported field {:?}", field));
         }
         self.eval.push(back);
         Ok(())
@@ -2304,7 +2298,7 @@ mod tests {
             party
                 .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
-            party.dmc_f2.finalize().unwrap_err();
+            let _ = party.dmc_f2.finalize().unwrap_err();
             party.dmc_f2.reset();
 
             party
@@ -2326,7 +2320,7 @@ mod tests {
                     vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
                 )
                 .unwrap();
-            party.dmc_f2.finalize().unwrap_err();
+            let _ = party.dmc_f2.finalize().unwrap_err();
             party.dmc_f2.reset();
 
             party
@@ -2351,7 +2345,7 @@ mod tests {
                     vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
                 )
                 .unwrap();
-            party.dmc_f2.finalize().unwrap_err();
+            let _ = party.dmc_f2.finalize().unwrap_err();
             party.dmc_f2.reset();
 
             // that's testing the little-endianness of the function
@@ -2361,7 +2355,7 @@ mod tests {
                     vec![F2::ZERO, F2::ONE].as_slice(),
                 )
                 .unwrap();
-            party.dmc_f2.finalize().unwrap_err();
+            let _ = party.dmc_f2.finalize().unwrap_err();
             party.dmc_f2.reset();
         });
 
@@ -2404,7 +2398,7 @@ mod tests {
         party
             .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
-        party.dmc_f2.finalize().unwrap_err();
+        let _ = party.dmc_f2.finalize().unwrap_err();
         party.dmc_f2.reset();
 
         party
@@ -2426,7 +2420,7 @@ mod tests {
                 vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
             )
             .unwrap();
-        party.dmc_f2.finalize().unwrap_err();
+        let _ = party.dmc_f2.finalize().unwrap_err();
         party.dmc_f2.reset();
 
         party
@@ -2451,7 +2445,7 @@ mod tests {
                 vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
             )
             .unwrap();
-        party.dmc_f2.finalize().unwrap_err();
+        let _ = party.dmc_f2.finalize().unwrap_err();
         party.dmc_f2.reset();
 
         // that's testing the little-endianness of the function
@@ -2461,7 +2455,7 @@ mod tests {
                 vec![F2::ZERO, F2::ONE].as_slice(),
             )
             .unwrap();
-        party.dmc_f2.finalize().unwrap_err();
+        let _ = party.dmc_f2.finalize().unwrap_err();
         party.dmc_f2.reset();
 
         handle.join().unwrap();

@@ -4,18 +4,18 @@ Implementation of ZKInterface `ZKBackend` trait.
 */
 
 use crate::backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier};
-use crate::error::Result as BResult;
 use crate::homcom::{MacProver, MacVerifier};
+use eyre::Result;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use zki_sieve::consumers::evaluator::ZKBackend;
 use zki_sieve::Result as ZkiResult;
 
-fn convert<T>(v: BResult<T>) -> ZkiResult<T> {
+fn convert<T>(v: Result<T>) -> ZkiResult<T> {
     match v {
-        BResult::Ok(x) => Ok(x),
-        BResult::Err(err) => Err(err.into()),
+        Result::Ok(x) => Ok(x),
+        Result::Err(err) => Err(err.into()),
     }
 }
 
