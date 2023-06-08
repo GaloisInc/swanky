@@ -41,6 +41,7 @@ pub enum GateM {
     New(TypeId, WireId, WireId),
     Delete(TypeId, WireId, WireId),
     Call(Box<(String, Vec<WireRange>, Vec<WireRange>)>),
+    Challenge(TypeId, WireId),
     Comment(String),
 }
 
@@ -62,6 +63,7 @@ impl GateM {
             Witness(ty, _) => *ty,
             Conv(_) => todo!(),
             Call(_) => todo!(),
+            Challenge(ty, _) => *ty,
             Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
         }
     }
@@ -101,6 +103,7 @@ impl GateM {
                 }
                 out
             }
+            Challenge(_, out) => Some(*out),
             Comment(_str) => None,
         }
     }
@@ -246,6 +249,7 @@ impl TypeIdMapping {
                 self.0[*ty as usize] = true;
             }
             Call(_) => {}
+            Challenge(ty, _) => self.0[*ty as usize] = true,
             Comment(_) => {}
         }
     }
@@ -324,6 +328,7 @@ pub(crate) struct CompiledInfo {
     pub(crate) plugin_gates: Option<GatesBody>,
 }
 
+/// Function declaration.
 #[derive(Clone)]
 pub struct FuncDecl {
     #[allow(dead_code)]

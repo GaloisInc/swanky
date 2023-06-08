@@ -189,7 +189,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     }
 
     /// Get party
-    pub fn get_party(&mut self) -> &RcRefCell<FComProver<FE>> {
+    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComProver<FE>> {
         &self.prover
     }
 
@@ -252,21 +252,21 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     }
 
     /// Assert a value is zero.
-    pub fn assert_zero(&mut self, value: &MacProver<FE>) -> Result<()> {
+    pub(crate) fn assert_zero(&mut self, value: &MacProver<FE>) -> Result<()> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_check_zero();
         self.push_check_zero_list(*value)
     }
 
     /// Add two values.
-    pub fn add(&mut self, a: &MacProver<FE>, b: &MacProver<FE>) -> Result<MacProver<FE>> {
+    pub(crate) fn add(&mut self, a: &MacProver<FE>, b: &MacProver<FE>) -> Result<MacProver<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_add();
         Ok(self.prover.get_refmut().add(*a, *b))
     }
 
     /// Multiply two values.
-    pub fn mul(&mut self, a: &MacProver<FE>, b: &MacProver<FE>) -> Result<MacProver<FE>> {
+    pub(crate) fn mul(&mut self, a: &MacProver<FE>, b: &MacProver<FE>) -> Result<MacProver<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_mul();
         let a_clr = a.value();
@@ -281,14 +281,14 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     }
 
     /// Add a value and a constant.
-    pub fn addc(&mut self, a: &MacProver<FE>, b: FE::PrimeField) -> Result<MacProver<FE>> {
+    pub(crate) fn addc(&mut self, a: &MacProver<FE>, b: FE::PrimeField) -> Result<MacProver<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
         Ok(self.prover.get_refmut().affine_add_cst(b, *a))
     }
 
     /// Multiply a value and a constant.
-    pub fn mulc(
+    pub(crate) fn mulc(
         &mut self,
         value: &MacProver<FE>,
         constant: FE::PrimeField,
@@ -299,13 +299,13 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     }
 
     /// Input a public value.
-    pub fn input_public(&mut self, value: FieldClear<FE>) -> MacProver<FE> {
+    pub(crate) fn input_public(&mut self, value: FieldClear<FE>) -> MacProver<FE> {
         self.monitor.incr_monitor_instance();
         MacProver::new(value, FE::ZERO)
     }
 
     /// Input a private value.
-    pub fn input_private(&mut self, value: FieldClear<FE>) -> Result<MacProver<FE>> {
+    pub(crate) fn input_private(&mut self, value: FieldClear<FE>) -> Result<MacProver<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_witness();
         self.input(value)
@@ -330,7 +330,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         Ok(())
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.prover.get_refmut().reset(&mut self.state_mult_check);
         self.is_ok = true;
     }
@@ -410,7 +410,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     /// Get party
-    pub fn get_party(&mut self) -> &RcRefCell<FComVerifier<FE>> {
+    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComVerifier<FE>> {
         &self.verifier
     }
 
@@ -474,21 +474,29 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     /// Assert a value is zero.
-    pub fn assert_zero(&mut self, value: &MacVerifier<FE>) -> Result<()> {
+    pub(crate) fn assert_zero(&mut self, value: &MacVerifier<FE>) -> Result<()> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_check_zero();
         self.push_check_zero_list(*value)
     }
 
     /// Add two values.
-    pub fn add(&mut self, a: &MacVerifier<FE>, b: &MacVerifier<FE>) -> Result<MacVerifier<FE>> {
+    pub(crate) fn add(
+        &mut self,
+        a: &MacVerifier<FE>,
+        b: &MacVerifier<FE>,
+    ) -> Result<MacVerifier<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_add();
         Ok(self.verifier.get_refmut().add(*a, *b))
     }
 
     /// Multiply two values.
-    pub fn mul(&mut self, a: &MacVerifier<FE>, b: &MacVerifier<FE>) -> Result<MacVerifier<FE>> {
+    pub(crate) fn mul(
+        &mut self,
+        a: &MacVerifier<FE>,
+        b: &MacVerifier<FE>,
+    ) -> Result<MacVerifier<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_mul();
         let tag = self.input()?;
@@ -499,27 +507,35 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     /// Add a value and a constant.
-    pub fn addc(&mut self, a: &MacVerifier<FE>, b: FE::PrimeField) -> Result<MacVerifier<FE>> {
+    pub(crate) fn addc(
+        &mut self,
+        a: &MacVerifier<FE>,
+        b: FE::PrimeField,
+    ) -> Result<MacVerifier<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
         Ok(self.verifier.get_refmut().affine_add_cst(b, *a))
     }
 
     /// Multiply a value and a constant.
-    pub fn mulc(&mut self, a: &MacVerifier<FE>, b: FE::PrimeField) -> Result<MacVerifier<FE>> {
+    pub(crate) fn mulc(
+        &mut self,
+        a: &MacVerifier<FE>,
+        b: FE::PrimeField,
+    ) -> Result<MacVerifier<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_mulc();
         Ok(self.verifier.get_refmut().affine_mult_cst(b, *a))
     }
 
     /// Input a public value and wraps it in a verifier value.
-    pub fn input_public(&mut self, val: FieldClear<FE>) -> MacVerifier<FE> {
+    pub(crate) fn input_public(&mut self, val: FieldClear<FE>) -> MacVerifier<FE> {
         self.monitor.incr_monitor_instance();
         MacVerifier::new(-val * self.get_party().get_refmut().get_delta())
     }
 
     /// Input a private value and verifier value.
-    pub fn input_private(&mut self) -> Result<MacVerifier<FE>> {
+    pub(crate) fn input_private(&mut self) -> Result<MacVerifier<FE>> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_witness();
         self.input()
@@ -548,7 +564,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         self.monitor.log_final_monitor();
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.verifier.get_refmut().reset(&mut self.state_mult_check);
         self.is_ok = true;
     }
@@ -566,10 +582,13 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
+    use crate::{
+        backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier},
+        backend_trait::BackendT,
+    };
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::ring::FiniteRing;
+    use scuttlebutt::{field::F40b, ring::FiniteRing};
     use scuttlebutt::{
         field::{F61p, FiniteField},
         AesRng, Channel,
@@ -664,8 +683,59 @@ mod tests {
         handle.join().unwrap();
     }
 
+    fn test_challenge<F: FiniteField>() {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let handle = std::thread::spawn(move || {
+            let rng = AesRng::from_seed(Default::default());
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+
+            let mut dmc: DietMacAndCheeseProver<F, _, _> = DietMacAndCheeseProver::init(
+                &mut channel,
+                rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                false,
+            )
+            .unwrap();
+
+            let challenge = dmc.challenge().unwrap();
+
+            dmc.finalize().unwrap();
+
+            challenge
+        });
+
+        let rng = AesRng::from_seed(Default::default());
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+
+        let mut dmc: DietMacAndCheeseVerifier<F, _, _> = DietMacAndCheeseVerifier::init(
+            &mut channel,
+            rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+            false,
+        )
+        .unwrap();
+
+        let challenge = dmc.challenge().unwrap();
+        dmc.finalize().unwrap();
+
+        let prover_challenge = handle.join().unwrap();
+        assert_eq!(prover_challenge.mac(), challenge.mac());
+    }
+
     #[test]
     fn test_f61p() {
         test::<F61p>();
+        test_challenge::<F61p>();
+    }
+
+    #[test]
+    fn test_f40b() {
+        test_challenge::<F40b>();
     }
 }
