@@ -17,6 +17,7 @@ use vectoreyes::{
 /// 1. `Self` is `repr(transparent)` to a `u64`
 /// 2. `Self` consists of 63 or fewer bits that are stored in the lower bits of the `u64`.
 /// 3. The upper bits of the `u64` are zero.
+/// 4. The lower bits of the `u64` match the [CLMUL](https://en.wikipedia.org/wiki/CLMUL_instruction_set) instruction (e.g. the lowest bit is the constant term of the polynomial).
 /// # Safety
 /// All the requirements above _must_ be met when this trait is `unsafe impl`'d.
 ///
