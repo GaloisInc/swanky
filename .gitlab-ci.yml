@@ -1,6 +1,6 @@
 default:
   tags: [docker-nix]
-  image: "debian/snapshot:stable-20221004"
+  image: "debian/snapshot:stable-20230612"
   interruptible: true
   before_script:
     - mkdir -p -m 0755 /nix/var/log/nix/drvs
@@ -24,7 +24,7 @@ normal-test:
   script:
     - pwd
     - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
-    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/run.sh
 
 nightly-test:
   rules:
@@ -33,4 +33,4 @@ nightly-test:
   script:
     - pwd
     - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
-    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/main.py --nightly
+    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/run.sh --nightly
