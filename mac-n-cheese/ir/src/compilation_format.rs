@@ -11,7 +11,7 @@ use std::{
     hash::BuildHasherDefault,
     io::{Read, Seek},
     os::unix::prelude::FileExt,
-    sync::atomic::AtomicU16,
+    sync::atomic::AtomicU32,
 };
 
 use crate::MAC_N_CHEESE_VERSION;
@@ -385,8 +385,8 @@ numerical_enum! {
     }
 }
 
-pub type GraphDegreeCount = u16;
-pub type AtomicGraphDegreeCount = AtomicU16;
+pub type GraphDegreeCount = u32;
+pub type AtomicGraphDegreeCount = AtomicU32;
 #[test]
 fn atomic_graph_degree_count_matches_non_atomic() {
     assert_eq!(
