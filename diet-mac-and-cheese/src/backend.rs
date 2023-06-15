@@ -225,12 +225,13 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
     }
 
     fn input_private(&mut self, value: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        if value.is_none() {
-            return Err(eyre!("No private input given to the prover"));
+        if let Some(value) = value {
+            self.check_is_ok()?;
+            self.monitor.incr_monitor_witness();
+            self.input(value)
+        } else {
+            Err(eyre!("No private input given to the prover"))
         }
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_witness();
-        self.input(value.unwrap())
     }
 
     fn finalize(&mut self) -> Result<()> {
@@ -241,7 +242,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
         self.do_check_zero()?;
 
         let mult_len = self.do_mult_check()?;
-        debug!("ERASE ME:  mult_len {:?}", mult_len);
         debug!(
             "finalize: mult_check:{:?}, check_zero:{:?} ",
             mult_len, zero_len
@@ -511,7 +511,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
             )?),
             channel: channel.clone(),
             rng,
-            check_zero_list: Vec::new(),
+            check_zero_list: Vec::with_capacity(QUEUE_CAPACITY),
             monitor: Monitor::default(),
             state_mult_check,
             is_ok: true,
@@ -532,7 +532,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
             verifier: fcom.clone(),
             channel: channel.clone(),
             rng,
-            check_zero_list: Vec::new(),
+            check_zero_list: Vec::with_capacity(QUEUE_CAPACITY),
             monitor: Monitor::default(),
             state_mult_check,
             no_batching,
