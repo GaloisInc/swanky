@@ -3,8 +3,11 @@ Implementation of ZKInterface `ZKBackend` trait.
 
 */
 
-use crate::backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use crate::homcom::{MacProver, MacVerifier};
+use crate::{
+    backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier},
+    backend_trait::BackendT,
+};
 use eyre::Result;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::ring::FiniteRing;
@@ -51,15 +54,15 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> ZKBackend
     }
 
     fn constant(&mut self, val: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        Ok(self.input_public(val))
+        convert(self.input_public(val))
     }
 
     fn assert_zero(&mut self, wire: &Self::Wire) -> ZkiResult<()> {
-        convert(self.assert_zero(wire))
+        convert(BackendT::assert_zero(self, wire))
     }
 
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
-        convert(self.add(a, b))
+        convert(BackendT::add(self, a, b))
     }
 
     fn multiply(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
@@ -67,11 +70,11 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> ZKBackend
     }
 
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        convert(self.addc(a, b))
+        convert(BackendT::add_constant(self, a, b))
     }
 
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        convert(self.mulc(a, b))
+        convert(BackendT::mul_constant(self, a, b))
     }
 
     fn and(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
@@ -79,23 +82,19 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> ZKBackend
     }
 
     fn xor(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
-        convert(self.add(a, b))
+        convert(BackendT::add(self, a, b))
     }
 
     fn not(&mut self, a: &Self::Wire) -> ZkiResult<Self::Wire> {
-        convert(self.addc(a, Self::FieldElement::ONE))
+        convert(BackendT::add_constant(self, a, Self::FieldElement::ONE))
     }
 
     fn instance(&mut self, val: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        Ok(self.input_public(val))
+        convert(self.input_public(val))
     }
 
     fn witness(&mut self, val: Option<Self::FieldElement>) -> ZkiResult<Self::Wire> {
-        if val.is_none() {
-            return Err("Should be some".into());
-        }
-
-        convert(self.input_private(val.unwrap()))
+        convert(self.input_private(val))
     }
 }
 
@@ -131,15 +130,15 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng + Clone> ZKBacken
     }
 
     fn constant(&mut self, val: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        Ok(self.input_public(val))
+        convert(self.input_public(val))
     }
 
     fn assert_zero(&mut self, wire: &Self::Wire) -> ZkiResult<()> {
-        convert(self.assert_zero(wire))
+        convert(BackendT::assert_zero(self, wire))
     }
 
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
-        convert(self.add(a, b))
+        convert(BackendT::add(self, a, b))
     }
 
     fn multiply(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
@@ -147,11 +146,11 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng + Clone> ZKBacken
     }
 
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        convert(self.addc(a, b))
+        convert(BackendT::add_constant(self, a, b))
     }
 
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        convert(self.mulc(a, b))
+        convert(BackendT::mul_constant(self, a, b))
     }
 
     fn and(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
@@ -159,22 +158,18 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng + Clone> ZKBacken
     }
 
     fn xor(&mut self, a: &Self::Wire, b: &Self::Wire) -> ZkiResult<Self::Wire> {
-        convert(self.add(a, b))
+        convert(BackendT::add(self, a, b))
     }
 
     fn not(&mut self, a: &Self::Wire) -> ZkiResult<Self::Wire> {
-        convert(self.addc(a, Self::FieldElement::ONE))
+        convert(BackendT::add_constant(self, a, Self::FieldElement::ONE))
     }
 
     fn instance(&mut self, val: Self::FieldElement) -> ZkiResult<Self::Wire> {
-        Ok(self.input_public(val))
+        convert(self.input_public(val))
     }
 
     fn witness(&mut self, val: Option<Self::FieldElement>) -> ZkiResult<Self::Wire> {
-        if val.is_some() {
-            return Err("Should be none".into());
-        }
-
-        convert(self.input_private())
+        convert(BackendT::input_private(self, val))
     }
 }

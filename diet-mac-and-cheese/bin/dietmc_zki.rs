@@ -2,7 +2,9 @@ mod cli;
 
 use clap::Parser;
 use cli::{map_lpn_size, Cli, Prover::*};
-use diet_mac_and_cheese::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
+use diet_mac_and_cheese::{
+    backend_trait::BackendT, DietMacAndCheeseProver, DietMacAndCheeseVerifier,
+};
 use log::info;
 use pretty_env_logger;
 #[cfg(feature = "ff")]

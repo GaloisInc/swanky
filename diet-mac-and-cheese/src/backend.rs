@@ -1,13 +1,13 @@
-use crate::edabits::RcRefCell;
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
+use crate::{backend_trait::BackendT, edabits::RcRefCell};
 use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use ocelot::svole::wykw::LpnParams;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{field::FiniteField, AbstractChannel};
+use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -129,11 +129,6 @@ impl Monitor {
     }
 }
 
-// The prover/verifier structures and functions are generic over a `FiniteField` named `FE`.
-// `FE` is the type for the authenticated values whereas the clear values are from
-// the underlying prime field `FE::PrimeField`.
-type FieldClear<FE> = <FE as FiniteField>::PrimeField;
-
 /// Prover for Diet Mac'n'Cheese.
 pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
     is_ok: bool,
@@ -144,6 +139,120 @@ pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel, RNG: Cryp
     monitor: Monitor,
     state_mult_check: StateMultCheckProver<FE>,
     no_batching: bool,
+}
+
+impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
+    for DietMacAndCheeseProver<FE, C, RNG>
+{
+    type Wire = MacProver<FE>;
+    type FieldElement = FE::PrimeField;
+
+    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
+        from_bytes_le(val)
+    }
+
+    fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
+        Ok(wire.clone())
+    }
+
+    fn challenge(&mut self) -> Result<Self::Wire> {
+        self.channel.flush()?;
+        let challenge = self.channel.read_serializable::<FE>()?;
+        Ok(MacProver::new(FE::PrimeField::ZERO, challenge))
+    }
+
+    fn one(&self) -> Result<Self::FieldElement> {
+        Ok(Self::FieldElement::ONE)
+    }
+
+    fn zero(&self) -> Result<Self::FieldElement> {
+        Ok(Self::FieldElement::ZERO)
+    }
+
+    fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.input_public(val)
+    }
+
+    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_check_zero();
+        self.push_check_zero_list(*wire)
+    }
+
+    fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_add();
+        Ok(self.prover.get_refmut().add(*a, *b))
+    }
+
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_mul();
+        let a_clr = a.value();
+        let b_clr = b.value();
+        let product = a_clr * b_clr;
+
+        let out = self.input(product)?;
+        self.prover
+            .get_refmut()
+            .quicksilver_push(&mut self.state_mult_check, &(*a, *b, out))?;
+        Ok(out)
+    }
+
+    fn add_constant(
+        &mut self,
+        value: &Self::Wire,
+        constant: Self::FieldElement,
+    ) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_addc();
+        Ok(self.prover.get_refmut().affine_add_cst(constant, *value))
+    }
+
+    fn mul_constant(
+        &mut self,
+        value: &Self::Wire,
+        constant: Self::FieldElement,
+    ) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_mulc();
+        Ok(self.prover.get_refmut().affine_mult_cst(constant, *value))
+    }
+
+    fn input_public(&mut self, value: Self::FieldElement) -> Result<Self::Wire> {
+        self.monitor.incr_monitor_instance();
+        Ok(MacProver::new(value, FE::ZERO))
+    }
+
+    fn input_private(&mut self, value: Option<Self::FieldElement>) -> Result<Self::Wire> {
+        if value.is_none() {
+            return Err(eyre!("No private input given to the prover"));
+        }
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_witness();
+        self.input(value.unwrap())
+    }
+
+    fn finalize(&mut self) -> Result<()> {
+        debug!("finalize");
+        self.check_is_ok()?;
+        self.channel.flush()?;
+        let zero_len = self.check_zero_list.len();
+        self.do_check_zero()?;
+
+        let mult_len = self.do_mult_check()?;
+        debug!("ERASE ME:  mult_len {:?}", mult_len);
+        debug!(
+            "finalize: mult_check:{:?}, check_zero:{:?} ",
+            mult_len, zero_len
+        );
+        self.log_final_monitor();
+        Ok(())
+    }
+    fn reset(&mut self) {
+        self.prover.get_refmut().reset(&mut self.state_mult_check);
+        self.is_ok = true;
+    }
 }
 
 impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheeseProver<FE, C, RNG> {
@@ -251,90 +360,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
         Ok(())
     }
 
-    /// Assert a value is zero.
-    pub(crate) fn assert_zero(&mut self, value: &MacProver<FE>) -> Result<()> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_check_zero();
-        self.push_check_zero_list(*value)
-    }
-
-    /// Add two values.
-    pub(crate) fn add(&mut self, a: &MacProver<FE>, b: &MacProver<FE>) -> Result<MacProver<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_add();
-        Ok(self.prover.get_refmut().add(*a, *b))
-    }
-
-    /// Multiply two values.
-    pub(crate) fn mul(&mut self, a: &MacProver<FE>, b: &MacProver<FE>) -> Result<MacProver<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_mul();
-        let a_clr = a.value();
-        let b_clr = b.value();
-        let product = a_clr * b_clr;
-
-        let out = self.input(product)?;
-        self.prover
-            .get_refmut()
-            .quicksilver_push(&mut self.state_mult_check, &(*a, *b, out))?;
-        Ok(out)
-    }
-
-    /// Add a value and a constant.
-    pub(crate) fn addc(&mut self, a: &MacProver<FE>, b: FE::PrimeField) -> Result<MacProver<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_addc();
-        Ok(self.prover.get_refmut().affine_add_cst(b, *a))
-    }
-
-    /// Multiply a value and a constant.
-    pub(crate) fn mulc(
-        &mut self,
-        value: &MacProver<FE>,
-        constant: FE::PrimeField,
-    ) -> Result<MacProver<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_mulc();
-        Ok(self.prover.get_refmut().affine_mult_cst(constant, *value))
-    }
-
-    /// Input a public value.
-    pub(crate) fn input_public(&mut self, value: FieldClear<FE>) -> MacProver<FE> {
-        self.monitor.incr_monitor_instance();
-        MacProver::new(value, FE::ZERO)
-    }
-
-    /// Input a private value.
-    pub(crate) fn input_private(&mut self, value: FieldClear<FE>) -> Result<MacProver<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_witness();
-        self.input(value)
-    }
-
-    /// `finalize` execute its queued multiplication and zero checks.
-    /// It can be called at any time and it is also called when the functionality is dropped.
-    pub fn finalize(&mut self) -> Result<()> {
-        debug!("finalize");
-        self.check_is_ok()?;
-        self.channel.flush()?;
-        let zero_len = self.check_zero_list.len();
-        self.do_check_zero()?;
-
-        let mult_len = self.do_mult_check()?;
-        debug!("ERASE ME:  mult_len {:?}", mult_len);
-        debug!(
-            "finalize: mult_check:{:?}, check_zero:{:?} ",
-            mult_len, zero_len
-        );
-        self.log_final_monitor();
-        Ok(())
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.prover.get_refmut().reset(&mut self.state_mult_check);
-        self.is_ok = true;
-    }
-
     fn log_final_monitor(&self) {
         info!("field largest value: {:?}", (FE::ZERO - FE::ONE).to_bytes());
         self.monitor.log_final_monitor();
@@ -361,6 +386,111 @@ pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel, RNG: Cr
     state_mult_check: StateMultCheckVerifier<FE>,
     is_ok: bool,
     no_batching: bool,
+}
+
+impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
+    for DietMacAndCheeseVerifier<FE, C, RNG>
+{
+    type Wire = MacVerifier<FE>;
+    type FieldElement = FE::PrimeField;
+
+    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
+        from_bytes_le(val)
+    }
+
+    fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
+        Ok(wire.clone())
+    }
+
+    fn challenge(&mut self) -> Result<Self::Wire> {
+        let challenge = FE::random(&mut self.rng);
+        self.channel.write_serializable(&challenge)?;
+        Ok(MacVerifier::new(challenge))
+    }
+
+    fn one(&self) -> Result<Self::FieldElement> {
+        Ok(Self::FieldElement::ONE)
+    }
+
+    fn zero(&self) -> Result<Self::FieldElement> {
+        Ok(Self::FieldElement::ZERO)
+    }
+
+    fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.input_public(val)
+    }
+
+    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_check_zero();
+        self.push_check_zero_list(*wire)
+    }
+
+    fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_add();
+        Ok(self.verifier.get_refmut().add(*a, *b))
+    }
+
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_mul();
+        let tag = self.input()?;
+        self.verifier
+            .get_refmut()
+            .quicksilver_push(&mut self.state_mult_check, &(*a, *b, tag))?;
+        Ok(tag)
+    }
+
+    fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_addc();
+        Ok(self.verifier.get_refmut().affine_add_cst(b, *a))
+    }
+
+    fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_mulc();
+        Ok(self.verifier.get_refmut().affine_mult_cst(b, *a))
+    }
+
+    fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.monitor.incr_monitor_instance();
+        Ok(MacVerifier::new(
+            -val * self.get_party().get_refmut().get_delta(),
+        ))
+    }
+
+    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
+        if val.is_some() {
+            return Err(eyre!("Private input given to the verifier"));
+        } else {
+            self.check_is_ok()?;
+            self.monitor.incr_monitor_witness();
+            self.input()
+        }
+    }
+
+    fn finalize(&mut self) -> Result<()> {
+        debug!("finalize");
+        self.check_is_ok()?;
+        self.channel.flush()?;
+        let zero_len = self.check_zero_list.len();
+        self.do_check_zero()?;
+
+        let mult_len = self.do_mult_check()?;
+        debug!(
+            "finalize: mult_check:{:?}, check_zero:{:?} ",
+            mult_len, zero_len
+        );
+        self.log_final_monitor();
+        Ok(())
+    }
+
+    fn reset(&mut self) {
+        self.verifier.get_refmut().reset(&mut self.state_mult_check);
+        self.is_ok = true;
+    }
 }
 
 impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
@@ -473,100 +603,9 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
         Ok(())
     }
 
-    /// Assert a value is zero.
-    pub(crate) fn assert_zero(&mut self, value: &MacVerifier<FE>) -> Result<()> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_check_zero();
-        self.push_check_zero_list(*value)
-    }
-
-    /// Add two values.
-    pub(crate) fn add(
-        &mut self,
-        a: &MacVerifier<FE>,
-        b: &MacVerifier<FE>,
-    ) -> Result<MacVerifier<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_add();
-        Ok(self.verifier.get_refmut().add(*a, *b))
-    }
-
-    /// Multiply two values.
-    pub(crate) fn mul(
-        &mut self,
-        a: &MacVerifier<FE>,
-        b: &MacVerifier<FE>,
-    ) -> Result<MacVerifier<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_mul();
-        let tag = self.input()?;
-        self.verifier
-            .get_refmut()
-            .quicksilver_push(&mut self.state_mult_check, &(*a, *b, tag))?;
-        Ok(tag)
-    }
-
-    /// Add a value and a constant.
-    pub(crate) fn addc(
-        &mut self,
-        a: &MacVerifier<FE>,
-        b: FE::PrimeField,
-    ) -> Result<MacVerifier<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_addc();
-        Ok(self.verifier.get_refmut().affine_add_cst(b, *a))
-    }
-
-    /// Multiply a value and a constant.
-    pub(crate) fn mulc(
-        &mut self,
-        a: &MacVerifier<FE>,
-        b: FE::PrimeField,
-    ) -> Result<MacVerifier<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_mulc();
-        Ok(self.verifier.get_refmut().affine_mult_cst(b, *a))
-    }
-
-    /// Input a public value and wraps it in a verifier value.
-    pub(crate) fn input_public(&mut self, val: FieldClear<FE>) -> MacVerifier<FE> {
-        self.monitor.incr_monitor_instance();
-        MacVerifier::new(-val * self.get_party().get_refmut().get_delta())
-    }
-
-    /// Input a private value and verifier value.
-    pub(crate) fn input_private(&mut self) -> Result<MacVerifier<FE>> {
-        self.check_is_ok()?;
-        self.monitor.incr_monitor_witness();
-        self.input()
-    }
-
-    /// `finalize` execute its internal queued multiplication and zero checks.
-    /// It can be called at any time and it is also be called when the functionality is dropped.
-    pub fn finalize(&mut self) -> Result<()> {
-        debug!("finalize");
-        self.check_is_ok()?;
-        self.channel.flush()?;
-        let zero_len = self.check_zero_list.len();
-        self.do_check_zero()?;
-
-        let mult_len = self.do_mult_check()?;
-        debug!(
-            "finalize: mult_check:{:?}, check_zero:{:?} ",
-            mult_len, zero_len
-        );
-        self.log_final_monitor();
-        Ok(())
-    }
-
     fn log_final_monitor(&self) {
         info!("field largest value: {:?}", (FE::ZERO - FE::ONE).to_bytes());
         self.monitor.log_final_monitor();
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.verifier.get_refmut().reset(&mut self.state_mult_check);
-        self.is_ok = true;
     }
 }
 
@@ -629,20 +668,22 @@ mod tests {
             let one = FE::PrimeField::ONE;
             let two = one + one;
             let three = two + one;
-            let one1 = dmc.input_public(one);
-            let one2 = dmc.input_public(one);
+            let one1 = dmc.input_public(one).unwrap();
+            let one2 = dmc.input_public(one).unwrap();
             let two_pub = dmc.add(&one1, &one2).unwrap();
-            assert_eq!(two_pub, dmc.input_public(two));
-            let three_pub = dmc.addc(&two_pub, FE::PrimeField::ONE).unwrap();
-            assert_eq!(three_pub, dmc.input_public(three));
+            assert_eq!(two_pub, dmc.input_public(two).unwrap());
+            let three_pub = dmc.add_constant(&two_pub, FE::PrimeField::ONE).unwrap();
+            assert_eq!(three_pub, dmc.input_public(three).unwrap());
             let two_priv = dmc
-                .input_private(FE::PrimeField::ONE + FE::PrimeField::ONE)
+                .input_private(Some(FE::PrimeField::ONE + FE::PrimeField::ONE))
                 .unwrap();
             let six = dmc.mul(&two_priv, &three_pub).unwrap();
-            let twelve_priv = dmc.mulc(&six, two).unwrap();
+            let twelve_priv = dmc.mul_constant(&six, two).unwrap();
             assert_eq!(twelve_priv.value(), three * two * two);
             let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
-            let r_zero_priv = dmc.addc(&n24_priv, -(three * two * two * two)).unwrap();
+            let r_zero_priv = dmc
+                .add_constant(&n24_priv, -(three * two * two * two))
+                .unwrap();
             dmc.assert_zero(&r_zero_priv).unwrap();
             dmc.finalize().unwrap();
             dmc.assert_zero(&n24_priv).unwrap();
@@ -666,15 +707,17 @@ mod tests {
         let one = FE::PrimeField::ONE;
         let two = one + one;
         let three = two + one;
-        let one1 = dmc.input_public(one);
-        let one2 = dmc.input_public(one);
+        let one1 = dmc.input_public(one).unwrap();
+        let one2 = dmc.input_public(one).unwrap();
         let two_pub = dmc.add(&one1, &one2).unwrap();
-        let three_pub = dmc.addc(&two_pub, FE::PrimeField::ONE).unwrap();
-        let two_priv = dmc.input_private().unwrap();
+        let three_pub = dmc.add_constant(&two_pub, FE::PrimeField::ONE).unwrap();
+        let two_priv = dmc.input_private(None).unwrap();
         let six = dmc.mul(&two_priv, &three_pub).unwrap();
-        let twelve_priv = dmc.mulc(&six, two).unwrap();
+        let twelve_priv = dmc.mul_constant(&six, two).unwrap();
         let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
-        let r_zero_priv = dmc.addc(&n24_priv, -(three * two * two * two)).unwrap();
+        let r_zero_priv = dmc
+            .add_constant(&n24_priv, -(three * two * two * two))
+            .unwrap();
         dmc.assert_zero(&r_zero_priv).unwrap();
         dmc.finalize().unwrap();
         dmc.assert_zero(&n24_priv).unwrap();
