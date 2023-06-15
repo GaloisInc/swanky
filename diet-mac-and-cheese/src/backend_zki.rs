@@ -1,7 +1,5 @@
-/*!
-Implementation of ZKInterface `ZKBackend` trait.
-
-*/
+//! Implementation of [`ZKBackend`] for [`DietMacAndCheeseProver`] and
+//! [`DietMacAndCheeseVerifier`].
 
 use crate::homcom::{MacProver, MacVerifier};
 use crate::{
@@ -16,17 +14,13 @@ use zki_sieve::consumers::evaluator::ZKBackend;
 use zki_sieve::Result as ZkiResult;
 
 fn convert<T>(v: Result<T>) -> ZkiResult<T> {
-    match v {
-        Result::Ok(x) => Ok(x),
-        Result::Err(err) => Err(err.into()),
-    }
+    v.map_err(|e| e.into())
 }
 
 impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> ZKBackend
     for DietMacAndCheeseProver<FE, C, RNG>
 {
     type Wire = MacProver<FE>;
-
     type FieldElement = FE::PrimeField;
 
     fn from_bytes_le(val: &[u8]) -> ZkiResult<Self::FieldElement> {
@@ -102,7 +96,6 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng + Clone> ZKBacken
     for DietMacAndCheeseVerifier<FE, C, RNG>
 {
     type Wire = MacVerifier<FE>;
-
     type FieldElement = FE::PrimeField;
 
     fn from_bytes_le(val: &[u8]) -> ZkiResult<Self::FieldElement> {
