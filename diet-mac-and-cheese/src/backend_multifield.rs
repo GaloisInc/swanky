@@ -85,7 +85,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
             MacBitGeneric::BitVerifier(_) => {
                 panic!("Should be a prover bit");
             }
-            MacBitGeneric::BitPublic(m) => Ok(self.input_public(m)),
+            MacBitGeneric::BitPublic(m) => self.input_public(m),
         }
     }
 
@@ -109,7 +109,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
             MacBitGeneric::BitProver(_) => {
                 panic!("Should be a verifier bit");
             }
-            MacBitGeneric::BitPublic(m) => Ok(self.input_public(m)),
+            MacBitGeneric::BitPublic(m) => self.input_public(m),
         }
     }
 
@@ -254,8 +254,8 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
         // assert_zero(r)
         assert_eq!(a.len(), b.len());
 
-        let mut act = self.dmc_f2.input_public(F2::ONE);
-        let mut r = self.dmc_f2.input_public(F2::ZERO);
+        let mut act = self.dmc_f2.input_public(F2::ONE)?;
+        let mut r = self.dmc_f2.input_public(F2::ZERO)?;
 
         // data assumed provided in little-endian
         let l = a.len();
@@ -371,7 +371,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
                 }
                 MacBitGeneric::BitPublic(b) => {
                     // input the public bit as a private value and assert they are equal
-                    let m = self.dmc_f2.input_private(*b)?;
+                    let m = self.dmc_f2.input_private(Some(*b))?;
                     let hope_zero = self.dmc_f2.add_constant(&m, *b)?;
                     self.dmc_f2.assert_zero(&hope_zero)?;
 
@@ -523,8 +523,8 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
         // assert_zero(r)
         assert_eq!(a.len(), b.len());
 
-        let mut act = self.dmc_f2.input_public(F2::ONE);
-        let mut r = self.dmc_f2.input_public(F2::ZERO);
+        let mut act = self.dmc_f2.input_public(F2::ONE)?;
+        let mut r = self.dmc_f2.input_public(F2::ZERO)?;
 
         // data assumed provided in little-endian
         let l = a.len();
@@ -629,7 +629,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
                 }
                 MacBitGeneric::BitPublic(b) => {
                     // input the public bit as a private value and assert they are equal
-                    let m = self.dmc_f2.input_private()?;
+                    let m = self.dmc_f2.input_private(None)?;
                     let hope_zero = self.dmc_f2.add_constant(&m, *b)?;
                     self.dmc_f2.assert_zero(&hope_zero)?;
                     bits.push(m);
@@ -1430,7 +1430,6 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 #[cfg(test)]
 mod tests {
     use super::{RcRefCell, TypeStore};
-    use crate::homcom::{FComProver, FComVerifier};
     use crate::{
         backend_multifield::{
             EvaluatorCirc,
@@ -1438,6 +1437,10 @@ mod tests {
             Party,
         },
         plugins::MuxV0,
+    };
+    use crate::{
+        backend_trait::BackendT,
+        homcom::{FComProver, FComVerifier},
     };
     use crate::{
         circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
@@ -2274,8 +2277,8 @@ mod tests {
                 false,
             )
             .unwrap();
-            let zero = party.dmc_f2.input_private(F2::ZERO).unwrap();
-            let one = party.dmc_f2.input_private(F2::ONE).unwrap();
+            let zero = party.dmc_f2.input_private(Some(F2::ZERO)).unwrap();
+            let one = party.dmc_f2.input_private(Some(F2::ONE)).unwrap();
 
             party
                 .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
@@ -2374,8 +2377,8 @@ mod tests {
             false,
         )
         .unwrap();
-        let zero = party.dmc_f2.input_private().unwrap();
-        let one = party.dmc_f2.input_private().unwrap();
+        let zero = party.dmc_f2.input_private(None).unwrap();
+        let one = party.dmc_f2.input_private(None).unwrap();
 
         party
             .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
