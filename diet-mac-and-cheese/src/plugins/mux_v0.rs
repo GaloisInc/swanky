@@ -124,3 +124,158 @@ impl Plugin for MuxV0 {
         Ok(GatesBody::new(vec_gates))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MuxV0;
+    use crate::{
+        backend_multifield::tests::{into_vec, minus_one, one, test_circuit, zero},
+        circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+    };
+    use crate::{
+        backend_multifield::tests::{F2_VEC, FF0},
+        plugins::Plugin,
+    };
+    use scuttlebutt::{field::F2, ring::FiniteRing};
+
+    // Simplest test for mux on f2
+    #[test]
+    fn test_f2_mux() {
+        let fields = vec![F2_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_mux".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 1), (FF0, 1), (FF0, 1)],
+            MuxV0::NAME.into(),
+            "strict".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mux".into(), func);
+
+        let gates = vec![
+            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, 2),
+            GateM::Witness(FF0, 3),
+            GateM::Instance(FF0, 4),
+            GateM::Instance(FF0, 5),
+            GateM::Instance(FF0, 6),
+            GateM::Instance(FF0, 7),
+            GateM::Instance(FF0, 8),
+            GateM::Instance(FF0, 9),
+            GateM::Instance(FF0, 10),
+            GateM::Instance(FF0, 11),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(12, 12)],
+                vec![(0, 0), (4, 4), (8, 8)],
+            ))),
+            GateM::AssertZero(FF0, 12),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(13, 13)],
+                vec![(1, 1), (4, 4), (8, 8)],
+            ))),
+            GateM::AddConstant(FF0, 14, 13, Box::from(into_vec(-F2::ONE))),
+            GateM::AssertZero(FF0, 14),
+        ];
+
+        let instances = vec![vec![
+            zero::<F2>(),
+            zero::<F2>(),
+            zero::<F2>(),
+            zero::<F2>(),
+            one::<F2>(),
+            one::<F2>(),
+            one::<F2>(),
+            one::<F2>(),
+        ]];
+        let witnesses = vec![vec![zero::<F2>(), one::<F2>(), zero::<F2>(), one::<F2>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    // More complicated test of mux selecting a triple and a unique element
+    #[test]
+    fn test_f2_mux_on_slices() {
+        let fields = vec![F2_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_mux".into(),
+            42,
+            vec![(FF0, 3), (FF0, 1)],
+            vec![(FF0, 1), (FF0, 3), (FF0, 1), (FF0, 3), (FF0, 1)],
+            MuxV0::NAME.into(),
+            "strict".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mux".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 4, 11),
+            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, 1),
+            // NOTE: there is a gap with 2 unused wires here
+            GateM::Instance(FF0, 4),
+            GateM::Instance(FF0, 5),
+            GateM::Instance(FF0, 6),
+            GateM::Instance(FF0, 7),
+            GateM::Instance(FF0, 8),
+            GateM::Instance(FF0, 9),
+            GateM::Instance(FF0, 10),
+            GateM::Instance(FF0, 11),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(12, 14), (15, 15)],
+                vec![(0, 0), (4, 6), (7, 7), (8, 10), (11, 11)],
+            ))),
+            GateM::AssertZero(FF0, 12),
+            GateM::AssertZero(FF0, 13),
+            GateM::AssertZero(FF0, 14),
+            GateM::AssertZero(FF0, 15),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(16, 18), (19, 19)],
+                vec![(1, 1), (4, 6), (7, 7), (8, 10), (11, 11)],
+            ))),
+            GateM::AddConstant(FF0, 20, 16, Box::from(minus_one::<F2>())),
+            GateM::AddConstant(FF0, 21, 17, Box::from(minus_one::<F2>())),
+            GateM::AddConstant(FF0, 22, 18, Box::from(minus_one::<F2>())),
+            GateM::AddConstant(FF0, 23, 19, Box::from(minus_one::<F2>())),
+            GateM::AssertZero(FF0, 20),
+            GateM::AssertZero(FF0, 21),
+            GateM::AssertZero(FF0, 22),
+            GateM::AssertZero(FF0, 23),
+        ];
+
+        let instances = vec![vec![
+            zero::<F2>(),
+            zero::<F2>(),
+            zero::<F2>(),
+            zero::<F2>(),
+            one::<F2>(),
+            one::<F2>(),
+            one::<F2>(),
+            one::<F2>(),
+        ]];
+        let witnesses = vec![vec![zero::<F2>(), one::<F2>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+}

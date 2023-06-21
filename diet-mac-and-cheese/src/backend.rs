@@ -53,6 +53,7 @@ struct Monitor {
     monitor_mul: usize,
     monitor_mulc: usize,
     monitor_add: usize,
+    monitor_sub: usize,
     monitor_addc: usize,
     monitor_check_zero: usize,
     monitor_zk_check_zero: usize,
@@ -83,6 +84,10 @@ impl Monitor {
     fn incr_monitor_add(&mut self) {
         self.tick();
         self.monitor_add += 1;
+    }
+    fn incr_monitor_sub(&mut self) {
+        self.tick();
+        self.monitor_sub += 1;
     }
     fn incr_monitor_addc(&mut self) {
         self.tick();
@@ -123,6 +128,7 @@ impl Monitor {
         info!("nb witn:   {:>11}", self.monitor_witness);
         info!("nb addc:   {:>11}", self.monitor_addc);
         info!("nb add:    {:>11}", self.monitor_add);
+        info!("nb sub:    {:>11}", self.monitor_sub);
         info!("nb multc:  {:>11}", self.monitor_mulc);
         info!("nb mult:   {:>11}", self.monitor_mul);
         info!("nb czero:  {:>11}", self.monitor_check_zero);
@@ -157,8 +163,8 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
 
     fn challenge(&mut self) -> Result<Self::Wire> {
         self.channel.flush()?;
-        let challenge = self.channel.read_serializable::<FE>()?;
-        Ok(MacProver::new(FE::PrimeField::ZERO, challenge))
+        let challenge = self.channel.read_serializable::<FE::PrimeField>()?;
+        self.input_public(challenge)
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -183,6 +189,12 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
         self.check_is_ok()?;
         self.monitor.incr_monitor_add();
         Ok(self.prover.get_refmut().add(*a, *b))
+    }
+
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_sub();
+        Ok(self.prover.get_refmut().sub(*a, *b))
     }
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
@@ -403,9 +415,10 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
     }
 
     fn challenge(&mut self) -> Result<Self::Wire> {
-        let challenge = FE::random(&mut self.rng);
+        let challenge = FE::PrimeField::random(&mut self.rng);
         self.channel.write_serializable(&challenge)?;
-        Ok(MacVerifier::new(challenge))
+        self.channel.flush()?;
+        self.input_public(challenge)
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -430,6 +443,12 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
         self.check_is_ok()?;
         self.monitor.incr_monitor_add();
         Ok(self.verifier.get_refmut().add(*a, *b))
+    }
+
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.check_is_ok()?;
+        self.monitor.incr_monitor_sub();
+        Ok(self.verifier.get_refmut().sub(*a, *b))
     }
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
@@ -624,6 +643,7 @@ mod tests {
     use crate::{
         backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier},
         backend_trait::BackendT,
+        homcom::validate,
     };
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
@@ -764,21 +784,29 @@ mod tests {
         )
         .unwrap();
 
-        let challenge = dmc.challenge().unwrap();
+        let verifier = dmc.challenge().unwrap();
         dmc.finalize().unwrap();
 
-        let prover_challenge = handle.join().unwrap();
-        assert_eq!(prover_challenge.mac(), challenge.mac());
+        let prover = handle.join().unwrap();
+        assert!(validate(
+            prover,
+            verifier,
+            dmc.get_party().get_refmut().get_delta()
+        ));
     }
 
     #[test]
     fn test_f61p() {
         test::<F61p>();
+    }
+
+    #[test]
+    fn test_challenge_f61p() {
         test_challenge::<F61p>();
     }
 
     #[test]
-    fn test_f40b() {
+    fn test_challenge_f40b() {
         test_challenge::<F40b>();
     }
 }

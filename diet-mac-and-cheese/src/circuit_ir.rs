@@ -3,7 +3,7 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{MuxV0, Plugin, PluginBody, PluginType},
+    plugins::{MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType},
 };
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
@@ -28,12 +28,17 @@ pub type WireRange = (WireId, WireId);
 // Using Box<Vec<u8>> for this reason, beware the size of `Box<[T]>` is not 8, it's 16.
 #[derive(Clone, Debug)]
 pub enum GateM {
+    /// Store the given element in [`WireId`].
     Constant(TypeId, WireId, Box<Vec<u8>>), // Using Box<Vec<u8>>
+    /// Assert that the element in [`WireId`] is zero.
     AssertZero(TypeId, WireId),
     Copy(TypeId, WireId, WireId),
     Add(TypeId, WireId, WireId, WireId),
+    Sub(TypeId, WireId, WireId, WireId),
     Mul(TypeId, WireId, WireId, WireId),
+    // TODO: Don't store constant as `Vec<u8>`
     AddConstant(TypeId, WireId, WireId, Box<Vec<u8>>),
+    // TODO: Don't store constant as `Vec<u8>`
     MulConstant(TypeId, WireId, WireId, Box<Vec<u8>>),
     Instance(TypeId, WireId),
     Witness(TypeId, WireId),
@@ -54,6 +59,7 @@ impl GateM {
             AssertZero(ty, _) => *ty,
             Copy(ty, _, _) => *ty,
             Add(ty, _, _, _) => *ty,
+            Sub(ty, _, _, _) => *ty,
             Mul(ty, _, _, _) => *ty,
             AddConstant(ty, _, _, _) => *ty,
             MulConstant(ty, _, _, _) => *ty,
@@ -73,13 +79,14 @@ impl GateM {
     fn out_wire(&self) -> Option<WireId> {
         use GateM::*;
         match self {
-            Constant(_, out, _value) => Some(*out),
-            AssertZero(_, _inp) => None,
-            Copy(_, out, _inp) => Some(*out),
-            Add(_, out, _left, _right) => Some(*out),
-            Mul(_, out, _left, _right) => Some(*out),
-            AddConstant(_, out, _inp, _constant) => Some(*out),
-            MulConstant(_, out, _inp, _constant) => Some(*out),
+            Constant(_, out, _) => Some(*out),
+            AssertZero(_, _) => None,
+            Copy(_, out, _) => Some(*out),
+            Add(_, out, _, _) => Some(*out),
+            Sub(_, out, _, _) => Some(*out),
+            Mul(_, out, _, _) => Some(*out),
+            AddConstant(_, out, _, _) => Some(*out),
+            MulConstant(_, out, _, _) => Some(*out),
             Conv(c) => {
                 let (_, (_, out), _, _) = c.as_ref();
                 Some(*out)
@@ -129,16 +136,20 @@ pub enum TypeSpecification {
 pub struct TypeStore(BTreeMap<TypeId, TypeSpecification>);
 
 impl TypeStore {
+    /// Insert a [`TypeId`]-[`TypeSpecification`] pair into the [`TypeStore`].
     pub(crate) fn insert(&mut self, key: TypeId, value: TypeSpecification) {
         self.0.insert(key, value);
     }
 
-    // pub(crate) fn get(&self, key: &TypeId) -> eyre::Result<&TypeSpecification> {
-    //     self.0
-    //         .get(key)
-    //         .ok_or_else(|| eyre!("Type ID {key} not found in `TypeStore`"))
-    // }
+    /// Get the [`TypeSpecification`] associated with the given [`TypeId`].
+    pub(crate) fn get(&self, key: &TypeId) -> eyre::Result<&TypeSpecification> {
+        self.0
+            .get(key)
+            .ok_or_else(|| eyre!("Type ID {key} not found in `TypeStore`"))
+    }
 
+    /// Return an [`Iterator`] over the [`TypeId`]-[`TypeSpecification`] pairs
+    /// in the [`TypeStore`].
     pub fn iter(&self) -> std::collections::btree_map::Iter<TypeId, TypeSpecification> {
         self.0.iter()
     }
@@ -220,6 +231,9 @@ impl TypeIdMapping {
                 self.0[*ty as usize] = true;
             }
             Add(ty, _, _, _) => {
+                self.0[*ty as usize] = true;
+            }
+            Sub(ty, _, _, _) => {
                 self.0[*ty as usize] = true;
             }
             Mul(ty, _, _, _) => {
@@ -410,14 +424,14 @@ impl FuncDecl {
                 &input_counts,
                 type_store,
             )?,
-            // PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
-            //     &operation,
-            //     &params,
-            //     count,
-            //     &output_counts,
-            //     &input_counts,
-            //     type_store,
-            // )?,
+            PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
+                &operation,
+                &params,
+                count,
+                &output_counts,
+                &input_counts,
+                type_store,
+            )?,
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };
 

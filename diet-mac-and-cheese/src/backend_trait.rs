@@ -22,6 +22,7 @@ pub trait BackendT {
     fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()>;
 
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire>;
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire>;
