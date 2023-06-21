@@ -771,12 +771,10 @@ where
     }
 
     pub(crate) fn get(&self, id: WireId) -> &X {
-        //debug!("GET {:?}", self.stack);
         let frame = self.get_frame();
 
         if id < frame.callframe_size {
             if !frame.callframe_is_vector {
-                //debug!("DEBUG GET in CALLFRAME {:?}", self.get_callframe(addr));
                 return self.get_callframe(id);
             } else {
                 let addr = &frame.callframe_vector[id as usize];
@@ -791,16 +789,11 @@ where
 
         // 1)
         if frame.memframe_is_vector {
-            /*println!(
-                "DEBUG GET in VECTOR {:?}",
-                &frame.memframe_vector[(id - callframe_size) as usize]
-            );*/
             return &frame.memframe_vector[(id - frame.callframe_size) as usize];
         }
 
         // 2) a)
         if frame.memframe_pool.present(id) {
-            //debug!("mem get: {:?} {:?}", id, frame.memframe_pool.get(id));
             return frame.memframe_pool.get(id);
         }
 

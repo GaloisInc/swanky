@@ -12,7 +12,7 @@ use crate::read_sieveir_phase2::BufRelation;
 use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::GatesOrPluginBody};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
-use eyre::{eyre, Result};
+use eyre::{ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
@@ -211,6 +211,9 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.add(a, b)
+    }
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.sub(a, b)
     }
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.mul(a, b)
@@ -485,6 +488,9 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.add(a, b)
     }
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.sub(a, b)
+    }
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.mul(a, b)
     }
@@ -738,9 +744,10 @@ where
             }
 
             AssertZero(_, inp) => {
-                let inp_wire = self.memory.get(*inp);
-                if self.backend.assert_zero(inp_wire).is_err() {
-                    return Err(eyre!("Assert zero fails on wire {}", *inp,));
+                let wire = self.memory.get(*inp);
+                debug!("AssertZero wire: {wire:?}");
+                if self.backend.assert_zero(wire).is_err() {
+                    return Err(eyre!("Assert zero fails on wire {}", *inp));
                 }
             }
 
@@ -754,6 +761,13 @@ where
                 let l = self.memory.get(*left);
                 let r = self.memory.get(*right);
                 let v = self.backend.add(l, r)?;
+                self.memory.set(*out, &v);
+            }
+
+            Sub(_, out, left, right) => {
+                let l = self.memory.get(*left);
+                let r = self.memory.get(*right);
+                let v = self.backend.sub(l, r)?;
                 self.memory.set(*out, &v);
             }
 
@@ -805,6 +819,7 @@ where
             }
             Challenge(_, out) => {
                 let v = self.backend.challenge()?;
+                debug!("Challenge value: {v:?}");
                 self.memory.set(*out, &v);
             }
             Comment(_) => {
@@ -1306,7 +1321,11 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 
         let gates_body = match &func.body() {
             GatesOrPluginBody::Gates(body) => body,
-            GatesOrPluginBody::Plugin(_) => func.compiled_info.plugin_gates.as_ref().unwrap(),
+            GatesOrPluginBody::Plugin(_) => func
+                .compiled_info
+                .plugin_gates
+                .as_ref()
+                .ok_or(eyre!("No gates associated with plugin"))?,
         };
 
         // 2)
@@ -1319,7 +1338,12 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 
         let mut prev = 0;
         let output_counts = func.output_counts();
-        assert_eq!(out_ranges.len(), output_counts.len());
+        ensure!(
+            out_ranges.len() == output_counts.len(),
+            "Output range does not match output counts: {} != {}",
+            out_ranges.len(),
+            output_counts.len()
+        );
         #[allow(clippy::needless_range_loop)]
         for i in 0..output_counts.len() {
             let (field_idx, count) = output_counts[i];
@@ -1329,7 +1353,12 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         }
 
         let input_counts = func.input_counts();
-        assert_eq!(in_ranges.len(), input_counts.len());
+        ensure!(
+            in_ranges.len() == input_counts.len(),
+            "Input range does not match input counts: {} != {}",
+            in_ranges.len(),
+            input_counts.len()
+        );
         #[allow(clippy::needless_range_loop)]
         for i in 0..input_counts.len() {
             let (field_idx, count) = input_counts[i];
@@ -1428,23 +1457,13 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{RcRefCell, TypeStore};
-    use crate::{
-        backend_multifield::{
-            EvaluatorCirc,
-            //F2_VEC, F384P_VEC, F384Q_VEC, F61P_VEC,
-            Party,
-        },
-        plugins::MuxV0,
-    };
+    use crate::backend_multifield::{EvaluatorCirc, Party};
+    use crate::circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange};
     use crate::{
         backend_trait::BackendT,
         homcom::{FComProver, FComVerifier},
-    };
-    use crate::{
-        circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
-        plugins::Plugin,
     };
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
@@ -1457,8 +1476,8 @@ mod tests {
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{field::F61p, field::FiniteField, AesRng, Channel};
-    use std::collections::VecDeque;
     use std::env;
+    use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
@@ -1468,8 +1487,8 @@ mod tests {
 
     // TODO: make test work without requiring feature `ff` for F384p, F384q
 
-    const F2_VEC: [u8; 1] = [2];
-    const F61P_VEC: [u8; 8] = [255, 255, 255, 255, 255, 255, 255, 31];
+    pub(crate) const F2_VEC: [u8; 1] = [2];
+    pub(crate) const F61P_VEC: [u8; 8] = [255, 255, 255, 255, 255, 255, 255, 31];
     #[allow(dead_code)]
     const F384P_VEC: [u8; 48] = [
         255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 254, 255, 255, 255, 255,
@@ -1495,27 +1514,27 @@ mod tests {
         255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     ];
 
-    const FF0: u8 = 0;
+    pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
     #[allow(dead_code)]
     const FF2: u8 = 2;
     #[allow(dead_code)]
     const FF3: u8 = 3;
 
-    fn into_vec<FE: FiniteField>(e: FE) -> Vec<u8> {
+    pub(crate) fn into_vec<FE: FiniteField>(e: FE) -> Vec<u8> {
         e.to_bytes().to_vec()
     }
 
-    fn zero<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn zero<FE: FiniteField>() -> Vec<u8> {
         into_vec(FE::ZERO)
     }
-    fn one<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn one<FE: FiniteField>() -> Vec<u8> {
         into_vec(FE::ONE)
     }
     fn two<FE: FiniteField>() -> Vec<u8> {
         into_vec(FE::ONE + FE::ONE)
     }
-    fn minus_one<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn minus_one<FE: FiniteField>() -> Vec<u8> {
         into_vec(-FE::ONE)
     }
     fn minus_two<FE: FiniteField>() -> Vec<u8> {
@@ -1559,21 +1578,21 @@ mod tests {
         pretty_env_logger::init_timed();
     }
 
-    fn test_circuit(
+    pub(crate) fn test_circuit(
         fields: Vec<Vec<u8>>,
         func_store: FunStore,
         gates: Vec<GateM>,
         ins: Vec<Vec<Vec<u8>>>,
         wit: Vec<Vec<Vec<u8>>>,
-    ) {
+    ) -> eyre::Result<()> {
         let func_store_prover = func_store.clone();
         let gates_prover = gates.clone();
         let ins_prover = ins.clone();
         let wit_prover = wit;
-        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+        let type_store = TypeStore::try_from(fields.clone())?;
         let type_store_prover = type_store.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
+        let (sender, receiver) = UnixStream::pair()?;
+        let handle: JoinHandle<eyre::Result<()>> = std::thread::spawn(move || {
             let rng = AesRng::from_seed(Default::default());
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
@@ -1597,11 +1616,10 @@ mod tests {
                 type_store_prover,
                 true,
                 false,
-            )
-            .unwrap();
-            eval.load_backends(&mut channel, true).unwrap();
-            eval.evaluate_gates(&gates_prover, &func_store_prover)
-                .unwrap();
+            )?;
+            eval.load_backends(&mut channel, true)?;
+            eval.evaluate_gates(&gates_prover, &func_store_prover)?;
+            eyre::Result::Ok(())
         });
 
         let rng = AesRng::from_seed(Default::default());
@@ -1625,10 +1643,10 @@ mod tests {
             false,
         )
         .unwrap();
-        eval.load_backends(&mut channel, true).unwrap();
-        eval.evaluate_gates(&gates, &func_store).unwrap();
+        eval.load_backends(&mut channel, true)?;
+        eval.evaluate_gates(&gates, &func_store)?;
 
-        handle.join().unwrap();
+        handle.join().unwrap()
     }
 
     fn test_conv_00() {
@@ -1647,7 +1665,7 @@ mod tests {
         let instances = vec![vec![], vec![]];
         let witnesses = vec![vec![zero::<F61p>(), one::<F61p>()]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_01() {
@@ -1667,7 +1685,7 @@ mod tests {
         let instances = vec![vec![], vec![]];
         let witnesses = vec![vec![], vec![zero::<F2>(), one::<F2>()]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_02_twoway() {
@@ -1695,7 +1713,7 @@ mod tests {
             vec![zero::<F2>(), one::<F2>()],
         ];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_binary_to_field() {
@@ -1714,7 +1732,7 @@ mod tests {
         let instances = vec![vec![], vec![]];
         let witnesses = vec![vec![], vec![one::<F2>(), one::<F2>()]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_field_to_binary() {
@@ -1738,7 +1756,7 @@ mod tests {
         let instances = vec![vec![], vec![]];
         let witnesses = vec![vec![three::<F61p>()], vec![]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_publics() {
@@ -1767,7 +1785,7 @@ mod tests {
         ];
         let witnesses = vec![vec![], vec![]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_shift() {
@@ -1801,7 +1819,7 @@ mod tests {
         let instances = vec![vec![], vec![]];
         let witnesses = vec![vec![two::<F61p>()], vec![]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     #[cfg(feature = "ff")]
@@ -1825,7 +1843,7 @@ mod tests {
         let instances = vec![vec![], vec![], vec![], vec![]];
         let witnesses = vec![vec![zero::<F61p>(), one::<F61p>()], vec![], vec![], vec![]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     #[cfg(feature = "ff")]
@@ -1851,7 +1869,7 @@ mod tests {
         let instances = vec![vec![], vec![], vec![], vec![]];
         let witnesses = vec![vec![], vec![], vec![], vec![one::<F2>()]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     #[cfg(feature = "ff")]
@@ -1884,7 +1902,7 @@ mod tests {
             vec![],
         ];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     #[cfg(feature = "ff")]
@@ -1909,7 +1927,7 @@ mod tests {
         let instances = vec![vec![], vec![]];
         let witnesses = vec![vec![], vec![zero::<F61p>(), one::<F61p>()]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     #[cfg(all(feature = "ff"))]
@@ -1938,7 +1956,7 @@ mod tests {
             vec![],
         ];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test4_simple_fun() {
@@ -1992,7 +2010,7 @@ mod tests {
             vec![],
         ];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test5_simple_fun_with_vec() {
@@ -2046,7 +2064,7 @@ mod tests {
             vec![],
         ];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test6_fun_slice_and_unallocated() {
@@ -2111,146 +2129,7 @@ mod tests {
         let instances = vec![vec![two.clone()]];
         let witnesses = vec![vec![two.clone(), two.clone(), two]];
 
-        test_circuit(fields, func_store, gates, instances, witnesses);
-    }
-
-    // Simplest test for mux on f2
-    fn test_f2_mux() {
-        let fields = vec![F2_VEC.to_vec()];
-        let mut func_store = FunStore::default();
-        let type_store = TypeStore::try_from(fields.clone()).unwrap();
-
-        let func = FuncDecl::new_plugin(
-            "my_mux".into(),
-            42,
-            vec![(FF0, 1)],
-            vec![(FF0, 1), (FF0, 1), (FF0, 1)],
-            MuxV0::NAME.into(),
-            "strict".into(),
-            vec![],
-            vec![],
-            vec![],
-            &type_store,
-        )
-        .unwrap();
-
-        func_store.insert("my_mux".into(), func);
-
-        let gates = vec![
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
-            GateM::Instance(FF0, 8),
-            GateM::Instance(FF0, 9),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
-            GateM::Call(Box::new((
-                "my_mux".into(),
-                vec![(12, 12)],
-                vec![(0, 0), (4, 4), (8, 8)],
-            ))),
-            GateM::AssertZero(FF0, 12),
-            GateM::Call(Box::new((
-                "my_mux".into(),
-                vec![(13, 13)],
-                vec![(1, 1), (4, 4), (8, 8)],
-            ))),
-            GateM::AddConstant(FF0, 14, 13, Box::from(into_vec(-F2::ONE))),
-            GateM::AssertZero(FF0, 14),
-        ];
-
-        let instances = vec![vec![
-            zero::<F2>(),
-            zero::<F2>(),
-            zero::<F2>(),
-            zero::<F2>(),
-            one::<F2>(),
-            one::<F2>(),
-            one::<F2>(),
-            one::<F2>(),
-        ]];
-        let witnesses = vec![vec![zero::<F2>(), one::<F2>(), zero::<F2>(), one::<F2>()]];
-
-        test_circuit(fields, func_store, gates, instances, witnesses);
-    }
-
-    // More complicated test of mux selecting a triple and a unique element
-    fn test_f2_mux_on_slices() {
-        let fields = vec![F2_VEC.to_vec()];
-        let mut func_store = FunStore::default();
-        let type_store = TypeStore::try_from(fields.clone()).unwrap();
-
-        let func = FuncDecl::new_plugin(
-            "my_mux".into(),
-            42,
-            vec![(FF0, 3), (FF0, 1)],
-            vec![(FF0, 1), (FF0, 3), (FF0, 1), (FF0, 3), (FF0, 1)],
-            MuxV0::NAME.into(),
-            "strict".into(),
-            vec![],
-            vec![],
-            vec![],
-            &type_store,
-        )
-        .unwrap();
-
-        func_store.insert("my_mux".into(), func);
-
-        let gates = vec![
-            GateM::New(FF0, 4, 11),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            // NOTE: there is a gap with 2 unused wires here
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
-            GateM::Instance(FF0, 8),
-            GateM::Instance(FF0, 9),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
-            GateM::Call(Box::new((
-                "my_mux".into(),
-                vec![(12, 14), (15, 15)],
-                vec![(0, 0), (4, 6), (7, 7), (8, 10), (11, 11)],
-            ))),
-            GateM::AssertZero(FF0, 12),
-            GateM::AssertZero(FF0, 13),
-            GateM::AssertZero(FF0, 14),
-            GateM::AssertZero(FF0, 15),
-            GateM::Call(Box::new((
-                "my_mux".into(),
-                vec![(16, 18), (19, 19)],
-                vec![(1, 1), (4, 6), (7, 7), (8, 10), (11, 11)],
-            ))),
-            GateM::AddConstant(FF0, 20, 16, Box::from(minus_one::<F2>())),
-            GateM::AddConstant(FF0, 21, 17, Box::from(minus_one::<F2>())),
-            GateM::AddConstant(FF0, 22, 18, Box::from(minus_one::<F2>())),
-            GateM::AddConstant(FF0, 23, 19, Box::from(minus_one::<F2>())),
-            GateM::AssertZero(FF0, 20),
-            GateM::AssertZero(FF0, 21),
-            GateM::AssertZero(FF0, 22),
-            GateM::AssertZero(FF0, 23),
-        ];
-
-        let instances = vec![vec![
-            zero::<F2>(),
-            zero::<F2>(),
-            zero::<F2>(),
-            zero::<F2>(),
-            one::<F2>(),
-            one::<F2>(),
-            one::<F2>(),
-            one::<F2>(),
-        ]];
-        let witnesses = vec![vec![zero::<F2>(), one::<F2>()]];
-
-        test_circuit(fields, func_store, gates, instances, witnesses);
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_less_eq_than_1() {
@@ -2489,12 +2368,6 @@ mod tests {
         test4_simple_fun();
         test5_simple_fun_with_vec();
         test6_fun_slice_and_unallocated()
-    }
-
-    #[test]
-    fn test_mux_plugin() {
-        test_f2_mux();
-        test_f2_mux_on_slices();
     }
 
     #[test]

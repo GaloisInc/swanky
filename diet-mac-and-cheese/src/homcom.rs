@@ -205,6 +205,15 @@ impl<F: FiniteField> Default for MacProver<F> {
     }
 }
 
+impl<FE: FiniteField> ConditionallySelectable for MacProver<FE> {
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        MacProver(
+            FE::PrimeField::conditional_select(&a.0, &b.0, choice),
+            FE::conditional_select(&a.1, &b.1, choice),
+        )
+    }
+}
+
 /// This type holds the verifier-side data associated with a MAC between a
 /// prover and verifier (see [`MacProver`] for the prover-side data).
 ///
@@ -234,19 +243,19 @@ impl<F: FiniteField> Default for MacVerifier<F> {
     }
 }
 
-impl<FE: FiniteField> ConditionallySelectable for MacProver<FE> {
-    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        MacProver(
-            FE::PrimeField::conditional_select(&a.0, &b.0, choice),
-            FE::conditional_select(&a.1, &b.1, choice),
-        )
-    }
-}
-
 impl<FE: FiniteField> ConditionallySelectable for MacVerifier<FE> {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         MacVerifier(FE::conditional_select(&a.0, &b.0, choice))
     }
+}
+
+#[cfg(test)]
+pub(crate) fn validate<FE: FiniteField>(
+    prover: MacProver<FE>,
+    verifier: MacVerifier<FE>,
+    delta: FE,
+) -> bool {
+    prover.value() * delta + verifier.mac() == prover.mac()
 }
 
 /// F_com protocol for the Prover
@@ -272,7 +281,7 @@ pub struct StateMultCheckProver<FE> {
 impl<FE> Drop for StateMultCheckProver<FE> {
     fn drop(&mut self) {
         if self.cnt != 0 {
-            panic!(
+            warn!(
                 "Quicksilver functionality dropped before check finished, mult cnt {:?}",
                 self.cnt
             );
@@ -591,7 +600,7 @@ pub struct StateMultCheckVerifier<FE> {
 impl<FE> Drop for StateMultCheckVerifier<FE> {
     fn drop(&mut self) {
         if self.cnt != 0 {
-            panic!(
+            warn!(
                 "Quicksilver functionality dropped before check finished, mult cnt {:?}",
                 self.cnt
             );

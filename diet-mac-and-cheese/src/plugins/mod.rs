@@ -77,6 +77,11 @@ pub(crate) trait Plugin {
     ) -> Result<GatesBody>;
 }
 
+//
+// The supported plugins.
+//
+
 mod mux_v0;
 pub(crate) use mux_v0::MuxV0;
-// pub(crate) mod permutation_check_v1;
+mod permutation_check_v1;
+pub(crate) use permutation_check_v1::PermutationCheckV1;
