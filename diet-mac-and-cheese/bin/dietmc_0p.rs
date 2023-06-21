@@ -68,13 +68,14 @@ fn run_text(args: &Cli) -> Result<()> {
             instances.push_back(number_to_bytes(&v));
         }
         let field = stream_inp.modulus();
+        let ninstances = instances[i].len();
         inputs.ingest_instances(i, instances);
         info!(
             "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
             i,
             number_to_bytes(&field),
             instance_path,
-            inputs.ins[i].len()
+            ninstances
         );
     }
 
@@ -91,13 +92,14 @@ fn run_text(args: &Cli) -> Result<()> {
                 witnesses.push_back(number_to_bytes(&v));
             }
             let field = stream_wit.modulus();
+            let nwitnesses = witnesses[i].len();
             inputs.ingest_witnesses(i, witnesses);
             info!(
                 "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
                 i,
                 number_to_bytes(&field),
                 witness_path,
-                inputs.wit[i].len()
+                nwitnesses
             );
         }
     }
@@ -195,13 +197,11 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
     for (i, instance_path) in instance_paths.iter().enumerate() {
         let mut instances = VecDeque::new();
         let field = read_public_inputs(&instance_path, &mut instances);
+        let ninstances = instances[i].len();
         inputs.ingest_instances(i, instances);
         info!(
             "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
-            i,
-            field,
-            instance_path,
-            inputs.ins[i].len()
+            i, field, instance_path, ninstances
         );
     }
 
@@ -212,13 +212,11 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
         for (i, witness_path) in witness_paths.iter().enumerate() {
             let mut witnesses = VecDeque::new();
             let field = read_private_inputs(&witness_path, &mut witnesses);
+            let nwitnesses = witnesses[i].len();
             inputs.ingest_witnesses(i, witnesses);
             info!(
                 "Loaded idx:{:?} field:{:?} file:{:?} num private witnesses:{:?}",
-                i,
-                field,
-                witness_path,
-                inputs.wit[i].len()
+                i, field, witness_path, nwitnesses,
             );
         }
     }
