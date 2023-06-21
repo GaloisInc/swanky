@@ -23,9 +23,14 @@ pub type TypeId = u8;
 pub type FunId = usize;
 pub type WireRange = (WireId, WireId);
 
-/// The Circuit IR gate types.
+/// The internal circuit representation gate types.
+///
+/// Most gates take a [`TypeId`] as their first argument, which denotes the
+/// Circuit IR type associated with the given gate. In addition, the [`WireId`]
+/// ordering for gates is generally: `<out> <in> ...`; that is, the first
+/// [`WireId`] denotes the _output_ of the gate.
 // This enum should fit in 32 bytes.
-// Using Box<Vec<u8>> for this reason, beware the size of `Box<[T]>` is not 8, it's 16.
+// Using `Box<Vec<u8>>` for this reason, beware the size of `Box<[T]>` is not 8, it's 16.
 #[derive(Clone, Debug)]
 pub enum GateM {
     /// Store the given element in [`WireId`].
@@ -50,68 +55,60 @@ pub enum GateM {
     Comment(String),
 }
 
+#[test]
+fn size_of_gate_m_less_than_32_bytes() {
+    // Enforce that `GateM` fits in 32 bytes.
+    assert!(std::mem::size_of::<GateM>() <= 32);
+}
+
 impl GateM {
     /// Return the [`TypeId`] associated with this gate.
     pub(crate) fn type_id(&self) -> TypeId {
         use GateM::*;
         match self {
-            Constant(ty, _, _) => *ty,
-            AssertZero(ty, _) => *ty,
-            Copy(ty, _, _) => *ty,
-            Add(ty, _, _, _) => *ty,
-            Sub(ty, _, _, _) => *ty,
-            Mul(ty, _, _, _) => *ty,
-            AddConstant(ty, _, _, _) => *ty,
-            MulConstant(ty, _, _, _) => *ty,
-            New(ty, _, _) => *ty,
-            Delete(ty, _, _) => *ty,
-            Instance(ty, _) => *ty,
-            Witness(ty, _) => *ty,
-            Conv(_) => todo!(),
-            Call(_) => todo!(),
-            Challenge(ty, _) => *ty,
+            Constant(ty, _, _)
+            | AssertZero(ty, _)
+            | Copy(ty, _, _)
+            | Add(ty, _, _, _)
+            | Sub(ty, _, _, _)
+            | Mul(ty, _, _, _)
+            | AddConstant(ty, _, _, _)
+            | MulConstant(ty, _, _, _)
+            | New(ty, _, _)
+            | Delete(ty, _, _)
+            | Instance(ty, _)
+            | Witness(ty, _)
+            | Challenge(ty, _) => *ty,
+            Conv(_) | Call(_) => todo!(),
             Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
         }
     }
 
     /// Return the [`WireId`] associated with the output of this gate, or
     /// `None` if the gate has no output wire.
-    fn out_wire(&self) -> Option<WireId> {
+    pub(crate) fn out_wire(&self) -> Option<WireId> {
         use GateM::*;
         match self {
-            Constant(_, out, _) => Some(*out),
-            AssertZero(_, _) => None,
-            Copy(_, out, _) => Some(*out),
-            Add(_, out, _, _) => Some(*out),
-            Sub(_, out, _, _) => Some(*out),
-            Mul(_, out, _, _) => Some(*out),
-            AddConstant(_, out, _, _) => Some(*out),
-            MulConstant(_, out, _, _) => Some(*out),
+            Constant(_, out, _)
+            | Copy(_, out, _)
+            | Add(_, out, _, _)
+            | Sub(_, out, _, _)
+            | Mul(_, out, _, _)
+            | AddConstant(_, out, _, _)
+            | MulConstant(_, out, _, _)
+            | Instance(_, out)
+            | Witness(_, out)
+            | New(_, _, out)
+            | Challenge(_, out) => Some(*out),
+            AssertZero(_, _) | Delete(_, _, _) | Comment(_) => None,
             Conv(c) => {
                 let (_, (_, out), _, _) = c.as_ref();
                 Some(*out)
             }
-            Instance(_, out) => Some(*out),
-            Witness(_, out) => Some(*out),
-            New(_, _, last) => Some(*last),
-            Delete(_, _, _) => None,
             Call(arg) => {
                 let (_, v, _) = arg.as_ref();
-                let mut out = None;
-                for (_first, last) in v.iter() {
-                    match out {
-                        None => {
-                            out = Some(*last);
-                        }
-                        Some(m) => {
-                            out = Some(max(m, *last));
-                        }
-                    }
-                }
-                out
+                v.iter().fold(None, |acc, (_, last)| max(acc, Some(*last)))
             }
-            Challenge(_, out) => Some(*out),
-            Comment(_str) => None,
         }
     }
 }
@@ -221,50 +218,27 @@ impl TypeIdMapping {
     pub(crate) fn set_from_gate(&mut self, gate: &GateM) {
         use GateM::*;
         match gate {
-            Constant(ty, _, _) => {
-                self.0[*ty as usize] = true;
+            Constant(ty, _, _)
+            | AssertZero(ty, _)
+            | Copy(ty, _, _)
+            | Add(ty, _, _, _)
+            | Sub(ty, _, _, _)
+            | Mul(ty, _, _, _)
+            | AddConstant(ty, _, _, _)
+            | MulConstant(ty, _, _, _)
+            | Instance(ty, _)
+            | Witness(ty, _)
+            | New(ty, _, _)
+            | Delete(ty, _, _)
+            | Challenge(ty, _) => {
+                self.set(*ty);
             }
-            AssertZero(ty, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Copy(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Add(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Sub(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Mul(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            AddConstant(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            MulConstant(ty, _, _, _) => {
-                self.0[*ty as usize] = true;
-            }
+            Call(_) | Comment(_) => {}
             Conv(c) => {
                 let (ty1, _, ty2, _) = c.as_ref();
-                self.0[*ty1 as usize] = true;
-                self.0[*ty2 as usize] = true;
+                self.set(*ty1);
+                self.set(*ty2);
             }
-            Instance(ty, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Witness(ty, _) => {
-                self.0[*ty as usize] = true;
-            }
-            New(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Delete(ty, _, _) => {
-                self.0[*ty as usize] = true;
-            }
-            Call(_) => {}
-            Challenge(ty, _) => self.0[*ty as usize] = true,
-            Comment(_) => {}
         }
     }
 
@@ -302,6 +276,7 @@ impl From<&GatesBody> for TypeIdMapping {
 
 /// A body of computation containing a sequence of [`GateM`]s.
 #[derive(Clone)]
+#[repr(transparent)]
 pub(crate) struct GatesBody {
     gates: Vec<GateM>,
 }
@@ -488,8 +463,8 @@ impl FunStore {
 //       maybe use Box<[u8]> like in other places.
 #[derive(Default)]
 pub struct CircInputs {
-    pub ins: Vec<VecDeque<Vec<u8>>>,
-    pub wit: Vec<VecDeque<Vec<u8>>>,
+    ins: Vec<VecDeque<Vec<u8>>>,
+    wit: Vec<VecDeque<Vec<u8>>>,
 }
 
 impl CircInputs {
