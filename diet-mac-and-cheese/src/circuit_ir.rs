@@ -413,7 +413,7 @@ impl FuncDecl {
                 count,
                 &output_counts,
                 &input_counts,
-                type_store
+                type_store,
             )?,
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };
