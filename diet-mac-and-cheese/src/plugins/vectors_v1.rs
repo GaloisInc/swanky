@@ -1,0 +1,1 @@
+pub(crate) struct VectorsV1;
