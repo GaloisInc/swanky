@@ -25,6 +25,7 @@ members = [
     "simple-arith-circuit",
     "vectoreyes",
     "zkv",
+    "bristol-fashion",
 ]
 
 
