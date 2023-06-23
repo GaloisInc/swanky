@@ -3,7 +3,7 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType},
+    plugins::{MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1},
 };
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
@@ -406,6 +406,14 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+            )?,
+            VectorsV1::NAME => VectorsV1::gates_body(
+                &operation,
+                &params,
+                count,
+                &output_counts,
+                &input_counts,
+                type_store
             )?,
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };
