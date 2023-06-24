@@ -133,19 +133,72 @@ impl Plugin for VectorsV1 {
                 let mut gates = vec![];
                 for i in 0..s {
                     gates.push(match operation {
-                        "addc" => {
-                            GateM::AddConstant(t, i, s + i, todo!("Replace with `c`."))
-                        }
-                        "mulc" => {
-                            GateM::MulConstant(t, i, s + i, todo!("Replace with `c`."))
-                        }
+                        "addc" => GateM::AddConstant(t, i, s + i, todo!("Replace with `c`.")),
+                        "mulc" => GateM::MulConstant(t, i, s + i, todo!("Replace with `c`.")),
                         _ => panic!("The universe is broken."),
                     });
                 }
 
                 Ok(GatesBody::new(gates))
             }
-            "add_scalar" | "mul_scalar" => todo!(),
+            "add_scalar" | "mul_scalar" => {
+                eyre::ensure!(
+                    params.len() == 0,
+                    "{}: {operation} expects 0 parameters, but {} were given.",
+                    Self::NAME,
+                    params.len(),
+                );
+
+                eyre::ensure!(
+                    input_counts.len() == 2,
+                    "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
+                    Self::NAME,
+                    input_counts.len(),
+                );
+
+                eyre::ensure!(
+                    input_counts[0].0 == input_counts[1].0,
+                    "{}: The type indices of the inputs to {operation} must match: {} != {}.",
+                    Self::NAME,
+                    input_counts[0].0,
+                    input_counts[1].0,
+                );
+
+                eyre::ensure!(
+                    output_counts[0].0 == input_counts[0].0,
+                    "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
+                    Self::NAME,
+                    output_counts[0].0,
+                    input_counts[0].0,
+                );
+
+                eyre::ensure!(
+                    output_counts[0].1 == input_counts[0].1,
+                    "{}: The length of the output of {operation} must match the length of the vector input: {} != {}",
+                    Self::NAME,
+                    output_counts[0].1,
+                    input_counts[0].1,
+                );
+
+                eyre::ensure!(
+                    input_counts[1].1 == 1,
+                    "{}: The scalar input to {operation} must be given on a single wire.",
+                    Self::NAME,
+                );
+
+                let s = output_counts[0].1;
+
+                let mut gates = vec![];
+                for i in 0..s {
+                    gates.push(match operation {
+                        "add_scalar" => GateM::Add(t, i, s + i, count - 1),
+                        "mul_scalar" => GateM::Mul(t, i, s + i, count - 1),
+                        _ => panic!("The universe is broken."),
+                    });
+                }
+
+                Ok(GatesBody::new(gates))
+            }
             "sum" | "product" => todo!(),
             "dotproduct" => todo!(),
             _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME,),
