@@ -1,13 +1,12 @@
 //! SIEVE IR0+ text reader.
 
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
-use log::{info, warn};
+use log::info;
 use mac_n_cheese_sieve_parser::{
     FunctionBodyVisitor,
     Identifier,
     Number,
     PluginBinding,
-    PluginTypeArg,
     RelationVisitor,
     TypeId,
     TypedCount,
@@ -239,18 +238,6 @@ impl RelationVisitor for TextRelation {
             input_counts.push((input.ty.try_into()?, input.count));
         }
 
-        let mut params = vec![];
-        for i in body.plugin_type.args {
-            match i {
-                PluginTypeArg::Number(_n) => {
-                    warn!("Ignoring number arg in plugin!!!!!");
-                }
-                PluginTypeArg::String(s) => {
-                    params.push(s);
-                }
-            }
-        }
-
         let fun_body = FuncDecl::new_plugin(
             name_s.clone(),
             MAGIC_FUN_ID,
@@ -258,7 +245,7 @@ impl RelationVisitor for TextRelation {
             input_counts,
             body.plugin_type.name,
             body.plugin_type.operation,
-            params,
+            body.plugin_type.args,
             vec![], // TODO: Add them !
             vec![], // TODO: Add them!
             &self.type_store,
