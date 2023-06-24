@@ -133,7 +133,7 @@ impl Plugin for VectorsV1 {
 
                 let s = output_counts[0].1;
 
-                // TODO: Replace with:
+                // TODO: Uncomment this:
                 //
                 // let PluginTypeArg::Number(c) = params[0] else {
                 //     eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
@@ -141,7 +141,6 @@ impl Plugin for VectorsV1 {
                 // let c = c.to_le_bytes().to_vec();
                 //
                 // once MR !236 is merged.
-                let _c = &params[0];
 
                 let mut gates = vec![];
                 for i in 0..s {
