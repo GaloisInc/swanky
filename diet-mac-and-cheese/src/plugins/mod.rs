@@ -13,11 +13,7 @@ pub struct PluginType {
 }
 
 impl PluginType {
-    pub(crate) fn new(name: String, operation: String, params: Vec<String>) -> Self {
-        let params = params
-            .into_iter()
-            .map(|s| PluginTypeArg::String(s))
-            .collect();
+    pub(crate) fn new(name: String, operation: String, params: Vec<PluginTypeArg>) -> Self {
         Self {
             name,
             operation,
@@ -69,7 +65,7 @@ pub(crate) trait Plugin {
     /// - `type_store`: The [`TypeStore`] for this circuit.
     fn gates_body(
         operation: &str,
-        params: &[String],
+        params: &[PluginTypeArg],
         count: u64,
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
