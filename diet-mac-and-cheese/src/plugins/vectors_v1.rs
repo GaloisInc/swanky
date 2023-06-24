@@ -15,6 +15,18 @@ impl Plugin for VectorsV1 {
         input_counts: &[(crate::circuit_ir::TypeId, crate::circuit_ir::WireCount)],
         type_store: &crate::circuit_ir::TypeStore,
     ) -> eyre::Result<crate::circuit_ir::GatesBody> {
+        eyre::ensure!(
+            output_counts.len() == 1,
+            "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
+            Self::NAME,
+            output_counts.len(),
+        );
+
+        let t = output_counts[0].0;
+        let TypeSpecification::Field(_) = type_store.get(&t)? else {
+            eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
+        };
+
         match operation {
             "add" | "mul" => {
                 eyre::ensure!(
@@ -22,13 +34,6 @@ impl Plugin for VectorsV1 {
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
-                );
-
-                eyre::ensure!(
-                    output_counts.len() == 1,
-                    "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
-                    Self::NAME,
-                    output_counts.len(),
                 );
 
                 eyre::ensure!(
@@ -70,11 +75,6 @@ impl Plugin for VectorsV1 {
                     input_counts[0].1,
                 );
 
-                let t = output_counts[0].0;
-                let TypeSpecification::Field(_) = type_store.get(&t)? else {
-                    eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
-                };
-
                 let s = output_counts[0].1;
 
                 let mut gates = vec![];
@@ -94,13 +94,6 @@ impl Plugin for VectorsV1 {
                     "{}: {operation} expects 1 parameter (the constant), but {} were given.",
                     Self::NAME,
                     params.len(),
-                );
-
-                eyre::ensure!(
-                    output_counts.len() == 1,
-                    "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
-                    Self::NAME,
-                    output_counts.len(),
                 );
 
                 eyre::ensure!(
@@ -125,11 +118,6 @@ impl Plugin for VectorsV1 {
                     output_counts[0].1,
                     input_counts[0].1,
                 );
-
-                let t = output_counts[0].0;
-                let TypeSpecification::Field(_) = type_store.get(&t)? else {
-                    eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
-                };
 
                 let s = output_counts[0].1;
 
