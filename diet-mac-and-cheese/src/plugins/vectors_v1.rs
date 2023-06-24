@@ -133,14 +133,24 @@ impl Plugin for VectorsV1 {
 
                 let s = output_counts[0].1;
 
+                // TODO: Replace with:
+                //
+                // let PluginTypeArg::Number(c) = params[0] else {
+                //     eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
+                // };
+                // let c = c.to_le_bytes().to_vec();
+                //
+                // once MR !236 is merged.
+                let _c = &params[0];
+
                 let mut gates = vec![];
                 for i in 0..s {
                     gates.push(match operation {
                         "addc" => {
-                            GateM::AddConstant(t, i, s + i, todo!("Need numeric plugin args"))
+                            GateM::AddConstant(t, i, s + i, todo!("Replace with `c`."))
                         }
                         "mulc" => {
-                            GateM::MulConstant(t, i, s + i, todo!("Need numeric plugin args"))
+                            GateM::MulConstant(t, i, s + i, todo!("Replace with `c`."))
                         }
                         _ => panic!("The universe is broken."),
                     });
