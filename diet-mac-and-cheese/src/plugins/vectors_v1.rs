@@ -72,7 +72,7 @@ impl Plugin for VectorsV1 {
 
                 let t = output_counts[0].0;
                 let TypeSpecification::Field(_) = type_store.get(&t)? else {
-                    eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t)
+                    eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
                 };
 
                 let s = output_counts[0].1;
@@ -88,7 +88,66 @@ impl Plugin for VectorsV1 {
 
                 Ok(GatesBody::new(gates))
             }
-            "addc" | "mulc" => todo!(),
+            "addc" | "mulc" => {
+                eyre::ensure!(
+                    params.len() == 1,
+                    "{}: {operation} expects 1 parameter (the constant), but {} were given.",
+                    Self::NAME,
+                    params.len(),
+                );
+
+                eyre::ensure!(
+                    output_counts.len() == 1,
+                    "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
+                    Self::NAME,
+                    output_counts.len(),
+                );
+
+                eyre::ensure!(
+                    input_counts.len() == 1,
+                    "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
+                    Self::NAME,
+                    input_counts.len(),
+                );
+
+                eyre::ensure!(
+                    output_counts[0].0 == input_counts[0].0,
+                    "{}: The type of the output of {operation} must match the type of the input: {} != {}.",
+                    Self::NAME,
+                    output_counts[0].0,
+                    input_counts[0].0,
+                );
+
+                eyre::ensure!(
+                    output_counts[0].1 == input_counts[0].1,
+                    "{}: The length of the output of {operation} must match the length of the input: {} != {}.",
+                    Self::NAME,
+                    output_counts[0].1,
+                    input_counts[0].1,
+                );
+
+                let t = output_counts[0].0;
+                let TypeSpecification::Field(_) = type_store.get(&t)? else {
+                    eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
+                };
+
+                let s = output_counts[0].1;
+
+                let mut gates = vec![];
+                for i in 0..s {
+                    gates.push(match operation {
+                        "addc" => {
+                            GateM::AddConstant(t, i, s + i, todo!("Need numeric plugin args"))
+                        }
+                        "mulc" => {
+                            GateM::MulConstant(t, i, s + i, todo!("Need numeric plugin args"))
+                        }
+                        _ => panic!("The universe is broken."),
+                    });
+                }
+
+                Ok(GatesBody::new(gates))
+            }
             "add_scalar" | "mul_scalar" => todo!(),
             "sum" | "product" => todo!(),
             "dotproduct" => todo!(),
