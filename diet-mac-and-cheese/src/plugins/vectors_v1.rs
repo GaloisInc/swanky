@@ -363,29 +363,595 @@ mod tests {
     use scuttlebutt::field::F61p;
 
     #[test]
-    fn test_vector_add() {}
+    fn test_vector_add() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_add".into(),
+            42,
+            vec![(FF0, 3)],
+            vec![(FF0, 3), (FF0, 3)],
+            VectorsV1::NAME.into(),
+            "add".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_add".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 2),
+            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, 2),
+            GateM::New(FF0, 3, 5),
+            GateM::Instance(FF0, 3),
+            GateM::Instance(FF0, 4),
+            GateM::Instance(FF0, 5),
+            GateM::Call(Box::new((
+                "my_add".into(),
+                vec![(6, 8)],
+                vec![(0, 2), (3, 5)],
+            ))),
+            GateM::AssertZero(FF0, 6),
+            GateM::AssertZero(FF0, 7),
+            GateM::AssertZero(FF0, 8),
+        ];
+
+        let instances = vec![vec![
+            minus_one::<F61p>(),
+            one::<F61p>(),
+            minus_one::<F61p>(),
+        ]];
+
+        let witnesses = vec![vec![one::<F61p>(), minus_one::<F61p>(), one::<F61p>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_mul() {}
+    fn test_vector_mul() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_mul".into(),
+            42,
+            vec![(FF0, 3)],
+            vec![(FF0, 3), (FF0, 3)],
+            VectorsV1::NAME.into(),
+            "mul".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mul".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 2),
+            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, 2),
+            GateM::New(FF0, 3, 5),
+            GateM::Instance(FF0, 3),
+            GateM::Instance(FF0, 4),
+            GateM::Instance(FF0, 5),
+            GateM::Call(Box::new((
+                "my_mul".into(),
+                vec![(6, 8)],
+                vec![(0, 2), (3, 5)],
+            ))),
+            GateM::AssertZero(FF0, 6),
+            GateM::AssertZero(FF0, 7),
+            GateM::AssertZero(FF0, 8),
+        ];
+
+        let instances = vec![vec![one::<F61p>(), zero::<F61p>(), one::<F61p>()]];
+
+        let witnesses = vec![vec![zero::<F61p>(), one::<F61p>(), zero::<F61p>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_addc() {}
+    fn test_vector_addc() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_addc".into(),
+            42,
+            vec![(FF0, 3)],
+            vec![(FF0, 3)],
+            VectorsV1::NAME.into(),
+            "addc".into(),
+            vec![
+                "TODO: Relace with: PluginTypeArg::Number(Number::ONE) once !236 is merged.".into(),
+            ],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_addc".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 2),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Call(Box::new(("my_addc".into(), vec![(3, 5)], vec![(0, 2)]))),
+            GateM::AssertZero(FF0, 3),
+            GateM::AssertZero(FF0, 4),
+            GateM::AssertZero(FF0, 5),
+        ];
+
+        let instances = vec![vec![
+            minus_one::<F61p>(),
+            minus_one::<F61p>(),
+            minus_one::<F61p>(),
+        ]];
+
+        let witnesses = vec![vec![]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_mulc() {}
+    fn test_vector_mulc() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_mulc".into(),
+            42,
+            vec![(FF0, 3)],
+            vec![(FF0, 3)],
+            VectorsV1::NAME.into(),
+            "mulc".into(),
+            vec![
+                "TODO: Relace with: PluginTypeArg::Number(Number::ZERO) once !236 is merged."
+                    .into(),
+            ],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mulc".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 2),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Call(Box::new(("my_mulc".into(), vec![(3, 5)], vec![(0, 2)]))),
+            GateM::AssertZero(FF0, 3),
+            GateM::AssertZero(FF0, 4),
+            GateM::AssertZero(FF0, 5),
+        ];
+
+        let instances = vec![vec![one::<F61p>(), one::<F61p>(), one::<F61p>()]];
+
+        let witnesses = vec![vec![]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_add_scalar() {}
+    fn test_vector_add_scalar() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_add_scalar".into(),
+            42,
+            vec![(FF0, 3)],
+            vec![(FF0, 3), (FF0, 1)],
+            VectorsV1::NAME.into(),
+            "add_scalar".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_add_scalar".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 2),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Witness(FF0, 3),
+            GateM::Call(Box::new((
+                "my_add_scalar".into(),
+                vec![(4, 6)],
+                vec![(0, 2), (3, 3)],
+            ))),
+            GateM::AssertZero(FF0, 4),
+            GateM::AssertZero(FF0, 5),
+            GateM::AssertZero(FF0, 6),
+        ];
+
+        let instances = vec![vec![
+            minus_one::<F61p>(),
+            minus_one::<F61p>(),
+            minus_one::<F61p>(),
+        ]];
+
+        let witnesses = vec![vec![one::<F61p>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_mul_scalar() {}
+    fn test_vector_mul_scalar() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            "my_mul_scalar".into(),
+            42,
+            vec![(FF0, 3)],
+            vec![(FF0, 3), (FF0, 1)],
+            VectorsV1::NAME.into(),
+            "mul_scalar".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mul_scalar".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 2),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Witness(FF0, 3),
+            GateM::Call(Box::new((
+                "my_mul_scalar".into(),
+                vec![(4, 6)],
+                vec![(0, 2), (3, 3)],
+            ))),
+            GateM::AssertZero(FF0, 4),
+            GateM::AssertZero(FF0, 5),
+            GateM::AssertZero(FF0, 6),
+        ];
+
+        let instances = vec![vec![one::<F61p>(), one::<F61p>(), one::<F61p>()]];
+
+        let witnesses = vec![vec![zero::<F61p>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_sum() {}
+    fn test_vector_sum() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let sum_one = FuncDecl::new_plugin(
+            "sum_one".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 1)],
+            VectorsV1::NAME.into(),
+            "sum".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let sum_two = FuncDecl::new_plugin(
+            "sum_two".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 2)],
+            VectorsV1::NAME.into(),
+            "sum".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let sum_three = FuncDecl::new_plugin(
+            "sum_three".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 3)],
+            VectorsV1::NAME.into(),
+            "sum".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let sum_four = FuncDecl::new_plugin(
+            "sum_four".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 4)],
+            VectorsV1::NAME.into(),
+            "sum".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("sum_one".into(), sum_one);
+        func_store.insert("sum_two".into(), sum_two);
+        func_store.insert("sum_three".into(), sum_three);
+        func_store.insert("sum_four".into(), sum_four);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 3),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Instance(FF0, 3),
+            GateM::Call(Box::new(("sum_one".into(), vec![(4, 4)], vec![(0, 0)]))),
+            GateM::Call(Box::new(("sum_two".into(), vec![(5, 5)], vec![(1, 2)]))),
+            GateM::Call(Box::new(("sum_three".into(), vec![(6, 6)], vec![(0, 2)]))),
+            GateM::Call(Box::new(("sum_four".into(), vec![(7, 7)], vec![(0, 3)]))),
+            GateM::AssertZero(FF0, 4),
+            GateM::AssertZero(FF0, 5),
+            GateM::AssertZero(FF0, 6),
+            GateM::AssertZero(FF0, 7),
+        ];
+
+        let instances = vec![vec![
+            zero::<F61p>(),
+            one::<F61p>(),
+            minus_one::<F61p>(),
+            zero::<F61p>(),
+        ]];
+
+        let witnesses = vec![vec![]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_product() {}
+    fn test_vector_product() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let mul_one = FuncDecl::new_plugin(
+            "mul_one".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 1)],
+            VectorsV1::NAME.into(),
+            "product".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let mul_two = FuncDecl::new_plugin(
+            "mul_two".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 2)],
+            VectorsV1::NAME.into(),
+            "product".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let mul_three = FuncDecl::new_plugin(
+            "mul_three".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 3)],
+            VectorsV1::NAME.into(),
+            "product".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let mul_four = FuncDecl::new_plugin(
+            "mul_four".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 4)],
+            VectorsV1::NAME.into(),
+            "product".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("mul_one".into(), mul_one);
+        func_store.insert("mul_two".into(), mul_two);
+        func_store.insert("mul_three".into(), mul_three);
+        func_store.insert("mul_four".into(), mul_four);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 3),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Instance(FF0, 3),
+            GateM::Call(Box::new(("mul_one".into(), vec![(4, 4)], vec![(0, 0)]))),
+            GateM::Call(Box::new(("mul_two".into(), vec![(5, 5)], vec![(0, 1)]))),
+            GateM::Call(Box::new(("mul_three".into(), vec![(6, 6)], vec![(0, 2)]))),
+            GateM::Call(Box::new(("mul_four".into(), vec![(7, 7)], vec![(0, 3)]))),
+            GateM::AssertZero(FF0, 4),
+            GateM::AssertZero(FF0, 5),
+            GateM::AssertZero(FF0, 6),
+            GateM::AssertZero(FF0, 7),
+        ];
+
+        let instances = vec![vec![
+            zero::<F61p>(),
+            one::<F61p>(),
+            minus_one::<F61p>(),
+            one::<F61p>(),
+        ]];
+
+        let witnesses = vec![vec![]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 
     #[test]
-    fn test_vector_dotproduct() {}
+    fn test_vector_dotproduct() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let dot_one = FuncDecl::new_plugin(
+            "dot_one".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 1), (FF0, 1)],
+            VectorsV1::NAME.into(),
+            "dotproduct".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let dot_two = FuncDecl::new_plugin(
+            "dot_two".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 2), (FF0, 2)],
+            VectorsV1::NAME.into(),
+            "dotproduct".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let dot_three = FuncDecl::new_plugin(
+            "dot_three".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 3), (FF0, 3)],
+            VectorsV1::NAME.into(),
+            "dotproduct".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        let dot_four = FuncDecl::new_plugin(
+            "dot_four".into(),
+            42,
+            vec![(FF0, 1)],
+            vec![(FF0, 4), (FF0, 4)],
+            VectorsV1::NAME.into(),
+            "dotproduct".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+
+        func_store.insert("dot_one".into(), dot_one);
+        func_store.insert("dot_two".into(), dot_two);
+        func_store.insert("dot_three".into(), dot_three);
+        func_store.insert("dot_four".into(), dot_four);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 3),
+            GateM::Instance(FF0, 0),
+            GateM::Instance(FF0, 1),
+            GateM::Instance(FF0, 2),
+            GateM::Instance(FF0, 3),
+            GateM::New(FF0, 4, 7),
+            GateM::Instance(FF0, 4),
+            GateM::Instance(FF0, 5),
+            GateM::Instance(FF0, 6),
+            GateM::Instance(FF0, 7),
+            GateM::Call(Box::new((
+                "dot_one".into(),
+                vec![(8, 8)],
+                vec![(0, 0), (4, 4)],
+            ))),
+            GateM::Call(Box::new((
+                "dot_two".into(),
+                vec![(9, 9)],
+                vec![(0, 1), (4, 5)],
+            ))),
+            GateM::Call(Box::new((
+                "dot_three".into(),
+                vec![(10, 10)],
+                vec![(0, 2), (4, 6)],
+            ))),
+            GateM::Call(Box::new((
+                "dot_four".into(),
+                vec![(11, 11)],
+                vec![(0, 3), (4, 7)],
+            ))),
+            GateM::AssertZero(FF0, 8),
+            GateM::AssertZero(FF0, 9),
+            GateM::AssertZero(FF0, 10),
+            GateM::AssertZero(FF0, 11),
+        ];
+
+        let instances = vec![vec![
+            zero::<F61p>(),
+            one::<F61p>(),
+            zero::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+            zero::<F61p>(),
+            one::<F61p>(),
+            zero::<F61p>(),
+        ]];
+
+        let witnesses = vec![vec![]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 }
