@@ -351,3 +351,40 @@ impl Plugin for VectorsV1 {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::VectorsV1;
+    use crate::{
+        backend_multifield::tests::test_circuit,
+        circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        plugins::Plugin,
+    };
+
+    #[test]
+    fn test_vector_add() {}
+
+    #[test]
+    fn test_vector_mul() {}
+
+    #[test]
+    fn test_vector_addc() {}
+
+    #[test]
+    fn test_vector_mulc() {}
+
+    #[test]
+    fn test_vector_add_scalar() {}
+
+    #[test]
+    fn test_vector_mul_scalar() {}
+
+    #[test]
+    fn test_vector_sum() {}
+
+    #[test]
+    fn test_vector_product() {}
+
+    #[test]
+    fn test_vector_dotproduct() {}
+}
