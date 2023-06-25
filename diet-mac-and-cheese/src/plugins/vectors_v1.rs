@@ -1,4 +1,4 @@
-use crate::circuit_ir::{GateM, GatesBody, TypeSpecification};
+use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount};
 
 use super::Plugin;
 
@@ -11,10 +11,10 @@ impl Plugin for VectorsV1 {
         operation: &str,
         params: &[String],
         count: u64,
-        output_counts: &[(crate::circuit_ir::TypeId, crate::circuit_ir::WireCount)],
-        input_counts: &[(crate::circuit_ir::TypeId, crate::circuit_ir::WireCount)],
-        type_store: &crate::circuit_ir::TypeStore,
-    ) -> eyre::Result<crate::circuit_ir::GatesBody> {
+        output_counts: &[(TypeId, WireCount)],
+        input_counts: &[(TypeId, WireCount)],
+        type_store: &TypeStore,
+    ) -> eyre::Result<GatesBody> {
         eyre::ensure!(
             output_counts.len() == 1,
             "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
