@@ -322,8 +322,8 @@ impl Plugin for VectorsV1 {
                     0 => gates.push(GateM::Constant(t, 0, Box::new(vec![0]))),
                     1 => gates.push(GateM::Mul(t, 0, 1, 2)),
                     2 => gates.append(&mut vec![
-                        GateM::Mul(t, count, 1, s + 1),
-                        GateM::Mul(t, count + 1, 2, s + 2),
+                        GateM::Mul(t, count, 1, 3),
+                        GateM::Mul(t, count + 1, 2, 4),
                         GateM::Add(t, 0, count, count + 1),
                     ]),
                     _ => {
@@ -332,10 +332,10 @@ impl Plugin for VectorsV1 {
                         }
 
                         let mut res = count + s;
+
                         gates.push(GateM::Add(t, res, count, count + 1));
 
-                        let first_sum = res;
-                        for i in (count + 2)..first_sum {
+                        for i in (count + 2)..(count + s) {
                             gates.push(GateM::Add(t, res + 1, res, i));
 
                             res += 1;
