@@ -269,7 +269,84 @@ impl Plugin for VectorsV1 {
 
                 Ok(GatesBody::new(gates))
             }
-            "dotproduct" => todo!(),
+            "dotproduct" => {
+                eyre::ensure!(
+                    params.len() == 0,
+                    "{}: {operation} expects 0 parameters, but {} were given.",
+                    Self::NAME,
+                    params.len(),
+                );
+
+                eyre::ensure!(
+                    input_counts.len() == 2,
+                    "{}: {operation} takes 2 wire ranges as input, but this declarations specifies {}.",
+                    Self::NAME,
+                    input_counts.len(),
+                );
+
+                eyre::ensure!(
+                    input_counts[0].0 == input_counts[1].0,
+                    "{}: The type indices of the inputs to {operation} must match: {} != {}.",
+                    Self::NAME,
+                    input_counts[0].0,
+                    input_counts[1].0,
+                );
+
+                eyre::ensure!(
+                    input_counts[0].1 == input_counts[1].1,
+                    "{}: The lengths of the inputs to {operation} must match: {} != {}.",
+                    Self::NAME,
+                    input_counts[0].1,
+                    input_counts[1].1,
+                );
+
+                eyre::ensure!(
+                    output_counts[0].0 == input_counts[0].0,
+                    "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
+                    Self::NAME,
+                    output_counts[0].0,
+                    input_counts[0].0,
+                );
+
+                eyre::ensure!(
+                    output_counts[0].1 == 1,
+                    "{}: The length of the output of {operation} must be 1, but this declaration specifies {}.",
+                    Self::NAME,
+                    output_counts[0].1,
+                );
+
+                let s = input_counts[0].1;
+
+                let mut gates = vec![];
+                match s {
+                    0 => gates.push(GateM::Constant(t, 0, Box::new(vec![0]))),
+                    1 => gates.push(GateM::Mul(t, 0, 1, 2)),
+                    2 => gates.append(&mut vec![
+                        GateM::Mul(t, count, 1, s + 1),
+                        GateM::Mul(t, count + 1, 2, s + 2),
+                        GateM::Add(t, 0, count, count + 1),
+                    ]),
+                    _ => {
+                        for i in 1..=s {
+                            gates.push(GateM::Mul(t, count + i - 1, i, s + i));
+                        }
+
+                        let mut res = count + s;
+                        gates.push(GateM::Add(t, res, count, count + 1));
+
+                        let first_sum = res;
+                        for i in (count + 2)..first_sum {
+                            gates.push(GateM::Add(t, res + 1, res, i));
+
+                            res += 1;
+                        }
+
+                        gates.push(GateM::Copy(t, 0, res));
+                    }
+                };
+
+                Ok(GatesBody::new(gates))
+            }
             _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME,),
         }
     }
