@@ -244,7 +244,7 @@ impl Plugin for VectorsV1 {
                         "product" => GateM::Mul(t, 0, 1, 2),
                         _ => panic!("The universe is broken."),
                     }),
-                    n => {
+                    _ => {
                         let mut res = count;
 
                         gates.push(match operation {
@@ -253,7 +253,7 @@ impl Plugin for VectorsV1 {
                             _ => panic!("The universe is broken."),
                         });
 
-                        for i in 3..=n {
+                        for i in 3..=s {
                             gates.push(match operation {
                                 "sum" => GateM::Add(t, res + 1, res, i),
                                 "product" => GateM::Mul(t, res + 1, res, i),
