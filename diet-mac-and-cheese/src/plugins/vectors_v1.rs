@@ -82,7 +82,7 @@ impl Plugin for VectorsV1 {
                     gates.push(match operation {
                         "add" => GateM::Add(t, i, s + i, 2 * s + i),
                         "mul" => GateM::Mul(t, i, s + i, 2 * s + i),
-                        _ => panic!("The universe is broken."),
+                        _ => unreachable!(),
                     });
                 }
 
@@ -135,7 +135,7 @@ impl Plugin for VectorsV1 {
                     gates.push(match operation {
                         "addc" => GateM::AddConstant(t, i, s + i, todo!("Replace with `c`.")),
                         "mulc" => GateM::MulConstant(t, i, s + i, todo!("Replace with `c`.")),
-                        _ => panic!("The universe is broken."),
+                        _ => unreachable!(),
                     });
                 }
 
@@ -193,7 +193,7 @@ impl Plugin for VectorsV1 {
                     gates.push(match operation {
                         "add_scalar" => GateM::Add(t, i, s + i, count - 1),
                         "mul_scalar" => GateM::Mul(t, i, s + i, count - 1),
-                        _ => panic!("The universe is broken."),
+                        _ => unreachable!(),
                     });
                 }
 
@@ -236,13 +236,13 @@ impl Plugin for VectorsV1 {
                     0 => gates.push(match operation {
                         "sum" => GateM::Constant(t, 0, Box::new(vec![0])),
                         "product" => GateM::Constant(t, 0, Box::new(vec![1])),
-                        _ => panic!("The universe is broken."),
+                        _ => unreachable!(),
                     }),
                     1 => gates.push(GateM::Copy(t, 0, 1)),
                     2 => gates.push(match operation {
                         "sum" => GateM::Add(t, 0, 1, 2),
                         "product" => GateM::Mul(t, 0, 1, 2),
-                        _ => panic!("The universe is broken."),
+                        _ => unreachable!(),
                     }),
                     _ => {
                         let mut res = count;
@@ -250,14 +250,14 @@ impl Plugin for VectorsV1 {
                         gates.push(match operation {
                             "sum" => GateM::Add(t, res, 1, 2),
                             "product" => GateM::Mul(t, res, 1, 2),
-                            _ => panic!("The universe is broken."),
+                            _ => unreachable!(),
                         });
 
                         for i in 3..=s {
                             gates.push(match operation {
                                 "sum" => GateM::Add(t, res + 1, res, i),
                                 "product" => GateM::Mul(t, res + 1, res, i),
-                                _ => panic!("The universe is broken."),
+                                _ => unreachable!(),
                             });
 
                             res += 1;
