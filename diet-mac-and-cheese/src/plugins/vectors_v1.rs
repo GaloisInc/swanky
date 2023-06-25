@@ -253,7 +253,7 @@ impl Plugin for VectorsV1 {
                             _ => panic!("The universe is broken."),
                         });
 
-                        for i in 3..n {
+                        for i in 3..=n {
                             gates.push(match operation {
                                 "sum" => GateM::Add(t, res + 1, res, i),
                                 "product" => GateM::Mul(t, res + 1, res, i),
