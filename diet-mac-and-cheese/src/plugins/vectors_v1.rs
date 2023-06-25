@@ -356,10 +356,11 @@ impl Plugin for VectorsV1 {
 mod tests {
     use super::VectorsV1;
     use crate::{
-        backend_multifield::tests::test_circuit,
+        backend_multifield::tests::{minus_one, one, test_circuit, zero, F61P_VEC, FF0},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         plugins::Plugin,
     };
+    use scuttlebutt::field::F61p;
 
     #[test]
     fn test_vector_add() {}
