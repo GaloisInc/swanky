@@ -199,7 +199,76 @@ impl Plugin for VectorsV1 {
 
                 Ok(GatesBody::new(gates))
             }
-            "sum" | "product" => todo!(),
+            "sum" | "product" => {
+                eyre::ensure!(
+                    params.len() == 0,
+                    "{}; {operation} expects 0 parameters, but {} were given.",
+                    Self::NAME,
+                    params.len(),
+                );
+
+                eyre::ensure!(
+                    input_counts.len() == 1,
+                    "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
+                    Self::NAME,
+                    input_counts.len(),
+                );
+
+                eyre::ensure!(
+                    output_counts[0].0 == input_counts[0].0,
+                    "{}: The type of the output of {operation} must match the type of the input: {} != {}.",
+                    Self::NAME,
+                    output_counts[0].0,
+                    input_counts[0].0,
+                );
+
+                eyre::ensure!(
+                    output_counts[0].1 == 1,
+                    "{}: The length of the output of {operation} must be 1, but this declaration specifies {}.",
+                    Self::NAME,
+                    output_counts[0].1,
+                );
+
+                let s = input_counts[0].1;
+
+                let mut gates = vec![];
+                match s {
+                    0 => gates.push(match operation {
+                        "sum" => GateM::Constant(t, 0, Box::new(vec![0])),
+                        "product" => GateM::Constant(t, 0, Box::new(vec![1])),
+                        _ => panic!("The universe is broken."),
+                    }),
+                    1 => gates.push(GateM::Copy(t, 0, 1)),
+                    2 => gates.push(match operation {
+                        "sum" => GateM::Add(t, 0, 1, 2),
+                        "product" => GateM::Mul(t, 0, 1, 2),
+                        _ => panic!("The universe is broken."),
+                    }),
+                    n => {
+                        let mut res = count;
+
+                        gates.push(match operation {
+                            "sum" => GateM::Add(t, res, 1, 2),
+                            "product" => GateM::Mul(t, res, 1, 2),
+                            _ => panic!("The universe is broken."),
+                        });
+
+                        for i in 3..n {
+                            gates.push(match operation {
+                                "sum" => GateM::Add(t, res + 1, res, i),
+                                "product" => GateM::Mul(t, res + 1, res, i),
+                                _ => panic!("The universe is broken."),
+                            });
+
+                            res += 1;
+                        }
+
+                        gates.push(GateM::Copy(t, 0, res));
+                    }
+                };
+
+                Ok(GatesBody::new(gates))
+            }
             "dotproduct" => todo!(),
             _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME,),
         }
