@@ -1,4 +1,9 @@
-use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount};
+use crypto_bigint::Encoding;
+use mac_n_cheese_sieve_parser::PluginTypeArg;
+
+use crate::circuit_ir::{
+    first_unused_wire_id, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+};
 
 use super::Plugin;
 
@@ -9,8 +14,7 @@ impl Plugin for VectorsV1 {
 
     fn gates_body(
         operation: &str,
-        params: &[String],
-        count: u64,
+        params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
@@ -121,20 +125,19 @@ impl Plugin for VectorsV1 {
 
                 let s = output_counts[0].1;
 
-                // TODO: Uncomment this:
-                //
-                // let PluginTypeArg::Number(c) = params[0] else {
-                //     eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
-                // };
-                // let c = c.to_le_bytes().to_vec();
-                //
-                // once MR !236 is merged.
+                let PluginTypeArg::Number(c) = params[0] else {
+                    eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
+                };
 
                 let mut gates = vec![];
                 for i in 0..s {
                     gates.push(match operation {
-                        "addc" => GateM::AddConstant(t, i, s + i, todo!("Replace with `c`.")),
-                        "mulc" => GateM::MulConstant(t, i, s + i, todo!("Replace with `c`.")),
+                        "addc" => {
+                            GateM::AddConstant(t, i, s + i, Box::new(c.to_le_bytes().to_vec()))
+                        }
+                        "mulc" => {
+                            GateM::MulConstant(t, i, s + i, Box::new(c.to_le_bytes().to_vec()))
+                        }
                         _ => unreachable!(),
                     });
                 }
@@ -188,11 +191,13 @@ impl Plugin for VectorsV1 {
 
                 let s = output_counts[0].1;
 
+                let scalar = first_unused_wire_id(output_counts, input_counts) - 1;
+
                 let mut gates = vec![];
                 for i in 0..s {
                     gates.push(match operation {
-                        "add_scalar" => GateM::Add(t, i, s + i, count - 1),
-                        "mul_scalar" => GateM::Mul(t, i, s + i, count - 1),
+                        "add_scalar" => GateM::Add(t, i, s + i, scalar),
+                        "mul_scalar" => GateM::Mul(t, i, s + i, scalar),
                         _ => unreachable!(),
                     });
                 }
@@ -245,7 +250,7 @@ impl Plugin for VectorsV1 {
                         _ => unreachable!(),
                     }),
                     _ => {
-                        let mut res = count;
+                        let mut res = first_unused_wire_id(output_counts, input_counts);
 
                         gates.push(match operation {
                             "sum" => GateM::Add(t, res, 1, 2),
@@ -317,25 +322,27 @@ impl Plugin for VectorsV1 {
 
                 let s = input_counts[0].1;
 
+                let first_mul = first_unused_wire_id(output_counts, input_counts);
+
                 let mut gates = vec![];
                 match s {
                     0 => gates.push(GateM::Constant(t, 0, Box::new(vec![0]))),
                     1 => gates.push(GateM::Mul(t, 0, 1, 2)),
                     2 => gates.append(&mut vec![
-                        GateM::Mul(t, count, 1, 3),
-                        GateM::Mul(t, count + 1, 2, 4),
-                        GateM::Add(t, 0, count, count + 1),
+                        GateM::Mul(t, first_mul, 1, 3),
+                        GateM::Mul(t, first_mul + 1, 2, 4),
+                        GateM::Add(t, 0, first_mul, first_mul + 1),
                     ]),
                     _ => {
                         for i in 1..=s {
-                            gates.push(GateM::Mul(t, count + i - 1, i, s + i));
+                            gates.push(GateM::Mul(t, first_mul + i - 1, i, s + i));
                         }
 
-                        let mut res = count + s;
+                        let mut res = first_mul + s;
 
-                        gates.push(GateM::Add(t, res, count, count + 1));
+                        gates.push(GateM::Add(t, res, first_mul, first_mul + 1));
 
-                        for i in (count + 2)..(count + s) {
+                        for i in (first_mul + 2)..(first_mul + s) {
                             gates.push(GateM::Add(t, res + 1, res, i));
 
                             res += 1;
@@ -360,6 +367,7 @@ mod tests {
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         plugins::Plugin,
     };
+    use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use scuttlebutt::field::F61p;
 
     #[test]
@@ -475,9 +483,7 @@ mod tests {
             vec![(FF0, 3)],
             VectorsV1::NAME.into(),
             "addc".into(),
-            vec![
-                "TODO: Relace with: PluginTypeArg::Number(Number::ONE) once !236 is merged.".into(),
-            ],
+            vec![PluginTypeArg::Number(Number::ONE)],
             vec![],
             vec![],
             &type_store,
@@ -521,10 +527,7 @@ mod tests {
             vec![(FF0, 3)],
             VectorsV1::NAME.into(),
             "mulc".into(),
-            vec![
-                "TODO: Relace with: PluginTypeArg::Number(Number::ZERO) once !236 is merged."
-                    .into(),
-            ],
+            vec![PluginTypeArg::Number(Number::ZERO)],
             vec![],
             vec![],
             &type_store,

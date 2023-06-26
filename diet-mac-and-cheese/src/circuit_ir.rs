@@ -425,7 +425,6 @@ impl FuncDecl {
             VectorsV1::NAME => VectorsV1::gates_body(
                 &operation,
                 &params,
-                count,
                 &output_counts,
                 &input_counts,
                 type_store,
