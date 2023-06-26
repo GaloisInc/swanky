@@ -425,7 +425,6 @@ impl FuncDecl {
             IterV0::NAME => IterV0::gates_body(
                 &operation,
                 &params,
-                count,
                 &output_counts,
                 &input_counts,
                 type_store,

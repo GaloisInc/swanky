@@ -1,3 +1,5 @@
+use mac_n_cheese_sieve_parser::PluginTypeArg;
+
 use crate::circuit_ir::{GatesBody, TypeId, TypeStore, WireCount};
 
 use super::Plugin;
@@ -9,8 +11,7 @@ impl Plugin for IterV0 {
 
     fn gates_body(
         _operation: &str,
-        _params: &[String],
-        _count: u64,
+        _params: &[PluginTypeArg],
         _output_counts: &[(TypeId, WireCount)],
         _input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
