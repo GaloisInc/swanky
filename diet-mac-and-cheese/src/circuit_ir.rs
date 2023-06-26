@@ -8,6 +8,7 @@ use crate::{
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
 use log::debug;
+use mac_n_cheese_sieve_parser::PluginTypeArg;
 use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
@@ -401,7 +402,7 @@ impl FuncDecl {
         input_counts: Vec<(TypeId, WireCount)>,
         plugin_name: String,
         operation: String,
-        params: Vec<String>,
+        params: Vec<PluginTypeArg>,
         _public_count: Vec<(TypeId, WireId)>,
         _private_count: Vec<(TypeId, WireId)>,
         type_store: &TypeStore,

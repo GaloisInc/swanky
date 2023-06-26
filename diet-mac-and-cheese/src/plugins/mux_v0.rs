@@ -1,6 +1,7 @@
 use super::Plugin;
 use crate::circuit_ir::{first_unused_wire_id, GateM, GatesBody, TypeId, TypeStore, WireCount};
 use eyre::{eyre, Result};
+use mac_n_cheese_sieve_parser::PluginTypeArg;
 use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
 
 pub(crate) struct MuxV0;
@@ -10,7 +11,7 @@ impl Plugin for MuxV0 {
 
     fn gates_body(
         operation: &str,
-        params: &[String],
+        params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
