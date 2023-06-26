@@ -406,6 +406,7 @@ impl FuncDecl {
         _public_count: Vec<(TypeId, WireId)>,
         _private_count: Vec<(TypeId, WireId)>,
         type_store: &TypeStore,
+        fun_store: &FunStore,
     ) -> Result<Self> {
         let gates = match plugin_name.as_str() {
             MuxV0::NAME => MuxV0::gates_body(
@@ -414,6 +415,7 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+                fun_store,
             )?,
             PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
                 &operation,
@@ -421,6 +423,7 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+                fun_store,
             )?,
             IterV0::NAME => IterV0::gates_body(
                 &operation,
@@ -428,6 +431,7 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+                fun_store,
             )?,
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };

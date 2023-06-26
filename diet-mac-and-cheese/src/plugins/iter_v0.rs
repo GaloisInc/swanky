@@ -15,6 +15,7 @@ impl Plugin for IterV0 {
         _output_counts: &[(TypeId, WireCount)],
         _input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
+        fun_store: &FunStore,
     ) -> eyre::Result<GatesBody> {
         todo!()
     }

@@ -438,6 +438,7 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             public_count,
                             private_count,
                             &rel.type_store,
+                            &rel.fun_store,
                         )
                         .unwrap();
                         info!(
