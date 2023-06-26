@@ -1,4 +1,4 @@
-use crate::circuit_ir::{GatesBody, TypeId, TypeStore, WireCount, WireId};
+use crate::circuit_ir::{GatesBody, TypeId, TypeStore, WireCount};
 use eyre::Result;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 
