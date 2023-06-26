@@ -128,16 +128,13 @@ impl Plugin for VectorsV1 {
                 let PluginTypeArg::Number(c) = params[0] else {
                     eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
                 };
+                let c = c.to_le_bytes().to_vec();
 
                 let mut gates = vec![];
                 for i in 0..s {
                     gates.push(match operation {
-                        "addc" => {
-                            GateM::AddConstant(t, i, s + i, Box::new(c.to_le_bytes().to_vec()))
-                        }
-                        "mulc" => {
-                            GateM::MulConstant(t, i, s + i, Box::new(c.to_le_bytes().to_vec()))
-                        }
+                        "addc" => GateM::AddConstant(t, i, s + i, Box::new(c.clone())),
+                        "mulc" => GateM::MulConstant(t, i, s + i, Box::new(c.clone())),
                         _ => unreachable!(),
                     });
                 }
