@@ -330,6 +330,31 @@ pub struct FuncDecl {
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
+/// Return the first wire ID available for allocation in the `Plugin`'s
+/// `GateBody`.
+///
+/// Arguments:
+/// - `output_counts`: A slice containins the outputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+/// - `input_counts`: A slice containins the inputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+pub(crate) fn first_unused_wire_id(
+    output_counts: &[(TypeId, WireCount)],
+    input_counts: &[(TypeId, WireCount)],
+) -> WireId {
+    let mut first_unused_wire_id = 0;
+
+    for (_, wc) in output_counts.iter() {
+        first_unused_wire_id += wc;
+    }
+
+    for (_, wc) in input_counts.iter() {
+        first_unused_wire_id += wc;
+    }
+
+    return first_unused_wire_id;
+}
+
 impl FuncDecl {
     pub fn new_function(
         name: String,
