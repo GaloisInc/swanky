@@ -331,6 +331,31 @@ pub struct FuncDecl {
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
+/// Return the first wire ID available for allocation in the `Plugin`'s
+/// `GateBody`.
+///
+/// Arguments:
+/// - `output_counts`: A slice containins the outputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+/// - `input_counts`: A slice containins the inputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+pub(crate) fn first_unused_wire_id(
+    output_counts: &[(TypeId, WireCount)],
+    input_counts: &[(TypeId, WireCount)],
+) -> WireId {
+    let mut first_unused_wire_id = 0;
+
+    for (_, wc) in output_counts.iter() {
+        first_unused_wire_id += wc;
+    }
+
+    for (_, wc) in input_counts.iter() {
+        first_unused_wire_id += wc;
+    }
+
+    return first_unused_wire_id;
+}
+
 impl FuncDecl {
     pub fn new_function(
         name: String,
@@ -382,20 +407,10 @@ impl FuncDecl {
         _private_count: Vec<(TypeId, WireId)>,
         type_store: &TypeStore,
     ) -> Result<Self> {
-        // Count of input and output wires.
-        let mut count = 0;
-        for (_, w) in output_counts.iter() {
-            count += w;
-        }
-        for (_, w) in input_counts.iter() {
-            count += w;
-        }
-
         let gates = match plugin_name.as_str() {
             MuxV0::NAME => MuxV0::gates_body(
                 &operation,
                 &params,
-                count,
                 &output_counts,
                 &input_counts,
                 type_store,
@@ -403,7 +418,6 @@ impl FuncDecl {
             PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
                 &operation,
                 &params,
-                count,
                 &output_counts,
                 &input_counts,
                 type_store,
@@ -411,6 +425,7 @@ impl FuncDecl {
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };
 
+        let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
         let body_max = gates.output_wire_max();
         let type_presence = TypeIdMapping::from(&gates);
         let type_ids = type_presence.to_type_ids();
@@ -423,7 +438,7 @@ impl FuncDecl {
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count: Some(count),
+                args_count,
                 body_max,
                 type_ids,
                 plugin_gates: Some(gates),

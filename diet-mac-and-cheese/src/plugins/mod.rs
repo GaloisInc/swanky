@@ -66,7 +66,6 @@ pub(crate) trait Plugin {
     fn gates_body(
         operation: &str,
         params: &[PluginTypeArg],
-        count: u64,
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
