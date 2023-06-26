@@ -3,7 +3,7 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType},
+    plugins::{IterV0, MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType},
 };
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
@@ -400,6 +400,14 @@ impl FuncDecl {
                 type_store,
             )?,
             PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
+                &operation,
+                &params,
+                count,
+                &output_counts,
+                &input_counts,
+                type_store,
+            )?,
+            IterV0::NAME => IterV0::gates_body(
                 &operation,
                 &params,
                 count,
