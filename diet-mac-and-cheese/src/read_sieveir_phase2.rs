@@ -13,6 +13,7 @@ use crate::{
 use eyre::{eyre, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
 use log::info;
+use mac_n_cheese_sieve_parser::PluginTypeArg;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -411,7 +412,9 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             let m = params_flatc.unwrap().len();
                             let mut params_v = vec![];
                             for j in 0..m {
-                                params_v.push(params_flatc.unwrap().get(j).into());
+                                params_v.push(
+                                    PluginTypeArg::from_str(params_flatc.unwrap().get(j)).ok()?,
+                                );
                             }
                             params_v
                         };
@@ -538,7 +541,7 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                 let mut params = Vec::with_capacity(n);
                 for i in 0..n {
                     let param = params_.get(i);
-                    params.push(param.into());
+                    params.push(PluginTypeArg::from_str(param).ok()?);
                 }
                 let plugin_type = PluginType::new(name, operation, params);
                 vout.insert(field_id, TypeSpecification::Plugin(plugin_type));

@@ -1,6 +1,7 @@
 use super::Plugin;
 use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount};
 use eyre::{ensure, eyre};
+use mac_n_cheese_sieve_parser::PluginTypeArg;
 use scuttlebutt::field::F61p;
 
 pub(crate) struct PermutationCheckV1;
@@ -10,7 +11,7 @@ impl Plugin for PermutationCheckV1 {
 
     fn gates_body(
         operation: &str,
-        params: &[String],
+        params: &[PluginTypeArg],
         count: u64,
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
@@ -27,7 +28,11 @@ impl Plugin for PermutationCheckV1 {
             Self::NAME,
             params.len()
         );
-        let tuple_size: u64 = params[0].parse()?;
+        let PluginTypeArg::Number(tuple_size) = params[0] else {
+            eyre::bail!("{}: The tuple size parameter must be numeric, not a string.", Self::NAME);
+        };
+        // TODO: Should we assume this param fits in a u64?
+        let tuple_size = tuple_size.as_words()[0];
         ensure!(tuple_size != 0, "{}: Tuple size cannot be zero", Self::NAME);
         ensure!(
             output_counts.len() == 0,
@@ -121,6 +126,7 @@ mod tests {
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         plugins::Plugin,
     };
+    use mac_n_cheese_sieve_parser::PluginTypeArg;
     use scuttlebutt::{field::F61p, ring::FiniteRing, serialization::CanonicalSerialize, AesRng};
 
     #[test]
@@ -137,7 +143,7 @@ mod tests {
             vec![(0, 1), (0, 1)],
             PermutationCheckV1::NAME.into(),
             "assert_perm".into(),
-            vec!["1".into()],
+            vec![PluginTypeArg::from_str("1").unwrap()],
             vec![],
             vec![],
             &type_store,
@@ -175,7 +181,7 @@ mod tests {
             vec![(0, 2), (0, 2)],
             PermutationCheckV1::NAME.into(),
             "assert_perm".into(),
-            vec!["1".into()],
+            vec![PluginTypeArg::from_str("1").unwrap()],
             vec![],
             vec![],
             &type_store,
@@ -216,7 +222,7 @@ mod tests {
             vec![(0, 4), (0, 4)],
             PermutationCheckV1::NAME.into(),
             "assert_perm".into(),
-            vec!["1".into()],
+            vec![PluginTypeArg::from_str("1").unwrap()],
             vec![],
             vec![],
             &type_store,
@@ -263,7 +269,7 @@ mod tests {
             vec![(0, 4), (0, 4)],
             PermutationCheckV1::NAME.into(),
             "assert_perm".into(),
-            vec!["1".into()],
+            vec![PluginTypeArg::from_str("1").unwrap()],
             vec![],
             vec![],
             &type_store,
