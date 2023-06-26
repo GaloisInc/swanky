@@ -1,6 +1,7 @@
 use super::Plugin;
-use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeStore, WireCount};
+use crate::circuit_ir::{first_unused_wire_id, GateM, GatesBody, TypeId, TypeStore, WireCount};
 use eyre::{eyre, Result};
+use mac_n_cheese_sieve_parser::PluginTypeArg;
 use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
 
 pub(crate) struct MuxV0;
@@ -10,8 +11,7 @@ impl Plugin for MuxV0 {
 
     fn gates_body(
         operation: &str,
-        params: &[String],
-        count: u64,
+        params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
@@ -39,7 +39,7 @@ impl Plugin for MuxV0 {
         // TODO: could minimize the number of multiplication gates
 
         let field = input_counts[0].0;
-        let callframe_size = count;
+        let callframe_size = first_unused_wire_id(output_counts, input_counts);
 
         let mut vec_gates = vec![];
 
