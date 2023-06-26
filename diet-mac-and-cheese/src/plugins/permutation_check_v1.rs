@@ -1,5 +1,7 @@
 use super::Plugin;
-use crate::circuit_ir::{GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount};
+use crate::circuit_ir::{
+    first_unused_wire_id, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+};
 use eyre::{ensure, eyre};
 use scuttlebutt::field::F61p;
 
@@ -11,7 +13,6 @@ impl Plugin for PermutationCheckV1 {
     fn gates_body(
         operation: &str,
         params: &[String],
-        count: u64,
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
@@ -75,6 +76,7 @@ impl Plugin for PermutationCheckV1 {
             todo!("Tuple sizes besides one temporarily not supported!");
         }
 
+        let count = first_unused_wire_id(output_counts, input_counts);
         let challenge_gate = count;
 
         let mut gates = vec![];

@@ -406,20 +406,10 @@ impl FuncDecl {
         _private_count: Vec<(TypeId, WireId)>,
         type_store: &TypeStore,
     ) -> Result<Self> {
-        // Count of input and output wires.
-        let mut count = 0;
-        for (_, w) in output_counts.iter() {
-            count += w;
-        }
-        for (_, w) in input_counts.iter() {
-            count += w;
-        }
-
         let gates = match plugin_name.as_str() {
             MuxV0::NAME => MuxV0::gates_body(
                 &operation,
                 &params,
-                count,
                 &output_counts,
                 &input_counts,
                 type_store,
@@ -427,7 +417,6 @@ impl FuncDecl {
             PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
                 &operation,
                 &params,
-                count,
                 &output_counts,
                 &input_counts,
                 type_store,
@@ -435,6 +424,7 @@ impl FuncDecl {
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };
 
+        let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
         let body_max = gates.output_wire_max();
         let type_presence = TypeIdMapping::from(&gates);
         let type_ids = type_presence.to_type_ids();
@@ -447,7 +437,7 @@ impl FuncDecl {
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count: Some(count),
+                args_count,
                 body_max,
                 type_ids,
                 plugin_gates: Some(gates),
