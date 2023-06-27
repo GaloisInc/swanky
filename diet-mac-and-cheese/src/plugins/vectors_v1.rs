@@ -81,7 +81,7 @@ impl Plugin for VectorsV1 {
 
                 let s = output_counts[0].1;
 
-                let mut gates = vec![];
+                let mut gates = Vec::with_capacity(s as usize);
                 for i in 0..s {
                     gates.push(match operation {
                         "add" => GateM::Add(t, i, s + i, 2 * s + i),
@@ -130,7 +130,7 @@ impl Plugin for VectorsV1 {
                 };
                 let c = c.to_le_bytes().to_vec();
 
-                let mut gates = vec![];
+                let mut gates = Vec::with_capacity(s as usize);
                 for i in 0..s {
                     gates.push(match operation {
                         "addc" => GateM::AddConstant(t, i, s + i, Box::new(c.clone())),
@@ -190,7 +190,7 @@ impl Plugin for VectorsV1 {
 
                 let scalar = first_unused_wire_id(output_counts, input_counts) - 1;
 
-                let mut gates = vec![];
+                let mut gates = Vec::with_capacity(s as usize);
                 for i in 0..s {
                     gates.push(match operation {
                         "add_scalar" => GateM::Add(t, i, s + i, scalar),
@@ -233,7 +233,10 @@ impl Plugin for VectorsV1 {
 
                 let s = input_counts[0].1;
 
-                let mut gates = vec![];
+                let mut gates = Vec::with_capacity(match s {
+                    0 | 1 | 2 => 1,
+                    _ => s as usize,
+                });
                 match s {
                     0 => gates.push(match operation {
                         "sum" => GateM::Constant(t, 0, Box::new(vec![0])),
@@ -321,7 +324,11 @@ impl Plugin for VectorsV1 {
 
                 let first_mul = first_unused_wire_id(output_counts, input_counts);
 
-                let mut gates = vec![];
+                let mut gates = Vec::with_capacity(match s {
+                    0 | 1 => 1,
+                    2 => 3,
+                    _ => 2 * s as usize,
+                });
                 match s {
                     0 => gates.push(GateM::Constant(t, 0, Box::new(vec![0]))),
                     1 => gates.push(GateM::Mul(t, 0, 1, 2)),
