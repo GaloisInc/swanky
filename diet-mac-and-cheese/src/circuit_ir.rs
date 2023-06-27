@@ -326,8 +326,8 @@ pub struct FuncDecl {
     #[allow(dead_code)]
     fun_id: FunId,
     body: GatesOrPluginBody,
-    output_counts: Vec<(TypeId, WireCount)>,
-    input_counts: Vec<(TypeId, WireCount)>,
+    pub(crate) output_counts: Vec<(TypeId, WireCount)>,
+    pub(crate) input_counts: Vec<(TypeId, WireCount)>,
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
