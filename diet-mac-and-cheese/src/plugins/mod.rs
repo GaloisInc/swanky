@@ -83,3 +83,5 @@ mod permutation_check_v1;
 pub(crate) use permutation_check_v1::PermutationCheckV1;
 mod iter_v0;
 pub(crate) use iter_v0::IterV0;
+mod vectors_v1;
+pub(crate) use vectors_v1::VectorsV1;
