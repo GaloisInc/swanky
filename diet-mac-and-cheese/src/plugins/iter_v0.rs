@@ -226,3 +226,12 @@ impl Plugin for IterV0 {
         Ok(GatesBody::new(gates))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_iter_map() {}
+
+    #[test]
+    fn test_iter_map_enumerated() {}
+}
