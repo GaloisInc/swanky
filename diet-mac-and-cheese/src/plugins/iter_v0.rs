@@ -75,7 +75,7 @@ impl Plugin for IterV0 {
         // TODO: Should we assume this param fits in a u64?
         let iter_count = iter_count.as_words()[0];
 
-        for (i, ((t, wc), (t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
+        for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
             eyre::ensure!(
                 t == t_f,
                 "{}: The output at position {i} has type {t}, but {func_name} expects {t_f}.",
@@ -83,7 +83,7 @@ impl Plugin for IterV0 {
             );
 
             eyre::ensure!(
-                *wc == wc_f * iter_count,
+                wc == wc_f * iter_count,
                 "{}: The output at position {i} should be {iter_count} times as large as the corresponding output of {func_name}: {wc} != {wc_f} * {iter_count}.",
                 Self::NAME,
             );
@@ -113,7 +113,7 @@ impl Plugin for IterV0 {
             num_env as usize
         };
 
-        for (i, ((t, wc), (t_f, wc_f))) in input_counts[num_env as usize..]
+        for (i, (&(t, wc), &(t_f, wc_f))) in input_counts[num_env as usize..]
             .iter()
             .zip(&f_input_counts[input_start..])
             .enumerate()
@@ -125,7 +125,7 @@ impl Plugin for IterV0 {
             );
 
             eyre::ensure!(
-                *wc == wc_f * iter_count,
+                wc == wc_f * iter_count,
                 "{}: The input at position {i} should be {iter_count} times as large as the corresponding input of {func_name}: {wc} != {wc_f} * {iter_count}.",
                 Self::NAME,
             );
