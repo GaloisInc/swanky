@@ -55,12 +55,12 @@ impl Plugin for IterV0 {
         );
 
         // Functions used with map_enumerated expect an additional input range
-        let f_input_count = f_input_counts.len() - if enumerated { 1 } else { 0 };
         eyre::ensure!(
-            input_counts.len() == f_input_count,
-            "{}: {operation} expected {f_input_count} inputs, but got {}.",
+            input_counts.len() == f_input_counts.len() - if enumerated { 1 } else { 0 },
+            "{}: {operation} expected {} inputs, but got {}.",
             Self::NAME,
             input_counts.len(),
+            f_input_counts.len() - if enumerated { 1 } else { 0 },
         );
 
         let PluginTypeArg::Number(num_env) = params[1] else {
