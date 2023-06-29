@@ -229,9 +229,250 @@ impl Plugin for IterV0 {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_iter_map() {}
+    use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+    use scuttlebutt::field::F61p;
+
+    use crate::{
+        backend_multifield::tests::{test_circuit, zero, F61P_VEC, FF0},
+        circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        plugins::Plugin,
+    };
+
+    use super::IterV0;
 
     #[test]
-    fn test_iter_map_enumerated() {}
+    fn test_iter_map() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_function(
+            "f".into(),
+            42,
+            vec![
+                GateM::Add(FF0, 100, 1, 2),
+                GateM::Add(FF0, 101, 3, 4),
+                GateM::Add(FF0, 102, 5, 6),
+                GateM::Add(FF0, 103, 100, 101),
+                GateM::Add(FF0, 0, 102, 103),
+            ],
+            vec![(FF0, 1)],
+            vec![(FF0, 1), (FF0, 2), (FF0, 3)],
+        );
+
+        func_store.insert("f".into(), func);
+
+        let map_func = FuncDecl::new_plugin(
+            "my_map".into(),
+            42,
+            vec![(FF0, 5)],
+            vec![(FF0, 1), (FF0, 10), (FF0, 15)],
+            IterV0::NAME.into(),
+            "map".into(),
+            vec![
+                PluginTypeArg::String("f".into()),
+                PluginTypeArg::Number(Number::from_u64(1)),
+                PluginTypeArg::Number(Number::from_u64(5)),
+            ],
+            vec![],
+            vec![],
+            &type_store,
+            &func_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_map".into(), map_func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 4),
+            GateM::New(FF0, 100, 100),
+            GateM::New(FF0, 200, 209),
+            GateM::New(FF0, 300, 314),
+            GateM::Witness(FF0, 100),
+            GateM::Witness(FF0, 200),
+            GateM::Witness(FF0, 201),
+            GateM::Witness(FF0, 202),
+            GateM::Witness(FF0, 203),
+            GateM::Witness(FF0, 204),
+            GateM::Witness(FF0, 205),
+            GateM::Witness(FF0, 206),
+            GateM::Witness(FF0, 207),
+            GateM::Witness(FF0, 208),
+            GateM::Witness(FF0, 209),
+            GateM::Witness(FF0, 300),
+            GateM::Witness(FF0, 301),
+            GateM::Witness(FF0, 302),
+            GateM::Witness(FF0, 303),
+            GateM::Witness(FF0, 304),
+            GateM::Witness(FF0, 305),
+            GateM::Witness(FF0, 306),
+            GateM::Witness(FF0, 307),
+            GateM::Witness(FF0, 308),
+            GateM::Witness(FF0, 309),
+            GateM::Witness(FF0, 310),
+            GateM::Witness(FF0, 311),
+            GateM::Witness(FF0, 312),
+            GateM::Witness(FF0, 313),
+            GateM::Witness(FF0, 314),
+            GateM::Call(Box::new((
+                "my_map".into(),
+                vec![(0, 4)],
+                vec![(100, 100), (200, 209), (300, 314)],
+            ))),
+            GateM::AssertZero(FF0, 0),
+            GateM::AssertZero(FF0, 1),
+            GateM::AssertZero(FF0, 2),
+            GateM::AssertZero(FF0, 3),
+            GateM::AssertZero(FF0, 4),
+        ];
+
+        let instances = vec![];
+
+        let witnesses = vec![vec![
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+        ]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    #[test]
+    fn test_iter_map_enumerated() {
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_function(
+            "f".into(),
+            42,
+            vec![
+                GateM::Add(FF0, 100, 1, 2),
+                GateM::Add(FF0, 101, 3, 4),
+                GateM::Add(FF0, 102, 5, 6),
+                GateM::Add(FF0, 103, 100, 101),
+                GateM::Add(FF0, 0, 102, 103),
+            ],
+            vec![(FF0, 1)],
+            vec![(FF0, 1), (FF0, 1), (FF0, 2), (FF0, 3)],
+        );
+
+        func_store.insert("f".into(), func);
+
+        let map_func = FuncDecl::new_plugin(
+            "my_map_enumerated".into(),
+            42,
+            vec![(FF0, 5)],
+            vec![(FF0, 1), (FF0, 10), (FF0, 15)],
+            IterV0::NAME.into(),
+            "map_enumerated".into(),
+            vec![
+                PluginTypeArg::String("f".into()),
+                PluginTypeArg::Number(Number::from_u64(1)),
+                PluginTypeArg::Number(Number::from_u64(5)),
+            ],
+            vec![],
+            vec![],
+            &type_store,
+            &func_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_map_enumerated".into(), map_func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 4),
+            GateM::New(FF0, 100, 100),
+            GateM::New(FF0, 200, 209),
+            GateM::New(FF0, 300, 314),
+            GateM::Witness(FF0, 100),
+            GateM::Witness(FF0, 200),
+            GateM::Witness(FF0, 201),
+            GateM::Witness(FF0, 202),
+            GateM::Witness(FF0, 203),
+            GateM::Witness(FF0, 204),
+            GateM::Witness(FF0, 205),
+            GateM::Witness(FF0, 206),
+            GateM::Witness(FF0, 207),
+            GateM::Witness(FF0, 208),
+            GateM::Witness(FF0, 209),
+            GateM::Witness(FF0, 300),
+            GateM::Witness(FF0, 301),
+            GateM::Witness(FF0, 302),
+            GateM::Witness(FF0, 303),
+            GateM::Witness(FF0, 304),
+            GateM::Witness(FF0, 305),
+            GateM::Witness(FF0, 306),
+            GateM::Witness(FF0, 307),
+            GateM::Witness(FF0, 308),
+            GateM::Witness(FF0, 309),
+            GateM::Witness(FF0, 310),
+            GateM::Witness(FF0, 311),
+            GateM::Witness(FF0, 312),
+            GateM::Witness(FF0, 313),
+            GateM::Witness(FF0, 314),
+            GateM::Call(Box::new((
+                "my_map".into(),
+                vec![(0, 4)],
+                vec![(100, 100), (200, 209), (300, 314)],
+            ))),
+            // TODO: AssertZero gates
+        ];
+
+        let instances = vec![];
+
+        let witnesses = vec![vec![
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+        ]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
 }
