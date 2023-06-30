@@ -446,7 +446,15 @@ impl FuncDecl {
 
         let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
         let body_max = gates.output_wire_max();
-        let type_presence = TypeIdMapping::from(&gates);
+
+        let mut type_presence = TypeIdMapping::from(&gates);
+        for (ty, _) in output_counts.iter() {
+            type_presence.set(*ty);
+        }
+        for (ty, _) in input_counts.iter() {
+            type_presence.set(*ty);
+        }
+
         let type_ids = type_presence.to_type_ids();
         let plugin_body = PluginBody::new(plugin_name, operation);
 
