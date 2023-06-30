@@ -35,6 +35,8 @@ impl GaloisPolyV0 {
     // a degree-1 polynomial p1 (over coefficients in F)
     // a degree-(n+1) polynomial q (over coefficients in F)
     // Assert whether p0*p1=q
+    //
+    // Polynomials are passed as a range where the first wire is the most significant coefficient.
     fn prod_eq_body(
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
@@ -78,93 +80,67 @@ impl GaloisPolyV0 {
             "{}: p0 must have at least 1 coefficient",
             Self::NAME
         );
+        // p0_degree (= n in the spec) is the degree of p0, i.e. one less than the number of coefficients in p0
+        let p0_degree = input_counts[0].1 - 1;
+        let p1_degree = input_counts[1].1 - 1;
+        let q_degree = input_counts[2].1 - 1;
         ensure!(
-            input_counts[1].1 == 2,
+            p1_degree == 1,
             "{}: p1 must be a degree 1 polynomial",
             Self::NAME
         );
-        // poly_degree (= n in the spec) is the degree of p0, i.e. one more than the number of coefficients in p0
-        let p0_degree = input_counts[0].1 - 1;
-        let q_degree = p0_degree + 1;
         ensure!(
-            input_counts[2].1 == q_degree - 1,
+            q_degree == p0_degree + 1,
             "{}: q must be a degree n+1 polynomial, where n is the degree of p0",
             Self::NAME
         );
+
+        let p0_start = 0;
+        let p1_start = input_counts[0].1;
+        let q_start = input_counts[0].1 + 2;
+
         let mut gates = vec![];
         if field == std::any::TypeId::of::<F61p>() {
-            let count = first_unused_wire_id(output_counts, input_counts);
             // TODO: How many times do we test the polynomial? Is there a target security level for all fields?
             // We evaluate the polynomials in a single challenge point.
-            let challenge_wire = count;
+            let challenge_wire = first_unused_wire_id(output_counts, input_counts);
             gates.push(GateM::Challenge(type_id, challenge_wire));
 
-            // Assuming that a polynomial is passed as a range where the first wire is the most significant coefficient.
-            let p0_eval_wire = {
-                // Evaluate p0(challenge) using Horner's
-                let mut acc_wire = 0;
-                for i in 0..p0_degree {
-                    // first available wire is after the challenge, and then we use two in each iteration.
-                    let x_mul_acc = challenge_wire + (i * 2) + 1;
-                    // multiply challenge to accumulator
-                    gates.push(GateM::Mul(type_id, x_mul_acc, challenge_wire, acc_wire));
-                    // add the next coefficient
-                    acc_wire = x_mul_acc + 1;
-                    gates.push(GateM::Add(type_id, acc_wire, x_mul_acc, i + 1));
-                }
-                acc_wire
-            };
-            // We spent one wire label on the challenge and 2 for each non-constant term of p0.
-            let next_free_wire = count + 1 + 2 * p0_degree;
-            let p1_eval_wire = {
-                let p1_start = input_counts[0].1;
-                // the degree of p1 is always 1 so we directly compute a1*challenge and then add a0
-                gates.push(GateM::Mul(
-                    type_id,
-                    next_free_wire,
-                    p1_start,
-                    challenge_wire,
-                ));
-                let p1_eval_wire = next_free_wire + 1;
-                gates.push(GateM::Add(
-                    type_id,
-                    p1_eval_wire,
-                    p1_start + 1,
-                    next_free_wire,
-                ));
-                p1_eval_wire
-            };
-            let q_eval_wire = {
-                let q_start = input_counts[0].1 + 2;
-                let mut acc_wire = q_start;
-                for i in 0..q_degree {
-                    // as p1 has degree 1 we always use a new wire for its evaluation.
-                    let x_mul_acc = p1_eval_wire + (i * 2) + 1;
-                    // multiply challenge to accumulator
-                    gates.push(GateM::Mul(type_id, x_mul_acc, challenge_wire, acc_wire));
-                    // add the next coefficient
-                    acc_wire = x_mul_acc + 1;
-                    gates.push(GateM::Add(type_id, acc_wire, x_mul_acc, q_start + i + 1));
-                }
-                acc_wire
-            };
-            let next_free_wire = p1_eval_wire + 1 + 2 * q_degree;
-            // compute the product of p0 and p1 evaluated in the challenge
-            gates.push(GateM::Mul(
+            // Compute p0(challenge)
+            let (p0_eval_wire, next_unused_wire) = eval_poly(
+                &mut gates,
                 type_id,
-                next_free_wire,
-                p0_eval_wire,
-                p1_eval_wire,
-            ));
-            // subtract the result from q
-            gates.push(GateM::Sub(
+                p0_degree,
+                p0_start,
+                challenge_wire,
+                challenge_wire + 1,
+            );
+            // Compute p1(challenge)
+            let (p1_eval_wire, next_unused_wire) = eval_poly(
+                &mut gates,
                 type_id,
-                next_free_wire + 1,
-                next_free_wire,
-                q_eval_wire,
-            ));
+                p1_degree,
+                p1_start,
+                challenge_wire,
+                next_unused_wire,
+            );
+            // Compute q(challenge)
+            let (q_eval_wire, next_unused_wire) = eval_poly(
+                &mut gates,
+                type_id,
+                q_degree,
+                q_start,
+                challenge_wire,
+                next_unused_wire,
+            );
+            // Compute p0(challenge)*p1(challenge)
+            let p0_mul_p1 = next_unused_wire;
+            gates.push(GateM::Mul(type_id, p0_mul_p1, p0_eval_wire, p1_eval_wire));
+            // Compute p0(challenge)*p1(challenge)-q(challenge)
+            let difference = p0_mul_p1 + 1;
+            gates.push(GateM::Sub(type_id, difference, p0_mul_p1, q_eval_wire));
             // Constrain the result to 0
-            gates.push(GateM::AssertZero(type_id, next_free_wire + 1));
+            gates.push(GateM::AssertZero(type_id, difference));
         } else if field == std::any::TypeId::of::<F2>() {
             // TODO: for F2 (and other small fields) where we want to evaluate in many points, I think it is cheaper to multiply p0 and p1 directly.
             todo!("prod_eq_body")
@@ -180,6 +156,8 @@ impl GaloisPolyV0 {
     // a field element c in F
     // a resulting polynomial q (over coefficients in F)
     // Assert whether p(x-c) = q
+    //
+    // Polynomials are passed as a range where the first wire is the most significant coefficient.
     fn shift_eq_body(
         _params: &[PluginTypeArg],
         _output_counts: &[(TypeId, WireCount)],
@@ -187,5 +165,146 @@ impl GaloisPolyV0 {
         _type_store: &TypeStore,
     ) -> Result<GatesBody> {
         todo!("shift_eq_body")
+    }
+}
+
+// Compute p(x), return the wire containing p(x) and the next unused wire.
+fn eval_poly(
+    gates: &mut Vec<GateM>,
+    type_id: u8,
+    degree: u64,
+    p_start: u64, // the wire containing the first (most significant) coefficient of p
+    x: u64,       //
+    first_unused_wire: u64,
+) -> (u64, u64) {
+    // The accumulator is initially the most significant coefficient.
+    let mut acc_wire = p_start;
+    for i in 0..degree {
+        // We use two wires in each iteration.
+        let x_mul_acc = first_unused_wire + (i * 2);
+        // Compute x * accumulator
+        gates.push(GateM::Mul(type_id, x_mul_acc, x, acc_wire));
+
+        // Add the next coefficient and update accumulator wire
+        acc_wire = x_mul_acc + 1;
+        gates.push(GateM::Add(type_id, acc_wire, x_mul_acc, p_start + i + 1));
+    }
+    (acc_wire, first_unused_wire + 2 * degree)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::MulAssign;
+
+    use super::GaloisPolyV0;
+    use crate::{
+        backend_multifield::tests::{test_circuit, F61P_VEC},
+        circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        plugins::Plugin,
+    };
+    use rand::Rng;
+    use scuttlebutt::{
+        field::{polynomial::Polynomial, F61p, FiniteField},
+        AesRng,
+    };
+
+    fn convert_poly<F: FiniteField>(p: Polynomial<F>) -> Vec<Vec<u8>> {
+        let mut coeffs = p.coefficients;
+        coeffs.reverse();
+        coeffs.push(p.constant);
+        coeffs.into_iter().map(|c| c.to_bytes().to_vec()).collect()
+    }
+
+    fn get_product_triple<R: Rng, F: FiniteField>(
+        rng: &mut R,
+        n: usize,
+    ) -> (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
+        let p0: Polynomial<F> = Polynomial::random(rng, n);
+        let p1: Polynomial<F> = Polynomial::random(rng, 1);
+        let mut q = p0.clone();
+        q.mul_assign(&p1);
+
+        (convert_poly(p0), convert_poly(p1), convert_poly(q))
+    }
+
+    #[test]
+    fn test_prod_eq_n0() {
+        test_prod_eq_with_n(0)
+    }
+
+    #[test]
+    fn test_prod_eq_n1() {
+        test_prod_eq_with_n(1)
+    }
+
+    #[test]
+    fn test_prod_eq_n10() {
+        test_prod_eq_with_n(10)
+    }
+
+    fn test_prod_eq_with_n(degree: u64) {
+        let p0_coefficient_count = degree + 1;
+        let p1_coefficient_count = 2;
+        let q_coefficient_count = degree + 2;
+        let wire_count = p0_coefficient_count + p1_coefficient_count + q_coefficient_count;
+
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut fun_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let name: String = "galois_poly_v0".into();
+        let func = FuncDecl::new_plugin(
+            name.clone(),
+            42,
+            vec![],
+            vec![
+                (0, p0_coefficient_count),
+                (0, p1_coefficient_count),
+                (0, q_coefficient_count),
+            ],
+            GaloisPolyV0::NAME.into(),
+            "prod_eq".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+        fun_store.insert(name.clone(), func);
+
+        let mut gates = vec![GateM::New(0, 0, wire_count)];
+        // Add witness gates for p0
+        for i in 0..p0_coefficient_count {
+            gates.push(GateM::Witness(0, i))
+        }
+        // Add witness gates for p1
+        for i in p0_coefficient_count..p0_coefficient_count + p1_coefficient_count {
+            gates.push(GateM::Witness(0, i))
+        }
+        // Add instance gates for q
+        for i in p0_coefficient_count + p1_coefficient_count..wire_count {
+            gates.push(GateM::Instance(0, i))
+        }
+        gates.push(GateM::Call(Box::new((
+            name.clone(),
+            vec![],
+            vec![
+                (0, p0_coefficient_count - 1),
+                (
+                    p0_coefficient_count,
+                    p0_coefficient_count + p1_coefficient_count - 1,
+                ),
+                (p0_coefficient_count + p1_coefficient_count, wire_count - 1),
+            ],
+        ))));
+
+        let mut rng = AesRng::new();
+
+        let (mut p0, mut p1, q) = get_product_triple::<_, F61p>(&mut rng, degree as usize);
+        p0.append(&mut p1);
+        let witnesses = vec![p0];
+        let instances = vec![q];
+
+        test_circuit(fields, fun_store, gates, instances, witnesses).unwrap();
     }
 }
