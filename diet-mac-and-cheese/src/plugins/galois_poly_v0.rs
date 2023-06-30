@@ -205,6 +205,8 @@ mod tests {
     use rand::Rng;
     use scuttlebutt::{
         field::{polynomial::Polynomial, F61p, FiniteField},
+        ring::FiniteRing,
+        serialization::CanonicalSerialize,
         AesRng,
     };
 
@@ -229,24 +231,33 @@ mod tests {
 
     #[test]
     fn test_prod_eq_n0() {
-        test_prod_eq_with_n(0)
+        // Test correct triple verifies
+        test_prod_eq_with_n(0, true);
+        // Test random triple fails
+        test_prod_eq_with_n(0, false)
     }
 
     #[test]
     fn test_prod_eq_n1() {
-        test_prod_eq_with_n(1)
+        // Test correct triple verifies
+        test_prod_eq_with_n(1, true);
+        // Test random triple fails
+        test_prod_eq_with_n(1, false);
     }
 
     #[test]
     fn test_prod_eq_n10() {
-        test_prod_eq_with_n(10)
+        // Test correct triple verifies
+        test_prod_eq_with_n(10, true);
+        // Test random triple fails
+        test_prod_eq_with_n(10, false);
     }
 
-    fn test_prod_eq_with_n(degree: u64) {
-        let p0_coefficient_count = degree + 1;
-        let p1_coefficient_count = 2;
-        let q_coefficient_count = degree + 2;
-        let wire_count = p0_coefficient_count + p1_coefficient_count + q_coefficient_count;
+    fn test_prod_eq_with_n(degree: u64, should_verify: bool) {
+        let p0_size = degree + 1;
+        let p1_size = 2;
+        let q_size = degree + 2;
+        let wire_count = p0_size + p1_size + q_size;
 
         let fields = vec![F61P_VEC.to_vec()];
         let mut fun_store = FunStore::default();
@@ -257,11 +268,7 @@ mod tests {
             name.clone(),
             42,
             vec![],
-            vec![
-                (0, p0_coefficient_count),
-                (0, p1_coefficient_count),
-                (0, q_coefficient_count),
-            ],
+            vec![(0, p0_size), (0, p1_size), (0, q_size)],
             GaloisPolyV0::NAME.into(),
             "prod_eq".into(),
             vec![],
@@ -274,27 +281,24 @@ mod tests {
 
         let mut gates = vec![GateM::New(0, 0, wire_count)];
         // Add witness gates for p0
-        for i in 0..p0_coefficient_count {
+        for i in 0..p0_size {
             gates.push(GateM::Witness(0, i))
         }
         // Add witness gates for p1
-        for i in p0_coefficient_count..p0_coefficient_count + p1_coefficient_count {
+        for i in p0_size..p0_size + p1_size {
             gates.push(GateM::Witness(0, i))
         }
         // Add instance gates for q
-        for i in p0_coefficient_count + p1_coefficient_count..wire_count {
+        for i in p0_size + p1_size..wire_count {
             gates.push(GateM::Instance(0, i))
         }
         gates.push(GateM::Call(Box::new((
             name.clone(),
             vec![],
             vec![
-                (0, p0_coefficient_count - 1),
-                (
-                    p0_coefficient_count,
-                    p0_coefficient_count + p1_coefficient_count - 1,
-                ),
-                (p0_coefficient_count + p1_coefficient_count, wire_count - 1),
+                (0, p0_size - 1),
+                (p0_size, p0_size + p1_size - 1),
+                (p0_size + p1_size, wire_count - 1),
             ],
         ))));
 
@@ -302,9 +306,20 @@ mod tests {
 
         let (mut p0, mut p1, q) = get_product_triple::<_, F61p>(&mut rng, degree as usize);
         p0.append(&mut p1);
-        let witnesses = vec![p0];
+        let witnesses = if should_verify {
+            vec![p0]
+        } else {
+            vec![(0..p0_size + p1_size)
+                .map(|_| F61p::random(&mut rng).to_bytes().to_vec())
+                .collect()]
+        };
         let instances = vec![q];
 
-        test_circuit(fields, fun_store, gates, instances, witnesses).unwrap();
+        let result = test_circuit(fields, fun_store, gates, instances, witnesses);
+        if should_verify {
+            assert!(result.is_ok())
+        } else {
+            assert!(result.is_err())
+        }
     }
 }
