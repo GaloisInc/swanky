@@ -435,7 +435,7 @@ mod tests {
             GateM::Witness(FF0, 313),
             GateM::Witness(FF0, 314),
             GateM::Call(Box::new((
-                "my_map".into(),
+                "my_map_enumerated".into(),
                 vec![(0, 4)],
                 vec![(100, 100), (200, 209), (300, 314)],
             ))),
