@@ -159,22 +159,114 @@ impl GaloisPolyV0 {
     //
     // Polynomials are passed as a range where the first wire is the most significant coefficient.
     fn shift_eq_body(
-        _params: &[PluginTypeArg],
-        _output_counts: &[(TypeId, WireCount)],
-        _input_counts: &[(TypeId, WireCount)],
-        _type_store: &TypeStore,
+        params: &[PluginTypeArg],
+        output_counts: &[(TypeId, WireCount)],
+        input_counts: &[(TypeId, WireCount)],
+        type_store: &TypeStore,
     ) -> Result<GatesBody> {
-        todo!("shift_eq_body")
+        ensure!(
+            params.len() == 0,
+            "{}: Invalid number of params (must be zero): {}",
+            Self::NAME,
+            params.len()
+        );
+        ensure!(
+            output_counts.len() == 0,
+            "{}: Output count must be zero",
+            Self::NAME
+        );
+        ensure!(
+            input_counts.len() == 3,
+            "{}: Input count must be 3",
+            Self::NAME
+        );
+        let type_id = input_counts[0].0;
+        ensure!(
+            type_id == input_counts[1].0 && type_id == input_counts[2].0,
+            "{}: Input type indices must match",
+            Self::NAME
+        );
+        let type_spec = type_store.get(&type_id)?;
+        let _field = match type_spec {
+            TypeSpecification::Field(field) => *field,
+            other => {
+                return Err(eyre!(
+                    "{}: Invalid type specification, must be `Field`: {other:?}",
+                    Self::NAME,
+                ))
+            }
+        };
+        ensure!(
+            input_counts[0].1 != 0, // TODO: Can this even happen?
+            "{}: p0 must have at least 1 coefficient",
+            Self::NAME
+        );
+        // p_degree (= n in the spec) is the degree of p, i.e. one less than the number of coefficients in p
+        let p_degree = input_counts[0].1 - 1;
+        let q_degree = input_counts[2].1 - 1;
+        ensure!(
+            input_counts[1].1 == 1,
+            "{}: c must be a constant",
+            Self::NAME
+        );
+        ensure!(
+            q_degree == p_degree,
+            "{}: q must have the same degree as p",
+            Self::NAME
+        );
+
+        let p_start = 0;
+        let c_wire = input_counts[0].1;
+        let q_start = input_counts[0].1 + 1;
+
+        let mut gates = vec![];
+
+        // TODO: How many challenges? Branch on field.
+        let challenge_wire = first_unused_wire_id(output_counts, input_counts);
+        gates.push(GateM::Challenge(type_id, challenge_wire));
+        let shifted_challenge_wire = challenge_wire + 1;
+        gates.push(GateM::Sub(
+            type_id,
+            shifted_challenge_wire,
+            challenge_wire,
+            c_wire,
+        ));
+
+        // Evaluate p(x-c) and q(x) in the challenge point
+        let (p_eval_wire, next_unused_wire) = eval_poly(
+            &mut gates,
+            type_id,
+            p_degree,
+            p_start,
+            shifted_challenge_wire,
+            challenge_wire + 2,
+        );
+        let (q_eval_wire, next_unused_wire) = eval_poly(
+            &mut gates,
+            type_id,
+            q_degree,
+            q_start,
+            challenge_wire,
+            next_unused_wire,
+        );
+        // Compute p(x-c) - q(x)
+        let difference = next_unused_wire;
+        gates.push(GateM::Sub(type_id, difference, p_eval_wire, q_eval_wire));
+        // Constraint the result to 0
+        gates.push(GateM::AssertZero(type_id, difference));
+
+        Ok(GatesBody::new(gates))
     }
 }
 
-// Compute p(x), return the wire containing p(x) and the next unused wire.
+// Computes p(x).
+// Returns the wire containing p(x) and the next unused wire.
 fn eval_poly(
     gates: &mut Vec<GateM>,
     type_id: u8,
     degree: u64,
     p_start: u64, // the wire containing the first (most significant) coefficient of p
-    x: u64,       //
+    x: u64,
     first_unused_wire: u64,
 ) -> (u64, u64) {
     // The accumulator is initially the most significant coefficient.
@@ -229,27 +321,38 @@ mod tests {
         (convert_poly(p0), convert_poly(p1), convert_poly(q))
     }
 
+    fn get_shift_triple<R: Rng, F: FiniteField>(
+        rng: &mut R,
+        n: usize,
+    ) -> (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
+        let p: Polynomial<F> = Polynomial::random(rng, n);
+        let c = F::random(rng);
+
+        // Evaluate p in n+1 points to find the coefficients of q by interpolation.
+        let mut points = vec![];
+        for _ in 0..n + 1 {
+            let x = F::random(rng);
+            points.push((x, p.eval(x - c)));
+        }
+        let q = Polynomial::<F>::interpolate(&points);
+        assert!(q.degree() == n);
+
+        (
+            convert_poly(p),
+            vec![c.to_bytes().to_vec()],
+            convert_poly(q),
+        )
+    }
+
     #[test]
-    fn test_prod_eq_n0() {
+    fn test_poly_prod_eq() {
         // Test correct triple verifies
         test_prod_eq_with_n(0, true);
-        // Test random triple fails
-        test_prod_eq_with_n(0, false)
-    }
-
-    #[test]
-    fn test_prod_eq_n1() {
-        // Test correct triple verifies
         test_prod_eq_with_n(1, true);
-        // Test random triple fails
-        test_prod_eq_with_n(1, false);
-    }
-
-    #[test]
-    fn test_prod_eq_n10() {
-        // Test correct triple verifies
         test_prod_eq_with_n(10, true);
         // Test random triple fails
+        test_prod_eq_with_n(0, false);
+        test_prod_eq_with_n(1, false);
         test_prod_eq_with_n(10, false);
     }
 
@@ -310,6 +413,84 @@ mod tests {
             vec![p0]
         } else {
             vec![(0..p0_size + p1_size)
+                .map(|_| F61p::random(&mut rng).to_bytes().to_vec())
+                .collect()]
+        };
+        let instances = vec![q];
+
+        let result = test_circuit(fields, fun_store, gates, instances, witnesses);
+        if should_verify {
+            assert!(result.is_ok())
+        } else {
+            assert!(result.is_err())
+        }
+    }
+
+    #[test]
+    fn test_poly_shift_eq() {
+        // Test correct triple verifies
+        test_shift_eq_with_n(0, true);
+        test_shift_eq_with_n(1, true);
+        test_shift_eq_with_n(10, true);
+        // Test random triple fails
+        test_shift_eq_with_n(0, false);
+        test_shift_eq_with_n(1, false);
+        test_shift_eq_with_n(10, false);
+    }
+
+    fn test_shift_eq_with_n(degree: u64, should_verify: bool) {
+        let p_size = degree + 1;
+        let wire_count = 2 * p_size + 1;
+
+        let fields = vec![F61P_VEC.to_vec()];
+        let mut fun_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let name: String = "galois_poly_v0".into();
+        let func = FuncDecl::new_plugin(
+            name.clone(),
+            42,
+            vec![],
+            vec![(0, p_size), (0, 1), (0, p_size)],
+            GaloisPolyV0::NAME.into(),
+            "shift_eq".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+        )
+        .unwrap();
+        fun_store.insert(name.clone(), func);
+
+        let mut gates = vec![GateM::New(0, 0, wire_count)];
+        // Add witness gates for p
+        for i in 0..p_size {
+            gates.push(GateM::Witness(0, i))
+        }
+        // Add witness gate for c
+        gates.push(GateM::Witness(0, p_size));
+        // Add instance gates for q
+        for i in p_size + 1..wire_count {
+            gates.push(GateM::Instance(0, i))
+        }
+        gates.push(GateM::Call(Box::new((
+            name.clone(),
+            vec![],
+            vec![
+                (0, p_size - 1),
+                (p_size, p_size),
+                (p_size + 1, wire_count - 1),
+            ],
+        ))));
+
+        let mut rng = AesRng::new();
+
+        let (mut p0, mut p1, q) = get_shift_triple::<_, F61p>(&mut rng, degree as usize);
+        p0.append(&mut p1);
+        let witnesses = if should_verify {
+            vec![p0]
+        } else {
+            vec![(0..p_size + 1)
                 .map(|_| F61p::random(&mut rng).to_bytes().to_vec())
                 .collect()]
         };
