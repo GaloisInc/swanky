@@ -159,9 +159,9 @@ impl Plugin for IterV0 {
         });
 
         // Compute ID of the first input wire
-        let mut curr_input_wire = 0;
+        let mut first_input_wire = 0;
         for (_, wc) in output_counts {
-            curr_input_wire += wc;
+            first_input_wire += wc;
         }
 
         if enumerated {
@@ -181,10 +181,11 @@ impl Plugin for IterV0 {
                 // Seed Vec of inputs with the closure environment inputs.
                 // After this loop, curr_input_wire will be the ID of the first
                 // 'normal' input wire.
+                let mut curr_env_wire = first_input_wire;
                 let mut ins = vec![];
                 for &(_, wc) in &input_counts[..num_env as usize] {
-                    ins.push((curr_input_wire, curr_input_wire + wc - 1));
-                    curr_input_wire += wc;
+                    ins.push((curr_env_wire, curr_env_wire + wc - 1));
+                    curr_env_wire += wc;
                 }
 
                 // TODO: Assumes counter is on one wire, but the spec actually
@@ -194,7 +195,7 @@ impl Plugin for IterV0 {
 
                 ins.append(&mut ranges_for_iteration(
                     i,
-                    curr_input_wire,
+                    curr_env_wire,
                     &input_counts[num_env as usize..],
                     &f_input_counts[input_start..],
                 ));
@@ -207,14 +208,15 @@ impl Plugin for IterV0 {
             for i in 0..iter_count {
                 let outs = ranges_for_iteration(i, 0, output_counts, f_output_counts);
 
+                let mut curr_env_wire = first_input_wire;
                 let mut ins = vec![];
                 for &(_, wc) in &input_counts[..num_env as usize] {
-                    ins.push((curr_input_wire, curr_input_wire + wc - 1));
-                    curr_input_wire += wc;
+                    ins.push((curr_env_wire, curr_env_wire + wc - 1));
+                    curr_env_wire += wc;
                 }
                 ins.append(&mut ranges_for_iteration(
                     i,
-                    curr_input_wire,
+                    curr_env_wire,
                     &input_counts[num_env as usize..],
                     &f_input_counts[input_start..],
                 ));
