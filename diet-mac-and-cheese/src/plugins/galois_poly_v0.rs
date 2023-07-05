@@ -66,15 +66,7 @@ impl GaloisPolyV0 {
             Self::NAME
         );
         let type_spec = type_store.get(&type_id)?;
-        let field = match type_spec {
-            TypeSpecification::Field(field) => *field,
-            other => {
-                return Err(eyre!(
-                    "{}: Invalid type specification, must be `Field`: {other:?}",
-                    Self::NAME,
-                ))
-            }
-        };
+
         ensure!(
             input_counts[0].1 != 0, // TODO: Can this even happen?
             "{}: p0 must have at least 1 coefficient",
@@ -99,15 +91,17 @@ impl GaloisPolyV0 {
         let p1_start = input_counts[0].1;
         let q_start = input_counts[0].1 + 2;
 
+        let number_of_challenges = Self::number_of_challenges(q_degree as f64, type_spec)?;
+
         let mut gates = vec![];
-        if field == std::any::TypeId::of::<F61p>() {
-            // TODO: How many times do we test the polynomial? Is there a target security level for all fields?
+        let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
+        for _ in 0..number_of_challenges {
             // We evaluate the polynomials in a single challenge point.
-            let challenge_wire = first_unused_wire_id(output_counts, input_counts);
+            let challenge_wire = loop_first_wire;
             gates.push(GateM::Challenge(type_id, challenge_wire));
 
             // Compute p0(challenge)
-            let (p0_eval_wire, next_unused_wire) = eval_poly(
+            let (p0_eval_wire, next_unused_wire) = Self::eval_poly(
                 &mut gates,
                 type_id,
                 p0_degree,
@@ -116,7 +110,7 @@ impl GaloisPolyV0 {
                 challenge_wire + 1,
             );
             // Compute p1(challenge)
-            let (p1_eval_wire, next_unused_wire) = eval_poly(
+            let (p1_eval_wire, next_unused_wire) = Self::eval_poly(
                 &mut gates,
                 type_id,
                 p1_degree,
@@ -125,7 +119,7 @@ impl GaloisPolyV0 {
                 next_unused_wire,
             );
             // Compute q(challenge)
-            let (q_eval_wire, next_unused_wire) = eval_poly(
+            let (q_eval_wire, next_unused_wire) = Self::eval_poly(
                 &mut gates,
                 type_id,
                 q_degree,
@@ -141,11 +135,7 @@ impl GaloisPolyV0 {
             gates.push(GateM::Sub(type_id, difference, p0_mul_p1, q_eval_wire));
             // Constrain the result to 0
             gates.push(GateM::AssertZero(type_id, difference));
-        } else if field == std::any::TypeId::of::<F2>() {
-            // TODO: for F2 (and other small fields) where we want to evaluate in many points, I think it is cheaper to multiply p0 and p1 directly.
-            todo!("prod_eq_body")
-        } else {
-            todo!("Unsupported field: {type_spec:?}.")
+            loop_first_wire = difference + 1;
         }
 
         Ok(GatesBody::new(gates))
@@ -187,15 +177,6 @@ impl GaloisPolyV0 {
             Self::NAME
         );
         let type_spec = type_store.get(&type_id)?;
-        let _field = match type_spec {
-            TypeSpecification::Field(field) => *field,
-            other => {
-                return Err(eyre!(
-                    "{}: Invalid type specification, must be `Field`: {other:?}",
-                    Self::NAME,
-                ))
-            }
-        };
         ensure!(
             input_counts[0].1 != 0, // TODO: Can this even happen?
             "{}: p0 must have at least 1 coefficient",
@@ -219,69 +200,102 @@ impl GaloisPolyV0 {
         let c_wire = input_counts[0].1;
         let q_start = input_counts[0].1 + 1;
 
+        let number_of_challenges = Self::number_of_challenges(q_degree as f64, type_spec)?;
+
         let mut gates = vec![];
+        let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
+        for _ in 0..number_of_challenges {
+            let challenge_wire = loop_first_wire;
+            gates.push(GateM::Challenge(type_id, challenge_wire));
+            let shifted_challenge_wire = challenge_wire + 1;
+            gates.push(GateM::Sub(
+                type_id,
+                shifted_challenge_wire,
+                challenge_wire,
+                c_wire,
+            ));
 
-        // TODO: How many challenges? Branch on field.
-        let challenge_wire = first_unused_wire_id(output_counts, input_counts);
-        gates.push(GateM::Challenge(type_id, challenge_wire));
-        let shifted_challenge_wire = challenge_wire + 1;
-        gates.push(GateM::Sub(
-            type_id,
-            shifted_challenge_wire,
-            challenge_wire,
-            c_wire,
-        ));
-
-        // Evaluate p(x-c) and q(x) in the challenge point
-        let (p_eval_wire, next_unused_wire) = eval_poly(
-            &mut gates,
-            type_id,
-            p_degree,
-            p_start,
-            shifted_challenge_wire,
-            challenge_wire + 2,
-        );
-        let (q_eval_wire, next_unused_wire) = eval_poly(
-            &mut gates,
-            type_id,
-            q_degree,
-            q_start,
-            challenge_wire,
-            next_unused_wire,
-        );
-        // Compute p(x-c) - q(x)
-        let difference = next_unused_wire;
-        gates.push(GateM::Sub(type_id, difference, p_eval_wire, q_eval_wire));
-        // Constraint the result to 0
-        gates.push(GateM::AssertZero(type_id, difference));
+            // Evaluate p(x-c) and q(x) in the challenge point
+            let (p_eval_wire, next_unused_wire) = Self::eval_poly(
+                &mut gates,
+                type_id,
+                p_degree,
+                p_start,
+                shifted_challenge_wire,
+                challenge_wire + 2,
+            );
+            let (q_eval_wire, next_unused_wire) = Self::eval_poly(
+                &mut gates,
+                type_id,
+                q_degree,
+                q_start,
+                challenge_wire,
+                next_unused_wire,
+            );
+            // Compute p(x-c) - q(x)
+            let difference = next_unused_wire;
+            gates.push(GateM::Sub(type_id, difference, p_eval_wire, q_eval_wire));
+            // Constraint the result to 0
+            gates.push(GateM::AssertZero(type_id, difference));
+            loop_first_wire = difference + 1;
+        }
 
         Ok(GatesBody::new(gates))
     }
-}
 
-// Computes p(x).
-// Returns the wire containing p(x) and the next unused wire.
-fn eval_poly(
-    gates: &mut Vec<GateM>,
-    type_id: u8,
-    degree: u64,
-    p_start: u64, // the wire containing the first (most significant) coefficient of p
-    x: u64,
-    first_unused_wire: u64,
-) -> (u64, u64) {
-    // The accumulator is initially the most significant coefficient.
-    let mut acc_wire = p_start;
-    for i in 0..degree {
-        // We use two wires in each iteration.
-        let x_mul_acc = first_unused_wire + (i * 2);
-        // Compute x * accumulator
-        gates.push(GateM::Mul(type_id, x_mul_acc, x, acc_wire));
+    // Computes p(x).
+    // Returns the wire containing p(x) and the next unused wire.
+    fn eval_poly(
+        gates: &mut Vec<GateM>,
+        type_id: u8,
+        degree: u64,
+        p_start: u64, // the wire containing the first (most significant) coefficient of p
+        x: u64,
+        first_unused_wire: u64,
+    ) -> (u64, u64) {
+        // The accumulator is initially the most significant coefficient.
+        let mut acc_wire = p_start;
+        for i in 0..degree {
+            // We use two wires in each iteration.
+            let x_mul_acc = first_unused_wire + (i * 2);
+            // Compute x * accumulator
+            gates.push(GateM::Mul(type_id, x_mul_acc, x, acc_wire));
 
-        // Add the next coefficient and update accumulator wire
-        acc_wire = x_mul_acc + 1;
-        gates.push(GateM::Add(type_id, acc_wire, x_mul_acc, p_start + i + 1));
+            // Add the next coefficient and update accumulator wire
+            acc_wire = x_mul_acc + 1;
+            gates.push(GateM::Add(type_id, acc_wire, x_mul_acc, p_start + i + 1));
+        }
+        (acc_wire, first_unused_wire + 2 * degree)
     }
-    (acc_wire, first_unused_wire + 2 * degree)
+
+    fn number_of_challenges(degree: f64, type_spec: &TypeSpecification) -> Result<usize> {
+        let TypeSpecification::Field(field) = type_spec else {
+            eyre::bail!("Invalid type specification for inputs; must be `Field`.");
+        };
+        if degree == 0f64 {
+            return Ok(1);
+        };
+
+        let field_size = if *field == std::any::TypeId::of::<F61p>() {
+            2f64.powi(61) - 1f64
+        } else if *field == std::any::TypeId::of::<F2>() {
+            2f64
+        } else {
+            todo!("Unsupported field: {type_spec:?}.")
+        };
+        // TODO: What level are we going for? Should it be a parameter?
+        let bits_of_security = 128;
+        // The probability of failure in each test is at most degree/|F|.
+        let single_test_failure_probability = degree / field_size;
+        // We want to choose the number of tests such that the probability of failure is at most 2^(-bits_of_security).
+        // (degree/|F|)^number_of_challenges <= 2^(-bits_of_security)
+        // <=> number_of_challenges >= log_(degree/|F|)(2^(-bits_of_security))
+        let number_of_challenges = 2f64
+            .powi(-bits_of_security)
+            .log(single_test_failure_probability)
+            .ceil();
+        Ok(number_of_challenges as usize)
+    }
 }
 
 #[cfg(test)]
@@ -347,16 +361,16 @@ mod tests {
     #[test]
     fn test_poly_prod_eq() {
         // Test correct triple verifies
-        test_prod_eq_with_n(0, true);
-        test_prod_eq_with_n(1, true);
-        test_prod_eq_with_n(10, true);
+        test_prod_eq_with_degree(0, true);
+        test_prod_eq_with_degree(1, true);
+        test_prod_eq_with_degree(10, true);
         // Test random triple fails
-        test_prod_eq_with_n(0, false);
-        test_prod_eq_with_n(1, false);
-        test_prod_eq_with_n(10, false);
+        test_prod_eq_with_degree(0, false);
+        test_prod_eq_with_degree(1, false);
+        test_prod_eq_with_degree(10, false);
     }
 
-    fn test_prod_eq_with_n(degree: u64, should_verify: bool) {
+    fn test_prod_eq_with_degree(degree: u64, should_verify: bool) {
         let p0_size = degree + 1;
         let p1_size = 2;
         let q_size = degree + 2;
@@ -429,16 +443,16 @@ mod tests {
     #[test]
     fn test_poly_shift_eq() {
         // Test correct triple verifies
-        test_shift_eq_with_n(0, true);
-        test_shift_eq_with_n(1, true);
-        test_shift_eq_with_n(10, true);
+        test_shift_eq_with_degree(0, true);
+        test_shift_eq_with_degree(1, true);
+        test_shift_eq_with_degree(10, true);
         // Test random triple fails
-        test_shift_eq_with_n(0, false);
-        test_shift_eq_with_n(1, false);
-        test_shift_eq_with_n(10, false);
+        test_shift_eq_with_degree(0, false);
+        test_shift_eq_with_degree(1, false);
+        test_shift_eq_with_degree(10, false);
     }
 
-    fn test_shift_eq_with_n(degree: u64, should_verify: bool) {
+    fn test_shift_eq_with_degree(degree: u64, should_verify: bool) {
         let p_size = degree + 1;
         let wire_count = 2 * p_size + 1;
 
