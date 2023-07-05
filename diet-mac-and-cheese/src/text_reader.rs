@@ -23,6 +23,14 @@ pub struct TextRelation {
     pub gates: Vec<GateM>,
 }
 
+impl TextRelation {
+    pub fn new_with_type_store(type_store: &TypeStore) -> Self {
+        let mut r = TextRelation::default();
+        r.type_store = type_store.clone();
+        r
+    }
+}
+
 pub fn number_to_bytes(n: &Number) -> Vec<u8> {
     let w = n.to_words();
     let mut nb_zeros = 0;
