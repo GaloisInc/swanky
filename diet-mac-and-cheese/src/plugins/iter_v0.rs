@@ -441,7 +441,11 @@ mod tests {
                 vec![(0, 4)],
                 vec![(100, 100), (200, 209), (300, 314)],
             ))),
-            // TODO: AssertZero gates
+            GateM::AssertZero(FF0, 0),
+            GateM::AssertZero(FF0, 1),
+            GateM::AssertZero(FF0, 2),
+            GateM::AssertZero(FF0, 3),
+            GateM::AssertZero(FF0, 4),
         ];
 
         let instances = vec![];
