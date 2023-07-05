@@ -235,7 +235,9 @@ mod tests {
     use scuttlebutt::field::F61p;
 
     use crate::{
-        backend_multifield::tests::{test_circuit, zero, F61P_VEC, FF0},
+        backend_multifield::tests::{
+            minus_four, minus_one, minus_three, minus_two, test_circuit, zero, F61P_VEC, FF0,
+        },
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         plugins::Plugin,
     };
@@ -442,10 +444,14 @@ mod tests {
                 vec![(100, 100), (200, 209), (300, 314)],
             ))),
             GateM::AssertZero(FF0, 0),
-            GateM::AssertZero(FF0, 1),
-            GateM::AssertZero(FF0, 2),
-            GateM::AssertZero(FF0, 3),
-            GateM::AssertZero(FF0, 4),
+            GateM::AddConstant(FF0, 1001, 1, Box::new(minus_one::<F61p>())),
+            GateM::AssertZero(FF0, 1001),
+            GateM::AddConstant(FF0, 1002, 2, Box::new(minus_two::<F61p>())),
+            GateM::AssertZero(FF0, 1002),
+            GateM::AddConstant(FF0, 1003, 3, Box::new(minus_three::<F61p>())),
+            GateM::AssertZero(FF0, 1003),
+            GateM::AddConstant(FF0, 1004, 4, Box::new(minus_four::<F61p>())),
+            GateM::AssertZero(FF0, 1004),
         ];
 
         let instances = vec![];
