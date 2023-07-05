@@ -188,16 +188,15 @@ pub struct BufRelation {
 }
 
 impl BufRelation {
-    pub fn new(path: &PathBuf) -> Result<Self> {
+    pub fn new(path: &PathBuf, type_store: &TypeStore) -> Result<Self> {
         let md = std::fs::metadata(path).unwrap();
 
         if md.is_file() {
             let file = std::fs::File::open(path).unwrap();
             let buffer = BufReader::new(file);
-            let type_store = TypeStore::default();
             let fun_store = FunStore::default();
             Ok(BufRelation {
-                type_store,
+                type_store: type_store.clone(),
                 fun_store,
                 gates: Vec::new(),
                 buffer_file: buffer,
