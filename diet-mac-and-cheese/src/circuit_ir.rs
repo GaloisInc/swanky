@@ -3,7 +3,7 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1},
+    plugins::{IterV0, MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1},
 };
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
@@ -326,8 +326,8 @@ pub struct FuncDecl {
     #[allow(dead_code)]
     fun_id: FunId,
     body: GatesOrPluginBody,
-    output_counts: Vec<(TypeId, WireCount)>,
-    input_counts: Vec<(TypeId, WireCount)>,
+    pub(crate) output_counts: Vec<(TypeId, WireCount)>,
+    pub(crate) input_counts: Vec<(TypeId, WireCount)>,
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
@@ -406,6 +406,7 @@ impl FuncDecl {
         _public_count: Vec<(TypeId, WireId)>,
         _private_count: Vec<(TypeId, WireId)>,
         type_store: &TypeStore,
+        fun_store: &FunStore,
     ) -> Result<Self> {
         let gates = match plugin_name.as_str() {
             MuxV0::NAME => MuxV0::gates_body(
@@ -414,6 +415,7 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+                fun_store,
             )?,
             PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
                 &operation,
@@ -421,6 +423,15 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+                fun_store,
+            )?,
+            IterV0::NAME => IterV0::gates_body(
+                &operation,
+                &params,
+                &output_counts,
+                &input_counts,
+                type_store,
+                fun_store,
             )?,
             VectorsV1::NAME => VectorsV1::gates_body(
                 &operation,
@@ -428,13 +439,22 @@ impl FuncDecl {
                 &output_counts,
                 &input_counts,
                 type_store,
+                fun_store,
             )?,
             name => return Err(eyre!("Unsupported plugin: {name}")),
         };
 
         let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
         let body_max = gates.output_wire_max();
-        let type_presence = TypeIdMapping::from(&gates);
+
+        let mut type_presence = TypeIdMapping::from(&gates);
+        for (ty, _) in output_counts.iter() {
+            type_presence.set(*ty);
+        }
+        for (ty, _) in input_counts.iter() {
+            type_presence.set(*ty);
+        }
+
         let type_ids = type_presence.to_type_ids();
         let plugin_body = PluginBody::new(plugin_name, operation);
 

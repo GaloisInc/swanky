@@ -1537,14 +1537,17 @@ pub(crate) mod tests {
     pub(crate) fn minus_one<FE: FiniteField>() -> Vec<u8> {
         into_vec(-FE::ONE)
     }
-    fn minus_two<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn minus_two<FE: FiniteField>() -> Vec<u8> {
         into_vec(-(FE::ONE + FE::ONE))
     }
     fn three<FE: FiniteField>() -> Vec<u8> {
         into_vec(FE::ONE + FE::ONE + FE::ONE)
     }
-    fn minus_three<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn minus_three<FE: FiniteField>() -> Vec<u8> {
         into_vec(-(FE::ONE + FE::ONE + FE::ONE))
+    }
+    pub(crate) fn minus_four<FE: FiniteField>() -> Vec<u8> {
+        into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE))
     }
     fn minus_five<FE: FiniteField>() -> Vec<u8> {
         into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE))

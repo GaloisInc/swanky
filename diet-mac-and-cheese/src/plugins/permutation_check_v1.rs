@@ -1,6 +1,7 @@
 use super::Plugin;
 use crate::circuit_ir::{
-    first_unused_wire_id, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
+    WireCount,
 };
 use eyre::{ensure, eyre};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
@@ -17,6 +18,7 @@ impl Plugin for PermutationCheckV1 {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
+        _fun_store: &FunStore,
     ) -> eyre::Result<GatesBody> {
         ensure!(
             operation == "assert_perm",
@@ -149,6 +151,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &fun_store,
         )
         .unwrap();
         fun_store.insert(name.clone(), func);
@@ -187,6 +190,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &fun_store,
         )
         .unwrap();
         fun_store.insert(name.clone(), func);
@@ -228,6 +232,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &fun_store,
         )
         .unwrap();
         fun_store.insert(name.clone(), func);
@@ -275,6 +280,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &fun_store,
         )
         .unwrap();
         fun_store.insert(name.clone(), func);

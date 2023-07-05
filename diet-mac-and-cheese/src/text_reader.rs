@@ -249,6 +249,7 @@ impl RelationVisitor for TextRelation {
             vec![], // TODO: Add them !
             vec![], // TODO: Add them!
             &self.type_store,
+            &self.fun_store,
         )?;
         info!(
             "plugin {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",

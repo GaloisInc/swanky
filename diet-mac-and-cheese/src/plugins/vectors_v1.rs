@@ -2,7 +2,8 @@ use crypto_bigint::Encoding;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 
 use crate::circuit_ir::{
-    first_unused_wire_id, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
+    WireCount,
 };
 
 use super::Plugin;
@@ -18,6 +19,7 @@ impl Plugin for VectorsV1 {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
+        _fun_store: &FunStore,
     ) -> eyre::Result<GatesBody> {
         eyre::ensure!(
             output_counts.len() == 1,
@@ -391,6 +393,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -443,6 +446,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -491,6 +495,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -535,6 +540,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -575,6 +581,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -624,6 +631,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -669,6 +677,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -683,6 +692,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -697,6 +707,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -711,6 +722,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -764,6 +776,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -778,6 +791,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -792,6 +806,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -806,6 +821,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -859,6 +875,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -873,6 +890,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -887,6 +905,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -901,6 +920,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
