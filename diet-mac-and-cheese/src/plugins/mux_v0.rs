@@ -1,5 +1,7 @@
 use super::Plugin;
-use crate::circuit_ir::{first_unused_wire_id, GateM, GatesBody, TypeId, TypeStore, WireCount};
+use crate::circuit_ir::{
+    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeStore, WireCount,
+};
 use eyre::{eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
@@ -15,6 +17,7 @@ impl Plugin for MuxV0 {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
+        _fun_store: &FunStore,
     ) -> Result<GatesBody> {
         if operation != "strict" {
             return Err(eyre!(
@@ -156,6 +159,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 
@@ -222,6 +226,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &func_store,
         )
         .unwrap();
 

@@ -1270,7 +1270,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     }
 
     pub fn evaluate_relation(&mut self, path: &PathBuf) -> Result<()> {
-        let mut buf_rel = BufRelation::new(path)?;
+        let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
         loop {
             let r = buf_rel.next();
@@ -1292,7 +1292,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     pub fn evaluate_relation_text(&mut self, path: &PathBuf) -> Result<()> {
         let rel = RelationReader::open(path.as_path()).unwrap();
 
-        let mut buf_rel = TextRelation::default();
+        let mut buf_rel = TextRelation::new_with_type_store(&self.type_store);
 
         rel.read(&mut buf_rel)?;
         self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
@@ -1537,14 +1537,17 @@ pub(crate) mod tests {
     pub(crate) fn minus_one<FE: FiniteField>() -> Vec<u8> {
         into_vec(-FE::ONE)
     }
-    fn minus_two<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn minus_two<FE: FiniteField>() -> Vec<u8> {
         into_vec(-(FE::ONE + FE::ONE))
     }
     fn three<FE: FiniteField>() -> Vec<u8> {
         into_vec(FE::ONE + FE::ONE + FE::ONE)
     }
-    fn minus_three<FE: FiniteField>() -> Vec<u8> {
+    pub(crate) fn minus_three<FE: FiniteField>() -> Vec<u8> {
         into_vec(-(FE::ONE + FE::ONE + FE::ONE))
+    }
+    pub(crate) fn minus_four<FE: FiniteField>() -> Vec<u8> {
+        into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE))
     }
     fn minus_five<FE: FiniteField>() -> Vec<u8> {
         into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE))

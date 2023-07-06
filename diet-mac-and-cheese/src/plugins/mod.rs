@@ -1,4 +1,4 @@
-use crate::circuit_ir::{GatesBody, TypeId, TypeStore, WireCount};
+use crate::circuit_ir::{FunStore, GatesBody, TypeId, TypeStore, WireCount};
 use eyre::Result;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 
@@ -69,6 +69,7 @@ pub(crate) trait Plugin {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
+        fun_store: &FunStore,
     ) -> Result<GatesBody>;
 }
 
@@ -82,5 +83,7 @@ mod permutation_check_v1;
 pub(crate) use permutation_check_v1::PermutationCheckV1;
 mod galois_poly_v0;
 pub(crate) use galois_poly_v0::GaloisPolyV0;
+mod iter_v0;
+pub(crate) use iter_v0::IterV0;
 mod vectors_v1;
 pub(crate) use vectors_v1::VectorsV1;
