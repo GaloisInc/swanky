@@ -1,0 +1,15 @@
+version 2.0.0;
+circuit;
+@type field 0x2;
+@plugin galois_poly_v0;
+@begin
+@function(my_prod_eq, @in: 0:1, 0:2, 0:2)
+  @plugin(galois_poly_v0, prod_eq);
+@new(0: $0x1 ... $0x4);
+$0x0 <- @private(0x0);
+$0x1 <- @private(0x0);
+$0x2 <- @private(0x0);
+$0x3 <- @public(0x0);
+$0x4 <- @public(0x0);
+@call(my_prod_eq, $0x0 ... $0x0, $0x1 ... $0x2, $0x3 ... $0x4);
+@end
