@@ -1,6 +1,7 @@
 use super::Plugin;
 use crate::circuit_ir::{
-    first_unused_wire_id, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
+    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
+    WireCount,
 };
 use eyre::{ensure, eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
@@ -17,6 +18,7 @@ impl Plugin for GaloisPolyV0 {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
+        _fun_store: &FunStore,
     ) -> Result<GatesBody> {
         if operation == "prod_eq" {
             Self::prod_eq_body(params, output_counts, input_counts, type_store)
@@ -392,6 +394,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &fun_store,
         )
         .unwrap();
         fun_store.insert(name.clone(), func);
@@ -472,6 +475,7 @@ mod tests {
             vec![],
             vec![],
             &type_store,
+            &fun_store,
         )
         .unwrap();
         fun_store.insert(name.clone(), func);
