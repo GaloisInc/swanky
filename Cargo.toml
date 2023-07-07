@@ -39,6 +39,7 @@ version = "0.5.0"
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by etc/new-crate.py
 # BEGIN OUR CRATES
+bristol-fashion = { path = "bristol-fashion" }
 diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
 fancy-garbling = { path = "fancy-garbling" }
 fancy-garbling-base-conversion = { path = "fancy-garbling/base_conversion" }
