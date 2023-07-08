@@ -80,7 +80,7 @@ impl std::fmt::Display for Error {
 
 pub type Wire = usize;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Gate {
     XOR { a: Wire, b: Wire, out: Wire },
     AND { a: Wire, b: Wire, out: Wire },
@@ -89,12 +89,12 @@ pub enum Gate {
     EQW { a: Wire, out: Wire },
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Circuit {
     ngates: usize,
     nwires: usize,
-    inputs: Vec<usize>,
-    outputs: Vec<usize>,
+    input_sizes: Vec<usize>,
+    output_sizes: Vec<usize>,
     gates: Vec<Gate>,
 }
 
@@ -107,12 +107,12 @@ impl Circuit {
         self.nwires
     }
     
-    pub fn inputs(&self) -> Vec<usize> {
-        self.inputs.clone()
+    pub fn input_sizes(&self) -> Vec<usize> {
+        self.input_sizes.clone()
     }
     
-    pub fn outputs(&self) -> Vec<usize> {
-        self.outputs.clone()
+    pub fn output_sizes(&self) -> Vec<usize> {
+        self.output_sizes.clone()
     }
 
     pub fn nxor(&self) -> usize {
@@ -175,103 +175,218 @@ impl Reader {
         Ok(x)
     }
 
+    fn read_bool(tokens: &mut SplitWhitespace, msg: &str) -> Result<bool, Error> {
+        let x = tokens.next().ok_or(ParseBristolError { inner: msg.to_string() })?.parse::<u8>()?;
+        (x == 0 || x == 1).then_some(()).ok_or(ParseBristolError { inner: format!("expected 0 or 1, but got {}", x) })?;
+        Ok(if x == 0 { false } else { true })
+    }
+
+    fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str, Error> {
+        let x = tokens.next_back().ok_or(ParseBristolError { inner: "unexpected EOL, expected gate kind".to_string() })?;
+        Ok(x)
+    }
+
     fn read_ngates(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
         Self::read_usize(tokens, "unexpected EOL, expected ngates")
+    }
+
+    fn read_nwires(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected nwires")
+    }
+
+    fn read_ninputs(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected ninputs")
+    }
+
+    fn read_input_size(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected input size")
+    }
+
+    fn read_noutputs(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected noutputs")
+    }
+
+    fn read_output_size(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected output size")
+    }
+
+    fn read_gate_input_arity(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected gate input arity")
+    }
+
+    fn read_gate_output_arity(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected gate output arity")
+    }
+
+    fn read_gate_input(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected gate input")
+    }
+
+    fn read_gate_input_lit(tokens: &mut SplitWhitespace) -> Result<bool, Error> {
+        Self::read_bool(tokens, "unexpected EOL, expected gate input lit")
+    }
+
+    fn read_gate_output(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
+        Self::read_usize(tokens, "unexpected EOL, expected gate output")
+    }
+
+    fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire), Error> {
+        let in_arity = Self::read_gate_input_arity(tokens)?;
+        (in_arity == 2).then_some(()).ok_or(ParseBristolError { inner: format!("unexpected input arity, expected 2 but got {}", in_arity) })?;
+        let out_arity = Self::read_gate_output_arity(tokens)?;
+        (out_arity == 1).then_some(()).ok_or(ParseBristolError { inner: format!("unexpected output arity, expected 1 but got {}", out_arity) })?;
+        let a = Self::read_gate_input(tokens)?;
+        let b = Self::read_gate_input(tokens)?;
+        let out = Self::read_gate_output(tokens)?;
+        let _ = Self::read_eol(tokens)?;
+        Ok((a, b, out))
+    }
+
+    fn read_unary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire), Error> {
+        let in_arity = Self::read_gate_input_arity(tokens)?;
+        (in_arity == 1).then_some(()).ok_or(ParseBristolError { inner: format!("unexpected input arity, expected 1 but got {}", in_arity) })?;
+        let out_arity = Self::read_gate_output_arity(tokens)?;
+        (out_arity == 1).then_some(()).ok_or(ParseBristolError { inner: format!("unexpected output arity, expected 1 but got {}", out_arity) })?;
+        let a = Self::read_gate_input(tokens)?;
+        let out = Self::read_gate_output(tokens)?;
+        let _ = Self::read_eol(tokens)?;
+        Ok((a, out))
+    }
+
+    fn read_eq_gate(tokens: &mut SplitWhitespace) -> Result<(bool, Wire), Error> {
+        let in_arity = Self::read_gate_input_arity(tokens)?;
+        (in_arity == 1).then_some(()).ok_or(ParseBristolError { inner: format!("unexpected input arity, expected 1 but got {}", in_arity) })?;
+        let out_arity = Self::read_gate_output_arity(tokens)?;
+        (out_arity == 1).then_some(()).ok_or(ParseBristolError { inner: format!("unexpected output arity, expected 1 but got {}", out_arity) })?;
+        let lit = Self::read_gate_input_lit(tokens)?;
+        let out = Self::read_gate_output(tokens)?;
+        let _ = Self::read_eol(tokens)?;
+        Ok((lit, out))
+    }
+
+    fn read_eol(tokens: &mut SplitWhitespace) -> Result<(), Error> {
+        let x = tokens.next();
+        match x {
+            Some(_) => Err(Error::ParseBristolError(ParseBristolError { inner: "unexpected token, expected EOL".to_string() })),
+            None => Ok(()),
+        }
     }
 
     pub fn read(&mut self) -> Result<Circuit, Error> {
         // Read number of gates (`ngates`) and number of wires (`nwires`) from first line
         let mut tokens = self.next_line()?.ok_or(ParseBristolError { inner: "unexpected EOF on line 1".to_string() })?;
         let ngates = Self::read_ngates(&mut tokens)?;
-        let nwires = Self::read_usize(&mut tokens, "unexpected EOL, expected nwires")?;
-        // TODO(isweet): Check EOL here
-
+        let nwires = Self::read_nwires(&mut tokens)?;
+        let _ = Self::read_eol(&mut tokens)?;
+        
         // Read number of inputs and sizes from second line
-        self.line.clear();
-        self.reader.read_line(&mut self.line)?;
-        let mut tokens = self.line.split_whitespace();
-        let ninputs = tokens.next().unwrap().parse()?;
-        assert_eq!(tokens.clone().count(), ninputs);
-        let mut inputs = Vec::with_capacity(ninputs);
+        let mut tokens = self.next_line()?.ok_or(ParseBristolError { inner: "unexpected EOF on line 2".to_string() })?;
+        let ninputs = Self::read_ninputs(&mut tokens)?;
+        let mut input_sizes = Vec::with_capacity(ninputs);
         for _ in 0..ninputs {
-            let n = tokens.next().unwrap().parse()?;
-            inputs.push(n);
+            let input_size = Self::read_input_size(&mut tokens)?;
+            input_sizes.push(input_size);
         }
+        let _ = Self::read_eol(&mut tokens)?;
 
         // Read number of outputs and sizes from third line
-        self.line.clear();
-        self.reader.read_line(&mut self.line)?;
-        let mut tokens = self.line.split_whitespace();
-        let noutputs = tokens.next().unwrap().parse()?;
-        assert_eq!(tokens.clone().count(), noutputs);
-        let mut outputs = Vec::with_capacity(noutputs);
+        let mut tokens = self.next_line()?.ok_or(ParseBristolError { inner: "unexpected EOF on line 3".to_string() })?;
+        let noutputs = Self::read_noutputs(&mut tokens)?;
+        let mut output_sizes = Vec::with_capacity(noutputs);
         for _ in 0..noutputs {
-            let n = tokens.next().unwrap().parse()?;
-            outputs.push(n);
+            let output_size = Self::read_output_size(&mut tokens)?;
+            output_sizes.push(output_size);
         }
+        let _ = Self::read_eol(&mut tokens)?;
         
         // Skip an empty line
-        self.line.clear();
-        self.reader.read_line(&mut self.line)?;
-        assert_eq!(self.line.split_whitespace().count(), 0);
+        let mut tokens = self.next_line()?.ok_or(ParseBristolError { inner: "unexpected EOF on line 4".to_string() })?;
+        let _ = Self::read_eol(&mut tokens)?;
 
         // Read gates from remaining lines
-        let gates: Vec<Gate> = Vec::new();
-        loop {
-            self.line.clear();
-            let n = self.reader.read_line(&mut self.line)?;
-            if n == 0 {
-                break;
+        let mut gates: Vec<Gate> = Vec::new();
+        for i in 0..ngates {
+            let mut tokens = self.next_line()?.ok_or(ParseBristolError { inner: format!("unexpected EOF on line {}", 5 + i) })?;
+            let gate_kind = Self::read_gate_kind(&mut tokens)?;
+            match gate_kind {
+                "XOR" => {
+                    let (a, b, out) = Self::read_binary_gate(&mut tokens)?;
+                    gates.push(Gate::XOR { a, b, out });
+                },
+                "AND" => {
+                    let (a, b, out) = Self::read_binary_gate(&mut tokens)?;
+                    gates.push(Gate::AND { a, b, out });
+                },
+                "INV" => {
+                    let (a, out) = Self::read_unary_gate(&mut tokens)?;
+                    gates.push(Gate::INV { a, out });
+                },
+                "EQW" => {
+                    let (a, out) = Self::read_unary_gate(&mut tokens)?;
+                    gates.push(Gate::EQW { a, out });
+                },
+                "EQ" => {
+                    let (lit, out) = Self::read_eq_gate(&mut tokens)?;
+                    gates.push(Gate::EQ { lit, out });
+                },
+                "MAND" => {
+                    unimplemented!()
+                },
+                _ => {
+                    return Err(Error::ParseBristolError(ParseBristolError { inner: format!("unexpected gate kind on line {}: {}", 5 + i, gate_kind) }));
+                }
             }
-            let mut tokens = self.line.split_whitespace();
-            let gate_kind = tokens.clone().last().unwrap(); // TODO(isweet): This should be a parse error
         }
 
-        assert_eq!(gates.len(), ngates);
-        
+        // Skip trailing empty lines, but make sure they are empty
+        loop {
+            let tokens = self.next_line()?;
+            match tokens {
+                None => { break; },
+                Some(mut tokens) => {
+                    let _ = Self::read_eol(&mut tokens)?;
+                },
+            }
+        }
         
         Ok(Circuit {
             ngates,
             nwires,
-            inputs,
-            outputs,
-            gates: todo!(),
+            input_sizes,
+            output_sizes,
+            gates,
         })
     }
 }
 
 // TODO(isweet): Can I do better than the below?
+//   Yes, see: https://gist.github.com/Isweet/22c598b7e9b19c84750f585319dddf7a
+
 enum StdLib {
-    Adder64,
-    Sub64,
+    Adder64 = 0,
+    Sub64 = 1,
 }
+
+const STDLIB: [StdLib; 2] = [StdLib::Adder64, StdLib::Sub64];
 
 impl StdLib {
     fn name(&self) -> &str {
         match self {
-            Adder64 => "adder64.txt",
-            Sub64 => "sub64.txt",
+            StdLib::Adder64 => "adder64.txt",
+            StdLib::Sub64 => "sub64.txt",
         }
     }
 }
 
 thread_local! {
-    static CACHE: [Option<Circuit>; 2] = {
-        let mut ret = [None, None];
-        
+    static CACHE: [Circuit; 2] = {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("circuits");
-
-        let c = StdLib::Adder64;
-        ret[c as usize] = Some(Reader::new(&path.join(c.name())).unwrap().read().unwrap());
-        let c = StdLib::Sub64;
-        ret[c as usize] = Some(Reader::new(&path.join(c.name())).unwrap().read().unwrap());
-
-        ret
+        STDLIB.map(|c| Reader::new(&path.join(c.name())).unwrap().read().unwrap())
     }
 }
 
 fn fetch(c: StdLib) -> Circuit {
-    CACHE.with(|cache| { cache[c as usize].as_ref().unwrap().clone() })
+    CACHE.with(|cache| { cache[c as usize].clone() })
 }
 
 pub fn adder64() -> Circuit {
@@ -290,8 +405,8 @@ mod tests {
         bristol: fn() -> Circuit,
         ngates: usize,
         nwires: usize,
-        inputs: Vec<usize>,
-        outputs: Vec<usize>,
+        input_sizes: Vec<usize>,
+        output_sizes: Vec<usize>,
         nxor: usize,
         nand: usize,
         ninv: usize,
@@ -303,8 +418,8 @@ mod tests {
         let bristol = (spec.bristol)();
         assert_eq!(bristol.ngates(), spec.ngates);
         assert_eq!(bristol.nwires(), spec.nwires);
-        assert_eq!(bristol.inputs(), spec.inputs);
-        assert_eq!(bristol.outputs(), spec.outputs);
+        assert_eq!(bristol.input_sizes(), spec.input_sizes);
+        assert_eq!(bristol.output_sizes(), spec.output_sizes);
         assert_eq!(bristol.nxor(), spec.nxor);
         assert_eq!(bristol.nand(), spec.nand);
         assert_eq!(bristol.ninv(), spec.ninv);
@@ -318,8 +433,8 @@ mod tests {
             bristol: adder64,
             ngates: 376,
             nwires: 504,
-            inputs: vec![64, 64],
-            outputs: vec![64],
+            input_sizes: vec![64, 64],
+            output_sizes: vec![64],
             nxor: 313,
             nand: 63,
             ninv: 0,
@@ -336,8 +451,8 @@ mod tests {
             bristol: sub64,
             ngates: 439,
             nwires: 567,
-            inputs: vec![64, 64],
-            outputs: vec![64],
+            input_sizes: vec![64, 64],
+            output_sizes: vec![64],
             nxor: 313,
             nand: 63,
             ninv: 63,
