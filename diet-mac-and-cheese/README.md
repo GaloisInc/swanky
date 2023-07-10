@@ -1,9 +1,27 @@
 # Diet Mac'n'Cheese
 
-Diet Mac'n'Cheese is a library and some programs for zero-knowledge proof of circuit execution.
+Diet Mac'n'Cheese is an implementation of the QuickSilver / Mac'n'Cheese
+zero-knowledge proof system supporting the SIEVE Circuit IR.
 
-See documentation for the structures and api the library provides.
+Run `cargo doc --open --no-deps` for available documentation.
 
+## Supported Circuit IR Plugins
+
+The below table presents the existing support levels for the various
+standardized SIEVE Circuit IR plugins. `✔` denotes fully supported, `✘` denotes not
+supported, and `〜` denotes partially supported.
+
+
+| Plugin              | Supported? | Notes           |
+| ------------------- | ---------- | --------------- |
+| extended-arithmetic | `✘`        |                 |
+| iter                | `✔`        |                 |
+| permutation-check   | `〜`       | Arithmetic only |
+| mux                 | `〜`       | Boolean only    |
+| ram                 | `✘`        |                 |
+| vectors             | `✔`        |                 |
+
+## Running 
 
 We provide an executable program `dietmc_zki` to run the protocol as a verifier or a prover:
 
@@ -22,7 +40,7 @@ cargo run --release --bin dietmc_zki --features "exe" -- \
 ```
 
 
-# SIEVE IR0+
+## SIEVE IR0+
 
 Diet Mac'n'Cheese provides a program `bin/dietmc_0p.rs` to run SIEVE IR0+ circuits.
 
@@ -34,7 +52,7 @@ cargo run --bin dietmc_0p --features=exe --release -- --instance <PATH>/*.sieve 
 ```
 
 
-# Compile flatbuffer sieveir
+## Compile flatbuffer sieveir
 
 ```bash
 cd src/sieveir_phase2/
