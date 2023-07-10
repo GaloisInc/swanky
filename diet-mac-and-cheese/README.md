@@ -13,13 +13,13 @@ supported, and `〜` denotes partially supported.
 
 
 | Plugin              | Supported? | Notes           |
-| ------------------- | ---------- | --------------- |
-| extended-arithmetic | `✘`        |                 |
-| iter                | `✔`        |                 |
-| permutation-check   | `〜`       | Arithmetic only |
-| mux                 | `〜`       | Boolean only    |
-| ram                 | `✘`        |                 |
-| vectors             | `✔`        |                 |
+| ------------------- | :--------: | --------------- |
+| extended-arithmetic |    `✘`     |                 |
+| iter                |    `✔`     |                 |
+| permutation-check   |    `〜`    | Arithmetic only |
+| mux                 |    `〜`    | Boolean only    |
+| ram                 |    `✘`     |                 |
+| vectors             |    `✔`     |                 |
 
 ## Running 
 
