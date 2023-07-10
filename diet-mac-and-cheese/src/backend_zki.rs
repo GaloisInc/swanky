@@ -7,7 +7,6 @@ use crate::{
     backend_trait::BackendT,
 };
 use eyre::Result;
-use rand::{CryptoRng, Rng};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use zki_sieve::consumers::evaluator::ZKBackend;
@@ -17,9 +16,7 @@ fn convert<T>(v: Result<T>) -> ZkiResult<T> {
     v.map_err(|e| e.into())
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> ZKBackend
-    for DietMacAndCheeseProver<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> ZKBackend for DietMacAndCheeseProver<FE, C> {
     type Wire = MacProver<FE>;
     type FieldElement = FE::PrimeField;
 
@@ -92,9 +89,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> ZKBackend
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng + Clone> ZKBackend
-    for DietMacAndCheeseVerifier<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> ZKBackend for DietMacAndCheeseVerifier<FE, C> {
     type Wire = MacVerifier<FE>;
     type FieldElement = FE::PrimeField;
 
