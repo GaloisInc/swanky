@@ -74,7 +74,7 @@ pub enum Gate {
 }
 
 /// A Bristol Fashion circuit.
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Circuit {
     /// The number of gates in this circuit.    
     pub ngates: usize,
@@ -93,65 +93,42 @@ pub struct Circuit {
 }
 
 impl Circuit {
+    fn count_gates<F>(&self, f: F) -> usize
+    where
+        F: FnMut(&Gate) -> bool,
+    {
+        self.gates.iter().copied().filter(f).count()
+    }
+
     /// The number of XOR gates in this circuit.
     pub fn nxor(&self) -> usize {
-        self.gates
-            .iter()
-            .filter(|&g| match g {
-                Gate::XOR { a: _, b: _, out: _ } => true,
-                _ => false,
-            })
-            .count()
+        self.count_gates(|g| matches!(g, Gate::XOR { .. }))
     }
 
     /// The number of AND gates in this circuit.
     pub fn nand(&self) -> usize {
-        self.gates
-            .iter()
-            .filter(|&g| match g {
-                Gate::AND { a: _, b: _, out: _ } => true,
-                _ => false,
-            })
-            .count()
+        self.count_gates(|g| matches!(g, Gate::AND { .. }))
     }
 
     /// The number of INV gates in this circuit.
     pub fn ninv(&self) -> usize {
-        self.gates
-            .iter()
-            .filter(|&g| match g {
-                Gate::INV { a: _, out: _ } => true,
-                _ => false,
-            })
-            .count()
+        self.count_gates(|g| matches!(g, Gate::INV { .. }))
     }
 
     /// The number of EQ gates in this circuit.
     pub fn neq(&self) -> usize {
-        self.gates
-            .iter()
-            .filter(|&g| match g {
-                Gate::EQ { lit: _, out: _ } => true,
-                _ => false,
-            })
-            .count()
+        self.count_gates(|g| matches!(g, Gate::EQ { .. }))
     }
 
     /// The number of EQW gates in this circuit.
     pub fn neqw(&self) -> usize {
-        self.gates
-            .iter()
-            .filter(|&g| match g {
-                Gate::EQW { a: _, out: _ } => true,
-                _ => false,
-            })
-            .count()
+        self.count_gates(|g| matches!(g, Gate::EQW { .. }))
     }
 }
 
 /// A reader that constructs a Bristol Fashion `Circuit` from
 /// a file path.
-pub struct Reader<R: BufRead> {
+struct Reader<R: BufRead> {
     reader: R,
     line: String,
     row: usize,
@@ -160,7 +137,7 @@ pub struct Reader<R: BufRead> {
 impl<R: BufRead> Reader<R> {
     /// Creates a new `Reader` from a path to a Bristol Fashion file.
     /// Produces an IO error if the file does not exist.
-    pub fn new(reader: R) -> Self {
+    fn new(reader: R) -> Self {
         let line = String::new();
         let row = 0;
         Self { reader, line, row }
@@ -180,29 +157,32 @@ impl<R: BufRead> Reader<R> {
     fn expect_line(&mut self) -> Result<SplitWhitespace, Error> {
         let row = self.row;
         let ret = self.next_line()?;
-        ret.ok_or(format!("unexpected EOF on line {}", row).into())
+        ret.ok_or_else(|| format!("unexpected EOF on line {}", row).into())
     }
 
     fn read_usize(tokens: &mut SplitWhitespace, msg: &str) -> Result<usize, Error> {
         tokens
             .next()
-            .ok_or(msg.to_string())?
+            .ok_or_else(|| msg.to_string())?
             .parse::<usize>()
             .map_err(Error::from)
     }
 
     fn read_bool(tokens: &mut SplitWhitespace, msg: &str) -> Result<bool, Error> {
-        let x = tokens.next().ok_or(msg.to_string())?.parse::<u8>()?;
+        let x = tokens
+            .next()
+            .ok_or_else(|| msg.to_string())?
+            .parse::<u8>()?;
         (x == 0 || x == 1)
             .then_some(())
-            .ok_or(format!("expected 0 or 1, but got {}", x))?;
+            .ok_or_else(|| format!("expected 0 or 1, but got {}", x))?;
         Ok(if x == 0 { false } else { true })
     }
 
     fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str, Error> {
         tokens
             .next_back()
-            .ok_or("unexpected EOL, expected gate kind".to_string())
+            .ok_or_else(|| "unexpected EOL, expected gate kind".to_string())
             .map_err(Error::from)
     }
 
@@ -252,15 +232,13 @@ impl<R: BufRead> Reader<R> {
 
     fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        (in_arity == 2).then_some(()).ok_or(format!(
-            "unexpected input arity, expected 2 but got {}",
-            in_arity
-        ))?;
+        (in_arity == 2)
+            .then_some(())
+            .ok_or_else(|| format!("unexpected input arity, expected 2 but got {}", in_arity))?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        (out_arity == 1).then_some(()).ok_or(format!(
-            "unexpected output arity, expected 1 but got {}",
-            out_arity
-        ))?;
+        (out_arity == 1)
+            .then_some(())
+            .ok_or_else(|| format!("unexpected output arity, expected 1 but got {}", out_arity))?;
         let a = Self::read_gate_input(tokens)?;
         let b = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
@@ -270,15 +248,13 @@ impl<R: BufRead> Reader<R> {
 
     fn read_unary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        (in_arity == 1).then_some(()).ok_or(format!(
-            "unexpected input arity, expected 1 but got {}",
-            in_arity
-        ))?;
+        (in_arity == 1)
+            .then_some(())
+            .ok_or_else(|| format!("unexpected input arity, expected 1 but got {}", in_arity))?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        (out_arity == 1).then_some(()).ok_or(format!(
-            "unexpected output arity, expected 1 but got {}",
-            out_arity
-        ))?;
+        (out_arity == 1)
+            .then_some(())
+            .ok_or_else(|| format!("unexpected output arity, expected 1 but got {}", out_arity))?;
         let a = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
         let _ = Self::read_eol(tokens)?;
@@ -287,15 +263,13 @@ impl<R: BufRead> Reader<R> {
 
     fn read_eq_gate(tokens: &mut SplitWhitespace) -> Result<(bool, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        (in_arity == 1).then_some(()).ok_or(format!(
-            "unexpected input arity, expected 1 but got {}",
-            in_arity
-        ))?;
+        (in_arity == 1)
+            .then_some(())
+            .ok_or_else(|| format!("unexpected input arity, expected 1 but got {}", in_arity))?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        (out_arity == 1).then_some(()).ok_or(format!(
-            "unexpected output arity, expected 1 but got {}",
-            out_arity
-        ))?;
+        (out_arity == 1)
+            .then_some(())
+            .ok_or_else(|| format!("unexpected output arity, expected 1 but got {}", out_arity))?;
         let lit = Self::read_gate_input_lit(tokens)?;
         let out = Self::read_gate_output(tokens)?;
         let _ = Self::read_eol(tokens)?;
@@ -314,7 +288,7 @@ impl<R: BufRead> Reader<R> {
 
     /// Parses the underlying Bristol Fashion file into a `Circuit`.
     /// Produces a parse error if the file is not well-formed Bristol Fashion.
-    pub fn read(&mut self) -> Result<Circuit, Error> {
+    fn read(mut self) -> Result<Circuit, Error> {
         // Read number of gates (`ngates`) and number of wires (`nwires`) from first line
         let mut tokens = self.expect_line()?;
         let ngates = Self::read_ngates(&mut tokens)?;
@@ -407,6 +381,10 @@ impl<R: BufRead> Reader<R> {
             gates,
         })
     }
+}
+
+pub fn read<R: BufRead>(reader: R) -> Result<Circuit, Error> {
+    Reader::new(reader).read()
 }
 
 pub mod circuits;
