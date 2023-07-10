@@ -1,24 +1,24 @@
 //! This module implements a reader for "Bristol Fashion" circuit definition files.
 
-use std::path::Path;
-use std::path::PathBuf;
-use std::fs::File;
-use std::io::BufReader;
 use std::io::BufRead;
 use std::str::SplitWhitespace;
 
 #[derive(Debug)]
 pub enum ParseError {
     ParseIntError(std::num::ParseIntError),
-    ParseBristolError(String),    
+    ParseBristolError(String),
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            ParseError::ParseIntError(e) => format!("Int: {e}"),            
-            ParseError::ParseBristolError(e) => format!("Bristol: {e}"),
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                ParseError::ParseIntError(e) => format!("Int: {e}"),
+                ParseError::ParseBristolError(e) => format!("Bristol: {e}"),
+            }
+        )
     }
 }
 
@@ -38,7 +38,7 @@ impl std::fmt::Display for Error {
                 Error::ParseError(e) => format!("Parse Error: {e}"),
             }
         )
-    }    
+    }
 }
 
 impl From<std::io::Error> for Error {
@@ -66,7 +66,7 @@ pub enum Gate {
     XOR { a: Wire, b: Wire, out: Wire },
     AND { a: Wire, b: Wire, out: Wire },
     INV { a: Wire, out: Wire },
-    EQ  { lit: bool, out: Wire },
+    EQ { lit: bool, out: Wire },
     EQW { a: Wire, out: Wire },
 }
 
@@ -92,91 +92,115 @@ pub struct Circuit {
 impl Circuit {
     /// The number of XOR gates in this circuit.
     pub fn nxor(&self) -> usize {
-        self.gates.iter().filter(|&g| match g {
-            Gate::XOR { a: _, b: _, out: _ } => true,
-            _ => false,
-        }).count()
+        self.gates
+            .iter()
+            .filter(|&g| match g {
+                Gate::XOR { a: _, b: _, out: _ } => true,
+                _ => false,
+            })
+            .count()
     }
 
     /// The number of AND gates in this circuit.
     pub fn nand(&self) -> usize {
-        self.gates.iter().filter(|&g| match g {
-            Gate::AND { a: _, b: _, out: _ } => true,
-            _ => false,
-        }).count()
+        self.gates
+            .iter()
+            .filter(|&g| match g {
+                Gate::AND { a: _, b: _, out: _ } => true,
+                _ => false,
+            })
+            .count()
     }
 
     /// The number of INV gates in this circuit.
     pub fn ninv(&self) -> usize {
-        self.gates.iter().filter(|&g| match g {
-            Gate::INV { a: _, out: _ } => true,
-            _ => false,
-        }).count()
+        self.gates
+            .iter()
+            .filter(|&g| match g {
+                Gate::INV { a: _, out: _ } => true,
+                _ => false,
+            })
+            .count()
     }
 
     /// The number of EQ gates in this circuit.
     pub fn neq(&self) -> usize {
-        self.gates.iter().filter(|&g| match g {
-            Gate::EQ { lit: _, out: _ } => true,
-            _ => false,
-        }).count()
+        self.gates
+            .iter()
+            .filter(|&g| match g {
+                Gate::EQ { lit: _, out: _ } => true,
+                _ => false,
+            })
+            .count()
     }
 
     /// The number of EQW gates in this circuit.
     pub fn neqw(&self) -> usize {
-        self.gates.iter().filter(|&g| match g {
-            Gate::EQW { a: _, out: _ } => true,
-            _ => false,
-        }).count()         
+        self.gates
+            .iter()
+            .filter(|&g| match g {
+                Gate::EQW { a: _, out: _ } => true,
+                _ => false,
+            })
+            .count()
     }
 }
 
 /// A reader that constructs a Bristol Fashion `Circuit` from
 /// a file path.
-pub struct Reader {
-    reader: BufReader<File>,
+pub struct Reader<R: BufRead> {
+    reader: R,
     line: String,
     row: usize,
 }
 
-impl Reader {
+impl<R: BufRead> Reader<R> {
     /// Creates a new `Reader` from a path to a Bristol Fashion file.
     /// Produces an IO error if the file does not exist.
-    pub fn new(path: &Path) -> Result<Reader, Error> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let line = String::new();        
+    pub fn new(reader: R) -> Self {
+        let line = String::new();
         let row = 0;
-        Ok(Self { reader, line, row })
+        Self { reader, line, row }
     }
 
     fn next_line(&mut self) -> Result<Option<SplitWhitespace>, Error> {
         self.line.clear();
         let n = self.reader.read_line(&mut self.line)?;
-        self.row += 1;        
-        Ok(if n != 0 { Some(self.line.split_whitespace()) } else { None })
+        self.row += 1;
+        Ok(if n != 0 {
+            Some(self.line.split_whitespace())
+        } else {
+            None
+        })
     }
 
     fn expect_line(&mut self) -> Result<SplitWhitespace, Error> {
-        let row = self.row;        
+        let row = self.row;
         let ret = self.next_line()?;
         ret.ok_or(format!("unexpected EOF on line {}", row).into())
     }
 
     fn read_usize(tokens: &mut SplitWhitespace, msg: &str) -> Result<usize, Error> {
-        let x = tokens.next().ok_or(msg.to_string())?.parse::<usize>()?;
-        Ok(x)
+        tokens
+            .next()
+            .ok_or(msg.to_string())?
+            .parse::<usize>()
+            .map_err(Error::from)
     }
 
     fn read_bool(tokens: &mut SplitWhitespace, msg: &str) -> Result<bool, Error> {
         let x = tokens.next().ok_or(msg.to_string())?.parse::<u8>()?;
-        (x == 0 || x == 1).then_some(()).ok_or(format!("expected 0 or 1, but got {}", x))?;
+        (x == 0 || x == 1)
+            .then_some(())
+            .ok_or(format!("expected 0 or 1, but got {}", x))?;
         Ok(if x == 0 { false } else { true })
     }
 
     fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str, Error> {
-        let x = tokens.next_back().ok_or("unexpected EOL, expected gate kind".to_string())?;
-        Ok(x)
+        tokens
+            .next_back()
+            .ok_or("unexpected EOL, expected gate kind".to_string())
+            .map_err(Error::from)
     }
 
     fn read_ngates(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
@@ -225,9 +249,15 @@ impl Reader {
 
     fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        (in_arity == 2).then_some(()).ok_or(format!("unexpected input arity, expected 2 but got {}", in_arity))?;
+        (in_arity == 2).then_some(()).ok_or(format!(
+            "unexpected input arity, expected 2 but got {}",
+            in_arity
+        ))?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        (out_arity == 1).then_some(()).ok_or(format!("unexpected output arity, expected 1 but got {}", out_arity))?;
+        (out_arity == 1).then_some(()).ok_or(format!(
+            "unexpected output arity, expected 1 but got {}",
+            out_arity
+        ))?;
         let a = Self::read_gate_input(tokens)?;
         let b = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
@@ -237,9 +267,15 @@ impl Reader {
 
     fn read_unary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        (in_arity == 1).then_some(()).ok_or(format!("unexpected input arity, expected 1 but got {}", in_arity))?;
+        (in_arity == 1).then_some(()).ok_or(format!(
+            "unexpected input arity, expected 1 but got {}",
+            in_arity
+        ))?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        (out_arity == 1).then_some(()).ok_or(format!("unexpected output arity, expected 1 but got {}", out_arity))?;
+        (out_arity == 1).then_some(()).ok_or(format!(
+            "unexpected output arity, expected 1 but got {}",
+            out_arity
+        ))?;
         let a = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
         let _ = Self::read_eol(tokens)?;
@@ -248,9 +284,15 @@ impl Reader {
 
     fn read_eq_gate(tokens: &mut SplitWhitespace) -> Result<(bool, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        (in_arity == 1).then_some(()).ok_or(format!("unexpected input arity, expected 1 but got {}", in_arity))?;
+        (in_arity == 1).then_some(()).ok_or(format!(
+            "unexpected input arity, expected 1 but got {}",
+            in_arity
+        ))?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        (out_arity == 1).then_some(()).ok_or(format!("unexpected output arity, expected 1 but got {}", out_arity))?;
+        (out_arity == 1).then_some(()).ok_or(format!(
+            "unexpected output arity, expected 1 but got {}",
+            out_arity
+        ))?;
         let lit = Self::read_gate_input_lit(tokens)?;
         let out = Self::read_gate_output(tokens)?;
         let _ = Self::read_eol(tokens)?;
@@ -260,7 +302,9 @@ impl Reader {
     fn read_eol(tokens: &mut SplitWhitespace) -> Result<(), Error> {
         let x = tokens.next();
         match x {
-            Some(_) => Err(Error::ParseError(ParseError::ParseBristolError("unexpected token, expected EOL".to_string()))),
+            Some(_) => Err(Error::ParseError(ParseError::ParseBristolError(
+                "unexpected token, expected EOL".to_string(),
+            ))),
             None => Ok(()),
         }
     }
@@ -273,7 +317,7 @@ impl Reader {
         let ngates = Self::read_ngates(&mut tokens)?;
         let nwires = Self::read_nwires(&mut tokens)?;
         let _ = Self::read_eol(&mut tokens)?;
-        
+
         // Read number of inputs and sizes from second line
         let mut tokens = self.expect_line()?;
         let ninputs = Self::read_ninputs(&mut tokens)?;
@@ -293,7 +337,7 @@ impl Reader {
             output_sizes.push(output_size);
         }
         let _ = Self::read_eol(&mut tokens)?;
-        
+
         // Skip an empty line
         let mut tokens = self.expect_line()?;
         let _ = Self::read_eol(&mut tokens)?;
@@ -307,28 +351,34 @@ impl Reader {
                 "XOR" => {
                     let (a, b, out) = Self::read_binary_gate(&mut tokens)?;
                     gates.push(Gate::XOR { a, b, out });
-                },
+                }
                 "AND" => {
                     let (a, b, out) = Self::read_binary_gate(&mut tokens)?;
                     gates.push(Gate::AND { a, b, out });
-                },
+                }
                 "INV" => {
                     let (a, out) = Self::read_unary_gate(&mut tokens)?;
                     gates.push(Gate::INV { a, out });
-                },
+                }
                 "EQW" => {
                     let (a, out) = Self::read_unary_gate(&mut tokens)?;
                     gates.push(Gate::EQW { a, out });
-                },
+                }
                 "EQ" => {
                     let (lit, out) = Self::read_eq_gate(&mut tokens)?;
                     gates.push(Gate::EQ { lit, out });
-                },
+                }
                 "MAND" => {
-                    unimplemented!()
-                },
+                    let error_msg = format!(
+                        "unexpected gate kind on line {}: MAND only supported by extended format",
+                        5 + i
+                    );
+                    return Err(Error::ParseError(ParseError::ParseBristolError(error_msg)));
+                }
                 _ => {
-                    return Err(Error::ParseError(ParseError::ParseBristolError(format!("unexpected gate kind on line {}: {}", 5 + i, gate_kind))));
+                    let error_msg =
+                        format!("unexpected gate kind on line {}: {}", 5 + i, gate_kind);
+                    return Err(Error::ParseError(ParseError::ParseBristolError(error_msg)));
                 }
             }
         }
@@ -337,13 +387,15 @@ impl Reader {
         loop {
             let tokens = self.next_line()?;
             match tokens {
-                None => { break; },
+                None => {
+                    break;
+                }
                 Some(mut tokens) => {
                     let _ = Self::read_eol(&mut tokens)?;
-                },
+                }
             }
         }
-        
+
         Ok(Circuit {
             ngates,
             nwires,
@@ -354,163 +406,12 @@ impl Reader {
     }
 }
 
-// TODO(isweet): Define cache according to Stuart's suggested macro, see https://gist.github.com/Isweet/22c598b7e9b19c84750f585319dddf7a
-
-enum StdLib {
-    Add64 = 0,
-    Sub64 = 1,
-    Neg64 = 2,
-    Mul64 = 3,
-    WideMul64 = 4,
-    DivS64 = 5,
-    DivU64 = 6,
-    EqZ64 = 7,
-    AES128 = 8,
-    AES192 = 9,
-    AES256 = 10,
-    Keccak = 11,
-    SHA256 = 12,
-    SHA512 = 13,
-}
-
-const COUNT: usize = 14;
-
-const STDLIB: [StdLib; COUNT] =
-    [StdLib::Add64,
-     StdLib::Sub64,
-     StdLib::Neg64,
-     StdLib::Mul64,
-     StdLib::WideMul64,
-     StdLib::DivS64,
-     StdLib::DivU64,
-     StdLib::EqZ64,
-     StdLib::AES128,
-     StdLib::AES192,
-     StdLib::AES256,
-     StdLib::Keccak,
-     StdLib::SHA256,
-     StdLib::SHA512,
-    ];
-
-impl StdLib {
-    fn name(&self) -> &str {
-        match self {
-            StdLib::Add64 => "adder64.txt",
-            StdLib::Sub64 => "sub64.txt",
-            StdLib::Neg64 => "neg64.txt",
-            StdLib::Mul64 => "mult64.txt",
-            StdLib::WideMul64 => "mult2_64.txt",
-            StdLib::DivS64 => "divide64.txt",
-            StdLib::DivU64 => "udivide64.txt",
-            StdLib::EqZ64 => "zero_equal.txt",
-            StdLib::AES128 => "aes_128.txt",
-            StdLib::AES192 => "aes_192.txt",
-            StdLib::AES256 => "aes_256.txt",
-            StdLib::Keccak => "Keccak_f.txt",
-            StdLib::SHA256 => "sha256.txt",
-            StdLib::SHA512 => "sha512.txt",
-        }
-    }
-}
-
-thread_local! {
-    static CACHE: [Circuit; COUNT] = {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("circuits");
-        STDLIB.map(|c| Reader::new(&path.join(c.name())).unwrap().read().unwrap())
-    }
-}
-
-fn fetch(c: StdLib) -> Circuit {
-    CACHE.with(|cache| { cache[c as usize].clone() })
-}
-
-/// A cached copy of the optimized 64-bit adder circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn add64() -> Circuit {
-    fetch(StdLib::Add64)
-}
-
-/// A cached copy of the optimized 64-bit subtraction circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn sub64() -> Circuit {
-    fetch(StdLib::Sub64)
-}
-
-/// A cached copy of the optimized 64-bit subtraction circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn neg64() -> Circuit {
-    fetch(StdLib::Neg64)
-}
-
-/// A cached copy of the optimized 64-bit multiplication circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn mul64() -> Circuit {
-    fetch(StdLib::Mul64)
-}
-
-/// A cached copy of the optimized 64-bit wide multiplication circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn wide_mul64() -> Circuit {
-    fetch(StdLib::WideMul64)
-}
-
-/// A cached copy of the optimized 64-bit signed division circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn signed_div64() -> Circuit {
-    fetch(StdLib::DivS64)
-}
-
-/// A cached copy of the optimized 64-bit unsigned division circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn unsigned_div64() -> Circuit {
-    fetch(StdLib::DivU64)
-}
-
-/// A cached copy of the optimized 64-bit zero equality circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn eq_zero64() -> Circuit {
-    fetch(StdLib::EqZ64)
-}
-
-/// A cached copy of the optimized AES-128 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn aes_128() -> Circuit {
-    fetch(StdLib::AES128)
-}
-
-/// A cached copy of the optimized AES-192 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn aes_192() -> Circuit {
-    fetch(StdLib::AES192)
-}
-
-/// A cached copy of the optimized AES-256 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn aes_256() -> Circuit {
-    fetch(StdLib::AES256)
-}
-
-/// A cached copy of the optimized Keccak circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn keccak() -> Circuit {
-    fetch(StdLib::Keccak)
-}
-
-/// A cached copy of the optimized SHA-256 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn sha_256() -> Circuit {
-    fetch(StdLib::SHA256)
-}
-
-/// A cached copy of the optimized SHA-512 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn sha_512() -> Circuit {
-    fetch(StdLib::SHA512)
-}
+pub mod circuits;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use circuits::*;
 
     struct ReadSpec {
         bristol: fn() -> Circuit,
@@ -539,7 +440,7 @@ mod tests {
     }
 
     #[test]
-    pub (crate) fn test_read_add64() {
+    pub(crate) fn test_read_add64() {
         let spec = ReadSpec {
             bristol: add64,
             ngates: 376,
@@ -552,12 +453,12 @@ mod tests {
             neq: 0,
             neqw: 0,
         };
-        
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_sub64() {
+    pub(crate) fn test_read_sub64() {
         let spec = ReadSpec {
             bristol: sub64,
             ngates: 439,
@@ -570,12 +471,12 @@ mod tests {
             neq: 0,
             neqw: 0,
         };
-        
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_neg64() {
+    pub(crate) fn test_read_neg64() {
         let spec = ReadSpec {
             bristol: neg64,
             ngates: 190,
@@ -588,12 +489,12 @@ mod tests {
             neq: 0,
             neqw: 1,
         };
-        
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_mul64() {
+    pub(crate) fn test_read_mul64() {
         let spec = ReadSpec {
             bristol: mul64,
             ngates: 13675,
@@ -611,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    pub (crate) fn test_read_wide_mul64() {
+    pub(crate) fn test_read_wide_mul64() {
         let spec = ReadSpec {
             bristol: wide_mul64,
             ngates: 28032,
@@ -623,13 +524,13 @@ mod tests {
             ninv: 0,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
-    }        
+    }
 
     #[test]
-    pub (crate) fn test_read_signed_div64() {
+    pub(crate) fn test_read_signed_div64() {
         let spec = ReadSpec {
             bristol: signed_div64,
             ngates: 29926,
@@ -641,13 +542,13 @@ mod tests {
             ninv: 445,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_unsigned_div64() {
+    pub(crate) fn test_read_unsigned_div64() {
         let spec = ReadSpec {
             bristol: unsigned_div64,
             ngates: 16952,
@@ -659,13 +560,13 @@ mod tests {
             ninv: 64,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_eq_zero64() {
+    pub(crate) fn test_read_eq_zero64() {
         let spec = ReadSpec {
             bristol: eq_zero64,
             ngates: 127,
@@ -677,13 +578,13 @@ mod tests {
             ninv: 64,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_aes128() {
+    pub(crate) fn test_read_aes128() {
         let spec = ReadSpec {
             bristol: aes_128,
             ngates: 36663,
@@ -695,13 +596,13 @@ mod tests {
             ninv: 2087,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_aes192() {
+    pub(crate) fn test_read_aes192() {
         let spec = ReadSpec {
             bristol: aes_192,
             ngates: 41565,
@@ -713,13 +614,13 @@ mod tests {
             ninv: 2317,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_aes256() {
+    pub(crate) fn test_read_aes256() {
         let spec = ReadSpec {
             bristol: aes_256,
             ngates: 50666,
@@ -731,13 +632,13 @@ mod tests {
             ninv: 2826,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_keccak() {
+    pub(crate) fn test_read_keccak() {
         let spec = ReadSpec {
             bristol: keccak,
             ngates: 192086,
@@ -749,13 +650,13 @@ mod tests {
             ninv: 38486,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_sha256() {
+    pub(crate) fn test_read_sha256() {
         let spec = ReadSpec {
             bristol: sha_256,
             ngates: 135073,
@@ -767,13 +668,13 @@ mod tests {
             ninv: 1856,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 
     #[test]
-    pub (crate) fn test_read_sha512() {
+    pub(crate) fn test_read_sha512() {
         let spec = ReadSpec {
             bristol: sha_512,
             ngates: 349617,
@@ -785,8 +686,8 @@ mod tests {
             ninv: 4946,
             neq: 0,
             neqw: 0,
-        };        
-        
+        };
+
         test_read(&spec)
     }
 

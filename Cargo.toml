@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "bristol-fashion",
     "crates/*",
     "diet-mac-and-cheese",
     "diet-mac-and-cheese/web-mac-and-cheese/wasm",
@@ -25,7 +26,6 @@ members = [
     "simple-arith-circuit",
     "vectoreyes",
     "zkv",
-    "bristol-fashion",
 ]
 
 

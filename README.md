@@ -2,6 +2,7 @@
 
 `swanky` provides a suite of rust libraries for doing secure computation.
 
+* `bristol-fashion`: A parser for Bristol Fashion circuits.
 * `fancy-garbling`: Boolean and arithmetic garbled circuits.
   * `twopac`: Two-party garbled-circuit-based secure computation.
 * `humidor`: Implementation of the Ligero zero knowledge proof system.
