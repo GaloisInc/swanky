@@ -5,7 +5,7 @@ use crate::circuit_ir::{
 };
 use eyre::{ensure, eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use scuttlebutt::field::{F61p, F2};
+use scuttlebutt::field::{F128b, F61p, F63b, F2};
 
 pub(crate) struct GaloisPolyV0;
 
@@ -64,13 +64,12 @@ impl GaloisPolyV0 {
         let type_id = input_counts[0].0;
         ensure!(
             type_id == input_counts[1].0 && type_id == input_counts[2].0,
-            "{}: Input type indices must match",
+            "{}: Input type IDs must match",
             Self::NAME
         );
-        let type_spec = type_store.get(&type_id)?;
 
         ensure!(
-            input_counts[0].1 != 0, // TODO: Can this even happen?
+            input_counts[0].1 != 0, // TODO: Can this happen?
             "{}: p0 must have at least 1 coefficient",
             Self::NAME
         );
@@ -93,7 +92,7 @@ impl GaloisPolyV0 {
         let p1_start = input_counts[0].1;
         let q_start = input_counts[0].1 + 2;
 
-        let number_of_challenges = Self::number_of_challenges(q_degree as f64, type_spec)?;
+        let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, &type_store)?;
 
         let mut gates = vec![];
         let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
@@ -175,13 +174,12 @@ impl GaloisPolyV0 {
         let type_id = input_counts[0].0;
         ensure!(
             type_id == input_counts[1].0 && type_id == input_counts[2].0,
-            "{}: Input type indices must match",
+            "{}: Input type IDs must match",
             Self::NAME
         );
-        let type_spec = type_store.get(&type_id)?;
         ensure!(
-            input_counts[0].1 != 0, // TODO: Can this even happen?
-            "{}: p0 must have at least 1 coefficient",
+            input_counts[0].1 != 0, // TODO: Can this happen?
+            "{}: p must have at least 1 coefficient",
             Self::NAME
         );
         // p_degree (= n in the spec) is the degree of p, i.e. one less than the number of coefficients in p
@@ -202,7 +200,7 @@ impl GaloisPolyV0 {
         let c_wire = input_counts[0].1;
         let q_start = input_counts[0].1 + 1;
 
-        let number_of_challenges = Self::number_of_challenges(q_degree as f64, type_spec)?;
+        let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, &type_store)?;
 
         let mut gates = vec![];
         let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
@@ -270,25 +268,43 @@ impl GaloisPolyV0 {
         (acc_wire, first_unused_wire + 2 * degree)
     }
 
-    fn number_of_challenges(degree: f64, type_spec: &TypeSpecification) -> Result<usize> {
+    // TODO: If more than three challenges are needed it is more efficient to check in F^(2^k).
+    fn number_of_challenges(
+        degree: u64,
+        type_id: &TypeId,
+        type_store: &TypeStore,
+    ) -> Result<usize> {
+        let type_spec = type_store.get(&type_id)?;
         let TypeSpecification::Field(field) = type_spec else {
             eyre::bail!("Invalid type specification for inputs; must be `Field`.");
         };
-        if degree == 0f64 {
+
+        if degree == 0 {
             return Ok(1);
         };
 
+        // TODO: Should this cover all fields in scuttlebutt?
+        // TODO: Is there a better pattern to switch over many fields?
         let field_size = if *field == std::any::TypeId::of::<F61p>() {
-            2f64.powi(61) - 1f64
+            2u64.pow(61) - 1
+        } else if *field == std::any::TypeId::of::<F128b>() {
+            // With 40 bits security unsound degrees are not representable in u64.
+            return Ok(1);
+        } else if *field == std::any::TypeId::of::<F63b>() {
+            2u64.pow(63)
         } else if *field == std::any::TypeId::of::<F2>() {
-            2f64
+            2
         } else {
-            todo!("Unsupported field: {type_spec:?}.")
+            todo!("Type id {type_id:?} is not a supported field.")
         };
-        // TODO: What level are we going for? Should it be a parameter?
-        let bits_of_security = 128;
+        if field_size <= degree {
+            // TODO: Can be tested in F^(2^k).
+            todo!("Degree larger or equal to field size not supported.")
+        }
+        // TODO: Should the security level be a parameter?
+        let bits_of_security = 40;
         // The probability of failure in each test is at most degree/|F|.
-        let single_test_failure_probability = degree / field_size;
+        let single_test_failure_probability = degree as f64 / field_size as f64;
         // We want to choose the number of tests such that the probability of failure is at most 2^(-bits_of_security).
         // (degree/|F|)^number_of_challenges <= 2^(-bits_of_security)
         // <=> number_of_challenges >= log_(degree/|F|)(2^(-bits_of_security))
