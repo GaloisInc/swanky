@@ -22,11 +22,11 @@ pub mod circuit_ir;
 pub mod edabits;
 mod fields;
 pub mod homcom;
-pub(crate) mod memory;
+mod memory;
 #[allow(clippy::all)]
 pub mod read_sieveir_phase2;
 mod sieveir_phase2;
 pub mod text_reader;
 pub use backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 pub mod backend_zki;
-pub(crate) mod plugins;
+mod plugins;

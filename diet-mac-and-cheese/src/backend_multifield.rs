@@ -21,7 +21,6 @@ use ocelot::svole::wykw::LpnParams;
 #[cfg(feature = "ff")]
 use ocelot::svole::wykw::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
-use rand::{CryptoRng, Rng};
 #[cfg(feature = "ff")]
 use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
 use scuttlebutt::field::{F40b, F61p, FiniteField, F2};
@@ -71,9 +70,7 @@ pub trait BackendConvT: BackendT {
     fn finalize_conv(&mut self) -> Result<()>;
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
-    for DietMacAndCheeseProver<F40b, C, RNG>
-{
+impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseProver<F40b, C> {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", w);
         Ok(vec![MacBitGeneric::BitProver(*w)])
@@ -96,9 +93,7 @@ impl<C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
     }
 }
 
-impl<C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
-    for DietMacAndCheeseVerifier<F40b, C, RNG>
-{
+impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseVerifier<F40b, C> {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         Ok(vec![MacBitGeneric::BitVerifier(*w)])
     }
@@ -139,27 +134,25 @@ impl<E> EdabitsMap<E> {
     }
 }
 
-struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
-    dmc: DietMacAndCheeseProver<FE, C, RNG>,
+struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
+    dmc: DietMacAndCheeseProver<FE, C>,
     conv: ProverConv<FE>,
     edabits_map: EdabitsMap<EdabitsProver<FE>>,
-    dmc_f2: DietMacAndCheeseProver<F40b, C, RNG>,
+    dmc_f2: DietMacAndCheeseProver<F40b, C>,
     no_batching: bool,
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
-    DietMacAndCheeseConvProver<FE, C, RNG>
-{
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
     pub fn init(
         channel: &mut C,
-        rng: RNG,
-        rng2: RNG,
+        mut rng: AesRng,
         fcom_f2: &RcRefCell<FComProver<F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let mut dmc = DietMacAndCheeseProver::<FE, C, RNG>::init(
+        let rng2 = rng.fork();
+        let mut dmc = DietMacAndCheeseProver::<FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -171,7 +164,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
             dmc,
             conv,
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseProver::<F40b, C, RNG>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseProver::<F40b, C>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -182,14 +175,14 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
-    for DietMacAndCheeseConvProver<FE, C, RNG>
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendT
+    for DietMacAndCheeseConvProver<FE, C>
 {
-    type Wire = <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::FieldElement;
+    type Wire = <DietMacAndCheeseProver<FE, C> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseProver<FE, C> as BackendT>::FieldElement;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::from_bytes_le(val)
+        <DietMacAndCheeseProver<FE, C> as BackendT>::from_bytes_le(val)
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -226,10 +219,10 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
-        <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::input_public(&mut self.dmc, val)
+        self.dmc.input_public(val)
     }
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::input_private(&mut self.dmc, val)
+        self.dmc.input_private(val)
     }
     fn finalize(&mut self) -> Result<()> {
         self.dmc.finalize()?;
@@ -241,9 +234,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
-    DietMacAndCheeseConvProver<FE, C, RNG>
-{
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
     pub(crate) fn less_eq_than_with_public2(
         &mut self,
         a: &[MacProver<F40b>],
@@ -313,8 +304,8 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
         Ok(())
     }
 }
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
-    for DietMacAndCheeseConvProver<FE, C, RNG>
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendConvT
+    for DietMacAndCheeseConvProver<FE, C>
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", a);
@@ -387,7 +378,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
         }
 
         debug!("CONV_FROM_BITS {:?}", recomposed_value);
-        let mac = <DietMacAndCheeseProver<FE, C, RNG> as BackendT>::input_private(
+        let mac = <DietMacAndCheeseProver<FE, C> as BackendT>::input_private(
             &mut self.dmc,
             Some(recomposed_value),
         )?;
@@ -415,27 +406,25 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
-    dmc: DietMacAndCheeseVerifier<FE, C, RNG>,
+struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
+    dmc: DietMacAndCheeseVerifier<FE, C>,
     conv: VerifierConv<FE>,
     edabits_map: EdabitsMap<EdabitsVerifier<FE>>,
-    dmc_f2: DietMacAndCheeseVerifier<F40b, C, RNG>,
+    dmc_f2: DietMacAndCheeseVerifier<F40b, C>,
     no_batching: bool,
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
-    DietMacAndCheeseConvVerifier<FE, C, RNG>
-{
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
     pub fn init(
         channel: &mut C,
-        rng: RNG,
-        rng2: RNG,
+        mut rng: AesRng,
         fcom_f2: &RcRefCell<FComVerifier<F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let mut dmc = DietMacAndCheeseVerifier::<FE, C, RNG>::init(
+        let rng2 = rng.fork();
+        let mut dmc = DietMacAndCheeseVerifier::<FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -447,7 +436,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
             dmc,
             conv,
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseVerifier::<F40b, C, RNG>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseVerifier::<F40b, C>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -458,14 +447,14 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
-    for DietMacAndCheeseConvVerifier<FE, C, RNG>
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendT
+    for DietMacAndCheeseConvVerifier<FE, C>
 {
-    type Wire = <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::FieldElement;
+    type Wire = <DietMacAndCheeseVerifier<FE, C> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseVerifier<FE, C> as BackendT>::FieldElement;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::from_bytes_le(val)
+        <DietMacAndCheeseVerifier<FE, C> as BackendT>::from_bytes_le(val)
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -502,10 +491,10 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
-        <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::input_public(&mut self.dmc, val)
+        self.dmc.input_public(val)
     }
     fn input_private(&mut self, _val: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::input_private(&mut self.dmc, None)
+        self.dmc.input_private(None)
     }
     fn finalize(&mut self) -> Result<()> {
         self.dmc.finalize()?;
@@ -517,9 +506,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
-    DietMacAndCheeseConvVerifier<FE, C, RNG>
-{
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
     fn less_eq_than_with_public2(&mut self, a: &[MacVerifier<F40b>], b: &[F2]) -> Result<()> {
         // act = 1;
         // r   = 0;
@@ -587,8 +574,8 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng> BackendConvT
-    for DietMacAndCheeseConvVerifier<FE, C, RNG>
+impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendConvT
+    for DietMacAndCheeseConvVerifier<FE, C>
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         let mut v = Vec::with_capacity(FE::NumberOfBitsInBitDecomposition::to_usize());
@@ -644,7 +631,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel, RNG: CryptoRng + Rng>
         }
 
         let mac =
-            <DietMacAndCheeseVerifier<FE, C, RNG> as BackendT>::input_private(&mut self.dmc, None)?;
+            <DietMacAndCheeseVerifier<FE, _> as BackendT>::input_private(&mut self.dmc, None)?;
 
         let id = bits.len();
         let num = self
@@ -704,13 +691,13 @@ trait EvaluatorT {
     fn finalize(&mut self) -> Result<()>;
 }
 
-pub struct EvaluatorSingle<B: BackendConvT> {
+pub struct EvaluatorSingle<B: BackendT> {
     memory: Memory<<B as BackendT>::Wire>,
     backend: B,
     is_boolean: bool,
 }
 
-impl<B: BackendConvT> EvaluatorSingle<B>
+impl<B: BackendT> EvaluatorSingle<B>
 where
     B::Wire: Default + Clone + Copy + Debug,
 {
@@ -1015,11 +1002,10 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     pub fn load_backends(&mut self, channel: &mut C, lpn_small: bool) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
+            let rng = self.rng.fork();
             match spec {
                 TypeSpecification::Field(field) => {
-                    let rng = self.rng.fork();
-                    let rng2 = self.rng.fork();
-                    self.load_backend(channel, rng, rng2, *field, *idx as usize, lpn_small)?;
+                    self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
                 }
                 _ => {
                     todo!("Type not supported yet: {:?}", spec);
@@ -1033,7 +1019,6 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         &mut self,
         channel: &mut C,
         rng: AesRng,
-        rng2: AesRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_small: bool,
@@ -1057,7 +1042,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             // Note for F2 we do not use the backend with Conv, simply dietMC
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseProver::<F40b, _, _>::init_with_fcom(
+                let dmc = DietMacAndCheeseProver::<F40b, _>::init_with_fcom(
                     channel,
                     rng,
                     fcom_f2,
@@ -1066,7 +1051,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             } else {
                 let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseVerifier::<F40b, _, _>::init_with_fcom(
+                let dmc = DietMacAndCheeseVerifier::<F40b, _>::init_with_fcom(
                     channel,
                     rng,
                     fcom_f2,
@@ -1079,10 +1064,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             info!("loading field F61p");
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<F61p, _, _>::init(
+                let dmc = DietMacAndCheeseConvProver::<F61p, _>::init(
                     channel,
                     rng,
-                    rng2,
                     fcom_f2,
                     lpn_setup,
                     lpn_extend,
@@ -1091,10 +1075,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 back = Box::new(EvaluatorSingle::new(dmc, false));
             } else {
                 let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<F61p, _, _>::init(
+                let dmc = DietMacAndCheeseConvVerifier::<F61p, _>::init(
                     channel,
                     rng,
-                    rng2,
                     fcom_f2,
                     lpn_setup,
                     lpn_extend,
@@ -2148,11 +2131,9 @@ pub(crate) mod tests {
                     .unwrap();
             let rfcom = RcRefCell::new(fcom);
 
-            let rng2 = AesRng::from_seed(Default::default());
-            let mut party = DietMacAndCheeseConvProver::<F61p, _, _>::init(
+            let mut party = DietMacAndCheeseConvProver::<F61p, _>::init(
                 &mut channel,
                 rng,
-                rng2,
                 &rfcom,
                 LPN_SETUP_SMALL,
                 LPN_EXTEND_SMALL,
@@ -2248,11 +2229,9 @@ pub(crate) mod tests {
                 .unwrap();
         let rfcom = RcRefCell::new(fcom);
 
-        let rng2 = AesRng::from_seed(Default::default());
-        let mut party = DietMacAndCheeseConvVerifier::<F61p, _, _>::init(
+        let mut party = DietMacAndCheeseConvVerifier::<F61p, _>::init(
             &mut channel,
             rng,
-            rng2,
             &rfcom,
             LPN_SETUP_SMALL,
             LPN_EXTEND_SMALL,
