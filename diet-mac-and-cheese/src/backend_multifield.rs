@@ -1092,10 +1092,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     info!("loading field Secp256k1");
                     if self.party == Party::Prover {
                         let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<Secp256k1, _, _>::init(
+                        let dmc = DietMacAndCheeseConvProver::<Secp256k1, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1104,10 +1103,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         back = Box::new(EvaluatorSingle::new(dmc, false));
                     } else {
                         let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _, _>::init(
+                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1119,10 +1117,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     info!("loading field Secp256k1order");
                     if self.party == Party::Prover {
                         let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _, _>::init(
+                        let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1131,10 +1128,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         back = Box::new(EvaluatorSingle::new(dmc, false));
                     } else {
                         let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _, _>::init(
+                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1146,10 +1142,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     info!("loading field F384p");
                     if self.party == Party::Prover {
                         let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<F384p, _, _>::init(
+                        let dmc = DietMacAndCheeseConvProver::<F384p, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1158,10 +1153,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         back = Box::new(EvaluatorSingle::new(dmc, false));
                     } else {
                         let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<F384p, _, _>::init(
+                        let dmc = DietMacAndCheeseConvVerifier::<F384p, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1173,10 +1167,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     info!("loading field F384q");
                     if self.party == Party::Prover {
                         let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<F384q, _, _>::init(
+                        let dmc = DietMacAndCheeseConvProver::<F384q, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
@@ -1185,10 +1178,9 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                         back = Box::new(EvaluatorSingle::new(dmc, false));
                     } else {
                         let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<F384q, _, _>::init(
+                        let dmc = DietMacAndCheeseConvVerifier::<F384q, _>::init(
                             channel,
                             rng,
-                            rng2,
                             fcom_f2,
                             LPN_SETUP_EXTRASMALL,
                             LPN_EXTEND_EXTRASMALL,
