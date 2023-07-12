@@ -16,7 +16,6 @@ use eyre::{ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use mac_n_cheese_sieve_parser::RelationReader as RR;
 use ocelot::svole::wykw::LpnParams;
 #[cfg(feature = "ff")]
 use ocelot::svole::wykw::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
@@ -29,6 +28,7 @@ use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::io::{Read, Seek};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
@@ -1015,7 +1015,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         Ok(())
     }
 
-    fn load_backend(
+    pub fn load_backend(
         &mut self,
         channel: &mut C,
         rng: AesRng,
@@ -1264,8 +1264,8 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         Ok(())
     }
 
-    pub fn evaluate_relation_text(&mut self, path: &PathBuf) -> Result<()> {
-        let rel = RelationReader::open(path.as_path()).unwrap();
+    pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
+        let rel = RelationReader::new(rel)?;
 
         let mut buf_rel = TextRelation::new_with_type_store(&self.type_store);
 

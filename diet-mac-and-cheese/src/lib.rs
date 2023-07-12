@@ -20,7 +20,7 @@ pub mod backend_multifield;
 pub mod backend_trait;
 pub mod circuit_ir;
 pub mod edabits;
-mod fields;
+pub mod fields;
 pub mod homcom;
 mod memory;
 #[allow(clippy::all)]

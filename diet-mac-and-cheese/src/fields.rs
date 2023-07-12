@@ -10,7 +10,7 @@ use scuttlebutt::field::{F61p, F2};
 use std::any::TypeId;
 
 /// Map a modulus, as a big-endian vector of [`u8`]s, to its [`TypeId`].
-pub(crate) fn modulus_to_type_id(modulus: &[u8]) -> eyre::Result<TypeId> {
+pub fn modulus_to_type_id(modulus: &[u8]) -> eyre::Result<TypeId> {
     match modulus {
         &[2] => Ok(TypeId::of::<F2>()),
         &[255, 255, 255, 255, 255, 255, 255, 31] => Ok(TypeId::of::<F61p>()),

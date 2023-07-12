@@ -1,0 +1,27 @@
+[package]
+name = "web-mac-n-cheese-websocket"
+readme = "README.md"
+description = "Web Mac'n'Cheese, the websocket part"
+categories = ["cryptography"]
+keywords = ["cryptography", "zero-knowledge", "web"]
+autoexamples = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+clap.workspace = true
+eyre.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
+rand.workspace = true
+generic-array.workspace = true
+rustls.workspace = true
+rustls-pemfile.workspace = true
+tungstenite.workspace = true
+scuttlebutt.workspace = true
+ocelot.workspace = true
+diet-mac-and-cheese.workspace = true
+mac-n-cheese-sieve-parser.workspace = true

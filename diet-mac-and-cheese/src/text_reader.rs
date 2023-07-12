@@ -38,8 +38,9 @@ pub fn number_to_bytes(n: &Number) -> Vec<u8> {
     for u in w.iter().rev() {
         let bs = u.to_le_bytes();
         let mut stop = false;
-        for i in 0..8 {
-            if bs[7 - i] == 0 {
+        let nb_bytes = bs.len();
+        for i in 0..nb_bytes {
+            if bs[nb_bytes - 1 - i] == 0 {
                 nb_zeros += 1;
             } else {
                 stop = true;

@@ -35,7 +35,7 @@ impl Plugin for PermutationCheckV1 {
             eyre::bail!("{}: The tuple size parameter must be numeric, not a string.", Self::NAME);
         };
         // TODO: Should we assume this param fits in a u64?
-        let tuple_size = tuple_size.as_words()[0];
+        let tuple_size: u64 = tuple_size.as_words()[0].into();
         ensure!(tuple_size != 0, "{}: Tuple size cannot be zero", Self::NAME);
         ensure!(
             output_counts.len() == 0,

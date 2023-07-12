@@ -1,0 +1,33 @@
+[package]
+name = "web-mac-n-cheese-wasm"
+description = "Web Mac'n'Cheese, the wasm part"
+categories = ["cryptography"]
+keywords = ["cryptography", "zero-knowledge", "web"]
+autoexamples = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+# this is required for wasm-pack
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+clap.workspace = true
+console_error_panic_hook.workspace = true
+console_log.workspace = true
+eyre.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
+rand.workspace = true
+generic-array.workspace = true
+wasm-bindgen.workspace = true
+scuttlebutt.workspace = true
+ocelot.workspace = true
+diet-mac-and-cheese.workspace = true
+mac-n-cheese-sieve-parser.workspace = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O4']

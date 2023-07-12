@@ -348,7 +348,7 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
     // Checked version
     let v = g::size_prefixed_root_as_root_with_opts(
         &flatbuffers::VerifierOptions {
-            max_tables: 1000000000000,
+            max_tables: u32::MAX as usize,
             ..flatbuffers::VerifierOptions::default()
         },
         rel.buffer_bytes.as_slice(),
