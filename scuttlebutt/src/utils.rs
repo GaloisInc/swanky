@@ -100,24 +100,3 @@ mod tests {
         assert_eq!(v__, v);
     }
 }
-
-#[cfg(all(feature = "nightly", test))]
-mod benchmarks {
-    extern crate test;
-    use super::*;
-    use test::Bencher;
-
-    #[bench]
-    fn bench_xor_inplace(b: &mut Bencher) {
-        let mut x = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let y = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        b.iter(|| xor_inplace(&mut x, &y));
-    }
-
-    #[bench]
-    fn bench_and_inplace(b: &mut Bencher) {
-        let mut x = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        let y = (0..128).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-        b.iter(|| and_inplace(&mut x, &y));
-    }
-}

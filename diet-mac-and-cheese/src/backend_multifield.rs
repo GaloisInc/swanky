@@ -17,10 +17,8 @@ use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use ocelot::svole::wykw::LpnParams;
-#[cfg(feature = "ff")]
 use ocelot::svole::wykw::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
-#[cfg(feature = "ff")]
 use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
 use scuttlebutt::field::{F40b, F61p, FiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
@@ -1086,118 +1084,108 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 back = Box::new(EvaluatorSingle::new(dmc, false));
             }
         } else {
-            #[cfg(all(feature = "ff"))]
-            {
-                if field == std::any::TypeId::of::<Secp256k1>() {
-                    info!("loading field Secp256k1");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<Secp256k1, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                } else if field == std::any::TypeId::of::<Secp256k1order>() {
-                    info!("loading field Secp256k1order");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                } else if field == std::any::TypeId::of::<F384p>() {
-                    info!("loading field F384p");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<F384p, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<F384p, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
-                } else if field == std::any::TypeId::of::<F384q>() {
-                    info!("loading field F384q");
-                    if self.party == Party::Prover {
-                        let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvProver::<F384q, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    } else {
-                        let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                        let dmc = DietMacAndCheeseConvVerifier::<F384q, _>::init(
-                            channel,
-                            rng,
-                            fcom_f2,
-                            LPN_SETUP_EXTRASMALL,
-                            LPN_EXTEND_EXTRASMALL,
-                            self.no_batching,
-                        )?;
-                        back = Box::new(EvaluatorSingle::new(dmc, false));
-                    }
+            if field == std::any::TypeId::of::<Secp256k1>() {
+                info!("loading field Secp256k1");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<Secp256k1, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
                 } else {
-                    return Err(eyre!("Unknown or unsupported field {:?}", field));
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
-            }
-            #[cfg(not(all(feature = "ff")))]
-            {
-                return Err(eyre!(
-                    "Unknown or unsupported field {:?} without feature ff",
-                    field
-                ));
+            } else if field == std::any::TypeId::of::<Secp256k1order>() {
+                info!("loading field Secp256k1order");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else if field == std::any::TypeId::of::<F384p>() {
+                info!("loading field F384p");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<F384p, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<F384p, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else if field == std::any::TypeId::of::<F384q>() {
+                info!("loading field F384q");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<F384q, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<F384q, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else {
+                return Err(eyre!("Unknown or unsupported field {:?}", field));
             }
         }
         self.eval.push(back);
@@ -1443,11 +1431,9 @@ pub(crate) mod tests {
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
     use rand::SeedableRng;
-    #[cfg(feature = "ff")]
     use scuttlebutt::field::{F384p, F384q};
     #[allow(unused_imports)]
     use scuttlebutt::field::{F40b, F2};
-    #[cfg(all(feature = "ff"))]
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{field::F61p, field::FiniteField, AesRng, Channel};
@@ -1459,8 +1445,6 @@ pub(crate) mod tests {
     };
 
     use super::{DietMacAndCheeseConvProver, DietMacAndCheeseConvVerifier};
-
-    // TODO: make test work without requiring feature `ff` for F384p, F384q
 
     pub(crate) const F2_VEC: [u8; 1] = [2];
     pub(crate) const F61P_VEC: [u8; 8] = [255, 255, 255, 255, 255, 255, 255, 31];
@@ -1800,7 +1784,6 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
-    #[cfg(feature = "ff")]
     fn test_conv_ff_1() {
         let fields = vec![
             F61P_VEC.to_vec(),
@@ -1824,7 +1807,6 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
-    #[cfg(feature = "ff")]
     fn test_conv_ff_2() {
         let fields = vec![
             F61P_VEC.to_vec(),
@@ -1850,7 +1832,6 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
-    #[cfg(feature = "ff")]
     fn test_conv_ff_3() {
         // tests that conversions from big fields to bools
         let fields = vec![
@@ -1883,7 +1864,6 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
-    #[cfg(feature = "ff")]
     fn test_conv_ff_4() {
         // test conversion from large field to smaller field
         let fields = vec![F61P_VEC.to_vec(), F384P_VEC.to_vec()];
@@ -1908,7 +1888,6 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
-    #[cfg(all(feature = "ff"))]
     fn test_conv_ff_5() {
         // tests that conversions from big fields secp
         let fields = vec![SECP256K1_VEC.to_vec(), SECP256K1ORDER_VEC.to_vec()];
@@ -2323,7 +2302,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ff")]
     fn test_multifield_ff() {
         test_conv_ff_1();
         test_conv_ff_2();
@@ -2332,7 +2310,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ff"))]
     fn test_multifield_ff_secp256() {
         test_conv_ff_5();
     }

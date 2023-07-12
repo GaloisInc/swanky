@@ -7,7 +7,7 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
-scuttlebutt = { workspace = true, features = ["ff"] }
+scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }

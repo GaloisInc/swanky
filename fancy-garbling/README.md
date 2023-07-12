@@ -42,9 +42,3 @@ is evaluated. Wires will be conveniently dropped as they go out of scope of your
 functions. A full circuit representation is not necessary to construct, analyze, or hold
 in memory. See the [API docs](https://galoisinc.github.io/swanky/fancy_garbling) for
 details.
-
-# Features
-
-`fancy-garbling` supports the following features:
-
-* `nightly`: Use nightly features from `rust` and the underlying libraries.

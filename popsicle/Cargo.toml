@@ -13,7 +13,6 @@ version.workspace = true
 [lib]
 
 [features]
-nightly = ["scuttlebutt/nightly", "ocelot/nightly", "ocelot/nightly"]
 psty = ["fancy-garbling", "openssl"]
 psty_payload = ["fancy-garbling", "serde", "serde_json", "fancy-garbling/serde"]
 

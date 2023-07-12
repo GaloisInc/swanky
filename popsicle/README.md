@@ -11,10 +11,3 @@ set intersection (PSI) protocols.
   on the oblivious programmable PRF of [Kolesnikov-Matania-Pinkas-Rosulek-Trieu](https://eprint.iacr.org/2017/799).
 * The [Kolesnikov-Matania-Pinkas-Rosulek-Trieu](https://eprint.iacr.org/2017/799) semi-honest multi-party PSI
   protocol.
-
-# Features
-
-`popsicle` supports the following features:
-
-* `nightly`: Use nightly features from `rust` and the underlying libraries.
-* `unstable`: Enable unstable components of `popsicle`.
