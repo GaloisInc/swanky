@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/*",
     "diet-mac-and-cheese",
     "diet-mac-and-cheese/web-mac-and-cheese/wasm",
     "diet-mac-and-cheese/web-mac-and-cheese/websocket",
@@ -36,7 +37,7 @@ publish = false
 version = "0.5.0"
 
 [workspace.dependencies]
-# Our crates
+# BEGIN OUR CRATES
 diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
 web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
 web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
@@ -59,7 +60,7 @@ scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
 swanky-flatbuffer-build = { path = "swanky-flatbuffer-build" }
 vectoreyes = { path = "vectoreyes" }
-
+# END OUR CRATES
 
 # Patched Dependencies
 ff = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }
