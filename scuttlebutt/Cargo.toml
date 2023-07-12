@@ -28,6 +28,7 @@ vectoreyes.workspace = true
 ndarray.workspace = true
 num-traits.workspace = true
 ff = { workspace = true, features = ["derive"] }
+swanky-generic-array.workspace = true
 
 [build-dependencies]
 ff_codegen = { workspace = true }

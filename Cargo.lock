@@ -2462,6 +2462,7 @@ dependencies = [
  "sha2",
  "smallvec 1.10.0",
  "subtle",
+ "swanky-generic-array",
  "tempfile",
  "vectoreyes",
 ]
@@ -2736,6 +2737,13 @@ version = "0.5.0"
 dependencies = [
  "blake3",
  "tempfile",
+]
+
+[[package]]
+name = "swanky-generic-array"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
 ]
 
 [[package]]

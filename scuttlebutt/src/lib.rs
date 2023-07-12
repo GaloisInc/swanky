@@ -18,7 +18,7 @@ mod rand_aes;
 pub mod ring;
 #[macro_use]
 pub mod serialization;
-pub mod generic_array_length;
+pub use swanky_generic_array as generic_array_length;
 pub mod utils;
 
 pub(crate) mod ops;
