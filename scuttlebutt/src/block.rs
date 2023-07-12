@@ -1,8 +1,6 @@
 //! Defines a block as a 128-bit value, and implements block-related functions.
 
-#[cfg(feature = "curve25519-dalek")]
 use crate::Aes256;
-#[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::RistrettoPoint;
 use std::hash::Hash;
 use subtle::ConditionallySelectable;
@@ -47,7 +45,6 @@ impl Block {
     /// Hash an elliptic curve point `pt` and tweak `tweak`.
     ///
     /// Computes the hash by computing `E_{pt}(tweak)`, where `E` is AES-256.
-    #[cfg(feature = "curve25519-dalek")]
     #[inline]
     pub fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Self {
         let k = pt.compress();

@@ -1,5 +1,4 @@
 //! `fancy-garbling` provides boolean and arithmetic garbling capabilities.
-#![cfg_attr(feature = "nightly", feature(test))]
 #![deny(clippy::all)]
 #![allow(
     clippy::cast_lossless,

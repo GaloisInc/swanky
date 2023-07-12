@@ -153,11 +153,8 @@ macro_rules! call_with_big_finite_fields {
         $f::<$crate::field::F45b>($($arg),*);
         $f::<$crate::field::F56b>($($arg),*);
         $f::<$crate::field::F63b>($($arg),*);
-        #[cfg(feature = "ff")]
         $f::<$crate::field::F128p>($($arg),*);
-        #[cfg(feature = "ff")]
         $f::<$crate::field::F384p>($($arg),*);
-        #[cfg(feature = "ff")]
         $f::<$crate::field::F384q>($($arg),*);
     }};
 }
@@ -211,15 +208,11 @@ pub use small_binary_fields::{F40b, F45b, F56b, F63b, SmallBinaryField};
 mod f61p;
 pub use f61p::F61p;
 
-#[cfg(feature = "ff")]
 mod prime_field_using_ff;
-#[cfg(feature = "ff")]
 pub use prime_field_using_ff::{
     F128p, F256p, F384p, F384q, F400p, Fbls12381, Fbn254, Secp256k1, Secp256k1order,
 };
-#[cfg(feature = "ff")]
 mod f2e19x3e26;
-#[cfg(feature = "ff")]
 pub use f2e19x3e26::F2e19x3e26;
 
 pub mod polynomial;

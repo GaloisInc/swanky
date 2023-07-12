@@ -7,7 +7,6 @@ use diet_mac_and_cheese::{
 };
 use log::info;
 use pretty_env_logger;
-#[cfg(feature = "ff")]
 use scuttlebutt::field::{F384p, F384q};
 use scuttlebutt::{
     field::{
@@ -286,27 +285,13 @@ fn main() -> std::io::Result<()> {
         // }
         &[255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
         {
-            #[cfg(feature = "ff")]
-            {
-                info!("field: F384p");
-                run::<F384p>(&cli)
-            }
-            #[cfg(not(feature = "ff"))]
-            {
-                panic!("Set feature ff for F384p")
-            }
+            info!("field: F384p");
+            run::<F384p>(&cli)
         }
         &[115, 41, 197, 204, 106, 25, 236, 236, 122, 167, 176, 72, 178, 13, 26, 88, 223, 45, 55, 244, 129, 77, 99, 199, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
         {
-            #[cfg(feature = "ff")]
-            {
-                info!("field: F394q");
-                run::<F384q>(&cli)
-            }
-            #[cfg(not(feature = "ff"))]
-            {
-                panic!("Set feature ff for F384q")
-            }
+            info!("field: F394q");
+            run::<F384q>(&cli)
         }
         x => std::io::Result::Err(std::io::Error::new(
             std::io::ErrorKind::Other,

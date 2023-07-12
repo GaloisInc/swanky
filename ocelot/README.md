@@ -30,16 +30,16 @@ libraries out there. When running the benchmarks with `1 << 23` OTs we get the
 following results (in # million OTs per second and using Chou-Orlandi as the
 base OT):
 
-| Protocol |   OT |  COT |  ROT |
-|----------|------|------|------|
+| Protocol | OT   | COT  | ROT  |
+| -------- | ---- | ---- | ---- |
 | ALSZ     | 10.3 | 11.8 | 15.5 |
-| KOS      |  8.7 | 10.0 | 11.1 |
+| KOS      | 8.7  | 10.0 | 11.1 |
 
 For our base OT protocols, we get the following results (in time to run 128
 OTs):
 
 | Protocol     | Running Time |
-|--------------|--------------|
+| ------------ | ------------ |
 | Naor-Pinkas  | 21.9 ms      |
 | Chou-Orlandi | 12.7 ms      |
 
@@ -47,16 +47,9 @@ For the OPRFs, we get the following (in # million OPRFs per second and using
 Chou-Orlandi as the base OT) when running the benchmarks with `1 << 18` OPRFs:
 
 | Protocol | OPRF |
-|----------|------|
-| KKRT     |  1.3 |
+| -------- | ---- |
+| KKRT     | 1.3  |
 
 All results use unix streams and were run on a 2.7 GHz machine with 16 GB RAM,
 with the sender and receiver run on different threads (see `benches/ot.rs` for
 details), using the `nightly` feature (see below).
-
-# Features
-
-`ocelot` supports the following features:
-
-* `nightly`: Use nightly features from `rust` and the underlying libraries.
-* `unstable`: Enable unstable components of `ocelot`.

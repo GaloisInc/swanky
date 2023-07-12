@@ -22,12 +22,3 @@ oblivious transfer. In particular, `scuttlebutt` provides the following:
 * A `utils` module, which contains useful utility functions.
 * Marker traits `SemiHonest` and `Malicious` for enforcing security properties
   on specific implementations.
-
-# Features
-
-`scuttlebutt` supports the following features:
-
-* `nightly`: Use nightly features from `rust` and the underlying libraries.
-* `serde`: Enable `serde` support.
-* `curve25519-dalek`: Enable functions that use `curve25519-dalek`.
-* `ff`: Enable primes that require the `ff` library.

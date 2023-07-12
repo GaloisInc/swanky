@@ -12,7 +12,6 @@ pub use track_channel::TrackChannel;
 pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
 use crate::{serialization::CanonicalSerialize, Block, Block512};
-#[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use generic_array::GenericArray;
 use std::{
@@ -172,7 +171,6 @@ pub trait AbstractChannel {
     }
 
     /// Write a `RistrettoPoint` to the channel.
-    #[cfg(feature = "curve25519-dalek")]
     #[inline(always)]
     fn write_pt(&mut self, pt: &RistrettoPoint) -> Result<()> {
         self.write_bytes(pt.compress().as_bytes())?;
@@ -180,7 +178,6 @@ pub trait AbstractChannel {
     }
 
     /// Read a `RistrettoPoint` from the channel.
-    #[cfg(feature = "curve25519-dalek")]
     #[inline(always)]
     fn read_pt(&mut self) -> Result<RistrettoPoint> {
         let mut data = [0u8; 32];

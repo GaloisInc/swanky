@@ -10,7 +10,7 @@ version.workspace = true
 
 [features]
 proptest = ["dep:proptest"]
-serde = ["dep:serde", "scuttlebutt/serde"]
+serde = ["dep:serde"]
 
 [dependencies]
 scuttlebutt.workspace = true

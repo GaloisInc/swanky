@@ -19,7 +19,7 @@ log.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
 rayon.workspace = true
-scuttlebutt = { workspace = true, features = ["serde"] }
+scuttlebutt.workspace = true
 serde = { workspace = true, features = ["derive"] }
 simple-arith-circuit = { workspace = true, features = ["serde"] }
 simple_logger.workspace = true

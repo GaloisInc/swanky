@@ -21,7 +21,7 @@ arrayvec.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
-scuttlebutt = { workspace = true, features = ["ff"] }
+scuttlebutt.workspace = true
 mimalloc.workspace = true
 
 [[bench]]

@@ -1704,7 +1704,6 @@ mod tests {
     #[allow(unused)]
     use log::{debug, info, warn};
     use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-    #[cfg(feature = "ff")]
     use scuttlebutt::field::F384p;
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{
@@ -2118,7 +2117,6 @@ mod tests {
         test_random_edabits_b2a::<F61p>(61);
     }
 
-    #[cfg(feature = "ff")]
     #[test]
     fn test_random_edabits_b2a_f384p() {
         test_random_edabits_b2a::<F384p>(384);

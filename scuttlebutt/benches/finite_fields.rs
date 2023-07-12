@@ -87,29 +87,17 @@ finite_field_benchmarks!(f45b, scuttlebutt::field::F45b,);
 finite_field_benchmarks!(f56b, scuttlebutt::field::F56b,);
 finite_field_benchmarks!(f63b, scuttlebutt::field::F63b,);
 
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(f2e19x3e26, scuttlebutt::field::F2e19x3e26,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(f128p, scuttlebutt::field::F128p,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(f256p, scuttlebutt::field::F256p,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(f384p, scuttlebutt::field::F384p,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(f384q, scuttlebutt::field::F384q,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(f400p, scuttlebutt::field::F400p,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(fbls12381, scuttlebutt::field::Fbls12381,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(fbn254, scuttlebutt::field::Fbn254,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(secp256k1, scuttlebutt::field::Secp256k1,);
-#[cfg(feature = "ff")]
 finite_field_benchmarks!(secp256k1order, scuttlebutt::field::Secp256k1order,);
 
-// XXX: Is there a better way to do this?
-#[cfg(not(feature = "ff"))]
 criterion::criterion_main!(
     f2::f2,
     f61p::f61p,
@@ -119,18 +107,6 @@ criterion::criterion_main!(
     f45b::f45b,
     f56b::f56b,
     f63b::f63b,
-);
-#[cfg(feature = "ff")]
-criterion::criterion_main!(
-    f2::f2,
-    f61p::f61p,
-    f64b::f64b,
-    f128b::f128b,
-    f40b::f40b,
-    f45b::f45b,
-    f56b::f56b,
-    f63b::f63b,
-    // `ff` specific fields
     f2e19x3e26::f2e19x3e26,
     f128p::f128p,
     f256p::f256p,

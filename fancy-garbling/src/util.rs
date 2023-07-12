@@ -494,29 +494,3 @@ mod tests {
         }
     }
 }
-
-#[cfg(all(feature = "nightly", test))]
-mod benchmarks {
-    extern crate test;
-    use super::*;
-    use test::Bencher;
-
-    #[bench]
-    fn bench_tweak(b: &mut Bencher) {
-        let i = test::black_box(rand::random::<usize>());
-        b.iter(|| {
-            let b = test::black_box(tweak(i));
-            test::black_box(b)
-        });
-    }
-
-    #[bench]
-    fn bench_tweak2(b: &mut Bencher) {
-        let i = test::black_box(rand::random::<u64>());
-        let j = test::black_box(rand::random::<u64>());
-        b.iter(|| {
-            let b = test::black_box(tweak2(i, j));
-            test::black_box(b)
-        });
-    }
-}
