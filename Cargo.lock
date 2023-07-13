@@ -2463,6 +2463,7 @@ dependencies = [
  "smallvec 1.10.0",
  "subtle",
  "swanky-generic-array",
+ "swanky-serialization",
  "tempfile",
  "vectoreyes",
 ]
@@ -2744,6 +2745,14 @@ name = "swanky-generic-array"
 version = "0.5.0"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "swanky-serialization"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
+ "serde",
 ]
 
 [[package]]

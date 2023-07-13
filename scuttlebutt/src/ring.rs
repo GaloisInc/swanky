@@ -188,7 +188,7 @@ macro_rules! ring_ops {
             }
         }
 
-        $crate::serialization::serde_implementation!($f);
+        swanky_serialization::derive_serde_via_canonical_serialize!($f);
     };
 }
 pub(crate) use ring_ops;

@@ -16,9 +16,8 @@ pub mod field;
 mod hash_aes;
 mod rand_aes;
 pub mod ring;
-#[macro_use]
-pub mod serialization;
 pub use swanky_generic_array as generic_array_length;
+pub use swanky_serialization as serialization;
 pub mod utils;
 
 pub(crate) mod ops;

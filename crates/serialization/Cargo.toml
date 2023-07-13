@@ -1,0 +1,13 @@
+[package]
+name = "swanky-serialization"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+# serde, itself, is a small crate. We just don't want to require the derive feature.
+serde.workspace = true
+generic-array.workspace = true
+

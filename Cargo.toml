@@ -58,6 +58,7 @@ scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
 swanky-flatbuffer-build = { path = "swanky-flatbuffer-build" }
 swanky-generic-array = { path = "crates/generic-array" }
+swanky-serialization = { path = "crates/serialization" }
 vectoreyes = { path = "vectoreyes" }
 web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
