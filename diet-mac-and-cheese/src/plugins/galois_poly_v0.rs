@@ -69,21 +69,26 @@ impl GaloisPolyV0 {
         );
 
         ensure!(
-            input_counts[0].1 != 0, // TODO: Can this happen?
+            input_counts[0].1 != 0,
             "{}: p0 must have at least 1 coefficient",
             Self::NAME
         );
+        ensure!(
+            input_counts[2].1 > 1,
+            "{}: q must have at least 2 coefficients",
+            Self::NAME
+        );
         // p0_degree (= n in the spec) is the degree of p0, i.e. one less than the number of coefficients in p0
-        let p0_degree = input_counts[0].1 - 1;
-        let p1_degree = input_counts[1].1 - 1;
-        let q_degree = input_counts[2].1 - 1;
+        let p0_degree = input_counts[0].1 - 1; // Cannot underflow because we check for length != 0.
+        let p1_degree = input_counts[1].1 - 1; // Underflow will be caught in check for degree == 1.
+        let q_degree = input_counts[2].1 - 1; // Cannot underflow because we check for length > 1.
         ensure!(
             p1_degree == 1,
             "{}: p1 must be a degree 1 polynomial",
             Self::NAME
         );
         ensure!(
-            q_degree == p0_degree + 1,
+            q_degree == p0_degree + 1, // Cannot overflow as p0_degree was obtained by subtracting 1 from a non-zero value.
             "{}: q must be a degree n+1 polynomial, where n is the degree of p0",
             Self::NAME
         );
@@ -178,7 +183,7 @@ impl GaloisPolyV0 {
             Self::NAME
         );
         ensure!(
-            input_counts[0].1 != 0, // TODO: Can this happen?
+            input_counts[0].1 != 0,
             "{}: p must have at least 1 coefficient",
             Self::NAME
         );
@@ -301,7 +306,6 @@ impl GaloisPolyV0 {
             // TODO: Can be tested in F^(2^k).
             todo!("Degree larger or equal to field size not supported.")
         }
-        // TODO: Should the security level be a parameter?
         let bits_of_security = 40;
         // The probability of failure in each test is at most degree/|F|.
         let single_test_failure_probability = degree as f64 / field_size as f64;
