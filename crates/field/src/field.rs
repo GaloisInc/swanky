@@ -1,12 +1,12 @@
 //! This module defines finite fields.
 
 use crate::{
-    field::polynomial::Polynomial,
-    generic_array_length::AnyArrayLength,
+    polynomial::Polynomial,
     ring::{FiniteRing, IsSubRingOf},
 };
 use generic_array::{ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
+use swanky_generic_array::AnyArrayLength;
 
 /// Types that implement this trait are finite fields.
 pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
@@ -139,40 +139,18 @@ pub trait PrimeFiniteField:
 {
 }
 
-#[cfg(test)]
-#[macro_use]
-mod test_utils;
-
-#[cfg(test)]
-macro_rules! call_with_big_finite_fields {
-    ($f:ident $(, $arg:expr)* $(,)?) => {{
-        $f::<$crate::field::F61p>($($arg),*);
-        $f::<$crate::field::F64b>($($arg),*);
-        $f::<$crate::field::F128b>($($arg),*);
-        $f::<$crate::field::F40b>($($arg),*);
-        $f::<$crate::field::F45b>($($arg),*);
-        $f::<$crate::field::F56b>($($arg),*);
-        $f::<$crate::field::F63b>($($arg),*);
-        $f::<$crate::field::F128p>($($arg),*);
-        $f::<$crate::field::F384p>($($arg),*);
-        $f::<$crate::field::F384q>($($arg),*);
-    }};
-}
-
-#[cfg(test)]
-macro_rules! call_with_finite_field {
-    ($f:ident $(, $arg:expr)* $(,)?) => {{
-        call_with_big_finite_fields!($f$(,$arg)*);
-        $f::<$crate::field::F2>($($arg),*);
-    }};
-}
-
+/// Automatically implement boilerplate field operations for the given type.
+///
+/// This macro is used like `field_ops!(my_type)`. If `my_type` already has a [`std::iter::Sum`]
+/// implementation, this macro can be asked to not generate an implementation of `Sum` via
+/// `field_ops!(my_type, SUM_ALREADY_DEFINED)`.
+#[macro_export]
 macro_rules! field_ops {
     ($f:ident $($tt:tt)*) => {
-        crate::ring::ring_ops!($f $($tt)*);
+        $crate::ring_ops!($f $($tt)*);
 
-        $crate::ops::binop!(Div, div, std::ops::DivAssign::div_assign, $f);
-        $crate::ops::assign_op!(DivAssign, div_assign, $f);
+        $crate::ring_ops!(@binop Div, div, std::ops::DivAssign::div_assign, $f);
+        $crate::ring_ops!(@assign_op DivAssign, div_assign, $f);
 
         impl<'a> std::ops::DivAssign<&'a $f> for $f {
             fn div_assign(&mut self, rhs: &Self) {
@@ -183,38 +161,10 @@ macro_rules! field_ops {
 }
 
 /// Bit decomposition of `bits` into an array.
-pub(crate) fn standard_bit_decomposition<L: ArrayLength<bool>>(
-    bits: u128,
-) -> GenericArray<bool, L> {
+pub fn standard_bit_decomposition<L: ArrayLength<bool>>(bits: u128) -> GenericArray<bool, L> {
     let mut out: GenericArray<bool, L> = Default::default();
     for (i, dst) in out.iter_mut().enumerate() {
         *dst = (bits & (1 << (i as u128))) != 0;
     }
     out
 }
-
-mod f2;
-pub use f2::F2;
-
-mod f128b;
-pub use f128b::F128b;
-
-mod f64b;
-pub use f64b::F64b;
-
-mod small_binary_fields;
-pub use small_binary_fields::{F40b, F45b, F56b, F63b, SmallBinaryField};
-
-mod f61p;
-pub use f61p::F61p;
-
-mod prime_field_using_ff;
-pub use prime_field_using_ff::{
-    F128p, F256p, F384p, F384q, F400p, Fbls12381, Fbn254, Secp256k1, Secp256k1order,
-};
-mod f2e19x3e26;
-pub use f2e19x3e26::F2e19x3e26;
-
-pub mod polynomial;
-
-pub mod fft;

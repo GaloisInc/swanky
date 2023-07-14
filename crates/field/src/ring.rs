@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use swanky_serialization::CanonicalSerialize;
 
 /// Types that implement this trait are finite rings.
 pub trait FiniteRing:
@@ -114,6 +115,12 @@ pub trait FiniteRing:
 pub trait IsSubRingOf<R: FiniteRing>: FiniteRing + Mul<R, Output = R> + Into<R> {}
 impl<R: FiniteRing> IsSubRingOf<R> for R {}
 
+/// Automatically implement boilerplate ring operations for the given type.
+///
+/// This macro is used like `ring_ops!(my_type)`. If `my_type` already has a [`std::iter::Sum`]
+/// implementation, this macro can be asked to not generate an implementation of `Sum` via
+/// `ring_ops!(my_type, SUM_ALREADY_DEFINED)`.
+#[macro_export]
 macro_rules! ring_ops {
     ($f:ident) => {
         impl std::iter::Sum for $f {
@@ -122,12 +129,12 @@ macro_rules! ring_ops {
             }
         }
 
-        crate::ring::ring_ops!($f, SUM_ALREADY_DEFINED);
+        $crate::ring_ops!($f, SUM_ALREADY_DEFINED);
     };
 
     // Compared to the previous pattern, `Sum` is missing and assumed
     // to be implemented by the field directly
-    ( $f:ident, SUM_ALREADY_DEFINED) => {
+    ($f:ident, SUM_ALREADY_DEFINED) => {
         impl PartialEq for $f {
             fn eq(&self, other: &Self) -> bool {
                 self.ct_eq(other).into()
@@ -145,32 +152,32 @@ macro_rules! ring_ops {
                 iter.fold($f::ONE, std::ops::Mul::mul)
             }
         }
-        $crate::ops::binop!(Add, add, std::ops::AddAssign::add_assign, $f);
-        $crate::ops::binop!(Sub, sub, std::ops::SubAssign::sub_assign, $f);
-        $crate::ops::binop!(Mul, mul, std::ops::MulAssign::mul_assign, $f);
-        $crate::ops::assign_op!(AddAssign, add_assign, $f);
-        $crate::ops::assign_op!(SubAssign, sub_assign, $f);
-        $crate::ops::assign_op!(MulAssign, mul_assign, $f);
+        $crate::ring_ops!(@binop Add, add, std::ops::AddAssign::add_assign, $f);
+        $crate::ring_ops!(@binop Sub, sub, std::ops::SubAssign::sub_assign, $f);
+        $crate::ring_ops!(@binop Mul, mul, std::ops::MulAssign::mul_assign, $f);
+        $crate::ring_ops!(@assign_op AddAssign, add_assign, $f);
+        $crate::ring_ops!(@assign_op SubAssign, sub_assign, $f);
+        $crate::ring_ops!(@assign_op MulAssign, mul_assign, $f);
 
-        impl num_traits::Zero for $f {
+        impl $crate::__macro_export::num_traits::Zero for $f {
             #[inline]
             fn zero() -> Self {
-                <$f as crate::field::FiniteRing>::ZERO
+                <$f as $crate::FiniteRing>::ZERO
             }
             #[inline]
             fn is_zero(&self) -> bool {
-                *self == <$f as crate::field::FiniteRing>::ZERO
+                *self == <$f as$ crate::FiniteRing>::ZERO
             }
         }
 
-        impl num_traits::One for $f {
+        impl $crate::__macro_export::num_traits::One for $f {
             #[inline]
             fn one() -> Self {
-                <$f as crate::field::FiniteRing>::ONE
+                <$f as $crate::FiniteRing>::ONE
             }
             #[inline]
             fn is_one(&self) -> bool {
-                *self == <$f as crate::field::FiniteRing>::ONE
+                *self == <$f as $crate::FiniteRing>::ONE
             }
         }
 
@@ -182,20 +189,70 @@ macro_rules! ring_ops {
             }
         }
 
-        impl rand::distributions::Distribution<$f> for rand::distributions::Standard {
+        impl $crate::__macro_export::rand::distributions::Distribution<$f>
+            for rand::distributions::Standard
+        {
             fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> $f {
                 <$f>::random(rng)
             }
         }
 
-        swanky_serialization::derive_serde_via_canonical_serialize!($f);
+        $crate::__macro_export::swanky_serialization::derive_serde_via_canonical_serialize!($f);
+    };
+    (@assign_op $tr:ident, $op:ident, $f:ident) => {
+        impl std::ops::$tr<$f> for $f {
+            #[inline]
+            #[allow(unused_imports)]
+            fn $op(&mut self, rhs: $f) {
+                use std::ops::$tr;
+                self.$op(&rhs)
+            }
+        }
+    };
+    (@binop $trait:ident, $name:ident, $assign:path, $f:ident) => {
+        impl std::ops::$trait<$f> for $f {
+            type Output = $f;
+
+            #[inline]
+            #[allow(unused_imports)]
+            fn $name(mut self, rhs: $f) -> Self::Output {
+                use std::ops::$trait;
+                $assign(&mut self, rhs);
+                self
+            }
+        }
+        impl<'a> std::ops::$trait<$f> for &'a $f {
+            type Output = $f;
+
+            #[inline]
+            #[allow(unused_imports)]
+            fn $name(self, rhs: $f) -> Self::Output {
+                use std::ops::$trait;
+                let mut this = self.clone();
+                $assign(&mut this, rhs);
+                this
+            }
+        }
+        impl<'a> std::ops::$trait<&'a $f> for $f {
+            type Output = $f;
+
+            #[inline]
+            #[allow(unused_imports)]
+            fn $name(mut self, rhs: &'a $f) -> Self::Output {
+                use std::ops::$trait;
+                $assign(&mut self, rhs);
+                self
+            }
+        }
+        impl<'a> std::ops::$trait<&'a $f> for &'a $f {
+            type Output = $f;
+
+            #[inline]
+            fn $name(self, rhs: &'a $f) -> Self::Output {
+                let mut this = self.clone();
+                $assign(&mut this, rhs);
+                this
+            }
+        }
     };
 }
-pub(crate) use ring_ops;
-
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
-pub(crate) use test_utils::test_ring;
-
-use crate::serialization::CanonicalSerialize;

@@ -56,6 +56,12 @@ ocelot = { path = "ocelot" }
 popsicle = { path = "popsicle" }
 scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
+swanky-field = { path = "crates/field" }
+swanky-field-binary = { path = "crates/field-binary" }
+swanky-field-f61p = { path = "crates/field-f61p" }
+swanky-field-fft = { path = "crates/field-fft" }
+swanky-field-large-primes = { path = "crates/field-large-primes" }
+swanky-field-test = { path = "crates/field-test" }
 swanky-flatbuffer-build = { path = "swanky-flatbuffer-build" }
 swanky-generic-array = { path = "crates/generic-array" }
 swanky-serialization = { path = "crates/serialization" }

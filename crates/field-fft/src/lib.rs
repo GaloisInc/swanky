@@ -11,7 +11,7 @@
 //! Note: This library was adapted from
 //! https://github.com/snipsco/rust-threshold-secret-sharing
 
-use crate::field::FiniteField;
+use swanky_field::FiniteField;
 
 /// This trait indicates that a finite field is suitable for use in radix-`N` FFT.
 /// This means that it must have a power-of-`N` root of unity for any desired

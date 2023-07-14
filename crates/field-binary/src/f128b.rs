@@ -1,18 +1,15 @@
-use crate::{
-    field::{f2::F2, polynomial::Polynomial, FiniteField},
-    ring::{FiniteRing, IsSubRingOf},
-    serialization::CanonicalSerialize,
-};
+use crate::F2;
 use generic_array::GenericArray;
-use rand_core::RngCore;
-use smallvec::smallvec;
-use std::{
-    iter::FromIterator,
-    ops::{AddAssign, Mul, MulAssign, SubAssign},
-};
+use rand::Rng;
+use std::iter::FromIterator;
+use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-
-use super::IsSubFieldOf;
+use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, IsSubFieldOf, IsSubRingOf};
+use swanky_serialization::{
+    ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
+    CanonicalSerialize,
+};
+use vectoreyes::{U64x2, U8x16};
 
 /// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^7 + x^2 + x + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
@@ -45,7 +42,9 @@ impl<'a> SubAssign<&'a F128b> for F128b {
 }
 
 mod multiply {
-    use vectoreyes::{SimdBase8, U64x2, U8x16};
+    use vectoreyes::SimdBase8;
+
+    use super::*;
 
     // TODO: this implements a simple algorithm that works. There are faster algorithms.
     // Maybe we'll implement one, one day...
@@ -121,8 +120,8 @@ mod multiply {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::field::{polynomial::Polynomial, F128b, FiniteField, F2};
         use proptest::prelude::*;
+        use swanky_field::polynomial::Polynomial;
 
         fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
             let mut out = Polynomial {
@@ -141,7 +140,11 @@ mod multiply {
         }
 
         fn poly_from_128(x: u128) -> Polynomial<F2> {
-            crate::field::test_utils::make_polynomial(&F128b(x).decompose())
+            let x = F128b(x).decompose();
+            Polynomial {
+                constant: x[0],
+                coefficients: x[1..].iter().cloned().collect(),
+            }
         }
 
         proptest! {
@@ -201,7 +204,7 @@ impl FiniteRing for F128b {
         F128b(u128::from_le_bytes(*x))
     }
 
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+    fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
         let mut bytes = [0; 16];
         rng.fill_bytes(&mut bytes[..]);
         F128b(u128::from_le_bytes(bytes))
@@ -212,10 +215,10 @@ impl FiniteRing for F128b {
 }
 
 impl CanonicalSerialize for F128b {
-    type Serializer = crate::serialization::ByteElementSerializer<Self>;
-    type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
+    type Serializer = ByteElementSerializer<Self>;
+    type Deserializer = ByteElementDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U16;
-    type FromBytesError = crate::serialization::BytesDeserializationCannotFail;
+    type FromBytesError = BytesDeserializationCannotFail;
 
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
@@ -234,7 +237,7 @@ impl FiniteField for F128b {
     const GENERATOR: Self = F128b(2);
 
     fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
-        let mut coefficients = smallvec![F2::ZERO; 128];
+        let mut coefficients = vec![F2::ZERO; 128];
         coefficients[128 - 1] = F2::ONE;
         coefficients[7 - 1] = F2::ONE;
         coefficients[2 - 1] = F2::ONE;
@@ -248,7 +251,7 @@ impl FiniteField for F128b {
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
 
     fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
-        super::standard_bit_decomposition(self.0)
+        swanky_field::standard_bit_decomposition(self.0)
     }
 
     fn inverse(&self) -> Self {
@@ -292,11 +295,12 @@ impl IsSubFieldOf<F128b> for F2 {
     }
 }
 
-field_ops!(F128b);
+swanky_field::field_ops!(F128b);
 
 #[cfg(test)]
 mod tests {
-    test_field!(test_field, crate::field::F128b);
+    use super::F128b;
+    swanky_field_test::test_field!(test_field, F128b);
 }
 
 #[test]

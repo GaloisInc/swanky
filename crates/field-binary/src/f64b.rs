@@ -1,15 +1,12 @@
-use crate::field::{polynomial::Polynomial, FiniteField, F2};
-use crate::ring::{FiniteRing, IsSubRingOf};
-use crate::serialization::{BytesDeserializationCannotFail, CanonicalSerialize};
+use crate::F2;
 use generic_array::GenericArray;
-use rand_core::RngCore;
-use smallvec::smallvec;
+use rand::Rng;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, IsSubFieldOf, IsSubRingOf};
+use swanky_serialization::{BytesDeserializationCannotFail, CanonicalSerialize};
 use vectoreyes::{SimdBase, U64x2};
-
-use super::IsSubFieldOf;
 
 /// An element of the finite field $`\textsf{GF}({2^{64}})`$ reduced over $`x^{64} + x^{19} + x^{16} + x + 1`$.
 #[derive(Debug, Clone, Copy, Hash, Eq)]
@@ -91,8 +88,8 @@ impl<'a> MulAssign<&'a F64b> for F64b {
 impl CanonicalSerialize for F64b {
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BytesDeserializationCannotFail;
-    type Serializer = crate::serialization::ByteElementSerializer<Self>;
-    type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
+    type Serializer = swanky_serialization::ByteElementSerializer<Self>;
+    type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
 
     #[inline]
     fn from_bytes(
@@ -111,7 +108,7 @@ impl FiniteRing for F64b {
         Self((u128::from_le_bytes(*x) & ((1 << 64) - 1)) as u64)
     }
 
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+    fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
         Self(rng.next_u64())
     }
 
@@ -123,7 +120,7 @@ impl FiniteField for F64b {
     type PrimeField = F2;
 
     fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
-        let mut coefficients = smallvec![F2::ZERO; 64];
+        let mut coefficients = vec![F2::ZERO; 64];
         coefficients[64 - 1] = F2::ONE;
         coefficients[19 - 1] = F2::ONE;
         coefficients[16 - 1] = F2::ONE;
@@ -137,7 +134,7 @@ impl FiniteField for F64b {
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U64;
 
     fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
-        super::standard_bit_decomposition(self.0 as u128)
+        swanky_field::standard_bit_decomposition(self.0 as u128)
     }
 
     const GENERATOR: Self = Self(2);
@@ -150,7 +147,7 @@ impl FiniteField for F64b {
     }
 }
 
-field_ops!(F64b);
+swanky_field::field_ops!(F64b);
 
 impl From<F2> for F64b {
     fn from(pf: F2) -> Self {
@@ -190,5 +187,6 @@ impl IsSubFieldOf<F64b> for F2 {
 
 #[cfg(test)]
 mod tests {
-    test_field!(test_field, crate::field::F64b);
+    use super::F64b;
+    swanky_field_test::test_field!(test_field, F64b);
 }
