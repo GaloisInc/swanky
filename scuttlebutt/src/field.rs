@@ -26,7 +26,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// ```
     ///
     /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
-    type NumberOfBitsInBitDecomposition: ArrayLength<bool> + ArrayLength<F2>;
+    type NumberOfBitsInBitDecomposition: ArrayLength<bool> + AnyArrayLength;
     /// Decompose the given field element into bits.
     ///
     /// This bit decomposition should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
