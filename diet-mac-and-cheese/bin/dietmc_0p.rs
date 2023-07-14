@@ -18,6 +18,7 @@ use pretty_env_logger;
 use scuttlebutt::{AesRng, Channel};
 use std::collections::VecDeque;
 use std::env;
+use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -135,7 +136,9 @@ fn run_text(args: &Cli) -> Result<()> {
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
-                    evaluator.evaluate_relation_text(&relation_path)?;
+                    let relation_file = File::open(relation_path)?;
+                    let relation_reader = BufReader::new(relation_file);
+                    evaluator.evaluate_relation_text(relation_reader)?;
                     info!("time circ exec: {:?}", start.elapsed());
                     info!("VERIFIER DONE!");
                 }
@@ -174,7 +177,9 @@ fn run_text(args: &Cli) -> Result<()> {
             evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
-            evaluator.evaluate_relation_text(&relation_path)?;
+            let relation_file = File::open(relation_path)?;
+            let relation_reader = BufReader::new(relation_file);
+            evaluator.evaluate_relation_text(relation_reader)?;
             info!("time circ exec: {:?}", start.elapsed());
             info!("PROVER DONE!");
         }

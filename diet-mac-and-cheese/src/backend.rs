@@ -6,8 +6,7 @@ use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use ocelot::svole::wykw::LpnParams;
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel};
+use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -136,20 +135,18 @@ impl Monitor {
 }
 
 /// Prover for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
+pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel> {
     is_ok: bool,
     prover: RcRefCell<FComProver<FE>>,
-    pub channel: C,
-    pub rng: RNG,
+    pub(crate) channel: C,
+    pub(crate) rng: AesRng,
     check_zero_list: Vec<MacProver<FE>>,
     monitor: Monitor,
     state_mult_check: StateMultCheckProver<FE>,
     no_batching: bool,
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
-    for DietMacAndCheeseProver<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE, C> {
     type Wire = MacProver<FE>;
     type FieldElement = FE::PrimeField;
 
@@ -267,11 +264,11 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheeseProver<FE, C, RNG> {
+impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
     /// Initialize the prover by providing a channel, a random generator and a pair of LPN parameters as defined by svole.
     pub fn init(
         channel: &mut C,
-        mut rng: RNG,
+        mut rng: AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -290,9 +287,9 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     }
 
     /// Initialize the verifier by providing a reference to a fcom.
-    pub fn init_with_fcom(
+    pub(crate) fn init_with_fcom(
         channel: &mut C,
-        rng: RNG,
+        rng: AesRng,
         fcom: &RcRefCell<FComProver<FE>>,
         no_batching: bool,
     ) -> Result<Self> {
@@ -316,12 +313,13 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
 
     // this function should be called before every function exposed publicly by the API.
     fn check_is_ok(&self) -> Result<()> {
-        if !self.is_ok {
-            return Err(eyre!(
+        if self.is_ok {
+            Ok(())
+        } else {
+            Err(eyre!(
                 "An error occurred earlier. This functionality should not be used further"
-            ));
+            ))
         }
-        Ok(())
     }
 
     fn input(&mut self, v: FE::PrimeField) -> Result<MacProver<FE>> {
@@ -378,9 +376,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> DietMacAndCheese
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
-    for DietMacAndCheeseProver<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> Drop for DietMacAndCheeseProver<FE, C> {
     fn drop(&mut self) {
         if self.is_ok && !self.check_zero_list.is_empty() {
             warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
@@ -389,10 +385,10 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
 }
 
 /// Verifier for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> {
+pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel> {
     verifier: RcRefCell<FComVerifier<FE>>,
-    pub channel: C,
-    pub rng: RNG,
+    pub(crate) channel: C,
+    pub(crate) rng: AesRng,
     check_zero_list: Vec<MacVerifier<FE>>,
     monitor: Monitor,
     state_mult_check: StateMultCheckVerifier<FE>,
@@ -400,9 +396,7 @@ pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel, RNG: Cr
     no_batching: bool,
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
-    for DietMacAndCheeseVerifier<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseVerifier<FE, C> {
     type Wire = MacVerifier<FE>;
     type FieldElement = FE::PrimeField;
 
@@ -512,13 +506,11 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> BackendT
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
-    DietMacAndCheeseVerifier<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
     /// Initialize the verifier by providing a channel, a random generator and a pair of LPN parameters as defined by svole.
     pub fn init(
         channel: &mut C,
-        mut rng: RNG,
+        mut rng: AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -539,9 +531,9 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 
     /// Initialize the verifier by providing a reference to a fcom.
-    pub fn init_with_fcom(
+    pub(crate) fn init_with_fcom(
         channel: &mut C,
-        mut rng: RNG,
+        mut rng: AesRng,
         fcom: &RcRefCell<FComVerifier<FE>>,
         no_batching: bool,
     ) -> Result<Self> {
@@ -628,9 +620,7 @@ impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng>
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel, RNG: CryptoRng + Rng> Drop
-    for DietMacAndCheeseVerifier<FE, C, RNG>
-{
+impl<FE: FiniteField, C: AbstractChannel> Drop for DietMacAndCheeseVerifier<FE, C> {
     fn drop(&mut self) {
         if self.is_ok && !self.check_zero_list.is_empty() {
             warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
@@ -665,7 +655,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<FE, _, _> = DietMacAndCheeseProver::init(
+            let mut dmc: DietMacAndCheeseProver<FE, _> = DietMacAndCheeseProver::init(
                 &mut channel,
                 rng,
                 LPN_SETUP_SMALL,
@@ -715,7 +705,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<FE, _, _> = DietMacAndCheeseVerifier::init(
+        let mut dmc: DietMacAndCheeseVerifier<FE, _> = DietMacAndCheeseVerifier::init(
             &mut channel,
             rng,
             LPN_SETUP_SMALL,
@@ -754,7 +744,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<F, _, _> = DietMacAndCheeseProver::init(
+            let mut dmc: DietMacAndCheeseProver<F, _> = DietMacAndCheeseProver::init(
                 &mut channel,
                 rng,
                 LPN_SETUP_SMALL,
@@ -775,7 +765,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<F, _, _> = DietMacAndCheeseVerifier::init(
+        let mut dmc: DietMacAndCheeseVerifier<F, _> = DietMacAndCheeseVerifier::init(
             &mut channel,
             rng,
             LPN_SETUP_SMALL,

@@ -1,45 +1,43 @@
 fn main() {
-    #[cfg(feature = "ff")]
-    {
-        use ff_codegen::{PrimeFieldCodegen, ReprEndianness::Little};
-        use sha2::Digest;
-        use std::fmt::Write;
-        use std::path::Path;
-        fn to_hex(buf: &[u8]) -> String {
-            let mut out = String::new();
-            for byte in buf {
-                write!(out, "{:x}", byte).unwrap();
-            }
-            out
+    use ff_codegen::{PrimeFieldCodegen, ReprEndianness::Little};
+    use sha2::Digest;
+    use std::fmt::Write;
+    use std::path::Path;
+    fn to_hex(buf: &[u8]) -> String {
+        let mut out = String::new();
+        for byte in buf {
+            write!(out, "{:x}", byte).unwrap();
         }
-        let cache_dir = if let Ok(swanky_cache_dir) = std::env::var("SWANKY_CACHE_DIR") {
-            let cache_dir = Path::new(&swanky_cache_dir).join("finite-field-codegen-v1");
-            std::fs::create_dir_all(&cache_dir).unwrap();
-            Some(cache_dir)
-        } else {
-            None
-        };
-        let out_dir = Path::new(&std::env::var("OUT_DIR").unwrap()).to_path_buf();
-        let mut outputs = std::collections::HashMap::<String, String>::new();
-        let cache_key = {
-            let mut h = sha2::Sha256::new();
-            h.update(std::fs::read(std::env::current_exe().unwrap()).unwrap());
-            h.finalize()
-        };
-        let cache_entry = cache_dir.map(|cache_dir| cache_dir.join(to_hex(&cache_key)));
-        if let Some(cache_entry) = cache_entry
-            .as_ref()
-            .filter(|cache_entry| cache_entry.exists())
-        {
-            for entry in std::fs::read_dir(cache_entry).unwrap() {
-                let entry = entry.unwrap();
-                outputs.insert(
-                    entry.file_name().to_str().unwrap().to_string(),
-                    std::fs::read_to_string(entry.path()).unwrap(),
-                );
-            }
-        } else {
-            for mut cg in [
+        out
+    }
+    let cache_dir = if let Ok(swanky_cache_dir) = std::env::var("SWANKY_CACHE_DIR") {
+        let cache_dir = Path::new(&swanky_cache_dir).join("finite-field-codegen-v1");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        Some(cache_dir)
+    } else {
+        None
+    };
+    let out_dir = Path::new(&std::env::var("OUT_DIR").unwrap()).to_path_buf();
+    let mut outputs = std::collections::HashMap::<String, String>::new();
+    let cache_key = {
+        let mut h = sha2::Sha256::new();
+        h.update(std::fs::read(std::env::current_exe().unwrap()).unwrap());
+        h.finalize()
+    };
+    let cache_entry = cache_dir.map(|cache_dir| cache_dir.join(to_hex(&cache_key)));
+    if let Some(cache_entry) = cache_entry
+        .as_ref()
+        .filter(|cache_entry| cache_entry.exists())
+    {
+        for entry in std::fs::read_dir(cache_entry).unwrap() {
+            let entry = entry.unwrap();
+            outputs.insert(
+                entry.file_name().to_str().unwrap().to_string(),
+                std::fs::read_to_string(entry.path()).unwrap(),
+            );
+        }
+    } else {
+        for mut cg in [
                 PrimeFieldCodegen {
                     ident: "F384p",
                     is_pub: true,
@@ -119,20 +117,19 @@ fn main() {
                 write!(out, "#[cfg(test)] pub(super) const GENERATOR_STRING: &str = {:?};", cg.generator).unwrap();
                 outputs.insert(filename, out);
             }
-        }
+    }
+    for (k, v) in outputs.iter() {
+        std::fs::write(&out_dir.join(k), v.as_bytes()).unwrap();
+    }
+    if let Some(cache_entry) = cache_entry
+        .as_ref()
+        .filter(|cache_entry| !cache_entry.exists())
+    {
+        let tmpdir = tempfile::TempDir::new_in(cache_entry.parent().unwrap()).unwrap();
         for (k, v) in outputs.iter() {
-            std::fs::write(&out_dir.join(k), v.as_bytes()).unwrap();
+            std::fs::write(&tmpdir.path().join(k), v.as_bytes()).unwrap();
         }
-        if let Some(cache_entry) = cache_entry
-            .as_ref()
-            .filter(|cache_entry| !cache_entry.exists())
-        {
-            let tmpdir = tempfile::TempDir::new_in(cache_entry.parent().unwrap()).unwrap();
-            for (k, v) in outputs.iter() {
-                std::fs::write(&tmpdir.path().join(k), v.as_bytes()).unwrap();
-            }
-            std::fs::rename(tmpdir.into_path(), cache_entry).unwrap();
-        }
+        std::fs::rename(tmpdir.into_path(), cache_entry).unwrap();
     }
     println!("cargo:rerun-if-changed=build.rs");
 }

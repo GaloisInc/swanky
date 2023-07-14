@@ -540,6 +540,16 @@ impl CircInputs {
         }
     }
 
+    // Return the number of instances associated with a given `type_id`
+    pub fn num_instances(&self, type_id: usize) -> usize {
+        self.ins[type_id].len()
+    }
+
+    // Return the number of witnesses associated with a given `type_id`
+    pub fn num_witnesses(&self, type_id: usize) -> usize {
+        self.wit[type_id].len()
+    }
+
     /// Ingest instance.
     pub fn ingest_instance(&mut self, type_id: usize, instance: Vec<u8>) {
         self.adjust_ins_type_idx(type_id);

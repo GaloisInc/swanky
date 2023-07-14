@@ -84,7 +84,7 @@ impl MessageReader {
                 return Ok(Some(
                     fb::size_prefixed_root_as_root_with_opts(
                         &flatbuffers::VerifierOptions {
-                            max_tables: 1000000000000,
+                            max_tables: u32::MAX as usize,
                             ..flatbuffers::VerifierOptions::default()
                         },
                         &self.buf,

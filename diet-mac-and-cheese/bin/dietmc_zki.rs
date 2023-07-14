@@ -7,7 +7,6 @@ use diet_mac_and_cheese::{
 };
 use log::info;
 use pretty_env_logger;
-#[cfg(feature = "ff")]
 use scuttlebutt::field::{F384p, F384q};
 use scuttlebutt::{
     field::{
@@ -166,7 +165,7 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
                 let rng = AesRng::new();
                 let start = Instant::now();
 
-                let mut zkbackend = DietMacAndCheeseVerifier::<FE, _, _>::init(
+                let mut zkbackend = DietMacAndCheeseVerifier::<FE, _>::init(
                     &mut channel,
                     rng,
                     lpn_setup,
@@ -177,7 +176,7 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
                 info!("init time: {:?}", start.elapsed());
 
                 let mut eval = zki_sieve::consumers::evaluator::Evaluator::<
-                    DietMacAndCheeseVerifier<FE, _, _>,
+                    DietMacAndCheeseVerifier<FE, _>,
                 >::default();
                 let start = Instant::now();
                 for ins in instances {
@@ -207,7 +206,7 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
         let rng = AesRng::new();
         let start = Instant::now();
 
-        let mut zkbackend = DietMacAndCheeseProver::<FE, _, _>::init(
+        let mut zkbackend = DietMacAndCheeseProver::<FE, _>::init(
             &mut channel,
             rng,
             lpn_setup,
@@ -219,8 +218,7 @@ fn run<FE: FiniteField>(args: &Cli) -> std::io::Result<()> {
 
         let start = Instant::now();
         let mut eval =
-            zki_sieve::consumers::evaluator::Evaluator::<DietMacAndCheeseProver<FE, _, _>>::default(
-            );
+            zki_sieve::consumers::evaluator::Evaluator::<DietMacAndCheeseProver<FE, _>>::default();
         for ins in instances {
             eval.ingest_instance(&ins.unwrap()).unwrap();
         }
@@ -287,27 +285,13 @@ fn main() -> std::io::Result<()> {
         // }
         &[255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
         {
-            #[cfg(feature = "ff")]
-            {
-                info!("field: F384p");
-                run::<F384p>(&cli)
-            }
-            #[cfg(not(feature = "ff"))]
-            {
-                panic!("Set feature ff for F384p")
-            }
+            info!("field: F384p");
+            run::<F384p>(&cli)
         }
         &[115, 41, 197, 204, 106, 25, 236, 236, 122, 167, 176, 72, 178, 13, 26, 88, 223, 45, 55, 244, 129, 77, 99, 199, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255] =>
         {
-            #[cfg(feature = "ff")]
-            {
-                info!("field: F394q");
-                run::<F384q>(&cli)
-            }
-            #[cfg(not(feature = "ff"))]
-            {
-                panic!("Set feature ff for F384q")
-            }
+            info!("field: F394q");
+            run::<F384q>(&cli)
         }
         x => std::io::Result::Err(std::io::Error::new(
             std::io::ErrorKind::Other,

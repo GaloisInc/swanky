@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "diet-mac-and-cheese",
+    "diet-mac-and-cheese/web-mac-and-cheese/wasm",
+    "diet-mac-and-cheese/web-mac-and-cheese/websocket",
     "fancy-garbling",
     "fancy-garbling/base_conversion",
     "humidor",
@@ -35,6 +37,9 @@ version = "0.5.0"
 
 [workspace.dependencies]
 # Our crates
+diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
+web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
+web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 fancy-garbling = { path = "fancy-garbling" }
 fancy-garbling-base-conversion = { path = "fancy-garbling/base_conversion" }
 humidor = { path = "humidor" }
@@ -81,6 +86,8 @@ cc = "1.0.79"
 ciborium = "0.2.1"
 clap = { version = "4.3.1", features = ["derive"] }
 color-eyre = "0.6.2"
+console_error_panic_hook = "0.1.6"
+console_log = { version = "0.2", features = ["color"] }
 criterion = "0.5.1"
 crossbeam = "0.8.2"
 crossbeam-queue = "0.3.8"
@@ -133,7 +140,9 @@ snmalloc-rs = { version = "0.3.3", default-features = false, features = ["build_
 sprs = "=0.11.0" # See issue #123
 subtle = "2.5.0"
 tempfile = "3.5.0"
+tungstenite = { version="0.19.0", features = ["rustls"] }
 twox-hash = "1.6.3"
+wasm-bindgen = "0.2.87"
 zki_sieve = { git = "https://github.com/QED-it/zkinterface-ir.git", rev = "3368622bdf5306256e56826141517a3a34f8f85c"}
 
 [profile.release]

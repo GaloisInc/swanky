@@ -94,7 +94,7 @@ impl Plugin for IterV0 {
             eyre::bail!("{}: The iteration count parameter must be numeric.", Self::NAME);
         };
         // TODO: Should we assume this param fits in a u64?
-        let iter_count = iter_count.as_words()[0];
+        let iter_count: u64 = iter_count.as_words()[0].into();
 
         for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
             eyre::ensure!(

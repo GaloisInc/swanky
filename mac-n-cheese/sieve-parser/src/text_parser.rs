@@ -278,7 +278,7 @@ impl<T: Read + Seek> ParseState<T> {
     }
     fn u64(&mut self) -> eyre::Result<WireId> {
         let out: U64 = self.parse_uint_generic()?;
-        Ok(out.to_words()[0])
+        Ok(out.to_words()[0].into())
     }
     fn bignum(&mut self) -> eyre::Result<Number> {
         let out: Number = self.parse_uint_generic()?;

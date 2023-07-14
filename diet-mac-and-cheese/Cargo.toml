@@ -11,9 +11,6 @@ license.workspace = true
 publish.workspace = true
 version.workspace = true
 
-[features]
-ff = ["scuttlebutt/ff"]
-
 [dependencies]
 blake3.workspace = true
 crypto-bigint.workspace = true
