@@ -25,8 +25,8 @@ pub mod field {
     };
     pub use swanky_field_binary::*;
     pub use swanky_field_f61p::*;
+    pub use swanky_field_ff_primes::*;
     pub use swanky_field_fft as fft;
-    pub use swanky_field_large_primes::*;
 }
 /// A polyfill for the ring functionality inside of `swanky-field`.
 pub mod ring {

@@ -33,7 +33,7 @@ swanky-field.workspace = true
 swanky-field-f61p.workspace = true
 swanky-field-binary.workspace = true
 swanky-field-fft.workspace = true
-swanky-field-large-primes.workspace = true
+swanky-field-ff-primes.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

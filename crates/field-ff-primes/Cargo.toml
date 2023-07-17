@@ -1,5 +1,5 @@
 [package]
-name = "swanky-field-large-primes"
+name = "swanky-field-ff-primes"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
