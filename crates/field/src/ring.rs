@@ -166,7 +166,7 @@ macro_rules! ring_ops {
             }
             #[inline]
             fn is_zero(&self) -> bool {
-                *self == <$f as$ crate::FiniteRing>::ZERO
+                *self == <$f as $crate::FiniteRing>::ZERO
             }
         }
 
