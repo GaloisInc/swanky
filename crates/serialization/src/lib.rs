@@ -219,6 +219,10 @@ pub mod serde_vec {
     }
 }
 
+/// Dependent crates might not neccessarily depend on `serde`, themsevles.
+/// Nonetheless, macros written in _this_ crate need to be able to access `serde`, even when
+/// those macros are invoked from other crates. To solve this problem, we re-export the crate that
+/// our macros need.
 #[doc(hidden)]
 pub use serde as __serde_for_macro;
 
