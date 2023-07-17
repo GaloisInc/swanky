@@ -1,0 +1,7 @@
+version 2.0.0;
+public_input;
+@type field 0x2;
+@begin
+<0x1>;
+<0x1>;
+@end

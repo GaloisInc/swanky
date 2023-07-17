@@ -81,6 +81,8 @@ mod mux_v0;
 pub(crate) use mux_v0::MuxV0;
 mod permutation_check_v1;
 pub(crate) use permutation_check_v1::PermutationCheckV1;
+mod galois_poly_v0;
+pub(crate) use galois_poly_v0::GaloisPolyV0;
 mod iter_v0;
 pub(crate) use iter_v0::IterV0;
 mod vectors_v1;

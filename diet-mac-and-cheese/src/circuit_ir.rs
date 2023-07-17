@@ -3,7 +3,9 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{IterV0, MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1},
+    plugins::{
+        GaloisPolyV0, IterV0, MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1,
+    },
 };
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
@@ -434,6 +436,14 @@ impl FuncDecl {
                 fun_store,
             )?,
             VectorsV1::NAME => VectorsV1::gates_body(
+                &operation,
+                &params,
+                &output_counts,
+                &input_counts,
+                type_store,
+                fun_store,
+            )?,
+            GaloisPolyV0::NAME => GaloisPolyV0::gates_body(
                 &operation,
                 &params,
                 &output_counts,
