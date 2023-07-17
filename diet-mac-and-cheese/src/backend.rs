@@ -137,17 +137,17 @@ impl Monitor {
 /// Prover for Diet Mac'n'Cheese.
 pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel> {
     is_ok: bool,
-    prover: RcRefCell<FComProver<FE>>,
+    prover: RcRefCell<FComProver<FE::PrimeField, FE>>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    check_zero_list: Vec<MacProver<FE>>,
+    check_zero_list: Vec<MacProver<FE::PrimeField, FE>>,
     monitor: Monitor,
     state_mult_check: StateMultCheckProver<FE>,
     no_batching: bool,
 }
 
 impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE, C> {
-    type Wire = MacProver<FE>;
+    type Wire = MacProver<FE::PrimeField, FE>;
     type FieldElement = FE::PrimeField;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
@@ -290,7 +290,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         rng: AesRng,
-        fcom: &RcRefCell<FComProver<FE>>,
+        fcom: &RcRefCell<FComProver<FE::PrimeField, FE>>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckProver::init(channel)?;
@@ -307,7 +307,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
     }
 
     /// Get party
-    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComProver<FE>> {
+    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComProver<FE::PrimeField, FE>> {
         &self.prover
     }
 
@@ -322,7 +322,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
         }
     }
 
-    fn input(&mut self, v: FE::PrimeField) -> Result<MacProver<FE>> {
+    fn input(&mut self, v: FE::PrimeField) -> Result<MacProver<FE::PrimeField, FE>> {
         let tag = self
             .prover
             .get_refmut()
@@ -361,7 +361,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
         r
     }
 
-    fn push_check_zero_list(&mut self, e: MacProver<FE>) -> Result<()> {
+    fn push_check_zero_list(&mut self, e: MacProver<FE::PrimeField, FE>) -> Result<()> {
         self.check_zero_list.push(e);
 
         if self.check_zero_list.len() == QUEUE_CAPACITY || self.no_batching {

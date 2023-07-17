@@ -9,8 +9,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use rand::{Rng, SeedableRng};
-use scuttlebutt::field::Degree;
-use scuttlebutt::ring::FiniteRing;
+use scuttlebutt::field::{Degree, DegreeModulo, IsSubFieldOf};
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::time::Instant;
@@ -20,46 +19,57 @@ use subtle::{Choice, ConditionallySelectable};
 /// and verifier (see [`MacVerifier`] for the verifier-side data).
 ///
 /// The main property associated with the two types is that, given a
-/// `MacProver(x, m)` and its corresponding `MacVerifier(k)`, the following
-/// equation holds for a global key `Δ` known only to the verifier: `m = k + Δ
-/// x`.
+/// `MacProver(v, t)` and its corresponding `MacVerifier(k)`, the following
+/// equation holds for a global key `Δ` known only to the verifier: `t = v · Δ +
+/// k`.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MacProver<F: FiniteField>(
-    /// The prover's value `x`.
-    F::PrimeField,
-    /// The prover's MAC `m`.
-    F,
-);
+pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
+    /// The prover's value `v`.
+    V,
+    /// The prover's MAC tag `t`.
+    T,
+)
+where
+    T::PrimeField: IsSubFieldOf<V>;
 
-impl<F: FiniteField> MacProver<F> {
-    pub fn new(x: F::PrimeField, m: F) -> Self {
+impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+    pub fn new(x: V, m: T) -> Self {
         Self(x, m)
     }
 
-    pub fn value(&self) -> F::PrimeField {
+    pub fn value(&self) -> V {
         self.0
     }
 
-    pub fn mac(&self) -> F {
+    pub fn mac(&self) -> T {
         self.1
     }
 
-    pub fn decompose(&self) -> (F::PrimeField, F) {
+    pub fn decompose(&self) -> (V, T) {
         (self.0, self.1)
     }
 }
 
-impl<F: FiniteField> Default for MacProver<F> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> Default for MacProver<V, T>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     fn default() -> Self {
-        Self::new(F::PrimeField::ZERO, F::ZERO)
+        Self::new(V::ZERO, T::ZERO)
     }
 }
 
-impl<FE: FiniteField> ConditionallySelectable for MacProver<FE> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> ConditionallySelectable for MacProver<V, T>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         MacProver(
-            FE::PrimeField::conditional_select(&a.0, &b.0, choice),
-            FE::conditional_select(&a.1, &b.1, choice),
+            V::conditional_select(&a.0, &b.0, choice),
+            T::conditional_select(&a.1, &b.1, choice),
         )
     }
 }
@@ -73,7 +83,7 @@ impl<FE: FiniteField> ConditionallySelectable for MacProver<FE> {
 /// x`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MacVerifier<F: FiniteField>(
-    /// The verifier's MAC `k`.
+    /// The verifier's MAC key `k`.
     F,
 );
 
@@ -100,24 +110,27 @@ impl<FE: FiniteField> ConditionallySelectable for MacVerifier<FE> {
 }
 
 #[cfg(test)]
-pub(crate) fn validate<FE: FiniteField>(
-    prover: MacProver<FE>,
-    verifier: MacVerifier<FE>,
-    delta: FE,
-) -> bool {
+pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
+    prover: MacProver<V, T>,
+    verifier: MacVerifier<T>,
+    delta: T,
+) -> bool
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     prover.value() * delta + verifier.mac() == prover.mac()
 }
 
 /// F_com protocol for the Prover
-pub struct FComProver<FE: FiniteField> {
-    svole_sender: Sender<FE>,
-    voles: Vec<(FE::PrimeField, FE)>,
+pub struct FComProver<V: IsSubFieldOf<T>, T: FiniteField> {
+    svole_sender: Sender<T>,
+    voles: Vec<(V, T)>,
 }
 
-fn make_x_i<FE: FiniteField>(i: usize) -> FE {
-    let mut v: GenericArray<FE::PrimeField, Degree<FE>> = GenericArray::default();
-    v[i] = FE::PrimeField::ONE;
-    FE::from_subfield(&v)
+fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
+    let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
+    v[i] = V::ONE;
+    T::from_subfield(&v)
 }
 
 pub struct StateMultCheckProver<FE> {
@@ -160,7 +173,10 @@ impl<FE: FiniteField> StateMultCheckProver<FE> {
     }
 }
 
-impl<FE: FiniteField> FComProver<FE> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> FComProver<V, T>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     /// Initialize the functionality.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -191,7 +207,7 @@ impl<FE: FiniteField> FComProver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-    ) -> Result<MacProver<FE>> {
+    ) -> Result<MacProver<V, T>> {
         match self.voles.pop() {
             Some(e) => Ok(MacProver(e.0, e.1)),
             None => {
@@ -209,8 +225,8 @@ impl<FE: FiniteField> FComProver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        x: &[FE::PrimeField],
-    ) -> Result<Vec<FE>> {
+        x: &[V],
+    ) -> Result<Vec<T>> {
         let mut out = Vec::with_capacity(x.len());
         self.input_low_level(channel, rng, x, &mut out)?;
         Ok(out)
@@ -221,14 +237,14 @@ impl<FE: FiniteField> FComProver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        x: &[FE::PrimeField],
-        out: &mut Vec<FE>,
+        x: &[V],
+        out: &mut Vec<T>,
     ) -> Result<()> {
         for x_i in x {
             let r = self.random(channel, rng)?;
             let y = *x_i - r.0;
             out.push(r.1);
-            channel.write_serializable::<FE::PrimeField>(&y)?;
+            channel.write_serializable::<V>(&y)?;
         }
         Ok(())
     }
@@ -238,30 +254,29 @@ impl<FE: FiniteField> FComProver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        x: FE::PrimeField,
-    ) -> Result<FE> {
+        x: V,
+    ) -> Result<T> {
         let r = self.random(channel, rng)?;
         let y = x - r.0;
-        channel.write_serializable::<FE::PrimeField>(&y)?;
-
+        channel.write_serializable::<V>(&y)?;
         Ok(r.1)
     }
 
     /// Add a constant to a Mac.
     #[inline]
-    pub fn affine_add_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
+    pub fn affine_add_cst(&self, cst: V, x: MacProver<V, T>) -> MacProver<V, T> {
         MacProver(cst + x.0, x.1)
     }
 
     /// Multiply by a constant a Mac.
     #[inline]
-    pub fn affine_mult_cst(&self, cst: FE::PrimeField, x: MacProver<FE>) -> MacProver<FE> {
+    pub fn affine_mult_cst(&self, cst: V, x: MacProver<V, T>) -> MacProver<V, T> {
         MacProver(cst * x.0, cst * (x.1))
     }
 
     /// Add two Macs.
     #[inline]
-    pub fn add(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
+    pub fn add(&self, a: MacProver<V, T>, b: MacProver<V, T>) -> MacProver<V, T> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
         MacProver(a + b, a_mac + b_mac)
@@ -269,14 +284,14 @@ impl<FE: FiniteField> FComProver<FE> {
 
     /// Negative Mac.
     #[inline]
-    pub fn neg(&self, a: MacProver<FE>) -> MacProver<FE> {
+    pub fn neg(&self, a: MacProver<V, T>) -> MacProver<V, T> {
         let MacProver(a, a_mac) = a;
         MacProver(-a, -a_mac)
     }
 
     /// Subtraction of two Macs.
     #[inline]
-    pub fn sub(&self, a: MacProver<FE>, b: MacProver<FE>) -> MacProver<FE> {
+    pub fn sub(&self, a: MacProver<V, T>, b: MacProver<V, T>) -> MacProver<V, T> {
         let MacProver(a, a_mac) = a;
         let MacProver(b, b_mac) = b;
         MacProver(a - b, a_mac - b_mac)
@@ -286,19 +301,19 @@ impl<FE: FiniteField> FComProver<FE> {
     pub fn check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        x_mac_batch: &[MacProver<FE>],
+        x_mac_batch: &[MacProver<V, T>],
     ) -> Result<()> {
         let seed = channel.read_block()?;
         let mut rng = AesRng::from_seed(seed);
 
-        let mut m = FE::ZERO;
+        let mut m = T::ZERO;
         let mut b = true;
         for MacProver(x, x_mac) in x_mac_batch.iter() {
-            b = b && *x == FE::PrimeField::ZERO;
-            let chi = FE::random(&mut rng);
+            b = b && *x == V::ZERO;
+            let chi = T::random(&mut rng);
             m += chi * *x_mac;
         }
-        channel.write_serializable::<FE>(&m)?;
+        channel.write_serializable::<T>(&m)?;
         channel.flush()?;
 
         if b {
@@ -313,23 +328,23 @@ impl<FE: FiniteField> FComProver<FE> {
     pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        batch: &[MacProver<FE>],
+        batch: &[MacProver<V, T>],
     ) -> Result<()> {
         let mut hasher = blake3::Hasher::new();
         for MacProver(x, _) in batch.iter() {
-            channel.write_serializable::<FE::PrimeField>(x)?;
+            channel.write_serializable::<V>(x)?;
             hasher.update(&x.to_bytes());
         }
 
         let seed = Block::try_from_slice(&hasher.finalize().as_bytes()[0..16]).unwrap();
         let mut rng = AesRng::from_seed(seed);
 
-        let mut m = FE::ZERO;
+        let mut m = T::ZERO;
         for MacProver(_, x_mac) in batch.iter() {
-            let chi = FE::random(&mut rng);
+            let chi = T::random(&mut rng);
             m += chi * *x_mac;
         }
-        channel.write_serializable::<FE>(&m)?;
+        channel.write_serializable::<T>(&m)?;
         channel.flush()?;
 
         Ok(())
@@ -340,10 +355,10 @@ impl<FE: FiniteField> FComProver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        triples: &[(MacProver<FE>, MacProver<FE>, MacProver<FE>)],
+        triples: &[(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>)],
     ) -> Result<()> {
-        let mut sum_a0 = FE::ZERO;
-        let mut sum_a1 = FE::ZERO;
+        let mut sum_a0 = T::ZERO;
+        let mut sum_a1 = T::ZERO;
 
         let chi = channel.read_serializable()?;
         let mut chi_power = chi;
@@ -359,12 +374,12 @@ impl<FE: FiniteField> FComProver<FE> {
         }
 
         // The following block implements VOPE(1)
-        let mut mask = FE::ZERO;
-        let mut mask_mac = FE::ZERO;
+        let mut mask = T::ZERO;
+        let mut mask_mac = T::ZERO;
 
-        for i in 0..Degree::<FE>::USIZE {
+        for i in 0..Degree::<T>::USIZE {
             let MacProver(u, u_mac) = self.random(channel, rng)?;
-            let x_i: FE = make_x_i(i);
+            let x_i: T = make_x_i::<V, T>(i);
             mask += u * x_i;
             mask_mac += u_mac * x_i;
         }
@@ -382,8 +397,8 @@ impl<FE: FiniteField> FComProver<FE> {
     /// Push a multiplication triplet for later checking.
     pub fn quicksilver_push(
         &mut self,
-        state: &mut StateMultCheckProver<FE>,
-        triple: &(MacProver<FE>, MacProver<FE>, MacProver<FE>),
+        state: &mut StateMultCheckProver<T>,
+        triple: &(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>),
     ) -> Result<()> {
         let (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) = triple;
         let a0 = *x_mac * *y_mac;
@@ -402,15 +417,15 @@ impl<FE: FiniteField> FComProver<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        state: &mut StateMultCheckProver<FE>,
+        state: &mut StateMultCheckProver<T>,
     ) -> Result<usize> {
         // The following block implements VOPE(1)
-        let mut mask = FE::ZERO;
-        let mut mask_mac = FE::ZERO;
+        let mut mask = T::ZERO;
+        let mut mask_mac = T::ZERO;
 
-        for i in 0..Degree::<FE>::USIZE {
+        for i in 0..Degree::<T>::USIZE {
             let MacProver(u, u_mac) = self.random(channel, rng)?;
-            let x_i: FE = make_x_i(i);
+            let x_i: T = make_x_i::<V, T>(i);
             mask += u * x_i;
             mask_mac += u_mac * x_i;
         }
@@ -428,7 +443,7 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Reset internal state of functionality
-    pub fn reset(&mut self, quick_state: &mut StateMultCheckProver<FE>) {
+    pub fn reset(&mut self, quick_state: &mut StateMultCheckProver<T>) {
         quick_state.reset();
     }
 }
@@ -706,7 +721,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         let mut mask_mac = FE::ZERO;
         for i in 0..Degree::<FE>::USIZE {
             let MacVerifier(v_m) = self.random(channel, rng)?;
-            let x_i: FE = make_x_i(i);
+            let x_i: FE = make_x_i::<FE::PrimeField, FE>(i);
             mask_mac += v_m * x_i;
         }
 
@@ -750,7 +765,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
         let mut mask_mac = FE::ZERO;
         for i in 0..Degree::<FE>::USIZE {
             let MacVerifier(v_m) = self.random(channel, rng)?;
-            let x_i: FE = make_x_i(i);
+            let x_i: FE = make_x_i::<FE::PrimeField, FE>(i);
             mask_mac += v_m * x_i;
         }
 
@@ -799,9 +814,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<FE::PrimeField, FE>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut v = Vec::with_capacity(count);
             for _ in 0..count {
@@ -840,9 +859,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<F61p>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<F61p, F61p>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -894,9 +917,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<FE::PrimeField, FE>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -944,9 +971,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<FE::PrimeField, FE>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             for n in 0..count {
                 // ZEROs

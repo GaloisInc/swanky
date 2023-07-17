@@ -1,16 +1,18 @@
+use std::any::TypeId;
+
 use super::{
     base_svole::{Receiver as BaseReceiver, Sender as BaseSender},
     spsvole::{SpsReceiver, SpsSender},
     utils::Powers,
 };
 use crate::errors::Error;
-use generic_array::typenum::Unsigned;
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand::{
     distributions::{Distribution, Uniform},
     Rng, SeedableRng,
 };
 use scuttlebutt::{
-    field::{Degree, FiniteField},
+    field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf},
     ring::FiniteRing,
     AbstractChannel, AesRng, Block, Malicious, SemiHonest,
 };
@@ -132,21 +134,24 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    fn send_internal<C: AbstractChannel>(
+    fn send_internal<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
         &mut self,
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
         rng: &mut AesRng,
-        output: &mut Vec<(FE::PrimeField, FE)>,
-    ) -> Result<(), Error> {
+        output: &mut Vec<(SFE, FE)>,
+    ) -> Result<(), Error>
+    where
+        <FE as FiniteField>::PrimeField: IsSubFieldOf<SFE>,
+    {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let r = Degree::<FE>::USIZE;
+        let degree = Degree::<FE>::USIZE;
         let m = cols / weight;
         // The number of base VOLEs we need to use.
-        let used = rows + weight + r;
+        let used = rows + weight + degree;
 
         debug_assert!(
             self.base_voles.len() >= used,
@@ -154,18 +159,21 @@ impl<FE: FiniteField> Sender<FE> {
             self.base_voles.len(),
             rows,
             weight,
-            r
+            degree
         );
 
-        let uws = self
-            .spsvole
-            .send(channel, m, &self.base_voles[rows..rows + weight + r], rng)?;
+        let uws: Vec<(FE::PrimeField, FE)> = self.spsvole.send(
+            channel,
+            m,
+            &self.base_voles[rows..rows + weight + degree],
+            rng,
+        )?;
         debug_assert_eq!(uws.len(), cols);
 
         let leftover = self.base_voles.len() - used;
 
         // The VOLEs we'll save for the next iteration.
-        let mut base_voles = Vec::with_capacity(num_saved + leftover);
+        let mut base_voles: Vec<(FE::PrimeField, FE)> = Vec::with_capacity(num_saved + leftover);
         // The VOLEs we'll return to the caller.
         output.clear();
         let out_len = cols - num_saved;
@@ -185,7 +193,12 @@ impl<FE: FiniteField> Sender<FE> {
             if i < num_saved {
                 base_voles.push((x, z));
             } else {
-                output.push((x, z));
+                // TODO: This currently only works if `SFE` is `FE::PrimeField`!!
+                assert!(TypeId::of::<FE::PrimeField>() == TypeId::of::<SFE>());
+                let mut arr: GenericArray<FE::PrimeField, DegreeModulo<FE::PrimeField, SFE>> =
+                    GenericArray::default();
+                arr[0] = x;
+                output.push((SFE::from_subfield(&arr), z));
             }
         }
         base_voles.extend(self.base_voles[used..].iter());
@@ -206,7 +219,7 @@ impl<FE: FiniteField> Sender<FE> {
     ) -> Result<Self, Error> {
         let pows: Powers<FE> = Default::default();
         let mut base_sender = BaseSender::<FE>::init(channel, pows.clone(), rng)?;
-        let base_voles_setup = base_sender.send(
+        let base_voles_setup: Vec<(FE::PrimeField, FE)> = base_sender.send(
             channel,
             compute_num_saved::<FE>(lpn_setup),
             &mut AesRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
@@ -232,13 +245,16 @@ impl<FE: FiniteField> Sender<FE> {
         Ok(sender)
     }
 
-    /// Produce VOLEs.
-    pub fn send<C: AbstractChannel>(
+    /// Generate VOLEs for the sender.
+    pub fn send<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        output: &mut Vec<(FE::PrimeField, FE)>,
-    ) -> Result<(), Error> {
+        output: &mut Vec<(SFE, FE)>,
+    ) -> Result<(), Error>
+    where
+        <FE as FiniteField>::PrimeField: IsSubFieldOf<SFE>,
+    {
         self.send_internal(
             channel,
             self.lpn_extend,

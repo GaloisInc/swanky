@@ -1,6 +1,6 @@
 use ocelot::svole::{Receiver, Sender};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
-use scuttlebutt::{field::F40b, AbstractChannel, AesRng};
+use scuttlebutt::{field::{F40b, F2}, AbstractChannel, AesRng};
 use std::io::{Read, Write};
 use std::{
     io::{BufReader, BufWriter},
@@ -91,7 +91,7 @@ fn run() {
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let mut count = 0;
-        let mut out = Vec::new();
+        let mut out: Vec<(F2, F40b)> = Vec::new();
         for _ in 0..get_trials() {
             vole.send(&mut channel, &mut rng, &mut out).unwrap();
             count += out.len();
