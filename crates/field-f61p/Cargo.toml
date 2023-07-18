@@ -12,6 +12,7 @@ swanky-serialization.workspace = true
 swanky-field.workspace = true
 subtle.workspace = true
 generic-array.workspace = true
+crypto-bigint.workspace = true
 
 [dev-dependencies]
 swanky-field-test.workspace = true

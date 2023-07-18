@@ -1,3 +1,4 @@
+use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
@@ -169,7 +170,17 @@ impl TryFrom<u128> for F61p {
     }
 }
 
-impl PrimeFiniteField for F61p {}
+impl PrimeFiniteField for F61p {
+    const MIN_LIMBS_NEEDED: usize = 1;
+
+    fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>> {
+        todo!()
+    }
+
+    fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> Option<Self> {
+        todo!()
+    }
+}
 
 swanky_field::field_ops!(F61p, SUM_ALREADY_DEFINED);
 

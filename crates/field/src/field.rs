@@ -4,6 +4,7 @@ use crate::{
     polynomial::Polynomial,
     ring::{FiniteRing, IsSubRingOf},
 };
+use crypto_bigint::Uint;
 use generic_array::{ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
 use swanky_generic_array::AnyArrayLength;
@@ -137,6 +138,18 @@ pub trait PrimeFiniteField:
     + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
     + std::convert::TryFrom<u128>
 {
+    /// The number of word-sized limbs needed to represent all values in this
+    /// prime finite field.
+    /// TODO: Make this portable to other architectures?
+    const MIN_LIMBS_NEEDED: usize;
+
+    /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
+    /// `None` if the value will not fit.
+    fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>>;
+
+    /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
+    /// `None` if the value is not a member of the field.
+    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> Option<Self>;
 }
 
 /// Automatically implement boilerplate field operations for the given type.

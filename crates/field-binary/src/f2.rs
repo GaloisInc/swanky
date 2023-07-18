@@ -3,6 +3,7 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
+use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
 use std::{
@@ -159,7 +160,17 @@ impl From<F2> for u8 {
     }
 }
 
-impl PrimeFiniteField for F2 {}
+impl PrimeFiniteField for F2 {
+    const MIN_LIMBS_NEEDED: usize = 1;
+
+    fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>> {
+        todo!()
+    }
+
+    fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> Option<Self> {
+        todo!()
+    }
+}
 
 pub struct F2BitSerializer {
     current_word: u64,

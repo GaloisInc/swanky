@@ -95,6 +95,7 @@ macro_rules! prime_field_using_ff {
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
             use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+            use crypto_bigint::Uint;
 
             #[allow(non_camel_case_types, unused_variables, unused_mut, dead_code)]
             mod internal {
@@ -225,7 +226,17 @@ macro_rules! prime_field_using_ff {
 
             crate::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
 
-            impl PrimeFiniteField for $name {}
+            impl PrimeFiniteField for $name {
+                const MIN_LIMBS_NEEDED: usize = $actual_limbs;
+
+                fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>> {
+                    todo!()
+                }
+
+                fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> Option<Self> {
+                    todo!()
+                }
+            }
 
             impl AddAssign<&$name> for $name {
                 fn add_assign(&mut self, rhs: &$name) {

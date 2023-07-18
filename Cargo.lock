@@ -2738,6 +2738,7 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 name = "swanky-field"
 version = "0.5.0"
 dependencies = [
+ "crypto-bigint",
  "generic-array",
  "num-traits",
  "rand 0.8.5",
@@ -2751,6 +2752,7 @@ name = "swanky-field-binary"
 version = "0.5.0"
 dependencies = [
  "bytemuck",
+ "crypto-bigint",
  "generic-array",
  "proptest",
  "rand 0.8.5",
@@ -2765,6 +2767,7 @@ dependencies = [
 name = "swanky-field-f61p"
 version = "0.5.0"
 dependencies = [
+ "crypto-bigint",
  "generic-array",
  "proptest",
  "rand 0.8.5",
@@ -2778,6 +2781,7 @@ dependencies = [
 name = "swanky-field-ff-primes"
 version = "0.5.0"
 dependencies = [
+ "crypto-bigint",
  "ff",
  "ff_codegen",
  "generic-array",
