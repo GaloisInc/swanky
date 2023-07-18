@@ -272,6 +272,9 @@ dependencies = [
 [[package]]
 name = "bristol-fashion"
 version = "0.5.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "bufstream"

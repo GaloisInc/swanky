@@ -5,43 +5,22 @@ use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::SplitWhitespace;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParseError {
+    #[error("Int: `{0}`")]
     ParseIntError(std::num::ParseIntError),
+    #[error("Bristol: `{0}`")]
     ParseBristolError(String),
 }
 
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ParseError::ParseIntError(e) => format!("Int: {e}"),
-                ParseError::ParseBristolError(e) => format!("Bristol: {e}"),
-            }
-        )
-    }
-}
-
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("I/O Error: `{0}`")]
     IOError(std::io::Error),
+    #[error("Parse Error: `{0}`")]
     ParseError(ParseError),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Error::IOError(e) => format!("I/O Error: {e}"),
-                Error::ParseError(e) => format!("Parse Error: {e}"),
-            }
-        )
-    }
 }
 
 impl From<std::io::Error> for Error {
