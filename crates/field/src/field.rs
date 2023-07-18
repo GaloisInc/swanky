@@ -140,7 +140,9 @@ pub trait PrimeFiniteField:
 {
     /// The number of word-sized limbs needed to represent all values in this
     /// prime finite field.
-    /// TODO: Make this portable to other architectures?
+    ///
+    /// To make sure this value is portable, it should be computed using the
+    /// [`crypto_bigint::nlimbs`] macro.
     const MIN_LIMBS_NEEDED: usize;
 
     /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
