@@ -1,8 +1,5 @@
-use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
-use ocelot::svole::{
-    wykw::{Receiver, Sender},
-    SVoleReceiver, SVoleSender,
-};
+use ocelot::svole::{Receiver, Sender};
+use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F40b, AbstractChannel, AesRng};
 use std::io::{Read, Write};
 use std::{
@@ -76,7 +73,6 @@ impl<S: Read + Write> AbstractChannel for OurTrackChannel<S> {
 type VSender = Sender<F40b>;
 type VReceiver = Receiver<F40b>;
 
-// <FE: FF, VSender: SVoleSender<Msg = FE>, VReceiver: SVoleReceiver<Msg = FE>>
 fn run() {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {

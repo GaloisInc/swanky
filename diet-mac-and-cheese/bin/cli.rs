@@ -3,7 +3,7 @@ Cli utilities.
 
 */
 use clap::{Parser, Subcommand, ValueEnum};
-use ocelot::svole::wykw::{
+use ocelot::svole::{
     LpnParams, LPN_EXTEND_LARGE, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_LARGE,
     LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
 };

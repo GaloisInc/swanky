@@ -7,164 +7,14 @@
 use eyre::{eyre, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
-use ocelot::svole::wykw::{LpnParams, Receiver, Sender};
-use ocelot::svole::{SVoleReceiver, SVoleSender};
-use rand::{CryptoRng, Rng, SeedableRng};
+use ocelot::svole::{LpnParams, Receiver, Sender};
+use rand::{Rng, SeedableRng};
 use scuttlebutt::field::Degree;
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::time::Instant;
 use subtle::{Choice, ConditionallySelectable};
-
-#[allow(unused)]
-#[allow(missing_docs)]
-pub(crate) enum Party<T1, T2> {
-    Prover(T1),
-    Verifier(T2),
-}
-
-#[allow(unused)]
-impl<T1, T2> Party<T1, T2> {
-    fn as_prover(&mut self) -> &mut T1 {
-        match self {
-            Party::Prover(t) => t,
-            _ => {
-                panic!("Prover expected")
-            }
-        }
-    }
-
-    fn as_verif(&mut self) -> &mut T2 {
-        match self {
-            Party::Verifier(t) => t,
-            _ => {
-                panic!("Verifier expected")
-            }
-        }
-    }
-}
-
-#[allow(unused)]
-#[allow(missing_docs)]
-pub(crate) trait Mac: Sized {
-    type ClearValue;
-    type AuthValue;
-    fn get_clear(&self) -> &Self::ClearValue;
-    fn get_auth(&self) -> &Self::AuthValue;
-}
-
-#[allow(unused)]
-#[allow(missing_docs)]
-pub(crate) trait HomComT: Sized {
-    type HomComMac: Mac;
-
-    /// Initialize the functionality.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-    ) -> Result<Self>;
-
-    /// Duplicate the functionality.
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self>;
-
-    /// Returns a random mac.
-    fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self::HomComMac>;
-
-    /// Input a slice of values and returns a vector of its macs.
-    fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        x: Party<&[<Self::HomComMac as Mac>::ClearValue], usize>,
-    ) -> Result<Vec<<Self::HomComMac as Mac>::AuthValue>>;
-
-    /// lower level implementation of `input` with pre-defined out vector.
-    fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        x: Party<&[<Self::HomComMac as Mac>::ClearValue], usize>,
-        out: &mut Vec<<Self::HomComMac as Mac>::AuthValue>,
-    ) -> Result<()>;
-
-    /// Input a single value and returns its mac.
-    fn input1<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        x: Party<<Self::HomComMac as Mac>::ClearValue, ()>,
-    ) -> Result<<Self::HomComMac as Mac>::AuthValue>;
-
-    /// Add a constant to a Mac.
-    fn affine_add_cst(
-        &self,
-        cst: <Self::HomComMac as Mac>::ClearValue,
-        x: Self::HomComMac,
-    ) -> Self::HomComMac;
-
-    /// Multiply by a constant a Mac.
-    fn affine_mult_cst(
-        &self,
-        cst: <Self::HomComMac as Mac>::ClearValue,
-        x: Self::HomComMac,
-    ) -> Self::HomComMac;
-
-    /// Add two Macs.
-    fn add(&self, a: Self::HomComMac, b: Self::HomComMac) -> Self::HomComMac;
-
-    /// Negative Mac.
-    fn neg(&self, a: Self::HomComMac) -> Self::HomComMac;
-
-    /// Subtraction of two Macs.
-    fn sub(&self, a: Self::HomComMac, b: Self::HomComMac) -> Self::HomComMac;
-
-    /// Check that a batch of Macs are zero.
-    fn check_zero<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        x_mac_batch: &[Self::HomComMac],
-    ) -> Result<()>;
-
-    /// Open Macs.
-    fn open<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        batch: &[Self::HomComMac],
-        out: Party<(), &mut Vec<<Self::HomComMac as Mac>::ClearValue>>,
-    ) -> Result<()>;
-
-    /// Quicksilver multiplication check.
-    fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-        triples: &[(Self::HomComMac, Self::HomComMac, Self::HomComMac)],
-    ) -> Result<()>;
-
-    /// Push a multiplication triplet for later checking.
-    fn quicksilver_push(
-        &mut self,
-        triple: &(Self::HomComMac, Self::HomComMac, Self::HomComMac),
-    ) -> Result<()>;
-
-    /// Finalize the check for the list of pushed multiplication triples.
-    fn quicksilver_finalize<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<usize>;
-}
 
 /// This type holds the prover-side data associated with a MAC between a prover
 /// and verifier (see [`MacVerifier`] for the verifier-side data).
@@ -312,9 +162,9 @@ impl<FE: FiniteField> StateMultCheckProver<FE> {
 
 impl<FE: FiniteField> FComProver<FE> {
     /// Initialize the functionality.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -325,10 +175,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Duplicate the functionality.
-    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn duplicate<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<Self> {
         Ok(Self {
             svole_sender: self.svole_sender.duplicate(channel, rng)?,
@@ -337,10 +187,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Returns a random mac.
-    pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<MacProver<FE>> {
         match self.voles.pop() {
             Some(e) => Ok(MacProver(e.0, e.1)),
@@ -355,10 +205,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Input a slice of values and returns a vector of its macs.
-    pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         x: &[FE::PrimeField],
     ) -> Result<Vec<FE>> {
         let mut out = Vec::with_capacity(x.len());
@@ -367,10 +217,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// lower level implementation of `input` with pre-defined out vector.
-    pub fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input_low_level<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         x: &[FE::PrimeField],
         out: &mut Vec<FE>,
     ) -> Result<()> {
@@ -384,10 +234,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Input a single value and returns its mac.
-    pub fn input1<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input1<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         x: FE::PrimeField,
     ) -> Result<FE> {
         let r = self.random(channel, rng)?;
@@ -486,10 +336,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Quicksilver multiplication check.
-    pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn quicksilver_check_multiply<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         triples: &[(MacProver<FE>, MacProver<FE>, MacProver<FE>)],
     ) -> Result<()> {
         let mut sum_a0 = FE::ZERO;
@@ -548,10 +398,10 @@ impl<FE: FiniteField> FComProver<FE> {
     }
 
     /// Finalize the check for the list of pushed multiplication triples.
-    pub fn quicksilver_finalize<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn quicksilver_finalize<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         state: &mut StateMultCheckProver<FE>,
     ) -> Result<usize> {
         // The following block implements VOPE(1)
@@ -609,10 +459,7 @@ impl<FE> Drop for StateMultCheckVerifier<FE> {
 }
 
 impl<FE: FiniteField> StateMultCheckVerifier<FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let chi = FE::random(rng);
         channel.write_serializable::<FE>(&chi)?;
         channel.flush()?;
@@ -634,9 +481,9 @@ impl<FE: FiniteField> StateMultCheckVerifier<FE> {
 
 impl<FE: FiniteField> FComVerifier<FE> {
     /// Initialize the functionality.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -649,10 +496,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Duplicate the functionality.
-    pub fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn duplicate<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<Self> {
         Ok(Self {
             delta: self.get_delta(),
@@ -668,10 +515,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Returns a random mac.
-    pub fn random<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<MacVerifier<FE>> {
         match self.voles.pop() {
             Some(e) => Ok(MacVerifier(e)),
@@ -692,10 +539,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Input a number of values and returns the associated macs.
-    pub fn input<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num: usize,
     ) -> Result<Vec<MacVerifier<FE>>> {
         let mut out = Vec::with_capacity(num);
@@ -704,10 +551,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// lower level implementation of `input` for predefined  out vector.
-    pub fn input_low_level<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input_low_level<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num: usize,
         out: &mut Vec<MacVerifier<FE>>,
     ) -> Result<()> {
@@ -720,10 +567,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Input a single value and returns its associated Mac.
-    pub fn input1<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input1<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<MacVerifier<FE>> {
         let r = self.random(channel, rng)?;
         let y = channel.read_serializable::<FE::PrimeField>()?;
@@ -767,10 +614,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Check that a batch of Macs are zero.
-    pub fn check_zero<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn check_zero<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         key_batch: &[MacVerifier<FE>],
     ) -> Result<()> {
         let seed = rng.gen::<Block>();
@@ -833,10 +680,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Quicksilver multiplication check.
-    pub fn quicksilver_check_multiply<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn quicksilver_check_multiply<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         triples: &[(MacVerifier<FE>, MacVerifier<FE>, MacVerifier<FE>)],
     ) -> Result<()> {
         let chi = FE::random(rng);
@@ -893,10 +740,10 @@ impl<FE: FiniteField> FComVerifier<FE> {
     }
 
     /// Finalize the check for the list of pushed multiplication triples.
-    pub fn quicksilver_finalize<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn quicksilver_finalize<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         state: &mut StateMultCheckVerifier<FE>,
     ) -> Result<usize> {
         // The following block implements VOPE(1)
@@ -932,7 +779,7 @@ impl<FE: FiniteField> FComVerifier<FE> {
 #[cfg(test)]
 mod tests {
     use super::{FComProver, FComVerifier, MacProver};
-    use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{
         field::{F40b, F61p, FiniteField},

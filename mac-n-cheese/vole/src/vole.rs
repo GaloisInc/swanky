@@ -5,7 +5,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use keyed_arena::{AllocationKey, KeyedArena};
 use mac_n_cheese_party as party;
 use ocelot::ot::explicit_round::{KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2};
-use ocelot::svole::wykw::ggm_utils::*;
+use ocelot::svole::ggm_utils::*;
 use party::{Party, IS_PROVER, IS_VERIFIER};
 use rand::prelude::Distribution;
 use rand::{distributions::Uniform, CryptoRng, Rng, SeedableRng};

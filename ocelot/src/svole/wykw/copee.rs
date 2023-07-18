@@ -16,7 +16,7 @@ use scuttlebutt::{
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
-pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
+pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128, Aes128)>,
     pows: Powers<FE>,
@@ -25,7 +25,7 @@ pub struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     counter: u64,
 }
 
-pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
+pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: GenericArray<bool, FE::NumberOfBitsInBitDecomposition>,
@@ -36,8 +36,8 @@ pub struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
-pub type CopeeSender<FE> = Sender<KosSender, FE>;
-pub type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
+pub(super) type CopeeSender<FE> = Sender<KosSender, FE>;
+pub(super) type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
 
 // Uses `Aes128` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
@@ -46,7 +46,7 @@ fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
 }
 
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
@@ -76,7 +76,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         })
     }
 
-    pub fn send<C: AbstractChannel>(
+    pub(super) fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         input: &FE::PrimeField,
@@ -100,7 +100,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
 }
 
 impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
-    pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
@@ -129,7 +129,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             counter: 0,
         })
     }
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
@@ -138,11 +138,11 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
         Self::init_with_picked_delta(channel, pows, rng, delta)
     }
 
-    pub fn delta(&self) -> FE {
+    pub(super) fn delta(&self) -> FE {
         self.delta
     }
 
-    pub fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
+    pub(super) fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
         let pt = Block::from(self.counter as u128);
         let mut res = FE::ZERO;
         for (j, pow) in self.pows.get().iter().enumerate() {
