@@ -64,7 +64,7 @@ fn bench_svole<F: FiniteField>(
     let mut vole_receiver = vole_receiver.lock().unwrap();
     let mut out = Vec::new();
     vole_receiver
-        .receive(&mut channel, &mut rng, &mut out)
+        .receive::<_, F::PrimeField>(&mut channel, &mut rng, &mut out)
         .unwrap();
     black_box(out);
     handle.join().unwrap();

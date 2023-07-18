@@ -416,7 +416,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &RcRefCell<FComVerifier<F40b>>,
+        fcom_f2: &RcRefCell<FComVerifier<F2, F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -937,7 +937,7 @@ pub enum Party {
 pub struct EvaluatorCirc<C: AbstractChannel + 'static> {
     inputs: CircInputs,
     fcom_f2_prover: Option<RcRefCell<FComProver<F2, F40b>>>, // RcRefCell because of a unique Homcom functionality F2 shared by all other fields
-    fcom_f2_verifier: Option<RcRefCell<FComVerifier<F40b>>>,
+    fcom_f2_verifier: Option<RcRefCell<FComVerifier<F2, F40b>>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT>>,
     f2_idx: usize,
@@ -976,7 +976,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         };
 
         let fcom_f2_verifier = if party == Party::Verifier {
-            Some(RcRefCell::new(FComVerifier::<F40b>::init(
+            Some(RcRefCell::new(FComVerifier::<F2, F40b>::init(
                 channel, &mut rng, lpn_setup, lpn_extend,
             )?))
         } else {
@@ -2199,9 +2199,13 @@ pub(crate) mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let fcom =
-            FComVerifier::<F40b>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let fcom = FComVerifier::<F2, F40b>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
         let rfcom = RcRefCell::new(fcom);
 
         let mut party = DietMacAndCheeseConvVerifier::<F61p, _>::init(

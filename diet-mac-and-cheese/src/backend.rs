@@ -386,7 +386,7 @@ impl<FE: FiniteField, C: AbstractChannel> Drop for DietMacAndCheeseProver<FE, C>
 
 /// Verifier for Diet Mac'n'Cheese.
 pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel> {
-    verifier: RcRefCell<FComVerifier<FE>>,
+    verifier: RcRefCell<FComVerifier<FE::PrimeField, FE>>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacVerifier<FE>>,
@@ -534,7 +534,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         mut rng: AesRng,
-        fcom: &RcRefCell<FComVerifier<FE>>,
+        fcom: &RcRefCell<FComVerifier<FE::PrimeField, FE>>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
@@ -551,7 +551,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
     }
 
     /// Get party
-    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComVerifier<FE>> {
+    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComVerifier<FE::PrimeField, FE>> {
         &self.verifier
     }
 

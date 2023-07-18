@@ -971,8 +971,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 /// Verifier for the edabits conversion protocol
 pub struct VerifierConv<FE: FiniteField> {
     #[allow(missing_docs)]
-    pub fcom_f2: RcRefCell<FComVerifier<F40b>>,
-    fcom_fe: RcRefCell<FComVerifier<FE>>,
+    pub fcom_f2: RcRefCell<FComVerifier<F2, F40b>>,
+    fcom_fe: RcRefCell<FComVerifier<FE::PrimeField, FE>>,
 }
 
 // The Finite field is required to be a prime field because of the fdabit
@@ -997,7 +997,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     pub fn init_half<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
-        fcom_f2: &mut FComVerifier<F40b>,
+        fcom_f2: &mut FComVerifier<F2, F40b>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -1011,8 +1011,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
 
     #[allow(missing_docs)]
     pub fn init_zero(
-        fcom_f2: &RcRefCell<FComVerifier<F40b>>,
-        fcom_fe: &RcRefCell<FComVerifier<FE>>,
+        fcom_f2: &RcRefCell<FComVerifier<F2, F40b>>,
+        fcom_fe: &RcRefCell<FComVerifier<FE::PrimeField, FE>>,
     ) -> Result<Self> {
         Ok(Self {
             fcom_f2: fcom_f2.clone(),
