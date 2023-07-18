@@ -4,7 +4,7 @@ use super::{
     utils::Powers,
 };
 use crate::errors::Error;
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::typenum::Unsigned;
 use rand::{
     distributions::{Distribution, Uniform},
     Rng, SeedableRng,
@@ -152,6 +152,11 @@ impl<FE: FiniteField> Sender<FE> {
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + degree;
+        // The number of `FE::PrimeField` elements to pack in a single `SFE`
+        // element.
+        let npacked = DegreeModulo::<FE::PrimeField, SFE>::USIZE;
+        // TODO: Can we avoid computing this each time we run `send_internal`?
+        let powers = Powers::<SFE>::default();
 
         debug_assert!(
             self.base_voles.len() >= used,
@@ -182,8 +187,8 @@ impl<FE: FiniteField> Sender<FE> {
         let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
 
         let mut j = 0;
-        let mut arr: GenericArray<FE::PrimeField, DegreeModulo<FE::PrimeField, SFE>> =
-            GenericArray::default();
+        let mut value = SFE::ZERO;
+        let mut key = FE::ZERO;
         for (i, (e, c)) in uws.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
             // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
@@ -197,23 +202,24 @@ impl<FE: FiniteField> Sender<FE> {
             if i < num_saved {
                 base_voles.push((x, z));
             } else {
-                // For VOLEs we are not saving, we construct the necessary
-                // subfield element, only pushing to the `output` vector once
-                // the subfield has been constructed.
-                arr[j] = x;
+                // We construct the `value` and `key` elements by computing `e_0
+                // + e_1 * g + e_2 * g^2 + ...`, where `g` is the field generator.
+                value += x.into() * powers.get()[j];
+                key += z * self.spsvole.pows.get()[j];
                 j += 1;
-                if j == DegreeModulo::<FE::PrimeField, SFE>::USIZE {
-                    output.push((SFE::from_subfield(&arr), z));
+                if j == npacked {
+                    output.push((value, key));
+                    // Reset the state so we can pack the next element.
                     j = 0;
-                    arr = GenericArray::default();
+                    value = SFE::ZERO;
+                    key = FE::ZERO;
                 }
             }
         }
-        assert_eq!(j, 0);
         base_voles.extend(self.base_voles[used..].iter());
         self.base_voles = base_voles;
         debug_assert_eq!(self.base_voles.len(), num_saved + leftover);
-        debug_assert_eq!(output.len(), cols - num_saved);
+        debug_assert_eq!(output.len(), (cols - num_saved) / npacked);
         Ok(())
     }
 }
@@ -342,6 +348,8 @@ impl<FE: FiniteField> Receiver<FE> {
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + degree;
+        // The number of elements to pack.
+        let npacked = DegreeModulo::<FE::PrimeField, SFE>::USIZE;
 
         debug_assert!(
             self.base_voles.len() >= used,
@@ -368,8 +376,7 @@ impl<FE: FiniteField> Receiver<FE> {
         let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
 
         let mut j = 0;
-        // let mut arr: GenericArray<FE, DegreeModulo<FE::PrimeField, SFE>> = GenericArray::default();
-        let mut arr = GenericArray::default();
+        let mut key = FE::ZERO;
         for (i, b) in vs.into_iter().enumerate() {
             let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
             let mut y = b;
@@ -379,19 +386,22 @@ impl<FE: FiniteField> Receiver<FE> {
             if i < num_saved {
                 base_voles.push(y);
             } else {
-                arr[j] = y;
+                // We construct the `key` element  by computing `e_0
+                // + e_1 * g + e_2 * g^2 + ...`, where `g` is the field
+                //   generator.
+                key += y * self.spsvole.pows.get()[j];
                 j += 1;
-                if j == DegreeModulo::<FE::PrimeField, SFE>::USIZE {
-                    output.push(FE::from_subfield(&arr));
+                if j == npacked {
+                    output.push(key);
+                    // Reset the state so we can pack the next element.
                     j = 0;
-                    arr = GenericArray::default();
+                    key = FE::ZERO;
                 }
             }
         }
-        assert_eq!(j, 0);
         base_voles.extend(self.base_voles[used..].iter());
         self.base_voles = base_voles;
-        debug_assert_eq!(output.len(), cols - num_saved);
+        debug_assert_eq!(output.len(), (cols - num_saved) / npacked);
         Ok(())
     }
 }
