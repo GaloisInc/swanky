@@ -23,7 +23,6 @@ members = [
     "popsicle",
     "scuttlebutt",
     "simple-arith-circuit",
-    "swanky-flatbuffer-build",
     "vectoreyes",
     "zkv",
 ]
@@ -63,7 +62,7 @@ swanky-field-f61p = { path = "crates/field-f61p" }
 swanky-field-ff-primes = { path = "crates/field-ff-primes" }
 swanky-field-fft = { path = "crates/field-fft" }
 swanky-field-test = { path = "crates/field-test" }
-swanky-flatbuffer-build = { path = "swanky-flatbuffer-build" }
+swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
 swanky-generic-array = { path = "crates/generic-array" }
 swanky-serialization = { path = "crates/serialization" }
 vectoreyes = { path = "vectoreyes" }
@@ -106,7 +105,7 @@ crypto-bigint = { version =  "0.5.2", features = ["generic-array"] }
 dhat = "0.3.2"
 digest = "0.10.7"
 eyre = "0.6.8"
-flatbuffers = "23.5.26" # Keep this version in sync with swanky-flatbuffer-build/src/lib.rs!
+flatbuffers = "23.5.26" # Keep this version in sync with crates/flatbuffer-build/src/lib.rs
 flume = "0.10.14"
 generic-array = "0.14.7"
 hex = "0.4.3"
