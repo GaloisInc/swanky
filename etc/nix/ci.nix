@@ -10,8 +10,7 @@ with import ./pkgs.nix {};
     cargo-deny
     lld_16
     git
-    (python310.withPackages (py: [
-      py.toml
+    (python311.withPackages (py: [
       py.rich
       py.typer
       py.black
