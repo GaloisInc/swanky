@@ -13,7 +13,6 @@ mod impls;
 /// Types that implement this trait have a canonical serialization and a fixed
 /// serialization size.
 pub trait CanonicalSerialize: Copy + Serialize + DeserializeOwned {
-    // TODO: make these GATs over the Read/Write type once GATs are stabilized
     /// A way to serialize field elements of this type.
     ///
     /// See [`SequenceSerializer`] for more info.
@@ -106,6 +105,7 @@ impl<E: CanonicalSerialize> SequenceDeserializer<E> for ByteElementDeserializer<
     }
 }
 
+// TODO: move this to swanky-field.
 /// The error which occurs if the inputted value or bit pattern doesn't correspond to
 /// an element.
 #[derive(Debug, Clone, Copy)]
@@ -128,9 +128,8 @@ impl std::fmt::Display for BytesDeserializationCannotFail {
 impl std::error::Error for BytesDeserializationCannotFail {}
 
 /// Provides `serde` serialize / deserialize functionality for vectors of elements.
-#[cfg(feature = "serde")]
 pub mod serde_vec {
-    use crate::serialization::{CanonicalSerialize, SequenceDeserializer, SequenceSerializer};
+    use super::*;
 
     /// Serializes a vector of elements using `serde`.
     pub fn serialize<E: CanonicalSerialize, S: serde::Serializer>(
@@ -220,20 +219,60 @@ pub mod serde_vec {
     }
 }
 
-macro_rules! serde_implementation {
+/// Dependent crates might not neccessarily depend on `serde`, themsevles.
+/// Nonetheless, macros written in _this_ crate need to be able to access `serde`, even when
+/// those macros are invoked from other crates. To solve this problem, we re-export the crate that
+/// our macros need.
+#[doc(hidden)]
+pub use serde as __serde_for_macro;
+
+/// Implement [`serde::Serialize`] and [`serde::Deserialize`] via an existing
+/// [`CanonicalSerialize`] implementation.
+///
+/// # Example
+/// ```
+/// use swanky_serialization::*;
+/// use generic_array::GenericArray;
+/// #[derive(Clone, Copy)]
+/// pub struct Foo;
+/// impl CanonicalSerialize for Foo {
+///     type Serializer = ByteElementSerializer<Self>;
+///     type Deserializer = ByteElementDeserializer<Self>;
+///     type ByteReprLen = generic_array::typenum::U0;
+///     type FromBytesError = BytesDeserializationCannotFail;
+///
+///     fn from_bytes(
+///         _bytes: &GenericArray<u8, Self::ByteReprLen>,
+///     ) -> Result<Self, Self::FromBytesError> {
+///         Ok(Foo)
+///     }
+///
+///     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+///         Default::default()
+///     }
+/// }
+/// derive_serde_via_canonical_serialize!(Foo);
+/// ````
+#[macro_export]
+macro_rules! derive_serde_via_canonical_serialize {
     ($f:ident) => {
-        impl serde::Serialize for $f {
-            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                let bytes = <Self as $crate::serialization::CanonicalSerialize>::to_bytes(&self);
+        impl $crate::__serde_for_macro::Serialize for $f {
+            fn serialize<S: $crate::__serde_for_macro::Serializer>(
+                &self,
+                serializer: S,
+            ) -> Result<S::Ok, S::Error> {
+                let bytes = <Self as $crate::CanonicalSerialize>::to_bytes(&self);
                 serializer.serialize_bytes(&bytes)
             }
         }
 
-        impl<'de> serde::Deserialize<'de> for $f {
-            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        impl<'de> $crate::__serde_for_macro::Deserialize<'de> for $f {
+            fn deserialize<D: $crate::__serde_for_macro::Deserializer<'de>>(
+                deserializer: D,
+            ) -> Result<Self, D::Error> {
                 struct FieldVisitor;
 
-                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                impl<'de> $crate::__serde_for_macro::de::Visitor<'de> for FieldVisitor {
                     type Value = $f;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -242,33 +281,31 @@ macro_rules! serde_implementation {
                             formatter,
                             "a field element {} ({} bytes)",
                             std::any::type_name::<Self>(),
-                            <$f as $crate::serialization::CanonicalSerialize>::ByteReprLen::USIZE
+                            <$f as $crate::CanonicalSerialize>::ByteReprLen::USIZE
                         )
                     }
 
-                    fn visit_borrowed_bytes<E: serde::de::Error>(
+                    fn visit_borrowed_bytes<E: $crate::__serde_for_macro::de::Error>(
                         self,
                         v: &'de [u8],
                     ) -> Result<Self::Value, E> {
                         use generic_array::typenum::Unsigned;
-                        if v.len()
-                            != <$f as $crate::serialization::CanonicalSerialize>::ByteReprLen::USIZE
-                        {
+                        if v.len() != <$f as $crate::CanonicalSerialize>::ByteReprLen::USIZE {
                             return Err(E::invalid_length(v.len(), &self));
                         }
                         let bytes = generic_array::GenericArray::from_slice(v);
-                        <$f as $crate::serialization::CanonicalSerialize>::from_bytes(&bytes)
-                            .map_err(serde::de::Error::custom)
+                        <$f as $crate::CanonicalSerialize>::from_bytes(&bytes)
+                            .map_err($crate::__serde_for_macro::de::Error::custom)
                     }
 
                     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
                     where
-                        A: serde::de::SeqAccess<'de>,
+                        A: $crate::__serde_for_macro::de::SeqAccess<'de>,
                     {
-                        use serde::de::Error;
+                        use $crate::__serde_for_macro::de::Error;
                         let mut bytes = generic_array::GenericArray::<
                             u8,
-                            <$f as $crate::serialization::CanonicalSerialize>::ByteReprLen,
+                            <$f as $crate::CanonicalSerialize>::ByteReprLen,
                         >::default();
                         for (i, byte) in bytes.iter_mut().enumerate() {
                             *byte = match seq.next_element()? {
@@ -279,8 +316,8 @@ macro_rules! serde_implementation {
                         if let Some(_) = seq.next_element::<u8>()? {
                             return Err(A::Error::invalid_length(bytes.len() + 1, &self));
                         }
-                        <$f as $crate::serialization::CanonicalSerialize>::from_bytes(&bytes)
-                            .map_err(serde::de::Error::custom)
+                        <$f as $crate::CanonicalSerialize>::from_bytes(&bytes)
+                            .map_err($crate::__serde_for_macro::de::Error::custom)
                     }
                 }
 
@@ -289,94 +326,3 @@ macro_rules! serde_implementation {
         }
     };
 }
-
-pub(crate) use serde_implementation;
-
-/// Serialization tests.
-/// XXX: Currently this assumes `$f` is a `FiniteRing`.
-#[cfg(test)]
-macro_rules! test_serialization {
-    ($mod_name: ident, $f: ty) => {
-        mod $mod_name {
-            use proptest::prelude::*;
-            use crate::serialization::CanonicalSerialize;
-            fn any_element() -> impl Strategy<Value=$f> {
-                any::<u128>().prop_map(|seed| {
-                    <$f as $crate::field::FiniteRing>::from_uniform_bytes(&seed.to_le_bytes())
-                })
-            }
-            proptest! {
-                #[test]
-                fn to_and_from_bytes(a in any_element()) {
-                    let buf = a.to_bytes();
-                    assert_eq!(a, <$f>::from_bytes(&buf).unwrap());
-                }
-            }
-            proptest! {
-                #[test]
-                fn false_equality_works(a in any_element(), b in any_element()) {
-                    if a == b {
-                        prop_assert_eq!(a.to_bytes(), b.to_bytes());
-                    } else {
-                        prop_assert_ne!(a.to_bytes(), b.to_bytes());
-                    }
-                }
-            }
-            proptest! {
-                #[test]
-                fn serde_serialize_serde_json(a in any_element()) {
-                    let ser = serde_json::to_string(&a).unwrap();
-                    let b: $f = serde_json::from_str(&ser).unwrap();
-                    assert_eq!(a, b);
-                }
-            }
-            proptest! {
-                #[test]
-                fn serde_serialize_bincode(a in any_element()) {
-                    let ser = bincode::serialize(&a).unwrap();
-                    let b: $f = bincode::deserialize(&ser).unwrap();
-                    assert_eq!(a, b);
-                }
-            }
-            proptest! {
-                #[test]
-                fn serialize(xs in proptest::collection::vec(any_element(), proptest::collection::SizeRange::default())) {
-                    use crate::serialization::*;
-                    let mut buf = Vec::new();
-                    let mut cursor = std::io::Cursor::new(&mut buf);
-                    let mut serializer = <$f as CanonicalSerialize>::Serializer::new(&mut cursor).unwrap();
-                    for x in xs.iter().copied() {
-                        serializer.write(&mut cursor, x).unwrap();
-                    }
-                    serializer.finish(&mut cursor).unwrap();
-                    prop_assert_eq!(cursor.get_ref().len(), <$f as CanonicalSerialize>::Serializer::serialized_size(xs.len()));
-                    cursor.set_position(0);
-                    let mut deserializer = <$f as CanonicalSerialize>::Deserializer::new(&mut cursor).unwrap();
-                    for x in xs.into_iter() {
-                        prop_assert_eq!(x, deserializer.read(&mut cursor).unwrap());
-                    }
-                }
-            }
-            #[cfg(feature = "serde")]
-            proptest! {
-                #[test]
-                fn serde_serialize_vec(xs in proptest::collection::vec(any_element(), proptest::collection::SizeRange::default())) {
-                    use crate::serialization::serde_vec;
-                    #[derive(serde::Serialize, serde::Deserialize)]
-                    struct Struct {
-                        #[serde(with = "serde_vec")]
-                        v: Vec<$f>
-                    }
-                    let xs = Struct {v: xs};
-                    let bytes = bincode::serialize(&xs).unwrap();
-                    let ys: Struct = bincode::deserialize(&bytes).unwrap();
-                    for (x, y) in xs.v.into_iter().zip(ys.v.into_iter()) {
-                        prop_assert_eq!(x, y);
-                    }
-                }
-            }
-        }
-    }
-}
-#[cfg(test)]
-pub(crate) use test_serialization;

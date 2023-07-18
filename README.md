@@ -11,6 +11,14 @@
 * `popsicle`: Private-set intersection.
 * `scuttlebutt`: Core primitives used by other `swanky` crates.
 * `simple-arith-circuit`: Simple flat arithmetic circuit representation.
+* `swanky-field`: Definitions of the core `FiniteField` and `FiniteRing` traits
+* `swanky-field-binary`: Binary (extension) finite fields
+* `swanky-field-f61p`: The finite field for the 61-bit mersenne prime
+* `swanky-field-ff-primes`: Arithmetic fields of prime order larger than 64
+* `swanky-field-fft`: Utilities for performing FFTs on fields
+* `swanky-field-test`: Utilities for testing that finite field implementations are correct
+* `swanky-generic-array`: Utilities to make it easier to use generic arrays from the `generic-array` crate
+* `swanky-serialization`: Traits and utilities for compact serialization into a canonical byte representation
 
 # A note on security
 

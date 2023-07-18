@@ -73,7 +73,6 @@ pub(crate) use try_from_helper;
 /// * `$num_bits`: The number of bits required to store `$modulus`, given as a `generic_array::typenum`.
 /// * \[Optional\] `$single_limb_modulus`: If `$limbs` is one, then this can contain `$modulus`
 ///    (given as an _integer_ not a string!) to enable faster random value generation.
-#[macro_export]
 macro_rules! prime_field_using_ff {
     (
         $(#[$m: meta])*
@@ -88,9 +87,8 @@ macro_rules! prime_field_using_ff {
         $(single_limb_modulus = $single_limb_modulus: expr)?
     ) => {
         mod $mod_name {
-            use crate::field::{FiniteField, Polynomial, PrimeFiniteField};
-            use crate::serialization::{CanonicalSerialize, BiggerThanModulus};
-            use crate::ring::FiniteRing;
+            use swanky_field::{FiniteField, polynomial::Polynomial, PrimeFiniteField, FiniteRing};
+            use swanky_serialization::{CanonicalSerialize, BiggerThanModulus};
             use ff::{Field, PrimeField};
             use generic_array::GenericArray;
             use rand_core::{RngCore, SeedableRng};
@@ -157,8 +155,8 @@ macro_rules! prime_field_using_ff {
             }
 
             impl CanonicalSerialize for $name {
-                type Serializer = crate::serialization::ByteElementSerializer<Self>;
-                type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
+                type Serializer = swanky_serialization::ByteElementSerializer<Self>;
+                type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
 
                 type ByteReprLen = $num_bytes;
                 type FromBytesError = BiggerThanModulus;
@@ -177,7 +175,7 @@ macro_rules! prime_field_using_ff {
             }
 
             impl FiniteRing for $name {
-                $crate::field::prime_field_using_ff::random_function_helper!($($single_limb_modulus)?);
+                $crate::prime_field_using_ff::random_function_helper!($($single_limb_modulus)?);
 
                 const ZERO: Self = Self {
                     internal: Internal::ZERO,
@@ -225,7 +223,7 @@ macro_rules! prime_field_using_ff {
                 }
             }
 
-            $crate::field::prime_field_using_ff::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
+            crate::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
 
             impl PrimeFiniteField for $name {}
 
@@ -247,10 +245,10 @@ macro_rules! prime_field_using_ff {
                 }
             }
 
-            field_ops!($name);
+            swanky_field::field_ops!($name);
 
             #[cfg(test)]
-            test_field!(test_field, $crate::field::$name);
+            swanky_field_test::test_field!(test_field, $name);
 
             #[cfg(test)]
             mod tests {
@@ -313,6 +311,7 @@ macro_rules! prime_field_using_ff {
         pub use $mod_name::$name;
     }
 }
+pub(crate) use prime_field_using_ff;
 
 // The modulus and generator for these fields is specified in `build.rs`
 prime_field_using_ff!(

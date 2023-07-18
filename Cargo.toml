@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/*",
     "diet-mac-and-cheese",
     "diet-mac-and-cheese/web-mac-and-cheese/wasm",
     "diet-mac-and-cheese/web-mac-and-cheese/websocket",
@@ -36,10 +37,9 @@ publish = false
 version = "0.5.0"
 
 [workspace.dependencies]
-# Our crates
+# Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by etc/new-crate.py
+# BEGIN OUR CRATES
 diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
-web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
-web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 fancy-garbling = { path = "fancy-garbling" }
 fancy-garbling-base-conversion = { path = "fancy-garbling/base_conversion" }
 humidor = { path = "humidor" }
@@ -57,9 +57,20 @@ ocelot = { path = "ocelot" }
 popsicle = { path = "popsicle" }
 scuttlebutt = { path = "scuttlebutt" }
 simple-arith-circuit = { path = "simple-arith-circuit" }
+swanky-field = { path = "crates/field" }
+swanky-field-binary = { path = "crates/field-binary" }
+swanky-field-f61p = { path = "crates/field-f61p" }
+swanky-field-ff-primes = { path = "crates/field-ff-primes" }
+swanky-field-fft = { path = "crates/field-fft" }
+swanky-field-test = { path = "crates/field-test" }
 swanky-flatbuffer-build = { path = "swanky-flatbuffer-build" }
+swanky-generic-array = { path = "crates/generic-array" }
+swanky-serialization = { path = "crates/serialization" }
 vectoreyes = { path = "vectoreyes" }
-
+web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
+web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
+# END OUR CRATES
+# Don't remove, or modify, the above "# END OUR CRATES" line. It's used by etc/new-crate.py
 
 # Patched Dependencies
 ff = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }

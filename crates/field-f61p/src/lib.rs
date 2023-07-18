@@ -1,10 +1,9 @@
-use crate::field::{polynomial::Polynomial, FiniteField, PrimeFiniteField};
-use crate::ring::FiniteRing;
-use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
 use generic_array::GenericArray;
-use rand_core::RngCore;
+use rand::Rng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
 
 /// A finite field over the Mersenne Prime 2^61 - 1
 #[derive(Clone, Copy, Eq, Debug, Hash)]
@@ -37,7 +36,7 @@ impl FiniteRing for F61p {
 
     /// This has a 2^-61 probability of being a biased draw.
     #[inline]
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+    fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
         F61p(reduce(rng.next_u64() as u128))
     }
 
@@ -46,8 +45,8 @@ impl FiniteRing for F61p {
 }
 
 impl CanonicalSerialize for F61p {
-    type Serializer = crate::serialization::ByteElementSerializer<Self>;
-    type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
+    type Serializer = swanky_serialization::ByteElementSerializer<Self>;
+    type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
     type ByteReprLen = generic_array::typenum::U8;
     type FromBytesError = BiggerThanModulus;
 
@@ -82,7 +81,7 @@ impl FiniteField for F61p {
     type NumberOfBitsInBitDecomposition = generic_array::typenum::U61;
 
     fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
-        super::standard_bit_decomposition(u128::from(self.0))
+        swanky_field::standard_bit_decomposition(u128::from(self.0))
     }
     fn inverse(&self) -> Self {
         if *self == Self::ZERO {
@@ -172,14 +171,14 @@ impl TryFrom<u128> for F61p {
 
 impl PrimeFiniteField for F61p {}
 
-field_ops!(F61p, SUM_ALREADY_DEFINED);
+swanky_field::field_ops!(F61p, SUM_ALREADY_DEFINED);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    test_field!(test_field, crate::field::F61p);
+    swanky_field_test::test_field!(test_field, F61p);
 
     #[cfg(test)]
     proptest! {

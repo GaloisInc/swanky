@@ -1,13 +1,11 @@
-use crate::field::{Degree, FiniteField, Polynomial, F2};
-use crate::ring::FiniteRing;
-use crate::serialization::{BiggerThanModulus, CanonicalSerialize};
+use crate::F2;
 use bytemuck::{TransparentWrapper, Zeroable};
 use generic_array::{typenum::Unsigned, GenericArray};
-use rand::RngCore;
-use smallvec::smallvec;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use swanky_field::polynomial::Polynomial;
+use swanky_field::{Degree, FiniteField, FiniteRing};
 use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     SimdBase, U64x2,
@@ -60,10 +58,10 @@ macro_rules! small_binary_field {
         $(reduce_vectored = $reduce_vectored_fn:ident)?
     ) => {
         $(#[$m])*
-        #[derive(Debug, Clone, Copy, Hash, Eq, bytemuck::Zeroable, TransparentWrapper)]
+        #[derive(Debug, Clone, Copy, Hash, Eq, Zeroable, TransparentWrapper)]
         #[repr(transparent)]
         pub struct $name(u64);
-        field_ops!($name);
+        swanky_field::field_ops!($name);
         impl ConstantTimeEq for $name {
             #[inline]
             fn ct_eq(&self, other: &Self) -> Choice {
@@ -100,15 +98,15 @@ macro_rules! small_binary_field {
             }
         }
 
-        impl CanonicalSerialize for $name {
-            type Serializer = crate::serialization::ByteElementSerializer<Self>;
-            type Deserializer = crate::serialization::ByteElementDeserializer<Self>;
+        impl swanky_serialization::CanonicalSerialize for $name {
+            type Serializer = swanky_serialization::ByteElementSerializer<Self>;
+            type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
             // ceil($num_bits / 8) = ($num_bits + 8 - 1) / 8 = ($num_bits + 7) / 8
             type ByteReprLen = <
                 <generic_array::typenum::U7 as std::ops::Add<$num_bits>>::Output as
                 std::ops::Div<generic_array::typenum::U8>
             >::Output;
-            type FromBytesError = BiggerThanModulus;
+            type FromBytesError = swanky_serialization::BiggerThanModulus;
 
             #[inline]
             fn from_bytes(
@@ -120,7 +118,7 @@ macro_rules! small_binary_field {
                 if (raw >> <$num_bits as Unsigned>::U64) == 0 {
                     Ok($name(raw))
                 } else {
-                    Err(BiggerThanModulus)
+                    Err(swanky_serialization::BiggerThanModulus)
                 }
             }
 
@@ -137,13 +135,13 @@ macro_rules! small_binary_field {
 
         }
 
-        impl FiniteRing for $name {
+        impl swanky_field::FiniteRing for $name {
             #[inline]
             fn from_uniform_bytes(x: &[u8; 16]) -> Self {
                 Self::from_lower_bits(u128::from_le_bytes(*x) as u64)
             }
             #[inline]
-            fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+            fn random<R: rand::Rng + ?Sized>(rng: &mut R) -> Self {
                 Self::from_lower_bits(rng.next_u64())
             }
             const ZERO: Self = $name(0);
@@ -157,14 +155,14 @@ macro_rules! small_binary_field {
             // This corresponds to the polynomial P(x) = x
             const GENERATOR: Self = $name(0b10);
 
-            fn polynomial_modulus() -> Polynomial<Self::PrimeField> {
+            fn polynomial_modulus() -> swanky_field::polynomial::Polynomial<Self::PrimeField> {
                 $modulus_fn()
             }
 
             type NumberOfBitsInBitDecomposition = $num_bits;
 
             fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
-                super::standard_bit_decomposition(u128::from(self.0))
+                swanky_field::standard_bit_decomposition(u128::from(self.0))
             }
 
             fn inverse(&self) -> Self {
@@ -174,8 +172,8 @@ macro_rules! small_binary_field {
                 self.pow_var_time((1 << <$num_bits as Unsigned>::U64) - 2)
             }
         }
-        impl crate::ring::IsSubRingOf<$name> for F2 {}
-        impl crate::field::IsSubFieldOf<$name> for F2 {
+        impl swanky_field::IsSubRingOf<$name> for F2 {}
+        impl swanky_field::IsSubFieldOf<$name> for F2 {
             type DegreeModulo = $num_bits;
             fn decompose_superfield(fe: &$name) -> generic_array::GenericArray<Self, $num_bits> {
                 let x = fe.0;
@@ -272,7 +270,7 @@ macro_rules! small_binary_field {
                     prop_assert_eq!(b_reduced, $name::reduce(b).0);
                 }
             }
-            test_field!(test_field, crate::field::$name);
+            swanky_field_test::test_field!(test_field, $name);
         }
     };
 }
@@ -306,7 +304,7 @@ where
 }
 
 fn polynomial_modulus_f63b() -> Polynomial<F2> {
-    let mut coefficients = smallvec![F2::ZERO; 63];
+    let mut coefficients = vec![F2::ZERO; 63];
     coefficients[63 - 1] = F2::ONE;
     coefficients[1 - 1] = F2::ONE;
     Polynomial {
@@ -349,7 +347,7 @@ fn reduce_f56b(product: U64x2) -> F56b {
 }
 
 fn polynomial_modulus_f56b() -> Polynomial<F2> {
-    let mut coefficients = smallvec![F2::ZERO; 56];
+    let mut coefficients = vec![F2::ZERO; 56];
     coefficients[56 - 1] = F2::ONE;
     coefficients[8 - 1] = F2::ONE;
     coefficients[3 - 1] = F2::ONE;
@@ -384,7 +382,7 @@ fn reduce_f40b(product: U64x2) -> F40b {
 
 fn polynomial_modulus_f40b() -> Polynomial<F2> {
     // x^40 + x^5 + x^4 + x^3 + 1
-    let mut coefficients = smallvec![F2::ZERO; 40];
+    let mut coefficients = vec![F2::ZERO; 40];
     coefficients[40 - 1] = F2::ONE;
     coefficients[5 - 1] = F2::ONE;
     coefficients[4 - 1] = F2::ONE;
@@ -426,7 +424,7 @@ fn reduce_f45b(wide_product: U64x2) -> F45b {
 
 fn polynomial_modulus_f45b() -> Polynomial<F2> {
     //X2^45 + X2^28 + X2^17 + X2^11 + 1
-    let mut coefficients = smallvec![F2::ZERO; 128];
+    let mut coefficients = vec![F2::ZERO; 128];
     coefficients[45 - 1] = F2::ONE;
     coefficients[28 - 1] = F2::ONE;
     coefficients[17 - 1] = F2::ONE;

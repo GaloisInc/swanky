@@ -12,16 +12,26 @@ pub mod bloomfilter;
 pub mod channel;
 pub mod cointoss;
 pub mod commitment;
-pub mod field;
 mod hash_aes;
 mod rand_aes;
-pub mod ring;
-#[macro_use]
-pub mod serialization;
-pub mod generic_array_length;
+pub use swanky_generic_array as generic_array_length;
+pub use swanky_serialization as serialization;
 pub mod utils;
 
-pub(crate) mod ops;
+/// A polyfill for the `swanky-field*` family of crates.
+pub mod field {
+    pub use swanky_field::{
+        field_ops, polynomial, Degree, DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField,
+    };
+    pub use swanky_field_binary::*;
+    pub use swanky_field_f61p::*;
+    pub use swanky_field_ff_primes::*;
+    pub use swanky_field_fft as fft;
+}
+/// A polyfill for the ring functionality inside of `swanky-field`.
+pub mod ring {
+    pub use swanky_field::{ring_ops, FiniteRing, IsSubRingOf};
+}
 
 pub use crate::{
     aes::{

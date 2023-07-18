@@ -2,7 +2,6 @@
 
 use crate::field::FiniteField;
 use rand::RngCore;
-use smallvec::{smallvec, SmallVec};
 use std::{
     fmt::Debug,
     ops::{AddAssign, Index, IndexMut, MulAssign, SubAssign},
@@ -49,7 +48,7 @@ pub struct Polynomial<FE: FiniteField> {
     /// The coefficients for $`x^1, ..., x^n`$
     ///
     /// `coefficients[i]` is the coefficient for $`x^{i+1}`$
-    pub coefficients: SmallVec<[FE; 3]>,
+    pub coefficients: Vec<FE>,
 }
 
 impl<FE: FiniteField> Polynomial<FE> {
@@ -87,7 +86,7 @@ impl<FE: FiniteField> Polynomial<FE> {
     pub fn x() -> Self {
         Polynomial {
             constant: FE::ZERO,
-            coefficients: smallvec![FE::ONE],
+            coefficients: vec![FE::ONE],
         }
     }
 
@@ -132,7 +131,7 @@ impl<FE: FiniteField> Polynomial<FE> {
             let b = r.degree();
             let mut t = Polynomial {
                 constant: FE::ZERO,
-                coefficients: smallvec![FE::ZERO; b.checked_sub(d).unwrap()],
+                coefficients: vec![FE::ZERO; b.checked_sub(d).unwrap()],
             };
             t[b - d] = r[b] / divisor[d];
             q += &t;
@@ -150,7 +149,7 @@ impl<FE: FiniteField> Polynomial<FE> {
         assert!(!points.is_empty());
         let mut out = Polynomial {
             constant: FE::ZERO,
-            coefficients: smallvec![FE::ZERO; points.len() - 1],
+            coefficients: vec![FE::ZERO; points.len() - 1],
         };
         for (j, (xj, yj)) in points.iter().enumerate() {
             let mut l = Polynomial::one();
@@ -163,7 +162,7 @@ impl<FE: FiniteField> Polynomial<FE> {
                 let delta_x_inverse = delta_x.inverse();
                 l *= &Polynomial {
                     constant: -(*xm) * delta_x_inverse,
-                    coefficients: smallvec![delta_x_inverse],
+                    coefficients: vec![delta_x_inverse],
                 };
             }
             l *= *yj;
@@ -287,7 +286,7 @@ impl<FE: FiniteField> From<&[FE]> for Polynomial<FE> {
             1 => Self::constant(v[0]),
             _ => Self {
                 constant: v[0],
-                coefficients: SmallVec::from_slice(&v[1..]),
+                coefficients: v[1..].to_vec(),
             },
         }
     }
@@ -392,194 +391,4 @@ fn compute_newton_points<F: FiniteField>(points: &[F]) -> Vec<F> {
         }
     }
     cache
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{AesRng, Block};
-    use rand::Rng;
-    use rand_core::SeedableRng;
-
-    #[test]
-    fn test_degree() {
-        fn f<FE: FiniteField>() {
-            assert_eq!(Polynomial::<FE>::zero().degree(), 0);
-            assert_eq!(Polynomial::<FE>::one().degree(), 0);
-            assert_eq!(Polynomial::<FE>::x().degree(), 1);
-            assert_eq!(
-                (Polynomial {
-                    constant: FE::ZERO,
-                    coefficients: smallvec![FE::ZERO, FE::ZERO],
-                })
-                .degree(),
-                0
-            );
-            assert_eq!(
-                (Polynomial {
-                    constant: FE::ZERO,
-                    coefficients: smallvec![
-                        FE::ZERO,
-                        FE::ZERO,
-                        FE::ONE,
-                        FE::ZERO,
-                        FE::ZERO,
-                        FE::ZERO
-                    ],
-                })
-                .degree(),
-                3
-            );
-        }
-        call_with_finite_field!(f);
-    }
-
-    #[test]
-    fn test_addition() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..100 {
-                let a = Polynomial::random(&mut rng, 10);
-                let b = Polynomial::random(&mut rng, 10);
-                let mut product = a.clone();
-                product += &b;
-                for _ in 0..100 {
-                    let x = FE::random(&mut rng);
-                    assert_eq!(product.eval(x), a.eval(x) + b.eval(x));
-                }
-            }
-        }
-        call_with_finite_field!(f);
-    }
-
-    #[test]
-    fn test_subtraction() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..100 {
-                let a = Polynomial::random(&mut rng, 10);
-                let b = Polynomial::random(&mut rng, 10);
-                let mut product = a.clone();
-                product -= &b;
-                for _ in 0..100 {
-                    let x = FE::random(&mut rng);
-                    assert_eq!(product.eval(x), a.eval(x) - b.eval(x));
-                }
-            }
-        }
-        call_with_finite_field!(f);
-    }
-
-    #[test]
-    fn test_multiplication() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..100 {
-                let a = Polynomial::random(&mut rng, 10);
-                let b = Polynomial::random(&mut rng, 10);
-                let mut product = a.clone();
-                product *= &b;
-                for _ in 0..100 {
-                    let x = FE::random(&mut rng);
-                    assert_eq!(product.eval(x), a.eval(x) * b.eval(x));
-                }
-            }
-        }
-        call_with_finite_field!(f);
-    }
-
-    #[test]
-    fn test_scalar_multiplication() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..100 {
-                let a = Polynomial::random(&mut rng, 10);
-                let c = FE::random(&mut rng);
-                let mut product = a.clone();
-                product *= c;
-                for _ in 0..100 {
-                    let x = FE::random(&mut rng);
-                    assert_eq!(product.eval(x), a.eval(x) * c);
-                }
-            }
-        }
-        call_with_finite_field!(f);
-    }
-
-    #[test]
-    fn test_interpolation() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            {
-                let poly = Polynomial::interpolate(&[(FE::ZERO, FE::ZERO), (FE::ONE, FE::ONE)]);
-                assert_eq!(poly.eval(FE::ZERO), FE::ZERO);
-                assert_eq!(poly.eval(FE::ONE), FE::ONE);
-            }
-            {
-                let poly = Polynomial::interpolate(&[(FE::ZERO, FE::ONE)]);
-                assert_eq!(poly.eval(FE::ZERO), FE::ONE);
-            }
-            for _ in 0..100 {
-                let n_points = 5;
-                let mut points = Vec::new();
-                for _ in 0..n_points {
-                    let x = FE::random(&mut rng);
-                    let y = FE::random(&mut rng);
-                    points.push((x, y));
-                }
-                let p = Polynomial::interpolate(&points);
-                for (x, y) in points {
-                    assert_eq!(p.eval(x), y);
-                }
-            }
-        }
-        // We don't want collisions between x values.
-        call_with_big_finite_fields!(f);
-    }
-
-    #[test]
-    fn test_divmod() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            for _ in 0..1000 {
-                let degree1 = rng.gen_range(0usize..20usize);
-                let degree2 = rng.gen_range(0usize..20usize);
-                let a = Polynomial::<FE>::random(&mut rng, degree1);
-                let mut b = Polynomial::<FE>::random(&mut rng, degree2);
-                if b == Polynomial::<FE>::zero() {
-                    continue;
-                }
-                let (q, r) = a.divmod(&b);
-                assert!(
-                    r == Polynomial::zero() || r.degree() < b.degree(),
-                    "{:?} {:?}",
-                    r,
-                    b
-                );
-                b *= &q;
-                b += &r;
-                // a = b*q + r
-                assert_eq!(a, b);
-            }
-        }
-        call_with_finite_field!(f);
-    }
-
-    #[test]
-    fn test_newton_polynomial() {
-        fn f<FE: FiniteField>() {
-            let mut rng = AesRng::from_seed(Block::default());
-            let poly = Polynomial::random(&mut rng, 10);
-            let xs: Vec<_> = (0..10).map(|_| FE::random(&mut rng)).collect();
-            let ys: Vec<FE> = xs.iter().map(|&x| poly.eval(x)).collect();
-
-            let npoly = NewtonPolynomial::new(xs.clone());
-            let mut coeffs = ys.clone();
-            npoly.interpolate_in_place(&mut coeffs);
-            let ys_: Vec<FE> = xs.iter().map(|&x| npoly.eval(&coeffs, x)).collect();
-
-            assert_eq!(ys, ys_);
-        }
-        call_with_big_finite_fields!(f);
-    }
 }

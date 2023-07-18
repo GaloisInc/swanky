@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc ee17e3f43607eec383b13c13e8736b649d8f116523d4790c25c8b43090ae0c30 # shrinks to mut a = P(X) = F61p(0), b = P(X) = F61p(0) + F61p(1) X^1, xs = [F61p(0), F61p(0), F61p(0), F61p(0), F61p(133), F61p(2300892590162707635), F61p(856418044324248923), F61p(2259531929835596144), F61p(2245243957033836162), F61p(2216243078558852979)]

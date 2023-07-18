@@ -3,19 +3,16 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
-use crate::serialization::{SequenceDeserializer, SequenceSerializer};
-use crate::{
-    field::{polynomial::Polynomial, FiniteField, PrimeFiniteField},
-    ring::FiniteRing,
-    serialization::{BiggerThanModulus, CanonicalSerialize},
-};
 use generic_array::GenericArray;
-use rand_core::RngCore;
+use rand::Rng;
 use std::{
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
+use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 
 /// A field element in the prime-order finite field $\textsf{GF}(2).$
 #[derive(Debug, Eq, Clone, Copy, Hash, bytemuck::Zeroable)]
@@ -51,13 +48,13 @@ impl ConditionallySelectable for F2 {
 
 impl FiniteRing for F2 {
     /// This uniformly generates a field element either 0 or 1 for `F2` type.
-    fn random<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+    fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
         // Grab the LSBit from a 32-bit integer. Rand's boolean generation doesn't do this,
         // since it's concerend about insecure random number generators.
         F2((rng.next_u32() & 1) as u8)
     }
 
-    fn random_nonzero<R: RngCore + ?Sized>(_rng: &mut R) -> Self {
+    fn random_nonzero<R: Rng + ?Sized>(_rng: &mut R) -> Self {
         Self::ONE
     }
 
@@ -230,13 +227,12 @@ impl SequenceDeserializer<F2> for F2BitDeserializer {
     }
 }
 
-field_ops!(F2);
+swanky_field::field_ops!(F2);
 
 // TODO: these prime finite field tests should be extracted into the test utils macros.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint::BigUint;
     use proptest::prelude::*;
 
     impl Arbitrary for F2 {
@@ -274,16 +270,5 @@ mod tests {
     test_binop!(test_sub, sub_assign);
     test_binop!(test_mul, mul_assign);
 
-    test_field!(test_field, crate::field::F2);
-
-    proptest! {
-        #[test]
-        fn check_pow(x in any::<F2>(), n in any::<u128>()) {
-            let m = BigUint::from(MODULUS);
-            let exp = BigUint::from(n);
-            let a = BigUint::from(u8::from(x));
-            let left = BigUint::from(u8::from(x.pow(n)));
-            assert_eq!(left, a.modpow(&exp, &m));
-        }
-    }
+    swanky_field_test::test_field!(test_field, F2);
 }

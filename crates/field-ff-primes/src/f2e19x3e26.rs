@@ -1,7 +1,7 @@
-use crate::field::fft::FieldForFFT;
-use crate::ring::FiniteRing;
+use swanky_field::FiniteRing;
+use swanky_field_fft::FieldForFFT;
 
-crate::prime_field_using_ff!(
+crate::prime_field_using_ff::prime_field_using_ff!(
     /// The finite field over the prime $`M = 2^{19} 3^{26} + 1`$.
     /// Hence, $`\phi(M)`$ is divisible by $`2^{19}`$ and $`3^{26}`$
     /// and thus supports a large number of FFT<2> and FFT<3> sizes for
@@ -115,11 +115,11 @@ impl num_traits::Num for F2e19x3e26 {
     // larger than the modulus, so we use that here even though it doesn't perfectly
     // describe the situation (since `from_str_radix` could presumably error out
     // for another reason).
-    type FromStrRadixErr = crate::serialization::BiggerThanModulus;
+    type FromStrRadixErr = swanky_serialization::BiggerThanModulus;
     fn from_str_radix(s: &str, r: u32) -> Result<Self, Self::FromStrRadixErr> {
         match <u128 as num_traits::Num>::from_str_radix(s, r) {
             Ok(num) => Self::try_from(num),
-            Err(_) => Err(crate::serialization::BiggerThanModulus),
+            Err(_) => Err(swanky_serialization::BiggerThanModulus),
         }
     }
 }

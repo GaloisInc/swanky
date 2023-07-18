@@ -2446,8 +2446,6 @@ dependencies = [
  "bytemuck",
  "criterion",
  "curve25519-dalek-ng",
- "ff",
- "ff_codegen",
  "generic-array",
  "hex",
  "ndarray",
@@ -2462,7 +2460,13 @@ dependencies = [
  "sha2",
  "smallvec 1.10.0",
  "subtle",
- "tempfile",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-field-f61p",
+ "swanky-field-ff-primes",
+ "swanky-field-fft",
+ "swanky-generic-array",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -2731,11 +2735,106 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
+name = "swanky-field"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
+ "num-traits",
+ "rand 0.8.5",
+ "subtle",
+ "swanky-generic-array",
+ "swanky-serialization",
+]
+
+[[package]]
+name = "swanky-field-binary"
+version = "0.5.0"
+dependencies = [
+ "bytemuck",
+ "generic-array",
+ "proptest",
+ "rand 0.8.5",
+ "subtle",
+ "swanky-field",
+ "swanky-field-test",
+ "swanky-serialization",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-field-f61p"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
+ "proptest",
+ "rand 0.8.5",
+ "subtle",
+ "swanky-field",
+ "swanky-field-test",
+ "swanky-serialization",
+]
+
+[[package]]
+name = "swanky-field-ff-primes"
+version = "0.5.0"
+dependencies = [
+ "ff",
+ "ff_codegen",
+ "generic-array",
+ "ndarray",
+ "num-bigint 0.4.3",
+ "num-traits",
+ "proptest",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+ "sha2",
+ "subtle",
+ "swanky-field",
+ "swanky-field-fft",
+ "swanky-field-test",
+ "swanky-serialization",
+ "tempfile",
+]
+
+[[package]]
+name = "swanky-field-fft"
+version = "0.5.0"
+dependencies = [
+ "swanky-field",
+]
+
+[[package]]
+name = "swanky-field-test"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
+ "proptest",
+ "swanky-field",
+ "swanky-serialization",
+]
+
+[[package]]
 name = "swanky-flatbuffer-build"
 version = "0.5.0"
 dependencies = [
  "blake3",
  "tempfile",
+]
+
+[[package]]
+name = "swanky-generic-array"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "swanky-serialization"
+version = "0.5.0"
+dependencies = [
+ "generic-array",
+ "serde",
 ]
 
 [[package]]

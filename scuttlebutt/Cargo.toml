@@ -27,12 +27,13 @@ bytemuck = { workspace = true, features = ["derive"] }
 vectoreyes.workspace = true
 ndarray.workspace = true
 num-traits.workspace = true
-ff = { workspace = true, features = ["derive"] }
-
-[build-dependencies]
-ff_codegen = { workspace = true }
-tempfile.workspace = true
-sha2.workspace = true
+swanky-generic-array.workspace = true
+swanky-serialization.workspace = true
+swanky-field.workspace = true
+swanky-field-f61p.workspace = true
+swanky-field-binary.workspace = true
+swanky-field-fft.workspace = true
+swanky-field-ff-primes.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
@@ -69,8 +70,4 @@ harness = false
 
 [[bench]]
 name = "rand_aes"
-harness = false
-
-[[bench]]
-name = "finite_fields"
 harness = false
