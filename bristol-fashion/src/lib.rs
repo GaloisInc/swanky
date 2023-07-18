@@ -506,7 +506,10 @@ mod tests {
 
         test_read(&spec)
     }
-
+    
+    // TODO(isweet): Add targeted `read` tests that cover `EQ` and `EQW` gates (not covered by Nigel circuits)
+    
+    /*
     #[test]
     pub(crate) fn test_read_signed_div64() {
         let spec = ReadSpec {
@@ -668,6 +671,5 @@ mod tests {
 
         test_read(&spec)
     }
-
-    // TODO(isweet): Add targeted `read` tests that cover `EQ` and `EQW` gates (not covered by Nigel circuits)
+     */
 }

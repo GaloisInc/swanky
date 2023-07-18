@@ -12,18 +12,9 @@ enum StdLib {
     Neg64 = 2,
     Mul64 = 3,
     WideMul64 = 4,
-    DivS64 = 5,
-    DivU64 = 6,
-    EqZ64 = 7,
-    AES128 = 8,
-    AES192 = 9,
-    AES256 = 10,
-    Keccak = 11,
-    SHA256 = 12,
-    SHA512 = 13,
 }
 
-const COUNT: usize = 14;
+const COUNT: usize = 5;
 
 const STDLIB: [StdLib; COUNT] = [
     StdLib::Add64,
@@ -31,15 +22,6 @@ const STDLIB: [StdLib; COUNT] = [
     StdLib::Neg64,
     StdLib::Mul64,
     StdLib::WideMul64,
-    StdLib::DivS64,
-    StdLib::DivU64,
-    StdLib::EqZ64,
-    StdLib::AES128,
-    StdLib::AES192,
-    StdLib::AES256,
-    StdLib::Keccak,
-    StdLib::SHA256,
-    StdLib::SHA512,
 ];
 
 impl StdLib {
@@ -50,15 +32,6 @@ impl StdLib {
             StdLib::Neg64 => "neg64.txt",
             StdLib::Mul64 => "mult64.txt",
             StdLib::WideMul64 => "mult2_64.txt",
-            StdLib::DivS64 => "divide64.txt",
-            StdLib::DivU64 => "udivide64.txt",
-            StdLib::EqZ64 => "zero_equal.txt",
-            StdLib::AES128 => "aes_128.txt",
-            StdLib::AES192 => "aes_192.txt",
-            StdLib::AES256 => "aes_256.txt",
-            StdLib::Keccak => "Keccak_f.txt",
-            StdLib::SHA256 => "sha256.txt",
-            StdLib::SHA512 => "sha512.txt",
         }
     }
 }
@@ -79,85 +52,52 @@ fn fetch(c: StdLib) -> Circuit {
 }
 
 /// A cached copy of the optimized 64-bit adder circuit.
+/// This circuit computes `a + b` where `a`, `b` and the result
+/// `a + b` are all 64-bit integers in little endian.
+///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
 pub fn add64() -> Circuit {
     fetch(StdLib::Add64)
 }
 
 /// A cached copy of the optimized 64-bit subtraction circuit.
+/// This circuit computes `a - b` where `a`, `b`, and the result
+/// `a - b` are all 64-bit integers in little endian.
+///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
 pub fn sub64() -> Circuit {
     fetch(StdLib::Sub64)
 }
 
-/// A cached copy of the optimized 64-bit subtraction circuit.
+/// A cached copy of the optimized 64-bit negation circuit.
+/// This circuit computes `-a` where `a` and the result
+/// `-a` are both 64-bit integers in little endian.
+///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
 pub fn neg64() -> Circuit {
     fetch(StdLib::Neg64)
 }
 
 /// A cached copy of the optimized 64-bit multiplication circuit.
+/// This circuit computes `a * b` where `a`, `b`, and the result
+/// `a * b` are all 64-bit integers in little endian.
+///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
 pub fn mul64() -> Circuit {
     fetch(StdLib::Mul64)
 }
 
 /// A cached copy of the optimized 64-bit wide multiplication circuit.
+/// This circuit computes `a * b` where `a` and `b` are 64-bit integers
+/// in little endian, and the result `a * b` is a 128-bit integer also
+/// in little endian.
+///
+/// Note: Technically, the output of this circuit is split into
+/// two 64-bit outputs, but this can be treated as a single 128-bit
+/// output since the output wires of a Bristol Fashion circuit are
+/// contiguous.
+///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
 pub fn wide_mul64() -> Circuit {
     fetch(StdLib::WideMul64)
-}
-
-/// A cached copy of the optimized 64-bit signed division circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn signed_div64() -> Circuit {
-    fetch(StdLib::DivS64)
-}
-
-/// A cached copy of the optimized 64-bit unsigned division circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn unsigned_div64() -> Circuit {
-    fetch(StdLib::DivU64)
-}
-
-/// A cached copy of the optimized 64-bit zero equality circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn eq_zero64() -> Circuit {
-    fetch(StdLib::EqZ64)
-}
-
-/// A cached copy of the optimized AES-128 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn aes_128() -> Circuit {
-    fetch(StdLib::AES128)
-}
-
-/// A cached copy of the optimized AES-192 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn aes_192() -> Circuit {
-    fetch(StdLib::AES192)
-}
-
-/// A cached copy of the optimized AES-256 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn aes_256() -> Circuit {
-    fetch(StdLib::AES256)
-}
-
-/// A cached copy of the optimized Keccak circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn keccak() -> Circuit {
-    fetch(StdLib::Keccak)
-}
-
-/// A cached copy of the optimized SHA-256 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn sha_256() -> Circuit {
-    fetch(StdLib::SHA256)
-}
-
-/// A cached copy of the optimized SHA-512 circuit.
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-pub fn sha_512() -> Circuit {
-    fetch(StdLib::SHA512)
 }
