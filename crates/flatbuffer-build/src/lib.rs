@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-const FLATBUFFER_MIN_VERSION: &str = "flatc version 23.1.21"; // Keep in sync with Cargo.toml
+const FLATBUFFER_MIN_VERSION: &str = include_str!("flatc-ver.txt"); // Keep in sync with Cargo.toml
 const PREFIX: &[u8] = b"// CACHE KEY ";
 const HEADER: &[u8] =
     b"#![cfg_attr(rustfmt, rustfmt_skip)]\n#![allow(clippy::all)]\n#![allow(unused_imports)]\n";
@@ -37,6 +37,7 @@ fn needs_recompile(src: &str, dst: &str) -> bool {
 }
 
 fn parse_version(version: &str) -> (u32, u32, u32) {
+    let version = version.trim();
     assert!(
         version.starts_with("flatc version "),
         "flatc --version output {version:?} didn't start with 'flatc version'"

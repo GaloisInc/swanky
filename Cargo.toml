@@ -105,7 +105,7 @@ crypto-bigint = { version =  "0.5.2", features = ["generic-array"] }
 dhat = "0.3.2"
 digest = "0.10.7"
 eyre = "0.6.8"
-flatbuffers = "23.5.26" # Keep this version in sync with crates/flatbuffer-build/src/lib.rs
+flatbuffers = "23.5.26" # Keep this version in sync with crates/flatbuffer-build/src/flatc-ver.txt
 flume = "0.10.14"
 generic-array = "0.14.7"
 hex = "0.4.3"
