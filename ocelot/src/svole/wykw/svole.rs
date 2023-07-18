@@ -3,14 +3,11 @@ use super::{
     spsvole::{SpsReceiver, SpsSender},
     utils::Powers,
 };
-use crate::{
-    errors::Error,
-    svole::{SVoleReceiver, SVoleSender},
-};
+use crate::errors::Error;
 use generic_array::typenum::Unsigned;
 use rand::{
     distributions::{Distribution, Uniform},
-    CryptoRng, Rng, SeedableRng,
+    Rng, SeedableRng,
 };
 use scuttlebutt::{
     field::{Degree, FiniteField},
@@ -135,12 +132,12 @@ pub struct Sender<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Sender<FE> {
-    fn send_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send_internal<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         output: &mut Vec<(FE::PrimeField, FE)>,
     ) -> Result<(), Error> {
         let rows = params.rows;
@@ -199,12 +196,11 @@ impl<FE: FiniteField> Sender<FE> {
     }
 }
 
-impl<FE: FiniteField> SVoleSender for Sender<FE> {
-    type Msg = FE;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+impl<FE: FiniteField> Sender<FE> {
+    /// Initialize the VOLE sender.
+    pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        mut rng: &mut RNG,
+        mut rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
@@ -236,10 +232,11 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         Ok(sender)
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// Produce VOLEs.
+    pub fn send<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         output: &mut Vec<(FE::PrimeField, FE)>,
     ) -> Result<(), Error> {
         self.send_internal(
@@ -251,10 +248,11 @@ impl<FE: FiniteField> SVoleSender for Sender<FE> {
         )
     }
 
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// Duplicate the sender's state.
+    pub fn duplicate<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<Self, Error> {
         let mut base_voles = Vec::new();
         self.send_internal(
@@ -301,12 +299,12 @@ pub struct Receiver<FE: FiniteField> {
 }
 
 impl<FE: FiniteField> Receiver<FE> {
-    fn receive_internal<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive_internal<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         output: &mut Vec<FE>,
     ) -> Result<(), Error> {
         let rows = params.rows;
@@ -356,12 +354,11 @@ impl<FE: FiniteField> Receiver<FE> {
     }
 }
 
-impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
-    type Msg = FE;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+impl<FE: FiniteField> Receiver<FE> {
+    /// Initialize the VOLE receiver.
+    pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
@@ -391,14 +388,16 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         Ok(receiver)
     }
 
-    fn delta(&self) -> FE {
+    /// Returns the $`Δ`$ value associated with the VOLEs.
+    pub fn delta(&self) -> FE {
         self.delta
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// Produce VOLEs.
+    pub fn receive<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         output: &mut Vec<FE>,
     ) -> Result<(), Error> {
         self.receive_internal(
@@ -410,10 +409,11 @@ impl<FE: FiniteField> SVoleReceiver for Receiver<FE> {
         )
     }
 
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    /// Duplicate the receiver's state.
+    pub fn duplicate<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
     ) -> Result<Self, Error> {
         let mut base_voles = Vec::new();
         self.receive_internal(
@@ -456,9 +456,9 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Receiver, SVoleReceiver, SVoleSender, Sender, LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use super::{Receiver, Sender, LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::{
-        field::{F128b, F40b, F61p, FiniteField as FF},
+        field::{F128b, F40b, F61p, FiniteField},
         AesRng, Channel,
     };
     use std::{
@@ -466,7 +466,7 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test_lpn_svole_<FE: FF, Sender: SVoleSender<Msg = FE>, Receiver: SVoleReceiver<Msg = FE>>() {
+    fn test_lpn_svole_<FE: FiniteField>() {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -475,7 +475,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut vole =
                 Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-            let mut out = Vec::new();
+            let mut out: Vec<(FE::PrimeField, FE)> = Vec::new();
             vole.send(&mut channel, &mut rng, &mut out).unwrap();
             out
         });
@@ -485,20 +485,16 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut vole =
             Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-        let mut vs = Vec::new();
+        let mut vs: Vec<FE> = Vec::new();
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
-            let right = uws[i].0 * vole.delta() + vs[i];
+            let right: FE = uws[i].0 * vole.delta() + vs[i];
             assert_eq!(uws[i].1, right);
         }
     }
 
-    fn test_duplicate_svole_<
-        FE: FF,
-        Sender: SVoleSender<Msg = FE>,
-        Receiver: SVoleReceiver<Msg = FE>,
-    >() {
+    fn test_duplicate_svole_<FE: FiniteField>() {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -507,7 +503,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut vole =
                 Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-            let mut uws = Vec::new();
+            let mut uws: Vec<(FE::PrimeField, FE)> = Vec::new();
             vole.send(&mut channel, &mut rng, &mut uws).unwrap();
             let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
             let mut uws2 = Vec::new();
@@ -525,7 +521,7 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut vole =
             Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-        let mut vs = Vec::new();
+        let mut vs: Vec<FE> = Vec::new();
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
         let mut vs2 = Vec::new();
@@ -538,33 +534,33 @@ mod tests {
 
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
-            let right = uws[i].0 * vole.delta() + vs[i];
+            let right: FE = uws[i].0 * vole.delta() + vs[i];
             assert_eq!(uws[i].1, right);
         }
     }
 
     #[test]
     fn test_lpn_svole_gf128() {
-        test_lpn_svole_::<F128b, Sender<F128b>, Receiver<F128b>>();
+        test_lpn_svole_::<F128b>();
     }
 
     #[test]
     fn test_lpn_svole_f61p() {
-        test_lpn_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
+        test_lpn_svole_::<F61p>();
     }
 
     #[test]
     fn test_lpn_svole_f40b() {
-        test_lpn_svole_::<F40b, Sender<F40b>, Receiver<F40b>>();
+        test_lpn_svole_::<F40b>();
     }
 
     #[test]
     fn test_duplicate_svole() {
-        test_duplicate_svole_::<F61p, Sender<F61p>, Receiver<F61p>>();
+        test_duplicate_svole_::<F61p>();
     }
 
     #[test]
     fn test_duplicate_svole_f40b() {
-        test_duplicate_svole_::<F40b, Sender<F40b>, Receiver<F40b>>();
+        test_duplicate_svole_::<F40b>();
     }
 }

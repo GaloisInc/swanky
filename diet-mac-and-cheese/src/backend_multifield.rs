@@ -16,9 +16,9 @@ use eyre::{ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use ocelot::svole::wykw::LpnParams;
-use ocelot::svole::wykw::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
-use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
+use ocelot::svole::LpnParams;
+use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
+use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
 use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
 use scuttlebutt::field::{F40b, F61p, FiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
@@ -1428,7 +1428,7 @@ pub(crate) mod tests {
         backend_trait::BackendT,
         homcom::{FComProver, FComVerifier},
     };
-    use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
     use rand::SeedableRng;
     use scuttlebutt::field::{F384p, F384q};
