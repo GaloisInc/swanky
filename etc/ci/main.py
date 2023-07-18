@@ -208,6 +208,20 @@ def ci(nightly: bool = False):
                 if x.endswith(".py")
             ]
         )
+    with gitlab_ci_section("Check flatbuffer version matches"):
+        flatbuffers_version = tomllib.loads((ROOT / "Cargo.toml").read_text())[
+            "workspace"
+        ]["dependencies"]["flatbuffers"]
+        flatc_ver_path = "crates/flatbuffer-build/src/flatc-ver.txt"
+        actual_flatc_ver = (ROOT / flatc_ver_path).read_text().strip()
+        expected_flatc_ver = f"flatc version {flatbuffers_version}"
+        if actual_flatc_ver != expected_flatc_ver:
+            typer.secho(
+                f"ERROR: {flatc_ver_path} contains {repr(actual_flatc_ver)}, which doesn't match "
+                + f"{repr(expected_flatc_ver)}, as set in /Cargo.toml",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
     with gitlab_ci_section("Check Cargo.toml files"):
         any_errors = False
         cargo_toml_files = [
