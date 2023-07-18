@@ -12,13 +12,13 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from collections import defaultdict
 from hashlib import sha256
 from pathlib import Path
 from typing import Dict, List
 from uuid import uuid4
 
-import toml
 import typer
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -81,7 +81,7 @@ def build_and_test(
                 'vectoreyes_target_cpu="haswell"',
             ]
             CARGO_CONFIG_FILE.write_text(
-                toml.dumps(
+                tomllib.dumps(
                     {
                         "build": {
                             "rustflags": flags,
@@ -208,6 +208,20 @@ def ci(nightly: bool = False):
                 if x.endswith(".py")
             ]
         )
+    with gitlab_ci_section("Check flatbuffer version matches"):
+        flatbuffers_version = tomllib.loads((ROOT / "Cargo.toml").read_text())[
+            "workspace"
+        ]["dependencies"]["flatbuffers"]
+        flatc_ver_path = "crates/flatbuffer-build/src/flatc-ver.txt"
+        actual_flatc_ver = (ROOT / flatc_ver_path).read_text().strip()
+        expected_flatc_ver = f"flatc version {flatbuffers_version}"
+        if actual_flatc_ver != expected_flatc_ver:
+            typer.secho(
+                f"ERROR: {flatc_ver_path} contains {repr(actual_flatc_ver)}, which doesn't match "
+                + f"{repr(expected_flatc_ver)}, as set in /Cargo.toml",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
     with gitlab_ci_section("Check Cargo.toml files"):
         any_errors = False
         cargo_toml_files = [
@@ -218,7 +232,7 @@ def ci(nightly: bool = False):
             .split("\n")
             if x.endswith("Cargo.toml")
         ]
-        root_cargo_toml = toml.loads((ROOT / "Cargo.toml").read_text())
+        root_cargo_toml = tomllib.loads((ROOT / "Cargo.toml").read_text())
         crates_in_manifest = list(
             itertools.chain.from_iterable(
                 ROOT.glob(member) for member in root_cargo_toml["workspace"]["members"]
@@ -228,7 +242,7 @@ def ci(nightly: bool = False):
             crate / "Cargo.toml" for crate in crates_in_manifest
         )
         for path in cargo_toml_files:
-            data = toml.loads(path.read_text())
+            data = tomllib.loads(path.read_text())
             if "workspace" in data:
                 continue
             if path not in crates_in_manifest_cargo_tomls:

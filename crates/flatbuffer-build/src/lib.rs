@@ -1,10 +1,21 @@
+//! Utilities to build flatbuffers code.
+//!
+//! We _require_ that the version of the flatbuffer compiler _exactly_ match the version of the
+//! `flatbuffers` rust library. Flatbuffers _does not_ use semantic versioning, and does not
+//! guarantee compatibility between a version of the compiler that's different from the version of
+//! the runtime library.
+//!
+//! See https://github.com/google/flatbuffers/wiki/Versioning for more details
+
 use std::{
     io::{Read, Write},
     process::Command,
-    str::FromStr,
 };
 
-const FLATBUFFER_MIN_VERSION: &str = "flatc version 23.1.21"; // Keep in sync with Cargo.toml
+fn flatbuffer_version() -> &'static str {
+    include_str!("flatc-ver.txt").trim() // Keep in sync with Cargo.toml
+}
+
 const PREFIX: &[u8] = b"// CACHE KEY ";
 const HEADER: &[u8] =
     b"#![cfg_attr(rustfmt, rustfmt_skip)]\n#![allow(clippy::all)]\n#![allow(unused_imports)]\n";
@@ -14,8 +25,11 @@ const FLATC_VERSION_MSG: &str =
     untentionally change a .fbs file or a _generated.rs file?";
 
 fn compute_hash(full_src: &[u8], dst_excluding_cache_key: &[u8]) -> blake3::Hash {
-    let hash_key = blake3::hash(b"v2 swanky fbs cache key");
+    let hash_key = blake3::hash(b"v3 swanky fbs cache key");
     let mut h = blake3::Hasher::new_keyed(hash_key.as_bytes());
+    h.update(blake3::hash(flatbuffer_version().as_bytes()).as_bytes());
+    h.update(blake3::hash(PREFIX).as_bytes());
+    h.update(blake3::hash(HEADER).as_bytes());
     h.update(blake3::hash(full_src).as_bytes());
     h.update(blake3::hash(dst_excluding_cache_key).as_bytes());
     h.finalize()
@@ -34,21 +48,6 @@ fn needs_recompile(src: &str, dst: &str) -> bool {
     } else {
         true
     }
-}
-
-fn parse_version(version: &str) -> (u32, u32, u32) {
-    assert!(
-        version.starts_with("flatc version "),
-        "flatc --version output {version:?} didn't start with 'flatc version'"
-    );
-    let version = &version[b"flatc version ".len()..];
-    let version = version.trim();
-    let parts = version
-        .split('.')
-        .map(|x| u32::from_str(x).expect(FLATC_VERSION_MSG))
-        .collect::<Vec<_>>();
-    assert_eq!(parts.len(), 3, "{}", FLATC_VERSION_MSG);
-    (parts[0], parts[1], parts[2])
 }
 
 /// Compile the `.fbs` file at `src` to the `.rs` file at `dst`.
@@ -74,20 +73,19 @@ pub fn compile_flatbuffer(src: &str, dst: &str) {
     if needs_recompile(src, dst) {
         let src_contents = std::fs::read(src).unwrap();
         std::env::set_var("PWD", std::env::current_dir().unwrap());
-        let flatc_version = parse_version(
-            &String::from_utf8(
-                Command::new("flatc")
-                    .arg("--version")
-                    .output()
-                    .unwrap()
-                    .stdout,
-            )
-            .expect(FLATC_VERSION_MSG),
-        );
-        let min_flatc_version = parse_version(FLATBUFFER_MIN_VERSION);
-        assert!(
-            min_flatc_version <= flatc_version,
-            "Expected flatc >= {min_flatc_version:?}. Found {flatc_version:?}"
+        let actual_flatc_version = String::from_utf8(
+            Command::new("flatc")
+                .arg("--version")
+                .output()
+                .expect(FLATC_VERSION_MSG)
+                .stdout,
+        )
+        .expect(FLATC_VERSION_MSG);
+        let expected_flatc_version = flatbuffer_version();
+        assert_eq!(
+            actual_flatc_version.trim(),
+            expected_flatc_version,
+            "Flatbuffer compiler (flatc) version mismatch"
         );
         let tmp = tempfile::tempdir().unwrap();
         let was_successful = Command::new("flatc")
