@@ -62,7 +62,7 @@ impl From<String> for Error {
     }
 }
 
-pub type Wire = usize;
+pub type Wire = u64;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Gate {
@@ -77,57 +77,55 @@ pub enum Gate {
 #[derive(Default, Debug, Clone)]
 pub struct Circuit {
     /// The number of gates in this circuit.    
-    pub ngates: usize,
+    pub ngates: u64,
     /// The number of wires in this circuit.    
-    pub nwires: usize,
+    pub nwires: u64,
     /// The sizes of each input to this circuit.
     /// For example, `vec![64, 64]` denotes a circuit with
     /// two inputs of `64` bits each.    
-    pub input_sizes: Vec<usize>,
+    pub input_sizes: Vec<u64>,
     /// The sizes of each output of this circuit.
     /// For example, `vec![64]` denotes a circuit with
     /// one output of `64` bits.    
-    pub output_sizes: Vec<usize>,
+    pub output_sizes: Vec<u64>,
     /// A topologically sorted list of gates.
     pub gates: Vec<Gate>,
 }
 
 impl Circuit {
-    fn count_gates<F>(&self, f: F) -> usize
+    fn count_gates<F>(&self, f: F) -> u64
     where
         F: FnMut(&Gate) -> bool,
     {
-        self.gates.iter().copied().filter(f).count()
+        self.gates.iter().copied().filter(f).count().try_into().unwrap()
     }
 
     /// The number of XOR gates in this circuit.
-    pub fn nxor(&self) -> usize {
+    pub fn nxor(&self) -> u64 {
         self.count_gates(|g| matches!(g, Gate::XOR { .. }))
     }
 
     /// The number of AND gates in this circuit.
-    pub fn nand(&self) -> usize {
+    pub fn nand(&self) -> u64 {
         self.count_gates(|g| matches!(g, Gate::AND { .. }))
     }
 
     /// The number of INV gates in this circuit.
-    pub fn ninv(&self) -> usize {
+    pub fn ninv(&self) -> u64 {
         self.count_gates(|g| matches!(g, Gate::INV { .. }))
     }
 
     /// The number of EQ gates in this circuit.
-    pub fn neq(&self) -> usize {
+    pub fn neq(&self) -> u64 {
         self.count_gates(|g| matches!(g, Gate::EQ { .. }))
     }
 
     /// The number of EQW gates in this circuit.
-    pub fn neqw(&self) -> usize {
+    pub fn neqw(&self) -> u64 {
         self.count_gates(|g| matches!(g, Gate::EQW { .. }))
     }
 }
 
-/// A reader that constructs a Bristol Fashion `Circuit` from
-/// a file path.
 struct Reader<R: BufRead> {
     reader: R,
     line: String,
@@ -135,8 +133,6 @@ struct Reader<R: BufRead> {
 }
 
 impl<R: BufRead> Reader<R> {
-    /// Creates a new `Reader` from a path to a Bristol Fashion file.
-    /// Produces an IO error if the file does not exist.
     fn new(reader: R) -> Self {
         let line = String::new();
         let row = 0;
@@ -160,11 +156,11 @@ impl<R: BufRead> Reader<R> {
         ret.ok_or_else(|| format!("unexpected EOF on line {}", row).into())
     }
 
-    fn read_usize(tokens: &mut SplitWhitespace, msg: &str) -> Result<usize, Error> {
+    fn read_u64(tokens: &mut SplitWhitespace, msg: &str) -> Result<u64, Error> {
         tokens
             .next()
             .ok_or_else(|| msg.to_string())?
-            .parse::<usize>()
+            .parse::<u64>()
             .map_err(Error::from)
     }
 
@@ -186,48 +182,48 @@ impl<R: BufRead> Reader<R> {
             .map_err(Error::from)
     }
 
-    fn read_ngates(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected ngates")
+    fn read_ngates(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected ngates")
     }
 
-    fn read_nwires(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected nwires")
+    fn read_nwires(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected nwires")
     }
 
-    fn read_ninputs(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected ninputs")
+    fn read_ninputs(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected ninputs")
     }
 
-    fn read_input_size(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected input size")
+    fn read_input_size(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected input size")
     }
 
-    fn read_noutputs(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected noutputs")
+    fn read_noutputs(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected noutputs")
     }
 
-    fn read_output_size(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected output size")
+    fn read_output_size(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected output size")
     }
 
-    fn read_gate_input_arity(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected gate input arity")
+    fn read_gate_input_arity(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected gate input arity")
     }
 
-    fn read_gate_output_arity(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected gate output arity")
+    fn read_gate_output_arity(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected gate output arity")
     }
 
-    fn read_gate_input(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected gate input")
+    fn read_gate_input(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected gate input")
     }
 
     fn read_gate_input_lit(tokens: &mut SplitWhitespace) -> Result<bool, Error> {
         Self::read_bool(tokens, "unexpected EOL, expected gate input lit")
     }
 
-    fn read_gate_output(tokens: &mut SplitWhitespace) -> Result<usize, Error> {
-        Self::read_usize(tokens, "unexpected EOL, expected gate output")
+    fn read_gate_output(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
+        Self::read_u64(tokens, "unexpected EOL, expected gate output")
     }
 
     fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire), Error> {
@@ -286,8 +282,6 @@ impl<R: BufRead> Reader<R> {
         }
     }
 
-    /// Parses the underlying Bristol Fashion file into a `Circuit`.
-    /// Produces a parse error if the file is not well-formed Bristol Fashion.
     fn read(mut self) -> Result<Circuit, Error> {
         // Read number of gates (`ngates`) and number of wires (`nwires`) from first line
         let mut tokens = self.expect_line()?;
@@ -298,7 +292,7 @@ impl<R: BufRead> Reader<R> {
         // Read number of inputs and sizes from second line
         let mut tokens = self.expect_line()?;
         let ninputs = Self::read_ninputs(&mut tokens)?;
-        let mut input_sizes = Vec::with_capacity(ninputs);
+        let mut input_sizes = Vec::with_capacity(usize::try_from(ninputs).unwrap());
         for _ in 0..ninputs {
             let input_size = Self::read_input_size(&mut tokens)?;
             input_sizes.push(input_size);
@@ -308,7 +302,7 @@ impl<R: BufRead> Reader<R> {
         // Read number of outputs and sizes from third line
         let mut tokens = self.expect_line()?;
         let noutputs = Self::read_noutputs(&mut tokens)?;
-        let mut output_sizes = Vec::with_capacity(noutputs);
+        let mut output_sizes = Vec::with_capacity(usize::try_from(noutputs).unwrap());
         for _ in 0..noutputs {
             let output_size = Self::read_output_size(&mut tokens)?;
             output_sizes.push(output_size);
@@ -320,7 +314,7 @@ impl<R: BufRead> Reader<R> {
         let _ = Self::read_eol(&mut tokens)?;
 
         // Read gates from remaining lines
-        let mut gates: Vec<Gate> = Vec::with_capacity(ngates);
+        let mut gates: Vec<Gate> = Vec::with_capacity(usize::try_from(ngates).unwrap());
         for i in 0..ngates {
             let mut tokens = self.expect_line()?;
             let gate_kind = Self::read_gate_kind(&mut tokens)?;
@@ -383,6 +377,9 @@ impl<R: BufRead> Reader<R> {
     }
 }
 
+/// Parses a reader formatted as Bristol Fashion into a `Circuit`.
+/// Produces an I/O error on failure to read, and a parse error if
+/// the reader is not well-formed Bristol Fashion.
 pub fn read<R: BufRead>(reader: R) -> Result<Circuit, Error> {
     Reader::new(reader).read()
 }
@@ -396,15 +393,15 @@ mod tests {
 
     struct ReadSpec {
         bristol: fn() -> Circuit,
-        ngates: usize,
-        nwires: usize,
-        input_sizes: Vec<usize>,
-        output_sizes: Vec<usize>,
-        nxor: usize,
-        nand: usize,
-        ninv: usize,
-        neq: usize,
-        neqw: usize,
+        ngates: u64,
+        nwires: u64,
+        input_sizes: Vec<u64>,
+        output_sizes: Vec<u64>,
+        nxor: u64,
+        nand: u64,
+        ninv: u64,
+        neq: u64,
+        neqw: u64,
     }
 
     fn test_read(spec: &ReadSpec) {
