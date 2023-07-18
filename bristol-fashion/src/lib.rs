@@ -136,12 +136,18 @@ impl Circuit {
     pub fn gates_mut(&mut self) -> &mut Vec<Gate> {
         &mut self.gates
     }
-    
+
     fn count_gates<F>(&self, f: F) -> u64
     where
         F: FnMut(&Gate) -> bool,
     {
-        self.gates.iter().copied().filter(f).count().try_into().unwrap()
+        self.gates
+            .iter()
+            .copied()
+            .filter(f)
+            .count()
+            .try_into()
+            .unwrap()
     }
 
     /// The number of XOR gates in this circuit.
@@ -550,9 +556,9 @@ mod tests {
 
         test_read(&spec)
     }
-    
+
     // TODO(isweet): Add targeted `read` tests that cover `EQ` and `EQW` gates (not covered by Nigel circuits)
-    
+
     /*
     #[test]
     pub(crate) fn test_read_signed_div64() {
