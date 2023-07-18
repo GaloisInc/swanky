@@ -194,7 +194,7 @@ pub fn initiate_tls<P: Party>(
                 .with_protocol_versions(&[&rustls::version::TLS13])
                 .expect("building rustls ClientConfig")
                 .with_root_certificates(tls_root_store)
-                .with_single_cert(tls_certs, tls_private_key)
+                .with_client_auth_cert(tls_certs, tls_private_key)
                 .context("building rustls client config")?;
             let tls_root_conn = rustls::ClientConnection::new(
                 Arc::new(tls_config),
