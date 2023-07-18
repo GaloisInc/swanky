@@ -77,22 +77,66 @@ pub enum Gate {
 #[derive(Default, Debug, Clone)]
 pub struct Circuit {
     /// The number of gates in this circuit.    
-    pub ngates: u64,
+    ngates: u64,
     /// The number of wires in this circuit.    
-    pub nwires: u64,
+    nwires: u64,
     /// The sizes of each input to this circuit.
     /// For example, `vec![64, 64]` denotes a circuit with
     /// two inputs of `64` bits each.    
-    pub input_sizes: Vec<u64>,
+    input_sizes: Vec<u64>,
     /// The sizes of each output of this circuit.
     /// For example, `vec![64]` denotes a circuit with
     /// one output of `64` bits.    
-    pub output_sizes: Vec<u64>,
+    output_sizes: Vec<u64>,
     /// A topologically sorted list of gates.
-    pub gates: Vec<Gate>,
+    gates: Vec<Gate>,
 }
 
 impl Circuit {
+    pub fn ngates(&self) -> u64 {
+        self.ngates
+    }
+
+    pub fn nwires(&self) -> u64 {
+        self.nwires
+    }
+
+    pub fn into_input_sizes(self) -> Vec<u64> {
+        self.input_sizes
+    }
+
+    pub fn input_sizes(&self) -> &Vec<u64> {
+        &self.input_sizes
+    }
+
+    pub fn input_sizes_mut(&mut self) -> &mut Vec<u64> {
+        &mut self.input_sizes
+    }
+
+    pub fn into_output_sizes(self) -> Vec<u64> {
+        self.output_sizes
+    }
+
+    pub fn output_sizes(&self) -> &Vec<u64> {
+        &self.output_sizes
+    }
+
+    pub fn output_sizes_mut(&mut self) -> &mut Vec<u64> {
+        &mut self.output_sizes
+    }
+
+    pub fn into_gates(self) -> Vec<Gate> {
+        self.gates
+    }
+
+    pub fn gates(&self) -> &Vec<Gate> {
+        &self.gates
+    }
+
+    pub fn gates_mut(&mut self) -> &mut Vec<Gate> {
+        &mut self.gates
+    }
+    
     fn count_gates<F>(&self, f: F) -> u64
     where
         F: FnMut(&Gate) -> bool,
