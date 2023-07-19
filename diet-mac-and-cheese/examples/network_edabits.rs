@@ -1,6 +1,6 @@
 use clap::{Arg, ArgAction, Command};
 use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
-use ocelot::svole::wykw::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
+use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::fs;
 use std::io::Write;

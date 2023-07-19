@@ -6,7 +6,7 @@ use eyre::Context;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, FieldTypeMacVisitor};
 use mac_n_cheese_party::{Party, WhichParty};
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
-use ocelot::svole::wykw::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
+use ocelot::svole::base_svole::{Receiver as BaseReceiver, Sender as BaseSender};
 use scuttlebutt::{AbstractChannel, AesRng};
 use std::{
     any::{Any, TypeId},

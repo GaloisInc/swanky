@@ -11,11 +11,12 @@ with import ./pkgs.nix {};
     lld_16
     git
     (python311.withPackages (py: [
-      py.rich
-      py.typer
       py.black
-      py.isort
       py.cbor2
+      py.isort
+      py.rich
+      py.toml
+      py.typer
     ]))
     sccache
     cacert

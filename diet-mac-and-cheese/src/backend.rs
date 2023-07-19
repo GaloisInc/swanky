@@ -5,7 +5,7 @@ use crate::{backend_trait::BackendT, edabits::RcRefCell};
 use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
-use ocelot::svole::wykw::LpnParams;
+use ocelot::svole::LpnParams;
 use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
 
 // Some design decisions:
@@ -635,7 +635,7 @@ mod tests {
         backend_trait::BackendT,
         homcom::validate,
     };
-    use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{field::F40b, ring::FiniteRing};
     use scuttlebutt::{

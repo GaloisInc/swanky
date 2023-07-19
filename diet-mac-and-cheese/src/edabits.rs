@@ -9,8 +9,8 @@ use eyre::{eyre, Result};
 use generic_array::typenum::Unsigned;
 #[allow(unused)]
 use log::{debug, info, warn};
-use ocelot::svole::wykw::LpnParams;
-use rand::{CryptoRng, Rng, SeedableRng};
+use ocelot::svole::LpnParams;
+use rand::{Rng, SeedableRng};
 use scuttlebutt::{
     field::{F40b, FiniteField, F2},
     ring::FiniteRing,
@@ -122,7 +122,7 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone, RNG: CryptoRng + Rng>(rng: &mut RNG, v: &mut Vec<T>) {
+fn generate_permutation<T: Clone>(rng: &mut AesRng, v: &mut Vec<T>) {
     let size = v.len();
     if size == 0 {
         return;
@@ -201,9 +201,9 @@ pub struct ProverConv<FE: FiniteField> {
 // protocol working only for prime finite fields.
 impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     /// initialize the prover
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -216,9 +216,9 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     #[allow(missing_docs)]
-    pub fn init_half<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init_half<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         fcom_f2: &RcRefCell<FComProver<F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -242,11 +242,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     #[allow(unused)]
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    fn duplicate<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         Ok(Self {
             fcom_f2: RcRefCell(Rc::new(RefCell::new(
                 self.fcom_f2.get_refmut().duplicate(channel, rng)?,
@@ -298,10 +294,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     // contrary to the one in the paper that applies it on a pair of
     // bits. This allows to the keep the rounds of communication equal
     // to m for any vector of additions
-    fn bit_add_carry<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn bit_add_carry<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         x_batch: &[EdabitsProver<FE>],
         y_batch: &[EdabitsProver<FE>],
     ) -> Result<Vec<(Vec<MacProver<F40b>>, MacProver<F40b>)>> {
@@ -394,10 +390,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     /// input edabits
-    pub fn input_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input_edabits<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         aux_bits: Vec<Vec<MacProver<F40b>>>,
     ) -> Result<Vec<EdabitsProver<FE>>> {
         let num = aux_bits.len();
@@ -424,10 +420,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     /// generate random edabits
-    pub fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random_edabits<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         nb_bits: usize,
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<EdabitsProver<FE>>> {
@@ -462,10 +458,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     /// generate random edabits
-    pub fn random_edabits_b2a<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random_edabits_b2a<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         nb_bits: usize,
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<EdabitsProver<FE>>> {
@@ -502,10 +498,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         Ok(edabits_vec)
     }
 
-    fn random_dabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn random_dabits<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num: usize,
     ) -> Result<Vec<DabitProver<FE>>> {
         let mut dabit_vec = Vec::with_capacity(num);
@@ -531,10 +527,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     /// Generate random triples
-    pub fn random_triples<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random_triples<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num: usize,
         out: &mut Vec<(MacProver<F40b>, MacProver<F40b>, MacProver<F40b>)>,
     ) -> Result<()> {
@@ -562,10 +558,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         Ok(())
     }
 
-    fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn fdabit<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         dabits: &Vec<DabitProver<FE>>,
     ) -> Result<()> {
         let s = FDABIT_SECURITY_PARAMETER;
@@ -756,10 +752,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         }
     }
 
-    fn conv_loop<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn conv_loop<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         edabits_vector: &[EdabitsProver<FE>],
         r: &[EdabitsProver<FE>],
         dabits: &[DabitProver<FE>],
@@ -831,10 +827,10 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     }
 
     /// conversion checking
-    pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn conv<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num_bucket: usize,
         num_cut: usize,
         edabits_vector: &[EdabitsProver<FE>],
@@ -979,9 +975,9 @@ pub struct VerifierConv<FE: FiniteField> {
 // protocol working only for prime finite fields.
 impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     /// initialize the verifier
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -994,9 +990,9 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     #[allow(missing_docs)]
-    pub fn init_half<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init_half<C: AbstractChannel>(
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         fcom_f2: &mut FComVerifier<F40b>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -1021,11 +1017,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     #[allow(unused)]
-    fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    fn duplicate<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         Ok(Self {
             fcom_f2: RcRefCell::new(self.fcom_f2.get_refmut().duplicate(channel, rng)?),
             fcom_fe: RcRefCell::new(self.fcom_fe.get_refmut().duplicate(channel, rng)?),
@@ -1074,10 +1066,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         Ok(())
     }
 
-    fn bit_add_carry<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn bit_add_carry<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         x_batch: &[EdabitsVerifier<FE>],
         y_batch: &[EdabitsVerifier<FE>],
     ) -> Result<Vec<(Vec<MacVerifier<F40b>>, MacVerifier<F40b>)>> {
@@ -1146,10 +1138,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     /// input edabits
-    pub fn input_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn input_edabits<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         aux_bits: Vec<Vec<MacVerifier<F40b>>>,
     ) -> Result<Vec<EdabitsVerifier<FE>>> {
         let num = aux_bits.len();
@@ -1170,10 +1162,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     /// generate random edabits
-    pub fn random_edabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random_edabits<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         nb_bits: usize,
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<EdabitsVerifier<FE>>> {
@@ -1199,10 +1191,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     /// generate random edabits
-    pub fn random_edabits_b2a<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random_edabits_b2a<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         nb_bits: usize,
         num: usize, // in the paper: NB + C
     ) -> Result<Vec<EdabitsVerifier<FE>>> {
@@ -1226,10 +1218,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         Ok(edabits_vec_mac)
     }
 
-    fn random_dabits<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn random_dabits<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num: usize,
     ) -> Result<Vec<DabitVerifier<FE>>> {
         let mut dabit_vec_mac = Vec::with_capacity(num);
@@ -1248,10 +1240,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     /// Generate random triples
-    pub fn random_triples<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn random_triples<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num: usize,
         out: &mut Vec<(MacVerifier<F40b>, MacVerifier<F40b>, MacVerifier<F40b>)>,
     ) -> Result<()> {
@@ -1274,10 +1266,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         Ok(())
     }
 
-    fn fdabit<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn fdabit<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         dabits_mac: &Vec<DabitVerifier<FE>>,
     ) -> Result<()> {
         let s = FDABIT_SECURITY_PARAMETER;
@@ -1418,10 +1410,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
         }
     }
 
-    fn conv_loop<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn conv_loop<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         edabits_vector_mac: &[EdabitsVerifier<FE>],
         r_mac: &[EdabitsVerifier<FE>],
         dabits_mac: &[DabitVerifier<FE>],
@@ -1511,10 +1503,10 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     }
 
     /// conversion checking
-    pub fn conv<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn conv<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
+        rng: &mut AesRng,
         num_bucket: usize,
         num_cut: usize,
         edabits_vector_mac: &[EdabitsVerifier<FE>],
@@ -1703,7 +1695,7 @@ mod tests {
     };
     #[allow(unused)]
     use log::{debug, info, warn};
-    use ocelot::svole::wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
+    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::field::F384p;
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{
