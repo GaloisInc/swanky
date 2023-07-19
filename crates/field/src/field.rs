@@ -133,6 +133,14 @@ impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
 
 /// A `PrimeFiniteField` is a `FiniteField` with a prime modulus. In this case
 /// the field is isomorphic to integers modulo prime `p`.
+///
+/// This trait provides methods to convert to and from the the [`Uint`] type
+/// from the [`crypto_bigint`] crate. These are large integers, parameterized
+/// over the number of limbs (i.e. machine words) used in their representation.
+///
+/// The conversion methods are generic over the number of limbs for caller's
+/// convenience. The constant `MIN_LIMBS_NEEDED` can be used to guarantee that
+/// the integer type is large enough for all field elements.
 pub trait PrimeFiniteField:
     FiniteField<PrimeField = Self>
     + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
