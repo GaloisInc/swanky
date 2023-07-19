@@ -227,6 +227,8 @@ macro_rules! prime_field_using_ff {
             crate::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
 
             impl PrimeFiniteField for $name {
+                const MIN_LIMBS_NEEDED: usize = $actual_limbs;
+
                 fn modulus_int<const LIMBS: usize>() -> Option<Uint<LIMBS>> {
                     todo!()
                 }
