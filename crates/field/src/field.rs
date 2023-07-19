@@ -4,8 +4,8 @@ use crate::{
     polynomial::Polynomial,
     ring::{FiniteRing, IsSubRingOf},
 };
-use crypto_bigint::Uint;
-use generic_array::{ArrayLength, GenericArray};
+use crypto_bigint::{nlimbs, Uint};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
 use swanky_generic_array::AnyArrayLength;
 
@@ -146,12 +146,9 @@ pub trait PrimeFiniteField:
     + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
     + std::convert::TryFrom<u128>
 {
-    /// The number of word-sized limbs needed to represent all values in this
-    /// prime finite field.
-    ///
-    /// To make sure this value is portable, it should be computed using the
-    /// [`crypto_bigint::nlimbs`] macro.
-    const MIN_LIMBS_NEEDED: usize;
+    /// The minimum number of word-sized limbs needed to represent all values
+    /// in this `PrimeFiniteField`.
+    const MIN_LIMBS_NEEDED: usize = nlimbs!(8 * Self::ByteReprLen::USIZE);
 
     /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
     /// `None` if the value will not fit.
