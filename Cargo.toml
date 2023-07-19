@@ -148,7 +148,7 @@ smallvec = { version = "1.11.0" , features = ["const_generics", "union", "const_
 snafu = "0.7.5"
 snmalloc-rs = { version = "0.3.4", default-features = false, features = ["build_cc", "usecxx17"] }
 sprs = "=0.11.0" # See issue #123
-subtle = "2.5.0"
+subtle = { version = "2.5.0", features = ["core_hint_black_box", "const-generics"] }
 tempfile = "3.6.0"
 tungstenite = { version="0.19.0", features = ["rustls"] }
 twox-hash = "1.6.3"
