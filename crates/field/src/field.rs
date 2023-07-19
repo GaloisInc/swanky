@@ -147,6 +147,9 @@ pub trait PrimeFiniteField:
 
     /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
     /// `None` if the value will not fit.
+    ///
+    /// Note: This conversion _may_ succeed even if
+    /// `LIMBS < Self::MIN_LIMBS_NEEDED` or `LIMBS > Self::MIN_LIMBS_NEEDED`.
     fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>>;
 
     /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
