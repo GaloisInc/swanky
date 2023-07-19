@@ -12,13 +12,13 @@ import subprocess
 import sys
 import tempfile
 import time
-import tomllib
 from collections import defaultdict
 from hashlib import sha256
 from pathlib import Path
 from typing import Dict, List
 from uuid import uuid4
 
+import toml
 import typer
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -81,7 +81,7 @@ def build_and_test(
                 'vectoreyes_target_cpu="haswell"',
             ]
             CARGO_CONFIG_FILE.write_text(
-                tomllib.dumps(
+                toml.dumps(
                     {
                         "build": {
                             "rustflags": flags,
@@ -209,7 +209,7 @@ def ci(nightly: bool = False):
             ]
         )
     with gitlab_ci_section("Check flatbuffer version matches"):
-        flatbuffers_version = tomllib.loads((ROOT / "Cargo.toml").read_text())[
+        flatbuffers_version = toml.loads((ROOT / "Cargo.toml").read_text())[
             "workspace"
         ]["dependencies"]["flatbuffers"]
         flatc_ver_path = "crates/flatbuffer-build/src/flatc-ver.txt"
@@ -232,7 +232,7 @@ def ci(nightly: bool = False):
             .split("\n")
             if x.endswith("Cargo.toml")
         ]
-        root_cargo_toml = tomllib.loads((ROOT / "Cargo.toml").read_text())
+        root_cargo_toml = toml.loads((ROOT / "Cargo.toml").read_text())
         crates_in_manifest = list(
             itertools.chain.from_iterable(
                 ROOT.glob(member) for member in root_cargo_toml["workspace"]["members"]
@@ -242,7 +242,7 @@ def ci(nightly: bool = False):
             crate / "Cargo.toml" for crate in crates_in_manifest
         )
         for path in cargo_toml_files:
-            data = tomllib.loads(path.read_text())
+            data = toml.loads(path.read_text())
             if "workspace" in data:
                 continue
             if path not in crates_in_manifest_cargo_tomls:
