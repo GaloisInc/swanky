@@ -150,6 +150,10 @@ pub trait PrimeFiniteField:
     /// in this `PrimeFiniteField`.
     const MIN_LIMBS_NEEDED: usize = nlimbs!(8 * Self::ByteReprLen::USIZE);
 
+    /// Return the modulus of this `PrimeFiniteField` as a `Uint`, and `None`
+    /// if it cannot fit in the given number of `LIMBS`.
+    fn modulus_int<const LIMBS: usize>() -> Option<Uint<LIMBS>>;
+
     /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
     /// `None` if the value will not fit.
     ///

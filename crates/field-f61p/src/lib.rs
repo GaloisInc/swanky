@@ -171,7 +171,9 @@ impl TryFrom<u128> for F61p {
 }
 
 impl PrimeFiniteField for F61p {
-    const MIN_LIMBS_NEEDED: usize = 1;
+    fn modulus_int<const LIMBS: usize>() -> Option<Uint<LIMBS>> {
+        todo!()
+    }
 
     fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>> {
         todo!()
