@@ -161,8 +161,6 @@ impl From<F2> for u8 {
 }
 
 impl PrimeFiniteField for F2 {
-    const MIN_LIMBS_NEEDED: usize = 1;
-
     fn modulus_int<const LIMBS: usize>() -> Option<Uint<LIMBS>> {
         todo!()
     }

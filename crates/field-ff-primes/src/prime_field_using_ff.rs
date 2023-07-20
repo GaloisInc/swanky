@@ -90,12 +90,12 @@ macro_rules! prime_field_using_ff {
             use swanky_field::{FiniteField, polynomial::Polynomial, PrimeFiniteField, FiniteRing};
             use swanky_serialization::{CanonicalSerialize, BiggerThanModulus};
             use ff::{Field, PrimeField};
-            use generic_array::{GenericArray, typenum::Unsigned};
+            use generic_array::GenericArray;
             use rand_core::{RngCore, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
             use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-            use crypto_bigint::{nlimbs, Uint};
+            use crypto_bigint::Uint;
 
             #[allow(non_camel_case_types, unused_variables, unused_mut, dead_code)]
             mod internal {
@@ -227,8 +227,6 @@ macro_rules! prime_field_using_ff {
             crate::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
 
             impl PrimeFiniteField for $name {
-                const MIN_LIMBS_NEEDED: usize = nlimbs!(Self::NumberOfBitsInBitDecomposition::USIZE);
-
                 fn modulus_int<const LIMBS: usize>() -> Option<Uint<LIMBS>> {
                     todo!()
                 }
