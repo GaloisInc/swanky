@@ -121,42 +121,42 @@ fn lpn_mtx_indices<FE: FiniteField>(
     out_indices
 }
 
-/// Subfield VOLE sender.
-pub struct Sender<FE: FiniteField> {
+/// Subfield VOLE sender. `T` denotes the [`FiniteField`] type to use for the VOLE tag.
+pub struct Sender<T: FiniteField> {
     lpn_setup: LpnParams,
     lpn_extend: LpnParams,
-    spsvole: SpsSender<FE>,
-    // Base VOLEs use a value type of `FE::PrimeField`. Generated VOLEs need
-    // not, as long as the value type is a subfield of `FE`.
-    base_voles: Vec<(FE::PrimeField, FE)>,
+    spsvole: SpsSender<T>,
+    // Base VOLEs use a value type of `T::PrimeField`. Generated VOLEs need
+    // not, as long as the value type is a subfield of `T`.
+    base_voles: Vec<(T::PrimeField, T)>,
     // Shared RNG with the receiver for generating the LPN matrix.
     lpn_rng: AesRng,
 }
 
-impl<FE: FiniteField> Sender<FE> {
-    fn send_internal<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
+impl<T: FiniteField> Sender<T> {
+    fn send_internal<C: AbstractChannel, V: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
         rng: &mut AesRng,
-        output: &mut Vec<(SFE, FE)>,
+        output: &mut Vec<(V, T)>,
     ) -> Result<(), Error>
     where
-        <FE as FiniteField>::PrimeField: IsSubFieldOf<SFE>,
+        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let degree = Degree::<FE>::USIZE;
+        let degree = Degree::<T>::USIZE;
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + degree;
-        // The number of `FE::PrimeField` elements to pack in a single `SFE`
+        // The number of `T::PrimeField` elements to pack in a single `V`
         // element.
-        let npacked = DegreeModulo::<FE::PrimeField, SFE>::USIZE;
+        let npacked = DegreeModulo::<T::PrimeField, V>::USIZE;
         // TODO: Can we avoid computing this each time we run `send_internal`?
-        let powers = Powers::<SFE>::default();
+        let powers = Powers::<V>::default();
 
         debug_assert!(
             self.base_voles.len() >= used,
@@ -167,7 +167,7 @@ impl<FE: FiniteField> Sender<FE> {
             degree
         );
 
-        let uws: Vec<(FE::PrimeField, FE)> = self.spsvole.send(
+        let uws: Vec<(T::PrimeField, T)> = self.spsvole.send(
             channel,
             m,
             &self.base_voles[rows..rows + weight + degree],
@@ -178,7 +178,7 @@ impl<FE: FiniteField> Sender<FE> {
         let leftover = self.base_voles.len() - used;
 
         // The VOLEs we'll save for the next iteration.
-        let mut base_voles: Vec<(FE::PrimeField, FE)> = Vec::with_capacity(num_saved + leftover);
+        let mut base_voles: Vec<(T::PrimeField, T)> = Vec::with_capacity(num_saved + leftover);
         // The VOLEs we'll return to the caller.
         output.clear();
         let out_len = cols - num_saved;
@@ -187,10 +187,10 @@ impl<FE: FiniteField> Sender<FE> {
         let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
 
         let mut j = 0;
-        let mut value = SFE::ZERO;
-        let mut key = FE::ZERO;
+        let mut value = V::ZERO;
+        let mut key = T::ZERO;
         for (i, (e, c)) in uws.into_iter().enumerate() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
+            let indices = lpn_mtx_indices::<T>(&distribution, &mut self.lpn_rng);
             // Compute `x := u A + e` and `z := w A + c`, where `A` is the LPN matrix.
             let mut x = e;
             let mut z = c;
@@ -211,8 +211,8 @@ impl<FE: FiniteField> Sender<FE> {
                     output.push((value, key));
                     // Reset the state so we can pack the next element.
                     j = 0;
-                    value = SFE::ZERO;
-                    key = FE::ZERO;
+                    value = V::ZERO;
+                    key = T::ZERO;
                 }
             }
         }
@@ -222,9 +222,7 @@ impl<FE: FiniteField> Sender<FE> {
         debug_assert_eq!(output.len(), (cols - num_saved) / npacked);
         Ok(())
     }
-}
 
-impl<FE: FiniteField> Sender<FE> {
     /// Initialize the VOLE sender.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -232,14 +230,14 @@ impl<FE: FiniteField> Sender<FE> {
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
-        let pows: Powers<FE> = Default::default();
-        let mut base_sender = BaseSender::<FE>::init(channel, pows.clone(), rng)?;
-        let base_voles_setup: Vec<(FE::PrimeField, FE)> = base_sender.send(
+        let pows: Powers<T> = Default::default();
+        let mut base_sender = BaseSender::<T>::init(channel, pows.clone(), rng)?;
+        let base_voles_setup: Vec<(T::PrimeField, T)> = base_sender.send(
             channel,
-            compute_num_saved::<FE>(lpn_setup),
+            compute_num_saved::<T>(lpn_setup),
             &mut AesRng::from_rng(&mut rng).expect("random number generation shouldn't fail"),
         )?;
-        let spsvole = SpsSender::<FE>::init(channel, pows, rng)?;
+        let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::receive(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
@@ -260,20 +258,21 @@ impl<FE: FiniteField> Sender<FE> {
         Ok(sender)
     }
 
-    /// Generate VOLEs for the sender.
-    pub fn send<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
+    /// Generate VOLEs. `V` denotes the [`FiniteField`] type to use for the VOLE
+    /// value.
+    pub fn send<C: AbstractChannel, V: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        output: &mut Vec<(SFE, FE)>,
+        output: &mut Vec<(V, T)>,
     ) -> Result<(), Error>
     where
-        <FE as FiniteField>::PrimeField: IsSubFieldOf<SFE>,
+        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
         self.send_internal(
             channel,
             self.lpn_extend,
-            compute_num_saved::<FE>(self.lpn_extend),
+            compute_num_saved::<T>(self.lpn_extend),
             rng,
             output,
         )
@@ -285,26 +284,17 @@ impl<FE: FiniteField> Sender<FE> {
         channel: &mut C,
         rng: &mut AesRng,
     ) -> Result<Self, Error> {
-        let mut base_voles = Vec::new();
+        let mut base_voles: Vec<(T::PrimeField, T)> = Vec::new();
         self.send_internal(
             channel,
             self.lpn_setup,
-            compute_num_saved::<FE>(self.lpn_setup),
+            compute_num_saved::<T>(self.lpn_setup),
             rng,
             &mut base_voles,
         )?;
-        // let mut extras = Vec::new();
-        // self.send_internal(
-        //     channel,
-        //     LPN_SETUP_PARAMS,
-        //     compute_num_saved::<FE>(LPN_SETUP_PARAMS),
-        //     rng,
-        //     &mut extras,
-        // )?;
-        // base_voles.extend(extras.into_iter());
 
-        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
-        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
+        debug_assert!(base_voles.len() >= compute_num_saved::<T>(self.lpn_extend));
+        debug_assert!(self.base_voles.len() >= compute_num_saved::<T>(self.lpn_extend));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         let lpn_rng = self.lpn_rng.fork();
@@ -318,38 +308,38 @@ impl<FE: FiniteField> Sender<FE> {
     }
 }
 
-/// Subfield VOLE receiver.
-pub struct Receiver<FE: FiniteField> {
+/// Subfield VOLE receiver. `T` denotes the [`FiniteField`] type to use for the VOLE tag.
+pub struct Receiver<T: FiniteField> {
     lpn_setup: LpnParams,
     lpn_extend: LpnParams,
-    spsvole: SpsReceiver<FE>,
-    delta: FE,
-    base_voles: Vec<FE>,
+    spsvole: SpsReceiver<T>,
+    delta: T,
+    base_voles: Vec<T>,
     // Shared RNG with the sender for generating the LPN matrix.
     lpn_rng: AesRng,
 }
 
-impl<FE: FiniteField> Receiver<FE> {
-    fn receive_internal<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
+impl<T: FiniteField> Receiver<T> {
+    fn receive_internal<C: AbstractChannel, V: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
         params: LpnParams,
         num_saved: usize,
         rng: &mut AesRng,
-        output: &mut Vec<FE>,
+        output: &mut Vec<T>,
     ) -> Result<(), Error>
     where
-        <FE as FiniteField>::PrimeField: IsSubFieldOf<SFE>,
+        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
         let rows = params.rows;
         let cols = params.cols;
         let weight = params.weight;
-        let degree = Degree::<FE>::USIZE;
+        let degree = Degree::<T>::USIZE;
         let m = cols / weight;
         // The number of base VOLEs we need to use.
         let used = rows + weight + degree;
         // The number of elements to pack.
-        let npacked = DegreeModulo::<FE::PrimeField, SFE>::USIZE;
+        let npacked = DegreeModulo::<T::PrimeField, V>::USIZE;
 
         debug_assert!(
             self.base_voles.len() >= used,
@@ -376,9 +366,9 @@ impl<FE: FiniteField> Receiver<FE> {
         let distribution = Uniform::<u32>::from(0..rows.try_into().unwrap());
 
         let mut j = 0;
-        let mut key = FE::ZERO;
+        let mut key = T::ZERO;
         for (i, b) in vs.into_iter().enumerate() {
-            let indices = lpn_mtx_indices::<FE>(&distribution, &mut self.lpn_rng);
+            let indices = lpn_mtx_indices::<T>(&distribution, &mut self.lpn_rng);
             let mut y = b;
 
             y += indices.iter().map(|(j, a)| *a * self.base_voles[*j]).sum();
@@ -395,7 +385,7 @@ impl<FE: FiniteField> Receiver<FE> {
                     output.push(key);
                     // Reset the state so we can pack the next element.
                     j = 0;
-                    key = FE::ZERO;
+                    key = T::ZERO;
                 }
             }
         }
@@ -404,9 +394,7 @@ impl<FE: FiniteField> Receiver<FE> {
         debug_assert_eq!(output.len(), (cols - num_saved) / npacked);
         Ok(())
     }
-}
 
-impl<FE: FiniteField> Receiver<FE> {
     /// Initialize the VOLE receiver.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -414,12 +402,12 @@ impl<FE: FiniteField> Receiver<FE> {
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self, Error> {
-        let pows: Powers<FE> = Default::default();
-        let mut base_receiver = BaseReceiver::<FE>::init(channel, pows.clone(), rng)?;
+        let pows: Powers<T> = Default::default();
+        let mut base_receiver = BaseReceiver::<T>::init(channel, pows.clone(), rng)?;
         let base_voles_setup =
-            base_receiver.receive(channel, compute_num_saved::<FE>(lpn_setup), rng)?;
+            base_receiver.receive(channel, compute_num_saved::<T>(lpn_setup), rng)?;
         let delta = base_receiver.delta();
-        let spsvole = SpsReceiver::<FE>::init(channel, pows, delta, rng)?;
+        let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
         let seed = rng.gen::<Block>();
         let seed = scuttlebutt::cointoss::send(channel, &[seed])?[0];
         let lpn_rng = AesRng::from_seed(seed);
@@ -432,7 +420,7 @@ impl<FE: FiniteField> Receiver<FE> {
             lpn_rng,
         };
         let mut base_voles_setup = Vec::new();
-        receiver.receive_internal::<_, FE::PrimeField>(
+        receiver.receive_internal::<_, T::PrimeField>(
             channel,
             lpn_setup,
             0,
@@ -440,65 +428,54 @@ impl<FE: FiniteField> Receiver<FE> {
             &mut base_voles_setup,
         )?;
         receiver.base_voles = base_voles_setup;
-        // let mut base_voles_extend = Vec::new();
-        // receiver.receive_internal(channel, LPN_SETUP_PARAMS, 0, rng, &mut base_voles_extend)?;
-        // receiver.base_voles = base_voles_extend;
         Ok(receiver)
     }
 
     /// Returns the $`Δ`$ value associated with the VOLEs.
-    pub fn delta(&self) -> FE {
+    pub fn delta(&self) -> T {
         self.delta
     }
 
-    /// Produce VOLEs.
-    pub fn receive<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
+    /// Generate VOLEs. `V` denotes the [`FiniteField`] type to use for the VOLE
+    /// value.
+    pub fn receive<C: AbstractChannel, V: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        output: &mut Vec<FE>,
+        output: &mut Vec<T>,
     ) -> Result<(), Error>
     where
-        FE::PrimeField: IsSubFieldOf<SFE>,
+        T::PrimeField: IsSubFieldOf<V>,
     {
-        self.receive_internal::<_, SFE>(
+        self.receive_internal::<_, V>(
             channel,
             self.lpn_extend,
-            compute_num_saved::<FE>(self.lpn_extend),
+            compute_num_saved::<T>(self.lpn_extend),
             rng,
             output,
         )
     }
 
     /// Duplicate the receiver's state.
-    pub fn duplicate<C: AbstractChannel, SFE: IsSubFieldOf<FE>>(
+    pub fn duplicate<C: AbstractChannel, SFE: IsSubFieldOf<T>>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
     ) -> Result<Self, Error>
     where
-        FE::PrimeField: IsSubFieldOf<SFE>,
+        T::PrimeField: IsSubFieldOf<SFE>,
     {
         let mut base_voles = Vec::new();
-        self.receive_internal(
+        self.receive_internal::<_, T::PrimeField>(
             channel,
             self.lpn_setup,
-            compute_num_saved::<FE>(self.lpn_setup),
+            compute_num_saved::<T>(self.lpn_setup),
             rng,
             &mut base_voles,
         )?;
-        // let mut extras = Vec::new();
-        // self.receive_internal(
-        //     channel,
-        //     LPN_SETUP_PARAMS,
-        //     compute_num_saved::<FE>(LPN_SETUP_PARAMS),
-        //     rng,
-        //     &mut extras,
-        // )?;
-        // base_voles.extend(extras.into_iter());
 
-        debug_assert!(base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
-        debug_assert!(self.base_voles.len() >= compute_num_saved::<FE>(self.lpn_extend));
+        debug_assert!(base_voles.len() >= compute_num_saved::<T>(self.lpn_extend));
+        debug_assert!(self.base_voles.len() >= compute_num_saved::<T>(self.lpn_extend));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
         let lpn_rng = self.lpn_rng.fork();

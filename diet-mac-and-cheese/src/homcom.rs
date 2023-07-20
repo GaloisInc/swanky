@@ -78,9 +78,9 @@ where
 /// prover and verifier (see [`MacProver`] for the prover-side data).
 ///
 /// The main property associated with the two types is that, given a
-/// `MacProver(x, m)` and its corresponding `MacVerifier(k)`, the following
-/// equation holds for a global key `Δ` known only to the verifier: `m = k + Δ
-/// x`.
+/// `MacProver(v, t)` and its corresponding `MacVerifier(k)`, the following
+/// equation holds for a global key `Δ` known only to the verifier: `t = v · Δ +
+/// k`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MacVerifier<F: FiniteField>(
     /// The verifier's MAC key `k`.
