@@ -42,9 +42,5 @@ name = "edabits"
 path = "examples/edabits.rs"
 
 [[bin]]
-name = "dietmc_zki"
-path = "bin/dietmc_zki.rs"
-
-[[bin]]
 name = "dietmc_0p"
 path = "bin/dietmc_0p.rs"
