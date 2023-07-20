@@ -52,7 +52,7 @@ const SIZE_CONVERSION_BATCH: usize = 100_000;
 
 #[derive(Clone, Debug)]
 pub enum MacBitGeneric {
-    BitProver(MacProver<F40b>),
+    BitProver(MacProver<F2, F40b>),
     BitVerifier(MacVerifier<F40b>),
     BitPublic(F2),
 }
@@ -144,7 +144,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvP
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &RcRefCell<FComProver<F40b>>,
+        fcom_f2: &RcRefCell<FComProver<F2, F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -235,7 +235,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendT
 impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
     pub(crate) fn less_eq_than_with_public2(
         &mut self,
-        a: &[MacProver<F40b>],
+        a: &[MacProver<F2, F40b>],
         b: &[F2],
     ) -> Result<()> {
         // act = 1;
@@ -416,7 +416,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &RcRefCell<FComVerifier<F40b>>,
+        fcom_f2: &RcRefCell<FComVerifier<F2, F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
@@ -936,8 +936,8 @@ pub enum Party {
 
 pub struct EvaluatorCirc<C: AbstractChannel + 'static> {
     inputs: CircInputs,
-    fcom_f2_prover: Option<RcRefCell<FComProver<F40b>>>, // RcRefCell because of a unique Homcom functionality F2 shared by all other fields
-    fcom_f2_verifier: Option<RcRefCell<FComVerifier<F40b>>>,
+    fcom_f2_prover: Option<RcRefCell<FComProver<F2, F40b>>>, // RcRefCell because of a unique Homcom functionality F2 shared by all other fields
+    fcom_f2_verifier: Option<RcRefCell<FComVerifier<F2, F40b>>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT>>,
     f2_idx: usize,
@@ -968,7 +968,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             lpn_extend = LPN_EXTEND_MEDIUM;
         }
         let fcom_f2_prover = if party == Party::Prover {
-            Some(RcRefCell::new(FComProver::<F40b>::init(
+            Some(RcRefCell::new(FComProver::<F2, F40b>::init(
                 channel, &mut rng, lpn_setup, lpn_extend,
             )?))
         } else {
@@ -976,7 +976,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         };
 
         let fcom_f2_verifier = if party == Party::Verifier {
-            Some(RcRefCell::new(FComVerifier::<F40b>::init(
+            Some(RcRefCell::new(FComVerifier::<F2, F40b>::init(
                 channel, &mut rng, lpn_setup, lpn_extend,
             )?))
         } else {
@@ -2097,9 +2097,13 @@ pub(crate) mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let fcom =
-                FComProver::<F40b>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let fcom = FComProver::<F2, F40b>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
             let rfcom = RcRefCell::new(fcom);
 
             let mut party = DietMacAndCheeseConvProver::<F61p, _>::init(
@@ -2195,9 +2199,13 @@ pub(crate) mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let fcom =
-            FComVerifier::<F40b>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let fcom = FComVerifier::<F2, F40b>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
         let rfcom = RcRefCell::new(fcom);
 
         let mut party = DietMacAndCheeseConvVerifier::<F61p, _>::init(
