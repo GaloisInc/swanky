@@ -556,12 +556,15 @@ mod tests {
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
-            let right: T = uws[i].0 * vole.delta() + vs[i];
-            assert_eq!(uws[i].1, right);
+            assert_eq!(uws[i].1, uws[i].0 * vole.delta() + vs[i]);
+            assert_ne!(uws[i].1, T::ZERO);
         }
     }
 
-    fn test_duplicate_svole_<FE: FiniteField>() {
+    fn test_duplicate_svole_<V: IsSubFieldOf<T>, T: FiniteField>()
+    where
+        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
+    {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let mut rng = AesRng::new();
@@ -570,7 +573,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
             let mut vole =
                 Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-            let mut uws: Vec<(FE::PrimeField, FE)> = Vec::new();
+            let mut uws: Vec<(V, T)> = Vec::new();
             vole.send(&mut channel, &mut rng, &mut uws).unwrap();
             let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
             let mut uws2 = Vec::new();
@@ -588,18 +591,16 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
         let mut vole =
             Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-        let mut vs: Vec<FE> = Vec::new();
-        vole.receive::<_, FE::PrimeField>(&mut channel, &mut rng, &mut vs)
+        let mut vs: Vec<T> = Vec::new();
+        vole.receive::<_, V>(&mut channel, &mut rng, &mut vs)
             .unwrap();
-        let mut vole2 = vole
-            .duplicate::<_, FE::PrimeField>(&mut channel, &mut rng)
-            .unwrap();
+        let mut vole2 = vole.duplicate::<_, V>(&mut channel, &mut rng).unwrap();
         let mut vs2 = Vec::new();
         vole2
-            .receive::<_, FE::PrimeField>(&mut channel, &mut rng, &mut vs2)
+            .receive::<_, V>(&mut channel, &mut rng, &mut vs2)
             .unwrap();
         let mut vs3 = Vec::new();
-        vole.receive::<_, FE::PrimeField>(&mut channel, &mut rng, &mut vs3)
+        vole.receive::<_, V>(&mut channel, &mut rng, &mut vs3)
             .unwrap();
         assert_ne!(vs2, vs3);
         vs.extend(vs2);
@@ -607,8 +608,7 @@ mod tests {
 
         let uws = handle.join().unwrap();
         for i in 0..uws.len() as usize {
-            let right: FE = uws[i].0 * vole.delta() + vs[i];
-            assert_eq!(uws[i].1, right);
+            assert_eq!(uws[i].1, uws[i].0 * vole.delta() + vs[i]);
         }
     }
 
@@ -639,11 +639,16 @@ mod tests {
 
     #[test]
     fn test_duplicate_svole() {
-        test_duplicate_svole_::<F61p>();
+        test_duplicate_svole_::<F61p, F61p>();
     }
 
     #[test]
-    fn test_duplicate_svole_f40b() {
-        test_duplicate_svole_::<F40b>();
+    fn test_duplicate_svole_f2_f40b() {
+        test_duplicate_svole_::<F2, F40b>();
+    }
+
+    #[test]
+    fn test_duplicate_svole_f40b_f40b() {
+        test_duplicate_svole_::<F40b, F40b>();
     }
 }
