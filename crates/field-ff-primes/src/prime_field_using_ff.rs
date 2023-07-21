@@ -90,11 +90,11 @@ macro_rules! prime_field_using_ff {
             use swanky_field::{FiniteField, polynomial::Polynomial, PrimeFiniteField, FiniteRing};
             use swanky_serialization::{CanonicalSerialize, BiggerThanModulus};
             use ff::{Field, PrimeField};
-            use generic_array::GenericArray;
+            use generic_array::{typenum::Unsigned, GenericArray};
             use rand_core::{RngCore, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
-            use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
+            use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
             use crypto_bigint::Uint;
 
             #[allow(non_camel_case_types, unused_variables, unused_mut, dead_code)]
@@ -228,15 +228,49 @@ macro_rules! prime_field_using_ff {
 
             impl PrimeFiniteField for $name {
                 fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS> {
-                    todo!()
+                    assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+                    let mut limbs = [0; LIMBS];
+
+                    // NOTE: Depends on little-endianness!
+                    bytemuck::bytes_of_mut(&mut limbs)[..Self::ByteReprLen::USIZE]
+                        .copy_from_slice(internal::MODULUS_BYTES);
+
+                    Uint::from_words(limbs)
                 }
 
                 fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
-                    todo!()
+                    assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+                    let mut limbs = [0; LIMBS];
+
+                    // NOTE: Depends on little-endianness (and
+                    // `CanonicalSerialize`, which is OK since we wrote it.)
+                    bytemuck::bytes_of_mut(&mut limbs)[..Self::ByteReprLen::USIZE]
+                        .copy_from_slice(&self.to_bytes());
+
+                    Uint::from_words(limbs)
                 }
 
-                fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> CtOption<Self> {
-                    todo!()
+                fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self> {
+                    let x_lt_modulus = x.ct_lt(&Self::modulus_int());
+
+                    CtOption::new(
+                        // NOTE: Depends on little-endianness (and
+                        // `CanonicalSerialize`, which is OK since we wrote
+                        // it.) Furthermore, this will not panic, since if
+                        // x >= Self::modulus_int(), there are _at least_
+                        // Self::ByteReprLen bytes, and we will simply read the
+                        // first Self::ByteReprLen (and not do anything with
+                        // them due to the modulus Choice.)
+                        Self::from_bytes(
+                            &GenericArray::from_slice(
+                                &bytemuck::bytes_of(x.as_words())[..Self::ByteReprLen::USIZE]
+                            )
+                        )
+                        .unwrap(),
+                        x_lt_modulus,
+                    )
                 }
             }
 
