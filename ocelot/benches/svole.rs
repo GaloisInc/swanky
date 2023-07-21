@@ -53,7 +53,7 @@ fn bench_svole<F: FiniteField>(
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut vole_sender = vole_sender.lock().unwrap();
-        let mut out = Vec::new();
+        let mut out: Vec<(F::PrimeField, F)> = Vec::new();
         vole_sender.send(&mut channel, &mut rng, &mut out).unwrap();
         black_box(out);
     });
@@ -64,7 +64,7 @@ fn bench_svole<F: FiniteField>(
     let mut vole_receiver = vole_receiver.lock().unwrap();
     let mut out = Vec::new();
     vole_receiver
-        .receive(&mut channel, &mut rng, &mut out)
+        .receive::<_, F::PrimeField>(&mut channel, &mut rng, &mut out)
         .unwrap();
     black_box(out);
     handle.join().unwrap();

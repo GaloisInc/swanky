@@ -29,9 +29,9 @@ use subtle::{ConditionallySelectable, ConstantTimeEq};
 #[derive(Clone)]
 pub struct EdabitsProver<FE: FiniteField> {
     #[allow(missing_docs)]
-    pub bits: Vec<MacProver<F40b>>,
+    pub bits: Vec<MacProver<F2, F40b>>,
     #[allow(missing_docs)]
-    pub value: MacProver<FE>,
+    pub value: MacProver<FE::PrimeField, FE>,
 }
 
 #[allow(unused)]
@@ -71,8 +71,8 @@ fn copy_edabits_verifier<FE: FiniteField>(edabits: &EdabitsVerifier<FE>) -> Edab
 
 #[derive(Clone)]
 struct DabitProver<FE: FiniteField> {
-    bit: MacProver<F40b>,
-    value: MacProver<FE>,
+    bit: MacProver<F2, F40b>,
+    value: MacProver<FE::PrimeField, FE>,
 }
 
 /// DabitVerifier struct
@@ -100,7 +100,7 @@ fn convert_bits_to_field<FE: FiniteField>(v: &[F2]) -> FE {
     res
 }
 
-fn convert_bits_to_field_mac<FE: FiniteField>(v: &[MacProver<F40b>]) -> FE {
+fn convert_bits_to_field_mac<FE: FiniteField>(v: &[MacProver<F2, F40b>]) -> FE {
     let mut res = FE::ZERO;
 
     for b in v.iter().rev() {
@@ -193,8 +193,8 @@ impl<X> Clone for RcRefCell<X> {
 /// Prover for the edabits conversion protocol
 pub struct ProverConv<FE: FiniteField> {
     #[allow(missing_docs)]
-    pub fcom_f2: RcRefCell<FComProver<F40b>>,
-    fcom_fe: RcRefCell<FComProver<FE>>,
+    pub fcom_f2: RcRefCell<FComProver<F2, F40b>>,
+    fcom_fe: RcRefCell<FComProver<FE::PrimeField, FE>>,
 }
 
 // The Finite field is required to be a prime field because of the fdabit
@@ -219,7 +219,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
     pub fn init_half<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
-        fcom_f2: &RcRefCell<FComProver<F40b>>,
+        fcom_f2: &RcRefCell<FComProver<F2, F40b>>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -232,8 +232,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 
     #[allow(missing_docs)]
     pub fn init_zero(
-        fcom_f2: &RcRefCell<FComProver<F40b>>,
-        fcom_fe: &RcRefCell<FComProver<FE>>,
+        fcom_f2: &RcRefCell<FComProver<F2, F40b>>,
+        fcom_fe: &RcRefCell<FComProver<FE::PrimeField, FE>>,
     ) -> Result<Self> {
         Ok(Self {
             fcom_f2: fcom_f2.clone(),
@@ -255,9 +255,9 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         &mut self,
         channel: &mut C,
         r_batch: &[DabitProver<FE>],
-        x_batch: &[MacProver<F40b>],
-        c_batch: &mut Vec<MacProver<F40b>>,
-        x_m_batch: &mut Vec<MacProver<FE>>,
+        x_batch: &[MacProver<F2, F40b>],
+        c_batch: &mut Vec<MacProver<F2, F40b>>,
+        x_m_batch: &mut Vec<MacProver<FE::PrimeField, FE>>,
     ) -> Result<()> {
         let n = r_batch.len();
         assert_eq!(n, x_batch.len());
@@ -300,7 +300,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         rng: &mut AesRng,
         x_batch: &[EdabitsProver<FE>],
         y_batch: &[EdabitsProver<FE>],
-    ) -> Result<Vec<(Vec<MacProver<F40b>>, MacProver<F40b>)>> {
+    ) -> Result<Vec<(Vec<MacProver<F2, F40b>>, MacProver<F2, F40b>)>> {
         let num = x_batch.len();
         if num != y_batch.len() {
             return Err(eyre!("incompatible input vectors in bit_add_carry"));
@@ -394,7 +394,7 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        aux_bits: Vec<Vec<MacProver<F40b>>>,
+        aux_bits: Vec<Vec<MacProver<F2, F40b>>>,
     ) -> Result<Vec<EdabitsProver<FE>>> {
         let num = aux_bits.len();
         debug!("HOW MANY {:?}", num);
@@ -532,7 +532,11 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         channel: &mut C,
         rng: &mut AesRng,
         num: usize,
-        out: &mut Vec<(MacProver<F40b>, MacProver<F40b>, MacProver<F40b>)>,
+        out: &mut Vec<(
+            MacProver<F2, F40b>,
+            MacProver<F2, F40b>,
+            MacProver<F2, F40b>,
+        )>,
     ) -> Result<()> {
         let mut pairs = Vec::with_capacity(num);
         let mut zs = Vec::with_capacity(num);
@@ -759,8 +763,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         edabits_vector: &[EdabitsProver<FE>],
         r: &[EdabitsProver<FE>],
         dabits: &[DabitProver<FE>],
-        convert_bit_2_field_aux: &mut Vec<MacProver<F40b>>,
-        e_m_batch: &mut Vec<MacProver<FE>>,
+        convert_bit_2_field_aux: &mut Vec<MacProver<F2, F40b>>,
+        e_m_batch: &mut Vec<MacProver<FE::PrimeField, FE>>,
     ) -> Result<()> {
         let n = edabits_vector.len();
         let nb_bits = edabits_vector[0].bits.len();
@@ -967,8 +971,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 /// Verifier for the edabits conversion protocol
 pub struct VerifierConv<FE: FiniteField> {
     #[allow(missing_docs)]
-    pub fcom_f2: RcRefCell<FComVerifier<F40b>>,
-    fcom_fe: RcRefCell<FComVerifier<FE>>,
+    pub fcom_f2: RcRefCell<FComVerifier<F2, F40b>>,
+    fcom_fe: RcRefCell<FComVerifier<FE::PrimeField, FE>>,
 }
 
 // The Finite field is required to be a prime field because of the fdabit
@@ -993,7 +997,7 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
     pub fn init_half<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
-        fcom_f2: &mut FComVerifier<F40b>,
+        fcom_f2: &mut FComVerifier<F2, F40b>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
@@ -1007,8 +1011,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
 
     #[allow(missing_docs)]
     pub fn init_zero(
-        fcom_f2: &RcRefCell<FComVerifier<F40b>>,
-        fcom_fe: &RcRefCell<FComVerifier<FE>>,
+        fcom_f2: &RcRefCell<FComVerifier<F2, F40b>>,
+        fcom_fe: &RcRefCell<FComVerifier<FE::PrimeField, FE>>,
     ) -> Result<Self> {
         Ok(Self {
             fcom_f2: fcom_f2.clone(),

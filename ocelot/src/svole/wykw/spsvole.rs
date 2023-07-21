@@ -24,7 +24,7 @@ use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
     ot: OT,
-    pows: Powers<FE>,
+    pub(super) pows: Powers<FE>,
     ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
     ggm_temporary_storage: Vec<U8x16>,
 }
@@ -32,7 +32,7 @@ pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
 pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF> {
     ot: OT,
     delta: FE,
-    pows: Powers<FE>,
+    pub(super) pows: Powers<FE>,
     ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
     ggm_temporary_storage: Vec<U8x16>,
 }
