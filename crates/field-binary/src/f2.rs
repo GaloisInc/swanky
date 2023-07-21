@@ -162,15 +162,29 @@ impl From<F2> for u8 {
 
 impl PrimeFiniteField for F2 {
     fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS> {
-        todo!()
+        assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+        // NOTE: This is OK since Uint<LIMBS> must have capacity for at least
+        // one bit. The `.into()` is portable since it will cast into the
+        // `crypto_bigint::Word` type, which is determined by the
+        // host architecture.
+        Uint::<LIMBS>::from_word(MODULUS.into())
     }
 
     fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
-        todo!()
+        assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+        Uint::<LIMBS>::from_u8(self.0)
     }
 
-    fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> CtOption<Self> {
-        todo!()
+    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self> {
+        let x_eq_zero = x.ct_eq(&Uint::ZERO);
+        let x_eq_one = x.ct_eq(&Uint::ONE);
+
+        CtOption::new(
+            F2::conditional_select(&F2::ZERO, &F2::ONE, x_eq_one),
+            x_eq_zero | x_eq_one,
+        )
     }
 }
 
