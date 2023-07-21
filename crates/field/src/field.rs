@@ -150,9 +150,12 @@ pub trait PrimeFiniteField:
     /// of the `PrimeFiniteField`.
     const MIN_LIMBS_NEEDED: usize = (Self::NumberOfBitsInBitDecomposition::USIZE + Limb::BITS - 1) / Limb::BITS ;
 
-    /// Return the modulus of this `PrimeFiniteField` as a `Uint`, and `None`
-    /// if it cannot fit in the given number of `LIMBS`.
-    fn modulus_int<const LIMBS: usize>() -> Option<Uint<LIMBS>>;
+    /// Return the modulus of this `PrimeFiniteField` as a `Uint`.
+    ///
+    /// # Panics
+    ///
+    /// This method should panic if `LIMBS` < `MIN_LIMBS_NEEDED`.
+    fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS>;
 
     /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
     /// `None` if the value will not fit.
