@@ -2802,6 +2802,7 @@ dependencies = [
 name = "swanky-field-f61p"
 version = "0.5.0"
 dependencies = [
+ "bytemuck",
  "crypto-bigint",
  "generic-array",
  "proptest",
