@@ -1,7 +1,8 @@
+use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
 use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, PrimeFiniteField};
 use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
 
@@ -169,7 +170,34 @@ impl TryFrom<u128> for F61p {
     }
 }
 
-impl PrimeFiniteField for F61p {}
+impl PrimeFiniteField for F61p {
+    fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS> {
+        assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+        Uint::from_u64(MODULUS)
+    }
+
+    fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
+        assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+        Uint::from_u64(self.0)
+    }
+
+    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self> {
+        let x_lt_modulus = x.ct_lt(&Self::modulus_int());
+
+        CtOption::new(
+            // NOTE: Depends on little-endianness! Furthermore, this will not
+            // panic, since if x >= Self::modulus_int(), there are _at least_ 8
+            // bytes, and we will simply read the first 8 (and not do anything
+            // with them due to the modulus Choice.)
+            F61p(u64::from_le_bytes(
+                <[u8; 8]>::try_from(&bytemuck::bytes_of(x.as_words())[..8]).unwrap(),
+            )),
+            x_lt_modulus,
+        )
+    }
+}
 
 swanky_field::field_ops!(F61p, SUM_ALREADY_DEFINED);
 

@@ -1,8 +1,10 @@
 fn main() {
     use ff_codegen::{PrimeFieldCodegen, ReprEndianness::Little};
+    use num_bigint::BigUint;
     use sha2::Digest;
     use std::fmt::Write;
     use std::path::Path;
+    use std::str::FromStr;
     fn to_hex(buf: &[u8]) -> String {
         let mut out = String::new();
         for byte in buf {
@@ -114,6 +116,7 @@ fn main() {
                 let mut out = String::new();
                 write!(out, "{cg}").unwrap();
                 write!(out, "#[cfg(test)] pub(super) const MODULUS_STRING: &str = {:?};", cg.modulus).unwrap();
+                write!(out, "pub(super) const MODULUS_BYTES: &[u8] = &{:?};", BigUint::from_str(cg.modulus).unwrap().to_bytes_le().as_slice()).unwrap();
                 write!(out, "#[cfg(test)] pub(super) const GENERATOR_STRING: &str = {:?};", cg.generator).unwrap();
                 outputs.insert(filename, out);
             }

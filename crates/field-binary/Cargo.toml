@@ -14,6 +14,7 @@ subtle.workspace = true
 generic-array.workspace = true
 rand.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
+crypto-bigint.workspace = true
 
 [dev-dependencies]
 swanky-field-test.workspace = true

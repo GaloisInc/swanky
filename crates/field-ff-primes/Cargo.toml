@@ -18,6 +18,8 @@ ff = { workspace = true, features = ["derive"] }
 swanky-field-fft.workspace = true
 ndarray.workspace = true
 num-traits.workspace = true
+crypto-bigint.workspace = true
+bytemuck.workspace = true
 
 [dev-dependencies]
 swanky-field-test.workspace = true
@@ -28,3 +30,4 @@ num-bigint.workspace = true
 ff_codegen = { workspace = true }
 tempfile.workspace = true
 sha2.workspace = true
+num-bigint.workspace = true

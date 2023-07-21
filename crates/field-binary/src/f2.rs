@@ -3,13 +3,14 @@
 //! # Security Warning
 //! TODO: this might not be constant-time in all cases.
 
+use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;
 use std::{
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, PrimeFiniteField};
 use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -159,7 +160,33 @@ impl From<F2> for u8 {
     }
 }
 
-impl PrimeFiniteField for F2 {}
+impl PrimeFiniteField for F2 {
+    fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS> {
+        assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+        // NOTE: This is OK since Uint<LIMBS> must have capacity for at least
+        // one bit. The `.into()` is portable since it will cast into the
+        // `crypto_bigint::Word` type, which is determined by the
+        // host architecture.
+        Uint::<LIMBS>::from_word(MODULUS.into())
+    }
+
+    fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
+        assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+        Uint::<LIMBS>::from_u8(self.0)
+    }
+
+    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self> {
+        let x_eq_zero = x.ct_eq(&Uint::ZERO);
+        let x_eq_one = x.ct_eq(&Uint::ONE);
+
+        CtOption::new(
+            F2::conditional_select(&F2::ZERO, &F2::ONE, x_eq_one),
+            x_eq_zero | x_eq_one,
+        )
+    }
+}
 
 pub struct F2BitSerializer {
     current_word: u64,

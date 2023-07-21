@@ -4,8 +4,10 @@ use crate::{
     polynomial::Polynomial,
     ring::{FiniteRing, IsSubRingOf},
 };
-use generic_array::{ArrayLength, GenericArray};
+use crypto_bigint::{Limb, Uint};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
+use subtle::CtOption;
 use swanky_generic_array::AnyArrayLength;
 
 /// Types that implement this trait are finite fields.
@@ -132,11 +134,43 @@ impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
 
 /// A `PrimeFiniteField` is a `FiniteField` with a prime modulus. In this case
 /// the field is isomorphic to integers modulo prime `p`.
+///
+/// This trait provides methods to convert to and from the the [`Uint`] type
+/// from the [`crypto_bigint`] crate. These are large integers, parameterized
+/// over the number of limbs (i.e. machine words) used in their representation.
+///
+/// The conversion methods are generic over the number of limbs for caller's
+/// convenience. The constant `MIN_LIMBS_NEEDED` is a number of limbs large
+/// enough to store the modulus of the `PrimeFiniteField`.
+///
+/// All of the methods provided by this trait should run in constant time.
 pub trait PrimeFiniteField:
     FiniteField<PrimeField = Self>
     + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
     + std::convert::TryFrom<u128>
 {
+    /// The minimum number of word-sized limbs needed to represent the modulus
+    /// of the `PrimeFiniteField`.
+    const MIN_LIMBS_NEEDED: usize =
+        (Self::NumberOfBitsInBitDecomposition::USIZE + Limb::BITS - 1) / Limb::BITS;
+
+    /// Return the modulus of this `PrimeFiniteField` as a `Uint`.
+    ///
+    /// # Panics
+    ///
+    /// This method should panic if `LIMBS` < `MIN_LIMBS_NEEDED`.
+    fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS>;
+
+    /// Convert a `PrimeFiniteField` value into a `Uint`.
+    ///
+    /// # Panics
+    ///
+    /// This method should panic if `LIMBS` < `MIN_LIMBS_NEEDED`.
+    fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS>;
+
+    /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
+    /// a [`CtOption`].
+    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self>;
 }
 
 /// Automatically implement boilerplate field operations for the given type.

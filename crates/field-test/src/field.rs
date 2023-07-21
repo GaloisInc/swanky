@@ -33,7 +33,7 @@ macro_rules! test_field {
                 use $crate::__internal_macro_exports::*;
                 use proptest::prelude::*;
                 use generic_array::{GenericArray, ArrayLength, typenum::Unsigned};
-                use swanky_field::{Degree, FiniteField, FiniteRing, polynomial::Polynomial};
+                use swanky_field::{Degree, FiniteField, FiniteRing, PrimeFiniteField, polynomial::Polynomial};
                 use swanky_serialization::CanonicalSerialize;
 
                 type PF = <FE as FiniteField>::PrimeField;
@@ -65,6 +65,14 @@ macro_rules! test_field {
                     $crate::arbitrary_ring::<<FE as FiniteField>::PrimeField>()
                 }
 
+                proptest! {
+                    #[test]
+                    fn crypto_bigint_roundtrip(a in any_prime_fe()) {
+                        type PF = <FE as FiniteField>::PrimeField;
+                        let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED}>(&a)).unwrap();
+                        prop_assert_eq!(a, b);
+                    }
+                }
                 proptest! {
                     #[test]
                     fn multiplicative_inverse(a in any_fe()) {

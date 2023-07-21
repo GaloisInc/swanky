@@ -90,11 +90,12 @@ macro_rules! prime_field_using_ff {
             use swanky_field::{FiniteField, polynomial::Polynomial, PrimeFiniteField, FiniteRing};
             use swanky_serialization::{CanonicalSerialize, BiggerThanModulus};
             use ff::{Field, PrimeField};
-            use generic_array::GenericArray;
+            use generic_array::{typenum::Unsigned, GenericArray};
             use rand_core::{RngCore, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
-            use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+            use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
+            use crypto_bigint::Uint;
 
             #[allow(non_camel_case_types, unused_variables, unused_mut, dead_code)]
             mod internal {
@@ -163,14 +164,14 @@ macro_rules! prime_field_using_ff {
 
                 fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
                     let mut bytes = [0u8; $limbs * 8];
-                    bytes[0..$actual_limbs * 8].copy_from_slice(buf.as_ref());
+                    bytes[..Self::ByteReprLen::USIZE].copy_from_slice(buf.as_ref());
                     $name::from_bytes_array(bytes)
                 }
 
                 /// Return the canonical byte representation (byte representation of the reduced field element).
                 fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
                     let repr = self.internal.to_repr();
-                    *GenericArray::from_slice(&repr.0[0..$actual_limbs * 8])
+                    *GenericArray::from_slice(&repr.0[..Self::ByteReprLen::USIZE])
                 }
             }
 
@@ -225,7 +226,53 @@ macro_rules! prime_field_using_ff {
 
             crate::try_from_helper!($name, $limbs, $($single_limb_modulus)?);
 
-            impl PrimeFiniteField for $name {}
+            impl PrimeFiniteField for $name {
+                fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS> {
+                    assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+                    let mut limbs = [0; LIMBS];
+
+                    // NOTE: Depends on little-endianness!
+                    bytemuck::bytes_of_mut(&mut limbs)[..Self::ByteReprLen::USIZE]
+                        .copy_from_slice(internal::MODULUS_BYTES);
+
+                    Uint::from_words(limbs)
+                }
+
+                fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
+                    assert!(LIMBS >= Self::MIN_LIMBS_NEEDED);
+
+                    let mut limbs = [0; LIMBS];
+
+                    // NOTE: Depends on little-endianness (and
+                    // `CanonicalSerialize`, which is OK since we wrote it.)
+                    bytemuck::bytes_of_mut(&mut limbs)[..Self::ByteReprLen::USIZE]
+                        .copy_from_slice(&self.to_bytes());
+
+                    Uint::from_words(limbs)
+                }
+
+                fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self> {
+                    let x_lt_modulus = x.ct_lt(&Self::modulus_int());
+
+                    CtOption::new(
+                        // NOTE: Depends on little-endianness (and
+                        // `CanonicalSerialize`, which is OK since we wrote
+                        // it.) Furthermore, this will not panic, since if
+                        // x >= Self::modulus_int(), there are _at least_
+                        // Self::ByteReprLen bytes, and we will simply read the
+                        // first Self::ByteReprLen (and not do anything with
+                        // them due to the modulus Choice.)
+                        Self::from_bytes(
+                            &GenericArray::from_slice(
+                                &bytemuck::bytes_of(x.as_words())[..Self::ByteReprLen::USIZE]
+                            )
+                        )
+                        .unwrap(),
+                        x_lt_modulus,
+                    )
+                }
+            }
 
             impl AddAssign<&$name> for $name {
                 fn add_assign(&mut self, rhs: &$name) {
@@ -257,11 +304,6 @@ macro_rules! prime_field_using_ff {
                 use num_bigint::BigUint;
                 use proptest::prelude::*;
 
-                // Test that `$num_bytes` is correct given the actual number of limbs required.
-                #[test]
-                fn test_num_bytes() {
-                    assert_eq!(<$num_bytes as Unsigned>::U64, $actual_limbs * 8);
-                }
                 // Test that `$num_bits` is correct given the modulus.
                 #[test]
                 fn test_num_bits() {
@@ -429,6 +471,6 @@ prime_field_using_ff!(
     generator = "5",
     limbs = 7,
     actual_limbs = 7,
-    num_bytes = generic_array::typenum::U56,
+    num_bytes = generic_array::typenum::U50,
     num_bits = generic_array::typenum::U400,
 );
