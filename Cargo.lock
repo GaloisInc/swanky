@@ -2849,6 +2849,7 @@ dependencies = [
 name = "swanky-field-test"
 version = "0.5.0"
 dependencies = [
+ "crypto-bigint",
  "generic-array",
  "proptest",
  "swanky-field",
