@@ -139,15 +139,15 @@ impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
 /// over the number of limbs (i.e. machine words) used in their representation.
 ///
 /// The conversion methods are generic over the number of limbs for caller's
-/// convenience. The constant `MIN_LIMBS_NEEDED` can be used to guarantee that
-/// the integer type is large enough for all field elements.
+/// convenience. The constant `MIN_LIMBS_NEEDED` is a number of limbs large
+/// enough to store the modulus of the `PrimeFiniteField`.
 pub trait PrimeFiniteField:
     FiniteField<PrimeField = Self>
     + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
     + std::convert::TryFrom<u128>
 {
-    /// The minimum number of word-sized limbs needed to represent all values
-    /// in this `PrimeFiniteField`.
+    /// The minimum number of word-sized limbs needed to represent the modulus
+    /// of the `PrimeFiniteField`.
     const MIN_LIMBS_NEEDED: usize = (Self::NumberOfBitsInBitDecomposition::USIZE + Limb::BITS - 1) / Limb::BITS ;
 
     /// Return the modulus of this `PrimeFiniteField` as a `Uint`, and `None`
