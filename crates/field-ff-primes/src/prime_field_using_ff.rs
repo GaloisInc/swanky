@@ -94,7 +94,7 @@ macro_rules! prime_field_using_ff {
             use rand_core::{RngCore, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
-            use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+            use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
             use crypto_bigint::Uint;
 
             #[allow(non_camel_case_types, unused_variables, unused_mut, dead_code)]
@@ -235,7 +235,7 @@ macro_rules! prime_field_using_ff {
                     todo!()
                 }
 
-                fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> Option<Self> {
+                fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> CtOption<Self> {
                     todo!()
                 }
             }

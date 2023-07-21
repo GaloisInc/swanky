@@ -6,6 +6,7 @@ use crate::{
 };
 use crypto_bigint::{Limb, Uint};
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use subtle::CtOption;
 use std::ops::{Div, DivAssign};
 use swanky_generic_array::AnyArrayLength;
 
@@ -141,6 +142,8 @@ impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
 /// The conversion methods are generic over the number of limbs for caller's
 /// convenience. The constant `MIN_LIMBS_NEEDED` is a number of limbs large
 /// enough to store the modulus of the `PrimeFiniteField`.
+///
+/// All of the methods provided by this trait should run in constant time.
 pub trait PrimeFiniteField:
     FiniteField<PrimeField = Self>
     + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
@@ -166,8 +169,8 @@ pub trait PrimeFiniteField:
     fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS>;
 
     /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
-    /// `None` if the value is not an element of the field.
-    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> Option<Self>;
+    /// a [`CtOption`].
+    fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self>;
 }
 
 /// Automatically implement boilerplate field operations for the given type.

@@ -10,7 +10,7 @@ use std::{
     hash::Hash,
     ops::{AddAssign, MulAssign, SubAssign},
 };
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use swanky_field::{polynomial::Polynomial, FiniteField, FiniteRing, PrimeFiniteField};
 use swanky_serialization::{BiggerThanModulus, CanonicalSerialize};
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -169,7 +169,7 @@ impl PrimeFiniteField for F2 {
         todo!()
     }
 
-    fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> Option<Self> {
+    fn try_from_int<const LIMBS: usize>(_x: Uint<LIMBS>) -> CtOption<Self> {
         todo!()
     }
 }
