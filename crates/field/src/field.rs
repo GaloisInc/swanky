@@ -6,8 +6,8 @@ use crate::{
 };
 use crypto_bigint::{Limb, Uint};
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
-use subtle::CtOption;
 use std::ops::{Div, DivAssign};
+use subtle::CtOption;
 use swanky_generic_array::AnyArrayLength;
 
 /// Types that implement this trait are finite fields.
