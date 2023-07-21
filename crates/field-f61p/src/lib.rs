@@ -175,7 +175,7 @@ impl PrimeFiniteField for F61p {
         todo!()
     }
 
-    fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>> {
+    fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
         todo!()
     }
 

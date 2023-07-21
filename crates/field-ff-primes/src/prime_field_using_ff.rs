@@ -231,7 +231,7 @@ macro_rules! prime_field_using_ff {
                     todo!()
                 }
 
-                fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>> {
+                fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS> {
                     todo!()
                 }
 

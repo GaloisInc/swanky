@@ -158,12 +158,12 @@ pub trait PrimeFiniteField:
     /// This method should panic if `LIMBS` < `MIN_LIMBS_NEEDED`.
     fn modulus_int<const LIMBS: usize>() -> Uint<LIMBS>;
 
-    /// Try to convert a `PrimeFiniteField` value into a `Uint`, returning
-    /// `None` if the value will not fit.
+    /// Convert a `PrimeFiniteField` value into a `Uint`.
     ///
-    /// Note: This conversion _may_ succeed even if
-    /// `LIMBS < Self::MIN_LIMBS_NEEDED` or `LIMBS > Self::MIN_LIMBS_NEEDED`.
-    fn try_into_int<const LIMBS: usize>(&self) -> Option<Uint<LIMBS>>;
+    /// # Panics
+    ///
+    /// This method should panic if `LIMBS` < `MIN_LIMBS_NEEDED`.
+    fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS>;
 
     /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
     /// `None` if the value is not a member of the field.
