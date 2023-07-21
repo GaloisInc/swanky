@@ -189,7 +189,7 @@ impl PrimeFiniteField for F61p {
         CtOption::new(
             // NOTE: Depends on little-endianness! Furthermore, this will not
             // panic, since if x >= Self::modulus_int(), there are _at least_ 8
-            // bytes, and we will simply read the first 8 (and not do anything)
+            // bytes, and we will simply read the first 8 (and not do anything
             // with them due to the modulus Choice.)
             F61p(u64::from_le_bytes(
                 <[u8; 8]>::try_from(&bytemuck::bytes_of(x.as_words())[..8]).unwrap(),
