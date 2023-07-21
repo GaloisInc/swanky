@@ -4,8 +4,8 @@ use crate::{
     polynomial::Polynomial,
     ring::{FiniteRing, IsSubRingOf},
 };
-use crypto_bigint::{Uint, Limb};
-use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+use crypto_bigint::{Limb, Uint};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
 use swanky_generic_array::AnyArrayLength;
 
@@ -148,7 +148,8 @@ pub trait PrimeFiniteField:
 {
     /// The minimum number of word-sized limbs needed to represent the modulus
     /// of the `PrimeFiniteField`.
-    const MIN_LIMBS_NEEDED: usize = (Self::NumberOfBitsInBitDecomposition::USIZE + Limb::BITS - 1) / Limb::BITS ;
+    const MIN_LIMBS_NEEDED: usize =
+        (Self::NumberOfBitsInBitDecomposition::USIZE + Limb::BITS - 1) / Limb::BITS;
 
     /// Return the modulus of this `PrimeFiniteField` as a `Uint`.
     ///
