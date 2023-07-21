@@ -166,7 +166,7 @@ pub trait PrimeFiniteField:
     fn into_int<const LIMBS: usize>(&self) -> Uint<LIMBS>;
 
     /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
-    /// `None` if the value is not a member of the field.
+    /// `None` if the value is not an element of the field.
     fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> Option<Self>;
 }
 
