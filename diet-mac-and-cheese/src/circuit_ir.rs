@@ -7,7 +7,7 @@ use crate::{
         GaloisPolyV0, IterV0, MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1,
     },
 };
-use crypto_bigint::{ArrayEncoding, U384};
+use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
 use log::debug;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
@@ -15,17 +15,6 @@ use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
 };
-
-/// A Diet Mac'n'Cheese (fixed-size) big integer.
-///
-/// Diet Mac'n'Cheese uses a uniform representation for all field elements,
-/// regardless of the field they belong to, until absolutely necessary (that
-/// is, when dispatching to a field-aware backend.)
-///
-/// This type must be large enough to hold values in all supported fields (see
-/// [`modulus_to_type_id`]), and is subject to change (though this should not
-/// affect any other code as long as this alias is used.)
-pub(crate) type DMCBigInt = U384;
 
 pub type WireId = u64;
 pub type WireCount = u64;
