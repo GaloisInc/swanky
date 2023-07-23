@@ -20,7 +20,7 @@ use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
 use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
-use scuttlebutt::field::{F40b, F61p, FiniteField, F2};
+use scuttlebutt::field::{F40b, F61p, FiniteField, PrimeFiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
@@ -173,9 +173,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvP
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendT
-    for DietMacAndCheeseConvProver<FE, C>
-{
+impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvProver<FE, C> {
     type Wire = <DietMacAndCheeseProver<FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseProver<FE, C> as BackendT>::FieldElement;
 
@@ -302,9 +300,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvP
         Ok(())
     }
 }
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendConvT
-    for DietMacAndCheeseConvProver<FE, C>
-{
+impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheeseConvProver<FE, C> {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", a);
         let bits = a.value().bit_decomposition();
@@ -445,9 +441,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendT
-    for DietMacAndCheeseConvVerifier<FE, C>
-{
+impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvVerifier<FE, C> {
     type Wire = <DietMacAndCheeseVerifier<FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseVerifier<FE, C> as BackendT>::FieldElement;
 
@@ -572,7 +566,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> BackendConvT
+impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
     for DietMacAndCheeseConvVerifier<FE, C>
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
