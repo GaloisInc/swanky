@@ -1953,7 +1953,7 @@ pub(crate) mod tests {
                 FF0,
                 7,
                 6,
-                Box::from((F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE).into_int()),
+                Box::from((-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int()),
             ),
             GateM::AssertZero(FF0, 7),
         ];
