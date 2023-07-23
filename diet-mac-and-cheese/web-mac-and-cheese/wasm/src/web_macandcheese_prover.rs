@@ -32,7 +32,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     let mut stream_inp =
         ValueStreamReader::new(ValueStreamKind::Public, Cursor::new(instance)).unwrap();
     while let Some(v) = stream_inp.next().unwrap() {
-        instances.push_back(number_to_bytes(&v));
+        instances.push_back(v);
     }
     let field = stream_inp.modulus();
     let type_id = 0;
@@ -51,7 +51,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     let mut stream_inp =
         ValueStreamReader::new(ValueStreamKind::Private, Cursor::new(witness)).unwrap();
     while let Some(v) = stream_inp.next().unwrap() {
-        witnesses.push_back(number_to_bytes(&v));
+        witnesses.push_back(v);
     }
     let field = stream_inp.modulus();
     let type_id = 0;
