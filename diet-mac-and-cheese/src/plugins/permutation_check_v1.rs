@@ -131,7 +131,11 @@ mod tests {
         plugins::Plugin,
     };
     use mac_n_cheese_sieve_parser::PluginTypeArg;
-    use scuttlebutt::{field::F61p, ring::FiniteRing, serialization::CanonicalSerialize, AesRng};
+    use scuttlebutt::{
+        field::{F61p, PrimeFiniteField},
+        ring::FiniteRing,
+        AesRng,
+    };
 
     #[test]
     fn test_permutation_1() {
@@ -164,7 +168,7 @@ mod tests {
 
         let mut rng = AesRng::new();
 
-        let a = F61p::random(&mut rng).to_bytes().to_vec();
+        let a = F61p::random(&mut rng).into_int();
 
         let witnesses = vec![vec![a.clone()]];
         let instances = vec![vec![a]];
@@ -205,8 +209,8 @@ mod tests {
 
         let mut rng = AesRng::new();
 
-        let a = F61p::random(&mut rng).to_bytes().to_vec();
-        let b = F61p::random(&mut rng).to_bytes().to_vec();
+        let a = F61p::random(&mut rng).into_int();
+        let b = F61p::random(&mut rng).into_int();
 
         let witnesses = vec![vec![a.clone(), b.clone()]];
         let instances = vec![vec![b, a]];
@@ -251,10 +255,10 @@ mod tests {
 
         let mut rng = AesRng::new();
 
-        let a = F61p::random(&mut rng).to_bytes().to_vec();
-        let b = F61p::random(&mut rng).to_bytes().to_vec();
-        let c = F61p::random(&mut rng).to_bytes().to_vec();
-        let d = F61p::random(&mut rng).to_bytes().to_vec();
+        let a = F61p::random(&mut rng).into_int();
+        let b = F61p::random(&mut rng).into_int();
+        let c = F61p::random(&mut rng).into_int();
+        let d = F61p::random(&mut rng).into_int();
 
         let witnesses = vec![vec![a.clone(), b.clone(), c.clone(), d.clone()]];
         let instances = vec![vec![d, c, b, a]];
@@ -299,10 +303,10 @@ mod tests {
 
         let mut rng = AesRng::new();
 
-        let a = F61p::random(&mut rng).to_bytes().to_vec();
-        let b = F61p::random(&mut rng).to_bytes().to_vec();
-        let c = F61p::random(&mut rng).to_bytes().to_vec();
-        let d = F61p::random(&mut rng).to_bytes().to_vec();
+        let a = F61p::random(&mut rng).into_int();
+        let b = F61p::random(&mut rng).into_int();
+        let c = F61p::random(&mut rng).into_int();
+        let d = F61p::random(&mut rng).into_int();
 
         let witnesses = vec![vec![a.clone(), b.clone(), c.clone(), d.clone()]];
         let instances = vec![vec![d, c, b.clone(), b]];

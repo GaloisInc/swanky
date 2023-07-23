@@ -3,6 +3,7 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use eyre::Result;
+use mac_n_cheese_sieve_parser::Number;
 use scuttlebutt::field::FiniteField;
 
 /// An interface for computing over basic gates using a single [`FiniteField`].
@@ -12,7 +13,7 @@ pub trait BackendT {
     /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement>;
+    fn from_number(val: &Number) -> Result<Self::FieldElement>;
     fn one(&self) -> Result<Self::FieldElement>;
     fn zero(&self) -> Result<Self::FieldElement>;
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;

@@ -330,25 +330,25 @@ mod tests {
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
         plugins::Plugin,
     };
+    use mac_n_cheese_sieve_parser::Number;
     use rand::Rng;
     use scuttlebutt::{
-        field::{polynomial::Polynomial, F61p, FiniteField},
+        field::{polynomial::Polynomial, F61p, PrimeFiniteField},
         ring::FiniteRing,
-        serialization::CanonicalSerialize,
         AesRng,
     };
 
-    fn convert_poly<F: FiniteField>(p: Polynomial<F>) -> Vec<Vec<u8>> {
+    fn convert_poly<F: PrimeFiniteField>(p: Polynomial<F>) -> Vec<Number> {
         let mut coeffs = p.coefficients;
         coeffs.reverse();
         coeffs.push(p.constant);
-        coeffs.into_iter().map(|c| c.to_bytes().to_vec()).collect()
+        coeffs.into_iter().map(|c| c.into_int()).collect()
     }
 
-    fn get_product_triple<R: Rng, F: FiniteField>(
+    fn get_product_triple<R: Rng, F: PrimeFiniteField>(
         rng: &mut R,
         n: usize,
-    ) -> (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
+    ) -> (Vec<Number>, Vec<Number>, Vec<Number>) {
         let p0: Polynomial<F> = Polynomial::random(rng, n);
         let p1: Polynomial<F> = Polynomial::random(rng, 1);
         let mut q = p0.clone();
@@ -357,10 +357,10 @@ mod tests {
         (convert_poly(p0), convert_poly(p1), convert_poly(q))
     }
 
-    fn get_shift_triple<R: Rng, F: FiniteField>(
+    fn get_shift_triple<R: Rng, F: PrimeFiniteField>(
         rng: &mut R,
         n: usize,
-    ) -> (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
+    ) -> (Vec<Number>, Vec<Number>, Vec<Number>) {
         let p: Polynomial<F> = Polynomial::random(rng, n);
         let c = F::random(rng);
 
@@ -373,11 +373,7 @@ mod tests {
         let q = Polynomial::<F>::interpolate(&points);
         assert!(q.degree() == n);
 
-        (
-            convert_poly(p),
-            vec![c.to_bytes().to_vec()],
-            convert_poly(q),
-        )
+        (convert_poly(p), vec![c.into_int()], convert_poly(q))
     }
 
     #[test]
@@ -450,7 +446,7 @@ mod tests {
             vec![p0]
         } else {
             vec![(0..p0_size + p1_size)
-                .map(|_| F61p::random(&mut rng).to_bytes().to_vec())
+                .map(|_| F61p::random(&mut rng).into_int())
                 .collect()]
         };
         let instances = vec![q];
@@ -529,7 +525,7 @@ mod tests {
             vec![p0]
         } else {
             vec![(0..p_size + 1)
-                .map(|_| F61p::random(&mut rng).to_bytes().to_vec())
+                .map(|_| F61p::random(&mut rng).into_int())
                 .collect()]
         };
         let instances = vec![q];

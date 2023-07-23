@@ -10,7 +10,7 @@ use crate::{
 use crypto_bigint::ArrayEncoding;
 use eyre::{eyre, Result};
 use log::debug;
-use mac_n_cheese_sieve_parser::PluginTypeArg;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
@@ -33,21 +33,18 @@ pub type WireRange = (WireId, WireId);
 /// ordering for gates is generally: `<out> <in> ...`; that is, the first
 /// [`WireId`] denotes the _output_ of the gate.
 // This enum should fit in 32 bytes.
-// Using `Box<Vec<u8>>` for this reason, beware the size of `Box<[T]>` is not 8, it's 16.
 #[derive(Clone, Debug)]
 pub enum GateM {
     /// Store the given element in [`WireId`].
-    Constant(TypeId, WireId, Box<Vec<u8>>), // Using Box<Vec<u8>>
+    Constant(TypeId, WireId, Box<Number>),
     /// Assert that the element in [`WireId`] is zero.
     AssertZero(TypeId, WireId),
     Copy(TypeId, WireId, WireId),
     Add(TypeId, WireId, WireId, WireId),
     Sub(TypeId, WireId, WireId, WireId),
     Mul(TypeId, WireId, WireId, WireId),
-    // TODO: Don't store constant as `Vec<u8>`
-    AddConstant(TypeId, WireId, WireId, Box<Vec<u8>>),
-    // TODO: Don't store constant as `Vec<u8>`
-    MulConstant(TypeId, WireId, WireId, Box<Vec<u8>>),
+    AddConstant(TypeId, WireId, WireId, Box<Number>),
+    MulConstant(TypeId, WireId, WireId, Box<Number>),
     Instance(TypeId, WireId),
     Witness(TypeId, WireId),
     Conv(Box<(TypeId, WireRange, TypeId, WireRange)>),
@@ -516,8 +513,8 @@ impl FunStore {
 //       maybe use Box<[u8]> like in other places.
 #[derive(Default)]
 pub struct CircInputs {
-    ins: Vec<VecDeque<Vec<u8>>>,
-    wit: Vec<VecDeque<Vec<u8>>>,
+    ins: Vec<VecDeque<Number>>,
+    wit: Vec<VecDeque<Number>>,
 }
 
 impl CircInputs {
@@ -551,35 +548,35 @@ impl CircInputs {
     }
 
     /// Ingest instance.
-    pub fn ingest_instance(&mut self, type_id: usize, instance: Vec<u8>) {
+    pub fn ingest_instance(&mut self, type_id: usize, instance: Number) {
         self.adjust_ins_type_idx(type_id);
         self.ins[type_id].push_back(instance);
     }
 
     /// Ingest witness.
-    pub fn ingest_witness(&mut self, type_id: usize, witness: Vec<u8>) {
+    pub fn ingest_witness(&mut self, type_id: usize, witness: Number) {
         self.adjust_wit_type_idx(type_id);
         self.wit[type_id].push_back(witness);
     }
 
     /// Ingest instances.
-    pub fn ingest_instances(&mut self, type_id: usize, instances: VecDeque<Vec<u8>>) {
+    pub fn ingest_instances(&mut self, type_id: usize, instances: VecDeque<Number>) {
         self.adjust_ins_type_idx(type_id);
         self.ins[type_id] = instances;
     }
 
     /// Ingest witnesses.
-    pub fn ingest_witnesses(&mut self, type_id: usize, witnesses: VecDeque<Vec<u8>>) {
+    pub fn ingest_witnesses(&mut self, type_id: usize, witnesses: VecDeque<Number>) {
         self.adjust_wit_type_idx(type_id);
         self.wit[type_id] = witnesses;
     }
 
-    pub fn pop_instance(&mut self, type_id: usize) -> Option<Vec<u8>> {
+    pub fn pop_instance(&mut self, type_id: usize) -> Option<Number> {
         self.adjust_ins_type_idx(type_id);
         self.ins[type_id].pop_front()
     }
 
-    pub fn pop_witness(&mut self, type_id: usize) -> Option<Vec<u8>> {
+    pub fn pop_witness(&mut self, type_id: usize) -> Option<Number> {
         self.adjust_wit_type_idx(type_id);
         self.wit[type_id].pop_front()
     }

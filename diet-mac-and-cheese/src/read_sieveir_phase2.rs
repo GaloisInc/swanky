@@ -13,11 +13,20 @@ use crate::{
 use eyre::{eyre, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
 use log::info;
-use mac_n_cheese_sieve_parser::PluginTypeArg;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+
+fn bigint_from_bytes(bytes: &[u8]) -> Number {
+    assert!(bytes.len() <= Number::BYTES, "number too big",);
+
+    let mut bigint_bytes = [0; Number::BYTES];
+    bigint_bytes[..bytes.len()].copy_from_slice(bytes);
+
+    Number::from_le_slice(&bigint_bytes)
+}
 
 // Read a flatbuffers size prefix (4 bytes, little-endian). Size including the prefix.
 //
@@ -50,18 +59,12 @@ fn read_size_prefix_in_vec(stream: &mut impl Read, buffer: &mut Vec<u8>) -> Resu
     Ok(Some(()))
 }
 
-fn vector_u8_to_vec(bytes: &[u8]) -> Vec<u8> {
-    let mut res = vec![0; bytes.len()];
-    res.copy_from_slice(bytes);
-    res
-}
-
 /// Read instances from bytes into the `instances` argument and return the associated field.
 ///
 /// # Panics
 ///
 /// May panic from flatbuffer error.
-pub fn read_public_inputs_bytes(bytes: &[u8], instances: &mut VecDeque<Vec<u8>>) -> Vec<u8> {
+pub fn read_public_inputs_bytes(bytes: &[u8], instances: &mut VecDeque<Number>) -> Number {
     let root = g::size_prefixed_root_as_root(bytes);
 
     if root.is_err() {
@@ -86,10 +89,10 @@ pub fn read_public_inputs_bytes(bytes: &[u8], instances: &mut VecDeque<Vec<u8>>)
     for i in 0..n {
         let instance_read = v1.get(i);
         let t = instance_read.value().unwrap();
-        instances.push_back(vector_u8_to_vec(t.bytes()));
+        instances.push_back(bigint_from_bytes(t.bytes()));
     }
 
-    vector_u8_to_vec(type_field.bytes())
+    bigint_from_bytes(type_field.bytes())
 }
 
 /// Read instances from path and return the associated field.
@@ -97,7 +100,7 @@ pub fn read_public_inputs_bytes(bytes: &[u8], instances: &mut VecDeque<Vec<u8>>)
 /// # Panics
 ///
 /// May panic with io error or flatbuffer error.
-pub fn read_public_inputs(path: &PathBuf, instances: &mut VecDeque<Vec<u8>>) -> Vec<u8> {
+pub fn read_public_inputs(path: &PathBuf, instances: &mut VecDeque<Number>) -> Number {
     let md = std::fs::metadata(path).unwrap();
     if !md.is_file() {
         panic!("Only support file instance")
@@ -115,7 +118,7 @@ pub fn read_public_inputs(path: &PathBuf, instances: &mut VecDeque<Vec<u8>>) -> 
 /// # Panics
 ///
 /// May panic from flatbuffer error.
-pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Vec<u8>>) -> Vec<u8> {
+pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Number>) -> Number {
     let root = g::size_prefixed_root_as_root(bytes);
 
     if root.is_err() {
@@ -140,10 +143,10 @@ pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Vec<u8>>
     for i in 0..n {
         let witness_read = v1.get(i);
         let t = witness_read.value().unwrap();
-        witnesses.push_back(vector_u8_to_vec(t.bytes()));
+        witnesses.push_back(bigint_from_bytes(t.bytes()));
     }
 
-    vector_u8_to_vec(type_field.bytes())
+    bigint_from_bytes(type_field.bytes())
 }
 
 /// Read witnesses from path and return the associated field.
@@ -151,12 +154,12 @@ pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Vec<u8>>
 /// # Panics
 ///
 /// May panic with io error or flatbuffer error.
-pub fn read_private_inputs(path: &PathBuf, witnesses: &mut VecDeque<Vec<u8>>) -> Vec<u8> {
+pub fn read_private_inputs(path: &PathBuf, witnesses: &mut VecDeque<Number>) -> Number {
     let file = std::fs::File::open(path).unwrap();
     let mut buffer = BufReader::new(file);
 
     let mut buffer_mem = vec![];
-    let mut field_res = vec![];
+    let mut field_res = None;
     loop {
         let msg = read_size_prefix_in_vec(&mut buffer, &mut buffer_mem);
         match msg {
@@ -169,13 +172,13 @@ pub fn read_private_inputs(path: &PathBuf, witnesses: &mut VecDeque<Vec<u8>>) ->
                 }
                 Some(_) => {
                     let field = read_private_inputs_bytes(&buffer_mem, witnesses);
-                    assert!(field_res.len() == 0 || field_res == field.clone());
-                    field_res = field;
+                    assert!(field_res.is_none() || field_res.unwrap() == field);
+                    field_res = Some(field);
                 }
             },
         }
     }
-    field_res
+    field_res.expect("Could not determine field modulus")
 }
 
 /// A Buffered Relation, analogous to `BufReader`.
@@ -238,7 +241,7 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate) -> GateM {
             GateM::Constant(
                 u.type_id(),
                 u.out_id(),
-                Box::from(u.constant().unwrap().bytes().to_vec()),
+                Box::from(bigint_from_bytes(u.constant().unwrap().bytes())),
             )
         }
         gs::GateAssertZero => {
@@ -263,7 +266,7 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate) -> GateM {
                 u.type_id(),
                 u.out_id(),
                 u.in_id(),
-                Box::from(u.constant().unwrap().bytes().to_vec()),
+                Box::from(bigint_from_bytes(u.constant().unwrap().bytes())),
             )
         }
         gs::GateMulConstant => {
@@ -272,7 +275,7 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate) -> GateM {
                 u.type_id(),
                 u.out_id(),
                 u.in_id(),
-                Box::from(u.constant().unwrap().bytes().to_vec()),
+                Box::from(bigint_from_bytes(u.constant().unwrap().bytes())),
             )
         }
         gs::GatePublic => {

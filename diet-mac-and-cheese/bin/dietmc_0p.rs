@@ -66,7 +66,7 @@ fn run_text(args: &Cli) -> Result<()> {
             ValueStreamReader::open(ValueStreamKind::Public, instance_path.as_path())?;
 
         while let Some(v) = stream_inp.next()? {
-            instances.push_back(number_to_bytes(&v));
+            instances.push_back(v);
         }
         let field = stream_inp.modulus();
         let ninstances = instances.len();
@@ -90,7 +90,7 @@ fn run_text(args: &Cli) -> Result<()> {
                 ValueStreamReader::open(ValueStreamKind::Private, witness_path.as_path())?;
 
             while let Some(v) = stream_wit.next()? {
-                witnesses.push_back(number_to_bytes(&v));
+                witnesses.push_back(v);
             }
             let field = stream_wit.modulus();
             let nwitnesses = witnesses.len();

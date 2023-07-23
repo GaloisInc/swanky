@@ -16,6 +16,7 @@ use eyre::{ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
+use mac_n_cheese_sieve_parser::Number;
 use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
@@ -24,6 +25,7 @@ use scuttlebutt::field::{F40b, F61p, FiniteField, PrimeFiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
+use std::any::type_name;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io::{Read, Seek};
@@ -177,8 +179,16 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseProver<FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseProver<FE, C> as BackendT>::FieldElement;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        <DietMacAndCheeseProver<FE, C> as BackendT>::from_bytes_le(val)
+    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
+        let x = Self::FieldElement::try_from_int(val);
+        if x.is_none().into() {
+            eyre::bail!(
+                "{val} is too large to be an element of {}",
+                type_name::<Self::FieldElement>()
+            )
+        } else {
+            Ok(x.unwrap())
+        }
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -445,8 +455,16 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseVerifier<FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseVerifier<FE, C> as BackendT>::FieldElement;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        <DietMacAndCheeseVerifier<FE, C> as BackendT>::from_bytes_le(val)
+    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
+        let x = Self::FieldElement::try_from_int(val);
+        if x.is_none().into() {
+            eyre::bail!(
+                "{val} is too large to be an element of {}",
+                type_name::<FE>()
+            )
+        } else {
+            Ok(x.unwrap())
+        }
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -660,8 +678,8 @@ trait EvaluatorT {
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
-        instance: Option<Vec<u8>>,
-        witness: Option<Vec<u8>>,
+        instance: Option<Number>,
+        witness: Option<Number>,
     ) -> Result<()>;
 
     fn conv_gate_get(&mut self, gate: &GateM) -> Result<Vec<MacBitGeneric>>;
@@ -711,14 +729,14 @@ where
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
-        instance: Option<Vec<u8>>,
-        witness: Option<Vec<u8>>,
+        instance: Option<Number>,
+        witness: Option<Number>,
     ) -> Result<()> {
         use GateM::*;
 
         match gate {
             Constant(_, out, value) => {
-                let v = self.backend.constant(B::from_bytes_le(value)?)?;
+                let v = self.backend.constant(B::from_number(value)?)?;
                 self.memory.set(*out, &v);
             }
 
@@ -760,26 +778,26 @@ where
             AddConstant(_, out, inp, constant) => {
                 let l = self.memory.get(*inp);
                 let r = constant;
-                let v = self.backend.add_constant(l, B::from_bytes_le(r)?)?;
+                let v = self.backend.add_constant(l, B::from_number(r)?)?;
                 self.memory.set(*out, &v);
             }
 
             MulConstant(_, out, inp, constant) => {
                 let l = self.memory.get(*inp);
                 let r = constant;
-                let v = self.backend.mul_constant(l, B::from_bytes_le(r)?)?;
+                let v = self.backend.mul_constant(l, B::from_number(r)?)?;
                 self.memory.set(*out, &v);
             }
 
             Instance(_ty, out) => {
                 let v = self
                     .backend
-                    .input_public(B::from_bytes_le(&instance.unwrap()).unwrap())?;
+                    .input_public(B::from_number(&instance.unwrap())?)?;
                 self.memory.set(*out, &v);
             }
 
             Witness(_, out) => {
-                let w = witness.map(|v| B::from_bytes_le(&v).unwrap());
+                let w = witness.and_then(|v| B::from_number(&v).ok());
                 let v = self.backend.input_private(w)?;
                 // debug!("WITNESS: {:?}", v);
                 self.memory.set(*out, &v);
@@ -1422,15 +1440,16 @@ pub(crate) mod tests {
         backend_trait::BackendT,
         homcom::{FComProver, FComVerifier},
     };
+    use mac_n_cheese_sieve_parser::Number;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
     use rand::SeedableRng;
-    use scuttlebutt::field::{F384p, F384q};
+    use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
     #[allow(unused_imports)]
     use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
-    use scuttlebutt::{field::F61p, field::FiniteField, AesRng, Channel};
+    use scuttlebutt::{field::F61p, AesRng, Channel};
     use std::env;
     use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
@@ -1474,49 +1493,36 @@ pub(crate) mod tests {
     #[allow(dead_code)]
     const FF3: u8 = 3;
 
-    pub(crate) fn into_vec<FE: FiniteField>(e: FE) -> Vec<u8> {
-        e.to_bytes().to_vec()
+    pub(crate) fn zero<FE: PrimeFiniteField>() -> Number {
+        FE::ZERO.into_int()
     }
-
-    pub(crate) fn zero<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ZERO)
+    pub(crate) fn one<FE: PrimeFiniteField>() -> Number {
+        FE::ONE.into_int()
     }
-    pub(crate) fn one<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ONE)
+    pub(crate) fn two<FE: PrimeFiniteField>() -> Number {
+        (FE::ONE + FE::ONE).into_int()
     }
-    fn two<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ONE + FE::ONE)
+    pub(crate) fn minus_one<FE: PrimeFiniteField>() -> Number {
+        (-FE::ONE).into_int()
     }
-    pub(crate) fn minus_one<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-FE::ONE)
+    pub(crate) fn minus_two<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE)).into_int()
     }
-    pub(crate) fn minus_two<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE))
+    pub(crate) fn three<FE: PrimeFiniteField>() -> Number {
+        (FE::ONE + FE::ONE + FE::ONE).into_int()
     }
-    fn three<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ONE + FE::ONE + FE::ONE)
+    pub(crate) fn minus_three<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
-    pub(crate) fn minus_three<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE + FE::ONE))
+    pub(crate) fn minus_four<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
-    pub(crate) fn minus_four<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE))
+    pub(crate) fn minus_five<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
-    fn minus_five<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE))
-    }
-    fn minus_nine<FE: FiniteField>() -> Vec<u8> {
-        into_vec(
-            -(FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE),
-        )
+    pub(crate) fn minus_nine<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE))
+            .into_int()
     }
 
     fn wr(w: WireId) -> WireRange {
@@ -1538,8 +1544,8 @@ pub(crate) mod tests {
         fields: Vec<Vec<u8>>,
         func_store: FunStore,
         gates: Vec<GateM>,
-        ins: Vec<Vec<Vec<u8>>>,
-        wit: Vec<Vec<Vec<u8>>>,
+        ins: Vec<Vec<Number>>,
+        wit: Vec<Vec<Number>>,
     ) -> eyre::Result<()> {
         let func_store_prover = func_store.clone();
         let gates_prover = gates.clone();
@@ -1733,10 +1739,10 @@ pub(crate) mod tests {
         let instances = vec![
             vec![],
             vec![
-                into_vec(F2::ZERO),
-                into_vec(F2::ONE),
-                into_vec(F2::ZERO),
-                into_vec(F2::ONE),
+                F2::ZERO.into_int(),
+                F2::ONE.into_int(),
+                F2::ZERO.into_int(),
+                F2::ONE.into_int(),
             ],
         ];
         let witnesses = vec![vec![], vec![]];
@@ -1850,8 +1856,8 @@ pub(crate) mod tests {
         let instances = vec![vec![], vec![], vec![], vec![]];
         let witnesses = vec![
             vec![],
-            vec![into_vec(F384p::ZERO)],
-            vec![into_vec(F384q::ONE)],
+            vec![F384p::ZERO.into_int()],
+            vec![F384q::ONE.into_int()],
             vec![],
         ];
 
@@ -1902,8 +1908,8 @@ pub(crate) mod tests {
 
         let instances = vec![vec![], vec![]];
         let witnesses = vec![
-            vec![into_vec(Secp256k1::ZERO)],
-            vec![into_vec(Secp256k1order::ONE)],
+            vec![Secp256k1::ZERO.into_int()],
+            vec![Secp256k1order::ONE.into_int()],
             vec![],
         ];
 
@@ -1947,7 +1953,7 @@ pub(crate) mod tests {
                 FF0,
                 7,
                 6,
-                Box::from(into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE))),
+                Box::from((F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE).into_int()),
             ),
             GateM::AssertZero(FF0, 7),
         ];
@@ -2001,7 +2007,7 @@ pub(crate) mod tests {
                 FF0,
                 7,
                 6,
-                Box::from(into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE))),
+                Box::from((-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int()),
             ),
             GateM::AssertZero(FF0, 7),
         ];
@@ -2042,8 +2048,8 @@ pub(crate) mod tests {
         func.compiled_info.body_max = None;
         func_store.insert("myfun".into(), func);
 
-        let two = into_vec(F61p::ONE + F61p::ONE);
-        let minus_four = into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE));
+        let two = (F61p::ONE + F61p::ONE).into_int();
+        let minus_four = (-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int();
         let gates = vec![
             // New(0,2)
             // New(3,3)

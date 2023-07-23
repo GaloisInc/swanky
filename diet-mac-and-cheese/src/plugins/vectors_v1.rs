@@ -1,5 +1,4 @@
-use crypto_bigint::Encoding;
-use mac_n_cheese_sieve_parser::PluginTypeArg;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 use crate::circuit_ir::{
     first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
@@ -130,13 +129,12 @@ impl Plugin for VectorsV1 {
                 let PluginTypeArg::Number(c) = params[0] else {
                     eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
                 };
-                let c = c.to_le_bytes().to_vec();
 
                 let mut gates = Vec::with_capacity(s as usize);
                 for i in 0..s {
                     gates.push(match operation {
-                        "addc" => GateM::AddConstant(t, i, s + i, Box::new(c.clone())),
-                        "mulc" => GateM::MulConstant(t, i, s + i, Box::new(c.clone())),
+                        "addc" => GateM::AddConstant(t, i, s + i, Box::new(c)),
+                        "mulc" => GateM::MulConstant(t, i, s + i, Box::new(c)),
                         _ => unreachable!(),
                     });
                 }
@@ -241,8 +239,8 @@ impl Plugin for VectorsV1 {
                 });
                 match s {
                     0 => gates.push(match operation {
-                        "sum" => GateM::Constant(t, 0, Box::new(vec![0])),
-                        "product" => GateM::Constant(t, 0, Box::new(vec![1])),
+                        "sum" => GateM::Constant(t, 0, Box::new(Number::ZERO)),
+                        "product" => GateM::Constant(t, 0, Box::new(Number::ONE)),
                         _ => unreachable!(),
                     }),
                     1 => gates.push(GateM::Copy(t, 0, 1)),
@@ -332,7 +330,7 @@ impl Plugin for VectorsV1 {
                     _ => 2 * s as usize,
                 });
                 match s {
-                    0 => gates.push(GateM::Constant(t, 0, Box::new(vec![0]))),
+                    0 => gates.push(GateM::Constant(t, 0, Box::new(Number::ZERO))),
                     1 => gates.push(GateM::Mul(t, 0, 1, 2)),
                     2 => gates.append(&mut vec![
                         GateM::Mul(t, first_mul, 1, 3),

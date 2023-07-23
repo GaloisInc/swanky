@@ -91,21 +91,21 @@ impl FunctionBodyVisitor for TextRelation {
             .push(GateM::Mul(ty.try_into()?, dst, left, right));
         Ok(())
     }
-    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> eyre::Result<()> {
         self.gates.push(GateM::AddConstant(
             ty.try_into()?,
             dst,
             left,
-            Box::new(number_to_bytes(right)),
+            Box::new(right),
         ));
         Ok(())
     }
-    fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+    fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> eyre::Result<()> {
         self.gates.push(GateM::MulConstant(
             ty.try_into()?,
             dst,
             left,
-            Box::new(number_to_bytes(right)),
+            Box::new(right),
         ));
         Ok(())
     }
@@ -113,12 +113,9 @@ impl FunctionBodyVisitor for TextRelation {
         self.gates.push(GateM::Copy(ty.try_into()?, dst, src));
         Ok(())
     }
-    fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()> {
-        self.gates.push(GateM::Constant(
-            ty.try_into()?,
-            dst,
-            Box::new(number_to_bytes(src)),
-        ));
+    fn constant(&mut self, ty: TypeId, dst: WireId, &src: &Number) -> eyre::Result<()> {
+        self.gates
+            .push(GateM::Constant(ty.try_into()?, dst, Box::new(src)));
         Ok(())
     }
     fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
