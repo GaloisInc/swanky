@@ -69,7 +69,7 @@ fn run_text(args: &Cli) -> Result<()> {
             instances.push_back(number_to_bytes(&v));
         }
         let field = stream_inp.modulus();
-        let ninstances = instances[i].len();
+        let ninstances = instances.len();
         inputs.ingest_instances(i, instances);
         info!(
             "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
@@ -93,7 +93,7 @@ fn run_text(args: &Cli) -> Result<()> {
                 witnesses.push_back(number_to_bytes(&v));
             }
             let field = stream_wit.modulus();
-            let nwitnesses = witnesses[i].len();
+            let nwitnesses = witnesses.len();
             inputs.ingest_witnesses(i, witnesses);
             info!(
                 "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
@@ -202,7 +202,7 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
     for (i, instance_path) in instance_paths.iter().enumerate() {
         let mut instances = VecDeque::new();
         let field = read_public_inputs(&instance_path, &mut instances);
-        let ninstances = instances[i].len();
+        let ninstances = instances.len();
         inputs.ingest_instances(i, instances);
         info!(
             "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
@@ -217,7 +217,7 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
         for (i, witness_path) in witness_paths.iter().enumerate() {
             let mut witnesses = VecDeque::new();
             let field = read_private_inputs(&witness_path, &mut witnesses);
-            let nwitnesses = witnesses[i].len();
+            let nwitnesses = witnesses.len();
             inputs.ingest_witnesses(i, witnesses);
             info!(
                 "Loaded idx:{:?} field:{:?} file:{:?} num private witnesses:{:?}",
