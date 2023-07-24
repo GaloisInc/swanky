@@ -33,6 +33,7 @@ pub type WireRange = (WireId, WireId);
 /// ordering for gates is generally: `<out> <in> ...`; that is, the first
 /// [`WireId`] denotes the _output_ of the gate.
 // This enum should fit in 32 bytes.
+// Using `Box<Number>` for this reason.
 #[derive(Clone, Debug)]
 pub enum GateM {
     /// Store the given element in [`WireId`].
