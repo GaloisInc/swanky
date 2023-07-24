@@ -142,7 +142,7 @@ struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
     no_batching: bool,
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
+impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
@@ -232,7 +232,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
+impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
     pub(crate) fn less_eq_than_with_public2(
         &mut self,
         a: &[MacProver<F2, F40b>],
@@ -410,7 +410,7 @@ struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
     no_batching: bool,
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
+impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
@@ -500,7 +500,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     }
 }
 
-impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
+impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
     fn less_eq_than_with_public2(&mut self, a: &[MacVerifier<F40b>], b: &[F2]) -> Result<()> {
         // act = 1;
         // r   = 0;
