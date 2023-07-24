@@ -2,7 +2,7 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
-use crate::backend_trait::prime_field_value_from_number;
+use crate::backend_trait::PrimeBackendT;
 use crate::circuit_ir::{CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId};
 use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
@@ -60,7 +60,7 @@ pub enum MacBitGeneric {
 }
 
 /// This trait extends the `BackendT` trait with `assert_conv_*` functions to go to bits.
-pub trait BackendConvT: BackendT {
+pub trait BackendConvT: PrimeBackendT {
     // Convert a wire to bits in lower-endian
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>>;
     // convert bits in lower-endian to a wire
@@ -179,9 +179,6 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::FieldElement;
 
-    fn from_number(val: &Number) -> Result<Self::FieldElement> {
-        prime_field_value_from_number(val)
-    }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
     }
@@ -447,9 +444,6 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::FieldElement;
 
-    fn from_number(val: &Number) -> Result<Self::FieldElement> {
-        prime_field_value_from_number(val)
-    }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
     }

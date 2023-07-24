@@ -1,4 +1,3 @@
-use crate::backend_trait::prime_field_value_from_number;
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
@@ -6,7 +5,6 @@ use crate::{backend_trait::BackendT, edabits::RcRefCell};
 use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
-use mac_n_cheese_sieve_parser::Number;
 use ocelot::svole::LpnParams;
 use scuttlebutt::{
     field::{FiniteField, IsSubFieldOf},
@@ -161,10 +159,6 @@ where
 {
     type Wire = MacProver<V, T>;
     type FieldElement = V;
-
-    fn from_number(val: &Number) -> Result<Self::FieldElement> {
-        prime_field_value_from_number(val)
-    }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())
@@ -425,10 +419,6 @@ where
 {
     type Wire = MacVerifier<T>;
     type FieldElement = V;
-
-    fn from_number(val: &Number) -> Result<Self::FieldElement> {
-        prime_field_value_from_number(val)
-    }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())
