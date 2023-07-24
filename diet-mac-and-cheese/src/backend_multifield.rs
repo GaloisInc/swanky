@@ -2,6 +2,7 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
+use crate::backend_trait::PrimeBackendT;
 use crate::circuit_ir::{CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId};
 use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
@@ -16,11 +17,12 @@ use eyre::{ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
+use mac_n_cheese_sieve_parser::Number;
 use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
-use scuttlebutt::field::PrimeFiniteField;
-use scuttlebutt::field::{F40b, F2};
+use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
+use scuttlebutt::field::{F40b, F61p, FiniteField, PrimeFiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
@@ -58,7 +60,7 @@ pub enum MacBitGeneric {
 }
 
 /// This trait extends the `BackendT` trait with `assert_conv_*` functions to go to bits.
-pub trait BackendConvT: BackendT {
+pub trait BackendConvT: PrimeBackendT {
     // Convert a wire to bits in lower-endian
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>>;
     // convert bits in lower-endian to a wire
@@ -132,10 +134,10 @@ impl<E> EdabitsMap<E> {
     }
 }
 
-struct DietMacAndCheeseConvProver<T: PrimeFiniteField, C: AbstractChannel> {
-    dmc: DietMacAndCheeseProver<T, T, C>,
-    conv: ProverConv<T>,
-    edabits_map: EdabitsMap<EdabitsProver<T>>,
+struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
+    dmc: DietMacAndCheeseProver<FE, FE, C>,
+    conv: ProverConv<FE>,
+    edabits_map: EdabitsMap<EdabitsProver<FE>>,
     dmc_f2: DietMacAndCheeseProver<F2, F40b, C>,
     no_batching: bool,
 }
@@ -177,9 +179,6 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::FieldElement;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        <DietMacAndCheeseProver<FE, FE, C> as BackendT>::from_bytes_le(val)
-    }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
     }
@@ -400,15 +399,15 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
     }
 }
 
-struct DietMacAndCheeseConvVerifier<T: PrimeFiniteField, C: AbstractChannel> {
-    dmc: DietMacAndCheeseVerifier<T, T, C>,
-    conv: VerifierConv<T>,
-    edabits_map: EdabitsMap<EdabitsVerifier<T>>,
+struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
+    dmc: DietMacAndCheeseVerifier<FE, FE, C>,
+    conv: VerifierConv<FE>,
+    edabits_map: EdabitsMap<EdabitsVerifier<FE>>,
     dmc_f2: DietMacAndCheeseVerifier<F2, F40b, C>,
     no_batching: bool,
 }
 
-impl<T: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<T, C> {
+impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
@@ -418,7 +417,7 @@ impl<T: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<T, C>
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let mut dmc = DietMacAndCheeseVerifier::<T, T, C>::init(
+        let mut dmc = DietMacAndCheeseVerifier::<FE, FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -441,13 +440,10 @@ impl<T: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<T, C>
     }
 }
 
-impl<T: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvVerifier<T, C> {
-    type Wire = <DietMacAndCheeseVerifier<T, T, C> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseVerifier<T, T, C> as BackendT>::FieldElement;
+impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvVerifier<FE, C> {
+    type Wire = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::FieldElement;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        <DietMacAndCheeseVerifier<T, T, C> as BackendT>::from_bytes_le(val)
-    }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
     }
@@ -660,8 +656,8 @@ trait EvaluatorT {
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
-        instance: Option<Vec<u8>>,
-        witness: Option<Vec<u8>>,
+        instance: Option<Number>,
+        witness: Option<Number>,
     ) -> Result<()>;
 
     fn conv_gate_get(&mut self, gate: &GateM) -> Result<Vec<MacBitGeneric>>;
@@ -711,14 +707,14 @@ where
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
-        instance: Option<Vec<u8>>,
-        witness: Option<Vec<u8>>,
+        instance: Option<Number>,
+        witness: Option<Number>,
     ) -> Result<()> {
         use GateM::*;
 
         match gate {
             Constant(_, out, value) => {
-                let v = self.backend.constant(B::from_bytes_le(value)?)?;
+                let v = self.backend.constant(B::from_number(value)?)?;
                 self.memory.set(*out, &v);
             }
 
@@ -760,26 +756,26 @@ where
             AddConstant(_, out, inp, constant) => {
                 let l = self.memory.get(*inp);
                 let r = constant;
-                let v = self.backend.add_constant(l, B::from_bytes_le(r)?)?;
+                let v = self.backend.add_constant(l, B::from_number(r)?)?;
                 self.memory.set(*out, &v);
             }
 
             MulConstant(_, out, inp, constant) => {
                 let l = self.memory.get(*inp);
                 let r = constant;
-                let v = self.backend.mul_constant(l, B::from_bytes_le(r)?)?;
+                let v = self.backend.mul_constant(l, B::from_number(r)?)?;
                 self.memory.set(*out, &v);
             }
 
             Instance(_ty, out) => {
                 let v = self
                     .backend
-                    .input_public(B::from_bytes_le(&instance.unwrap()).unwrap())?;
+                    .input_public(B::from_number(&instance.unwrap())?)?;
                 self.memory.set(*out, &v);
             }
 
             Witness(_, out) => {
-                let w = witness.map(|v| B::from_bytes_le(&v).unwrap());
+                let w = witness.and_then(|v| B::from_number(&v).ok());
                 let v = self.backend.input_private(w)?;
                 // debug!("WITNESS: {:?}", v);
                 self.memory.set(*out, &v);
@@ -1015,8 +1011,6 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         idx: usize,
         lpn_small: bool,
     ) -> Result<()> {
-        use scuttlebutt::field::{F384p, F384q, F61p, Secp256k1, Secp256k1order};
-
         // Loading the backends in order
         assert_eq!(idx, self.eval.len());
 
@@ -1079,108 +1073,110 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 )?;
                 back = Box::new(EvaluatorSingle::new(dmc, false));
             }
-        } else if field == std::any::TypeId::of::<Secp256k1>() {
-            info!("loading field Secp256k1");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<Secp256k1, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
-        } else if field == std::any::TypeId::of::<Secp256k1order>() {
-            info!("loading field Secp256k1order");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
-        } else if field == std::any::TypeId::of::<F384p>() {
-            info!("loading field F384p");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<F384p, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<F384p, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
-        } else if field == std::any::TypeId::of::<F384q>() {
-            info!("loading field F384q");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<F384q, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<F384q, _>::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
         } else {
-            return Err(eyre!("Unknown or unsupported field {:?}", field));
+            if field == std::any::TypeId::of::<Secp256k1>() {
+                info!("loading field Secp256k1");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<Secp256k1, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<Secp256k1, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else if field == std::any::TypeId::of::<Secp256k1order>() {
+                info!("loading field Secp256k1order");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<Secp256k1order, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<Secp256k1order, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else if field == std::any::TypeId::of::<F384p>() {
+                info!("loading field F384p");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<F384p, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<F384p, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else if field == std::any::TypeId::of::<F384q>() {
+                info!("loading field F384q");
+                if self.party == Party::Prover {
+                    let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvProver::<F384q, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                } else {
+                    let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+                    let dmc = DietMacAndCheeseConvVerifier::<F384q, _>::init(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_EXTRASMALL,
+                        LPN_EXTEND_EXTRASMALL,
+                        self.no_batching,
+                    )?;
+                    back = Box::new(EvaluatorSingle::new(dmc, false));
+                }
+            } else {
+                return Err(eyre!("Unknown or unsupported field {:?}", field));
+            }
         }
         self.eval.push(back);
         Ok(())
@@ -1422,15 +1418,16 @@ pub(crate) mod tests {
         backend_trait::BackendT,
         homcom::{FComProver, FComVerifier},
     };
+    use mac_n_cheese_sieve_parser::Number;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
     use rand::SeedableRng;
-    use scuttlebutt::field::{F384p, F384q};
+    use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
     #[allow(unused_imports)]
     use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
-    use scuttlebutt::{field::F61p, field::FiniteField, AesRng, Channel};
+    use scuttlebutt::{field::F61p, AesRng, Channel};
     use std::env;
     use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
@@ -1474,49 +1471,36 @@ pub(crate) mod tests {
     #[allow(dead_code)]
     const FF3: u8 = 3;
 
-    pub(crate) fn into_vec<FE: FiniteField>(e: FE) -> Vec<u8> {
-        e.to_bytes().to_vec()
+    pub(crate) fn zero<FE: PrimeFiniteField>() -> Number {
+        FE::ZERO.into_int()
     }
-
-    pub(crate) fn zero<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ZERO)
+    pub(crate) fn one<FE: PrimeFiniteField>() -> Number {
+        FE::ONE.into_int()
     }
-    pub(crate) fn one<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ONE)
+    pub(crate) fn two<FE: PrimeFiniteField>() -> Number {
+        (FE::ONE + FE::ONE).into_int()
     }
-    fn two<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ONE + FE::ONE)
+    pub(crate) fn minus_one<FE: PrimeFiniteField>() -> Number {
+        (-FE::ONE).into_int()
     }
-    pub(crate) fn minus_one<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-FE::ONE)
+    pub(crate) fn minus_two<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE)).into_int()
     }
-    pub(crate) fn minus_two<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE))
+    pub(crate) fn three<FE: PrimeFiniteField>() -> Number {
+        (FE::ONE + FE::ONE + FE::ONE).into_int()
     }
-    fn three<FE: FiniteField>() -> Vec<u8> {
-        into_vec(FE::ONE + FE::ONE + FE::ONE)
+    pub(crate) fn minus_three<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
-    pub(crate) fn minus_three<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE + FE::ONE))
+    pub(crate) fn minus_four<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
-    pub(crate) fn minus_four<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE))
+    pub(crate) fn minus_five<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
-    fn minus_five<FE: FiniteField>() -> Vec<u8> {
-        into_vec(-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE))
-    }
-    fn minus_nine<FE: FiniteField>() -> Vec<u8> {
-        into_vec(
-            -(FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE
-                + FE::ONE),
-        )
+    pub(crate) fn minus_nine<FE: PrimeFiniteField>() -> Number {
+        (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE + FE::ONE))
+            .into_int()
     }
 
     fn wr(w: WireId) -> WireRange {
@@ -1538,8 +1522,8 @@ pub(crate) mod tests {
         fields: Vec<Vec<u8>>,
         func_store: FunStore,
         gates: Vec<GateM>,
-        ins: Vec<Vec<Vec<u8>>>,
-        wit: Vec<Vec<Vec<u8>>>,
+        ins: Vec<Vec<Number>>,
+        wit: Vec<Vec<Number>>,
     ) -> eyre::Result<()> {
         let func_store_prover = func_store.clone();
         let gates_prover = gates.clone();
@@ -1733,10 +1717,10 @@ pub(crate) mod tests {
         let instances = vec![
             vec![],
             vec![
-                into_vec(F2::ZERO),
-                into_vec(F2::ONE),
-                into_vec(F2::ZERO),
-                into_vec(F2::ONE),
+                F2::ZERO.into_int(),
+                F2::ONE.into_int(),
+                F2::ZERO.into_int(),
+                F2::ONE.into_int(),
             ],
         ];
         let witnesses = vec![vec![], vec![]];
@@ -1850,8 +1834,8 @@ pub(crate) mod tests {
         let instances = vec![vec![], vec![], vec![], vec![]];
         let witnesses = vec![
             vec![],
-            vec![into_vec(F384p::ZERO)],
-            vec![into_vec(F384q::ONE)],
+            vec![F384p::ZERO.into_int()],
+            vec![F384q::ONE.into_int()],
             vec![],
         ];
 
@@ -1902,8 +1886,8 @@ pub(crate) mod tests {
 
         let instances = vec![vec![], vec![]];
         let witnesses = vec![
-            vec![into_vec(Secp256k1::ZERO)],
-            vec![into_vec(Secp256k1order::ONE)],
+            vec![Secp256k1::ZERO.into_int()],
+            vec![Secp256k1order::ONE.into_int()],
             vec![],
         ];
 
@@ -1947,7 +1931,7 @@ pub(crate) mod tests {
                 FF0,
                 7,
                 6,
-                Box::from(into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE))),
+                Box::from((-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int()),
             ),
             GateM::AssertZero(FF0, 7),
         ];
@@ -2001,7 +1985,7 @@ pub(crate) mod tests {
                 FF0,
                 7,
                 6,
-                Box::from(into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE))),
+                Box::from((-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int()),
             ),
             GateM::AssertZero(FF0, 7),
         ];
@@ -2042,8 +2026,8 @@ pub(crate) mod tests {
         func.compiled_info.body_max = None;
         func_store.insert("myfun".into(), func);
 
-        let two = into_vec(F61p::ONE + F61p::ONE);
-        let minus_four = into_vec(-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE));
+        let two = (F61p::ONE + F61p::ONE).into_int();
+        let minus_four = (-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int();
         let gates = vec![
             // New(0,2)
             // New(3,3)

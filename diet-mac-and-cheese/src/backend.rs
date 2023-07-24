@@ -160,10 +160,6 @@ where
     type Wire = MacProver<V, T>;
     type FieldElement = V;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        from_bytes_le(val)
-    }
-
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())
     }
@@ -423,10 +419,6 @@ where
 {
     type Wire = MacVerifier<T>;
     type FieldElement = V;
-
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
-        from_bytes_le(val)
-    }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())

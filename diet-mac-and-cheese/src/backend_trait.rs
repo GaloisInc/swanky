@@ -3,7 +3,9 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use eyre::Result;
-use scuttlebutt::field::FiniteField;
+use mac_n_cheese_sieve_parser::Number;
+use scuttlebutt::field::{FiniteField, PrimeFiniteField};
+use std::any::type_name;
 
 /// An interface for computing over basic gates using a single [`FiniteField`].
 pub trait BackendT {
@@ -12,7 +14,6 @@ pub trait BackendT {
     /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 
-    fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement>;
     fn one(&self) -> Result<Self::FieldElement>;
     fn zero(&self) -> Result<Self::FieldElement>;
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;
@@ -32,4 +33,31 @@ pub trait BackendT {
 
     fn finalize(&mut self) -> Result<()>;
     fn reset(&mut self);
+}
+
+/// Backends that admit a conversion from [`Number`] to the underlying field
+/// element type.
+pub trait PrimeBackendT: BackendT {
+    /// Try to convert a [`Number`] to a `Self::FieldElement`.
+    fn from_number(val: &Number) -> Result<Self::FieldElement>;
+}
+
+/// Blanket implementation of `PrimeBackendT` for all types whose `FieldElement`
+/// is a `PrimeFiniteField`.
+impl<T: BackendT> PrimeBackendT for T
+where
+    T::FieldElement: PrimeFiniteField,
+{
+    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
+        let x = T::FieldElement::try_from_int(val);
+        if x.is_none().into() {
+            eyre::bail!(
+                "{val} is too large to be an element of {}",
+                type_name::<T::FieldElement>()
+            )
+        } else {
+            // Safe: We've already checked that x is not none.
+            Ok(x.unwrap())
+        }
+    }
 }

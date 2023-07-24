@@ -1,5 +1,5 @@
 use eyre::Context;
-use mac_n_cheese_sieve_parser::PluginTypeArg;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 use crate::circuit_ir::{
     first_unused_wire_id, FunStore, FuncDecl, GateM, GatesBody, TypeId, TypeStore, WireCount,
@@ -169,11 +169,10 @@ impl Plugin for IterV0 {
             let mut counter_wire = first_unused_wire_id(output_counts, input_counts);
 
             for i in 0..iter_count {
-                // TODO: This seems a little bit sus. Do we need to do something more clever?
                 gates.push(GateM::Constant(
                     counter_type,
                     counter_wire,
-                    Box::new(i.to_le_bytes().to_vec()),
+                    Box::new(Number::from_u64(i)),
                 ));
 
                 let outs = ranges_for_iteration(i, 0, output_counts, f_output_counts);

@@ -40,7 +40,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let mut stream_inp = ValueStreamReader::open(ValueStreamKind::Public, instance.as_path())?;
 
     while let Some(v) = stream_inp.next()? {
-        instances.push_back(number_to_bytes(&v));
+        instances.push_back(v);
     }
     let field = stream_inp.modulus();
     let type_id = 0;

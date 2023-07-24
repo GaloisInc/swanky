@@ -67,9 +67,34 @@ macro_rules! test_field {
 
                 proptest! {
                     #[test]
-                    fn crypto_bigint_roundtrip(a in any_prime_fe()) {
+                    fn crypto_bigint_into_int_consistent(a in any_prime_fe()) {
+                        type PF = <FE as FiniteField>::PrimeField;
+                        let wider_int = PF::into_int::<{PF::MIN_LIMBS_NEEDED + 1}>(&a);
+                        let narrower_int = PF::into_int::<{PF::MIN_LIMBS_NEEDED}>(&a);
+                        prop_assert_eq!(wider_int, narrower_int.resize())
+                    }
+                }
+                proptest! {
+                    #[test]
+                    fn crypto_bigint_min_limbs_roundtrip(a in any_prime_fe()) {
                         type PF = <FE as FiniteField>::PrimeField;
                         let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED}>(&a)).unwrap();
+                        prop_assert_eq!(a, b);
+                    }
+                }
+                proptest! {
+                    #[test]
+                    fn crypto_bigint_min_limbs_1_roundtrip(a in any_prime_fe()) {
+                        type PF = <FE as FiniteField>::PrimeField;
+                        let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED + 1}>(&a)).unwrap();
+                        prop_assert_eq!(a, b);
+                    }
+                }
+                proptest! {
+                    #[test]
+                    fn crypto_bigint_min_limbs_2_roundtrip(a in any_prime_fe()) {
+                        type PF = <FE as FiniteField>::PrimeField;
+                        let b = PF::try_from_int(PF::into_int::<{PF::MIN_LIMBS_NEEDED + 2}>(&a)).unwrap();
                         prop_assert_eq!(a, b);
                     }
                 }

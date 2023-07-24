@@ -4,7 +4,10 @@ use crate::circuit_ir::{
 };
 use eyre::{eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use scuttlebutt::{field::F2, ring::FiniteRing, serialization::CanonicalSerialize};
+use scuttlebutt::{
+    field::{PrimeFiniteField, F2},
+    ring::FiniteRing,
+};
 
 pub(crate) struct MuxV0;
 
@@ -61,12 +64,7 @@ impl Plugin for MuxV0 {
         // wire_cond_neg <- cond - 1
         let wire_cond_neg = callframe_size;
         vec_gates.push(
-            GateM::AddConstant(
-                field,
-                wire_cond_neg,
-                cond,
-                Box::from(F2::ONE.to_bytes().to_vec()),
-            ), // WARNING only works in F2
+            GateM::AddConstant(field, wire_cond_neg, cond, Box::from(F2::ONE.into_int())), // WARNING only works in F2
         );
 
         let middle_index = input_counts.len() / 2; // WARNING: works for F2, Should divide by the number of possibilities
@@ -132,14 +130,17 @@ impl Plugin for MuxV0 {
 mod tests {
     use super::MuxV0;
     use crate::{
-        backend_multifield::tests::{into_vec, minus_one, one, test_circuit, zero},
+        backend_multifield::tests::{minus_one, one, test_circuit, zero},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
     };
     use crate::{
         backend_multifield::tests::{F2_VEC, FF0},
         plugins::Plugin,
     };
-    use scuttlebutt::{field::F2, ring::FiniteRing};
+    use scuttlebutt::{
+        field::{PrimeFiniteField, F2},
+        ring::FiniteRing,
+    };
 
     // Simplest test for mux on f2
     #[test]
@@ -189,7 +190,7 @@ mod tests {
                 vec![(13, 13)],
                 vec![(1, 1), (4, 4), (8, 8)],
             ))),
-            GateM::AddConstant(FF0, 14, 13, Box::from(into_vec(-F2::ONE))),
+            GateM::AddConstant(FF0, 14, 13, Box::from((-F2::ONE).into_int())),
             GateM::AssertZero(FF0, 14),
         ];
 
