@@ -2,6 +2,7 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
+use crate::backend_trait::prime_field_value_from_number;
 use crate::circuit_ir::{CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId};
 use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
@@ -25,7 +26,6 @@ use scuttlebutt::field::{F40b, F61p, FiniteField, PrimeFiniteField, F2};
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
-use std::any::type_name;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io::{Read, Seek};
@@ -179,16 +179,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseProver<FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseProver<FE, C> as BackendT>::FieldElement;
 
-    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
-        let x = Self::FieldElement::try_from_int(val);
-        if x.is_none().into() {
-            eyre::bail!(
-                "{val} is too large to be an element of {}",
-                type_name::<Self::FieldElement>()
-            )
-        } else {
-            Ok(x.unwrap())
-        }
+    fn from_number(val: &Number) -> Result<Self::FieldElement> {
+        prime_field_value_from_number(val)
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -455,16 +447,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseVerifier<FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseVerifier<FE, C> as BackendT>::FieldElement;
 
-    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
-        let x = Self::FieldElement::try_from_int(val);
-        if x.is_none().into() {
-            eyre::bail!(
-                "{val} is too large to be an element of {}",
-                type_name::<FE>()
-            )
-        } else {
-            Ok(x.unwrap())
-        }
+    fn from_number(val: &Number) -> Result<Self::FieldElement> {
+        prime_field_value_from_number(val)
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()

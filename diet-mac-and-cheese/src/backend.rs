@@ -1,5 +1,4 @@
-use std::any::type_name;
-
+use crate::backend_trait::prime_field_value_from_number;
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
@@ -9,11 +8,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::Number;
 use ocelot::svole::LpnParams;
-use scuttlebutt::{
-    field::{FiniteField, PrimeFiniteField},
-    ring::FiniteRing,
-    AbstractChannel, AesRng,
-};
+use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -157,16 +152,8 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE
     type Wire = MacProver<FE::PrimeField, FE>;
     type FieldElement = FE::PrimeField;
 
-    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
-        let x = Self::FieldElement::try_from_int(val);
-        if x.is_none().into() {
-            eyre::bail!(
-                "{val} is too large to be an element of {}",
-                type_name::<Self::FieldElement>()
-            )
-        } else {
-            Ok(x.unwrap())
-        }
+    fn from_number(val: &Number) -> Result<Self::FieldElement> {
+        prime_field_value_from_number(val)
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
@@ -415,16 +402,8 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseVerifier<
     type Wire = MacVerifier<FE>;
     type FieldElement = FE::PrimeField;
 
-    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
-        let x = Self::FieldElement::try_from_int(val);
-        if x.is_none().into() {
-            eyre::bail!(
-                "{val} is too large to be an element of {}",
-                type_name::<FE>()
-            )
-        } else {
-            Ok(x.unwrap())
-        }
+    fn from_number(val: &Number) -> Result<Self::FieldElement> {
+        prime_field_value_from_number(val)
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
