@@ -6,7 +6,10 @@ use eyre::{eyre, Context, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
-use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
+use scuttlebutt::{
+    field::{FiniteField, IsSubFieldOf},
+    AbstractChannel, AesRng,
+};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -135,20 +138,27 @@ impl Monitor {
 }
 
 /// Prover for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseProver<FE: FiniteField, C: AbstractChannel> {
+pub struct DietMacAndCheeseProver<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     is_ok: bool,
-    prover: RcRefCell<FComProver<FE::PrimeField, FE>>,
+    prover: RcRefCell<FComProver<V, T>>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    check_zero_list: Vec<MacProver<FE::PrimeField, FE>>,
+    check_zero_list: Vec<MacProver<V, T>>,
     monitor: Monitor,
-    state_mult_check: StateMultCheckProver<FE>,
+    state_mult_check: StateMultCheckProver<T>,
     no_batching: bool,
 }
 
-impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE, C> {
-    type Wire = MacProver<FE::PrimeField, FE>;
-    type FieldElement = FE::PrimeField;
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> BackendT
+    for DietMacAndCheeseProver<V, T, C>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+    type Wire = MacProver<V, T>;
+    type FieldElement = V;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
         from_bytes_le(val)
@@ -160,7 +170,7 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE
 
     fn challenge(&mut self) -> Result<Self::Wire> {
         self.channel.flush()?;
-        let challenge = self.channel.read_serializable::<FE::PrimeField>()?;
+        let challenge = self.channel.read_serializable::<V>()?;
         self.input_public(challenge)
     }
 
@@ -230,7 +240,7 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE
 
     fn input_public(&mut self, value: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
-        Ok(MacProver::new(value, FE::ZERO))
+        Ok(MacProver::new(value, T::ZERO))
     }
 
     fn input_private(&mut self, value: Option<Self::FieldElement>) -> Result<Self::Wire> {
@@ -264,7 +274,10 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseProver<FE
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<V, T, C>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     /// Initialize the prover by providing a channel, a random generator and a pair of LPN parameters as defined by svole.
     pub fn init(
         channel: &mut C,
@@ -290,7 +303,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         rng: AesRng,
-        fcom: &RcRefCell<FComProver<FE::PrimeField, FE>>,
+        fcom: &RcRefCell<FComProver<V, T>>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckProver::init(channel)?;
@@ -307,7 +320,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
     }
 
     /// Get party
-    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComProver<FE::PrimeField, FE>> {
+    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComProver<V, T>> {
         &self.prover
     }
 
@@ -322,7 +335,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
         }
     }
 
-    fn input(&mut self, v: FE::PrimeField) -> Result<MacProver<FE::PrimeField, FE>> {
+    fn input(&mut self, v: V) -> Result<MacProver<V, T>> {
         let tag = self
             .prover
             .get_refmut()
@@ -361,7 +374,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
         r
     }
 
-    fn push_check_zero_list(&mut self, e: MacProver<FE::PrimeField, FE>) -> Result<()> {
+    fn push_check_zero_list(&mut self, e: MacProver<V, T>) -> Result<()> {
         self.check_zero_list.push(e);
 
         if self.check_zero_list.len() == QUEUE_CAPACITY || self.no_batching {
@@ -371,12 +384,16 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<FE, C> {
     }
 
     fn log_final_monitor(&self) {
-        info!("field largest value: {:?}", (FE::ZERO - FE::ONE).to_bytes());
+        info!("field largest value: {:?}", (T::ZERO - T::ONE).to_bytes());
         self.monitor.log_final_monitor();
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel> Drop for DietMacAndCheeseProver<FE, C> {
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> Drop
+    for DietMacAndCheeseProver<V, T, C>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     fn drop(&mut self) {
         if self.is_ok && !self.check_zero_list.is_empty() {
             warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
@@ -385,20 +402,27 @@ impl<FE: FiniteField, C: AbstractChannel> Drop for DietMacAndCheeseProver<FE, C>
 }
 
 /// Verifier for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseVerifier<FE: FiniteField, C: AbstractChannel> {
-    verifier: RcRefCell<FComVerifier<FE::PrimeField, FE>>,
+pub struct DietMacAndCheeseVerifier<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+    verifier: RcRefCell<FComVerifier<V, T>>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    check_zero_list: Vec<MacVerifier<FE>>,
+    check_zero_list: Vec<MacVerifier<T>>,
     monitor: Monitor,
-    state_mult_check: StateMultCheckVerifier<FE>,
+    state_mult_check: StateMultCheckVerifier<T>,
     is_ok: bool,
     no_batching: bool,
 }
 
-impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseVerifier<FE, C> {
-    type Wire = MacVerifier<FE>;
-    type FieldElement = FE::PrimeField;
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> BackendT
+    for DietMacAndCheeseVerifier<V, T, C>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+    type Wire = MacVerifier<T>;
+    type FieldElement = V;
 
     fn from_bytes_le(val: &[u8]) -> Result<Self::FieldElement> {
         from_bytes_le(val)
@@ -409,7 +433,7 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseVerifier<
     }
 
     fn challenge(&mut self) -> Result<Self::Wire> {
-        let challenge = FE::PrimeField::random(&mut self.rng);
+        let challenge = V::random(&mut self.rng);
         self.channel.write_serializable(&challenge)?;
         self.channel.flush()?;
         self.input_public(challenge)
@@ -506,7 +530,10 @@ impl<FE: FiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseVerifier<
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<V, T, C>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     /// Initialize the verifier by providing a channel, a random generator and a pair of LPN parameters as defined by svole.
     pub fn init(
         channel: &mut C,
@@ -534,7 +561,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         mut rng: AesRng,
-        fcom: &RcRefCell<FComVerifier<FE::PrimeField, FE>>,
+        fcom: &RcRefCell<FComVerifier<V, T>>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
@@ -551,7 +578,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
     }
 
     /// Get party
-    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComVerifier<FE::PrimeField, FE>> {
+    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComVerifier<V, T>> {
         &self.verifier
     }
 
@@ -565,7 +592,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
         Ok(())
     }
 
-    fn input(&mut self) -> Result<MacVerifier<FE>> {
+    fn input(&mut self) -> Result<MacVerifier<T>> {
         let tag = self
             .verifier
             .get_refmut()
@@ -605,7 +632,7 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
         r
     }
 
-    fn push_check_zero_list(&mut self, e: MacVerifier<FE>) -> Result<()> {
+    fn push_check_zero_list(&mut self, e: MacVerifier<T>) -> Result<()> {
         self.check_zero_list.push(e);
 
         if self.check_zero_list.len() == QUEUE_CAPACITY || self.no_batching {
@@ -615,12 +642,16 @@ impl<FE: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<FE, C> {
     }
 
     fn log_final_monitor(&self) {
-        info!("field largest value: {:?}", (FE::ZERO - FE::ONE).to_bytes());
+        info!("field largest value: {:?}", (T::ZERO - T::ONE).to_bytes());
         self.monitor.log_final_monitor();
     }
 }
 
-impl<FE: FiniteField, C: AbstractChannel> Drop for DietMacAndCheeseVerifier<FE, C> {
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> Drop
+    for DietMacAndCheeseVerifier<V, T, C>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
     fn drop(&mut self) {
         if self.is_ok && !self.check_zero_list.is_empty() {
             warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
@@ -637,7 +668,7 @@ mod tests {
     };
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    use scuttlebutt::{field::F40b, ring::FiniteRing};
+    use scuttlebutt::field::{F40b, IsSubFieldOf, F2};
     use scuttlebutt::{
         field::{F61p, FiniteField},
         AesRng, Channel,
@@ -647,7 +678,10 @@ mod tests {
         os::unix::net::UnixStream,
     };
 
-    fn test<FE: FiniteField>() {
+    fn test<V: IsSubFieldOf<T>, T: FiniteField>()
+    where
+        T::PrimeField: IsSubFieldOf<V>,
+    {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let rng = AesRng::from_seed(Default::default());
@@ -655,7 +689,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<FE, _> = DietMacAndCheeseProver::init(
+            let mut dmc: DietMacAndCheeseProver<V, T, _> = DietMacAndCheeseProver::init(
                 &mut channel,
                 rng,
                 LPN_SETUP_SMALL,
@@ -675,18 +709,16 @@ mod tests {
             // r_zero_priv = addc(n24_priv, -24)
             // assert_zero(r_zero_priv)
             // assert_zero(n24_priv) !!!!FAIL!!!!!
-            let one = FE::PrimeField::ONE;
+            let one = V::ONE;
             let two = one + one;
             let three = two + one;
             let one1 = dmc.input_public(one).unwrap();
             let one2 = dmc.input_public(one).unwrap();
             let two_pub = dmc.add(&one1, &one2).unwrap();
             assert_eq!(two_pub, dmc.input_public(two).unwrap());
-            let three_pub = dmc.add_constant(&two_pub, FE::PrimeField::ONE).unwrap();
+            let three_pub = dmc.add_constant(&two_pub, one).unwrap();
             assert_eq!(three_pub, dmc.input_public(three).unwrap());
-            let two_priv = dmc
-                .input_private(Some(FE::PrimeField::ONE + FE::PrimeField::ONE))
-                .unwrap();
+            let two_priv = dmc.input_private(Some(two)).unwrap();
             let six = dmc.mul(&two_priv, &three_pub).unwrap();
             let twelve_priv = dmc.mul_constant(&six, two).unwrap();
             assert_eq!(twelve_priv.value(), three * two * two);
@@ -705,7 +737,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<FE, _> = DietMacAndCheeseVerifier::init(
+        let mut dmc: DietMacAndCheeseVerifier<V, T, _> = DietMacAndCheeseVerifier::init(
             &mut channel,
             rng,
             LPN_SETUP_SMALL,
@@ -714,13 +746,13 @@ mod tests {
         )
         .unwrap();
 
-        let one = FE::PrimeField::ONE;
+        let one = V::ONE;
         let two = one + one;
         let three = two + one;
         let one1 = dmc.input_public(one).unwrap();
         let one2 = dmc.input_public(one).unwrap();
         let two_pub = dmc.add(&one1, &one2).unwrap();
-        let three_pub = dmc.add_constant(&two_pub, FE::PrimeField::ONE).unwrap();
+        let three_pub = dmc.add_constant(&two_pub, one).unwrap();
         let two_priv = dmc.input_private(None).unwrap();
         let six = dmc.mul(&two_priv, &three_pub).unwrap();
         let twelve_priv = dmc.mul_constant(&six, two).unwrap();
@@ -736,7 +768,10 @@ mod tests {
         handle.join().unwrap();
     }
 
-    fn test_challenge<F: FiniteField>() {
+    fn test_challenge<V: IsSubFieldOf<T>, T: FiniteField>()
+    where
+        T::PrimeField: IsSubFieldOf<V>,
+    {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let rng = AesRng::from_seed(Default::default());
@@ -744,7 +779,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<F, _> = DietMacAndCheeseProver::init(
+            let mut dmc: DietMacAndCheeseProver<V, T, _> = DietMacAndCheeseProver::init(
                 &mut channel,
                 rng,
                 LPN_SETUP_SMALL,
@@ -765,7 +800,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<F, _> = DietMacAndCheeseVerifier::init(
+        let mut dmc: DietMacAndCheeseVerifier<V, T, _> = DietMacAndCheeseVerifier::init(
             &mut channel,
             rng,
             LPN_SETUP_SMALL,
@@ -787,16 +822,21 @@ mod tests {
 
     #[test]
     fn test_f61p() {
-        test::<F61p>();
+        test::<F61p, F61p>();
     }
 
     #[test]
     fn test_challenge_f61p() {
-        test_challenge::<F61p>();
+        test_challenge::<F61p, F61p>();
     }
 
     #[test]
-    fn test_challenge_f40b() {
-        test_challenge::<F40b>();
+    fn test_challenge_f2_f40b() {
+        test_challenge::<F2, F40b>();
+    }
+
+    #[test]
+    fn test_challenge_f40b_f40b() {
+        test_challenge::<F40b, F40b>();
     }
 }
