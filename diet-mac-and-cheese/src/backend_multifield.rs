@@ -70,7 +70,7 @@ pub trait BackendConvT: BackendT {
     fn finalize_conv(&mut self) -> Result<()>;
 }
 
-impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseProver<F40b, C> {
+impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseProver<F2, F40b, C> {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", w);
         Ok(vec![MacBitGeneric::BitProver(*w)])
@@ -93,7 +93,7 @@ impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseProver<F40b, C> {
     }
 }
 
-impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseVerifier<F40b, C> {
+impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseVerifier<F2, F40b, C> {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         Ok(vec![MacBitGeneric::BitVerifier(*w)])
     }
@@ -135,10 +135,10 @@ impl<E> EdabitsMap<E> {
 }
 
 struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
-    dmc: DietMacAndCheeseProver<FE, C>,
+    dmc: DietMacAndCheeseProver<FE, FE, C>,
     conv: ProverConv<FE>,
     edabits_map: EdabitsMap<EdabitsProver<FE>>,
-    dmc_f2: DietMacAndCheeseProver<F40b, C>,
+    dmc_f2: DietMacAndCheeseProver<F2, F40b, C>,
     no_batching: bool,
 }
 
@@ -152,7 +152,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvP
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let mut dmc = DietMacAndCheeseProver::<FE, C>::init(
+        let mut dmc = DietMacAndCheeseProver::<FE, FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -164,7 +164,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvP
             dmc,
             conv,
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseProver::<F40b, C>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseProver::<F2, F40b, C>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -176,8 +176,8 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvP
 }
 
 impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvProver<FE, C> {
-    type Wire = <DietMacAndCheeseProver<FE, C> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseProver<FE, C> as BackendT>::FieldElement;
+    type Wire = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::FieldElement;
 
     fn from_number(val: &Number) -> Result<Self::FieldElement> {
         prime_field_value_from_number(val)
@@ -374,7 +374,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
         }
 
         debug!("CONV_FROM_BITS {:?}", recomposed_value);
-        let mac = <DietMacAndCheeseProver<FE, C> as BackendT>::input_private(
+        let mac = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::input_private(
             &mut self.dmc,
             Some(recomposed_value),
         )?;
@@ -403,10 +403,10 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
 }
 
 struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
-    dmc: DietMacAndCheeseVerifier<FE, C>,
+    dmc: DietMacAndCheeseVerifier<FE, FE, C>,
     conv: VerifierConv<FE>,
     edabits_map: EdabitsMap<EdabitsVerifier<FE>>,
-    dmc_f2: DietMacAndCheeseVerifier<F40b, C>,
+    dmc_f2: DietMacAndCheeseVerifier<F2, F40b, C>,
     no_batching: bool,
 }
 
@@ -420,7 +420,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let mut dmc = DietMacAndCheeseVerifier::<FE, C>::init(
+        let mut dmc = DietMacAndCheeseVerifier::<FE, FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -432,7 +432,7 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
             dmc,
             conv,
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseVerifier::<F40b, C>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseVerifier::<F2, F40b, C>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -444,8 +444,8 @@ impl<FE: FiniteField<PrimeField = FE>, C: AbstractChannel> DietMacAndCheeseConvV
 }
 
 impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvVerifier<FE, C> {
-    type Wire = <DietMacAndCheeseVerifier<FE, C> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseVerifier<FE, C> as BackendT>::FieldElement;
+    type Wire = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::FieldElement;
 
     fn from_number(val: &Number) -> Result<Self::FieldElement> {
         prime_field_value_from_number(val)
@@ -625,7 +625,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
         }
 
         let mac =
-            <DietMacAndCheeseVerifier<FE, _> as BackendT>::input_private(&mut self.dmc, None)?;
+            <DietMacAndCheeseVerifier<FE, FE, _> as BackendT>::input_private(&mut self.dmc, None)?;
 
         let id = bits.len();
         let num = self
@@ -1036,7 +1036,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             // Note for F2 we do not use the backend with Conv, simply dietMC
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseProver::<F40b, _>::init_with_fcom(
+                let dmc = DietMacAndCheeseProver::<F2, F40b, _>::init_with_fcom(
                     channel,
                     rng,
                     fcom_f2,
@@ -1045,7 +1045,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             } else {
                 let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseVerifier::<F40b, _>::init_with_fcom(
+                let dmc = DietMacAndCheeseVerifier::<F2, F40b, _>::init_with_fcom(
                     channel,
                     rng,
                     fcom_f2,
