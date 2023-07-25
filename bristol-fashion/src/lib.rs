@@ -387,10 +387,9 @@ pub mod circuits;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use circuits::*;
 
     struct ReadSpec {
-        bristol: fn() -> Circuit,
+        bristol: Circuit,
         ngates: u64,
         nwires: u64,
         input_sizes: Vec<u64>,
@@ -403,22 +402,21 @@ mod tests {
     }
 
     fn test_read(spec: &ReadSpec) {
-        let bristol = (spec.bristol)();
-        assert_eq!(bristol.ngates, spec.ngates);
-        assert_eq!(bristol.nwires, spec.nwires);
-        assert_eq!(bristol.input_sizes.clone(), spec.input_sizes);
-        assert_eq!(bristol.output_sizes.clone(), spec.output_sizes);
-        assert_eq!(bristol.nxor(), spec.nxor);
-        assert_eq!(bristol.nand(), spec.nand);
-        assert_eq!(bristol.ninv(), spec.ninv);
-        assert_eq!(bristol.neq(), spec.neq);
-        assert_eq!(bristol.neqw(), spec.neqw);
+        assert_eq!(spec.bristol.ngates, spec.ngates);
+        assert_eq!(spec.bristol.nwires, spec.nwires);
+        assert_eq!(spec.bristol.input_sizes.clone(), spec.input_sizes);
+        assert_eq!(spec.bristol.output_sizes.clone(), spec.output_sizes);
+        assert_eq!(spec.bristol.nxor(), spec.nxor);
+        assert_eq!(spec.bristol.nand(), spec.nand);
+        assert_eq!(spec.bristol.ninv(), spec.ninv);
+        assert_eq!(spec.bristol.neq(), spec.neq);
+        assert_eq!(spec.bristol.neqw(), spec.neqw);
     }
 
     #[test]
     pub(crate) fn test_read_add64() {
         let spec = ReadSpec {
-            bristol: add64,
+            bristol: add64!(),
             ngates: 376,
             nwires: 504,
             input_sizes: vec![64, 64],
@@ -436,7 +434,7 @@ mod tests {
     #[test]
     pub(crate) fn test_read_sub64() {
         let spec = ReadSpec {
-            bristol: sub64,
+            bristol: sub64!(),
             ngates: 439,
             nwires: 567,
             input_sizes: vec![64, 64],
@@ -454,7 +452,7 @@ mod tests {
     #[test]
     pub(crate) fn test_read_neg64() {
         let spec = ReadSpec {
-            bristol: neg64,
+            bristol: neg64!(),
             ngates: 190,
             nwires: 254,
             input_sizes: vec![64],
@@ -472,7 +470,7 @@ mod tests {
     #[test]
     pub(crate) fn test_read_mul64() {
         let spec = ReadSpec {
-            bristol: mul64,
+            bristol: mul64!(),
             ngates: 13675,
             nwires: 13803,
             input_sizes: vec![64, 64],
@@ -490,7 +488,7 @@ mod tests {
     #[test]
     pub(crate) fn test_read_wide_mul64() {
         let spec = ReadSpec {
-            bristol: wide_mul64,
+            bristol: wide_mul64!(),
             ngates: 28032,
             nwires: 28160,
             input_sizes: vec![64, 64],
