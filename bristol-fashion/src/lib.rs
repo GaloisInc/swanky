@@ -405,6 +405,7 @@ pub mod circuits;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use circuits::*;
 
     struct ReadSpec {
         bristol: Circuit,
@@ -433,6 +434,9 @@ mod tests {
 
     #[test]
     pub(crate) fn test_read_add64() {
+        let a = add64!();
+        let b = add64!();
+        assert_eq!(a.ngates, b.ngates);
         let spec = ReadSpec {
             bristol: add64!(),
             ngates: 376,

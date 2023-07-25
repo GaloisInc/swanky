@@ -1,20 +1,21 @@
 // TODO(isweet): Define cache according to Stuart's suggested macro, see https://gist.github.com/Isweet/22c598b7e9b19c84750f585319dddf7a
 
-#[macro_export]
-macro_rules! cache_circuit {
-    ($name:ident, $loc:tt) => {{
-        thread_local! {
-            static $name: Circuit = {
-                use std::io::Cursor;
+use crate::{read, Circuit};
+use std::io::Cursor;
 
-                let content = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/circuits/", $loc));
-                read(Cursor::new(content)).unwrap()
+macro_rules! define_cached_circuit {
+    ($name:ident, $loc:tt) => {
+        thread_local! {
+            pub static $name: Circuit = {
+                let contents = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/circuits/", $loc));
+                let reader = Cursor::new(contents);
+                read(reader).unwrap()
             }
         }
-
-        $name.with(Circuit::clone)
-    }};
+    }
 }
+
+define_cached_circuit!(ADD64, "adder64.txt");
 
 /// A cached copy of the optimized 64-bit adder circuit.
 /// This circuit computes `a + b` where `a`, `b` and the result
@@ -24,9 +25,11 @@ macro_rules! cache_circuit {
 #[macro_export]
 macro_rules! add64 {
     () => {
-        cache_circuit!(ADD64, "adder64.txt")
+        ADD64.with(Circuit::clone)
     };
 }
+
+define_cached_circuit!(SUB64, "sub64.txt");
 
 /// A cached copy of the optimized 64-bit subtraction circuit.
 /// This circuit computes `a - b` where `a`, `b`, and the result
@@ -36,9 +39,11 @@ macro_rules! add64 {
 #[macro_export]
 macro_rules! sub64 {
     () => {
-        cache_circuit!(SUB64, "sub64.txt")
+        SUB64.with(Circuit::clone)
     };
 }
+
+define_cached_circuit!(NEG64, "neg64.txt");
 
 /// A cached copy of the optimized 64-bit negation circuit.
 /// This circuit computes `-a` where `a` and the result
@@ -48,9 +53,11 @@ macro_rules! sub64 {
 #[macro_export]
 macro_rules! neg64 {
     () => {
-        cache_circuit!(NEG64, "neg64.txt")
+        NEG64.with(Circuit::clone)
     };
 }
+
+define_cached_circuit!(MUL64, "mult64.txt");
 
 /// A cached copy of the optimized 64-bit multiplication circuit.
 /// This circuit computes `a * b` where `a`, `b`, and the result
@@ -60,9 +67,11 @@ macro_rules! neg64 {
 #[macro_export]
 macro_rules! mul64 {
     () => {
-        cache_circuit!(MUL64, "mult64.txt")
+        MUL64.with(Circuit::clone)
     };
 }
+
+define_cached_circuit!(WIDE_MUL64, "mult2_64.txt");
 
 /// A cached copy of the optimized 64-bit wide multiplication circuit.
 /// This circuit computes `a * b` where `a` and `b` are 64-bit integers
@@ -78,6 +87,6 @@ macro_rules! mul64 {
 #[macro_export]
 macro_rules! wide_mul64 {
     () => {
-        cache_circuit!(WIDE_MUL64, "mult2_64.txt")
+        WIDE_MUL64.with(Circuit::clone)
     };
 }
