@@ -1,4 +1,4 @@
-use super::Plugin;
+use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeStore, WireCount,
 };
@@ -14,14 +14,14 @@ pub(crate) struct MuxV0;
 impl Plugin for MuxV0 {
     const NAME: &'static str = "mux_v0";
 
-    fn gates_body(
+    fn instantiate(
         operation: &str,
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> Result<GatesBody> {
+    ) -> Result<PluginExecution> {
         if operation != "strict" {
             return Err(eyre!(
                 "{}: Implementation only handles strict permissiveness: {operation}",
@@ -122,7 +122,7 @@ impl Plugin for MuxV0 {
             pos += how_many;
         }
 
-        Ok(GatesBody::new(vec_gates))
+        Ok(GatesBody::new(vec_gates).into())
     }
 }
 

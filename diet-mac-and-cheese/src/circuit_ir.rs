@@ -3,12 +3,10 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{
-        GaloisPolyV0, IterV0, MuxV0, PermutationCheckV1, Plugin, PluginBody, PluginType, VectorsV1,
-    },
+    plugins::{Plugin, PluginBody, PluginType},
 };
 use crypto_bigint::ArrayEncoding;
-use eyre::{eyre, Result};
+use eyre::{bail, eyre, Result};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
@@ -24,7 +22,17 @@ pub type WireCount = u64;
 /// [`@type`](`TypeSpecification`).
 pub type TypeId = u8;
 pub type FunId = usize;
+/// An inclusive range of [`WireId`]s.
 pub type WireRange = (WireId, WireId);
+
+/// The conversion gate representation. The first [`TypeId`]-[`WireRange`]
+/// pairing denotes the _output_ of the conversion, and the second pairing
+/// denotes the _input_ of the conversion.
+pub type ConvGate = (TypeId, WireRange, TypeId, WireRange);
+/// The call gate representation. The [`String`] denotes the function name, the
+/// first [`Vec`] denotes the _output_ wires, and the second [`Vec`] denotes the
+/// _input_ wires.
+pub type CallGate = (String, Vec<WireRange>, Vec<WireRange>);
 
 /// The internal circuit representation gate types.
 ///
@@ -41,6 +49,8 @@ pub enum GateM {
     /// Assert that the element in [`WireId`] is zero.
     AssertZero(TypeId, WireId),
     Copy(TypeId, WireId, WireId),
+    /// Adds the elements in the latter two [`WireId`]s together, storing the
+    /// result in the first [`WireId`].
     Add(TypeId, WireId, WireId, WireId),
     Sub(TypeId, WireId, WireId, WireId),
     Mul(TypeId, WireId, WireId, WireId),
@@ -48,10 +58,11 @@ pub enum GateM {
     MulConstant(TypeId, WireId, WireId, Box<Number>),
     Instance(TypeId, WireId),
     Witness(TypeId, WireId),
-    Conv(Box<(TypeId, WireRange, TypeId, WireRange)>),
+    /// Does field conversion.
+    Conv(Box<ConvGate>),
     New(TypeId, WireId, WireId),
     Delete(TypeId, WireId, WireId),
-    Call(Box<(String, Vec<WireRange>, Vec<WireRange>)>),
+    Call(Box<CallGate>),
     Challenge(TypeId, WireId),
     Comment(String),
 }
@@ -276,7 +287,7 @@ impl From<&GatesBody> for TypeIdMapping {
 }
 
 /// A body of computation containing a sequence of [`GateM`]s.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(transparent)]
 pub(crate) struct GatesBody {
     gates: Vec<GateM>,
@@ -293,7 +304,7 @@ impl GatesBody {
     }
 
     /// Return the maximum [`WireId`] found, or `None` if no [`WireId`] was found.
-    fn output_wire_max(&self) -> Option<WireId> {
+    pub(crate) fn output_wire_max(&self) -> Option<WireId> {
         self.gates
             .iter()
             .fold(None, |acc, x| max(acc, x.out_wire()))
@@ -314,19 +325,22 @@ pub(crate) struct CompiledInfo {
     pub(crate) body_max: Option<WireId>,
     /// [`TypeId`]s encountered in the function body.
     pub(crate) type_ids: Vec<TypeId>,
-    /// Gates associated to the function, if any.
-    pub(crate) plugin_gates: Option<GatesBody>,
 }
 
-/// Function declaration.
+/// A Circuit IR function declaration.
 #[derive(Clone)]
 pub struct FuncDecl {
     #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
     fun_id: FunId,
+    /// The function body.
     body: GatesOrPluginBody,
+    /// A [`Vec`] containing pairings of [`TypeId`]s and their associated output
+    /// [`WireCount`].
     pub(crate) output_counts: Vec<(TypeId, WireCount)>,
+    /// A [`Vec`] containing pairings of [`TypeId`]s and their associated input
+    /// [`WireCount`].
     pub(crate) input_counts: Vec<(TypeId, WireCount)>,
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
@@ -390,7 +404,6 @@ impl FuncDecl {
                 args_count: Some(args_count),
                 body_max,
                 type_ids,
-                plugin_gates: None,
             },
         }
     }
@@ -408,8 +421,10 @@ impl FuncDecl {
         type_store: &TypeStore,
         fun_store: &FunStore,
     ) -> Result<Self> {
-        let gates = match plugin_name.as_str() {
-            MuxV0::NAME => MuxV0::gates_body(
+        use crate::plugins::{GaloisPolyV0, IterV0, MuxV0, PermutationCheckV1, VectorsV1};
+
+        let execution = match plugin_name.as_str() {
+            MuxV0::NAME => MuxV0::instantiate(
                 &operation,
                 &params,
                 &output_counts,
@@ -417,7 +432,7 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
-            PermutationCheckV1::NAME => PermutationCheckV1::gates_body(
+            PermutationCheckV1::NAME => PermutationCheckV1::instantiate(
                 &operation,
                 &params,
                 &output_counts,
@@ -425,7 +440,7 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
-            IterV0::NAME => IterV0::gates_body(
+            IterV0::NAME => IterV0::instantiate(
                 &operation,
                 &params,
                 &output_counts,
@@ -433,7 +448,7 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
-            VectorsV1::NAME => VectorsV1::gates_body(
+            VectorsV1::NAME => VectorsV1::instantiate(
                 &operation,
                 &params,
                 &output_counts,
@@ -441,7 +456,7 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
-            GaloisPolyV0::NAME => GaloisPolyV0::gates_body(
+            GaloisPolyV0::NAME => GaloisPolyV0::instantiate(
                 &operation,
                 &params,
                 &output_counts,
@@ -449,13 +464,13 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
-            name => return Err(eyre!("Unsupported plugin: {name}")),
+            name => bail!("Unsupported plugin: {name}"),
         };
 
         let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
-        let body_max = gates.output_wire_max();
+        let body_max = execution.output_wire_max();
 
-        let mut type_presence = TypeIdMapping::from(&gates);
+        let mut type_presence = execution.type_id_mapping();
         for (ty, _) in output_counts.iter() {
             type_presence.set(*ty);
         }
@@ -464,7 +479,7 @@ impl FuncDecl {
         }
 
         let type_ids = type_presence.to_type_ids();
-        let plugin_body = PluginBody::new(plugin_name, operation);
+        let plugin_body = PluginBody::new(plugin_name, operation, execution);
 
         Ok(FuncDecl {
             name,
@@ -476,7 +491,6 @@ impl FuncDecl {
                 args_count,
                 body_max,
                 type_ids,
-                plugin_gates: Some(gates),
             },
         })
     }

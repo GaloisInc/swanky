@@ -1,4 +1,4 @@
-use super::Plugin;
+use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
     WireCount,
@@ -12,14 +12,14 @@ pub(crate) struct GaloisPolyV0;
 impl Plugin for GaloisPolyV0 {
     const NAME: &'static str = "galois_poly_v0";
 
-    fn gates_body(
+    fn instantiate(
         operation: &str,
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> Result<GatesBody> {
+    ) -> Result<PluginExecution> {
         if operation == "prod_eq" {
             Self::prod_eq_body(params, output_counts, input_counts, type_store)
         } else if operation == "shift_eq" {
@@ -44,7 +44,7 @@ impl GaloisPolyV0 {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
-    ) -> Result<GatesBody> {
+    ) -> Result<PluginExecution> {
         ensure!(
             params.len() == 0,
             "{}: Invalid number of params (must be zero): {}",
@@ -144,7 +144,7 @@ impl GaloisPolyV0 {
             loop_first_wire = difference + 1;
         }
 
-        Ok(GatesBody::new(gates))
+        Ok(GatesBody::new(gates).into())
     }
 
     // Given
@@ -159,7 +159,7 @@ impl GaloisPolyV0 {
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
-    ) -> Result<GatesBody> {
+    ) -> Result<PluginExecution> {
         ensure!(
             params.len() == 0,
             "{}: Invalid number of params (must be zero): {}",
@@ -245,7 +245,7 @@ impl GaloisPolyV0 {
             loop_first_wire = difference + 1;
         }
 
-        Ok(GatesBody::new(gates))
+        Ok(GatesBody::new(gates).into())
     }
 
     // Computes p(x).

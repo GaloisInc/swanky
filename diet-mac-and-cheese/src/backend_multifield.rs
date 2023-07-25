@@ -2,18 +2,21 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
-use crate::backend_trait::PrimeBackendT;
-use crate::circuit_ir::{CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId};
+use crate::circuit_ir::{
+    CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId, WireRange,
+};
 use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
 use crate::memory::Memory;
+use crate::plugins::PluginExecution;
 use crate::read_sieveir_phase2::BufRelation;
 use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::GatesOrPluginBody};
+use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
-use eyre::{ensure, eyre, Result};
+use eyre::{bail, ensure, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
@@ -59,7 +62,8 @@ pub enum MacBitGeneric {
     BitPublic(F2),
 }
 
-/// This trait extends the `BackendT` trait with `assert_conv_*` functions to go to bits.
+/// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
+/// functions to go to bits.
 pub trait BackendConvT: PrimeBackendT {
     // Convert a wire to bits in lower-endian
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>>;
@@ -299,6 +303,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C>
         Ok(())
     }
 }
+
 impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheeseConvProver<FE, C> {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", a);
@@ -597,6 +602,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
 
         Ok(r)
     }
+
     fn assert_conv_from_bits(&mut self, x: &[MacBitGeneric]) -> Result<Self::Wire> {
         let mut bits = Vec::with_capacity(x.len());
 
@@ -629,6 +635,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
 
         Ok(mac)
     }
+
     fn finalize_conv(&mut self) -> Result<()> {
         for (_key, edabits) in self.edabits_map.0.iter() {
             self.conv.conv(
@@ -652,16 +659,26 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
 
 // IV Evaluator for single field
 
+/// A trait for evaluating circuits on a single field.
 trait EvaluatorT {
+    /// Evaluate a [`GateM`] alongside an optional instance and witness value.
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
         instance: Option<Number>,
         witness: Option<Number>,
     ) -> Result<()>;
+    /// Start the conversion for a [`ConvGate`].
+    fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<MacBitGeneric>>;
+    /// Finish the conversion for a [`ConvGate`].
+    fn conv_gate_set(&mut self, gate: &ConvGate, bits: &[MacBitGeneric]) -> Result<()>;
 
-    fn conv_gate_get(&mut self, gate: &GateM) -> Result<Vec<MacBitGeneric>>;
-    fn conv_gate_set(&mut self, gate: &GateM, bits: &[MacBitGeneric]) -> Result<()>;
+    fn plugin_call_gate(
+        &mut self,
+        outputs: &[WireRange],
+        inputs: &[WireRange],
+        plugin: &PluginExecution,
+    ) -> Result<()>;
 
     fn push_frame(&mut self, args_count: &Option<WireId>, vector_size: &Option<WireId>);
     fn pop_frame(&mut self);
@@ -679,6 +696,10 @@ trait EvaluatorT {
     fn finalize(&mut self) -> Result<()>;
 }
 
+/// A circuit evaluator for a single [`BackendT`].
+///
+/// The evaluator uses [`BackendT`] to evaluate the circuit, and uses [`Memory`]
+/// to manage memory for the evaluation.
 pub struct EvaluatorSingle<B: BackendT> {
     memory: Memory<<B as BackendT>::Wire>,
     backend: B,
@@ -722,7 +743,7 @@ where
                 let wire = self.memory.get(*inp);
                 debug!("AssertZero wire: {wire:?}");
                 if self.backend.assert_zero(wire).is_err() {
-                    return Err(eyre!("Assert zero fails on wire {}", *inp));
+                    bail!("Assert zero fails on wire {}", *inp);
                 }
             }
 
@@ -767,7 +788,7 @@ where
                 self.memory.set(*out, &v);
             }
 
-            Instance(_ty, out) => {
+            Instance(_, out) => {
                 let v = self
                     .backend
                     .input_public(B::from_number(&instance.unwrap())?)?;
@@ -777,13 +798,12 @@ where
             Witness(_, out) => {
                 let w = witness.and_then(|v| B::from_number(&v).ok());
                 let v = self.backend.input_private(w)?;
-                // debug!("WITNESS: {:?}", v);
                 self.memory.set(*out, &v);
             }
-            New(_ty, first, last) => {
+            New(_, first, last) => {
                 self.memory.allocation_new(*first, *last);
             }
-            Delete(_ty, first, last) => {
+            Delete(_, first, last) => {
                 self.memory.allocation_delete(*first, *last);
             }
             Call(_) => {
@@ -794,13 +814,41 @@ where
             }
             Challenge(_, out) => {
                 let v = self.backend.challenge()?;
-                debug!("Challenge value: {v:?}");
                 self.memory.set(*out, &v);
             }
             Comment(_) => {
                 panic!("Comment should be intercepted earlier")
             }
         }
+        Ok(())
+    }
+
+    fn plugin_call_gate(
+        &mut self,
+        outputs: &[WireRange],
+        inputs: &[WireRange],
+        plugin: &PluginExecution,
+    ) -> Result<()> {
+        match plugin {
+            PluginExecution::PermutationCheck(plugin) => {
+                assert_eq!(outputs.len(), 0);
+                assert_eq!(inputs.len(), 2);
+                let (start, end) = inputs[0];
+                let mut xs = Vec::with_capacity((end - start + 1) as usize);
+                for i in start..=end {
+                    let x = self.memory.get(i);
+                    xs.push(*x);
+                }
+                let (start, end) = inputs[1];
+                let mut ys = Vec::with_capacity((end - start + 1) as usize);
+                for i in start..=end {
+                    let y = self.memory.get(i);
+                    ys.push(*y);
+                }
+                plugin.execute::<B>(&xs, &ys, &mut self.backend)?
+            }
+            _ => bail!("Plugin {plugin:?} is unsupported"),
+        };
         Ok(())
     }
 
@@ -813,74 +861,58 @@ where
     // 6) x <- b0..b_n   with n < log2(X)
     // 7) y <- x         with Y > X
     // 8) x <- y         with Y > X
-    fn conv_gate_get(&mut self, gate: &GateM) -> Result<Vec<MacBitGeneric>> {
-        use GateM::*;
-        match gate {
-            Conv(conv_members) => {
-                let (_ty_out, _out, _ty_in, (inp1, inp2)) = conv_members.as_ref();
-                if *inp1 != *inp2 {
-                    if self.is_boolean {
-                        let mut v = Vec::with_capacity((inp2 + 1 - inp1).try_into().unwrap());
-                        for inp in *inp1..(*inp2 + 1) {
-                            let in_wire = self.memory.get(inp);
-                            debug!("CONV GET {:?}", in_wire);
-                            let bits = self.backend.assert_conv_to_bits(in_wire)?;
-                            assert_eq!(bits.len(), 1);
-                            v.push(bits[0].clone());
-                        }
-                        return Ok(v.into_iter().rev().collect());
-                        // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
-                        //return Ok(v);
-                    }
-
-                    return Err(eyre!(
-                        "field switching from multiple wires on non-boolean field is not supported"
-                    ));
+    fn conv_gate_get(&mut self, (_, _, _, (start, end)): &ConvGate) -> Result<Vec<MacBitGeneric>> {
+        if *start != *end {
+            if self.is_boolean {
+                let mut v = Vec::with_capacity((end + 1 - start).try_into().unwrap());
+                for inp in *start..(*end + 1) {
+                    let in_wire = self.memory.get(inp);
+                    debug!("CONV GET {:?}", in_wire);
+                    let bits = self.backend.assert_conv_to_bits(in_wire)?;
+                    assert_eq!(bits.len(), 1);
+                    v.push(bits[0].clone());
                 }
-                let in_wire = self.memory.get(*inp1);
-                debug!("CONV GET {:?}", in_wire);
-                let bits = self.backend.assert_conv_to_bits(in_wire)?;
-                debug!("CONV GET bits {:?}", bits);
-                Ok(bits)
+                Ok(v.into_iter().rev().collect())
+                // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
+                //return Ok(v);
+            } else {
+                bail!("field switching from multiple wires on non-boolean field is not supported");
             }
-            _ => {
-                panic!("Conv gate expected");
-            }
+        } else {
+            let in_wire = self.memory.get(*start);
+            debug!("CONV GET {:?}", in_wire);
+            let bits = self.backend.assert_conv_to_bits(in_wire)?;
+            debug!("CONV GET bits {:?}", bits);
+            Ok(bits)
         }
     }
 
-    fn conv_gate_set(&mut self, gate: &GateM, bits: &[MacBitGeneric]) -> Result<()> {
-        use GateM::*;
-        match gate {
-            Conv(conv_members) => {
-                let (_ty_out, (out1, out2), _ty_in, _inp) = conv_members.as_ref();
-                if *out1 != *out2 {
-                    if self.is_boolean {
-                        assert!((*out2 - *out1 + 1) as usize <= bits.len());
+    fn conv_gate_set(
+        &mut self,
+        (_, (start, end), _, _): &ConvGate,
+        bits: &[MacBitGeneric],
+    ) -> Result<()> {
+        if *start != *end {
+            if self.is_boolean {
+                assert!((*end - *start + 1) as usize <= bits.len());
 
-                        for (i, _out) in (*out1..(*out2 + 1)).enumerate() {
-                            let v = self.backend.assert_conv_from_bits(&[bits[i].clone()])?;
-                            debug!("CONV SET {:?}", v);
-                            let out_wire = out2 - (i as WireId);
-                            // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
-                            // let out_wire = out1 + i as WireId;
-                            self.memory.set(out_wire, &v);
-                        }
-                        return Ok(());
-                    }
-
-                    return Err(eyre!(
-                        "field switching to multiple wires on non-boolean field is not supported"
-                    ));
+                for (i, _) in (*start..(*end + 1)).enumerate() {
+                    let v = self.backend.assert_conv_from_bits(&[bits[i].clone()])?;
+                    debug!("CONV SET {:?}", v);
+                    let out_wire = end - (i as WireId);
+                    // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
+                    // let out_wire = out1 + i as WireId;
+                    self.memory.set(out_wire, &v);
                 }
-                let v = self.backend.assert_conv_from_bits(bits)?;
-                debug!("CONV SET {:?}", v);
-                self.memory.set(*out1, &v);
                 Ok(())
+            } else {
+                bail!("field switching to multiple wires on non-boolean field is not supported");
             }
-            _ => {
-                panic!("Conv gate expected");
-            }
+        } else {
+            let v = self.backend.assert_conv_from_bits(bits)?;
+            debug!("CONV SET {:?}", v);
+            self.memory.set(*start, &v);
+            Ok(())
         }
     }
 
@@ -1175,7 +1207,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     back = Box::new(EvaluatorSingle::new(dmc, false));
                 }
             } else {
-                return Err(eyre!("Unknown or unsupported field {:?}", field));
+                bail!("Unknown or unsupported field {:?}", field);
             }
         }
         self.eval.push(back);
@@ -1183,23 +1215,15 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     }
 
     pub fn finish(&mut self) -> Result<()> {
-        info!("Finish EvaluatorCirc...");
         for i in 0..self.eval.len() {
             self.eval[i].finalize()?;
         }
-        info!("...done");
         Ok(())
     }
 
     pub fn evaluate_gates(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
-        for gate in gates.iter() {
-            self.eval_gate(gate, fun_store)?;
-        }
-
-        for i in 0..self.eval.len() {
-            self.eval[i].finalize()?;
-        }
-        Ok(())
+        self.evaluate_gates_passed(gates, fun_store)?;
+        self.finish()
     }
 
     fn evaluate_gates_passed(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
@@ -1209,7 +1233,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         Ok(())
     }
 
-    // This is an almost copy of `eval_gate`for Cybernetica
+    // This is an almost copy of `eval_gate` for Cybernetica
     pub fn evaluate_gates_with_inputs(
         &mut self,
         gates: &[GateM],
@@ -1236,10 +1260,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 }
             }
         }
-        for i in 0..self.eval.len() {
-            self.eval[i].finalize()?;
-        }
-        Ok(())
+        self.finish()
     }
 
     pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
@@ -1250,18 +1271,15 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         rel.read(&mut buf_rel)?;
         self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
 
-        for i in 0..self.eval.len() {
-            self.eval[i].finalize()?;
-        }
-        Ok(())
+        self.finish()
     }
 
     #[inline]
     fn evaluate_call_gate(
         &mut self,
         name: &String,
-        out_ranges: &[(WireId, WireId)],
-        in_ranges: &[(WireId, WireId)],
+        out_ranges: &[WireRange],
+        in_ranges: &[WireRange],
         fun_store: &FunStore,
     ) -> Result<()> {
         // 1) get the function information and body
@@ -1269,19 +1287,8 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         // 3) call eval_gates on body of function
         // 4) pop frame
 
-        // 1)
         let func = fun_store.get(name)?;
 
-        let gates_body = match &func.body() {
-            GatesOrPluginBody::Gates(body) => body,
-            GatesOrPluginBody::Plugin(_) => func
-                .compiled_info
-                .plugin_gates
-                .as_ref()
-                .ok_or(eyre!("No gates associated with plugin"))?,
-        };
-
-        // 2)
         // We use the analysis on function body to find the types used in the body and only push a frame to those field backends.
         // TODO: currently push the size of args or vec without differentiating based on type.
         for ty in func.compiled_info.type_ids.iter() {
@@ -1320,11 +1327,25 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             prev += count;
         }
 
-        // 3)
-        self.evaluate_gates_passed(gates_body.gates(), fun_store)?;
+        match &func.body() {
+            GatesOrPluginBody::Gates(body) => {
+                self.evaluate_gates_passed(body.gates(), fun_store)?;
+            }
+            GatesOrPluginBody::Plugin(body) => match &body.execution() {
+                PluginExecution::Gates(body) => {
+                    self.evaluate_gates_passed(body.gates(), fun_store)?;
+                }
+                PluginExecution::PermutationCheck(plugin) => {
+                    let type_id = plugin.type_id() as usize;
+                    self.eval[type_id].plugin_call_gate(
+                        out_ranges,
+                        in_ranges,
+                        &body.execution(),
+                    )?;
+                }
+            },
+        };
 
-        // 4)
-        // TODO: dont do the push blindly on all backends
         for ty in func.compiled_info.type_ids.iter() {
             self.eval[*ty as usize].pop_frame();
         }
@@ -1334,20 +1355,20 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     fn eval_gate(&mut self, gate: &GateM, fun_store: &FunStore) -> Result<()> {
         debug!("GATE: {:?}", gate);
         match gate {
-            GateM::Conv(conv_members) => {
+            GateM::Conv(gate) => {
                 debug!("CONV IN");
-                let (ty1, _out, ty2, _inp) = conv_members.as_ref();
+                let (ty1, _, ty2, _) = gate.as_ref();
                 // First we get the bits from the input and then we convert to the output.
-                let bits = self.eval[*ty2 as usize].conv_gate_get(gate)?;
+                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref())?;
                 // then we convert the bits to the out field.
-                self.eval[*ty1 as usize].conv_gate_set(gate, &bits)?;
+                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
                 debug!("CONV OUT");
             }
-            GateM::Instance(ty, _out) => {
+            GateM::Instance(ty, _) => {
                 let i = *ty as usize;
                 self.eval[i].evaluate_gate(gate, self.inputs.pop_instance(i), None)?;
             }
-            GateM::Witness(ty, _out) => {
+            GateM::Witness(ty, _) => {
                 let i = *ty as usize;
                 self.eval[i].evaluate_gate(gate, None, self.inputs.pop_witness(i))?;
             }
@@ -1376,13 +1397,13 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     ) -> Result<()> {
         debug!("GATE: {:?}", gate);
         match gate {
-            GateM::Conv(conv_members) => {
+            GateM::Conv(gate) => {
                 debug!("CONV IN");
-                let (ty1, _out, ty2, _inp) = conv_members.as_ref();
+                let (ty1, _, ty2, _) = gate.as_ref();
                 // First we get the bits from the input and then we convert to the output.
-                let bits = self.eval[*ty2 as usize].conv_gate_get(gate)?;
+                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref())?;
                 // then we convert the bits to the out field.
-                self.eval[*ty1 as usize].conv_gate_set(gate, &bits)?;
+                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
                 debug!("CONV OUT");
             }
             GateM::Instance(ty, _out) => {

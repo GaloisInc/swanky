@@ -5,21 +5,21 @@ use crate::circuit_ir::{
     WireCount,
 };
 
-use super::Plugin;
+use super::{Plugin, PluginExecution};
 
 pub(crate) struct VectorsV1;
 
 impl Plugin for VectorsV1 {
     const NAME: &'static str = "vectors_v1";
 
-    fn gates_body(
+    fn instantiate(
         operation: &str,
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> eyre::Result<GatesBody> {
+    ) -> eyre::Result<PluginExecution> {
         eyre::ensure!(
             output_counts.len() == 1,
             "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
@@ -91,7 +91,7 @@ impl Plugin for VectorsV1 {
                     });
                 }
 
-                Ok(GatesBody::new(gates))
+                Ok(GatesBody::new(gates).into())
             }
             "addc" | "mulc" => {
                 eyre::ensure!(
@@ -139,7 +139,7 @@ impl Plugin for VectorsV1 {
                     });
                 }
 
-                Ok(GatesBody::new(gates))
+                Ok(GatesBody::new(gates).into())
             }
             "add_scalar" | "mul_scalar" => {
                 eyre::ensure!(
@@ -199,7 +199,7 @@ impl Plugin for VectorsV1 {
                     });
                 }
 
-                Ok(GatesBody::new(gates))
+                Ok(GatesBody::new(gates).into())
             }
             "sum" | "product" => {
                 eyre::ensure!(
@@ -272,7 +272,7 @@ impl Plugin for VectorsV1 {
                     }
                 };
 
-                Ok(GatesBody::new(gates))
+                Ok(GatesBody::new(gates).into())
             }
             "dotproduct" => {
                 eyre::ensure!(
@@ -356,7 +356,7 @@ impl Plugin for VectorsV1 {
                     }
                 };
 
-                Ok(GatesBody::new(gates))
+                Ok(GatesBody::new(gates).into())
             }
             _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME,),
         }
