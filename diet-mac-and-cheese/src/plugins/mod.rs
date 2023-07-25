@@ -1,4 +1,4 @@
-use crate::circuit_ir::{FunStore, GatesBody, TypeId, TypeStore, WireCount};
+use crate::circuit_ir::{FunStore, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount};
 use eyre::Result;
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 
@@ -32,17 +32,68 @@ impl From<mac_n_cheese_sieve_parser::PluginType> for PluginType {
     }
 }
 
+/// The various execution contexts for a plugin.
+#[derive(Clone, Debug)]
+pub(crate) enum PluginExecution {
+    /// The plugin is implemented as a sequence of gates.
+    Gates(GatesBody),
+    /// The plugin implements a permutation check.
+    PermutationCheck(PermutationCheckV1),
+}
+
+impl PluginExecution {
+    /// Return the [`GatesBody`] associated with the plugin, if there is any.
+    pub(crate) fn gates(&self) -> Option<&GatesBody> {
+        match &self {
+            PluginExecution::Gates(gates) => Some(&gates),
+            PluginExecution::PermutationCheck(_) => None,
+        }
+    }
+
+    /// Return the maximum [`WireCount`] for the plugin, if there is any.
+    pub(crate) fn output_wire_max(&self) -> Option<WireCount> {
+        self.gates().and_then(|body| body.output_wire_max())
+    }
+
+    /// Return the [`TypeIdMapping`] associated with the plugin.
+    pub(crate) fn type_id_mapping(&self) -> TypeIdMapping {
+        match &self {
+            PluginExecution::Gates(gates) => gates.into(),
+            PluginExecution::PermutationCheck(plugin) => {
+                let mut mapping = TypeIdMapping::default();
+                mapping.set(plugin.type_id());
+                mapping
+            }
+        }
+    }
+}
+
+impl From<GatesBody> for PluginExecution {
+    fn from(body: GatesBody) -> Self {
+        Self::Gates(body)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PluginBody {
     #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
     operation: String,
+    execution: PluginExecution,
 }
 
 impl PluginBody {
-    pub(crate) fn new(name: String, operation: String) -> Self {
-        Self { name, operation }
+    pub(crate) fn new(name: String, operation: String, execution: PluginExecution) -> Self {
+        Self {
+            name,
+            operation,
+            execution,
+        }
+    }
+
+    pub(crate) fn execution(&self) -> &PluginExecution {
+        &self.execution
     }
 }
 
@@ -51,7 +102,7 @@ pub(crate) trait Plugin {
     /// The name of the plugin.
     const NAME: &'static str;
 
-    /// Return the [`GatesBody`] associated with this plugin.
+    /// Return the [`PluginExecution`] associated with this plugin.
     ///
     /// Arguments:
     /// - `operation`: The name of the operation
@@ -63,14 +114,14 @@ pub(crate) trait Plugin {
     /// - `input_counts`: A slice containing the inputs given as a tuple of
     ///   [`TypeId`] and [`WireCount`].
     /// - `type_store`: The [`TypeStore`] for this circuit.
-    fn gates_body(
+    fn instantiate(
         operation: &str,
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         fun_store: &FunStore,
-    ) -> Result<GatesBody>;
+    ) -> Result<PluginExecution>;
 }
 
 //

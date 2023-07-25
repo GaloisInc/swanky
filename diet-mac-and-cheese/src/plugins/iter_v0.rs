@@ -6,21 +6,21 @@ use crate::circuit_ir::{
     WireId, WireRange,
 };
 
-use super::Plugin;
+use super::{Plugin, PluginExecution};
 
 pub(crate) struct IterV0;
 
 impl Plugin for IterV0 {
     const NAME: &'static str = "iter_v0";
 
-    fn gates_body(
+    fn instantiate(
         operation: &str,
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
         fun_store: &FunStore,
-    ) -> eyre::Result<GatesBody> {
+    ) -> eyre::Result<PluginExecution> {
         fn ranges_for_iteration(
             which_iteration: u64,
             mut starting_id: WireId,
@@ -224,7 +224,7 @@ impl Plugin for IterV0 {
             }
         }
 
-        Ok(GatesBody::new(gates))
+        Ok(GatesBody::new(gates).into())
     }
 }
 
