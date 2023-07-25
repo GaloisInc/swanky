@@ -182,7 +182,10 @@ pub trait AbstractChannel {
     fn read_pt(&mut self) -> Result<RistrettoPoint> {
         let mut data = [0u8; 32];
         self.read_bytes(&mut data)?;
-        let pt = match CompressedRistretto::from_slice(&data).decompress() {
+        let pt = match CompressedRistretto::from_slice(&data)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            .decompress()
+        {
             Some(pt) => pt,
             None => {
                 return Err(std::io::Error::new(
