@@ -11,10 +11,10 @@ use thiserror::Error;
 pub enum Error {
     #[error("I/O Error: `{0}`")]
     IOError(#[from] std::io::Error),
-    #[error("Parse Error (Int): `{0}`")]    
+    #[error("Parse Error (Int): `{0}`")]
     ParseIntError(#[from] std::num::ParseIntError),
-    #[error("Parse Error (Bristol): `{0}`")]    
-    ParseBristolError(String),    
+    #[error("Parse Error (Bristol): `{0}`")]
+    ParseBristolError(String),
 }
 
 pub type Wire = u64;
@@ -179,9 +179,9 @@ impl<R: BufRead> Reader<R> {
     }
 
     fn read_gate_kind<'a>(tokens: &mut SplitWhitespace<'a>) -> Result<&'a str, Error> {
-        tokens
-            .next_back()
-            .ok_or_else(|| Error::ParseBristolError("unexpected EOL, expected gate kind".to_string()))
+        tokens.next_back().ok_or_else(|| {
+            Error::ParseBristolError("unexpected EOL, expected gate kind".to_string())
+        })
     }
 
     fn read_ngates(tokens: &mut SplitWhitespace) -> Result<u64, Error> {
@@ -238,9 +238,15 @@ impl<R: BufRead> Reader<R> {
 
     fn read_binary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        Self::parsing_assert(in_arity == 2, format!("unexpected input arity, expected 2 but got {}", in_arity))?;
+        Self::parsing_assert(
+            in_arity == 2,
+            format!("unexpected input arity, expected 2 but got {}", in_arity),
+        )?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        Self::parsing_assert(out_arity == 1, format!("unexpected output arity, expected 1 but got {}", out_arity))?;
+        Self::parsing_assert(
+            out_arity == 1,
+            format!("unexpected output arity, expected 1 but got {}", out_arity),
+        )?;
         let a = Self::read_gate_input(tokens)?;
         let b = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
@@ -250,9 +256,15 @@ impl<R: BufRead> Reader<R> {
 
     fn read_unary_gate(tokens: &mut SplitWhitespace) -> Result<(Wire, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        Self::parsing_assert(in_arity == 1, format!("unexpected input arity, expected 1 but got {}", in_arity))?;
+        Self::parsing_assert(
+            in_arity == 1,
+            format!("unexpected input arity, expected 1 but got {}", in_arity),
+        )?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        Self::parsing_assert(out_arity == 1, format!("unexpected output arity, expected 1 but got {}", out_arity))?;
+        Self::parsing_assert(
+            out_arity == 1,
+            format!("unexpected output arity, expected 1 but got {}", out_arity),
+        )?;
         let a = Self::read_gate_input(tokens)?;
         let out = Self::read_gate_output(tokens)?;
         let _ = Self::read_eol(tokens)?;
@@ -261,9 +273,15 @@ impl<R: BufRead> Reader<R> {
 
     fn read_eq_gate(tokens: &mut SplitWhitespace) -> Result<(bool, Wire), Error> {
         let in_arity = Self::read_gate_input_arity(tokens)?;
-        Self::parsing_assert(in_arity == 1, format!("unexpected input arity, expected 1 but got {}", in_arity))?;        
+        Self::parsing_assert(
+            in_arity == 1,
+            format!("unexpected input arity, expected 1 but got {}", in_arity),
+        )?;
         let out_arity = Self::read_gate_output_arity(tokens)?;
-        Self::parsing_assert(out_arity == 1, format!("unexpected output arity, expected 1 but got {}", out_arity))?;        
+        Self::parsing_assert(
+            out_arity == 1,
+            format!("unexpected output arity, expected 1 but got {}", out_arity),
+        )?;
         let lit = Self::read_gate_input_lit(tokens)?;
         let out = Self::read_gate_output(tokens)?;
         let _ = Self::read_eol(tokens)?;
@@ -508,7 +526,7 @@ mod tests {
     /*
 
     // Tests for other Nigel circuits that are not (yet) included in `circuits`
-    
+
     #[test]
     pub(crate) fn test_read_signed_div64() {
         let spec = ReadSpec {

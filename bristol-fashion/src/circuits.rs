@@ -6,14 +6,14 @@ macro_rules! cache_circuit {
         thread_local! {
             static $name: Circuit = {
                 use std::io::Cursor;
-                
+
                 let content = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/circuits/", $loc));
                 read(Cursor::new(content)).unwrap()
             }
         }
 
-        $name.with(Circuit::clone)        
-    }}
+        $name.with(Circuit::clone)
+    }};
 }
 
 /// A cached copy of the optimized 64-bit adder circuit.
@@ -25,7 +25,7 @@ macro_rules! cache_circuit {
 macro_rules! add64 {
     () => {
         cache_circuit!(ADD64, "adder64.txt")
-    }
+    };
 }
 
 /// A cached copy of the optimized 64-bit subtraction circuit.
@@ -37,7 +37,7 @@ macro_rules! add64 {
 macro_rules! sub64 {
     () => {
         cache_circuit!(SUB64, "sub64.txt")
-    }
+    };
 }
 
 /// A cached copy of the optimized 64-bit negation circuit.
@@ -49,7 +49,7 @@ macro_rules! sub64 {
 macro_rules! neg64 {
     () => {
         cache_circuit!(NEG64, "neg64.txt")
-    }
+    };
 }
 
 /// A cached copy of the optimized 64-bit multiplication circuit.
@@ -61,7 +61,7 @@ macro_rules! neg64 {
 macro_rules! mul64 {
     () => {
         cache_circuit!(MUL64, "mult64.txt")
-    }
+    };
 }
 
 /// A cached copy of the optimized 64-bit wide multiplication circuit.
@@ -79,5 +79,5 @@ macro_rules! mul64 {
 macro_rules! wide_mul64 {
     () => {
         cache_circuit!(WIDE_MUL64, "mult2_64.txt")
-    }
+    };
 }
