@@ -434,9 +434,6 @@ mod tests {
 
     #[test]
     pub(crate) fn test_read_add64() {
-        let a = add64!();
-        let b = add64!();
-        assert_eq!(a.ngates, b.ngates);
         let spec = ReadSpec {
             bristol: add64!(),
             ngates: 376,
