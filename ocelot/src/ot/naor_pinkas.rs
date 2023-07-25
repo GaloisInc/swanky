@@ -50,7 +50,7 @@ impl OtSender for Sender {
         }
         for (i, (input, pk)) in inputs.iter().zip(pks.into_iter()).enumerate() {
             let r = Scalar::random(&mut rng);
-            let ei0 = &r * &RISTRETTO_BASEPOINT_TABLE;
+            let ei0 = &r * RISTRETTO_BASEPOINT_TABLE;
             let h = Block::hash_pt(i as u128, &(pk.0 * r));
             let e01 = h ^ input.0;
             let h = Block::hash_pt(i as u128, &(pk.1 * r));
@@ -95,7 +95,7 @@ impl OtReceiver for Receiver {
         }
         for (b, c) in inputs.iter().zip(cs.into_iter()) {
             let k = Scalar::random(&mut rng);
-            let pk = &k * &RISTRETTO_BASEPOINT_TABLE;
+            let pk = &k * RISTRETTO_BASEPOINT_TABLE;
             let pk_ = c - pk;
             match b {
                 false => channel.write_pt(&pk)?,

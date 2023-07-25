@@ -74,7 +74,7 @@ web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/we
 # Patched Dependencies
 ff = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }
 ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }
-curve25519-dalek = { package = "curve25519-dalek-ng", version = "4.1.1" }
+curve25519-dalek = { version = "4.0.0", features = ["rand_core"] }
 
 # External Dependencies
 aes = "0.8.3"
