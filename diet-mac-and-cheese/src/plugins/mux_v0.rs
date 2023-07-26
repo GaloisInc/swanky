@@ -129,13 +129,10 @@ impl Plugin for MuxV0 {
 #[cfg(test)]
 mod tests {
     use super::MuxV0;
+    use crate::{backend_multifield::tests::FF0, fields::F2_MODULUS, plugins::Plugin};
     use crate::{
         backend_multifield::tests::{minus_one, one, test_circuit, zero},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
-    };
-    use crate::{
-        backend_multifield::tests::{F2_VEC, FF0},
-        plugins::Plugin,
     };
     use scuttlebutt::{
         field::{PrimeFiniteField, F2},
@@ -145,7 +142,7 @@ mod tests {
     // Simplest test for mux on f2
     #[test]
     fn test_f2_mux() {
-        let fields = vec![F2_VEC.to_vec()];
+        let fields = vec![F2_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -212,7 +209,7 @@ mod tests {
     // More complicated test of mux selecting a triple and a unique element
     #[test]
     fn test_f2_mux_on_slices() {
-        let fields = vec![F2_VEC.to_vec()];
+        let fields = vec![F2_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 

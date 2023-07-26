@@ -1433,11 +1433,17 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{RcRefCell, TypeStore};
-    use crate::backend_multifield::{EvaluatorCirc, Party};
-    use crate::circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange};
+    use crate::{
+        backend_multifield::{EvaluatorCirc, Party},
+        fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
+    };
     use crate::{
         backend_trait::BackendT,
         homcom::{FComProver, FComVerifier},
+    };
+    use crate::{
+        circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
+        fields::{F384P_MODULUS, F384Q_MODULUS},
     };
     use mac_n_cheese_sieve_parser::Number;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
@@ -1457,33 +1463,6 @@ pub(crate) mod tests {
     };
 
     use super::{DietMacAndCheeseConvProver, DietMacAndCheeseConvVerifier};
-
-    pub(crate) const F2_VEC: [u8; 1] = [2];
-    pub(crate) const F61P_VEC: [u8; 8] = [255, 255, 255, 255, 255, 255, 255, 31];
-    #[allow(dead_code)]
-    const F384P_VEC: [u8; 48] = [
-        255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 254, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255,
-    ];
-    #[allow(dead_code)]
-    const F384Q_VEC: [u8; 48] = [
-        115, 41, 197, 204, 106, 25, 236, 236, 122, 167, 176, 72, 178, 13, 26, 88, 223, 45, 55, 244,
-        129, 77, 99, 199, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    ];
-
-    #[allow(dead_code)]
-    const SECP256K1_VEC: [u8; 32] = [
-        47, 252, 255, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    ];
-
-    #[allow(dead_code)]
-    const SECP256K1ORDER_VEC: [u8; 32] = [
-        65, 65, 54, 208, 140, 94, 210, 191, 59, 160, 72, 175, 230, 220, 174, 186, 254, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    ];
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
@@ -1540,7 +1519,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn test_circuit(
-        fields: Vec<Vec<u8>>,
+        fields: Vec<Number>,
         func_store: FunStore,
         gates: Vec<GateM>,
         ins: Vec<Vec<Number>>,
@@ -1612,7 +1591,7 @@ pub(crate) mod tests {
 
     fn test_conv_00() {
         // Test simple conversion from F61p to F2
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1631,7 +1610,7 @@ pub(crate) mod tests {
 
     fn test_conv_01() {
         // Test simple conversion from F2 to F61p
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1651,7 +1630,7 @@ pub(crate) mod tests {
 
     fn test_conv_02_twoway() {
         // Test that convert from F61p to F2 and from F2 to F61p works
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1679,7 +1658,7 @@ pub(crate) mod tests {
 
     fn test_conv_binary_to_field() {
         // Test conversion from 2 bits to F61p
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1699,7 +1678,7 @@ pub(crate) mod tests {
     fn test_conv_field_to_binary() {
         // Test conversion from F61p to a vec of F2
         // 3 bit decomposition is 11000 on 5 bits, 00011
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1722,7 +1701,7 @@ pub(crate) mod tests {
 
     fn test_conv_publics() {
         // Test conversion from F61p to a vec of F2 on public values
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1752,7 +1731,7 @@ pub(crate) mod tests {
     fn test_conv_shift() {
         // Test conversion and shift
         // 2 = 010000..., shifted as 10+010000...]= 10010000...] = 9, with truncation
-        let fields = vec![F61P_VEC.to_vec(), F2_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let mut gates = vec![
@@ -1783,13 +1762,9 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    #[test]
     fn test_conv_ff_1() {
-        let fields = vec![
-            F61P_VEC.to_vec(),
-            F384P_VEC.to_vec(),
-            F384Q_VEC.to_vec(),
-            F2_VEC.to_vec(),
-        ];
+        let fields = vec![F61P_MODULUS, F384P_MODULUS, F384Q_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1806,13 +1781,9 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    #[test]
     fn test_conv_ff_2() {
-        let fields = vec![
-            F61P_VEC.to_vec(),
-            F384P_VEC.to_vec(),
-            F384Q_VEC.to_vec(),
-            F2_VEC.to_vec(),
-        ];
+        let fields = vec![F61P_MODULUS, F384P_MODULUS, F384Q_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1831,14 +1802,10 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    #[test]
     fn test_conv_ff_3() {
         // tests that conversions from big fields to bools
-        let fields = vec![
-            F61P_VEC.to_vec(),
-            F384P_VEC.to_vec(),
-            F384Q_VEC.to_vec(),
-            F2_VEC.to_vec(),
-        ];
+        let fields = vec![F61P_MODULUS, F384P_MODULUS, F384Q_MODULUS, F2_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1863,9 +1830,10 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    #[test]
     fn test_conv_ff_4() {
         // test conversion from large field to smaller field
-        let fields = vec![F61P_VEC.to_vec(), F384P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS, F384P_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1889,7 +1857,7 @@ pub(crate) mod tests {
 
     fn test_conv_ff_5() {
         // tests that conversions from big fields secp
-        let fields = vec![SECP256K1_VEC.to_vec(), SECP256K1ORDER_VEC.to_vec()];
+        let fields = vec![SECP256K1_MODULUS, SECP256K1ORDER_MODULUS];
         let func_store = FunStore::default();
 
         let gates = vec![
@@ -1918,7 +1886,7 @@ pub(crate) mod tests {
     fn test4_simple_fun() {
         // tests the simplest function
 
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
 
         let gates_func = vec![GateM::Add(FF0, 0, 2, 4), GateM::Add(FF0, 1, 3, 5)];
@@ -1972,7 +1940,7 @@ pub(crate) mod tests {
     fn test5_simple_fun_with_vec() {
         // tests the simplest function with vec
 
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
 
         let gates_fun = vec![
@@ -2026,7 +1994,7 @@ pub(crate) mod tests {
     fn test6_fun_slice_and_unallocated() {
         // tests a simple function passing instances in allocated slice and unallocated wire
 
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
 
         let gates_func = vec![
@@ -2306,14 +2274,6 @@ pub(crate) mod tests {
         test_conv_field_to_binary();
         test_conv_publics();
         test_conv_shift();
-    }
-
-    #[test]
-    fn test_multifield_ff() {
-        test_conv_ff_1();
-        test_conv_ff_2();
-        test_conv_ff_3();
-        test_conv_ff_4();
     }
 
     #[test]

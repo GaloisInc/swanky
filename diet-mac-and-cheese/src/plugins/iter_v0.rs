@@ -235,9 +235,10 @@ mod tests {
 
     use crate::{
         backend_multifield::tests::{
-            minus_four, minus_one, minus_three, minus_two, test_circuit, zero, F61P_VEC, FF0,
+            minus_four, minus_one, minus_three, minus_two, test_circuit, zero, FF0,
         },
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        fields::F61P_MODULUS,
         plugins::Plugin,
     };
 
@@ -245,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_iter_map() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -365,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_iter_map_enumerated() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 

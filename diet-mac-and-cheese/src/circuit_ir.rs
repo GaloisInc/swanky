@@ -5,7 +5,6 @@ use crate::{
     fields::modulus_to_type_id,
     plugins::{Plugin, PluginBody, PluginType},
 };
-use crypto_bigint::ArrayEncoding;
 use eyre::{bail, eyre, Result};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
@@ -21,6 +20,7 @@ pub type WireCount = u64;
 /// This is a value `< 256` that is associated with a specific Circuit IR
 /// [`@type`](`TypeSpecification`).
 pub type TypeId = u8;
+// TODO: Is this needed?
 pub type FunId = usize;
 /// An inclusive range of [`WireId`]s.
 pub type WireRange = (WireId, WireId);
@@ -178,15 +178,7 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
         for (i, ty) in types.into_iter().enumerate() {
             let spec = match ty {
                 mac_n_cheese_sieve_parser::Type::Field { modulus } => {
-                    // `modulus` is provided as a fixed length large integer, so
-                    // when we convert it to a vector we get a bunch of zero
-                    // bytes at the end. We need to remove those before we pass
-                    // the vector to `modulus_to_type_id`, otherwise it won't
-                    // correctly recognize the vector.
-                    let v = modulus.to_le_byte_array().to_vec();
-                    // Get the last index that is non-zero.
-                    let to = v.iter().rposition(|x| *x != 0).unwrap_or(v.len() - 1);
-                    TypeSpecification::Field(modulus_to_type_id(&v[..=to])?)
+                    TypeSpecification::Field(modulus_to_type_id(modulus)?)
                 }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
@@ -198,17 +190,17 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
     }
 }
 
-impl TryFrom<Vec<Vec<u8>>> for TypeStore {
+impl TryFrom<Vec<Number>> for TypeStore {
     type Error = eyre::Error;
 
-    fn try_from(fields: Vec<Vec<u8>>) -> std::result::Result<Self, Self::Error> {
+    fn try_from(fields: Vec<Number>) -> std::result::Result<Self, Self::Error> {
         debug!("Converting vector of fields to `TypeStore`");
         if fields.len() > 256 {
             return Err(eyre!("Too many types specified: {} > 256", fields.len()));
         }
         let mut store = TypeStore::default();
         for (i, field) in fields.into_iter().enumerate() {
-            let spec = TypeSpecification::Field(modulus_to_type_id(&field)?);
+            let spec = TypeSpecification::Field(modulus_to_type_id(field)?);
             store.insert(i as u8, spec);
         }
         Ok(store)
