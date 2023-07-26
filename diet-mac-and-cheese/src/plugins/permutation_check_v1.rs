@@ -5,7 +5,7 @@ use crate::{
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use scuttlebutt::ring::FiniteRing;
+use swanky_field::FiniteRing;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]

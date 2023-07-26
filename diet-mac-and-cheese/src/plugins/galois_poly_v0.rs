@@ -5,7 +5,8 @@ use crate::circuit_ir::{
 };
 use eyre::{ensure, eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use scuttlebutt::field::{F128b, F61p, F63b, F2};
+use swanky_field_binary::{F128b, F63b, F2};
+use swanky_field_f61p::F61p;
 
 pub(crate) struct GaloisPolyV0;
 

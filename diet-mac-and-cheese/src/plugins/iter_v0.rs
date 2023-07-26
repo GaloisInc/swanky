@@ -1,12 +1,10 @@
-use eyre::Context;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
-
+use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     first_unused_wire_id, FunStore, FuncDecl, GateM, GatesBody, TypeId, TypeStore, WireCount,
     WireId, WireRange,
 };
-
-use super::{Plugin, PluginExecution};
+use eyre::Context;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 pub(crate) struct IterV0;
 

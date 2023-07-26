@@ -5,9 +5,10 @@
 
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::Number;
-use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
-use scuttlebutt::field::{F61p, F2};
 use std::any::TypeId;
+use swanky_field_binary::F2;
+use swanky_field_f61p::F61p;
+use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
 
 pub(crate) const F2_MODULUS: Number = Number::from_u64(2);
 pub(crate) const F61P_MODULUS: Number = Number::from_u64((1 << 61) - 1);

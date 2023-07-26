@@ -24,9 +24,6 @@ use mac_n_cheese_sieve_parser::Number;
 use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
-use scuttlebutt::field::{F384p, F384q, Secp256k1, Secp256k1order};
-use scuttlebutt::field::{F40b, F61p, FiniteField, PrimeFiniteField, F2};
-use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
 use std::collections::BTreeMap;
@@ -34,6 +31,10 @@ use std::fmt::Debug;
 use std::io::{Read, Seek};
 use std::marker::PhantomData;
 use std::path::PathBuf;
+use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_field_binary::{F40b, F2};
+use swanky_field_f61p::F61p;
+use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
 //

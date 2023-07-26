@@ -3,17 +3,8 @@
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
 use log::info;
 use mac_n_cheese_sieve_parser::{
-    FunctionBodyVisitor,
-    Identifier,
-    Number,
-    PluginBinding,
-    RelationVisitor,
-    TypeId,
-    TypedCount,
-    TypedWireRange,
-    // ValueStreamReader,
-    WireId,
-    WireRange,
+    FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor, TypeId, TypedCount,
+    TypedWireRange, WireId, WireRange,
 };
 
 #[derive(Default)]
