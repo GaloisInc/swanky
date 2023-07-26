@@ -4,10 +4,8 @@ use crate::circuit_ir::{
 };
 use eyre::{eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use scuttlebutt::{
-    field::{PrimeFiniteField, F2},
-    ring::FiniteRing,
-};
+use swanky_field::{FiniteRing, PrimeFiniteField};
+use swanky_field_binary::F2;
 
 pub(crate) struct MuxV0;
 

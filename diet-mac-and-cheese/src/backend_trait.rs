@@ -4,8 +4,8 @@
 
 use eyre::Result;
 use mac_n_cheese_sieve_parser::Number;
-use scuttlebutt::field::{FiniteField, PrimeFiniteField};
 use std::any::type_name;
+use swanky_field::{FiniteField, PrimeFiniteField};
 
 /// An interface for computing over basic gates using a single [`FiniteField`].
 pub trait BackendT {

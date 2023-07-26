@@ -11,11 +11,7 @@ use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
-use scuttlebutt::{
-    field::{F40b, FiniteField, F2},
-    ring::FiniteRing,
-    AbstractChannel, AesRng, Block, SyncChannel,
-};
+use scuttlebutt::{AbstractChannel, AesRng, Block, SyncChannel};
 use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use std::time::Instant;
@@ -24,6 +20,8 @@ use std::{
     rc::Rc,
 };
 use subtle::{ConditionallySelectable, ConstantTimeEq};
+use swanky_field::{FiniteField, FiniteRing};
+use swanky_field_binary::{F40b, F2};
 
 /// EdabitsProver struct
 #[derive(Clone)]

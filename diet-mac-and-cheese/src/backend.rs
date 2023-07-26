@@ -5,10 +5,8 @@ use crate::{backend_trait::BackendT, edabits::RcRefCell};
 use eyre::{eyre, Result};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
-use scuttlebutt::{
-    field::{FiniteField, IsSubFieldOf},
-    AbstractChannel, AesRng,
-};
+use scuttlebutt::{AbstractChannel, AesRng};
+use swanky_field::{FiniteField, IsSubFieldOf};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
