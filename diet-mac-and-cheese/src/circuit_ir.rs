@@ -13,15 +13,15 @@ use std::{
     collections::{BTreeMap, VecDeque},
 };
 
+/// The wire index.
 pub type WireId = u64;
+/// A count of the number of wires.
 pub type WireCount = u64;
 /// The type index.
 ///
 /// This is a value `< 256` that is associated with a specific Circuit IR
 /// [`@type`](`TypeSpecification`).
 pub type TypeId = u8;
-// TODO: Is this needed?
-pub type FunId = usize;
 /// An inclusive range of [`WireId`]s.
 pub type WireRange = (WireId, WireId);
 
@@ -303,17 +303,23 @@ impl GatesBody {
     }
 }
 
+/// The body of a Circuit IR function.
+///
+/// The function body can be either a sequence of gates or a plugin.
 #[derive(Clone)]
-pub(crate) enum GatesOrPluginBody {
+pub(crate) enum FunctionBody {
+    /// The function body as a sequence of gates.
     Gates(GatesBody),
+    /// The function body as a plugin.
     Plugin(PluginBody),
 }
 
+/// Collected information associated with a Circuit IR function.
 #[derive(Clone)]
 pub(crate) struct CompiledInfo {
-    /// Count of wires for output/input args to function.
+    /// Count of wires for output/input arguments to the function.
     pub(crate) args_count: Option<WireId>,
-    // Maximum [`WireId`] in the function body.
+    // The maximum [`WireId`] in the function body.
     pub(crate) body_max: Option<WireId>,
     /// [`TypeId`]s encountered in the function body.
     pub(crate) type_ids: Vec<TypeId>,
@@ -322,12 +328,8 @@ pub(crate) struct CompiledInfo {
 /// A Circuit IR function declaration.
 #[derive(Clone)]
 pub struct FuncDecl {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    fun_id: FunId,
     /// The function body.
-    body: GatesOrPluginBody,
+    body: FunctionBody,
     /// A [`Vec`] containing pairings of [`TypeId`]s and their associated output
     /// [`WireCount`].
     pub(crate) output_counts: Vec<(TypeId, WireCount)>,
@@ -337,13 +339,13 @@ pub struct FuncDecl {
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
-/// Return the first wire ID available for allocation in the `Plugin`'s
-/// `GateBody`.
+/// Return the first [`WireId`] available for allocation in the `Plugin`'s
+/// [`GateBody`].
 ///
 /// Arguments:
-/// - `output_counts`: A slice containins the outputs given as a tuple of
+/// - `output_counts`: A slice containing the outputs given as a tuple of
 /// [`TypeId`] and [`WireCount`].
-/// - `input_counts`: A slice containins the inputs given as a tuple of
+/// - `input_counts`: A slice containing the inputs given as a tuple of
 /// [`TypeId`] and [`WireCount`].
 pub(crate) fn first_unused_wire_id(
     output_counts: &[(TypeId, WireCount)],
@@ -359,13 +361,18 @@ pub(crate) fn first_unused_wire_id(
         first_unused_wire_id += wc;
     }
 
-    return first_unused_wire_id;
+    first_unused_wire_id
 }
 
 impl FuncDecl {
+    /// Instantiate a new function.
+    ///
+    /// * `gates` denotes a sequence of gates that makes up the function body.
+    /// * `output_counts` denotes the wire counts for each [`TypeId`] used as an
+    ///   output.
+    /// * `input_counts` denotes the wire counts for each [`TypeId`] used as an
+    ///   input.
     pub fn new_function(
-        name: String,
-        fun_id: FunId,
         gates: Vec<GateM>,
         output_counts: Vec<(TypeId, WireCount)>,
         input_counts: Vec<(TypeId, WireCount)>,
@@ -383,12 +390,10 @@ impl FuncDecl {
             args_count += wc;
         }
 
-        let body = GatesOrPluginBody::Gates(gates);
+        let body = FunctionBody::Gates(gates);
         let type_ids = type_presence.to_type_ids();
 
         FuncDecl {
-            name,
-            fun_id,
             body,
             output_counts,
             input_counts,
@@ -400,9 +405,18 @@ impl FuncDecl {
         }
     }
 
+    /// Instantiate a new plugin.
+    ///
+    /// * `output_counts` contains the wire counts for each [`TypeId`] used as an
+    ///   output.
+    /// * `input_counts` contains the wire counts for each [`TypeId`] used as an
+    ///   input.
+    /// * `plugin_name` is the name of the plugin.
+    /// * `operation` is the plugin operation.
+    /// * `params` contains any associated parameters to the plugin operation.
+    /// * `type_store` contains the [`TypeStore`] of the circuit.
+    /// * `fun_store` contains the [`FunStore`] of the circuit.
     pub fn new_plugin(
-        name: String,
-        fun_id: FunId,
         output_counts: Vec<(TypeId, WireCount)>,
         input_counts: Vec<(TypeId, WireCount)>,
         plugin_name: String,
@@ -474,9 +488,7 @@ impl FuncDecl {
         let plugin_body = PluginBody::new(plugin_name, operation, execution);
 
         Ok(FuncDecl {
-            name,
-            fun_id,
-            body: GatesOrPluginBody::Plugin(plugin_body),
+            body: FunctionBody::Plugin(plugin_body),
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
@@ -487,7 +499,7 @@ impl FuncDecl {
         })
     }
 
-    pub(crate) fn body(&self) -> &GatesOrPluginBody {
+    pub(crate) fn body(&self) -> &FunctionBody {
         &self.body
     }
 

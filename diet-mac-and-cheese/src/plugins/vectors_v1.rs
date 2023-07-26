@@ -382,8 +382,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_add".into(),
-            42,
             vec![(FF0, 3)],
             vec![(FF0, 3), (FF0, 3)],
             VectorsV1::NAME.into(),
@@ -435,8 +433,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_mul".into(),
-            42,
             vec![(FF0, 3)],
             vec![(FF0, 3), (FF0, 3)],
             VectorsV1::NAME.into(),
@@ -484,8 +480,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_addc".into(),
-            42,
             vec![(FF0, 3)],
             vec![(FF0, 3)],
             VectorsV1::NAME.into(),
@@ -529,8 +523,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_mulc".into(),
-            42,
             vec![(FF0, 3)],
             vec![(FF0, 3)],
             VectorsV1::NAME.into(),
@@ -570,8 +562,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_add_scalar".into(),
-            42,
             vec![(FF0, 3)],
             vec![(FF0, 3), (FF0, 1)],
             VectorsV1::NAME.into(),
@@ -620,8 +610,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_mul_scalar".into(),
-            42,
             vec![(FF0, 3)],
             vec![(FF0, 3), (FF0, 1)],
             VectorsV1::NAME.into(),
@@ -666,8 +654,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let sum_one = FuncDecl::new_plugin(
-            "sum_one".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 1)],
             VectorsV1::NAME.into(),
@@ -681,8 +667,6 @@ mod tests {
         .unwrap();
 
         let sum_two = FuncDecl::new_plugin(
-            "sum_two".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 2)],
             VectorsV1::NAME.into(),
@@ -696,8 +680,6 @@ mod tests {
         .unwrap();
 
         let sum_three = FuncDecl::new_plugin(
-            "sum_three".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 3)],
             VectorsV1::NAME.into(),
@@ -711,8 +693,6 @@ mod tests {
         .unwrap();
 
         let sum_four = FuncDecl::new_plugin(
-            "sum_four".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 4)],
             VectorsV1::NAME.into(),
@@ -765,8 +745,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let mul_one = FuncDecl::new_plugin(
-            "mul_one".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 1)],
             VectorsV1::NAME.into(),
@@ -780,8 +758,6 @@ mod tests {
         .unwrap();
 
         let mul_two = FuncDecl::new_plugin(
-            "mul_two".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 2)],
             VectorsV1::NAME.into(),
@@ -795,8 +771,6 @@ mod tests {
         .unwrap();
 
         let mul_three = FuncDecl::new_plugin(
-            "mul_three".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 3)],
             VectorsV1::NAME.into(),
@@ -810,8 +784,6 @@ mod tests {
         .unwrap();
 
         let mul_four = FuncDecl::new_plugin(
-            "mul_four".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 4)],
             VectorsV1::NAME.into(),
@@ -864,8 +836,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let dot_one = FuncDecl::new_plugin(
-            "dot_one".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 1), (FF0, 1)],
             VectorsV1::NAME.into(),
@@ -879,8 +849,6 @@ mod tests {
         .unwrap();
 
         let dot_two = FuncDecl::new_plugin(
-            "dot_two".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 2), (FF0, 2)],
             VectorsV1::NAME.into(),
@@ -894,8 +862,6 @@ mod tests {
         .unwrap();
 
         let dot_three = FuncDecl::new_plugin(
-            "dot_three".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 3), (FF0, 3)],
             VectorsV1::NAME.into(),
@@ -909,8 +875,6 @@ mod tests {
         .unwrap();
 
         let dot_four = FuncDecl::new_plugin(
-            "dot_four".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 4), (FF0, 4)],
             VectorsV1::NAME.into(),

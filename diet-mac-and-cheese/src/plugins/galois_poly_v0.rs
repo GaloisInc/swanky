@@ -401,8 +401,6 @@ mod tests {
 
         let name: String = "galois_poly_v0".into();
         let func = FuncDecl::new_plugin(
-            name.clone(),
-            42,
             vec![],
             vec![(0, p0_size), (0, p1_size), (0, q_size)],
             GaloisPolyV0::NAME.into(),
@@ -482,8 +480,6 @@ mod tests {
 
         let name: String = "galois_poly_v0".into();
         let func = FuncDecl::new_plugin(
-            name.clone(),
-            42,
             vec![],
             vec![(0, p_size), (0, 1), (0, p_size)],
             GaloisPolyV0::NAME.into(),

@@ -164,8 +164,6 @@ mod tests {
 
         let name: String = "permutation".into();
         let func = FuncDecl::new_plugin(
-            name.clone(),
-            42,
             vec![],
             vec![(0, 1), (0, 1)],
             PermutationCheckV1::NAME.into(),
@@ -203,8 +201,6 @@ mod tests {
 
         let name: String = "permutation".into();
         let func = FuncDecl::new_plugin(
-            name.clone(),
-            42,
             vec![],
             vec![(0, 2), (0, 2)],
             PermutationCheckV1::NAME.into(),
@@ -245,8 +241,6 @@ mod tests {
 
         let name: String = "permutation".into();
         let func = FuncDecl::new_plugin(
-            name.clone(),
-            42,
             vec![],
             vec![(0, 4), (0, 4)],
             PermutationCheckV1::NAME.into(),
@@ -293,8 +287,6 @@ mod tests {
 
         let name: String = "permutation".into();
         let func = FuncDecl::new_plugin(
-            name.clone(),
-            42,
             vec![],
             vec![(0, 4), (0, 4)],
             PermutationCheckV1::NAME.into(),

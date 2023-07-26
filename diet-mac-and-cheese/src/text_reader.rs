@@ -177,9 +177,6 @@ impl FunctionBodyVisitor for TextRelation {
     }
 }
 
-// TODO: remove this when fun_id are supported.
-const MAGIC_FUN_ID: usize = 42;
-
 impl RelationVisitor for TextRelation {
     type FBV<'a> = Self;
 
@@ -207,13 +204,7 @@ impl RelationVisitor for TextRelation {
         }
 
         let name_s: String = std::str::from_utf8(name).unwrap().into();
-        let fun_body = FuncDecl::new_function(
-            name_s.clone(),
-            MAGIC_FUN_ID,
-            body_struct.gates,
-            output_counts,
-            input_counts,
-        );
+        let fun_body = FuncDecl::new_function(body_struct.gates, output_counts, input_counts);
         info!(
             "function {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
             name_s,
@@ -245,8 +236,6 @@ impl RelationVisitor for TextRelation {
         }
 
         let fun_body = FuncDecl::new_plugin(
-            name_s.clone(),
-            MAGIC_FUN_ID,
             output_counts,
             input_counts,
             body.plugin_type.name,

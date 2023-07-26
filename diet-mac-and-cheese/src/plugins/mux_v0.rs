@@ -147,8 +147,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_mux".into(),
-            42,
             vec![(FF0, 1)],
             vec![(FF0, 1), (FF0, 1), (FF0, 1)],
             MuxV0::NAME.into(),
@@ -214,8 +212,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_plugin(
-            "my_mux".into(),
-            42,
             vec![(FF0, 3), (FF0, 1)],
             vec![(FF0, 1), (FF0, 3), (FF0, 1), (FF0, 3), (FF0, 1)],
             MuxV0::NAME.into(),

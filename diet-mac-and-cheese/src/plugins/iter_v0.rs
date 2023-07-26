@@ -251,8 +251,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_function(
-            "f".into(),
-            42,
             vec![
                 GateM::Add(FF0, 100, 1, 2),
                 GateM::Add(FF0, 101, 3, 4),
@@ -267,8 +265,6 @@ mod tests {
         func_store.insert("f".into(), func);
 
         let map_func = FuncDecl::new_plugin(
-            "my_map".into(),
-            42,
             vec![(FF0, 5)],
             vec![(FF0, 1), (FF0, 10), (FF0, 15)],
             IterV0::NAME.into(),
@@ -371,8 +367,6 @@ mod tests {
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
         let func = FuncDecl::new_function(
-            "f".into(),
-            42,
             vec![
                 GateM::Add(FF0, 100, 1, 2),
                 GateM::Add(FF0, 101, 3, 4),
@@ -387,8 +381,6 @@ mod tests {
         func_store.insert("f".into(), func);
 
         let map_func = FuncDecl::new_plugin(
-            "my_map_enumerated".into(),
-            42,
             vec![(FF0, 5)],
             vec![(FF0, 1), (FF0, 10), (FF0, 15)],
             IterV0::NAME.into(),
