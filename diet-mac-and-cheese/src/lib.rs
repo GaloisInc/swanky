@@ -27,5 +27,5 @@ mod memory;
 pub mod read_sieveir_phase2;
 mod sieveir_phase2;
 pub mod text_reader;
-pub use backend::{from_bytes_le, DietMacAndCheeseProver, DietMacAndCheeseVerifier};
+pub use backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 mod plugins;

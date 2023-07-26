@@ -2,8 +2,7 @@ use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
 use crate::{backend_trait::BackendT, edabits::RcRefCell};
-use eyre::{eyre, Context, Result};
-use generic_array::{typenum::Unsigned, GenericArray};
+use eyre::{eyre, Result};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
 use scuttlebutt::{
@@ -19,30 +18,6 @@ use scuttlebutt::{
 //   does a case analysis to perform the right operation.
 //   For example, a multiplication with public values requires a simple field multiplication,
 //   whereas the input are private it requires a zero_knowledge multiplication check.
-
-// function adapted from the `mac-and-cheese-rfme` branch
-fn padded_read<FE: FiniteField>(mut x: &[u8]) -> Result<FE> {
-    // This assumes that finite field elements can be zero padded in their byte reprs. For prime
-    // fields, this assumes that the byte representation is little-endian.
-    while x.last() == Some(&0) {
-        x = &x[0..x.len() - 1];
-    }
-    if x.len() > FE::ByteReprLen::USIZE {
-        Err(eyre!("Invalid field element"))
-    } else {
-        let mut out = GenericArray::default();
-        let size = x.len().min(FE::ByteReprLen::USIZE);
-        out[0..size].copy_from_slice(&x[0..size]);
-        // NOTE: the FE type doesn't require that from_bytes be little-endian. However, we
-        // currently implement it that way for all fields.
-        FE::from_bytes(&out).context("Invalid field element")
-    }
-}
-
-/// Converts a little-endian byte slice to a field element. The byte slice may be zero padded.
-pub fn from_bytes_le<FE: FiniteField>(val: &[u8]) -> Result<FE> {
-    padded_read(val)
-}
 
 const QUEUE_CAPACITY: usize = 3_000_000;
 const TICK_TIMER: usize = 5_000_000;
