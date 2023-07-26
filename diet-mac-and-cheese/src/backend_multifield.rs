@@ -13,7 +13,7 @@ use crate::memory::Memory;
 use crate::plugins::PluginExecution;
 use crate::read_sieveir_phase2::BufRelation;
 use crate::text_reader::TextRelation;
-use crate::{backend_trait::BackendT, circuit_ir::GatesOrPluginBody};
+use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use eyre::{bail, ensure, Result};
@@ -1328,10 +1328,10 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         }
 
         match &func.body() {
-            GatesOrPluginBody::Gates(body) => {
+            FunctionBody::Gates(body) => {
                 self.evaluate_gates_passed(body.gates(), fun_store)?;
             }
-            GatesOrPluginBody::Plugin(body) => match &body.execution() {
+            FunctionBody::Plugin(body) => match &body.execution() {
                 PluginExecution::Gates(body) => {
                     self.evaluate_gates_passed(body.gates(), fun_store)?;
                 }
@@ -1892,8 +1892,6 @@ pub(crate) mod tests {
         let gates_func = vec![GateM::Add(FF0, 0, 2, 4), GateM::Add(FF0, 1, 3, 5)];
 
         let mut func = FuncDecl::new_function(
-            "myadd".into(),
-            0,
             gates_func,
             vec![(FF0, 1), (FF0, 1)],
             vec![(FF0, 2), (FF0, 2)],
@@ -1950,8 +1948,6 @@ pub(crate) mod tests {
         ];
 
         let func = FuncDecl::new_function(
-            "myadd".into(),
-            0,
             gates_fun,
             vec![(FF0, 1), (FF0, 1)],
             vec![(FF0, 2), (FF0, 2)],
@@ -2004,8 +2000,6 @@ pub(crate) mod tests {
         ];
 
         let mut func = FuncDecl::new_function(
-            "myfun".into(),
-            0,
             gates_func,
             vec![(FF0, 2), (FF0, 1)],
             vec![(FF0, 3), (FF0, 1)],

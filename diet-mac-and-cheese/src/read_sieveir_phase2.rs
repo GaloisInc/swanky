@@ -231,9 +231,6 @@ impl BufRelation {
     }
 }
 
-// TODO: remove this when fun_id are supported.
-const MAGIC_FUN_ID: usize = 42;
-
 fn flatbuffer_gate_to_gate(the_gate: g::Gate) -> GateM {
     match the_gate.gate_type() {
         gs::GateConstant => {
@@ -405,7 +402,6 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                     g::FunctionBody::PluginBody => {
                         let x = the_function.body_as_plugin_body().unwrap();
                         let plugin_name = x.name().unwrap().into();
-                        let fun_id = MAGIC_FUN_ID;
                         let operation = x.operation().unwrap_or_else(|| "missing_op").into();
                         let params_flatc = x.params();
                         let params = if params_flatc.is_none() {
@@ -430,8 +426,6 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                         }
 
                         let fun_body = FuncDecl::new_plugin(
-                            name.clone(),
-                            fun_id,
                             output_counts,
                             input_counts,
                             plugin_name,
@@ -459,13 +453,8 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             let gate = flatbuffer_gate_to_gate(u.get(i));
                             gates_body.push(gate);
                         }
-                        let fun_body = FuncDecl::new_function(
-                            name.clone(),
-                            MAGIC_FUN_ID,
-                            gates_body,
-                            output_counts,
-                            input_counts,
-                        );
+                        let fun_body =
+                            FuncDecl::new_function(gates_body, output_counts, input_counts);
                         info!(
                             "function {:?} args_size:{:?} body_max:{:?} type_ids:{:?} output_ranges:{:?} input_ranges:{:?}",
                             name.clone(),
