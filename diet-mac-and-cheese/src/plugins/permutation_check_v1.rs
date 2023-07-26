@@ -144,8 +144,9 @@ impl Plugin for PermutationCheckV1 {
 mod tests {
     use super::PermutationCheckV1;
     use crate::{
-        backend_multifield::tests::{test_circuit, F61P_VEC},
+        backend_multifield::tests::test_circuit,
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        fields::F61P_MODULUS,
         plugins::Plugin,
     };
     use mac_n_cheese_sieve_parser::PluginTypeArg;
@@ -157,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_permutation_1() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut fun_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -196,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_permutation_2() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut fun_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -238,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_permutation_4() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut fun_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -286,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_bad_permutation_4() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut fun_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 

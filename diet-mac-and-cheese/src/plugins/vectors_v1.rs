@@ -367,8 +367,9 @@ impl Plugin for VectorsV1 {
 mod tests {
     use super::VectorsV1;
     use crate::{
-        backend_multifield::tests::{minus_one, one, test_circuit, zero, F61P_VEC, FF0},
+        backend_multifield::tests::{minus_one, one, test_circuit, zero, FF0},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        fields::F61P_MODULUS,
         plugins::Plugin,
     };
     use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
@@ -376,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_vector_add() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -429,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_vector_mul() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -478,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_vector_addc() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -523,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_vector_mulc() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -564,7 +565,7 @@ mod tests {
 
     #[test]
     fn test_vector_add_scalar() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -614,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_vector_mul_scalar() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -660,7 +661,7 @@ mod tests {
 
     #[test]
     fn test_vector_sum() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -759,7 +760,7 @@ mod tests {
 
     #[test]
     fn test_vector_product() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -858,7 +859,7 @@ mod tests {
 
     #[test]
     fn test_vector_dotproduct() {
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 

@@ -326,8 +326,9 @@ mod tests {
 
     use super::GaloisPolyV0;
     use crate::{
-        backend_multifield::tests::{test_circuit, F61P_VEC},
+        backend_multifield::tests::test_circuit,
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
+        fields::F61P_MODULUS,
         plugins::Plugin,
     };
     use mac_n_cheese_sieve_parser::Number;
@@ -394,7 +395,7 @@ mod tests {
         let q_size = degree + 2;
         let wire_count = p0_size + p1_size + q_size;
 
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut fun_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
@@ -475,7 +476,7 @@ mod tests {
         let p_size = degree + 1;
         let wire_count = 2 * p_size + 1;
 
-        let fields = vec![F61P_VEC.to_vec()];
+        let fields = vec![F61P_MODULUS];
         let mut fun_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();
 
