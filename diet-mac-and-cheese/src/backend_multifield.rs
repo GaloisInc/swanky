@@ -190,8 +190,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     fn zero(&self) -> Result<Self::FieldElement> {
         self.dmc.zero()
     }
-    fn challenge(&mut self) -> Result<Self::Wire> {
-        self.dmc.challenge()
+    fn random(&mut self) -> Result<Self::FieldElement> {
+        self.dmc.random()
     }
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.copy(wire)
@@ -459,8 +459,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.copy(wire)
     }
-    fn challenge(&mut self) -> Result<Self::Wire> {
-        self.dmc.challenge()
+    fn random(&mut self) -> Result<Self::FieldElement> {
+        self.dmc.random()
     }
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.constant(val)
@@ -814,7 +814,8 @@ where
                 panic!("Conv should be intercepted earlier")
             }
             Challenge(_, out) => {
-                let v = self.backend.challenge()?;
+                let v = self.backend.random()?;
+                let v = self.backend.input_public(v)?;
                 self.memory.set(*out, &v);
             }
             Comment(_) => {

@@ -59,15 +59,16 @@ impl PermutationCheckV1 {
             Self::NAME
         );
 
-        let challenge = backend.challenge()?;
+        let minus_one = -B::FieldElement::ONE;
+        let challenge = backend.random()?;
         let mut x = backend.constant(B::FieldElement::ONE)?;
         for x_i in xs {
-            let tmp = backend.sub(x_i, &challenge)?;
+            let tmp = backend.add_constant(x_i, challenge * minus_one)?;
             x = backend.mul(&x, &tmp)?;
         }
         let mut y = backend.constant(B::FieldElement::ONE)?;
         for y_i in ys {
-            let tmp = backend.sub(y_i, &challenge)?;
+            let tmp = backend.add_constant(y_i, challenge * minus_one)?;
             y = backend.mul(&y, &tmp)?;
         }
         let z = backend.sub(&x, &y)?;

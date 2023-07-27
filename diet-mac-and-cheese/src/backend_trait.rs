@@ -1,5 +1,3 @@
-#![allow(clippy::clone_on_copy)]
-
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use eyre::Result;
@@ -7,19 +5,24 @@ use mac_n_cheese_sieve_parser::Number;
 use std::any::type_name;
 use swanky_field::{FiniteField, PrimeFiniteField};
 
-/// An interface for computing over basic gates using a single [`FiniteField`].
+/// An interface for computing a proof over a single [`FiniteField`].
 pub trait BackendT {
     /// The type associated with the input and output wires of the gates.
     type Wire;
     /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 
+    /// Return [`Self::FieldElement::ONE`].
     fn one(&self) -> Result<Self::FieldElement>;
+    /// Return [`Self::FieldElement::ZERO`].
     fn zero(&self) -> Result<Self::FieldElement>;
+    /// Return a copy of `wire`.
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;
-    fn challenge(&mut self) -> Result<Self::Wire>;
-
+    /// Return a random [`Self::FieldElement`].
+    fn random(&mut self) -> Result<Self::FieldElement>;
+    /// Return `val` as a [`Self::Wire`].
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire>;
+    /// Assert that `wire` is zero.
     fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()>;
 
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;

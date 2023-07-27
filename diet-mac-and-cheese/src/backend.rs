@@ -137,10 +137,10 @@ where
         Ok(wire.clone())
     }
 
-    fn challenge(&mut self) -> Result<Self::Wire> {
+    fn random(&mut self) -> Result<Self::FieldElement> {
         self.channel.flush()?;
-        let challenge = self.channel.read_serializable::<V>()?;
-        self.input_public(challenge)
+        let challenge = self.channel.read_serializable::<Self::FieldElement>()?;
+        Ok(challenge)
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -397,11 +397,11 @@ where
         Ok(wire.clone())
     }
 
-    fn challenge(&mut self) -> Result<Self::Wire> {
-        let challenge = V::random(&mut self.rng);
+    fn random(&mut self) -> Result<Self::FieldElement> {
+        let challenge = Self::FieldElement::random(&mut self.rng);
         self.channel.write_serializable(&challenge)?;
         self.channel.flush()?;
-        self.input_public(challenge)
+        Ok(challenge)
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -753,7 +753,8 @@ mod tests {
             )
             .unwrap();
 
-            let challenge = dmc.challenge().unwrap();
+            let challenge = dmc.random().unwrap();
+            let challenge = dmc.input_public(challenge).unwrap();
 
             dmc.finalize().unwrap();
 
@@ -774,7 +775,8 @@ mod tests {
         )
         .unwrap();
 
-        let verifier = dmc.challenge().unwrap();
+        let challenge = dmc.random().unwrap();
+        let verifier = dmc.input_public(challenge).unwrap();
         dmc.finalize().unwrap();
 
         let prover = handle.join().unwrap();
