@@ -1754,13 +1754,13 @@ pub(crate) mod tests {
         fields: Vec<Number>,
         func_store: FunStore,
         gates: Vec<GateM>,
-        ins: Vec<Vec<Number>>,
-        wit: Vec<Vec<Number>>,
+        instances: Vec<Vec<Number>>,
+        witnesses: Vec<Vec<Number>>,
     ) -> eyre::Result<()> {
         let func_store_prover = func_store.clone();
         let gates_prover = gates.clone();
-        let ins_prover = ins.clone();
-        let wit_prover = wit;
+        let ins_prover = instances.clone();
+        let wit_prover = witnesses;
         let type_store = TypeStore::try_from(fields.clone())?;
         let type_store_prover = type_store.clone();
         let (sender, receiver) = UnixStream::pair()?;
@@ -1772,12 +1772,12 @@ pub(crate) mod tests {
 
             let mut inputs = CircInputs::default();
 
-            for (id, inst) in ins_prover.iter().enumerate() {
-                inputs.ingest_instances(id, VecDeque::from(inst.clone()));
+            for (id, instances) in ins_prover.into_iter().enumerate() {
+                inputs.ingest_instances(id, VecDeque::from(instances));
             }
 
-            for (id, w) in wit_prover.iter().enumerate() {
-                inputs.ingest_witnesses(id, VecDeque::from(w.clone()));
+            for (id, witnesses) in wit_prover.into_iter().enumerate() {
+                inputs.ingest_witnesses(id, VecDeque::from(witnesses));
             }
 
             let mut eval = EvaluatorCirc::new(
@@ -1801,8 +1801,8 @@ pub(crate) mod tests {
 
         let mut inputs = CircInputs::default();
 
-        for (id, inst) in ins.iter().enumerate() {
-            inputs.ingest_instances(id, VecDeque::from(inst.clone()));
+        for (id, inst) in instances.into_iter().enumerate() {
+            inputs.ingest_instances(id, VecDeque::from(inst));
         }
 
         let mut eval = EvaluatorCirc::new(
