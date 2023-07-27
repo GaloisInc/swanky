@@ -1,18 +1,19 @@
 // TODO(isweet): Define cache according to Stuart's suggested macro, see https://gist.github.com/Isweet/22c598b7e9b19c84750f585319dddf7a
 
 use crate::{read, Circuit};
+
 use std::io::Cursor;
 
 macro_rules! define_cached_circuit {
     ($name:ident, $loc:tt) => {
         thread_local! {
-            pub static $name: Circuit = {
-                let contents = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/circuits/", $loc));
-                let reader = Cursor::new(contents);
+            static $name: Circuit = {
+                let c = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/circuits/", $loc));
+                let reader = Cursor::new(c);
                 read(reader).unwrap()
             }
         }
-    }
+    };
 }
 
 define_cached_circuit!(ADD64, "adder64.txt");
@@ -22,11 +23,9 @@ define_cached_circuit!(ADD64, "adder64.txt");
 /// `a + b` are all 64-bit integers in little endian.
 ///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-#[macro_export]
-macro_rules! add64 {
-    () => {
-        ADD64.with(Circuit::clone)
-    };
+#[inline(never)]
+pub fn add64() -> Circuit {
+    ADD64.with(Circuit::clone)
 }
 
 define_cached_circuit!(SUB64, "sub64.txt");
@@ -36,11 +35,9 @@ define_cached_circuit!(SUB64, "sub64.txt");
 /// `a - b` are all 64-bit integers in little endian.
 ///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-#[macro_export]
-macro_rules! sub64 {
-    () => {
-        SUB64.with(Circuit::clone)
-    };
+#[inline(never)]
+pub fn sub64() -> Circuit {
+    SUB64.with(Circuit::clone)
 }
 
 define_cached_circuit!(NEG64, "neg64.txt");
@@ -50,11 +47,9 @@ define_cached_circuit!(NEG64, "neg64.txt");
 /// `-a` are both 64-bit integers in little endian.
 ///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-#[macro_export]
-macro_rules! neg64 {
-    () => {
-        NEG64.with(Circuit::clone)
-    };
+#[inline(never)]
+pub fn neg64() -> Circuit {
+    NEG64.with(Circuit::clone)
 }
 
 define_cached_circuit!(MUL64, "mult64.txt");
@@ -64,11 +59,9 @@ define_cached_circuit!(MUL64, "mult64.txt");
 /// `a * b` are all 64-bit integers in little endian.
 ///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-#[macro_export]
-macro_rules! mul64 {
-    () => {
-        MUL64.with(Circuit::clone)
-    };
+#[inline(never)]
+pub fn mul64() -> Circuit {
+    MUL64.with(Circuit::clone)
 }
 
 define_cached_circuit!(WIDE_MUL64, "mult2_64.txt");
@@ -84,9 +77,7 @@ define_cached_circuit!(WIDE_MUL64, "mult2_64.txt");
 /// contiguous.
 ///
 /// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
-#[macro_export]
-macro_rules! wide_mul64 {
-    () => {
-        WIDE_MUL64.with(Circuit::clone)
-    };
+#[inline(never)]
+pub fn wide_mul64() -> Circuit {
+    WIDE_MUL64.with(Circuit::clone)
 }
