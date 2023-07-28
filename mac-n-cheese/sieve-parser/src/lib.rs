@@ -64,7 +64,9 @@ pub enum Type {
     PluginType(PluginType),
 }
 
-pub type TypeId = u64;
+/// The type index.
+// The maximum number of types is 256, hence we use `u8` here.
+pub type TypeId = u8;
 pub type WireId = u64;
 
 #[derive(Debug, Clone, Copy)]

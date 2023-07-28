@@ -276,7 +276,13 @@ impl<T: Read + Seek> ParseState<T> {
             NumberFormat::Zero => Ok(Default::default()),
         }
     }
-    fn u64(&mut self) -> eyre::Result<WireId> {
+    fn u8(&mut self) -> eyre::Result<u8> {
+        let out: U64 = self.parse_uint_generic()?;
+        let out: u64 = out.to_words()[0].into();
+        let out = out.try_into()?;
+        Ok(out)
+    }
+    fn u64(&mut self) -> eyre::Result<u64> {
         let out: U64 = self.parse_uint_generic()?;
         Ok(out.to_words()[0].into())
     }
@@ -395,7 +401,7 @@ impl<T: Read + Seek> RelationReader<T> {
 
                     self.ps.colon()?;
 
-                    let out_ty = self.ps.u64()?;
+                    let out_ty = self.ps.u8()?;
 
                     self.ps.colon()?;
 
@@ -409,7 +415,7 @@ impl<T: Read + Seek> RelationReader<T> {
 
                     self.ps.colon()?;
 
-                    let in_ty = self.ps.u64()?;
+                    let in_ty = self.ps.u8()?;
 
                     self.ps.colon()?;
 
@@ -446,7 +452,7 @@ impl<T: Read + Seek> RelationReader<T> {
         let mut type_id = 0;
         if self.ps.peek()? != Some(b'$') {
             // If it doesn't start with a dollar sign, then it's a type colon a wire
-            type_id = self.ps.u64().context("Parsing type id before wire")?;
+            type_id = self.ps.u8().context("Parsing type id before wire")?;
             self.ps.colon()?;
         }
         let wire_id = self.read_wire_id()?;
@@ -609,7 +615,7 @@ impl<T: Read + Seek> RelationReader<T> {
                                     let ty = if let Some(b')') = self.ps.peek()? {
                                         0
                                     } else {
-                                        self.ps.u64()?
+                                        self.ps.u8()?
                                     };
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
@@ -622,7 +628,7 @@ impl<T: Read + Seek> RelationReader<T> {
                                     let ty = if let Some(b')') = self.ps.peek()? {
                                         0
                                     } else {
-                                        self.ps.u64()?
+                                        self.ps.u8()?
                                     };
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
@@ -653,7 +659,7 @@ impl<T: Read + Seek> RelationReader<T> {
                             let ty = if peeked != b'<' && peeked != b'$' {
                                 // If we see neither a < or $, then assume that it's the type
                                 // number up first.
-                                let ty = self.ps.u64().context(
+                                let ty = self.ps.u8().context(
                                     "Expecting type number following '<-' for constant or copy",
                                 )?;
                                 self.ps.colon()?;
@@ -681,7 +687,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     // It must be a conversion gate
                     let dst_type_id = self
                         .ps
-                        .u64()
+                        .u8()
                         .context("parsing type id of conversion destination")?;
                     self.ps.colon()?;
                     let dst = self.read_wire_range()?;
@@ -689,7 +695,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     self.ps.at()?;
                     self.ps.expect_token(&mut buf, b"convert")?;
                     self.ps.expect_byte(b'(')?;
-                    let src_type_id = self.ps.u64()?;
+                    let src_type_id = self.ps.u8()?;
                     self.ps.colon()?;
                     let src = self.read_wire_range()?;
                     self.ps.expect_byte(b')')?;
@@ -742,7 +748,7 @@ impl<T: Read + Seek> RelationReader<T> {
                 self.ps.colon()?;
             }
             // No comma after @out: and @in:
-            let ty = self.ps.u64()?;
+            let ty = self.ps.u8()?;
             self.ps.colon()?;
             let count = self.ps.u64()?;
             dst.push(TypedCount { ty, count });
@@ -807,7 +813,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     self.ps.colon()?;
                 }
 
-                let ty = self.ps.u64()?;
+                let ty = self.ps.u8()?;
                 self.ps.colon()?;
                 let count = self.ps.u64()?;
                 dst.push(TypedCount { ty, count });
