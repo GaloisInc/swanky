@@ -384,10 +384,26 @@ impl<T: Read + Seek> RelationReader<T> {
                             }))
                         }
                         _ => {
-                            self.ps.expect_token(&mut buf, b"field")?;
-                            let modulus = self.ps.bignum()?;
-                            self.ps.semi()?;
-                            self.header.types.push(Type::Field { modulus });
+                            self.ps.token(&mut buf)?;
+                            match buf.as_slice() {
+                                b"field" => {
+                                    let modulus = self.ps.bignum()?;
+                                    self.ps.semi()?;
+                                    self.header.types.push(Type::Field { modulus });
+                                }
+                                b"ext_field" => {
+                                    let index = self.ps.u8()?;
+                                    let degree = self.ps.u64()?;
+                                    let modulus = self.ps.bignum()?;
+                                    self.ps.semi()?;
+                                    self.header.types.push(Type::ExtField {
+                                        index,
+                                        degree,
+                                        modulus,
+                                    })
+                                }
+                                _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
+                            }
                         }
                     }
                 }

@@ -58,7 +58,14 @@ pub struct PluginBinding {
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    Field { modulus: Number },
+    Field {
+        modulus: Number,
+    },
+    ExtField {
+        index: TypeId,
+        degree: u64,
+        modulus: Number,
+    },
     // Ignores private/public counts in this context, but they're needed
     // for plugin function bodies
     PluginType(PluginType),
@@ -99,6 +106,11 @@ impl std::fmt::Display for Header {
         for ty in self.types.iter() {
             match ty {
                 Type::Field { modulus } => writeln!(f, "@type field 0x{modulus:X};")?,
+                Type::ExtField {
+                    index,
+                    degree,
+                    modulus,
+                } => writeln!(f, "@type ext_field {index} {degree} {modulus}")?,
                 Type::PluginType(PluginType {
                     name,
                     operation,
