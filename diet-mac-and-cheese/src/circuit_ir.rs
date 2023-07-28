@@ -180,6 +180,9 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                 mac_n_cheese_sieve_parser::Type::Field { modulus } => {
                     TypeSpecification::Field(modulus_to_type_id(modulus)?)
                 }
+                mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
+                    bail!("Extension fields not supported!")
+                }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
                 }
