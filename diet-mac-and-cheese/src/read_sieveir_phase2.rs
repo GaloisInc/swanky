@@ -1,8 +1,8 @@
 /*!
 SIEVE IR0+ flatbuffer reader.
 */
-use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs;
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::{self as g};
+use crate::{circuit_ir::TypeId, sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs};
 use crate::{
     circuit_ir::{FunStore, FuncDecl, GateM, TypeSpecification, TypeStore},
     plugins::PluginType,
@@ -513,7 +513,7 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
 
     let types = v.message_as_relation().unwrap().types().unwrap();
     let l = types.len();
-    let mut field_id = 0;
+    let mut type_id: TypeId = 0;
     for i in 0..l {
         let t = types.get(i);
         let out = t.element_type();
@@ -527,12 +527,15 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                     .value()
                     .unwrap();
                 vout.insert(
-                    field_id,
+                    type_id,
                     TypeSpecification::Field(
                         modulus_to_type_id(bigint_from_bytes(field.bytes())).unwrap(),
                     ),
                 );
-                field_id += 1;
+                type_id += 1;
+            }
+            g::TypeU::ExtField => {
+                
             }
             g::TypeU::PluginType => {
                 let plugin = t.element_as_plugin_type().unwrap();
@@ -547,8 +550,8 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                     params.push(PluginTypeArg::from_str(param).ok()?);
                 }
                 let plugin_type = PluginType::new(name, operation, params);
-                vout.insert(field_id, TypeSpecification::Plugin(plugin_type));
-                field_id += 1;
+                vout.insert(type_id, TypeSpecification::Plugin(plugin_type));
+                type_id += 1;
             }
             _ => {}
         }
