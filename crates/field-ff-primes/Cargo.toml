@@ -31,3 +31,5 @@ ff_codegen = { workspace = true }
 tempfile.workspace = true
 sha2.workspace = true
 num-bigint.workspace = true
+num_cpus.workspace = true
+
