@@ -1,6 +1,5 @@
 use super::{Plugin, PluginExecution};
 use crate::backend_trait::{BackendT, Party};
-use crate::circuit_ir::WireRange;
 use crate::circuit_ir::{FunStore, TypeId, TypeStore, WireCount};
 use crate::memory::Memory;
 use eyre::{bail, ensure, Result};

@@ -139,8 +139,8 @@ where
     fn party(&self) -> Party {
         Party::Prover
     }
-    fn get_value_from_wire(&self, wire: &Self::Wire) -> Result<Self::FieldElement> {
-        Ok(wire.value())
+    fn get_value_from_wire(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+        Some(wire.value())
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
@@ -406,8 +406,8 @@ where
     fn party(&self) -> Party {
         Party::Verifier
     }
-    fn get_value_from_wire(&self, _wire: &Self::Wire) -> Result<Self::FieldElement> {
-        Err(eyre!("Try to get value from value in verifier"))
+    fn get_value_from_wire(&self, _wire: &Self::Wire) -> Option<Self::FieldElement> {
+        None
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
