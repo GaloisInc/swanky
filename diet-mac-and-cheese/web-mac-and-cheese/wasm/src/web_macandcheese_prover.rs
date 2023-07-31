@@ -2,7 +2,6 @@ use crate::js_channel::ShimChannel;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::text_reader::number_to_bytes;
 use log::info;
 use log::Level;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -41,7 +40,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     info!(
         "Loaded type_id:{:?} field:{:?} num public instances:{:?}",
         type_id,
-        number_to_bytes(&field),
+        field,
         inputs.num_instances(type_id)
     );
 
@@ -60,7 +59,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     info!(
         "Loaded type_id:{:?} field:{:?} num private instances:{:?}",
         type_id,
-        number_to_bytes(&field),
+        field,
         inputs.num_witnesses(type_id)
     );
     alert("*** WITNESS LOADING: done!");

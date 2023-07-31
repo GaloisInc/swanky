@@ -3,7 +3,6 @@ use core::fmt::Debug;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::text_reader::number_to_bytes;
 use eyre::Result;
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -49,7 +48,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     info!(
         "Loaded type_id:{:?} field:{:?} file:{:?} num public instances:{:?}",
         type_id,
-        number_to_bytes(&field),
+        field,
         instance,
         inputs.num_instances(type_id)
     );
