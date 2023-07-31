@@ -430,10 +430,10 @@ impl FuncDecl {
         type_store: &TypeStore,
         fun_store: &FunStore,
     ) -> Result<Self> {
-        use crate::plugins::{GaloisPolyV0, IterV0, MuxV0, PermutationCheckV1, VectorsV1};
+        use crate::plugins::{GaloisPolyV0, IterV0, Mux, PermutationCheckV1, VectorsV1};
 
         let execution = match plugin_name.as_str() {
-            MuxV0::NAME => MuxV0::instantiate(
+            Mux::NAME => Mux::instantiate(
                 &operation,
                 &params,
                 &output_counts,

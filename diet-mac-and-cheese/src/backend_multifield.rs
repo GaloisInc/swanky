@@ -2,6 +2,7 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
+use crate::backend_trait::Party;
 use crate::circuit_ir::{
     CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
     WireRange,
@@ -224,6 +225,14 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C>
 impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConvProver<FE, C> {
     type Wire = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseProver<FE, FE, C> as BackendT>::FieldElement;
+
+    fn party(&self) -> Party {
+        Party::Prover
+    }
+
+    fn get_value_from_wire(&self, wire: &Self::Wire) -> Result<Self::FieldElement> {
+        self.dmc.get_value_from_wire(wire)
+    }
 
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
@@ -563,6 +572,12 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     type Wire = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::Wire;
     type FieldElement = <DietMacAndCheeseVerifier<FE, FE, C> as BackendT>::FieldElement;
 
+    fn party(&self) -> Party {
+        Party::Verifier
+    }
+    fn get_value_from_wire(&self, wire: &Self::Wire) -> Result<Self::FieldElement> {
+        self.dmc.get_value_from_wire(wire)
+    }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
     }
@@ -1011,6 +1026,9 @@ where
                 }
                 debug_assert!(wires.next().is_none());
             }
+            PluginExecution::Mux(plugin) => {
+                plugin.execute::<B>(&mut self.backend, &mut self.memory)?
+            }
             _ => bail!("Plugin {plugin:?} is unsupported"),
         };
         Ok(())
@@ -1113,12 +1131,6 @@ where
 }
 
 // V) Evaluator for multiple fields
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Party {
-    Prover,
-    Verifier,
-}
 
 pub struct EvaluatorCirc<C: AbstractChannel + 'static> {
     inputs: CircInputs,
@@ -1551,6 +1563,14 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     // disjunction does not use a callframe:
                     // since the inputs/outputs must be flattened to an R1CS witness.
                     self.eval[plugin.field() as usize].plugin_call_gate(
+                        out_ranges,
+                        in_ranges,
+                        &body.execution(),
+                    )?;
+                }
+                PluginExecution::Mux(plugin) => {
+                    let type_id = plugin.type_id() as usize;
+                    self.eval[type_id].plugin_call_gate(
                         out_ranges,
                         in_ranges,
                         &body.execution(),

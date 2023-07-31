@@ -1,7 +1,10 @@
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
-use crate::{backend_trait::BackendT, edabits::RcRefCell};
+use crate::{
+    backend_trait::{BackendT, Party},
+    edabits::RcRefCell,
+};
 use eyre::{eyre, Result};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
@@ -132,6 +135,13 @@ where
 {
     type Wire = MacProver<V, T>;
     type FieldElement = V;
+
+    fn party(&self) -> Party {
+        Party::Prover
+    }
+    fn get_value_from_wire(&self, wire: &Self::Wire) -> Result<Self::FieldElement> {
+        Ok(wire.value())
+    }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())
@@ -392,6 +402,13 @@ where
 {
     type Wire = MacVerifier<T>;
     type FieldElement = V;
+
+    fn party(&self) -> Party {
+        Party::Verifier
+    }
+    fn get_value_from_wire(&self, _wire: &Self::Wire) -> Result<Self::FieldElement> {
+        Err(eyre!("Try to get value from value in verifier"))
+    }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         Ok(wire.clone())

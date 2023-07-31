@@ -1,15 +1,179 @@
 use super::{Plugin, PluginExecution};
-use crate::circuit_ir::{
-    first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeStore, WireCount,
-};
-use eyre::{eyre, Result};
+use crate::backend_trait::{BackendT, Party};
+use crate::circuit_ir::WireRange;
+use crate::circuit_ir::{FunStore, TypeId, TypeStore, WireCount};
+use crate::memory::Memory;
+use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use swanky_field::{FiniteRing, PrimeFiniteField};
-use swanky_field_binary::F2;
+use swanky_field::FiniteRing;
 
-pub(crate) struct MuxV0;
+#[derive(Clone, Debug)]
+pub(crate) struct Mux {
+    /// The [`TypeId`] associated with this mux.
+    type_id: TypeId,
+    /// The range of the selector
+    selector_range: usize,
+    // The shape of branches. It is derived from the wire ranges in outputs.
+    branch_shape: Vec<WireCount>,
+    // Boolean indicating if the plugin is permissive or strict.
+    is_permissive: bool,
+}
 
-impl Plugin for MuxV0 {
+impl Mux {
+    /// Create a new [`Mux`] instantiation for the field
+    /// associated with the provided [`TypeId`], the provided number the size of the wire range,
+    /// a boolean indicating if the mux is permissize and if the type_id is F2.
+    pub(crate) fn new(
+        type_id: TypeId,
+        selector_range: usize,
+        branch_shape: Vec<WireCount>,
+        is_permissive: bool,
+    ) -> Self {
+        Mux {
+            type_id,
+            selector_range,
+            branch_shape,
+            is_permissive,
+        }
+    }
+
+    /// Return the [`TypeId`] of this instantiation.
+    pub(crate) fn type_id(&self) -> TypeId {
+        self.type_id
+    }
+
+    /// Run the mux on the memory and the backend
+    pub(crate) fn execute<B: BackendT>(
+        &self,
+        backend: &mut B,
+        memory: &mut Memory<B::Wire>,
+    ) -> Result<()> {
+        // The general idea for how the mux plugin works is the following.
+        // Let's consider the following example:
+        // r <- mux(cond, b_0, ..., b_n)
+        // The steps are basically:
+        // 1) Input(a_i)  for i in 0..n
+        // 2) Check that a_i is 0 or 1                (done with CheckZero(a_i * (1 - a_i)))
+        // 3) Check that If a_i == 1 then cond == i   (done with CheckZero(a_i * (cond-i)))
+        // 4) r = Sum_i a_i * b_i
+
+        // NOTE: this algorithm works for any field, but there is a more direct algorithm for F2:
+        // r <- mux(cond, b_0, b_1)
+        // cond_neg = cond + 1
+        // r = b_0 * cond_neg + b_1 * cond
+        // And the number of multiplication gates could be minimized further.
+        // So we keep as a TODO to specialize this code for F2 and improve the performance of mux
+
+        // First find where the condition wire is:
+        let mut cond_wire = 0;
+        for branch_size in self.branch_shape.iter() {
+            cond_wire += branch_size;
+        }
+
+        // 1) Input(a_i)  for i in 0..n
+        let mut ai_s = Vec::with_capacity(self.selector_range);
+        let cond = memory.get(cond_wire);
+        let cond_value = backend.get_value_from_wire(cond);
+        let mut i = 0;
+        let mut i_f = <B as BackendT>::FieldElement::ZERO;
+        while i < self.selector_range {
+            // depending on the party running, if it is the prover and the index is matching then
+            // it fixes the private input to 1, otherwise it fixes the private input to 0
+            let what_to_input = if backend.party() == Party::Prover {
+                // TODO: constant time this
+                if cond_value.as_ref().unwrap() == &i_f {
+                    Some(<B as BackendT>::FieldElement::ONE)
+                } else {
+                    Some(<B as BackendT>::FieldElement::ZERO)
+                }
+            } else {
+                None
+            };
+            let t = backend.input_private(what_to_input)?;
+            ai_s.push(t);
+
+            i += 1;
+            if backend.party() == Party::Prover {
+                i_f += <B as BackendT>::FieldElement::ONE;
+            }
+        }
+
+        // 2) Check that a_i is 0 or 1                (done with CheckZero(a_i * (1 - a_i)))
+        let one = backend.constant(B::FieldElement::ONE)?;
+        for ai in ai_s.iter() {
+            let tmp1 = backend.sub(&one, ai)?;
+            let tmp2 = backend.mul(ai, &tmp1)?;
+            backend.assert_zero(&tmp2)?;
+        }
+
+        // 3) Check that If a_i == 1 then cond == i   (done with CheckZero(a_i * (cond-i)))
+        if !self.is_permissive {
+            let mut minus_i = B::FieldElement::ZERO;
+            for ai in ai_s.iter() {
+                let tmp1 = backend.add_constant(cond, minus_i)?;
+                let tmp2 = backend.mul(ai, &tmp1)?;
+                backend.assert_zero(&tmp2)?;
+                minus_i -= B::FieldElement::ONE;
+            }
+        }
+
+        // 4) r = Sum_i a_i * b_i
+
+        // The shape of `r` and `bi_s` will match the self.branch_shape
+        let mut r = Vec::with_capacity(self.branch_shape.len());
+        let mut bi_s = Vec::with_capacity(self.branch_shape.len());
+
+        let mut wire = cond_wire + 1; //  this is where the first branch wire is
+
+        // 4) a) first we set r with the a_1 * b_1 for a branch shape
+        for wirerange_size in self.branch_shape.iter() {
+            let mut r1 = Vec::with_capacity(*wirerange_size as usize);
+            let mut b1 = Vec::with_capacity(*wirerange_size as usize);
+
+            for i in 0..*wirerange_size {
+                b1.push(*memory.get(wire + i));
+            }
+            for i in 0..*wirerange_size {
+                r1.push(backend.mul(&ai_s[0], &b1[i as usize])?);
+            }
+            r.push(r1);
+            bi_s.push(b1);
+
+            // moving by `wirerange_size` on the inputs
+            wire += wirerange_size;
+        }
+
+        // 4) b) iterate the summation updating r and bs
+        let mut wire = cond_wire + 1 + cond_wire;
+        for ai in ai_s[1..].iter() {
+            for (branch, wirerange_size) in self.branch_shape.iter().enumerate() {
+                for i in 0..*wirerange_size {
+                    bi_s[branch][i as usize] = *memory.get(wire + i);
+                }
+                for i in 0..*wirerange_size {
+                    let t = backend.mul(ai, &bi_s[branch][i as usize])?;
+                    r[branch][i as usize] = backend.add(&r[branch][i as usize], &t)?;
+                }
+                // moving by `wirerange_size` on the inputs
+                wire += wirerange_size;
+            }
+        }
+
+        // Finally, the result of r is stored in the output wires
+        let mut wire = 0;
+        for (branch, wirerange_size) in self.branch_shape.iter().enumerate() {
+            for i in 0..*wirerange_size {
+                memory.set(wire + i, &r[branch][i as usize]);
+            }
+
+            // moving by `wirerange_size` on the outputs
+            wire += wirerange_size;
+        }
+        Ok(())
+    }
+}
+
+impl Plugin for Mux {
     const NAME: &'static str = "mux_v0";
 
     fn instantiate(
@@ -20,120 +184,77 @@ impl Plugin for MuxV0 {
         _type_store: &TypeStore,
         _fun_store: &FunStore,
     ) -> Result<PluginExecution> {
-        if operation != "strict" {
-            return Err(eyre!(
-                "{}: Implementation only handles strict permissiveness: {operation}",
-                Self::NAME,
-            ));
+        ensure! {
+            input_counts[0].1 == 1,
+            "Only wire count equal to 1 is supported for the selector, not {}",
+            input_counts[0].1
         }
 
-        if params.len() != 0 {
-            return Err(eyre!(
-                "{}: Invalid number of params (must be zero): {}",
-                Self::NAME,
-                params.len()
-            ));
-        }
+        let branch_shape: Vec<WireCount> = output_counts.iter().map(|x| x.1).collect();
 
-        // TODO: Ensure that `F2` is being used.
-
-        // r <- mux(cond, b_0, b_1)
-        // cond_neg = cond + 1
-        // r = b_0 * cond_neg + b_1 * cond
-        // TODO: could minimize the number of multiplication gates
-
-        let field = input_counts[0].0;
-        let callframe_size = first_unused_wire_id(output_counts, input_counts);
-
-        let mut vec_gates = vec![];
-
-        // 1) find where the condition is:
-        let mut prev = 0;
-        // assert_eq!(out_ranges.len(), func.output_counts.len());
-        for (_field_idx, count) in output_counts {
-            prev += *count;
-        }
-
-        // assert_eq!(in_ranges.len(), func.input_counts.len());
-        let cond = prev;
-
-        // 2) MUX dedicated circuit
-
-        // wire_cond_neg <- cond - 1
-        let wire_cond_neg = callframe_size;
-        vec_gates.push(
-            GateM::AddConstant(field, wire_cond_neg, cond, Box::from(F2::ONE.into_int())), // WARNING only works in F2
+        ensure!(
+            params.is_empty(),
+            "{}: Invalid number of params (must be zero): {}",
+            Self::NAME,
+            params.len()
         );
 
-        let middle_index = input_counts.len() / 2; // WARNING: works for F2, Should divide by the number of possibilities
+        let is_permissive = if operation == "permissive" {
+            true
+        } else if operation == "strict" {
+            false
+        } else {
+            bail!(
+                "unknown operation (should be strict or permissive), found:{}",
+                operation
+            );
+        };
 
-        let mut pos = 0;
-        for i in 0..middle_index {
-            let (field, how_many) = input_counts[1 + i];
-            for idx in 0..how_many {
-                // Allocate one new wire per input.
-                //println!("WIRE 0: {:?}", callframe_size + 1 + pos + idx);
-                //println!("WIRE 0: {:?}", wire_cond_neg);
-                //println!("WIRE 0: {:?}", cond + 1 + pos + idx);
-                vec_gates.push(GateM::Mul(
-                    field,
-                    callframe_size + 1 + pos + idx,
-                    wire_cond_neg,
-                    cond + 1 + pos + idx,
-                ));
-            }
-            pos += how_many;
+        // The selector range is function of the shape of the output and the input.
+        let selector_range = (input_counts.len() - 1) / output_counts.len();
+
+        let type_id = input_counts[0].0;
+
+        let mut i = 0;
+        for (ty_inputs, inp) in input_counts[1..].iter() {
+            ensure!(
+                *ty_inputs == type_id,
+                "only homogeneous type is currently supported: {} != {}",
+                ty_inputs,
+                type_id
+            );
+            ensure!(
+                *inp == branch_shape[i],
+                "input branch has different range than expected output: {} != {}",
+                *inp,
+                branch_shape[i]
+            );
+            i = (i + 1) % branch_shape.len();
         }
 
-        let input_range = pos;
-
-        let mut pos = 0;
-        for i in 0..middle_index {
-            let (field, how_many) = input_counts[1 + middle_index + i];
-            for idx in 0..how_many {
-                //println!("WIRE 1: {:?}", callframe_size + 1 + input_range + pos + idx);
-                //println!("WIRE 1: {:?}", cond);
-                //println!("WIRE 1: {:?}", cond + 1 + input_range + pos + idx);
-                vec_gates.push(GateM::Mul(
-                    field,
-                    callframe_size + 1 + input_range + pos + idx,
-                    cond,
-                    cond + 1 + input_range + pos + idx,
-                ));
-            }
-            pos += how_many;
-        }
-
-        let mut pos = 0;
-        for (field, how_many) in output_counts {
-            for idx in 0..*how_many {
-                //println!("WIRE 2: {:?}", pos + idx);
-                //println!("WIRE 2: {:?}", callframe_size + 1 + pos + idx);
-                //println!("WIRE 2: {:?}", callframe_size + 1 + input_range + pos + idx);
-                vec_gates.push(GateM::Add(
-                    *field,
-                    pos + idx,
-                    callframe_size + 1 + pos + idx,
-                    callframe_size + 1 + input_range + pos + idx,
-                ));
-            }
-            pos += how_many;
-        }
-
-        Ok(GatesBody::new(vec_gates).into())
+        Ok(PluginExecution::Mux(Mux::new(
+            type_id,
+            selector_range,
+            branch_shape,
+            is_permissive,
+        )))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::MuxV0;
-    use crate::{backend_multifield::tests::FF0, fields::F2_MODULUS, plugins::Plugin};
+    use super::Mux;
     use crate::{
-        backend_multifield::tests::{minus_one, one, test_circuit, zero},
+        backend_multifield::tests::FF0,
+        fields::{F2_MODULUS, F61P_MODULUS},
+        plugins::Plugin,
+    };
+    use crate::{
+        backend_multifield::tests::{minus_one, one, test_circuit, three, zero},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
     };
     use scuttlebutt::{
-        field::{PrimeFiniteField, F2},
+        field::{F61p, PrimeFiniteField, F2},
         ring::FiniteRing,
     };
 
@@ -147,7 +268,7 @@ mod tests {
         let func = FuncDecl::new_plugin(
             vec![(FF0, 1)],
             vec![(FF0, 1), (FF0, 1), (FF0, 1)],
-            MuxV0::NAME.into(),
+            Mux::NAME.into(),
             "strict".into(),
             vec![],
             vec![],
@@ -160,6 +281,7 @@ mod tests {
         func_store.insert("my_mux".into(), func);
 
         let gates = vec![
+            GateM::New(FF0, 4, 14),
             GateM::Witness(FF0, 0),
             GateM::Witness(FF0, 1),
             GateM::Witness(FF0, 2),
@@ -212,7 +334,7 @@ mod tests {
         let func = FuncDecl::new_plugin(
             vec![(FF0, 3), (FF0, 1)],
             vec![(FF0, 1), (FF0, 3), (FF0, 1), (FF0, 3), (FF0, 1)],
-            MuxV0::NAME.into(),
+            Mux::NAME.into(),
             "strict".into(),
             vec![],
             vec![],
@@ -272,6 +394,159 @@ mod tests {
             one::<F2>(),
         ]];
         let witnesses = vec![vec![zero::<F2>(), one::<F2>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    // More complicated test of mux selecting a triple and a unique element
+    #[test]
+    fn test_f61p_mux_simple() {
+        let fields = vec![F61P_MODULUS];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            vec![(FF0, 3)],
+            vec![(FF0, 1), (FF0, 3), (FF0, 3), (FF0, 3), (FF0, 3)],
+            Mux::NAME.into(),
+            "strict".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+            &func_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mux".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 0, 100),
+            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, 1),
+            GateM::Instance(FF0, 10),
+            GateM::Instance(FF0, 11),
+            GateM::Instance(FF0, 12),
+            GateM::Instance(FF0, 13),
+            GateM::Instance(FF0, 14),
+            GateM::Instance(FF0, 15),
+            GateM::Instance(FF0, 16),
+            GateM::Instance(FF0, 17),
+            GateM::Instance(FF0, 18),
+            GateM::Instance(FF0, 19),
+            GateM::Instance(FF0, 20),
+            GateM::Instance(FF0, 21),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(30, 32)],
+                vec![(0, 0), (10, 12), (13, 15), (16, 18), (19, 21)],
+            ))),
+            GateM::AssertZero(FF0, 30),
+            GateM::AssertZero(FF0, 31),
+            GateM::AssertZero(FF0, 32),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(40, 42)],
+                vec![(1, 1), (10, 12), (13, 15), (16, 18), (19, 21)],
+            ))),
+            GateM::AddConstant(FF0, 50, 40, Box::from(minus_one::<F61p>())),
+            GateM::AddConstant(FF0, 51, 41, Box::from(minus_one::<F61p>())),
+            GateM::AddConstant(FF0, 52, 42, Box::from(minus_one::<F61p>())),
+            GateM::AssertZero(FF0, 50),
+            GateM::AssertZero(FF0, 51),
+            GateM::AssertZero(FF0, 52),
+        ];
+
+        let instances = vec![vec![
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+        ]];
+        let witnesses = vec![vec![zero::<F61p>(), three::<F61p>()]];
+
+        test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    // More complicated test of mux selecting a triple and a unique element.
+    // Same test as `test_f2_mux_on_slices()` but on F61p
+    #[test]
+    fn test_f61p_mux_on_slices() {
+        let fields = vec![F61P_MODULUS];
+        let mut func_store = FunStore::default();
+        let type_store = TypeStore::try_from(fields.clone()).unwrap();
+
+        let func = FuncDecl::new_plugin(
+            vec![(FF0, 3), (FF0, 1)],
+            vec![(FF0, 1), (FF0, 3), (FF0, 1), (FF0, 3), (FF0, 1)],
+            Mux::NAME.into(),
+            "strict".into(),
+            vec![],
+            vec![],
+            vec![],
+            &type_store,
+            &func_store,
+        )
+        .unwrap();
+
+        func_store.insert("my_mux".into(), func);
+
+        let gates = vec![
+            GateM::New(FF0, 4, 11),
+            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, 1),
+            // NOTE: there is a gap with 2 unused wires here
+            GateM::Instance(FF0, 4),
+            GateM::Instance(FF0, 5),
+            GateM::Instance(FF0, 6),
+            GateM::Instance(FF0, 7),
+            GateM::Instance(FF0, 8),
+            GateM::Instance(FF0, 9),
+            GateM::Instance(FF0, 10),
+            GateM::Instance(FF0, 11),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(12, 14), (15, 15)],
+                vec![(0, 0), (4, 6), (7, 7), (8, 10), (11, 11)],
+            ))),
+            GateM::AssertZero(FF0, 12),
+            GateM::AssertZero(FF0, 13),
+            GateM::AssertZero(FF0, 14),
+            GateM::AssertZero(FF0, 15),
+            GateM::Call(Box::new((
+                "my_mux".into(),
+                vec![(16, 18), (19, 19)],
+                vec![(1, 1), (4, 6), (7, 7), (8, 10), (11, 11)],
+            ))),
+            GateM::AddConstant(FF0, 20, 16, Box::from(minus_one::<F61p>())),
+            GateM::AddConstant(FF0, 21, 17, Box::from(minus_one::<F61p>())),
+            GateM::AddConstant(FF0, 22, 18, Box::from(minus_one::<F61p>())),
+            GateM::AddConstant(FF0, 23, 19, Box::from(minus_one::<F61p>())),
+            GateM::AssertZero(FF0, 20),
+            GateM::AssertZero(FF0, 21),
+            GateM::AssertZero(FF0, 22),
+            GateM::AssertZero(FF0, 23),
+        ];
+
+        let instances = vec![vec![
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            zero::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+            one::<F61p>(),
+        ]];
+        let witnesses = vec![vec![zero::<F61p>(), one::<F61p>()]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }

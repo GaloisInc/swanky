@@ -41,14 +41,18 @@ pub(crate) enum PluginExecution {
     PermutationCheck(PermutationCheckV1),
     /// The plugin implements a disjunction
     Disjunction(DisjunctionBody),
+    /// The plugin implements a mux.
+    Mux(Mux),
 }
 
 impl PluginExecution {
     /// Return the [`GatesBody`] associated with the plugin, if there is any.
     pub(crate) fn gates(&self) -> Option<&GatesBody> {
         match &self {
-            PluginExecution::Gates(gates) => Some(&gates),
-            _ => None,
+            PluginExecution::Gates(gates) => Some(gates),
+            PluginExecution::PermutationCheck(_)
+            | PluginExecution::Disjunction(_)
+            | PluginExecution::Mux(_) => None,
         }
     }
 
@@ -67,6 +71,11 @@ impl PluginExecution {
                 mapping
             }
             PluginExecution::Disjunction(body) => body.type_id_mapping(),
+            PluginExecution::Mux(plugin) => {
+                let mut mapping = TypeIdMapping::default();
+                mapping.set(plugin.type_id());
+                mapping
+            }
         }
     }
 }
@@ -134,7 +143,7 @@ pub(crate) trait Plugin {
 mod dora;
 pub(crate) use dora::DisjunctionV0;
 mod mux_v0;
-pub(crate) use mux_v0::MuxV0;
+pub(crate) use mux_v0::Mux;
 mod permutation_check_v1;
 pub(crate) use permutation_check_v1::PermutationCheckV1;
 mod galois_poly_v0;
