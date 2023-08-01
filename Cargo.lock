@@ -2539,6 +2539,7 @@ dependencies = [
  "ndarray",
  "num-bigint 0.4.3",
  "num-traits",
+ "num_cpus",
  "proptest",
  "rand",
  "rand_chacha",
