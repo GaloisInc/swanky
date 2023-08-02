@@ -23,7 +23,7 @@ pub trait BackendT {
     /// Return the [`Party`]
     fn party(&self) -> Party;
     /// Return the value from a wire when it is a prover.
-    fn get_value_from_wire(&self, wire: &Self::Wire) -> Option<Self::FieldElement>;
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement>;
     /// Return [`Self::FieldElement::ONE`].
     fn one(&self) -> Result<Self::FieldElement>;
     /// Return [`Self::FieldElement::ZERO`].

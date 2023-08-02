@@ -139,7 +139,7 @@ where
     fn party(&self) -> Party {
         Party::Prover
     }
-    fn get_value_from_wire(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         Some(wire.value())
     }
 
@@ -406,7 +406,7 @@ where
     fn party(&self) -> Party {
         Party::Verifier
     }
-    fn get_value_from_wire(&self, _wire: &Self::Wire) -> Option<Self::FieldElement> {
+    fn wire_value(&self, _wire: &Self::Wire) -> Option<Self::FieldElement> {
         None
     }
 

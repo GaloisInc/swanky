@@ -21,7 +21,7 @@ pub(crate) struct Mux {
 impl Mux {
     /// Create a new [`Mux`] instantiation for the field
     /// associated with the provided [`TypeId`], the provided number the size of the wire range,
-    /// a boolean indicating if the mux is permissize and if the type_id is F2.
+    /// and a boolean indicating if the mux is permissive.
     pub(crate) fn new(
         type_id: TypeId,
         selector_range: usize,
@@ -72,10 +72,9 @@ impl Mux {
         // 1) Input(a_i)  for i in 0..n
         let mut ai_s = Vec::with_capacity(self.selector_range);
         let cond = memory.get(cond_wire);
-        let cond_value = backend.get_value_from_wire(cond);
-        let mut i = 0;
+        let cond_value = backend.wire_value(cond);
         let mut i_f = <B as BackendT>::FieldElement::ZERO;
-        while i < self.selector_range {
+        for _ in 0..self.selector_range {
             // depending on the party running, if it is the prover and the index is matching then
             // it fixes the private input to 1, otherwise it fixes the private input to 0
             let what_to_input = if backend.party() == Party::Prover {
@@ -91,7 +90,6 @@ impl Mux {
             let t = backend.input_private(what_to_input)?;
             ai_s.push(t);
 
-            i += 1;
             if backend.party() == Party::Prover {
                 i_f += <B as BackendT>::FieldElement::ONE;
             }
@@ -118,25 +116,20 @@ impl Mux {
 
         // 4) r = Sum_i a_i * b_i
 
-        // The shape of `r` and `bi_s` will match the self.branch_shape
+        // The shape of `r` will match the self.branch_shape
         let mut r = Vec::with_capacity(self.branch_shape.len());
-        let mut bi_s = Vec::with_capacity(self.branch_shape.len());
 
         let mut wire = cond_wire + 1; //  this is where the first branch wire is
 
         // 4) a) first we set r with the a_1 * b_1 for a branch shape
         for wirerange_size in self.branch_shape.iter() {
             let mut r1 = Vec::with_capacity(*wirerange_size as usize);
-            let mut b1 = Vec::with_capacity(*wirerange_size as usize);
 
             for i in 0..*wirerange_size {
-                b1.push(*memory.get(wire + i));
-            }
-            for i in 0..*wirerange_size {
-                r1.push(backend.mul(&ai_s[0], &b1[i as usize])?);
+                let b = memory.get(wire + i);
+                r1.push(backend.mul(&ai_s[0], b)?);
             }
             r.push(r1);
-            bi_s.push(b1);
 
             // moving by `wirerange_size` on the inputs
             wire += wirerange_size;
@@ -147,10 +140,8 @@ impl Mux {
         for ai in ai_s[1..].iter() {
             for (branch, wirerange_size) in self.branch_shape.iter().enumerate() {
                 for i in 0..*wirerange_size {
-                    bi_s[branch][i as usize] = *memory.get(wire + i);
-                }
-                for i in 0..*wirerange_size {
-                    let t = backend.mul(ai, &bi_s[branch][i as usize])?;
+                    let b = memory.get(wire + i);
+                    let t = backend.mul(ai, b)?;
                     r[branch][i as usize] = backend.add(&r[branch][i as usize], &t)?;
                 }
                 // moving by `wirerange_size` on the inputs
@@ -160,13 +151,13 @@ impl Mux {
 
         // Finally, the result of r is stored in the output wires
         let mut wire = 0;
-        for (branch, wirerange_size) in self.branch_shape.iter().enumerate() {
-            for i in 0..*wirerange_size {
-                memory.set(wire + i, &r[branch][i as usize]);
+        for branch_values in r.iter() {
+            for (i, value) in branch_values.iter().enumerate() {
+                memory.set(wire + (i as WireCount), value);
             }
 
             // moving by `wirerange_size` on the outputs
-            wire += wirerange_size;
+            wire += branch_values.len() as WireCount;
         }
         Ok(())
     }

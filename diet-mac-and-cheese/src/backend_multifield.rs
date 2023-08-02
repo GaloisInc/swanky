@@ -230,8 +230,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
         Party::Prover
     }
 
-    fn get_value_from_wire(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
-        self.dmc.get_value_from_wire(wire)
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+        self.dmc.wire_value(wire)
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -575,8 +575,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
     fn party(&self) -> Party {
         Party::Verifier
     }
-    fn get_value_from_wire(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
-        self.dmc.get_value_from_wire(wire)
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+        self.dmc.wire_value(wire)
     }
     fn one(&self) -> Result<Self::FieldElement> {
         self.dmc.one()
