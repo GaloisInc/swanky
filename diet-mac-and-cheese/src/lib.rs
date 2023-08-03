@@ -19,6 +19,10 @@ mod backend;
 pub mod backend_multifield;
 pub mod backend_trait;
 pub mod circuit_ir;
+
+#[allow(dead_code)] // because, well, it's not used yet.
+mod dora;
+
 pub mod edabits;
 pub mod fields;
 pub mod homcom;
