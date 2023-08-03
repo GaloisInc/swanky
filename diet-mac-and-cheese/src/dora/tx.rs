@@ -1,32 +1,29 @@
-use std::{cell::RefCell, io::Result};
+use std::io::Result;
 
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 
-#[derive(Debug, Clone)]
-pub struct TxChannel<C: AbstractChannel> {
+#[derive(Debug)]
+pub struct TxChannel<'a, C: AbstractChannel> {
     pub ch: C,
-    pub tx: RefCell<blake3::Hasher>,
+    pub tx: &'a mut blake3::Hasher,
 }
 
-impl<C: AbstractChannel> AbstractChannel for TxChannel<C> {
+impl<'a, C: AbstractChannel> AbstractChannel for TxChannel<'a, C> {
     fn clone(&self) -> Self
     where
         Self: Sized,
     {
-        Self {
-            ch: self.ch.clone(),
-            tx: self.tx.clone(),
-        }
+        unimplemented!("Fiat-Shamir channel does not allow cloning")
     }
 
     fn read_bytes(&mut self, buf: &mut [u8]) -> Result<()> {
         self.ch.read_bytes(buf)?;
-        self.tx.borrow_mut().update(buf);
+        self.tx.update(buf);
         Ok(())
     }
 
     fn write_bytes(&mut self, buf: &[u8]) -> Result<()> {
-        self.tx.borrow_mut().update(buf);
+        self.tx.update(buf);
         self.ch.write_bytes(buf)
     }
 
@@ -35,17 +32,16 @@ impl<C: AbstractChannel> AbstractChannel for TxChannel<C> {
     }
 }
 
-impl<C: AbstractChannel> TxChannel<C> {
-    pub fn new(ch: C, tx: RefCell<blake3::Hasher>) -> Self {
+impl<'a, C: AbstractChannel> TxChannel<'a, C> {
+    pub fn new(ch: C, tx: &'a mut blake3::Hasher) -> Self {
         Self { ch, tx }
     }
 
     pub fn challenge<F: FiniteField>(&mut self) -> F {
-        let mut tx = self.tx.borrow_mut();
-        let hsh = tx.finalize();
-        let hsh = hsh.as_bytes();
-        let fld = F::from_uniform_bytes(&hsh[..16].try_into().unwrap());
-        tx.update(&[0]);
-        fld
+        let mut buf: [u8; 16] = [0u8; 16];
+        self.tx.finalize_xof().fill(&mut buf);
+        let chl = F::from_uniform_bytes(&buf);
+        self.tx.update(&[0]);
+        chl
     }
 }

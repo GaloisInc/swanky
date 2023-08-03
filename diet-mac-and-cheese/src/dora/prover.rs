@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use eyre::Result;
 
 use scuttlebutt::{field::FiniteField, AbstractChannel};
@@ -23,7 +21,7 @@ where
     F::PrimeField: IsSubFieldOf<V>,
 {
     calls: usize,
-    tx: RefCell<blake3::Hasher>,
+    tx: blake3::Hasher,
     _ph: std::marker::PhantomData<(F, C)>,
     accs: Vec<acc::Accumulator<V>>, // current state of accumulator
     disj: Disjunction<V>,
@@ -42,7 +40,7 @@ where
             .collect();
         Self {
             _ph: std::marker::PhantomData,
-            tx: RefCell::new(blake3::Hasher::new()),
+            tx: blake3::Hasher::new(),
             accs,
             trace: vec![],
             calls: 0,
@@ -71,7 +69,7 @@ where
         let cxt = clause.cross_wit_acc(&wit, &self.accs[opt]);
 
         // wrap in transcript hasher (if FS enabled)
-        let mut ch = TxChannel::new(prover.channel.clone(), self.tx.clone());
+        let mut ch = TxChannel::new(prover.channel.clone(), &mut self.tx);
 
         // commit to extended witness
         let comm_wit = CommittedWitness::commit_prover(

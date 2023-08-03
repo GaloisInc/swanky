@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use eyre::Result;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
@@ -24,7 +22,7 @@ where
     _ph: std::marker::PhantomData<(F, C)>,
     disj: Disjunction<V>,
     trace: Vec<Trace<DietMacAndCheeseVerifier<V, F, C>>>,
-    tx: RefCell<blake3::Hasher>,
+    tx: blake3::Hasher,
 }
 
 impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel> DoraVerifier<V, F, C>
@@ -36,7 +34,7 @@ where
             _ph: std::marker::PhantomData,
             trace: vec![],
             disj,
-            tx: RefCell::new(blake3::Hasher::new()),
+            tx: blake3::Hasher::new(),
         }
     }
 
@@ -46,7 +44,7 @@ where
         input: &[MacVerifier<F>],
     ) -> Result<Vec<MacVerifier<F>>> {
         // wrap channel in transcript
-        let mut ch = TxChannel::new(verifier.channel.clone(), self.tx.clone());
+        let mut ch = TxChannel::new(verifier.channel.clone(), &mut self.tx);
 
         // commit to new extended witness
         let wit =
