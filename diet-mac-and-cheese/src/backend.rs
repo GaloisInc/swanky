@@ -116,7 +116,7 @@ where
     T::PrimeField: IsSubFieldOf<V>,
 {
     is_ok: bool,
-    prover: RcRefCell<FComProver<V, T>>,
+    pub(crate) prover: RcRefCell<FComProver<V, T>>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacProver<V, T>>,
@@ -375,7 +375,7 @@ pub struct DietMacAndCheeseVerifier<V: IsSubFieldOf<T>, T: FiniteField, C: Abstr
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    verifier: RcRefCell<FComVerifier<V, T>>,
+    pub(crate) verifier: RcRefCell<FComVerifier<V, T>>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacVerifier<T>>,
