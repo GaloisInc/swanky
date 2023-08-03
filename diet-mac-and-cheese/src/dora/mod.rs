@@ -36,6 +36,7 @@ use crate::circuit_ir::{GateM, TypeId};
 // a restricted set of gates possible in clauses
 #[derive(Debug, Clone, Copy)]
 enum DisjGate<F: FiniteField> {
+    // translation of supported GateM variants
     Add(WireId, WireId, WireId),
     Sub(WireId, WireId, WireId),
     Mul(WireId, WireId, WireId),
@@ -45,7 +46,8 @@ enum DisjGate<F: FiniteField> {
     AddConstant(WireId, WireId, F),
     MulConstant(WireId, WireId, F),
     AssertZero(WireId),
-    AssertConstant(WireId, F), // convient for the guard
+    // convenient for implementing the guard
+    AssertConstant(WireId, F),
 }
 
 #[derive(Debug, Clone)]
