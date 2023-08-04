@@ -803,15 +803,6 @@ trait EvaluatorT {
         witness: Option<Number>,
     ) -> Result<()>;
 
-    /// Execute the provided disjunction
-    fn disjunction(
-        &mut self,
-        disj: &DisjunctionBody,
-        cond: WireRange,      // condition range
-        inputs: &[WireRange], // input wires
-        outpus: &[WireRange], // output wires
-    ) -> Result<()>;
-
     /// Start the conversion for a [`ConvGate`].
     fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<MacBitGeneric>>;
     /// Finish the conversion for a [`ConvGate`].
@@ -868,45 +859,6 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B>
 where
     B::Wire: Default + Clone + Copy + Debug,
 {
-    fn disjunction(
-        &mut self,
-        disj: &DisjunctionBody,
-        cond: WireRange,
-        inputs: &[WireRange],
-        outputs: &[WireRange],
-    ) -> Result<()> {
-        // retrieve input wires
-        let mut wires = Vec::with_capacity(disj.inputs() as usize + disj.cond() as usize);
-
-        // copy enviroment / inputs
-        for range in inputs {
-            for w in (range.0)..=(range.1) {
-                wires.push(*self.memory.get(w));
-            }
-        }
-
-        // copy condition
-        for w in (cond.0)..=(cond.1) {
-            wires.push(*self.memory.get(w));
-        }
-
-        debug_assert_eq!(wires.len() as WireCount, disj.inputs() + disj.cond());
-
-        // invoke disjunction implement on the backend
-        let wires = self.backend.disjunction(&wires[..], disj)?;
-        debug_assert_eq!(wires.len() as u64, disj.outputs());
-
-        // write back output wires
-        let mut wires = wires.into_iter();
-        for range in outputs {
-            for w in (range.0)..=(range.1) {
-                self.memory.set(w, &wires.next().unwrap())
-            }
-        }
-        debug_assert!(wires.next().is_none());
-        Ok(())
-    }
-
     #[inline]
     fn evaluate_gate(
         &mut self,
@@ -1013,23 +965,51 @@ where
         inputs: &[WireRange],
         plugin: &PluginExecution,
     ) -> Result<()> {
+        fn copy_mem<'a, W>(mem: &'a Memory<W>, range: WireRange) -> impl Iterator<Item = &'a W>
+        where
+            W: Copy + Clone + Debug + Default,
+        {
+            let (start, end) = range;
+            (start..=end).map(|i| mem.get(i))
+        }
+
         match plugin {
             PluginExecution::PermutationCheck(plugin) => {
                 assert_eq!(outputs.len(), 0);
                 assert_eq!(inputs.len(), 2);
-                let (start, end) = inputs[0];
-                let mut xs = Vec::with_capacity((end - start + 1) as usize);
-                for i in start..=end {
-                    let x = self.memory.get(i);
-                    xs.push(*x);
-                }
-                let (start, end) = inputs[1];
-                let mut ys = Vec::with_capacity((end - start + 1) as usize);
-                for i in start..=end {
-                    let y = self.memory.get(i);
-                    ys.push(*y);
-                }
+                let xs: Vec<_> = copy_mem(&self.memory, inputs[0]).copied().collect();
+                let ys: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
                 plugin.execute::<B>(&xs, &ys, &mut self.backend)?
+            }
+            PluginExecution::Disjunction(disj) => {
+                assert!(inputs.len() >= 1, "must provide condition");
+
+                // retrieve input wires
+                let mut wires = Vec::with_capacity(disj.inputs() as usize + disj.cond() as usize);
+
+                // copy enviroment / inputs
+                for range in inputs[1..].iter() {
+                    wires.extend(copy_mem(&self.memory, *range));
+                }
+
+                // copy condition
+                wires.extend(copy_mem(&self.memory, inputs[0]));
+
+                // sanity check
+                debug_assert_eq!(wires.len() as WireCount, disj.inputs() + disj.cond());
+
+                // invoke disjunction implement on the backend
+                let wires = self.backend.disjunction(&wires[..], disj)?;
+                debug_assert_eq!(wires.len() as u64, disj.outputs());
+
+                // write back output wires
+                let mut wires = wires.into_iter();
+                for range in outputs {
+                    for w in (range.0)..=(range.1) {
+                        self.memory.set(w, &wires.next().unwrap())
+                    }
+                }
+                debug_assert!(wires.next().is_none());
             }
             _ => bail!("Plugin {plugin:?} is unsupported"),
         };
@@ -1567,14 +1547,13 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                     )?;
                     self.callframe_end(func);
                 }
-                PluginExecution::Disjunction(body) => {
+                PluginExecution::Disjunction(plugin) => {
                     // disjunction does not use a callframe:
                     // since the inputs/outputs must be flattened to an R1CS witness.
-                    self.eval[body.field() as usize].disjunction(
-                        body,
-                        in_ranges[0],
-                        &in_ranges[1..],
+                    self.eval[plugin.field() as usize].plugin_call_gate(
                         out_ranges,
+                        in_ranges,
+                        &body.execution(),
                     )?;
                 }
             },
