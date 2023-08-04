@@ -3,14 +3,16 @@
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::circuit_ir::{
-    CircInputs, FunStore, GateM, TypeSpecification, TypeStore, WireId, WireRange,
+    CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
+    WireRange,
 };
+use crate::dora::{Disjunction, DoraProver, DoraVerifier};
 use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
 use crate::memory::Memory;
-use crate::plugins::PluginExecution;
+use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
 use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
@@ -26,12 +28,13 @@ use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
-use std::collections::BTreeMap;
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::io::{Read, Seek};
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
@@ -75,6 +78,28 @@ pub trait BackendConvT: PrimeBackendT {
     fn finalize_conv(&mut self) -> Result<()>;
 }
 
+pub trait BackendDisjunctionT: BackendT {
+    fn disjunction(
+        &mut self,
+        inputs: &[Self::Wire],
+        disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>>;
+}
+
+impl<V: IsSubFieldOf<F40b>, C: AbstractChannel> BackendDisjunctionT
+    for DietMacAndCheeseProver<V, F40b, C>
+where
+    <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
+{
+    fn disjunction(
+        &mut self,
+        _inputs: &[Self::Wire],
+        _disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>> {
+        unimplemented!()
+    }
+}
+
 impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseProver<F2, F40b, C> {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", w);
@@ -95,6 +120,20 @@ impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseProver<F2, F40b, C> {
         // We dont need to finalize the conversion
         // for the binary functionality because they are for free.
         Ok(())
+    }
+}
+
+impl<V: IsSubFieldOf<F40b>, C: AbstractChannel> BackendDisjunctionT
+    for DietMacAndCheeseVerifier<V, F40b, C>
+where
+    <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
+{
+    fn disjunction(
+        &mut self,
+        _inputs: &[Self::Wire],
+        _disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>> {
+        unimplemented!()
     }
 }
 
@@ -142,6 +181,7 @@ impl<E> EdabitsMap<E> {
 struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
     dmc: DietMacAndCheeseProver<FE, FE, C>,
     conv: ProverConv<FE>,
+    dora: HashMap<usize, DoraState<FE, FE, C>>,
     edabits_map: EdabitsMap<EdabitsProver<FE>>,
     dmc_f2: DietMacAndCheeseProver<F2, F40b, C>,
     no_batching: bool,
@@ -168,6 +208,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C>
         Ok(DietMacAndCheeseConvProver {
             dmc,
             conv,
+            dora: Default::default(),
             edabits_map: EdabitsMap::new(),
             dmc_f2: DietMacAndCheeseProver::<F2, F40b, C>::init_with_fcom(
                 channel,
@@ -305,6 +346,76 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C>
     }
 }
 
+pub(super) struct DoraState<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
+where
+    F::PrimeField: IsSubFieldOf<V>,
+{
+    // map used to lookup the guard -> active clause index
+    clause_resolver: HashMap<F, usize>,
+    // dora prover for this particular switch/mux
+    dora: DoraProver<V, F, C>,
+}
+
+// Note: The restriction to a primefield is not caused by Dora
+// This should be expanded in the future to allow disjunctions over extension fields.
+impl<FP: PrimeFiniteField, C: AbstractChannel> BackendDisjunctionT
+    for DietMacAndCheeseConvProver<FP, C>
+{
+    fn disjunction(
+        &mut self,
+        inputs: &[Self::Wire],
+        disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>> {
+        fn execute_branch<F: FiniteField<PrimeField = F>, C: AbstractChannel>(
+            prover: &mut DietMacAndCheeseProver<F, F, C>,
+            inputs: &[<DietMacAndCheeseProver<F, F, C> as BackendT>::Wire],
+            cond: usize,
+            st: &mut DoraState<F, F, C>,
+        ) -> Result<Vec<<DietMacAndCheeseProver<F, F, C> as BackendT>::Wire>> {
+            // currently only support 1 field element switch
+            debug_assert_eq!(cond, 1);
+
+            // so the guard is the last input
+            let guard_val = inputs[inputs.len() - 1].value();
+
+            // lookup the clause based on the guard
+            let opt = *st
+                .clause_resolver
+                .get(&guard_val)
+                .expect("no clause guard is satisified");
+
+            st.dora.mux(prover, inputs, opt)
+        }
+
+        match self.dora.entry(disj.id()) {
+            Entry::Occupied(mut entry) => {
+                // use existing Dora instance
+                execute_branch(&mut self.dmc, inputs, disj.cond() as usize, entry.get_mut())
+            }
+            Entry::Vacant(entry) => {
+                // compile disjunction to the field
+                let disjunction: Disjunction<FP> = Disjunction::compile(disj);
+
+                // create resolver (parse guard numbers as field elements)
+                let mut resolv: HashMap<_, usize> = Default::default();
+                for (i, guard) in disj.guards().enumerate() {
+                    let guard: FP = FP::try_from_int(*guard).unwrap();
+                    resolv.insert(guard, i);
+                }
+
+                // create new Dora instance
+                let dora = entry.insert(DoraState {
+                    dora: DoraProver::new(disjunction),
+                    clause_resolver: resolv,
+                });
+
+                // compute opt
+                execute_branch(&mut self.dmc, inputs, disj.cond() as usize, dora)
+            }
+        }
+    }
+}
+
 impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheeseConvProver<FE, C> {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", a);
@@ -408,6 +519,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
 struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
     dmc: DietMacAndCheeseVerifier<FE, FE, C>,
     conv: VerifierConv<FE>,
+    dora: HashMap<usize, DoraVerifier<FE, FE, C>>,
     edabits_map: EdabitsMap<EdabitsVerifier<FE>>,
     dmc_f2: DietMacAndCheeseVerifier<F2, F40b, C>,
     no_batching: bool,
@@ -434,6 +546,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, 
         Ok(DietMacAndCheeseConvVerifier {
             dmc,
             conv,
+            dora: Default::default(),
             edabits_map: EdabitsMap::new(),
             dmc_f2: DietMacAndCheeseVerifier::<F2, F40b, C>::init_with_fcom(
                 channel,
@@ -568,6 +681,26 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, 
     }
 }
 
+impl<FP: PrimeFiniteField, C: AbstractChannel> BackendDisjunctionT
+    for DietMacAndCheeseConvVerifier<FP, C>
+{
+    fn disjunction(
+        &mut self,
+        inputs: &[Self::Wire],
+        disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>> {
+        match self.dora.entry(disj.id()) {
+            Entry::Occupied(mut entry) => entry.get_mut().mux(&mut self.dmc, inputs),
+            Entry::Vacant(entry) => {
+                // compile disjunction to the field
+                let disjunction: Disjunction<FP> = Disjunction::compile(disj);
+                let dora = entry.insert(DoraVerifier::new(disjunction));
+                dora.mux(&mut self.dmc, inputs)
+            }
+        }
+    }
+}
+
 impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
     for DietMacAndCheeseConvVerifier<FE, C>
 {
@@ -669,6 +802,16 @@ trait EvaluatorT {
         instance: Option<Number>,
         witness: Option<Number>,
     ) -> Result<()>;
+
+    /// Execute the provided disjunction
+    fn disjunction(
+        &mut self,
+        disj: &DisjunctionBody,
+        cond: WireRange,      // condition range
+        inputs: &[WireRange], // input wires
+        outpus: &[WireRange], // output wires
+    ) -> Result<()>;
+
     /// Start the conversion for a [`ConvGate`].
     fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<MacBitGeneric>>;
     /// Finish the conversion for a [`ConvGate`].
@@ -721,10 +864,49 @@ where
     }
 }
 
-impl<B: BackendConvT> EvaluatorT for EvaluatorSingle<B>
+impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B>
 where
     B::Wire: Default + Clone + Copy + Debug,
 {
+    fn disjunction(
+        &mut self,
+        disj: &DisjunctionBody,
+        cond: WireRange,
+        inputs: &[WireRange],
+        outputs: &[WireRange],
+    ) -> Result<()> {
+        // retrieve input wires
+        let mut wires = Vec::with_capacity(disj.inputs() as usize + disj.cond() as usize);
+
+        // copy enviroment / inputs
+        for range in inputs {
+            for w in (range.0)..=(range.1) {
+                wires.push(*self.memory.get(w));
+            }
+        }
+
+        // copy condition
+        for w in (cond.0)..=(cond.1) {
+            wires.push(*self.memory.get(w));
+        }
+
+        debug_assert_eq!(wires.len() as WireCount, disj.inputs() + disj.cond());
+
+        // invoke disjunction implement on the backend
+        let wires = self.backend.disjunction(&wires[..], disj)?;
+        debug_assert_eq!(wires.len() as u64, disj.outputs());
+
+        // write back output wires
+        let mut wires = wires.into_iter();
+        for range in outputs {
+            for w in (range.0)..=(range.1) {
+                self.memory.set(w, &wires.next().unwrap())
+            }
+        }
+        debug_assert!(wires.next().is_none());
+        Ok(())
+    }
+
     #[inline]
     fn evaluate_gate(
         &mut self,
@@ -1299,21 +1481,13 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
         self.finish()
     }
 
-    #[inline]
-    fn evaluate_call_gate(
+    fn callframe_start(
         &mut self,
-        name: &String,
+        func: &FuncDecl,
         out_ranges: &[WireRange],
         in_ranges: &[WireRange],
-        fun_store: &FunStore,
     ) -> Result<()> {
-        // 1) get the function information and body
-        // 2) push new function frame, with references to output and inputs
-        // 3) call eval_gates on body of function
-        // 4) pop frame
-
-        let func = fun_store.get(name)?;
-
+        // 2)
         // We use the analysis on function body to find the types used in the body and only push a frame to those field backends.
         // TODO: currently push the size of args or vec without differentiating based on type.
         for ty in func.compiled_info.type_ids.iter() {
@@ -1351,29 +1525,61 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             self.eval[field_idx as usize].allocate_slice(src_first, src_last, prev, count, false);
             prev += count;
         }
+        Ok(())
+    }
 
+    fn callframe_end(&mut self, func: &FuncDecl) {
+        // 4)
+        // TODO: dont do the push blindly on all backends
+        for ty in func.compiled_info.type_ids.iter() {
+            self.eval[*ty as usize].pop_frame();
+        }
+    }
+
+    #[inline]
+    fn evaluate_call_gate(
+        &mut self,
+        name: &String,
+        out_ranges: &[WireRange],
+        in_ranges: &[WireRange],
+        fun_store: &FunStore,
+    ) -> Result<()> {
+        let func = fun_store.get(name)?;
         match &func.body() {
             FunctionBody::Gates(body) => {
+                self.callframe_start(func, out_ranges, in_ranges)?;
                 self.evaluate_gates_passed(body.gates(), fun_store)?;
+                self.callframe_end(func);
             }
             FunctionBody::Plugin(body) => match &body.execution() {
                 PluginExecution::Gates(body) => {
+                    self.callframe_start(func, out_ranges, in_ranges)?;
                     self.evaluate_gates_passed(body.gates(), fun_store)?;
+                    self.callframe_end(func);
                 }
                 PluginExecution::PermutationCheck(plugin) => {
                     let type_id = plugin.type_id() as usize;
+                    self.callframe_start(func, out_ranges, in_ranges)?;
                     self.eval[type_id].plugin_call_gate(
                         out_ranges,
                         in_ranges,
                         &body.execution(),
                     )?;
+                    self.callframe_end(func);
+                }
+                PluginExecution::Disjunction(body) => {
+                    // disjunction does not use a callframe:
+                    // since the inputs/outputs must be flattened to an R1CS witness.
+                    self.eval[body.field() as usize].disjunction(
+                        body,
+                        in_ranges[0],
+                        &in_ranges[1..],
+                        out_ranges,
+                    )?;
                 }
             },
         };
 
-        for ty in func.compiled_info.type_ids.iter() {
-            self.eval[*ty as usize].pop_frame();
-        }
         Ok(())
     }
 

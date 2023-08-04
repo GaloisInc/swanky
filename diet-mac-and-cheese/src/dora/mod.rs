@@ -63,7 +63,7 @@ impl<F: PrimeFiniteField> Clause<F> {
     ///
     /// The input to the disjunction is [input || cond]
     /// where cond is not exposed to the body of the clause.
-    fn new(
+    pub(crate) fn new(
         typ: TypeId,
         inputs: usize, // inputs to clause (body, not including guard/cond)
         outputs: usize,

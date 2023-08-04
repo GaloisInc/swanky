@@ -1,8 +1,9 @@
 use std::cmp;
 
 use scuttlebutt::field::FiniteField;
+use swanky_field::PrimeFiniteField;
 
-use crate::circuit_ir::WireCount;
+use crate::{circuit_ir::WireCount, plugins::DisjunctionBody};
 
 use super::{r1cs::R1CS, Clause};
 
@@ -13,6 +14,25 @@ pub struct Disjunction<F: FiniteField> {
     inputs: usize,         // number of inputs to disjunction
     outputs: usize,        // number of outputs from disjunction
     clauses: Vec<R1CS<F>>, // R1CS relations for each clause
+}
+
+impl<FP: PrimeFiniteField> Disjunction<FP> {
+    pub fn compile(disj: &DisjunctionBody) -> Self {
+        Self::new(
+            disj.clauses().map(|cls| {
+                let guard = FP::try_from_int(cls.guard).unwrap();
+                Clause::new(
+                    disj.field(),
+                    disj.inputs() as usize,
+                    disj.outputs() as usize,
+                    &[guard],
+                    cls.body.gates(),
+                )
+            }),
+            disj.inputs() + disj.cond(),
+            disj.outputs(),
+        )
+    }
 }
 
 impl<F: FiniteField> Disjunction<F> {

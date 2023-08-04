@@ -1,0 +1,79 @@
+version 2.0.0;
+circuit;
+@type field 2305843009213693951;
+@begin
+    // case of cond = 5
+    //
+    // $1 : a
+    // $2 : b
+    // $3 : c
+    //
+    // assert(a = b)
+    // return c
+    @function(clause_cond5, @out: 0:1, @in: 0:3)
+        // assert_zero(a - b)
+        $4 <- @mulc($2, <2305843009213693950>); // * -1
+        $4 <- @add($1, $4);
+        @assert_zero(0: $4);
+
+        // return c
+        $0 <- $3;
+    @end
+
+    // case of cond = 7
+    //
+    // $1 : a
+    // $2 : b
+    // $3 : c
+    //
+    // assert((a - b) * d = 1)
+    // return b
+    @function(clause_cond7, @out: 0:1, @in: 0:3)
+        // a - b
+        $4 <- @mulc($2, <2305843009213693950>); // * -1
+        $4 <- @add($1, $4);
+
+        // (a - b) * d
+        $4 <- @mul($4, $3);
+
+        // assert( (a - b) * d = 1 )
+        $4 <- @addc($4, <2305843009213693950>);
+        @assert_zero(0: $4);
+
+        // return b
+        $0 <- $2;
+    @end
+
+    @function(branch_example, @out: 0:1, @in: 0:1, 0:3)
+        @plugin(
+            galois_disjunction_v0,
+            switch,
+            strict,
+            5, clause_cond5,
+            7, clause_cond7
+        );
+
+    @new(0: $0 ... $3);
+   
+    // cond5: output should be 88
+
+    $0 <- @private(0);
+    $1 <- @private(0);
+    $2 <- @private(0);
+    $3 <- @private(0);
+    
+    $5 <- @call(branch_example, $0, $1 ... $3);
+    $6 <- @addc($5, <2305843009213693863>);
+    @assert_zero(0: $6);
+
+    // cond7 : output should be 2000
+
+    $0 <- @private(0);
+    $1 <- @private(0);
+    $2 <- @private(0);
+    $3 <- @private(0);
+   
+    $5 <- @call(branch_example, $0, $1 ... $3);
+    $6 <- @addc($5, <2305843009213691951>);
+    @assert_zero(0: $6);
+@end
