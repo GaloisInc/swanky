@@ -96,7 +96,7 @@ where
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!()
+        unimplemented!("disjunction plugin is not sound for GF(2)")
     }
 }
 
@@ -133,7 +133,7 @@ where
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!()
+        unimplemented!("disjunction plugin is not sound for GF(2)")
     }
 }
 
