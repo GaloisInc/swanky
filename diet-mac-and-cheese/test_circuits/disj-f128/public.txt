@@ -1,0 +1,6 @@
+version 2.0.0;
+public_input;
+@type field 340282366920938463463374607431768211297;
+@begin
+    <0>;
+@end
