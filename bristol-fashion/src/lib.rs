@@ -1,9 +1,6 @@
 //! This module implements a reader for "Bristol Fashion" circuit definition files.
 
 use std::io::BufRead;
-use std::io::BufReader;
-use std::path::Path;
-use std::path::PathBuf;
 use std::str::SplitWhitespace;
 use thiserror::Error;
 
