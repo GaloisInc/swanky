@@ -57,7 +57,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
 
     let mut websocket = accept(connection).unwrap();
 
-    let msg = websocket.read_message().unwrap();
+    let msg = websocket.read().unwrap();
     match msg {
         Message::Text(m) => {
             if m == "init".to_string() {
