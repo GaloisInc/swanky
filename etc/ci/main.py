@@ -293,6 +293,19 @@ def ci(nightly: bool = False):
                 typer.secho("")
         if any_errors:
             raise typer.Exit(code=1)
+    with gitlab_ci_section("Checking Dependencies (with cargo-deny)"):
+        # Check dependencies with https://github.com/EmbarkStudios/cargo-deny
+        # Check that we only use liberally-licensed dependencies.
+        # On nightly, also check whether any of our dependencies are vulnerable.
+        if nightly:
+            subprocess.check_call(["cargo", "deny", "--workspace", "check"], cwd=ROOT)
+        else:
+            # These offline checks should run _after_ the Cargo.lock update above.
+            for check in ["bans", "licenses"]:
+                subprocess.check_call(
+                    ["cargo", "deny", "--workspace", "--offline", "check", check],
+                    cwd=ROOT,
+                )
     with gitlab_ci_section("Code Generation"):
 
         def compute_cache_key():
