@@ -22,13 +22,13 @@ rayon.workspace = true
 scuttlebutt.workspace = true
 serde = { workspace = true, features = ["derive"] }
 simple-arith-circuit = { workspace = true, features = ["serde"] }
-simple_logger.workspace = true
 snafu.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
+env_logger.workspace = true
 
 [[bench]]
 name = "random_circuit"
