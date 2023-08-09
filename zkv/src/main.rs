@@ -128,7 +128,9 @@ fn main() {
     fn set_logging(matches: &ArgMatches) {
         if let Some(value) = matches.get_one::<bool>("logging") {
             if *value {
-                simple_logger::SimpleLogger::new().env().init().unwrap();
+                env_logger::Builder::from_default_env()
+                    .filter_level(log::LevelFilter::Info)
+                    .init();
             }
         }
     }
