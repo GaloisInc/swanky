@@ -156,7 +156,6 @@ thiserror = "1.0.43"
 tungstenite = { version="0.20.0", features = ["rustls"] }
 twox-hash = "1.6.3"
 wasm-bindgen = "0.2.87"
-zki_sieve = { git = "https://github.com/QED-it/zkinterface-ir.git", rev = "3368622bdf5306256e56826141517a3a34f8f85c"}
 
 [profile.release]
 opt-level = 3
