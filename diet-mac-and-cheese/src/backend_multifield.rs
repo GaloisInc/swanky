@@ -1570,11 +1570,13 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 }
                 PluginExecution::Mux(plugin) => {
                     let type_id = plugin.type_id() as usize;
+                    self.callframe_start(func, out_ranges, in_ranges)?;
                     self.eval[type_id].plugin_call_gate(
                         out_ranges,
                         in_ranges,
                         &body.execution(),
                     )?;
+                    self.callframe_end(func);
                 }
             },
         };
