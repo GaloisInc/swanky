@@ -23,8 +23,10 @@
 
 # A note on security
 
-`swanky` is currently considered **prototype** software. Do not deploy it in
-production, or trust it with sensitive data.
+`swanky` is currently **research** software. Do not deploy it in production, or trust
+it with sensitive data.
+
+Please reach out to us at <swanky@galois.com> if you're interested in using Swanky in a production setting.
 
 # Using `swanky`
 ## Preferred Way
