@@ -129,7 +129,7 @@ fn run_text(args: &Cli) -> Result<()> {
                         rng,
                         inputs,
                         TypeStore::try_from(rel.header().types.clone())?,
-                        false,
+                        args.lpn == LpnSize::Small,
                         args.nobatching,
                     )?;
                     evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
@@ -171,7 +171,7 @@ fn run_text(args: &Cli) -> Result<()> {
                 rng,
                 inputs,
                 TypeStore::try_from(rel.header().types.clone())?,
-                false,
+                args.lpn == LpnSize::Small,
                 args.nobatching,
             )?;
             evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
@@ -248,7 +248,7 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                         rng,
                         inputs,
                         fields,
-                        false,
+                        args.lpn == LpnSize::Small,
                         args.nobatching,
                     )?;
                     evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
@@ -288,7 +288,7 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                 rng,
                 inputs,
                 fields.clone(),
-                false,
+                args.lpn == LpnSize::Small,
                 args.nobatching,
             )?;
             evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
