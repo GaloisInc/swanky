@@ -4,6 +4,7 @@ use crate::circuit_ir::{FunStore, TypeId, TypeStore, WireCount};
 use crate::memory::Memory;
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_field::FiniteRing;
 
 #[derive(Clone, Debug)]
@@ -78,12 +79,11 @@ impl Mux {
             // depending on the party running, if it is the prover and the index is matching then
             // it fixes the private input to 1, otherwise it fixes the private input to 0
             let what_to_input = if backend.party() == Party::Prover {
-                // TODO: constant time this
-                if cond_value.as_ref().unwrap() == &i_f {
-                    Some(<B as BackendT>::FieldElement::ONE)
-                } else {
-                    Some(<B as BackendT>::FieldElement::ZERO)
-                }
+                Some(<B as BackendT>::FieldElement::conditional_select(
+                    &<B as BackendT>::FieldElement::ZERO,
+                    &<B as BackendT>::FieldElement::ONE,
+                    cond_value.as_ref().unwrap().ct_eq(&i_f),
+                ))
             } else {
                 None
             };
