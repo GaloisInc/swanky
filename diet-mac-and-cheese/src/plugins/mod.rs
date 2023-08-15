@@ -42,7 +42,7 @@ pub(crate) enum PluginExecution {
     /// The plugin implements a disjunction
     Disjunction(DisjunctionBody),
     /// The plugin implements a mux.
-    Mux(Mux),
+    Mux(MuxVersion),
 }
 
 impl PluginExecution {
@@ -143,7 +143,7 @@ pub(crate) trait Plugin {
 mod dora;
 pub(crate) use dora::DisjunctionV0;
 mod mux_v0;
-pub(crate) use mux_v0::Mux;
+pub(crate) use mux_v0::{MuxV0, MuxV1, MuxVersion};
 mod permutation_check_v1;
 pub(crate) use permutation_check_v1::PermutationCheckV1;
 mod galois_poly_v0;

@@ -1724,6 +1724,9 @@ pub(crate) mod tests {
     pub(crate) fn minus_three<FE: PrimeFiniteField>() -> Number {
         (-(FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
+    pub(crate) fn four<FE: PrimeFiniteField>() -> Number {
+        (FE::ONE + FE::ONE + FE::ONE + FE::ONE).into_int()
+    }
     pub(crate) fn minus_four<FE: PrimeFiniteField>() -> Number {
         (-(FE::ONE + FE::ONE + FE::ONE + FE::ONE)).into_int()
     }
