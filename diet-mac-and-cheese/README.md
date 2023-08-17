@@ -21,33 +21,26 @@ supported, and `〜` denotes partially supported.
 | ram                 |    `✘`     |                 |
 | vectors             |    `✔`     |                 |
 
-## Running 
+## Running Diet Mac'n'Cheese
 
-We provide an executable program `dietmc_zki` to run the protocol as a verifier or a prover:
+The main program is called `dietmc_0p`.
+It is expecting inputs for the relation/instance/witness following the standard SIEVE Circuit IR (a.k.a IR0+).
+This standard currently has two binary format: flatbuffers and text.
 
+
+To run diet Mac'n'Cheese with inputs in flatbuffers:
 ```bash
-# Verifier
-cargo run --release --bin dietmc_zki --features "exe" -- \
-  --instance <PATH>/*.ins.sieve \
-  --relation <PATH>/*.rel.sieve
+cargo run --bin dietmc_0p --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve
 
-# Prover
-cargo run --release --bin dietmc_zki --features "exe" -- \
-  --instance <PATH>/*.ins.sieve \
-  --relation <PATH>/*.rel.sieve \
-  prover \
-  --witness  <PATH>/*.wit.sieve
+cargo run --bin dietmc_0p --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
+  prover --witness <PATH>/*.sieve
 ```
 
-
-## SIEVE IR0+
-
-Diet Mac'n'Cheese provides a program `bin/dietmc_0p.rs` to run SIEVE IR0+ circuits.
-
+To run diet Mac'n'Cheese with inputs in text format, add a `--text` flag:
 ```bash
-cargo run --bin dietmc_0p --features=exe --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve
+cargo run --bin dietmc_0p --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text
 
-cargo run --bin dietmc_0p --features=exe --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
+cargo run --bin dietmc_0p --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text\
   prover --witness <PATH>/*.sieve
 ```
 
