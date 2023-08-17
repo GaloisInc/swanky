@@ -1,9 +1,6 @@
+use crate::backend_trait::{BackendT, Party};
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
-};
-use crate::{
-    backend_trait::{BackendT, Party},
-    edabits::RcRefCell,
 };
 use eyre::{eyre, Result};
 use log::{debug, info, warn};
@@ -119,7 +116,7 @@ where
     T::PrimeField: IsSubFieldOf<V>,
 {
     is_ok: bool,
-    pub(crate) prover: RcRefCell<FComProver<V, T>>,
+    pub(crate) prover: FComProver<V, T>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacProver<V, T>>,
@@ -174,13 +171,13 @@ where
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_add();
-        Ok(self.prover.get_refmut().add(*a, *b))
+        Ok(self.prover.add(*a, *b))
     }
 
     fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_sub();
-        Ok(self.prover.get_refmut().sub(*a, *b))
+        Ok(self.prover.sub(*a, *b))
     }
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
@@ -192,7 +189,6 @@ where
 
         let out = self.input(product)?;
         self.prover
-            .get_refmut()
             .quicksilver_push(&mut self.state_mult_check, &(*a, *b, out))?;
         Ok(out)
     }
@@ -204,7 +200,7 @@ where
     ) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
-        Ok(self.prover.get_refmut().affine_add_cst(constant, *value))
+        Ok(self.prover.affine_add_cst(constant, *value))
     }
 
     fn mul_constant(
@@ -214,7 +210,7 @@ where
     ) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_mulc();
-        Ok(self.prover.get_refmut().affine_mult_cst(constant, *value))
+        Ok(self.prover.affine_mult_cst(constant, *value))
     }
 
     fn input_public(&mut self, value: Self::FieldElement) -> Result<Self::Wire> {
@@ -248,7 +244,7 @@ where
         Ok(())
     }
     fn reset(&mut self) {
-        self.prover.get_refmut().reset(&mut self.state_mult_check);
+        self.prover.reset(&mut self.state_mult_check);
         self.is_ok = true;
     }
 }
@@ -268,7 +264,7 @@ where
         let state_mult_check = StateMultCheckProver::init(channel)?;
         Ok(Self {
             is_ok: true,
-            prover: RcRefCell::new(FComProver::init(channel, &mut rng, lpn_setup, lpn_extend)?),
+            prover: FComProver::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
             rng,
             check_zero_list: Vec::new(),
@@ -282,13 +278,13 @@ where
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         rng: AesRng,
-        fcom: &RcRefCell<FComProver<V, T>>,
+        fcom: &FComProver<V, T>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckProver::init(channel)?;
         Ok(Self {
             is_ok: true,
-            prover: fcom.clone(),
+            prover: fcom.duplicate()?,
             channel: channel.clone(),
             rng,
             check_zero_list: Vec::new(),
@@ -299,7 +295,7 @@ where
     }
 
     /// Get party
-    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComProver<V, T>> {
+    pub(crate) fn get_party(&self) -> &FComProver<V, T> {
         &self.prover
     }
 
@@ -315,10 +311,7 @@ where
     }
 
     fn input(&mut self, v: V) -> Result<MacProver<V, T>> {
-        let tag = self
-            .prover
-            .get_refmut()
-            .input1(&mut self.channel, &mut self.rng, v);
+        let tag = self.prover.input1(&mut self.channel, &mut self.rng, v);
         if tag.is_err() {
             self.is_ok = false;
         }
@@ -328,7 +321,7 @@ where
     fn do_mult_check(&mut self) -> Result<usize> {
         debug!("do mult_check");
         self.channel.flush()?;
-        let cnt = self.prover.get_refmut().quicksilver_finalize(
+        let cnt = self.prover.quicksilver_finalize(
             &mut self.channel,
             &mut self.rng,
             &mut self.state_mult_check,
@@ -342,7 +335,6 @@ where
         self.channel.flush()?;
         let r = self
             .prover
-            .get_refmut()
             .check_zero(&mut self.channel, &self.check_zero_list);
         if r.is_err() {
             warn!("check_zero fails");
@@ -385,7 +377,7 @@ pub struct DietMacAndCheeseVerifier<V: IsSubFieldOf<T>, T: FiniteField, C: Abstr
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    pub(crate) verifier: RcRefCell<FComVerifier<V, T>>,
+    pub(crate) verifier: FComVerifier<V, T>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacVerifier<T>>,
@@ -442,13 +434,13 @@ where
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_add();
-        Ok(self.verifier.get_refmut().add(*a, *b))
+        Ok(self.verifier.add(*a, *b))
     }
 
     fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_sub();
-        Ok(self.verifier.get_refmut().sub(*a, *b))
+        Ok(self.verifier.sub(*a, *b))
     }
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
@@ -456,7 +448,6 @@ where
         self.monitor.incr_monitor_mul();
         let tag = self.input()?;
         self.verifier
-            .get_refmut()
             .quicksilver_push(&mut self.state_mult_check, &(*a, *b, tag))?;
         Ok(tag)
     }
@@ -464,20 +455,18 @@ where
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_addc();
-        Ok(self.verifier.get_refmut().affine_add_cst(b, *a))
+        Ok(self.verifier.affine_add_cst(b, *a))
     }
 
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
         self.check_is_ok()?;
         self.monitor.incr_monitor_mulc();
-        Ok(self.verifier.get_refmut().affine_mult_cst(b, *a))
+        Ok(self.verifier.affine_mult_cst(b, *a))
     }
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
-        Ok(MacVerifier::new(
-            -val * self.get_party().get_refmut().get_delta(),
-        ))
+        Ok(MacVerifier::new(-val * self.get_party().get_delta()))
     }
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
@@ -507,7 +496,7 @@ where
     }
 
     fn reset(&mut self) {
-        self.verifier.get_refmut().reset(&mut self.state_mult_check);
+        self.verifier.reset(&mut self.state_mult_check);
         self.is_ok = true;
     }
 }
@@ -526,9 +515,7 @@ where
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
         Ok(Self {
-            verifier: RcRefCell::new(FComVerifier::init(
-                channel, &mut rng, lpn_setup, lpn_extend,
-            )?),
+            verifier: FComVerifier::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
             rng,
             check_zero_list: Vec::with_capacity(QUEUE_CAPACITY),
@@ -543,13 +530,13 @@ where
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         mut rng: AesRng,
-        fcom: &RcRefCell<FComVerifier<V, T>>,
+        fcom: &FComVerifier<V, T>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
         Ok(Self {
             is_ok: true,
-            verifier: fcom.clone(),
+            verifier: fcom.duplicate()?,
             channel: channel.clone(),
             rng,
             check_zero_list: Vec::with_capacity(QUEUE_CAPACITY),
@@ -560,7 +547,7 @@ where
     }
 
     /// Get party
-    pub(crate) fn get_party(&mut self) -> &RcRefCell<FComVerifier<V, T>> {
+    pub(crate) fn get_party(&self) -> &FComVerifier<V, T> {
         &self.verifier
     }
 
@@ -575,10 +562,7 @@ where
     }
 
     fn input(&mut self) -> Result<MacVerifier<T>> {
-        let tag = self
-            .verifier
-            .get_refmut()
-            .input1(&mut self.channel, &mut self.rng);
+        let tag = self.verifier.input1(&mut self.channel, &mut self.rng);
         if tag.is_err() {
             self.is_ok = false;
         }
@@ -588,7 +572,7 @@ where
     fn do_mult_check(&mut self) -> Result<usize> {
         debug!("do mult_check");
         self.channel.flush()?;
-        let cnt = self.verifier.get_refmut().quicksilver_finalize(
+        let cnt = self.verifier.quicksilver_finalize(
             &mut self.channel,
             &mut self.rng,
             &mut self.state_mult_check,
@@ -600,11 +584,9 @@ where
     fn do_check_zero(&mut self) -> Result<()> {
         // debug!("do check_zero");
         self.channel.flush()?;
-        let r = self.verifier.get_refmut().check_zero(
-            &mut self.channel,
-            &mut self.rng,
-            &self.check_zero_list,
-        );
+        let r = self
+            .verifier
+            .check_zero(&mut self.channel, &mut self.rng, &self.check_zero_list);
         if r.is_err() {
             warn!("check_zero fails");
             self.is_ok = false;
@@ -797,11 +779,7 @@ mod tests {
         dmc.finalize().unwrap();
 
         let prover = handle.join().unwrap();
-        assert!(validate(
-            prover,
-            verifier,
-            dmc.get_party().get_refmut().get_delta()
-        ));
+        assert!(validate(prover, verifier, dmc.get_party().get_delta()));
     }
 
     #[test]

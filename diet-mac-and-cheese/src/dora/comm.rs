@@ -5,7 +5,6 @@ use swanky_field::IsSubFieldOf;
 
 use crate::{
     backend_trait::BackendT,
-    edabits::RcRefCell,
     homcom::{FComProver, FComVerifier, MacProver, MacVerifier},
     DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };
@@ -27,7 +26,7 @@ pub(super) struct CommittedWitness<'a, B: BackendT> {
 //
 // Idealy there would be a nicer way to do this.
 fn prover_commit_vec<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>(
-    backend: &RcRefCell<FComProver<V, F>>,
+    backend: &mut FComProver<V, F>,
     channel: &mut C,
     rng: &mut AesRng,
     sec: impl IntoIterator<Item = V>, // secret values
@@ -41,8 +40,7 @@ where
     pad.extend(sec.into_iter().chain(iter::repeat(V::ZERO)).take(len));
 
     // mac vector
-    let mut prv = backend.get_refmut();
-    let tag = prv.input(channel, rng, &pad)?;
+    let tag = backend.input(channel, rng, &pad)?;
 
     // combine
     Ok(tag
@@ -52,7 +50,7 @@ where
 }
 
 fn verifier_commit_vec<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>(
-    backend: &RcRefCell<FComVerifier<V, F>>,
+    backend: &mut FComVerifier<V, F>,
     channel: &mut C,
     rng: &mut AesRng,
     len: usize, // padded length
@@ -60,8 +58,7 @@ fn verifier_commit_vec<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChanne
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    let mut vrf = backend.get_refmut();
-    let inp = vrf.input(channel, rng, len)?;
+    let inp = backend.input(channel, rng, len)?;
     Ok(inp.into_iter())
 }
 
@@ -84,7 +81,7 @@ where
         let out = witness.outputs().copied();
         let int = witness.intermediate().copied();
         let free = prover_commit_vec(
-            &backend.prover,
+            &mut backend.prover,
             channel,
             &mut backend.rng,
             out.chain(int),
@@ -110,7 +107,7 @@ where
     ) -> Result<Self> {
         // commit to witness
         let free = verifier_commit_vec(
-            &backend.verifier,
+            &mut backend.verifier,
             channel,
             &mut backend.rng,
             disj.dim_output() + disj.dim_intermediate(),
@@ -189,7 +186,7 @@ where
     ) -> Result<Self> {
         let mut terms = Vec::with_capacity(disj.dim_err());
         terms.extend(prover_commit_vec(
-            &backend.prover,
+            &mut backend.prover,
             channel,
             &mut backend.rng,
             cxt.terms.iter().copied(),
@@ -211,7 +208,7 @@ where
     ) -> Result<Self> {
         let mut terms = Vec::with_capacity(disj.dim_err());
         terms.extend(verifier_commit_vec(
-            &backend.verifier,
+            &mut backend.verifier,
             channel,
             &mut backend.rng,
             disj.dim_err(),
