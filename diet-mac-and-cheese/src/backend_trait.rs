@@ -3,15 +3,27 @@
 use eyre::Result;
 use mac_n_cheese_sieve_parser::Number;
 use std::any::type_name;
+use std::fmt::Debug;
 use swanky_field::{FiniteField, PrimeFiniteField};
+
+/// A type indicating whether a party is a prover or a verifier.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum Party {
+    Prover,
+    Verifier,
+}
 
 /// An interface for computing a proof over a single [`FiniteField`].
 pub trait BackendT {
     /// The type associated with the input and output wires of the gates.
-    type Wire;
+    type Wire: Default + Clone + Copy + Debug;
     /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 
+    /// Return the [`Party`]
+    fn party(&self) -> Party;
+    /// Return the value from a wire when it is a prover.
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement>;
     /// Return [`Self::FieldElement::ONE`].
     fn one(&self) -> Result<Self::FieldElement>;
     /// Return [`Self::FieldElement::ZERO`].

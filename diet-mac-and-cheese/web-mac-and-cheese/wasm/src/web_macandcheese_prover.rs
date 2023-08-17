@@ -1,5 +1,6 @@
 use crate::js_channel::ShimChannel;
-use diet_mac_and_cheese::backend_multifield::{EvaluatorCirc, Party};
+use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
+use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::text_reader::number_to_bytes;
 use log::info;
