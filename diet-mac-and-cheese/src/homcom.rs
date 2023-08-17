@@ -11,6 +11,10 @@ use ocelot::svole::{LpnParams, Receiver, Sender};
 use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
+use std::{
+    cell::{RefCell, RefMut},
+    rc::Rc,
+};
 use std::{marker::PhantomData, time::Instant};
 use subtle::{Choice, ConditionallySelectable};
 
@@ -166,9 +170,34 @@ impl<T: FiniteField> StateMultCheckProver<T> {
     }
 }
 
+/// Generic Type synonym to Rc<RefCell<X>>.
+pub struct RcRefCell<X>(Rc<RefCell<X>>);
+
+impl<X> RcRefCell<X> {
+    /// Create new.
+    pub fn new(x: X) -> Self {
+        RcRefCell(Rc::new(RefCell::new(x)))
+    }
+
+    /// Get access to the mutable reference.
+    pub fn get_refmut(&self) -> RefMut<X> {
+        (*self.0).borrow_mut()
+    }
+}
+
+impl<X> Clone for RcRefCell<X> {
+    fn clone(&self) -> Self {
+        RcRefCell(Rc::clone(&self.0))
+    }
+}
+
 /// Homomorphic commitment scheme from the prover's point-of-view.
 pub struct FComProver<V: IsSubFieldOf<T>, T: FiniteField> {
-    svole_sender: Sender<T>,
+    // We use a Rc<RefCell<>> here so that the underlying svole functionality can be shared among
+    // other components of diet mac'n'cheese. This is specifically relevant for field switching, where
+    // the svole functionality for F2 can be shared while converting from A to B using F2 in the middle, or
+    // A to F2 or F2 to B.
+    svole_sender: RcRefCell<Sender<T>>,
     voles: Vec<(V, T)>,
 }
 
@@ -184,19 +213,15 @@ where
         lpn_extend: LpnParams,
     ) -> Result<Self> {
         Ok(Self {
-            svole_sender: Sender::init(channel, rng, lpn_setup, lpn_extend)?,
+            svole_sender: RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend)?),
             voles: Vec::new(),
         })
     }
 
     /// Duplicate the commitment scheme.
-    pub fn duplicate<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<Self> {
+    pub fn duplicate(&self) -> Result<Self> {
         Ok(Self {
-            svole_sender: self.svole_sender.duplicate(channel, rng)?,
+            svole_sender: self.svole_sender.clone(),
             voles: Vec::new(),
         })
     }
@@ -210,7 +235,9 @@ where
         match self.voles.pop() {
             Some(e) => Ok(MacProver(e.0, e.1)),
             None => {
-                self.svole_sender.send(channel, rng, &mut self.voles)?;
+                self.svole_sender
+                    .get_refmut()
+                    .send(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => Ok(MacProver(e.0, e.1)),
                     None => Err(eyre!("svole failed for random")),
@@ -453,7 +480,7 @@ where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
     delta: T,
-    svole_receiver: Receiver<T>,
+    svole_receiver: RcRefCell<Receiver<T>>,
     voles: Vec<T>,
     phantom: PhantomData<V>,
 }
@@ -511,21 +538,17 @@ where
         let recv = Receiver::init(channel, rng, lpn_setup, lpn_extend)?;
         Ok(Self {
             delta: recv.delta(),
-            svole_receiver: recv,
+            svole_receiver: RcRefCell::new(recv),
             voles: Vec::new(),
             phantom: PhantomData,
         })
     }
 
     /// Duplicate the commitment scheme.
-    pub fn duplicate<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<Self> {
+    pub fn duplicate(&self) -> Result<Self> {
         Ok(Self {
             delta: self.get_delta(),
-            svole_receiver: self.svole_receiver.duplicate::<_, V>(channel, rng)?,
+            svole_receiver: self.svole_receiver.clone(),
             voles: Vec::new(),
             phantom: PhantomData,
         })
@@ -548,6 +571,7 @@ where
             None => {
                 let _start = Instant::now();
                 self.svole_receiver
+                    .get_refmut()
                     .receive::<_, V>(channel, rng, &mut self.voles)?;
                 info!(
                     "SVOLE<time:{:?} field:{:?}>",

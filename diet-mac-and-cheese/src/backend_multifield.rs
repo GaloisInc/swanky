@@ -8,7 +8,6 @@ use crate::circuit_ir::{
     WireRange,
 };
 use crate::dora::{Disjunction, DoraProver, DoraVerifier};
-use crate::edabits::RcRefCell;
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
@@ -192,13 +191,13 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C>
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &RcRefCell<FComProver<F2, F40b>>,
+        fcom_f2: &FComProver<F2, F40b>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let mut dmc = DietMacAndCheeseProver::<FE, FE, C>::init(
+        let dmc = DietMacAndCheeseProver::<FE, FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -433,11 +432,10 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
         let mut v = Vec::with_capacity(bits.len());
         for b in bits {
             let b2 = F2::from(b);
-            let mac = self.conv.fcom_f2.get_refmut().input1(
-                &mut self.dmc.channel,
-                &mut self.dmc.rng,
-                b2,
-            )?;
+            let mac = self
+                .conv
+                .fcom_f2
+                .input1(&mut self.dmc.channel, &mut self.dmc.rng, b2)?;
             v.push(MacProver::new(b2, mac));
         }
 
@@ -538,13 +536,13 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, 
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &RcRefCell<FComVerifier<F2, F40b>>,
+        fcom_f2: &FComVerifier<F2, F40b>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let mut dmc = DietMacAndCheeseVerifier::<FE, FE, C>::init(
+        let dmc = DietMacAndCheeseVerifier::<FE, FE, C>::init(
             channel,
             rng,
             lpn_setup,
@@ -725,7 +723,6 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
             let mac = self
                 .conv
                 .fcom_f2
-                .get_refmut()
                 .input1(&mut self.dmc.channel, &mut self.dmc.rng)?;
             v.push(mac);
         }
@@ -1134,8 +1131,8 @@ where
 
 pub struct EvaluatorCirc<C: AbstractChannel + 'static> {
     inputs: CircInputs,
-    fcom_f2_prover: Option<RcRefCell<FComProver<F2, F40b>>>, // RcRefCell because of a unique Homcom functionality F2 shared by all other fields
-    fcom_f2_verifier: Option<RcRefCell<FComVerifier<F2, F40b>>>,
+    fcom_f2_prover: Option<FComProver<F2, F40b>>,
+    fcom_f2_verifier: Option<FComVerifier<F2, F40b>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT>>,
     f2_idx: usize,
@@ -1166,17 +1163,17 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
             lpn_extend = LPN_EXTEND_MEDIUM;
         }
         let fcom_f2_prover = if party == Party::Prover {
-            Some(RcRefCell::new(FComProver::<F2, F40b>::init(
+            Some(FComProver::<F2, F40b>::init(
                 channel, &mut rng, lpn_setup, lpn_extend,
-            )?))
+            )?)
         } else {
             None
         };
 
         let fcom_f2_verifier = if party == Party::Verifier {
-            Some(RcRefCell::new(FComVerifier::<F2, F40b>::init(
+            Some(FComVerifier::<F2, F40b>::init(
                 channel, &mut rng, lpn_setup, lpn_extend,
-            )?))
+            )?)
         } else {
             None
         };
@@ -1664,7 +1661,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{RcRefCell, TypeStore};
+    use super::TypeStore;
     use crate::{
         backend_multifield::{EvaluatorCirc, Party},
         fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
@@ -2300,7 +2297,7 @@ pub(crate) mod tests {
                 LPN_EXTEND_SMALL,
             )
             .unwrap();
-            let rfcom = RcRefCell::new(fcom);
+            let rfcom = fcom;
 
             let mut party = DietMacAndCheeseConvProver::<F61p, _>::init(
                 &mut channel,
@@ -2402,7 +2399,7 @@ pub(crate) mod tests {
             LPN_EXTEND_SMALL,
         )
         .unwrap();
-        let rfcom = RcRefCell::new(fcom);
+        let rfcom = fcom;
 
         let mut party = DietMacAndCheeseConvVerifier::<F61p, _>::init(
             &mut channel,
