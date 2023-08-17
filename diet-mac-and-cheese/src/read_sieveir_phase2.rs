@@ -520,7 +520,7 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                 vout.insert(
                     field_id,
                     TypeSpecification::Field(
-                        modulus_to_type_id(Number::from_le_slice(field.bytes())).unwrap(),
+                        modulus_to_type_id(bigint_from_bytes(field.bytes())).unwrap(),
                     ),
                 );
                 field_id += 1;
