@@ -65,10 +65,6 @@ If you use `swanky` in your academic paper, please cite it as follows:
 }
 ```
 
-# Generating documentation
-
-To generate documentation, please use `etc/rustdoc.py` in lieu of `cargo doc`.
-
 # License
 
 MIT License
