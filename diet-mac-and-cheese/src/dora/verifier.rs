@@ -13,7 +13,9 @@ use super::{
     acc::{collapse_trace, Accumulator, ComittedAcc, Trace},
     comm::CommittedWitness,
     disjunction::Disjunction,
+    fiat_shamir,
     perm::permutation,
+    COMPACT_MIN, COMPACT_MUL,
 };
 
 pub struct DoraVerifier<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
@@ -22,7 +24,9 @@ where
 {
     _ph: std::marker::PhantomData<(F, C)>,
     disj: Disjunction<V>,
+    init: Vec<ComittedAcc<DietMacAndCheeseVerifier<V, F, C, SVOLE>>>,
     trace: Vec<Trace<DietMacAndCheeseVerifier<V, F, C, SVOLE>>>,
+    max_trace: usize, // maximum trace len before compactification
     tx: blake3::Hasher,
 }
 
@@ -32,10 +36,13 @@ where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn new(disj: Disjunction<V>) -> Self {
+        let max_trace = std::cmp::max(disj.clauses().len() * COMPACT_MUL, COMPACT_MIN);
         Self {
             _ph: std::marker::PhantomData,
-            trace: vec![],
+            trace: Vec::with_capacity(max_trace),
+            init: vec![],
             disj,
+            max_trace,
             tx: blake3::Hasher::new(),
         }
     }
@@ -45,6 +52,11 @@ where
         verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
         input: &[MacVerifier<F>],
     ) -> Result<Vec<MacVerifier<F>>> {
+        // check if we should compact the trace first
+        if self.trace.len() >= self.max_trace {
+            self.compact(verifier)?;
+        }
+
         // wrap channel in transcript
         let mut ch = TxChannel::new(verifier.channel.clone(), &mut self.tx);
 
@@ -72,33 +84,60 @@ where
     }
 
     /// Verifies all the disjuctions and consumes the verifier.
-    pub fn finalize(self, verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>) -> Result<()> {
-        // commit and verify all final accumulators
-        let mut accs = Vec::with_capacity(self.disj.clauses().len());
-        for r1cs in self.disj.clauses() {
-            let acc = ComittedAcc::new(verifier, &self.disj, None)?;
+    pub fn finalize(
+        mut self,
+        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
+    ) -> Result<()> {
+        // compact into single set of accumulators
+        self.compact(verifier)?;
+
+        // verify accumulors
+        for (acc, r1cs) in self.init.into_iter().zip(self.disj.clauses()) {
             acc.verify(verifier, r1cs)?;
-            accs.push(acc);
+        }
+        Ok(())
+    }
+
+    // "compact" the disjunction trace (without verification)
+    //
+    // Commits to all the accumulators and executes the permutation proof.
+    // This reduces the trace to a single element per branch.
+    fn compact(&mut self, verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>) -> Result<()> {
+        // commit to all accumulators
+        let mut ch = TxChannel::new(verifier.channel.clone(), &mut self.tx);
+        let mut accs = Vec::with_capacity(self.disj.clauses().len());
+        for _ in self.disj.clauses() {
+            accs.push(ComittedAcc::commit_verifier(&mut ch, verifier, &self.disj)?);
         }
 
         // challenges for permutation proof
-        let chal_perm = V::random(&mut verifier.rng);
-        let chal_cmbn = V::random(&mut verifier.rng);
-        verifier.channel.write_serializable(&chal_perm)?;
-        verifier.channel.write_serializable(&chal_cmbn)?;
-        verifier.channel.flush()?;
+        // obtain challenges for permutation proof
+        let (chal_perm, chal_cmbn) = if fiat_shamir::<V>() {
+            (ch.challenge(), ch.challenge())
+        } else {
+            let chal_perm = V::random(&mut verifier.rng);
+            let chal_cmbn = V::random(&mut verifier.rng);
+            verifier.channel.write_serializable(&chal_perm)?;
+            verifier.channel.write_serializable(&chal_cmbn)?;
+            verifier.channel.flush()?;
+            (chal_perm, chal_cmbn)
+        };
 
         // collapse trace into single elements
         let (mut lhs, mut rhs) = collapse_trace(verifier, &self.trace, chal_cmbn)?;
 
-        // verify first/final accumulators
-        for (acc, r1cs) in accs.iter_mut().zip(self.disj.clauses()) {
-            // add initial / final accumulator to permutation proof
+        // add initial / final accumulator to permutation proof
+        for (i, (acc, r1cs)) in accs.iter_mut().zip(self.disj.clauses()).enumerate() {
             lhs.push(acc.combine(verifier, chal_cmbn)?);
-            rhs.push(Accumulator::init(r1cs).combine(verifier, chal_cmbn)?);
+            rhs.push(match self.init.get(i) {
+                Some(acc) => acc.combine(verifier, chal_cmbn)?,
+                None => Accumulator::init(r1cs).combine(verifier, chal_cmbn)?,
+            });
         }
 
         // execute permutation proof
+        self.trace.clear();
+        self.init = accs;
         permutation(verifier, chal_perm, &lhs, &rhs)
     }
 }
