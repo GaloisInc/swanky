@@ -1,3 +1,25 @@
+//! This module implements the permutation check plugin.
+//!
+//! We check that two lists are permutations of each other by mapping the lists
+//! to polynomials and doing a polynomial equality check. This allows us to
+//! compute the check with `O(N)` multiplications, where `N` is the list size.
+//! Using a sorting network would require `O(N log N)` multiplications.
+//!
+//! Consider lists `A = [a_1, ..., a_n]` and `B = [b_1, ..., b_n]`. We can view
+//! these as the polynomials `A(X) = ∏_i (X - a_i)` and `B(X) = ∏_i (X - b_i)`.
+//! Now, based on Schwartz-Zippel, given a random value `r` then `A(r) = B(r) ⇒
+//! A = B` with high probability.
+//!
+//! Thus, the protocol proceeds by the verifier sending a random "challenge"
+//! value `r` to the prover, and then the parties check that `ZeroTest(A(r) -
+//! B(r))` holds.
+//!
+//! The above approach works if each list contains only single elements, however
+//! we also support the setting where, say, a given `a_i` is composed of a tuple
+//! of elements `(a_i1, ..., a_im)`. We map these `m` values to a single element
+//! by computing the dot product with the vector `(r, r^2, ..., r^m)` for some
+//! random `r` supplied by the verifier.
+
 use super::{Plugin, PluginExecution};
 use crate::{
     backend_trait::BackendT,
