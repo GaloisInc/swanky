@@ -8,7 +8,6 @@ use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::read_sieveir_phase2::{
     read_private_inputs, read_public_inputs, read_types,
 };
-use diet_mac_and_cheese::text_reader::number_to_bytes;
 use eyre::{Result, WrapErr};
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -74,10 +73,7 @@ fn run_text(args: &Cli) -> Result<()> {
         inputs.ingest_instances(i, instances);
         info!(
             "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
-            i,
-            number_to_bytes(&field),
-            instance_path,
-            ninstances
+            i, field, instance_path, ninstances
         );
     }
 
@@ -98,10 +94,7 @@ fn run_text(args: &Cli) -> Result<()> {
             inputs.ingest_witnesses(i, witnesses);
             info!(
                 "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
-                i,
-                number_to_bytes(&field),
-                witness_path,
-                nwitnesses
+                i, field, witness_path, nwitnesses
             );
         }
     }

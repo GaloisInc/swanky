@@ -8,59 +8,20 @@ use mac_n_cheese_sieve_parser::{
 };
 
 #[derive(Default)]
-pub struct TextRelation {
-    pub type_store: TypeStore,
-    pub fun_store: FunStore,
-    pub gates: Vec<GateM>,
+pub(crate) struct TextRelation {
+    pub(crate) type_store: TypeStore,
+    pub(crate) fun_store: FunStore,
+    pub(crate) gates: Vec<GateM>,
 }
 
 impl TextRelation {
-    pub fn new_with_type_store(type_store: &TypeStore) -> Self {
-        let mut r = TextRelation::default();
-        r.type_store = type_store.clone();
-        r
-    }
-}
-
-pub fn number_to_bytes(n: &Number) -> Vec<u8> {
-    let w = n.to_words();
-    let mut nb_zeros = 0;
-    let total = 8 * w.len();
-    for u in w.iter().rev() {
-        let bs = u.to_le_bytes();
-        let mut stop = false;
-        let nb_bytes = bs.len();
-        for i in 0..nb_bytes {
-            if bs[nb_bytes - 1 - i] == 0 {
-                nb_zeros += 1;
-            } else {
-                stop = true;
-                break;
-            }
-        }
-        if stop {
-            break;
+    pub(crate) fn new(type_store: TypeStore) -> Self {
+        Self {
+            type_store,
+            fun_store: Default::default(),
+            gates: Default::default(),
         }
     }
-    let mut real = total - nb_zeros;
-    if real == 0 {
-        real = 1;
-    }
-
-    let mut v = vec![0; real];
-
-    let mut cnt = 0;
-    for u in w {
-        let bs = u.to_le_bytes();
-        for b in bs {
-            v[cnt] = b;
-            cnt += 1;
-            if cnt == real {
-                return v;
-            }
-        }
-    }
-    v
 }
 
 impl FunctionBodyVisitor for TextRelation {
@@ -158,13 +119,11 @@ impl FunctionBodyVisitor for TextRelation {
         }
 
         self.gates.push(GateM::Call(Box::new((
-            std::str::from_utf8(name).unwrap().into(),
+            std::str::from_utf8(name)?.into(),
             outids,
             inids,
         ))));
         Ok(())
-
-        //unimplemented!()
     }
 }
 
@@ -186,15 +145,15 @@ impl RelationVisitor for TextRelation {
 
         let mut output_counts = vec![];
         for o in outputs {
-            output_counts.push((o.ty.try_into().unwrap(), o.count));
+            output_counts.push((o.ty.try_into()?, o.count));
         }
 
         let mut input_counts = vec![];
         for inp in inputs {
-            input_counts.push((inp.ty.try_into().unwrap(), inp.count));
+            input_counts.push((inp.ty.try_into()?, inp.count));
         }
 
-        let name_s: String = std::str::from_utf8(name).unwrap().into();
+        let name_s: String = std::str::from_utf8(name)?.into();
         let fun_body = FuncDecl::new_function(body_struct.gates, output_counts, input_counts);
         info!(
             "function {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
@@ -214,7 +173,7 @@ impl RelationVisitor for TextRelation {
         inputs: &[TypedCount],
         body: PluginBinding,
     ) -> eyre::Result<()> {
-        let name_s: String = std::str::from_utf8(name).unwrap().into();
+        let name_s: String = std::str::from_utf8(name)?.into();
 
         let mut output_counts = vec![];
         for output in outputs {

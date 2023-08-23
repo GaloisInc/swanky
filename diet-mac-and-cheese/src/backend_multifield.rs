@@ -1462,7 +1462,7 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
         let rel = RelationReader::new(rel)?;
 
-        let mut buf_rel = TextRelation::new_with_type_store(&self.type_store);
+        let mut buf_rel = TextRelation::new(self.type_store.clone());
 
         rel.read(&mut buf_rel)?;
         self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
