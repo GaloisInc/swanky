@@ -410,10 +410,8 @@ impl FuncDecl {
 
     /// Instantiate a new plugin.
     ///
-    /// * `output_counts` contains the wire counts for each [`TypeId`] used as an
-    ///   output.
-    /// * `input_counts` contains the wire counts for each [`TypeId`] used as an
-    ///   input.
+    /// * `output_counts` contains the [`TypeId`] and [`WireCount`] for each output.
+    /// * `input_counts` contains the [`TypeId`] and [`WireCount`] for each input.
     /// * `plugin_name` is the name of the plugin.
     /// * `operation` is the plugin operation.
     /// * `params` contains any associated parameters to the plugin operation.
@@ -549,7 +547,7 @@ impl FunStore {
 
 // TODO: add type synonym for Vec<u8> serialized field values,
 //       maybe use Box<[u8]> like in other places.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct CircInputs {
     ins: Vec<VecDeque<Number>>,
     wit: Vec<VecDeque<Number>>,
