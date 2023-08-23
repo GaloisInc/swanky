@@ -3,7 +3,7 @@ use eyre::Result;
 use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel};
 use swanky_field::IsSubFieldOf;
 
-use crate::{backend_trait::BackendT, DietMacAndCheeseProver};
+use crate::{backend_trait::BackendT, svole_trait::SvoleT, DietMacAndCheeseProver};
 
 use super::{
     comm::{CommittedCrossTerms, CommittedWitness},
@@ -148,8 +148,8 @@ impl<B: BackendT> ComittedAcc<B> {
     }
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    ComittedAcc<DietMacAndCheeseProver<V, F, C>>
+impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
+    ComittedAcc<DietMacAndCheeseProver<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

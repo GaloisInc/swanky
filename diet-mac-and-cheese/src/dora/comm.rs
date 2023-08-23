@@ -6,6 +6,7 @@ use swanky_field::IsSubFieldOf;
 use crate::{
     backend_trait::BackendT,
     homcom::{FComProver, FComVerifier, MacProver, MacVerifier},
+    svole_trait::SvoleT,
     DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };
 
@@ -25,8 +26,14 @@ pub(super) struct CommittedWitness<'a, B: BackendT> {
 // (allows control of the channel for Fiat-Shamir)
 //
 // Idealy there would be a nicer way to do this.
-fn prover_commit_vec<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>(
-    backend: &mut FComProver<V, F>,
+fn prover_commit_vec<
+    'a,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel,
+    SVOLE: SvoleT<(V, F)>,
+>(
+    backend: &mut FComProver<V, F, SVOLE>,
     channel: &mut C,
     rng: &mut AesRng,
     sec: impl IntoIterator<Item = V>, // secret values
@@ -49,8 +56,14 @@ where
         .map(|(t, v)| MacProver::new(v, t)))
 }
 
-fn verifier_commit_vec<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>(
-    backend: &mut FComVerifier<V, F>,
+fn verifier_commit_vec<
+    'a,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel,
+    SVOLE: SvoleT<F>,
+>(
+    backend: &mut FComVerifier<V, F, SVOLE>,
     channel: &mut C,
     rng: &mut AesRng,
     len: usize, // padded length
@@ -62,17 +75,17 @@ where
     Ok(inp.into_iter())
 }
 
-impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    CommittedWitness<'a, DietMacAndCheeseProver<V, F, C>>
+impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
+    CommittedWitness<'a, DietMacAndCheeseProver<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit_prover<
         'b,
-        I: Iterator<Item = <DietMacAndCheeseProver<V, F, C> as BackendT>::Wire>,
+        I: Iterator<Item = <DietMacAndCheeseProver<V, F, C, SVOLE> as BackendT>::Wire>,
     >(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseProver<V, F, C>,
+        backend: &mut DietMacAndCheeseProver<V, F, C, SVOLE>,
         disj: &'a Disjunction<V>,
         input: I,
         witness: &'b ExtendedWitness<V>,
@@ -91,17 +104,17 @@ where
     }
 }
 
-impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    CommittedWitness<'a, DietMacAndCheeseVerifier<V, F, C>>
+impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
+    CommittedWitness<'a, DietMacAndCheeseVerifier<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit_verifer<
         'b,
-        I: Iterator<Item = <DietMacAndCheeseVerifier<V, F, C> as BackendT>::Wire>,
+        I: Iterator<Item = <DietMacAndCheeseVerifier<V, F, C, SVOLE> as BackendT>::Wire>,
     >(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseVerifier<V, F, C>,
+        backend: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
         disj: &'a Disjunction<V>,
         input: I,
     ) -> Result<Self> {
@@ -150,8 +163,8 @@ impl<'a, B: BackendT> CommittedWitness<'a, B> {
     }
 }
 
-impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    CommittedWitness<'a, DietMacAndCheeseProver<V, F, C>>
+impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
+    CommittedWitness<'a, DietMacAndCheeseProver<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -173,14 +186,14 @@ pub(super) struct CommittedCrossTerms<B: BackendT> {
     pub terms: Vec<B::Wire>,
 }
 
-impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    CommittedCrossTerms<DietMacAndCheeseProver<V, F, C>>
+impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
+    CommittedCrossTerms<DietMacAndCheeseProver<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit_prover<'b>(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseProver<V, F, C>,
+        backend: &mut DietMacAndCheeseProver<V, F, C, SVOLE>,
         disj: &'a Disjunction<V>,
         cxt: &CrossTerms<V>,
     ) -> Result<Self> {
@@ -196,14 +209,14 @@ where
     }
 }
 
-impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    CommittedCrossTerms<DietMacAndCheeseVerifier<V, F, C>>
+impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
+    CommittedCrossTerms<DietMacAndCheeseVerifier<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit_verifier<'b>(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseVerifier<V, F, C>,
+        backend: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
         disj: &'a Disjunction<V>,
     ) -> Result<Self> {
         let mut terms = Vec::with_capacity(disj.dim_err());
@@ -217,14 +230,14 @@ where
     }
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    ComittedAcc<DietMacAndCheeseProver<V, F, C>>
+impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
+    ComittedAcc<DietMacAndCheeseProver<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit_prover<'a>(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseProver<V, F, C>,
+        backend: &mut DietMacAndCheeseProver<V, F, C, SVOLE>,
         disj: &'a Disjunction<V>,
         acc: &Accumulator<V>,
     ) -> Result<Self> {
@@ -250,14 +263,14 @@ where
     }
 }
 
-impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel>
-    ComittedAcc<DietMacAndCheeseVerifier<V, F, C>>
+impl<'a, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
+    ComittedAcc<DietMacAndCheeseVerifier<V, F, C, SVOLE>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit_verifier<'b>(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseVerifier<V, F, C>,
+        backend: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
         disj: &'a Disjunction<V>,
     ) -> Result<Self> {
         let wit = verifier_commit_vec(

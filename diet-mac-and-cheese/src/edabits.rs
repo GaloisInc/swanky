@@ -2,9 +2,10 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-//! Field switching functionality based on protocol with Edabuts.
+//! Field switching functionality based on protocol with Edabits.
 
 use crate::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
+use crate::svole_trait::SvoleT;
 use eyre::{eyre, Result};
 use generic_array::typenum::Unsigned;
 #[allow(unused)]
@@ -164,15 +165,20 @@ fn check_parameters<FE: FiniteField>(n: usize, gamma: usize) -> Result<()> {
 }
 
 /// Prover for the edabits conversion protocol
-pub struct ProverConv<FE: FiniteField> {
+pub struct ProverConv<FE: FiniteField, SvoleF2: SvoleT<(F2, F40b)>, SvoleFE: SvoleT<(FE, FE)>> {
     #[allow(missing_docs)]
-    pub fcom_f2: FComProver<F2, F40b>,
-    fcom_fe: FComProver<FE::PrimeField, FE>,
+    pub fcom_f2: FComProver<F2, F40b, SvoleF2>,
+    fcom_fe: FComProver<FE, FE, SvoleFE>,
 }
 
 // The Finite field is required to be a prime field because of the fdabit
 // protocol working only for prime finite fields.
-impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
+impl<
+        FE: FiniteField<PrimeField = FE>,
+        SvoleF2: SvoleT<(F2, F40b)>,
+        SvoleFE: SvoleT<(FE::PrimeField, FE)>,
+    > ProverConv<FE, SvoleF2, SvoleFE>
+{
     /// initialize the prover
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -190,8 +196,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 
     #[allow(missing_docs)]
     pub fn init_zero(
-        fcom_f2: &FComProver<F2, F40b>,
-        fcom_fe: &FComProver<FE::PrimeField, FE>,
+        fcom_f2: &FComProver<F2, F40b, SvoleF2>,
+        fcom_fe: &FComProver<FE::PrimeField, FE, SvoleFE>,
     ) -> Result<Self> {
         Ok(Self {
             fcom_f2: fcom_f2.duplicate()?,
@@ -764,8 +770,8 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
         }
         let nb_bits = edabits_vector[0].bits.len();
         info!(
-            "conversion check, field:{:?}, nb_bits:{:?} vector_size:{:?}",
-            (-FE::ONE).to_bytes(),
+            "conversion check, field:{}, nb_bits:{:?} vector_size:{:?}",
+            std::any::type_name::<FE>().split("::").last().unwrap(),
             nb_bits,
             edabits_vector.len()
         );
@@ -886,15 +892,17 @@ impl<FE: FiniteField<PrimeField = FE>> ProverConv<FE> {
 }
 
 /// Verifier for the edabits conversion protocol
-pub struct VerifierConv<FE: FiniteField> {
+pub struct VerifierConv<FE: FiniteField, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE>> {
     #[allow(missing_docs)]
-    pub fcom_f2: FComVerifier<F2, F40b>,
-    fcom_fe: FComVerifier<FE::PrimeField, FE>,
+    pub fcom_f2: FComVerifier<F2, F40b, SvoleF2>,
+    fcom_fe: FComVerifier<FE::PrimeField, FE, SvoleFE>,
 }
 
 // The Finite field is required to be a prime field because of the fdabit
 // protocol working only for prime finite fields.
-impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
+impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE>>
+    VerifierConv<FE, SvoleF2, SvoleFE>
+{
     /// initialize the verifier
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -912,8 +920,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
 
     #[allow(missing_docs)]
     pub fn init_zero(
-        fcom_f2: &FComVerifier<F2, F40b>,
-        fcom_fe: &FComVerifier<FE::PrimeField, FE>,
+        fcom_f2: &FComVerifier<F2, F40b, SvoleF2>,
+        fcom_fe: &FComVerifier<FE::PrimeField, FE, SvoleFE>,
     ) -> Result<Self> {
         Ok(Self {
             fcom_f2: fcom_f2.duplicate()?,
@@ -1384,8 +1392,8 @@ impl<FE: FiniteField<PrimeField = FE>> VerifierConv<FE> {
 
         let nb_bits = edabits_vector_mac[0].bits.len();
         info!(
-            "conversion check, field:{:?}, nb_bits:{:?} vector_size:{:?}",
-            (-FE::ONE).to_bytes(),
+            "conversion check, field:{}, nb_bits:{:?} vector_size:{:?}",
+            std::any::type_name::<FE>().split("::").last().unwrap(),
             nb_bits,
             edabits_vector_mac.len()
         );
@@ -1553,13 +1561,14 @@ mod tests {
         f2_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ProverConv,
         VerifierConv,
     };
+    use crate::svole_trait::{SvoleReceiver, SvoleSender};
     #[allow(unused)]
     use log::{debug, info, warn};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::field::F384p;
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{
-        field::{F61p, FiniteField, F2},
+        field::{F40b, F61p, FiniteField, F2},
         AesRng, Channel,
     };
     use std::{
@@ -1579,9 +1588,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv =
-                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fconv = ProverConv::<FE, SvoleSender<F40b>, SvoleSender<FE>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut res = Vec::new();
             for _ in 0..count {
@@ -1624,9 +1637,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv =
-            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fconv = VerifierConv::<FE, SvoleReceiver<F2, F40b>, SvoleReceiver<FE, FE>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         let mut res = Vec::new();
         for _ in 0..count {
@@ -1685,9 +1702,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv =
-                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fconv = ProverConv::<FE, SvoleSender<F40b>, SvoleSender<FE>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &x).unwrap();
             let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, &y).unwrap();
@@ -1727,9 +1748,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv =
-            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fconv = VerifierConv::<FE, SvoleReceiver<F2, F40b>, SvoleReceiver<FE, FE>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         let x_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
         let y_mac = fconv.fcom_f2.input(&mut channel, &mut rng, power).unwrap();
@@ -1776,9 +1801,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv =
-                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_EXTEND_SMALL, LPN_SETUP_SMALL)
-                    .unwrap();
+            let mut fconv = ProverConv::<FE, SvoleSender<F40b>, SvoleSender<FE>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_EXTEND_SMALL,
+                LPN_SETUP_SMALL,
+            )
+            .unwrap();
 
             let edabits = fconv
                 .random_edabits_b2a(&mut channel, &mut rng, nb_bits, count)
@@ -1792,9 +1821,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv =
-            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_EXTEND_SMALL, LPN_SETUP_SMALL)
-                .unwrap();
+        let mut fconv = VerifierConv::<FE, SvoleReceiver<F2, F40b>, SvoleReceiver<FE, FE>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_EXTEND_SMALL,
+            LPN_SETUP_SMALL,
+        )
+        .unwrap();
 
         let edabits = fconv
             .random_edabits_b2a(&mut channel, &mut rng, nb_bits, count)
@@ -1826,9 +1859,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv =
-                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fconv = ProverConv::<FE, SvoleSender<F40b>, SvoleSender<FE>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let dabits = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
             fconv.fdabit(&mut channel, &mut rng, &dabits).unwrap();
@@ -1837,9 +1874,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv =
-            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fconv = VerifierConv::<FE, SvoleReceiver<F2, F40b>, SvoleReceiver<FE, FE>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         let dabits_mac = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
         fconv.fdabit(&mut channel, &mut rng, &dabits_mac).unwrap();
@@ -1856,9 +1897,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv =
-                ProverConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fconv = ProverConv::<FE, SvoleSender<F40b>, SvoleSender<FE>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             for n in 1..nb_edabits {
                 let edabits = fconv
@@ -1881,9 +1926,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv =
-            VerifierConv::<FE>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fconv = VerifierConv::<FE, SvoleReceiver<F2, F40b>, SvoleReceiver<FE, FE>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         for n in 1..nb_edabits {
             let edabits = fconv

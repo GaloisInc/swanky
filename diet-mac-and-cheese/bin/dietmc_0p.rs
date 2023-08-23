@@ -8,14 +8,17 @@ use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::read_sieveir_phase2::{
     read_private_inputs, read_public_inputs, read_types,
 };
-use eyre::{Result, WrapErr};
+use diet_mac_and_cheese::svole_thread::SvoleAtomic;
+use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
+use eyre::{bail, Result, WrapErr};
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
 use pretty_env_logger;
-use scuttlebutt::{AesRng, Channel};
+use scuttlebutt::field::{F40b, F2};
+use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::collections::VecDeque;
 use std::env;
 use std::fs::File;
@@ -49,14 +52,45 @@ fn path_to_files(path: PathBuf) -> Result<Vec<PathBuf>> {
     }
 }
 
-// Run with relation in text format
-fn run_text(args: &Cli) -> Result<()> {
+fn start_connection_verifier(addresses: &[String]) -> Result<Vec<TcpStream>> {
+    let mut tcp_streams = vec![];
+
+    for addr in addresses.iter() {
+        let listener = TcpListener::bind(addr.clone())?;
+        if let Ok((stream, _addr)) = listener.accept() {
+            tcp_streams.push(stream);
+            info!("accept connections on {:?}", addr);
+        } else {
+            bail!("Error binding addr: {:?}", addr);
+        }
+    }
+
+    Ok(tcp_streams)
+}
+
+fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
+    let mut tcp_streams = vec![];
+
+    for addr in addresses.iter() {
+        loop {
+            let c = TcpStream::connect(addr.clone());
+            if let Ok(stream) = c {
+                tcp_streams.push(stream);
+                info!("connection accepted on {:?}", addr);
+                break;
+            }
+        }
+    }
+
+    Ok(tcp_streams)
+}
+
+fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     info!("relation: {:?}", args.relation);
 
     let instance_path = args.instance.clone();
     let relation_path = args.relation.clone();
 
-    let start = Instant::now();
     let mut inputs = CircInputs::default();
 
     let instance_paths = path_to_files(instance_path)?;
@@ -100,93 +134,13 @@ fn run_text(args: &Cli) -> Result<()> {
     }
 
     let rel = RelationReader::open(relation_path.as_path())?;
-
-    info!("time reading ins/wit/rel: {:?}", start.elapsed());
-
-    match args.command {
-        None => {
-            // Verifier mode
-            let listener = TcpListener::bind(&args.connection_addr)?;
-            match listener.accept() {
-                Ok((stream, _addr)) => {
-                    info!("connection received");
-                    let reader = BufReader::new(stream.try_clone()?);
-                    let writer = BufWriter::new(stream);
-                    let mut channel = Channel::new(reader, writer);
-
-                    let start = Instant::now();
-                    let rng = AesRng::new();
-
-                    let mut evaluator = EvaluatorCirc::new(
-                        Party::Verifier,
-                        &mut channel,
-                        rng,
-                        inputs,
-                        TypeStore::try_from(rel.header().types.clone())?,
-                        args.lpn == LpnSize::Small,
-                        args.nobatching,
-                    )?;
-                    evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
-                    info!("init time: {:?}", start.elapsed());
-
-                    let start = Instant::now();
-                    let relation_file = File::open(relation_path)?;
-                    let relation_reader = BufReader::new(relation_file);
-                    evaluator.evaluate_relation_text(relation_reader)?;
-                    info!("time circ exec: {:?}", start.elapsed());
-                    info!("VERIFIER DONE!");
-                }
-                Err(e) => info!("couldn't get client: {:?}", e),
-            }
-        }
-        Some(Prover { witness: _ }) => {
-            // Prover mode
-            let stream;
-            loop {
-                let c = TcpStream::connect(args.connection_addr.clone());
-                match c {
-                    Ok(s) => {
-                        stream = s;
-                        break;
-                    }
-                    Err(_) => {}
-                }
-            }
-            let reader = BufReader::new(stream.try_clone()?);
-            let writer = BufWriter::new(stream);
-            let mut channel = Channel::new(reader, writer);
-
-            let start = Instant::now();
-            let rng = AesRng::new();
-
-            let mut evaluator = EvaluatorCirc::new(
-                Party::Prover,
-                &mut channel,
-                rng,
-                inputs,
-                TypeStore::try_from(rel.header().types.clone())?,
-                args.lpn == LpnSize::Small,
-                args.nobatching,
-            )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
-            info!("init time: {:?}", start.elapsed());
-            let start = Instant::now();
-            let relation_file = File::open(relation_path)?;
-            let relation_reader = BufReader::new(relation_file);
-            evaluator.evaluate_relation_text(relation_reader)?;
-            info!("time circ exec: {:?}", start.elapsed());
-            info!("PROVER DONE!");
-        }
-    }
-    Ok(())
+    Ok((inputs, TypeStore::try_from(rel.header().types.clone())?))
 }
 
-// Run with relation in flatbuffers format
-fn run_flatbuffers(args: &Cli) -> Result<()> {
+fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     info!("relation: {:?}", args.relation);
 
     let instance_path = args.instance.clone();
-    let relation_path = args.relation.clone();
 
     let fields = read_types(&args.relation).unwrap();
     let start = Instant::now();
@@ -221,54 +175,22 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
     }
 
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
+    Ok((inputs, fields))
+}
 
+// Run with relation in text format
+fn run_text(args: &Cli) -> Result<()> {
+    let start = Instant::now();
+    let (inputs, type_store) = build_inputs_types_text(args)?;
+    info!("time reading ins/wit/rel: {:?}", start.elapsed());
+
+    let relation_path = args.relation.clone();
     match args.command {
         None => {
             // Verifier mode
-            let listener = TcpListener::bind(args.connection_addr.clone())?;
-            match listener.accept() {
-                Ok((stream, _addr)) => {
-                    info!("connection received");
-                    let reader = BufReader::new(stream.try_clone()?);
-                    let writer = BufWriter::new(stream);
-                    let mut channel = Channel::new(reader, writer);
+            let mut conns = start_connection_verifier(&vec![args.connection_addr.clone()])?;
+            let stream = conns.pop().unwrap();
 
-                    let start = Instant::now();
-                    let rng = AesRng::new();
-
-                    let mut evaluator = EvaluatorCirc::new(
-                        Party::Verifier,
-                        &mut channel,
-                        rng,
-                        inputs,
-                        fields,
-                        args.lpn == LpnSize::Small,
-                        args.nobatching,
-                    )?;
-                    evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
-                    info!("init time: {:?}", start.elapsed());
-
-                    let start = Instant::now();
-                    evaluator.evaluate_relation(&relation_path).unwrap();
-                    info!("time circ exec: {:?}", start.elapsed());
-                    info!("VERIFIER DONE!");
-                }
-                Err(e) => info!("couldn't get client: {:?}", e),
-            }
-        }
-        Some(Prover { witness: _ }) => {
-            // Prover mode
-            let stream;
-            loop {
-                let c = TcpStream::connect(args.connection_addr.clone());
-                match c {
-                    Ok(s) => {
-                        stream = s;
-                        break;
-                    }
-                    Err(_) => {}
-                }
-            }
             let reader = BufReader::new(stream.try_clone()?);
             let writer = BufWriter::new(stream);
             let mut channel = Channel::new(reader, writer);
@@ -276,20 +198,403 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator = EvaluatorCirc::new(
-                Party::Prover,
+            let mut evaluator =
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                    Party::Verifier,
+                    &mut channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.lpn == LpnSize::Small,
+                    args.nobatching,
+                )?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            info!("init time: {:?}", start.elapsed());
+
+            let start = Instant::now();
+            let relation_file = File::open(relation_path)?;
+            let relation_reader = BufReader::new(relation_file);
+            evaluator.evaluate_relation_text(relation_reader)?;
+            info!("time circ exec: {:?}", start.elapsed());
+            info!("VERIFIER DONE!");
+        }
+        Some(Prover { witness: _ }) => {
+            // Prover mode
+            let mut conns = start_connection_prover(&vec![args.connection_addr.clone()])?;
+            let stream = conns.pop().unwrap();
+
+            let reader = BufReader::new(stream.try_clone()?);
+            let writer = BufWriter::new(stream);
+            let mut channel = Channel::new(reader, writer);
+
+            let start = Instant::now();
+            let rng = AesRng::new();
+
+            let mut evaluator =
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                    Party::Prover,
+                    &mut channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.lpn == LpnSize::Small,
+                    args.nobatching,
+                )?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            info!("init time: {:?}", start.elapsed());
+            let start = Instant::now();
+            let relation_file = File::open(relation_path)?;
+            let relation_reader = BufReader::new(relation_file);
+            evaluator.evaluate_relation_text(relation_reader)?;
+            info!("time circ exec: {:?}", start.elapsed());
+            info!("PROVER DONE!");
+        }
+    }
+    Ok(())
+}
+
+// Run with relation in flatbuffers format
+fn run_text_multihtreaded(args: &Cli) -> Result<()> {
+    let start = Instant::now();
+    let (inputs, type_store) = build_inputs_types_text(args)?;
+    info!("time reading ins/wit/rel: {:?}", start.elapsed());
+
+    let addresses: Vec<String> = parse_addresses(args);
+
+    let relation_path = args.relation.clone();
+    match args.command {
+        None => {
+            // Verifier mode
+            let mut conns = start_connection_verifier(&addresses)?;
+
+            let init_time = Instant::now();
+            let total_time = Instant::now();
+
+            let rng = AesRng::new();
+
+            let conn = conns.pop().unwrap();
+            let reader = BufReader::new(conn.try_clone()?);
+            let writer = BufWriter::new(conn);
+            let channel_f2_svole = SyncChannel::new(reader, writer);
+
+            let mut handles = vec![];
+            let (mut evaluator, handle_f2) =
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                    Party::Verifier,
+                    channel_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.nobatching,
+                    args.lpn == LpnSize::Small,
+                )?;
+            handles.push(handle_f2);
+
+            let mut channels_svole = vec![];
+            for _ in 1..conns.len() {
+                let conn = conns.pop().unwrap();
+                let reader = BufReader::new(conn.try_clone()?);
+                let writer = BufWriter::new(conn);
+                channels_svole.push(SyncChannel::new(reader, writer));
+            }
+            //eyre::ensure!(conns.len() == 1);
+            let conn_main = conns.pop().unwrap();
+            let reader = BufReader::new(conn_main.try_clone()?);
+            let writer = BufWriter::new(conn_main);
+            let mut channel = Channel::new(reader, writer);
+
+            let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
-                rng,
-                inputs,
-                fields.clone(),
+                channels_svole,
                 args.lpn == LpnSize::Small,
-                args.nobatching,
             )?;
+            handles.extend(handles_fields);
+            info!("init time: {:?}", init_time.elapsed());
+
+            let start = Instant::now();
+            let relation_file = File::open(relation_path)?;
+            let relation_reader = BufReader::new(relation_file);
+            evaluator.evaluate_relation_text(relation_reader)?;
+            info!("circ exec time: {:?}", start.elapsed());
+
+            info!("total time: {:?}", total_time.elapsed());
+            info!("VERIFIER DONE!");
+        }
+        Some(Prover { witness: _ }) => {
+            // Prover mode
+            let mut conns = start_connection_prover(&addresses)?;
+
+            let init_time = Instant::now();
+            let total_time = Instant::now();
+
+            let rng = AesRng::new();
+
+            let conn = conns.pop().unwrap();
+            let reader = BufReader::new(conn.try_clone()?);
+            let writer = BufWriter::new(conn);
+            let channel_f2_svole = SyncChannel::new(reader, writer);
+
+            let mut handles = vec![];
+            let (mut evaluator, handle_f2) =
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                    Party::Prover,
+                    channel_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.nobatching,
+                    args.lpn == LpnSize::Small,
+                )?;
+            handles.push(handle_f2);
+
+            let mut channels_svole = vec![];
+            for _ in 1..conns.len() {
+                let conn = conns.pop().unwrap();
+                let reader = BufReader::new(conn.try_clone()?);
+                let writer = BufWriter::new(conn);
+                channels_svole.push(SyncChannel::new(reader, writer));
+            }
+            //eyre::ensure!(conns.len() == 1);
+            let conn_main = conns.pop().unwrap();
+            let reader = BufReader::new(conn_main.try_clone()?);
+            let writer = BufWriter::new(conn_main);
+            let mut channel = Channel::new(reader, writer);
+
+            let handles_fields = evaluator.load_backends_multithreaded(
+                &mut channel,
+                channels_svole,
+                args.lpn == LpnSize::Small,
+            )?;
+            handles.extend(handles_fields);
+            info!("init time: {:?}", init_time.elapsed());
+
+            let start = Instant::now();
+            let relation_file = File::open(relation_path)?;
+            let relation_reader = BufReader::new(relation_file);
+            evaluator.evaluate_relation_text(relation_reader)?;
+            info!("circ exec time: {:?}", start.elapsed());
+
+            info!("total time: {:?}", total_time.elapsed());
+            info!("PROVER DONE!");
+        }
+    }
+    Ok(())
+}
+
+// Run with relation in flatbuffers format
+fn run_flatbuffers(args: &Cli) -> Result<()> {
+    let start = Instant::now();
+    let (inputs, type_store) = build_inputs_flatbuffers(args)?;
+    info!("time reading ins/wit/rel: {:?}", start.elapsed());
+
+    let relation_path = args.relation.clone();
+    match args.command {
+        None => {
+            // Verifier mode
+            let mut conns = start_connection_verifier(&vec![args.connection_addr.clone()])?;
+            let stream = conns.pop().unwrap();
+
+            let reader = BufReader::new(stream.try_clone()?);
+            let writer = BufWriter::new(stream);
+            let mut channel = Channel::new(reader, writer);
+
+            let start = Instant::now();
+            let rng = AesRng::new();
+
+            let mut evaluator =
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                    Party::Verifier,
+                    &mut channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.lpn == LpnSize::Small,
+                    args.nobatching,
+                )?;
+            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            info!("init time: {:?}", start.elapsed());
+
+            let start = Instant::now();
+            evaluator.evaluate_relation(&relation_path).unwrap();
+            info!("time circ exec: {:?}", start.elapsed());
+            info!("VERIFIER DONE!");
+        }
+        Some(Prover { witness: _ }) => {
+            // Prover mode
+            let mut conns = start_connection_prover(&vec![args.connection_addr.clone()])?;
+            let stream = conns.pop().unwrap();
+
+            let reader = BufReader::new(stream.try_clone()?);
+            let writer = BufWriter::new(stream);
+            let mut channel = Channel::new(reader, writer);
+
+            let start = Instant::now();
+            let rng = AesRng::new();
+
+            let mut evaluator =
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                    Party::Prover,
+                    &mut channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.lpn == LpnSize::Small,
+                    args.nobatching,
+                )?;
             evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;
             info!("time circ exec: {:?}", start.elapsed());
+        }
+    }
+    Ok(())
+}
+
+fn parse_addresses(args: &Cli) -> Vec<String> {
+    let mut addresses: Vec<String> = args
+        .connection_addr
+        .clone()
+        .split(",")
+        .map(|x| x.into())
+        .collect();
+    // if there are not enough addresses then add some other ones
+    if addresses.len() == 1 {
+        let split_addr: Vec<String> = addresses[0].clone().split(":").map(|x| x.into()).collect();
+        let addr = split_addr[0].clone();
+        let port: usize = split_addr[1]
+            .clone()
+            .parse::<usize>()
+            .unwrap_or_else(|_| panic!("cant parse port"));
+        for i in 1..args.threads {
+            let mut new_addr = addr.clone();
+            new_addr.push_str(":".into());
+            let new_port = format!("{:?}", port + i);
+            new_addr.push_str(&new_port);
+            addresses.push(new_addr);
+        }
+    }
+    addresses
+}
+
+// Run with relation in flatbuffers format
+fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
+    let start = Instant::now();
+    let (inputs, type_store) = build_inputs_flatbuffers(args)?;
+    info!("time reading ins/wit/rel: {:?}", start.elapsed());
+
+    let addresses: Vec<String> = parse_addresses(args);
+
+    let relation_path = args.relation.clone();
+    match args.command {
+        None => {
+            // Verifier mode
+            let mut conns = start_connection_verifier(&addresses)?;
+
+            let init_time = Instant::now();
+            let total_time = Instant::now();
+
+            let conn = conns.pop().unwrap();
+            let reader = BufReader::new(conn.try_clone()?);
+            let writer = BufWriter::new(conn);
+            let channel_f2_svole = SyncChannel::new(reader, writer);
+
+            let rng = AesRng::new();
+
+            let mut handles = vec![];
+            let (mut evaluator, handle_f2) =
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                    Party::Verifier,
+                    channel_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.nobatching,
+                    args.lpn == LpnSize::Small,
+                )?;
+            handles.push(handle_f2);
+
+            let mut channels_svole = vec![];
+            for _ in 1..conns.len() {
+                let conn = conns.pop().unwrap();
+                let reader = BufReader::new(conn.try_clone()?);
+                let writer = BufWriter::new(conn);
+                channels_svole.push(SyncChannel::new(reader, writer));
+            }
+            //eyre::ensure!(conns.len() == 1);
+            let conn_main = conns.pop().unwrap();
+            let reader = BufReader::new(conn_main.try_clone()?);
+            let writer = BufWriter::new(conn_main);
+            let mut channel = Channel::new(reader, writer);
+
+            let handles_fields = evaluator.load_backends_multithreaded(
+                &mut channel,
+                channels_svole,
+                args.lpn == LpnSize::Small,
+            )?;
+            handles.extend(handles_fields);
+            info!("init time: {:?}", init_time.elapsed());
+
+            let start = Instant::now();
+            evaluator.evaluate_relation(&relation_path).unwrap();
+            info!("circ exec time: {:?}", start.elapsed());
+
+            info!("total time: {:?}", total_time.elapsed());
+            info!("VERIFIER DONE!");
+        }
+        Some(Prover { witness: _ }) => {
+            // Prover mode
+            let mut conns = start_connection_prover(&addresses)?;
+
+            let init_time = Instant::now();
+            let total_time = Instant::now();
+
+            let conn = conns.pop().unwrap();
+            let reader = BufReader::new(conn.try_clone()?);
+            let writer = BufWriter::new(conn);
+            let channel_f2_svole = SyncChannel::new(reader, writer);
+
+            let rng = AesRng::new();
+            let mut handles = vec![];
+            let (mut evaluator, handle_f2) =
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                    Party::Prover,
+                    channel_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    args.nobatching,
+                    args.lpn == LpnSize::Small,
+                )?;
+            handles.push(handle_f2);
+
+            let mut channels_svole = vec![];
+            for _ in 1..conns.len() {
+                let conn = conns.pop().unwrap();
+                let reader = BufReader::new(conn.try_clone()?);
+                let writer = BufWriter::new(conn);
+                channels_svole.push(SyncChannel::new(reader, writer));
+            }
+            //eyre::ensure!(conns.len() == 1);
+            let conn_main = conns.pop().unwrap();
+            let reader = BufReader::new(conn_main.try_clone()?);
+            let writer = BufWriter::new(conn_main);
+            let mut channel = Channel::new(reader, writer);
+
+            let handles_fields = evaluator.load_backends_multithreaded(
+                &mut channel,
+                channels_svole,
+                args.lpn == LpnSize::Small,
+            )?;
+            handles.extend(handles_fields);
+
+            info!("init time: {:?}", init_time.elapsed());
+            let start = Instant::now();
+            evaluator.evaluate_relation(&relation_path)?;
+            info!("circ exec time: {:?}", start.elapsed());
+
+            info!("total time: {:?}", total_time.elapsed());
+            info!("PROVER DONE!");
         }
     }
     Ok(())
@@ -301,15 +606,27 @@ fn run(args: &Cli) -> Result<()> {
     } else {
         info!("verifier mode");
     }
-    info!("addr: {:?}", args.connection_addr);
-    info!("lpn: {:?}", args.lpn);
-    info!("instance: {:?}", args.instance);
-    info!("text format: {:?}", args.text);
+    info!("addr:       {:?}", args.connection_addr);
+    info!("lpn:        {:?}", args.lpn);
+    info!("nobatching: {:?}", args.nobatching);
+    info!("instance:   {:?}", args.instance);
+    info!("text fmt:   {:?}", args.text);
+    info!("threads:    {:?}", args.threads);
 
     if args.text {
-        run_text(args)
+        if args.threads == 1 {
+            run_text(args)
+        } else {
+            assert!(args.threads > 1);
+            run_text_multihtreaded(args)
+        }
     } else {
-        run_flatbuffers(args)
+        if args.threads == 1 {
+            run_flatbuffers(args)
+        } else {
+            assert!(args.threads > 1);
+            run_flatbuffers_multihtreaded(args)
+        }
     }
 }
 

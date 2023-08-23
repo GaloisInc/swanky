@@ -34,3 +34,5 @@ mod sieveir_phase2;
 pub mod text_reader;
 pub use backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 mod plugins;
+pub mod svole_thread;
+pub mod svole_trait;

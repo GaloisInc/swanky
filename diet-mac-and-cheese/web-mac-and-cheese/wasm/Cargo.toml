@@ -28,6 +28,7 @@ scuttlebutt.workspace = true
 ocelot.workspace = true
 diet-mac-and-cheese.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
+swanky-field-binary.workspace = true
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O4']

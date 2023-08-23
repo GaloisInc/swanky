@@ -1,10 +1,12 @@
 use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
+use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{channel::track_unix_channel_pair, field::F61p, AesRng};
 use std::time::Instant;
+use swanky_field_binary::{F40b, F2};
 
-type Prover = ProverConv<F61p>;
-type Verifier = VerifierConv<F61p>;
+type Prover = ProverConv<F61p, SvoleSender<F40b>, SvoleSender<F61p>>;
+type Verifier = VerifierConv<F61p, SvoleReceiver<F2, F40b>, SvoleReceiver<F61p, F61p>>;
 
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
