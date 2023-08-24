@@ -24,10 +24,10 @@ use super::{Plugin, PluginExecution};
 use crate::{
     backend_trait::BackendT,
     circuit_ir::{FunStore, TypeId, TypeStore, WireCount},
+    circuits::GadgetPermutationCheck,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use swanky_field::FiniteRing;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]
@@ -59,74 +59,14 @@ impl PermutationCheckV1 {
 
     /// Run the permutation check on two lists provided by `xs` and `ys`,
     /// utilizing the provided `backend`.
-    pub(crate) fn execute<B: BackendT>(
+    pub(crate) fn execute<B: BackendT + GadgetPermutationCheck>(
         &self,
         xs: &[B::Wire],
         ys: &[B::Wire],
         backend: &mut B,
     ) -> Result<()> {
-        // TODO: Need to ensure that `B::FieldElement` is larger than 40 bits!
-
-        ensure!(
-            xs.len() == ys.len(),
-            "{}: Input lengths are not equal",
-            Self::NAME
-        );
-        ensure!(
-            xs.len() == self.ntuples * self.tuple_size,
-            "{}: Provided input length not equal to expected input length",
-            Self::NAME
-        );
-
-        let minus_one = -B::FieldElement::ONE;
-        let random = backend.random()?;
-
-        // TODO: Better would be to generate random values using `random` as a seed.
-        let mut acc = random;
-        let mut challenges = vec![B::FieldElement::ZERO; self.tuple_size];
-        for challenge in challenges.iter_mut() {
-            *challenge = acc;
-            acc = random * random;
-        }
-
-        let challenge = backend.random()?;
-
-        let mut x = backend.constant(B::FieldElement::ONE)?;
-        for i in 0..self.ntuples {
-            let result = dotproduct(
-                &xs[i * self.tuple_size..(i + 1) * self.tuple_size],
-                &challenges,
-                backend,
-            )?;
-            let tmp = backend.add_constant(&result, challenge * minus_one)?;
-            x = backend.mul(&x, &tmp)?;
-        }
-        let mut y = backend.constant(B::FieldElement::ONE)?;
-        for i in 0..self.ntuples {
-            let result = dotproduct(
-                &ys[i * self.tuple_size..(i + 1) * self.tuple_size],
-                &challenges,
-                backend,
-            )?;
-            let tmp = backend.add_constant(&result, challenge * minus_one)?;
-            y = backend.mul(&y, &tmp)?;
-        }
-        let z = backend.sub(&x, &y)?;
-        backend.assert_zero(&z)
+        backend.permutation_check(xs, ys, self.ntuples, self.tuple_size)
     }
-}
-
-fn dotproduct<B: BackendT>(
-    xs: &[B::Wire],
-    ys: &[B::FieldElement],
-    backend: &mut B,
-) -> Result<B::Wire> {
-    let mut result = backend.input_public(B::FieldElement::ZERO)?;
-    for (x, y) in xs.iter().zip(ys.iter()) {
-        let tmp = backend.mul_constant(x, *y)?;
-        result = backend.add(&result, &tmp)?;
-    }
-    Ok(result)
 }
 
 impl Plugin for PermutationCheckV1 {

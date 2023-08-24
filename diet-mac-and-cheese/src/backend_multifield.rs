@@ -3,7 +3,6 @@
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_trait::Party;
-use crate::dora::{Disjunction, DoraProver, DoraVerifier};
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
@@ -18,7 +17,11 @@ use crate::{
         CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
         WireRange,
     },
-    circuits::BackendLessEqThanWithPublic,
+    circuits::GadgetLessEqThanWithPublic,
+};
+use crate::{
+    circuits::GadgetPermutationCheck,
+    dora::{Disjunction, DoraProver, DoraVerifier},
 };
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use eyre::{bail, ensure, Result};
@@ -181,7 +184,7 @@ impl<E> EdabitsMap<E> {
     }
 }
 
-struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
+pub(crate) struct DietMacAndCheeseConvProver<FE: FiniteField, C: AbstractChannel> {
     dmc: DietMacAndCheeseProver<FE, FE, C>,
     conv: ProverConv<FE>,
     dora: HashMap<usize, DoraState<FE, FE, C>>,
@@ -474,7 +477,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
     }
 }
 
-struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
+pub(crate) struct DietMacAndCheeseConvVerifier<FE: FiniteField, C: AbstractChannel> {
     dmc: DietMacAndCheeseVerifier<FE, FE, C>,
     conv: VerifierConv<FE>,
     dora: HashMap<usize, DoraVerifier<FE, FE, C>>,
@@ -755,10 +758,7 @@ pub struct EvaluatorSingle<B: BackendT> {
     is_boolean: bool,
 }
 
-impl<B: BackendT> EvaluatorSingle<B>
-where
-    B::Wire: Default + Clone + Copy + Debug,
-{
+impl<B: BackendT> EvaluatorSingle<B> {
     fn new(backend: B, is_boolean: bool) -> Self {
         let memory = Memory::new();
         EvaluatorSingle {
@@ -769,9 +769,8 @@ where
     }
 }
 
-impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B>
-where
-    B::Wire: Default + Clone + Copy + Debug,
+impl<B: BackendConvT + BackendDisjunctionT + GadgetPermutationCheck> EvaluatorT
+    for EvaluatorSingle<B>
 {
     #[inline]
     fn evaluate_gate(
@@ -1566,7 +1565,7 @@ pub(crate) mod tests {
     use super::TypeStore;
     use crate::{
         backend_multifield::{EvaluatorCirc, Party},
-        circuits::BackendLessEqThanWithPublic,
+        circuits::GadgetLessEqThanWithPublic,
         fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
     };
     use crate::{
