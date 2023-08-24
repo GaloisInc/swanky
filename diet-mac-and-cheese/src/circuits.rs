@@ -4,10 +4,35 @@
 //! particular implementation of [`BackendT`], add the appropriate `impl
 //! CircuitName for Backend`.
 
-use crate::{backend_trait::BackendT, homcom::Mac};
+use crate::{
+    backend_trait::BackendT,
+    homcom::{MacProver, MacVerifier},
+};
 use eyre::Result;
-use swanky_field::FiniteRing;
+use std::fmt::Debug;
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
+
+/// This trait defines a generic MAC, which can be realized as either a
+/// [`MacProver`] or a [`MacVerifier`].
+pub(crate) trait Mac<V: IsSubFieldOf<T>, T: FiniteField>:
+    Clone + Copy + Debug + PartialEq
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+}
+
+/// A [`MacProver`] is a [`Mac`].
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacProver<V, T> where
+    T::PrimeField: IsSubFieldOf<V>
+{
+}
+
+/// A [`MacVerifier`] is a [`Mac`].
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacVerifier<T> where
+    T::PrimeField: IsSubFieldOf<V>
+{
+}
 
 /// This trait implements a "less-than-or-equal" circuit `a <= b` for [`F2`],
 /// where `a` contains MAC'd values, and `b` is public.
