@@ -1,16 +1,12 @@
+use crate::backend_trait::{BackendT, Party};
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
-};
-use crate::{
-    backend_trait::{BackendT, Party},
-    circuits::BackendLessEqThanWithPublic,
 };
 use eyre::{eyre, Result};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_field_binary::{F40b, F2};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -251,11 +247,6 @@ where
         self.prover.reset(&mut self.state_mult_check);
         self.is_ok = true;
     }
-}
-
-impl<C: AbstractChannel> BackendLessEqThanWithPublic<MacProver<F2, F40b>>
-    for DietMacAndCheeseProver<F2, F40b, C>
-{
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<V, T, C>
@@ -508,11 +499,6 @@ where
         self.verifier.reset(&mut self.state_mult_check);
         self.is_ok = true;
     }
-}
-
-impl<C: AbstractChannel> BackendLessEqThanWithPublic<MacVerifier<F40b>>
-    for DietMacAndCheeseVerifier<F2, F40b, C>
-{
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<V, T, C>

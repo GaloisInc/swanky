@@ -7,8 +7,10 @@
 use crate::{
     backend_trait::BackendT,
     homcom::{MacProver, MacVerifier},
+    DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };
 use eyre::Result;
+use scuttlebutt::AbstractChannel;
 use std::fmt::Debug;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
@@ -85,4 +87,15 @@ pub(crate) trait BackendLessEqThanWithPublic<M: Mac<F2, F40b>>:
 
         self.assert_zero(&r)
     }
+}
+
+/// Enable [`BackendLessEqThanWithPublic`] for the DMC prover over [`F2`].
+impl<C: AbstractChannel> BackendLessEqThanWithPublic<MacProver<F2, F40b>>
+    for DietMacAndCheeseProver<F2, F40b, C>
+{
+}
+/// Enable [`BackendLessEqThanWithPublic`] for the DMC verifier over [`F2`].
+impl<C: AbstractChannel> BackendLessEqThanWithPublic<MacVerifier<F40b>>
+    for DietMacAndCheeseVerifier<F2, F40b, C>
+{
 }
