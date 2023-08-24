@@ -13,12 +13,15 @@ use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::{
     cell::{RefCell, RefMut},
+    fmt::Debug,
     rc::Rc,
 };
 use std::{marker::PhantomData, time::Instant};
 use subtle::{Choice, ConditionallySelectable};
 
-pub trait Mac<V: IsSubFieldOf<T>, T: FiniteField>: Clone + Copy
+/// This trait defines a generic MAC, which can be realized as either a
+/// [`MacProver`] or a [`MacVerifier`].
+pub trait Mac<V: IsSubFieldOf<T>, T: FiniteField>: Clone + Copy + Debug + PartialEq
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
