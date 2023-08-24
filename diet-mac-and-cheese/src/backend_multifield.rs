@@ -3,10 +3,6 @@
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_trait::Party;
-use crate::circuit_ir::{
-    CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
-    WireRange,
-};
 use crate::dora::{Disjunction, DoraProver, DoraVerifier};
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
@@ -17,6 +13,13 @@ use crate::read_sieveir_phase2::BufRelation;
 use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
+use crate::{
+    circuit_ir::{
+        CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
+        WireRange,
+    },
+    circuits::BackendLessEqThanWithPublic,
+};
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use eyre::{bail, ensure, Result};
 use generic_array::typenum::Unsigned;
@@ -284,58 +287,6 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
 }
 
 impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
-    pub(crate) fn less_eq_than_with_public2(
-        &mut self,
-        a: &[MacProver<F2, F40b>],
-        b: &[F2],
-    ) -> Result<()> {
-        // act = 1;
-        // r   = 0;
-        // for i in 0..(n+1):
-        //     act' = act(1+a+b)
-        //     r'   = r + ((r+1) * act * a * (b+1))
-        // assert_zero(r)
-        assert_eq!(a.len(), b.len());
-
-        let mut act = self.dmc_f2.input_public(F2::ONE)?;
-        let mut r = self.dmc_f2.input_public(F2::ZERO)?;
-
-        // data assumed provided in little-endian
-        let l = a.len();
-        for i in 0..a.len() {
-            let a_i = a[l - i - 1];
-            let b_i = b[l - i - 1];
-            // (1+a+b)
-            let a_plus_b = self.dmc_f2.add_constant(&a_i, b_i)?;
-            let one_plus_a_plus_b = self.dmc_f2.add_constant(&a_plus_b, F2::ONE)?;
-
-            // act' = act(1+a+b)
-            let act_prime = self.dmc_f2.mul(&act, &one_plus_a_plus_b)?;
-
-            // r + 1
-            let r_plus_one = self.dmc_f2.add_constant(&r, F2::ONE)?;
-
-            // p1 = a * (b+1)
-            let b_1 = b_i + F2::ONE;
-            let p1 = self.dmc_f2.mul_constant(&a_i, b_1)?;
-
-            // act * (a * (b+1))
-            let act_times_p1 = self.dmc_f2.mul(&act, &p1)?;
-
-            // (r+1) * (act * (a * (b+1)))
-            let p2 = self.dmc_f2.mul(&r_plus_one, &act_times_p1)?;
-
-            // r' = r + ((r+1) * act * a * (b+1))
-            let r_prime = self.dmc_f2.add(&r, &p2)?;
-
-            act = act_prime;
-            r = r_prime;
-        }
-
-        self.dmc_f2.assert_zero(&r)?;
-        Ok(())
-    }
-
     fn maybe_do_conversion_check(&mut self, id: usize, num: usize) -> Result<()> {
         if num > SIZE_CONVERSION_BATCH || self.no_batching {
             let edabits = self.edabits_map.0.get_mut(&id).unwrap();
@@ -439,7 +390,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
             v.push(MacProver::new(b2, mac));
         }
 
-        self.less_eq_than_with_public2(
+        self.dmc_f2.less_eq_than_with_public2(
             &v,
             (-FE::ONE)
                 .bit_decomposition()
@@ -627,55 +578,6 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
 }
 
 impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
-    fn less_eq_than_with_public2(&mut self, a: &[MacVerifier<F40b>], b: &[F2]) -> Result<()> {
-        // act = 1;
-        // r   = 0;
-        // for i in 0..(n+1):
-        //     act' = act(1+a+b)
-        //     r'   = r + ((r+1) * act * a * (b+1))
-        // assert_zero(r)
-        assert_eq!(a.len(), b.len());
-
-        let mut act = self.dmc_f2.input_public(F2::ONE)?;
-        let mut r = self.dmc_f2.input_public(F2::ZERO)?;
-
-        // data assumed provided in little-endian
-        let l = a.len();
-        for i in 0..a.len() {
-            let a_i = a[l - i - 1];
-            let b_i = b[l - i - 1];
-
-            // (1+a+b)
-            let a_plus_b = self.dmc_f2.add_constant(&a_i, b_i)?;
-            let one_plus_a_plus_b = self.dmc_f2.add_constant(&a_plus_b, F2::ONE)?;
-
-            // act' = act(1+a+b)
-            let act_prime = self.dmc_f2.mul(&act, &one_plus_a_plus_b)?;
-
-            // r + 1
-            let r_plus_one = self.dmc_f2.add_constant(&r, F2::ONE)?;
-
-            // p1 = a * (b+1)
-            let b_1 = b_i + F2::ONE;
-            let p1 = self.dmc_f2.mul_constant(&a_i, b_1)?;
-
-            // act * (a * (b+1))
-            let act_times_p1 = self.dmc_f2.mul(&act, &p1)?;
-
-            // (r+1) * (act * (a * (b+1)))
-            let p2 = self.dmc_f2.mul(&r_plus_one, &act_times_p1)?;
-
-            // r' = r + ((r+1) * act * a * (b+1))
-            let r_prime = self.dmc_f2.add(&r, &p2)?;
-
-            act = act_prime;
-            r = r_prime;
-        }
-
-        self.dmc_f2.assert_zero(&r)?;
-        Ok(())
-    }
-
     fn maybe_do_conversion_check(&mut self, id: usize, num: usize) -> Result<()> {
         if num > SIZE_CONVERSION_BATCH || self.no_batching {
             let edabits = self.edabits_map.0.get_mut(&id).unwrap();
@@ -727,7 +629,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
             v.push(mac);
         }
 
-        self.less_eq_than_with_public2(
+        self.dmc_f2.less_eq_than_with_public2(
             &v,
             (-FE::ONE)
                 .bit_decomposition()
@@ -1664,6 +1566,7 @@ pub(crate) mod tests {
     use super::TypeStore;
     use crate::{
         backend_multifield::{EvaluatorCirc, Party},
+        circuits::BackendLessEqThanWithPublic,
         fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
     };
     use crate::{
@@ -2312,29 +2215,35 @@ pub(crate) mod tests {
             let one = party.dmc_f2.input_private(Some(F2::ONE)).unwrap();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
             party
+                .dmc_f2
                 .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ONE].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
             party
+                .dmc_f2
                 .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ONE].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
             party
+                .dmc_f2
                 .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
             let _ = party.dmc_f2.finalize().unwrap_err();
             party.dmc_f2.reset();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(
                     vec![one, one, zero].as_slice(),
                     vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
@@ -2343,6 +2252,7 @@ pub(crate) mod tests {
             party.dmc_f2.finalize().unwrap();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(
                     vec![one, one, one].as_slice(),
                     vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
@@ -2352,6 +2262,7 @@ pub(crate) mod tests {
             party.dmc_f2.reset();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(
                     vec![one, zero, zero].as_slice(),
                     vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
@@ -2360,6 +2271,7 @@ pub(crate) mod tests {
             party.dmc_f2.finalize().unwrap();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(
                     vec![one, one, one].as_slice(),
                     vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
@@ -2368,6 +2280,7 @@ pub(crate) mod tests {
             party.dmc_f2.finalize().unwrap();
 
             party
+                .dmc_f2
                 .less_eq_than_with_public2(
                     vec![one, zero, one, one].as_slice(),
                     vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
@@ -2378,6 +2291,7 @@ pub(crate) mod tests {
 
             // that's testing the little-endianness of the function
             party
+                .dmc_f2
                 .less_eq_than_with_public2(
                     vec![one, one].as_slice(),
                     vec![F2::ZERO, F2::ONE].as_slice(),
@@ -2414,29 +2328,35 @@ pub(crate) mod tests {
         let one = party.dmc_f2.input_private(None).unwrap();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
         party
+            .dmc_f2
             .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ONE].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
         party
+            .dmc_f2
             .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ONE].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
         party
+            .dmc_f2
             .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
         let _ = party.dmc_f2.finalize().unwrap_err();
         party.dmc_f2.reset();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(
                 vec![one, one, zero].as_slice(),
                 vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
@@ -2445,6 +2365,7 @@ pub(crate) mod tests {
         party.dmc_f2.finalize().unwrap();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(
                 vec![one, one, one].as_slice(),
                 vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
@@ -2454,6 +2375,7 @@ pub(crate) mod tests {
         party.dmc_f2.reset();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(
                 vec![one, zero, zero].as_slice(),
                 vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
@@ -2462,6 +2384,7 @@ pub(crate) mod tests {
         party.dmc_f2.finalize().unwrap();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(
                 vec![one, one, one].as_slice(),
                 vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
@@ -2470,6 +2393,7 @@ pub(crate) mod tests {
         party.dmc_f2.finalize().unwrap();
 
         party
+            .dmc_f2
             .less_eq_than_with_public2(
                 vec![one, zero, one, one].as_slice(),
                 vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
@@ -2480,6 +2404,7 @@ pub(crate) mod tests {
 
         // that's testing the little-endianness of the function
         party
+            .dmc_f2
             .less_eq_than_with_public2(
                 vec![one, one].as_slice(),
                 vec![F2::ZERO, F2::ONE].as_slice(),

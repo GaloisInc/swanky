@@ -18,6 +18,12 @@ use std::{
 use std::{marker::PhantomData, time::Instant};
 use subtle::{Choice, ConditionallySelectable};
 
+pub trait Mac<V: IsSubFieldOf<T>, T: FiniteField>: Clone + Copy
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+}
+
 /// This type holds the prover-side data associated with a MAC between a prover
 /// and verifier (see [`MacVerifier`] for the verifier-side data).
 ///
@@ -34,6 +40,11 @@ pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
 )
 where
     T::PrimeField: IsSubFieldOf<V>;
+
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacProver<V, T> where
+    T::PrimeField: IsSubFieldOf<V>
+{
+}
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T>
 where
@@ -89,6 +100,11 @@ pub struct MacVerifier<T: FiniteField>(
     /// The verifier's MAC key `k`.
     T,
 );
+
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacVerifier<T> where
+    T::PrimeField: IsSubFieldOf<V>
+{
+}
 
 impl<T: FiniteField> MacVerifier<T> {
     pub fn new(k: T) -> Self {
