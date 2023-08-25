@@ -17,7 +17,9 @@ use eyre::{ensure, Result};
 use generic_array::typenum::Unsigned;
 use scuttlebutt::AbstractChannel;
 use std::fmt::Debug;
-use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
+use swanky_field::{
+    FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField, StatisticallySecureField,
+};
 use swanky_field_binary::{F40b, F2};
 
 /// This trait defines a generic MAC, which can be realized as either a
@@ -199,17 +201,16 @@ pub(crate) trait GadgetPermutationCheck: BackendT + GadgetDotProduct {
     }
 }
 
-/// XXX: NOT CORRECT! F2 is NOT secure!
-impl<T: PrimeFiniteField, C: AbstractChannel> GadgetPermutationCheck
+impl<T: PrimeFiniteField + StatisticallySecureField, C: AbstractChannel> GadgetPermutationCheck
     for DietMacAndCheeseConvProver<T, C>
 {
 }
-/// XXX: NOT CORRECT! F2 is NOT secure!
-impl<T: PrimeFiniteField, C: AbstractChannel> GadgetPermutationCheck
+impl<T: PrimeFiniteField + StatisticallySecureField, C: AbstractChannel> GadgetPermutationCheck
     for DietMacAndCheeseConvVerifier<T, C>
 {
 }
-/// XXX: NOT CORRECT! F2 is NOT secure!
+
+/// Note: This is not correct! F2 is NOT secure! Need to use extension fields here.
 impl<C: AbstractChannel> GadgetPermutationCheck for DietMacAndCheeseProver<F2, F40b, C> {}
-/// XXX: NOT CORRECT! F2 is NOT secure!
+/// Note: This is not correct! F2 is NOT secure! Need to use extension fields here.
 impl<C: AbstractChannel> GadgetPermutationCheck for DietMacAndCheeseVerifier<F2, F40b, C> {}
