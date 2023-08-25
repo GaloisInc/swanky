@@ -62,8 +62,18 @@ use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
 //   Profiler was showing a lot of time on `drop Gate`, which implies not building the intermediate gate
 // * Reduce to one round the `mult_check` and `check_zero`.
 
-/// Conversions between fields are batched, and this constant defines the batch size.
-const SIZE_CONVERSION_BATCH: usize = 100_000;
+/// Conversions between fields are batched, and this constant defines the batch size
+/// with parameter B=5, B=4, B=3.
+/// The size of the conversion batch is coming from the Theorem 1 of the Appenzeller to Brie paper.
+/// N >= 2^{s/(B-1)} for B=3 or 4 or 5, and s is the security parameter.
+/// We get the following constants for N with s=40.
+/// For B = 5, N = 1024
+/// For B = 4, N = 10_321;
+/// For B = 3, N = 1_048_576;
+const CONVERSION_PARAM_B: usize = 4; // We choose B=4, because it's a good space/time
+const CONVERSION_BATCH_SIZE: usize = 10_321;
+// When we have fewer than 10_321 conversions, let's be safe and use 5.
+const CONVERSION_PARAM_B_SAFE: usize = 5;
 
 #[derive(Clone, Debug)]
 pub enum MacBitGeneric {
@@ -168,19 +178,27 @@ impl<C: AbstractChannel> BackendConvT for DietMacAndCheeseVerifier<F2, F40b, C> 
 // this structure is for grouping the edabits with the same number of bits.
 // This is necessary for example when F1 -> F2 and F3 -> F2, with F1 and F3
 // requiring a different number of bits.
-// NOTE: We use a BTreeMap instead of a HashMap so that the iterator is sorted over the keys, which proved
-// to be useful during `finalize`
+// NOTE: We use a BTreeMap instead of a HashMap so that the iterator is sorted over the keys, which
+// is essential during `finalize`. The keys must be sorted deterministically so that the prover and verifier are in sync while finalizing
+// the conversion for every bit width.
 struct EdabitsMap<E>(BTreeMap<usize, Vec<E>>);
 
 impl<E> EdabitsMap<E> {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         EdabitsMap(BTreeMap::new())
     }
 
-    pub(crate) fn push_elm(&mut self, k: usize, e: E) -> usize {
-        self.0.entry(k).or_insert_with(std::vec::Vec::new);
-        self.0.get_mut(&k).as_mut().unwrap().push(e);
-        self.0.len()
+    fn push_elem(&mut self, bit_width: usize, e: E) {
+        self.0.entry(bit_width).or_insert_with(std::vec::Vec::new);
+        self.0.get_mut(&bit_width).as_mut().unwrap().push(e);
+    }
+
+    fn get_edabits(&mut self, bit_width: usize) -> Option<&mut Vec<E>> {
+        self.0.get_mut(&bit_width)
+    }
+
+    fn set_edabits(&mut self, bit_width: usize, edabits: Vec<E>) {
+        self.0.insert(bit_width, edabits);
     }
 }
 
@@ -290,18 +308,35 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
 }
 
 impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C> {
-    fn maybe_do_conversion_check(&mut self, id: usize, num: usize) -> Result<()> {
-        if num > SIZE_CONVERSION_BATCH || self.no_batching {
-            let edabits = self.edabits_map.0.get_mut(&id).unwrap();
+    fn maybe_do_conversion_check(&mut self, bit_width: usize) -> Result<()> {
+        let edabits = self.edabits_map.get_edabits(bit_width).unwrap();
+        let num = edabits.len();
+        if self.no_batching {
             self.conv.conv(
                 &mut self.dmc.channel,
                 &mut self.dmc.rng,
-                5,
-                5,
+                CONVERSION_PARAM_B_SAFE,
+                CONVERSION_PARAM_B_SAFE,
                 edabits,
                 None,
             )?;
-            self.edabits_map.0.insert(id, vec![]);
+            self.edabits_map.set_edabits(bit_width, vec![]);
+        } else if num >= CONVERSION_BATCH_SIZE {
+            let index_to_split = edabits.len() - CONVERSION_BATCH_SIZE;
+            let (_, edabits_to_process) = edabits.split_at(index_to_split);
+            self.conv.conv(
+                &mut self.dmc.channel,
+                &mut self.dmc.rng,
+                CONVERSION_PARAM_B,
+                CONVERSION_PARAM_B,
+                edabits_to_process,
+                None,
+            )?;
+            edabits.truncate(index_to_split);
+            assert_eq!(
+                edabits.len(),
+                self.edabits_map.get_edabits(bit_width).unwrap().len()
+            );
         }
 
         Ok(())
@@ -405,11 +440,10 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
 
         let r = v.iter().map(|m| MacBitGeneric::BitProver(*m)).collect();
 
-        let id = v.len();
-        let num = self
-            .edabits_map
-            .push_elm(id, EdabitsProver { bits: v, value: *a });
-        self.maybe_do_conversion_check(id, num)?;
+        let bit_width = v.len();
+        self.edabits_map
+            .push_elem(bit_width, EdabitsProver { bits: v, value: *a });
+        self.maybe_do_conversion_check(bit_width)?;
 
         Ok(r)
     }
@@ -454,21 +488,21 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
             Some(recomposed_value),
         )?;
 
-        let id = bits.len();
-        let num = self
-            .edabits_map
-            .push_elm(id, EdabitsProver { bits, value: mac });
-        self.maybe_do_conversion_check(id, num)?;
+        let bit_width = bits.len();
+        self.edabits_map
+            .push_elem(bit_width, EdabitsProver { bits, value: mac });
+        self.maybe_do_conversion_check(bit_width)?;
         Ok(mac)
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
         for (_key, edabits) in self.edabits_map.0.iter() {
+            assert!(edabits.len() <= CONVERSION_BATCH_SIZE);
             self.conv.conv(
                 &mut self.dmc.channel,
                 &mut self.dmc.rng,
-                5,
-                5,
+                CONVERSION_PARAM_B_SAFE,
+                CONVERSION_PARAM_B_SAFE,
                 edabits,
                 None,
             )?;
@@ -581,18 +615,35 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendT for DietMacAndCheeseConv
 }
 
 impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, C> {
-    fn maybe_do_conversion_check(&mut self, id: usize, num: usize) -> Result<()> {
-        if num > SIZE_CONVERSION_BATCH || self.no_batching {
-            let edabits = self.edabits_map.0.get_mut(&id).unwrap();
+    fn maybe_do_conversion_check(&mut self, bit_width: usize) -> Result<()> {
+        let edabits = self.edabits_map.get_edabits(bit_width).unwrap();
+        let num = edabits.len();
+        if self.no_batching {
             self.conv.conv(
                 &mut self.dmc.channel,
                 &mut self.dmc.rng,
-                5,
-                5,
+                CONVERSION_PARAM_B_SAFE,
+                CONVERSION_PARAM_B_SAFE,
                 edabits,
                 None,
             )?;
-            self.edabits_map.0.insert(id, vec![]);
+            self.edabits_map.set_edabits(bit_width, vec![]);
+        } else if num >= CONVERSION_BATCH_SIZE {
+            let index_to_split = edabits.len() - CONVERSION_BATCH_SIZE;
+            let (_, edabits_to_process) = edabits.split_at(index_to_split);
+            self.conv.conv(
+                &mut self.dmc.channel,
+                &mut self.dmc.rng,
+                CONVERSION_PARAM_B,
+                CONVERSION_PARAM_B,
+                edabits_to_process,
+                None,
+            )?;
+            edabits.truncate(index_to_split);
+            assert_eq!(
+                edabits.len(),
+                self.edabits_map.0.get_mut(&bit_width).unwrap().len()
+            );
         }
 
         Ok(())
@@ -645,11 +696,10 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
 
         let r = v.iter().map(|m| MacBitGeneric::BitVerifier(*m)).collect();
 
-        let id = v.len();
-        let num = self
-            .edabits_map
-            .push_elm(id, EdabitsVerifier { bits: v, value: *a });
-        self.maybe_do_conversion_check(id, num)?;
+        let bit_width = v.len();
+        self.edabits_map
+            .push_elem(bit_width, EdabitsVerifier { bits: v, value: *a });
+        self.maybe_do_conversion_check(bit_width)?;
 
         Ok(r)
     }
@@ -678,22 +728,24 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
         let mac =
             <DietMacAndCheeseVerifier<FE, FE, _> as BackendT>::input_private(&mut self.dmc, None)?;
 
-        let id = bits.len();
-        let num = self
-            .edabits_map
-            .push_elm(id, EdabitsVerifier { bits, value: mac });
-        self.maybe_do_conversion_check(id, num)?;
+        let bit_width = bits.len();
+        self.edabits_map
+            .push_elem(bit_width, EdabitsVerifier { bits, value: mac });
+        self.maybe_do_conversion_check(bit_width)?;
 
         Ok(mac)
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
+        // The keys must be sorted deterministically so that the prover and verifier are in sync.
+        // This is the reason why the EdabitsMap is using a BTreeMap instead of a HashMap.
         for (_key, edabits) in self.edabits_map.0.iter() {
+            assert!(edabits.len() <= CONVERSION_BATCH_SIZE);
             self.conv.conv(
                 &mut self.dmc.channel,
                 &mut self.dmc.rng,
-                5,
-                5,
+                CONVERSION_PARAM_B_SAFE,
+                CONVERSION_PARAM_B_SAFE,
                 edabits,
                 None,
             )?;
