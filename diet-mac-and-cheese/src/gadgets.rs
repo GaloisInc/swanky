@@ -22,8 +22,7 @@ use swanky_field_binary::{F40b, F2};
 
 /// This trait defines a generic MAC, which can be realized as either a
 /// [`MacProver`] or a [`MacVerifier`].
-pub(crate) trait Mac<V: IsSubFieldOf<T>, T: FiniteField>:
-    Clone + Copy + Debug + PartialEq
+trait Mac<V: IsSubFieldOf<T>, T: FiniteField>: Clone + Copy + Debug + PartialEq
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
