@@ -6,6 +6,16 @@
 //!
 //! To "enable" a gadget for a particular implementation of [`BackendT`], add
 //! the appropriate `impl GadgetName for Backend`.
+//!
+//! Note! A significant limitation of this design is when we need to
+//! "specialize" a gadget to a particular field. For example, we need a
+//! specialized gadget for a permutation check on [`F2`]. This is not possible
+//! with the current design, so for something like [`F2`] we need to revert to
+//! the old "copy-the-code-between-the-prover-and-verifier" approach, which is
+//! not ideal. A potential fix for this is to move to using a `Party` trait
+//! instead of having separate `Prover` and `Verifier` implementations. However,
+//! this is a much larger refactor, and will take time. So for now, if we need
+//! specialization, we copy-and-paste.
 
 use crate::{
     backend_multifield::{DietMacAndCheeseConvProver, DietMacAndCheeseConvVerifier},
