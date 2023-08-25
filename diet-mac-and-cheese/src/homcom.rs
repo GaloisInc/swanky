@@ -13,6 +13,7 @@ use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::{
     cell::{RefCell, RefMut},
+    fmt::Debug,
     rc::Rc,
 };
 use std::{marker::PhantomData, time::Instant};
