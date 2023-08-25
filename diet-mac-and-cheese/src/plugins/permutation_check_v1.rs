@@ -24,7 +24,7 @@ use super::{Plugin, PluginExecution};
 use crate::{
     backend_trait::BackendT,
     circuit_ir::{FunStore, TypeId, TypeStore, WireCount},
-    circuits::GadgetPermutationCheck,
+    gadgets::GadgetPermutationCheck,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;

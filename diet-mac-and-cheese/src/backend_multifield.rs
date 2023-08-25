@@ -17,11 +17,11 @@ use crate::{
         CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
         WireRange,
     },
-    circuits::GadgetLessEqThanWithPublic,
+    gadgets::GadgetLessThanEqWithPublic,
 };
 use crate::{
-    circuits::GadgetPermutationCheck,
     dora::{Disjunction, DoraProver, DoraVerifier},
+    gadgets::GadgetPermutationCheck,
 };
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use eyre::{bail, ensure, Result};
@@ -393,7 +393,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
             v.push(MacProver::new(b2, mac));
         }
 
-        self.dmc_f2.less_eq_than_with_public2(
+        self.dmc_f2.less_than_eq_with_public(
             &v,
             (-FE::ONE)
                 .bit_decomposition()
@@ -632,7 +632,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
             v.push(mac);
         }
 
-        self.dmc_f2.less_eq_than_with_public2(
+        self.dmc_f2.less_than_eq_with_public(
             &v,
             (-FE::ONE)
                 .bit_decomposition()
@@ -1565,8 +1565,8 @@ pub(crate) mod tests {
     use super::TypeStore;
     use crate::{
         backend_multifield::{EvaluatorCirc, Party},
-        circuits::GadgetLessEqThanWithPublic,
         fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
+        gadgets::GadgetLessThanEqWithPublic,
     };
     use crate::{
         backend_trait::BackendT,
@@ -2215,35 +2215,35 @@ pub(crate) mod tests {
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
+                .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
             party
                 .dmc_f2
-                .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ONE].as_slice())
+                .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ONE].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
             party
                 .dmc_f2
-                .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ONE].as_slice())
+                .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ONE].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
             party
                 .dmc_f2
-                .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ZERO].as_slice())
+                .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
             let _ = party.dmc_f2.finalize().unwrap_err();
             party.dmc_f2.reset();
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
+                .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
                 .unwrap();
             party.dmc_f2.finalize().unwrap();
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(
+                .less_than_eq_with_public(
                     vec![one, one, zero].as_slice(),
                     vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
                 )
@@ -2252,7 +2252,7 @@ pub(crate) mod tests {
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(
+                .less_than_eq_with_public(
                     vec![one, one, one].as_slice(),
                     vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
                 )
@@ -2262,7 +2262,7 @@ pub(crate) mod tests {
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(
+                .less_than_eq_with_public(
                     vec![one, zero, zero].as_slice(),
                     vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
                 )
@@ -2271,7 +2271,7 @@ pub(crate) mod tests {
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(
+                .less_than_eq_with_public(
                     vec![one, one, one].as_slice(),
                     vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
                 )
@@ -2280,7 +2280,7 @@ pub(crate) mod tests {
 
             party
                 .dmc_f2
-                .less_eq_than_with_public2(
+                .less_than_eq_with_public(
                     vec![one, zero, one, one].as_slice(),
                     vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
                 )
@@ -2291,7 +2291,7 @@ pub(crate) mod tests {
             // that's testing the little-endianness of the function
             party
                 .dmc_f2
-                .less_eq_than_with_public2(
+                .less_than_eq_with_public(
                     vec![one, one].as_slice(),
                     vec![F2::ZERO, F2::ONE].as_slice(),
                 )
@@ -2328,35 +2328,35 @@ pub(crate) mod tests {
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
+            .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
         party
             .dmc_f2
-            .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ONE].as_slice())
+            .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ONE].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
         party
             .dmc_f2
-            .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ONE].as_slice())
+            .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ONE].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
         party
             .dmc_f2
-            .less_eq_than_with_public2(vec![one].as_slice(), vec![F2::ZERO].as_slice())
+            .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
         let _ = party.dmc_f2.finalize().unwrap_err();
         party.dmc_f2.reset();
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
+            .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
             .unwrap();
         party.dmc_f2.finalize().unwrap();
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(
+            .less_than_eq_with_public(
                 vec![one, one, zero].as_slice(),
                 vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
             )
@@ -2365,7 +2365,7 @@ pub(crate) mod tests {
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(
+            .less_than_eq_with_public(
                 vec![one, one, one].as_slice(),
                 vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
             )
@@ -2375,7 +2375,7 @@ pub(crate) mod tests {
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(
+            .less_than_eq_with_public(
                 vec![one, zero, zero].as_slice(),
                 vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
             )
@@ -2384,7 +2384,7 @@ pub(crate) mod tests {
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(
+            .less_than_eq_with_public(
                 vec![one, one, one].as_slice(),
                 vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
             )
@@ -2393,7 +2393,7 @@ pub(crate) mod tests {
 
         party
             .dmc_f2
-            .less_eq_than_with_public2(
+            .less_than_eq_with_public(
                 vec![one, zero, one, one].as_slice(),
                 vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
             )
@@ -2404,7 +2404,7 @@ pub(crate) mod tests {
         // that's testing the little-endianness of the function
         party
             .dmc_f2
-            .less_eq_than_with_public2(
+            .less_than_eq_with_public(
                 vec![one, one].as_slice(),
                 vec![F2::ZERO, F2::ONE].as_slice(),
             )

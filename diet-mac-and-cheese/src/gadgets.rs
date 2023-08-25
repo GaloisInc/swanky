@@ -1,8 +1,11 @@
-//! This module contains a collection of circuits.
+//! This module contains a collection of circuit gadgets.
 //!
-//! Each circuit is encapsulated in a trait. To "enable" a circuit for a
-//! particular implementation of [`BackendT`], add the appropriate `impl
-//! CircuitName for Backend`.
+//! A circuit gadget implements some computation over a (possibly
+//! type-constrained) [`BackendT`]. Each gadget is encapsulated in a trait to
+//! allow reusing the gadget between both the prover and the verifier.
+//!
+//! To "enable" a gadget for a particular implementation of [`BackendT`], add
+//! the appropriate `impl GadgetName for Backend`.
 
 use crate::{
     backend_multifield::{DietMacAndCheeseConvProver, DietMacAndCheeseConvVerifier},
@@ -11,6 +14,7 @@ use crate::{
     DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };
 use eyre::{ensure, Result};
+use generic_array::typenum::Unsigned;
 use scuttlebutt::AbstractChannel;
 use std::fmt::Debug;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
@@ -39,12 +43,8 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacVerifier<T> where
 
 /// This trait implements a "less-than-or-equal" circuit `a <= b` for [`F2`],
 /// where `a` contains MAC'd values, and `b` is public.
-pub(crate) trait GadgetLessEqThanWithPublic: BackendT<FieldElement = F2> {
-    fn less_eq_than_with_public2(
-        &mut self,
-        a: &[<Self as BackendT>::Wire],
-        b: &[F2],
-    ) -> Result<()> {
+pub(crate) trait GadgetLessThanEqWithPublic: BackendT<FieldElement = F2> {
+    fn less_than_eq_with_public(&mut self, a: &[<Self as BackendT>::Wire], b: &[F2]) -> Result<()> {
         // act = 1;
         // r   = 0;
         // for i in 0..(n+1):
@@ -92,15 +92,17 @@ pub(crate) trait GadgetLessEqThanWithPublic: BackendT<FieldElement = F2> {
     }
 }
 
-/// Enable [`BackendLessEqThanWithPublic`] for the DMC prover over [`F2`].
-impl<C: AbstractChannel> GadgetLessEqThanWithPublic for DietMacAndCheeseProver<F2, F40b, C> {}
-/// Enable [`BackendLessEqThanWithPublic`] for the DMC verifier over [`F2`].
-impl<C: AbstractChannel> GadgetLessEqThanWithPublic for DietMacAndCheeseVerifier<F2, F40b, C> {}
+/// Enable [`GadgetLessThanEqWithPublic`] for the DMC prover over [`F2`].
+impl<C: AbstractChannel> GadgetLessThanEqWithPublic for DietMacAndCheeseProver<F2, F40b, C> {}
+/// Enable [`GadgetLessThanEqWithPublic`] for the DMC verifier over [`F2`].
+impl<C: AbstractChannel> GadgetLessThanEqWithPublic for DietMacAndCheeseVerifier<F2, F40b, C> {}
 
 /// This trait implements a "dotproduct" gadget.
 ///
 /// It computes `xs · ys`, where `xs` contains MAC'd values and `ys` contains
 /// public values.
+///
+/// This gadget works over all fields.
 pub(crate) trait GadgetDotProduct: BackendT {
     fn dotproduct_with_public(
         &mut self,
@@ -143,7 +145,10 @@ impl<T: PrimeFiniteField, C: AbstractChannel> GadgetDotProduct
 
 /// This trait implements a "permutation check" gadget.
 ///
-/// It checks whether `xs = 𝛑(ys)`, erroring out if not.
+/// It asserts that `xs = 𝛑(ys)`, erroring out if not.
+///
+/// This gadget currently only works over fields larger than the statistical
+/// security parameter (which we have harded at 40 bits).
 pub(crate) trait GadgetPermutationCheck: BackendT + GadgetDotProduct {
     fn permutation_check(
         &mut self,
@@ -152,7 +157,10 @@ pub(crate) trait GadgetPermutationCheck: BackendT + GadgetDotProduct {
         ntuples: usize,
         tuple_size: usize,
     ) -> Result<()> {
-        // TODO: Need to ensure that `B::FieldElement` is larger than 40 bits!
+        ensure!(
+            <Self::FieldElement as FiniteField>::NumberOfBitsInBitDecomposition::USIZE >= 40,
+            "Field size must be >= 40 bits"
+        );
 
         ensure!(xs.len() == ys.len(), "Input lengths are not equal",);
         ensure!(
