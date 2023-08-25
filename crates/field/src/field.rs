@@ -5,6 +5,7 @@ use crate::{
     ring::{FiniteRing, IsSubRingOf},
 };
 use crypto_bigint::{Limb, Uint};
+use generic_array::typenum;
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
 use subtle::CtOption;
@@ -171,6 +172,16 @@ pub trait PrimeFiniteField:
     /// Try to convert a `Uint` into a `PrimeFiniteField` value, returning
     /// a [`CtOption`].
     fn try_from_int<const LIMBS: usize>(x: Uint<LIMBS>) -> CtOption<Self>;
+}
+
+/// A marker trait for [`FiniteField`]s large enough to achieve statistical
+/// security, where we hardcode the statistical security parameter to be 40
+/// bits.
+pub trait StatisticallySecureField: FiniteField {}
+impl<T: FiniteField> StatisticallySecureField for T where
+    Self::NumberOfBitsInBitDecomposition:
+        typenum::type_operators::Cmp<typenum::consts::U39, Output = typenum::Greater>
+{
 }
 
 /// Automatically implement boilerplate field operations for the given type.
