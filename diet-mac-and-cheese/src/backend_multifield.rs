@@ -26,7 +26,7 @@ use crate::{
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use eyre::{bail, ensure, Result};
 use generic_array::typenum::Unsigned;
-use log::{debug, info};
+use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::Number;
 use ocelot::svole::LpnParams;
@@ -62,18 +62,40 @@ use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
 //   Profiler was showing a lot of time on `drop Gate`, which implies not building the intermediate gate
 // * Reduce to one round the `mult_check` and `check_zero`.
 
-/// Conversions between fields are batched, and this constant defines the batch size
-/// with parameter B=5, B=4, B=3.
-/// The size of the conversion batch is coming from the Theorem 1 of the Appenzeller to Brie paper.
-/// N >= 2^{s/(B-1)} for B=3 or 4 or 5, and s is the security parameter.
-/// We get the following constants for N with s=40.
-/// For B = 5, N = 1024
-/// For B = 4, N = 10_321;
-/// For B = 3, N = 1_048_576;
-const CONVERSION_PARAM_B: usize = 4; // We choose B=4, because it's a good space/time
+// ## Design Choices Integrating Edabits Conversion Check
+//
+// The protocol for conversions is designed to check a batch of conversions at once, as opposed to individual conversions.
+// It is secure when the batch contains more than N conversions to check, depending on a second parameter B.
+// According to the protocol, the number of voles underlying a conversion check is proportional to N*B,
+// and the memory required is also proportional to N*B.
+// According to Theorem 1 of the Appenzeller to Brie paper, if N is the batch size, B is a parameter and
+// s be the security parameter, then the protocol is secure when
+// N >= 2^{s/(B-1)} for B=3 or 4 or 5.
+// So the lower B, the higher becomes N for the protocol to be secure.
+// Working out the equation we get the following constants for N and B with s=40.
+// For B = 5, N >= 1024
+// For B = 4, N >= 10_321;
+// For B = 3, N >= 1_048_576;
+// There is a memory/time tradeoff for the different set of parameters. We wont use B=3 because even though
+// it would be the most time efficient, it could require several GB of memory. Therefore we are going to
+// limit ourselves to using B=4 and B=5, where we call "safe" the later.
+// Since we do not know ahead of time how many conversions are in a circuit, we decide to
+// presume that the number of conversions will be larger than N=10_321 with B=4.
+// During the execution of a circuit we maintain a bucket of conversions to check.
+// When the bucket becomes larger than 2*N, we perform a conversion check for N of them,
+// and leave the other N unchecked in the bucket. Once the entire circuit is executed, and we reach finalize(),
+// we analyze the number of conversions that remain to be checked and may use the B=5 parameter when appropriate.
+// And if there are fewer than 1024 conversions in the bucket then a warning is emitted to indicate that the
+// conversion check might be insecure.
+const CONVERSION_PARAM_B: usize = 4;
 const CONVERSION_BATCH_SIZE: usize = 10_321;
-// When we have fewer than 10_321 conversions, let's be safe and use 5.
 const CONVERSION_PARAM_B_SAFE: usize = 5;
+const CONVERSION_BATCH_SIZE_SAFE: usize = 1_024;
+
+#[test]
+fn conversion_param_b_valid() {
+    assert!((CONVERSION_PARAM_B == 4) || (CONVERSION_PARAM_B == 5))
+}
 
 #[derive(Clone, Debug)]
 pub enum MacBitGeneric {
@@ -321,7 +343,9 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvProver<FE, C>
                 None,
             )?;
             self.edabits_map.set_edabits(bit_width, vec![]);
-        } else if num >= CONVERSION_BATCH_SIZE {
+        } else if num >= 2 * CONVERSION_BATCH_SIZE {
+            // If there is more than twice the conversion_batch then lets do half of them, and keep the other
+            // half for finalize so that it is still safe
             let index_to_split = edabits.len() - CONVERSION_BATCH_SIZE;
             let (_, edabits_to_process) = edabits.split_at(index_to_split);
             self.conv.conv(
@@ -497,15 +521,66 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT for DietMacAndCheese
 
     fn finalize_conv(&mut self) -> Result<()> {
         for (_key, edabits) in self.edabits_map.0.iter() {
-            assert!(edabits.len() <= CONVERSION_BATCH_SIZE);
-            self.conv.conv(
-                &mut self.dmc.channel,
-                &mut self.dmc.rng,
-                CONVERSION_PARAM_B_SAFE,
-                CONVERSION_PARAM_B_SAFE,
-                edabits,
-                None,
-            )?;
+            // because they are periodically executed by maybe_do_conversion
+            assert!(edabits.len() < 2 * CONVERSION_BATCH_SIZE);
+            if edabits.len() < CONVERSION_BATCH_SIZE_SAFE {
+                warn!(
+                   "Insecure conversion check in finalize() because there are only {}, less than {}",
+                   edabits.len(),
+                   CONVERSION_BATCH_SIZE_SAFE
+               );
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B_SAFE,
+                    CONVERSION_PARAM_B_SAFE,
+                    edabits,
+                    None,
+                )?;
+            } else if edabits.len() >= CONVERSION_BATCH_SIZE_SAFE
+                && edabits.len() < CONVERSION_BATCH_SIZE
+            {
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B_SAFE,
+                    CONVERSION_PARAM_B_SAFE,
+                    edabits,
+                    None,
+                )?;
+            } else if edabits.len() >= CONVERSION_BATCH_SIZE
+                && edabits.len() < (CONVERSION_BATCH_SIZE + CONVERSION_BATCH_SIZE_SAFE)
+            {
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B,
+                    CONVERSION_PARAM_B,
+                    edabits,
+                    None,
+                )?;
+            } else {
+                let index_to_split = CONVERSION_BATCH_SIZE;
+                let (edabits1, edabits2) = edabits.split_at(index_to_split);
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B,
+                    CONVERSION_PARAM_B,
+                    edabits1,
+                    None,
+                )?;
+
+                // TODO: maybe split this in small chunks
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B_SAFE,
+                    CONVERSION_PARAM_B_SAFE,
+                    edabits2,
+                    None,
+                )?;
+            }
         }
         Ok(())
     }
@@ -628,7 +703,9 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> DietMacAndCheeseConvVerifier<FE, 
                 None,
             )?;
             self.edabits_map.set_edabits(bit_width, vec![]);
-        } else if num >= CONVERSION_BATCH_SIZE {
+        } else if num >= 2 * CONVERSION_BATCH_SIZE {
+            // If there is more than twice the conversion_batch then lets do half of them, and keep the other
+            // half for finalize so that it is still safe
             let index_to_split = edabits.len() - CONVERSION_BATCH_SIZE;
             let (_, edabits_to_process) = edabits.split_at(index_to_split);
             self.conv.conv(
@@ -739,16 +816,67 @@ impl<FE: PrimeFiniteField, C: AbstractChannel> BackendConvT
     fn finalize_conv(&mut self) -> Result<()> {
         // The keys must be sorted deterministically so that the prover and verifier are in sync.
         // This is the reason why the EdabitsMap is using a BTreeMap instead of a HashMap.
-        for (_key, edabits) in self.edabits_map.0.iter() {
-            assert!(edabits.len() <= CONVERSION_BATCH_SIZE);
-            self.conv.conv(
-                &mut self.dmc.channel,
-                &mut self.dmc.rng,
-                CONVERSION_PARAM_B_SAFE,
-                CONVERSION_PARAM_B_SAFE,
-                edabits,
-                None,
-            )?;
+        for (_key, edabits) in self.edabits_map.0.iter_mut() {
+            // because they are periodically executed by maybe_do_conversion
+            assert!(edabits.len() < 2 * CONVERSION_BATCH_SIZE);
+            if edabits.len() < CONVERSION_BATCH_SIZE_SAFE {
+                warn!(
+                    "Insecure conversion check in finalize() because there are only {}, less than {}",
+                    edabits.len(),
+                    CONVERSION_BATCH_SIZE_SAFE
+                );
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B_SAFE,
+                    CONVERSION_PARAM_B_SAFE,
+                    edabits,
+                    None,
+                )?;
+            } else if edabits.len() >= CONVERSION_BATCH_SIZE_SAFE
+                && edabits.len() < CONVERSION_BATCH_SIZE
+            {
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B_SAFE,
+                    CONVERSION_PARAM_B_SAFE,
+                    edabits,
+                    None,
+                )?;
+            } else if edabits.len() >= CONVERSION_BATCH_SIZE
+                && edabits.len() < (CONVERSION_BATCH_SIZE + CONVERSION_BATCH_SIZE_SAFE)
+            {
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B,
+                    CONVERSION_PARAM_B,
+                    edabits,
+                    None,
+                )?;
+            } else {
+                let index_to_split = CONVERSION_BATCH_SIZE;
+                let (edabits1, edabits2) = edabits.split_at(index_to_split);
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B,
+                    CONVERSION_PARAM_B,
+                    edabits1,
+                    None,
+                )?;
+
+                // TODO: maybe split this in small chunks
+                self.conv.conv(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    CONVERSION_PARAM_B_SAFE,
+                    CONVERSION_PARAM_B_SAFE,
+                    edabits2,
+                    None,
+                )?;
+            }
         }
         Ok(())
     }
