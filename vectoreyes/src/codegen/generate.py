@@ -1,8 +1,5 @@
-#!/usr/bin/env nix-shell
-#!nix-shell --keep UOPS_INFO_XML --pure -i python3 ../../../etc/nix/vectoreyes-codegen.nix
 import json
 import re
-import shutil
 import subprocess
 import sys
 from itertools import product, takewhile
@@ -11,13 +8,9 @@ from pathlib import Path
 import jinja2
 
 CODEGEN = Path(__file__).resolve().parent
-GENERATED = CODEGEN.parent / "generated"
-if GENERATED.exists():
-    shutil.rmtree(str(GENERATED))
-GENERATED.mkdir()
 
-from avx2 import *
-from cgtypes import *
+from .avx2 import *
+from .cgtypes import *
 
 
 def assert_eq(a, b):
@@ -137,13 +130,17 @@ def compress_implementation(code):
     return " ".join(line + "\n" if "//" in line else line for line in lines)
 
 
-def write_rust(dst, code):
-    if "/test/" in str(dst):
-        code = compress_test_code(code)
-    else:
-        code = compress_implementation(code)
-    dst.write_bytes(
-        b"".join(
+def generate():
+    out = {}
+
+    def write_rust(dst, code):
+        nonlocal out
+        if "/test/" in str(dst):
+            code = compress_test_code(code)
+        else:
+            code = compress_implementation(code)
+        assert dst not in out
+        out[dst] = b"".join(
             [
                 b"// @generated\n",
                 b"// rustfmt-format_generated_files: false\n",
@@ -156,24 +153,18 @@ def write_rust(dst, code):
                 ).stdout,
             ]
         )
-    )
 
-
-write_rust(
-    GENERATED / "implementation.rs",
-    env.get_template("implementation.tmpl").render(),
-)
-
-
-(GENERATED / "tests").mkdir()
-write_rust(
-    GENERATED / "tests/scalar.rs", env.get_template("tests/scalar.tmpl").render()
-)
-write_rust(GENERATED / "tests/aes.rs", env.get_template("tests/aes.tmpl").render())
-for ty in VECTOR_TYPES:
     write_rust(
-        GENERATED / f"tests/{str(ty).lower()}.rs",
-        env.get_template("tests/vector.tmpl").render(ty=ty),
+        "implementation.rs",
+        env.get_template("implementation.tmpl").render(),
     )
-write_rust(GENERATED / "tests.rs", env.get_template("tests.tmpl").render())
-write_rust(GENERATED / "array_impls.rs", env.get_template("array_impls.tmpl").render())
+    write_rust("tests/scalar.rs", env.get_template("tests/scalar.tmpl").render())
+    write_rust("tests/aes.rs", env.get_template("tests/aes.tmpl").render())
+    for ty in VECTOR_TYPES:
+        write_rust(
+            f"tests/{str(ty).lower()}.rs",
+            env.get_template("tests/vector.tmpl").render(ty=ty),
+        )
+    write_rust("tests.rs", env.get_template("tests.tmpl").render())
+    write_rust("array_impls.rs", env.get_template("array_impls.tmpl").render())
+    return out
