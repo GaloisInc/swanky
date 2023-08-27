@@ -1,6 +1,6 @@
 default:
   tags: [docker-nix]
-  image: "debian/snapshot:stable-20230612"
+  image: "debian/snapshot:stable-20230814"
   interruptible: true
   before_script:
     - mkdir -p -m 0755 /nix/var/log/nix/drvs
