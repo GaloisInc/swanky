@@ -1,11 +1,13 @@
-with import ../../nix/pkgs.nix {};
-let sccache_disk_proxy = buildGoModule {
-  pname = "sccache_disk_proxy";
-  version = "0.0.1";
-  src = ./.;
-  vendorSha256 = "sha256-paCJiOD5J5I3N2TLdXlYR/WD69UyGaYALWIdsIxQkCs=";
-};
-in mkShell {
+with import ../../nix/pkgs.nix { };
+let
+  sccache_disk_proxy = buildGoModule {
+    pname = "sccache_disk_proxy";
+    version = "0.0.1";
+    src = ./.;
+    vendorHash = null;
+  };
+in
+mkShell {
   buildInputs = [
     (writeShellScriptBin "start_sccache" ''
       source ${./env.sh}
