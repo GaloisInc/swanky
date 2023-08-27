@@ -1,15 +1,10 @@
-#!/usr/bin/env python3
-USAGE = """
-USAGE: etc/new-crate.py swanky-foo swanky-baz
-
-This will add new swanky crates, register them, and set them up with our preferred settings.
-"""
-
-import sys
 from pathlib import Path
 from string import Template
+from typing import Sequence
 
-ROOT = Path(__file__).resolve().parent.parent
+import click
+
+from etc import ROOT
 
 _TOML_TEMPLATE = Template(
     """
@@ -27,14 +22,25 @@ version.workspace = true
     + "\n"
 )
 
-if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print(USAGE)
-        sys.exit(1)
-    for crate in sys.argv[1:]:
-        if not crate.startswith("swanky-"):
-            print(f"{repr(crate)} doesn't start with 'swanky-'")
-            sys.exit(1)
+
+@click.command()
+@click.argument("names", nargs=-1)
+def new_crate(names: Sequence[str]) -> None:
+    """
+    Create new crates in Swanky
+
+    NAMES are names of crates to create. They must start with 'swanky-'.
+
+    A crate template will be instantiated in the crates/ directory
+
+    For example: ./swanky new-crate swanky-cool-protocol1 swanky-cool-protocol2
+    """
+    bad_names = [name for name in names if not name.startswith("swanky-")]
+    if len(bad_names) > 0:
+        raise click.UsageError(
+            f"Crate names must start with 'swanky-'. But {repr(bad_names)} were submitted."
+        )
+    for crate in names:
         dst = ROOT / "crates" / crate.replace("swanky-", "", 1)
         if dst.exists():
             print(f"{dst} already exists. Skipping.")

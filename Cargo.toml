@@ -37,7 +37,7 @@ publish = false
 version = "0.5.0"
 
 [workspace.dependencies]
-# Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by etc/new-crate.py
+# Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate
 # BEGIN OUR CRATES
 bristol-fashion = { path = "bristol-fashion" }
 diet-mac-and-cheese = { path = "diet-mac-and-cheese" }
@@ -71,7 +71,7 @@ vectoreyes = { path = "vectoreyes" }
 web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
 # END OUR CRATES
-# Don't remove, or modify, the above "# END OUR CRATES" line. It's used by etc/new-crate.py
+# Don't remove, or modify, the above "# END OUR CRATES" line. It's used by ./swanky new-crate
 
 # Patched Dependencies
 ff = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }
