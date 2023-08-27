@@ -14,4 +14,5 @@ if len(rs_files_in_args) > 0:
     if rs_file.resolve().is_relative_to(ROOT):
         # only deny warnings for swanky code
         args += ["--deny", "warnings"]
+args += ["-Clinker=clang", "-Clinker-flavor=gcc", "-Clink-arg=-fuse-ld=lld"]
 os.execvp("sccache", ["sccache"] + args)
