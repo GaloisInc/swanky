@@ -9,7 +9,7 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
     (import ./rust-toolchain.nix)
     cargo-nextest
     cargo-deny
-    lld_16
+    llvmPackages_16.bintools
     git
     (python311.withPackages (py: [
       py.black
