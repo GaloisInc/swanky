@@ -23,7 +23,7 @@ use subtle::{Choice, ConditionallySelectable};
 /// equation holds for a global key `Δ` known only to the verifier: `t = v · Δ +
 /// k`.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MacProver<V, T>(
+pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
     /// The prover's value `v`.
     V,
     /// The prover's MAC tag `t`.
@@ -518,7 +518,7 @@ where
     ) -> Result<Self> {
         let recv = VOLE::init(channel, rng, lpn_setup, lpn_extend)?;
         Ok(Self {
-            delta: recv.delta(),
+            delta: recv.delta().unwrap(),
             svole_receiver: recv,
             voles: Vec::new(),
             phantom: PhantomData,
@@ -527,7 +527,7 @@ where
 
     pub fn init_with_vole(vole: VOLE) -> Result<Self> {
         Ok(Self {
-            delta: vole.delta(), // That's going to block until delta is set
+            delta: vole.delta().unwrap(), // That's going to block until delta is set
             svole_receiver: vole,
             voles: Vec::new(),
             phantom: PhantomData,

@@ -56,7 +56,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
     ) -> Result<Self> {
-        unimplemented!()
+        panic!("Should not be initialized")
     }
 
     fn duplicate(&self) -> Self {
@@ -108,7 +108,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         Ok(())
     }
 
-    fn delta(&self) -> X {
+    fn delta(&self) -> Option<X> {
         while (*self.delta.lock().unwrap()).is_none() {
             warn!(
                 "Waiting for DELTA: {:?}",
@@ -116,7 +116,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
             );
             std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
         }
-        (*self.delta.lock().unwrap()).unwrap()
+        Some((*self.delta.lock().unwrap()).unwrap())
     }
 }
 

@@ -14,9 +14,9 @@ use std::{
 /// Svole trait.
 ///
 /// The same trait is used for both the sender and the receiver.
-/// The trait is parametric over a type `X`. Typically `X` is `(V,T)` for a sender and `T` for a receiver.
-///
-pub trait SvoleT<X> {
+/// The trait is parametric over a type `M`. Typically `M` is pair value/tag `(V,T)`
+/// for a sender and tag `T` for a receiver.
+pub trait SvoleT<M> {
     /// Initialize function.
     fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -32,7 +32,7 @@ pub trait SvoleT<X> {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        out: &mut Vec<X>,
+        out: &mut Vec<M>,
     ) -> Result<()>;
 
     /// Duplicate the functionality.
@@ -40,7 +40,7 @@ pub trait SvoleT<X> {
 
     /// Return the delta as a receiver.
     /// This function should panic as a sender.
-    fn delta(&self) -> X;
+    fn delta(&self) -> Option<M>;
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<(V, T)> for Sender<T>
@@ -57,7 +57,7 @@ where
     }
 
     fn duplicate(&self) -> Self {
-        unimplemented!()
+        panic!("Should not try to duplicate a svole Sender")
     }
 
     fn extend<C: AbstractChannel>(
@@ -71,8 +71,8 @@ where
         Ok(())
     }
 
-    fn delta(&self) -> (V, T) {
-        panic!("delta should not be called on a Sender")
+    fn delta(&self) -> Option<(V, T)> {
+        None
     }
 }
 
@@ -139,8 +139,8 @@ where
         Ok(())
     }
 
-    fn delta(&self) -> (V, T) {
-        panic!("cannot request delta on the sender side")
+    fn delta(&self) -> Option<(V, T)> {
+        None
     }
 }
 
@@ -194,7 +194,7 @@ where
         Ok(())
     }
 
-    fn delta(&self) -> T {
-        self.the_receiver.get_refmut().delta()
+    fn delta(&self) -> Option<T> {
+        Some(self.the_receiver.get_refmut().delta())
     }
 }
