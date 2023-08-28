@@ -152,6 +152,8 @@ where
 
 /// Svole receiver.
 pub struct SvoleReceiver<V, T: FiniteField> {
+    // NOTE: The `V` type is added to solve some trait constraints that pop up later with the
+    // `extend()` function for the `SvoleT` impl.
     the_receiver: RcRefCell<Receiver<T>>,
     phantom: PhantomData<V>,
 }
