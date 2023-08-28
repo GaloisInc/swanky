@@ -77,6 +77,26 @@ def crates_enumerated_in_workspace(ctx: click.Context) -> LintResult:
         return LintResult.SUCCESS
 
 
+def workspace_members_are_defined_in_workspace(ctx: click.Context) -> LintResult:
+    "Check that all crates in Swanky are defined as workspace dependencies"
+    missing = (
+        set(
+            toml.loads((crate / "Cargo.toml").read_text())["package"]["name"]
+            for crate in crates_in_manifest()
+        )
+        - root_cargo_toml()["workspace"]["dependencies"].keys()
+    )
+    if len(missing) > 0:
+        rich.print(
+            "The following crates aren't listed in the '#BEGIN OUR CRATES' section:"
+        )
+        for x in sorted(list(missing)):
+            rich.print(f"- {x}")
+        return LintResult.FAILURE
+    else:
+        return LintResult.SUCCESS
+
+
 def validate_crate_manifests(ctx: click.Context) -> LintResult:
     "Validate crate manifests to ensure they adhere to workspace rules."
     any_errors = False
