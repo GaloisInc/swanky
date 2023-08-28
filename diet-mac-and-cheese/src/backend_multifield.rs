@@ -42,7 +42,9 @@ use std::fmt::Debug;
 use std::io::{Read, Seek};
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
+use swanky_field::{
+    FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField, StatisticallySecureField,
+};
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
@@ -1795,7 +1797,10 @@ impl<
         Ok(())
     }
 
-    fn load_backend_multithreaded_fe<FE: PrimeFiniteField, C2: AbstractChannel + 'static + Send>(
+    fn load_backend_multithreaded_fe<
+        FE: PrimeFiniteField + StatisticallySecureField,
+        C2: AbstractChannel + 'static + Send,
+    >(
         &mut self,
         channel: &mut C,
         mut channel_vole: C2,
