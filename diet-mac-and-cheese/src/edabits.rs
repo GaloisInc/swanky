@@ -194,8 +194,8 @@ impl<
         })
     }
 
-    #[allow(missing_docs)]
-    pub fn init_zero(
+    /// Initialize provided the commitment functionalities.
+    pub fn init_with_fcoms(
         fcom_f2: &FComProver<F2, F40b, SvoleF2>,
         fcom_fe: &FComProver<FE::PrimeField, FE, SvoleFE>,
     ) -> Result<Self> {
@@ -918,8 +918,8 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         })
     }
 
-    #[allow(missing_docs)]
-    pub fn init_zero(
+    /// Initialize provided the commitment functionalities.
+    pub fn init_with_fcoms(
         fcom_f2: &FComVerifier<F2, F40b, SvoleF2>,
         fcom_fe: &FComVerifier<FE::PrimeField, FE, SvoleFE>,
     ) -> Result<Self> {

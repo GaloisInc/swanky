@@ -267,7 +267,7 @@ impl<
             lpn_extend,
             no_batching,
         )?;
-        let conv = ProverConv::init_zero(fcom_f2, dmc.get_party())?;
+        let conv = ProverConv::init_with_fcoms(fcom_f2, dmc.get_party())?;
         Ok(DietMacAndCheeseConvProver {
             dmc,
             conv,
@@ -303,7 +303,7 @@ impl<
             no_batching,
         )?;
         debug!("3...");
-        let conv = ProverConv::init_zero(fcom_f2, dmc.get_party())?;
+        let conv = ProverConv::init_with_fcoms(fcom_f2, dmc.get_party())?;
         debug!("4...");
         let r = Ok(DietMacAndCheeseConvProver {
             dmc,
@@ -706,7 +706,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
             lpn_extend,
             no_batching,
         )?;
-        let conv = VerifierConv::init_zero(fcom_f2, dmc.get_party())?;
+        let conv = VerifierConv::init_with_fcoms(fcom_f2, dmc.get_party())?;
         Ok(DietMacAndCheeseConvVerifier {
             dmc,
             conv,
@@ -738,7 +738,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
             &fcom_prover,
             no_batching,
         )?;
-        let conv = VerifierConv::init_zero(fcom_f2, dmc.get_party())?;
+        let conv = VerifierConv::init_with_fcoms(fcom_f2, dmc.get_party())?;
         Ok(DietMacAndCheeseConvVerifier {
             dmc,
             conv,
