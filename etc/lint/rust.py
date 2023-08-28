@@ -127,9 +127,15 @@ def validate_crate_manifests(ctx: click.Context) -> LintResult:
             )
             rich.print("")
         deps_needing_workspace = defaultdict(lambda: set())
-        # TODO: this list of sections isn't complete, since these also exist in target-specific sections.
+        sections = []
         for section in ["dependencies", "dev-dependencies", "build-dependencies"]:
-            for k, v in data.get(section, dict()).items():
+            sections.append((section, data.get(section, dict())))
+            for target_name, target in data.get("target", dict()).items():
+                sections.append(
+                    (f"target.'{target_name}'.section", target.get(section, dict()))
+                )
+        for section, section_contents in sections:
+            for k, v in section_contents.items():
                 if (not isinstance(v, dict)) or v.get("workspace") != True:
                     deps_needing_workspace[section].add(k)
         if len(deps_needing_workspace) > 0:
