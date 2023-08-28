@@ -4,6 +4,7 @@ use crate::backend_trait::{BackendT, Party};
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
+use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
 use eyre::{eyre, Result};
 use log::{debug, info, warn};
@@ -39,7 +40,7 @@ struct Monitor<T> {
     phantom: PhantomData<T>,
 }
 
-impl<T> Monitor<T> {
+impl<T: FiniteField> Monitor<T> {
     fn tick(&mut self) {
         self.tick += 1;
         if self.tick >= TICK_TIMER {
@@ -91,7 +92,7 @@ impl<T> Monitor<T> {
     fn log_monitor(&self) {
         info!(
             "field:{} inp:{:<11} witn:{:<11} mul:{:<11} czero:{:<11}",
-            std::any::type_name::<T>().split("::").last().unwrap(),
+            field_name::<T>(),
             self.monitor_instance,
             self.monitor_witness,
             self.monitor_mul,
@@ -100,6 +101,7 @@ impl<T> Monitor<T> {
     }
 
     fn log_final_monitor(&self) {
+        info!("Monitor for field: {}", field_name::<T>());
         if self.monitor_mul != self.monitor_zk_mult_check {
             warn!(
                 "diff numb of mult gates {} and mult_check {}",
@@ -368,10 +370,6 @@ where
     }
 
     fn log_final_monitor(&self) {
-        info!(
-            "field: {}",
-            std::any::type_name::<T>().split("::").last().unwrap()
-        );
         self.monitor.log_final_monitor();
     }
 }
@@ -627,10 +625,6 @@ where
     }
 
     fn log_final_monitor(&self) {
-        info!(
-            "field: {}",
-            std::any::type_name::<T>().split("::").last().unwrap()
-        );
         self.monitor.log_final_monitor();
     }
 }

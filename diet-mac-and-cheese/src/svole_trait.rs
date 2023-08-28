@@ -5,6 +5,7 @@ use log::debug;
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
+use std::any::type_name;
 use std::marker::PhantomData;
 use std::{
     cell::{RefCell, RefMut},
@@ -41,6 +42,11 @@ pub trait SvoleT<M> {
     /// Return the delta as a receiver.
     /// This function should panic as a sender.
     fn delta(&self) -> Option<M>;
+}
+
+/// Name of a field
+pub(crate) fn field_name<F: FiniteField>() -> &'static str {
+    type_name::<F>().split("::").last().unwrap()
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<(V, T)> for Sender<T>

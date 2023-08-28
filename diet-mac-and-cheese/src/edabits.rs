@@ -5,7 +5,7 @@
 //! Field switching functionality based on protocol with Edabits.
 
 use crate::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
-use crate::svole_trait::SvoleT;
+use crate::svole_trait::{field_name, SvoleT};
 use eyre::{eyre, Result};
 use generic_array::typenum::Unsigned;
 #[allow(unused)]
@@ -771,7 +771,7 @@ impl<
         let nb_bits = edabits_vector[0].bits.len();
         info!(
             "conversion check, field:{}, nb_bits:{:?} vector_size:{:?}",
-            std::any::type_name::<FE>().split("::").last().unwrap(),
+            field_name::<FE>(),
             nb_bits,
             edabits_vector.len()
         );
@@ -1393,7 +1393,7 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         let nb_bits = edabits_vector_mac[0].bits.len();
         info!(
             "conversion check, field:{}, nb_bits:{:?} vector_size:{:?}",
-            std::any::type_name::<FE>().split("::").last().unwrap(),
+            field_name::<FE>(),
             nb_bits,
             edabits_vector_mac.len()
         );
