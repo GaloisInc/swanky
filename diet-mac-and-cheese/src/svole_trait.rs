@@ -1,12 +1,13 @@
 //! Svole trait and common implementations.
 
 use eyre::Result;
-use log::debug;
+use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
 use std::any::type_name;
 use std::marker::PhantomData;
+use std::time::Instant;
 use std::{
     cell::{RefCell, RefMut},
     rc::Rc,
@@ -196,9 +197,11 @@ where
         out: &mut Vec<T>,
     ) -> Result<()> {
         debug!("verifier extend");
+        let start = Instant::now();
         self.the_receiver
             .get_refmut()
             .receive::<_, V>(channel, rng, out)?;
+        info!("SVOLE<{} {:?}>", field_name::<T>(), start.elapsed());
         Ok(())
     }
 

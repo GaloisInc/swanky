@@ -227,9 +227,9 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
                     &mut *self.svole_atomic.voles[next_todo].lock().unwrap(),
                 )?;
                 info!(
-                    "SVOLE<{:?} {}>",
+                    "SVOLE<{} {:?}>",
+                    std::any::type_name::<T>().split("::").last().unwrap(),
                     start.elapsed(),
-                    std::any::type_name::<T>().split("::").last().unwrap()
                 );
                 debug!("DONE multithread verifier extend");
                 *self.svole_atomic.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
