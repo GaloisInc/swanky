@@ -41,7 +41,7 @@ pub trait SvoleT<M> {
     fn duplicate(&self) -> Self;
 
     /// Return the delta as a receiver.
-    /// This function should panic as a sender.
+    /// This function returns None as a sender.
     fn delta(&self) -> Option<M>;
 }
 

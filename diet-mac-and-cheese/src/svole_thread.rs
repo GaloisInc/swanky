@@ -10,9 +10,10 @@ use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-const SLEEP_TIME: u64 = 200;
+const SLEEP_TIME: u64 = 1;
+const SLEEP_TIME_MAX: u64 = 200;
 
-// number of VOLE extension vectors cannot be smaller than 3.
+// number of VOLE extension vectors cannot be smaller than 2.
 const VOLE_VEC_NUM_MIN: usize = 2;
 const VOLE_VEC_NUM: usize = 2;
 
@@ -79,6 +80,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         _rng: &mut AesRng,
         out: &mut Vec<X>,
     ) -> Result<()> {
+        let mut sleep_time = SLEEP_TIME;
         loop {
             let last_done = *self.last_done.lock().unwrap();
             let next_todo = *self.next_todo.lock().unwrap();
@@ -101,7 +103,9 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
                 // hence it is a deadlock.
                 channel.flush()?;
                 debug!("SLEEP! VoleInterface {:?}", X::default());
-                std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
+                // exponential backoff sleep
+                std::thread::sleep(std::time::Duration::from_millis(sleep_time));
+                sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
             }
         }
 
@@ -149,6 +153,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadSender<V, T> {
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>, // Not sure why rustc cannot figure that one...
     {
+        let mut sleep_time = SLEEP_TIME;
         loop {
             if *self.svole_atomic.stop_signal.lock().unwrap() {
                 break;
@@ -166,12 +171,15 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadSender<V, T> {
                 )?;
                 debug!("DONE multithread prover extend");
                 *self.svole_atomic.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
+                sleep_time = SLEEP_TIME; // reset sleep time
             } else {
                 debug!(
                     "SLEEP! multithreaded sender: {:?}",
                     std::any::type_name::<T>()
                 );
-                std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
+                // exponential backoff sleep
+                std::thread::sleep(std::time::Duration::from_millis(sleep_time));
+                sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
             }
         }
         Ok(())
@@ -210,6 +218,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>, // Not sure why rustc cannot figure that one...
     {
+        let mut sleep_time = SLEEP_TIME;
         loop {
             if *self.svole_atomic.stop_signal.lock().unwrap() {
                 break;
@@ -233,12 +242,15 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
                 );
                 debug!("DONE multithread verifier extend");
                 *self.svole_atomic.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
+                sleep_time = SLEEP_TIME; // reset sleep time
             } else {
                 debug!(
                     "SLEEP! multithreaded receiver:{:?}",
                     std::any::type_name::<T>()
                 );
-                std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
+                // exponential backoff sleep
+                std::thread::sleep(std::time::Duration::from_millis(sleep_time));
+                sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
             }
         }
         Ok(())
