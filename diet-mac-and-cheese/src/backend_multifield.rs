@@ -1518,6 +1518,58 @@ impl<
         Ok(())
     }
 
+    fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField>(
+        &mut self,
+        channel: &mut C,
+        rng: AesRng,
+        idx: usize,
+        lpn_small: bool,
+        setup_small: LpnParams,
+        extend_small: LpnParams,
+        setup_normal: LpnParams,
+        extend_normal: LpnParams,
+    ) -> Result<()> {
+        assert!(idx == self.eval.len());
+        let back: Box<dyn EvaluatorT>;
+        let (lpn_setup, lpn_extend) = if lpn_small {
+            (setup_small, extend_small)
+        } else {
+            (setup_normal, extend_normal)
+        };
+        if self.party == Party::Prover {
+            let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
+            let dmc = DietMacAndCheeseConvProver::<FE, _, SvoleF2Prover, SvoleSender<FE>>::init(
+                channel,
+                rng,
+                fcom_f2,
+                lpn_setup,
+                lpn_extend,
+                self.no_batching,
+            )?;
+            back = Box::new(EvaluatorSingle::new(dmc, false));
+            self.eval.push(back);
+            Ok(())
+        } else {
+            let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+            let dmc = DietMacAndCheeseConvVerifier::<
+                FE,
+                _,
+                SvoleF2Verifier,
+                SvoleReceiver<FE, FE>,
+            >::init(
+                channel,
+                rng,
+                fcom_f2,
+                lpn_setup,
+                lpn_extend,
+                self.no_batching,
+            )?;
+            back = Box::new(EvaluatorSingle::new(dmc, false));
+            self.eval.push(back);
+            Ok(())
+        }
+    }
+
     pub fn load_backend(
         &mut self,
         channel: &mut C,
@@ -1527,21 +1579,10 @@ impl<
         lpn_small: bool,
     ) -> Result<()> {
         // Loading the backends in order
-        assert_eq!(idx, self.eval.len());
-
         let back: Box<dyn EvaluatorT>;
-        let lpn_setup;
-        let lpn_extend;
-        if lpn_small {
-            lpn_setup = LPN_SETUP_SMALL;
-            lpn_extend = LPN_EXTEND_SMALL;
-        } else {
-            lpn_setup = LPN_SETUP_MEDIUM;
-            lpn_extend = LPN_EXTEND_MEDIUM;
-        }
         if field == std::any::TypeId::of::<F2>() {
             info!("loading field F2");
-
+            assert_eq!(idx, self.eval.len());
             // Note for F2 we do not use the backend with Conv, simply dietMC
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
@@ -1563,206 +1604,89 @@ impl<
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             }
             self.f2_idx = self.eval.len();
+            self.eval.push(back);
+            Ok(())
         } else if field == std::any::TypeId::of::<F61p>() {
-            // TODO: Should do like for the multithreaded version: create a generic `load_backend_fe()` and call it on every field
             info!("loading field F61p");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc =
-                    DietMacAndCheeseConvProver::<F61p, _, SvoleF2Prover, SvoleSender<F61p>>::init(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        lpn_setup,
-                        lpn_extend,
-                        self.no_batching,
-                    )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<
-                    F61p,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleReceiver<F61p, F61p>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    lpn_setup,
-                    lpn_extend,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
+            self.load_backend_fe::<F61p>(
+                channel,
+                rng,
+                idx,
+                lpn_small,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                LPN_SETUP_MEDIUM,
+                LPN_EXTEND_MEDIUM,
+            )?;
+            Ok(())
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc =
-                    DietMacAndCheeseConvProver::<F128p, _, SvoleF2Prover, SvoleSender<F128p>>::init(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        lpn_setup,
-                        lpn_extend,
-                        self.no_batching,
-                    )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<
-                    F128p,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleReceiver<F128p, F128p>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    lpn_setup,
-                    lpn_extend,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
+            self.load_backend_fe::<F128p>(
+                channel,
+                rng,
+                idx,
+                lpn_small,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                LPN_SETUP_MEDIUM,
+                LPN_EXTEND_MEDIUM,
+            )?;
+            Ok(())
         } else if field == std::any::TypeId::of::<Secp256k1>() {
             info!("loading field Secp256k1");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<
-                    Secp256k1,
-                    _,
-                    SvoleF2Prover,
-                    SvoleSender<Secp256k1>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<
-                    Secp256k1,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleReceiver<Secp256k1, Secp256k1>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
+            self.load_backend_fe::<Secp256k1>(
+                channel,
+                rng,
+                idx,
+                lpn_small,
+                LPN_SETUP_EXTRASMALL,
+                LPN_EXTEND_EXTRASMALL,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )?;
+            Ok(())
         } else if field == std::any::TypeId::of::<Secp256k1order>() {
             info!("loading field Secp256k1order");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvProver::<
-                    Secp256k1order,
-                    _,
-                    SvoleF2Prover,
-                    SvoleSender<Secp256k1order>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<
-                    Secp256k1order,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleReceiver<Secp256k1order, Secp256k1order>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
+            self.load_backend_fe::<Secp256k1order>(
+                channel,
+                rng,
+                idx,
+                lpn_small,
+                LPN_SETUP_EXTRASMALL,
+                LPN_EXTEND_EXTRASMALL,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )?;
+            Ok(())
         } else if field == std::any::TypeId::of::<F384p>() {
             info!("loading field F384p");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc =
-                    DietMacAndCheeseConvProver::<F384p, _, SvoleF2Prover, SvoleSender<F384p>>::init(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        LPN_SETUP_EXTRASMALL,
-                        LPN_EXTEND_EXTRASMALL,
-                        self.no_batching,
-                    )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<
-                    F384p,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleReceiver<F384p, F384p>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
+            self.load_backend_fe::<F384p>(
+                channel,
+                rng,
+                idx,
+                lpn_small,
+                LPN_SETUP_EXTRASMALL,
+                LPN_EXTEND_EXTRASMALL,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )?;
+            Ok(())
         } else if field == std::any::TypeId::of::<F384q>() {
             info!("loading field F384q");
-            if self.party == Party::Prover {
-                let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc =
-                    DietMacAndCheeseConvProver::<F384q, _, SvoleF2Prover, SvoleSender<F384q>>::init(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        LPN_SETUP_EXTRASMALL,
-                        LPN_EXTEND_EXTRASMALL,
-                        self.no_batching,
-                    )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            } else {
-                let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseConvVerifier::<
-                    F384q,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleReceiver<F384q, F384q>,
-                >::init(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    LPN_SETUP_EXTRASMALL,
-                    LPN_EXTEND_EXTRASMALL,
-                    self.no_batching,
-                )?;
-                back = Box::new(EvaluatorSingle::new(dmc, false));
-            }
+            self.load_backend_fe::<F384q>(
+                channel,
+                rng,
+                idx,
+                lpn_small,
+                LPN_SETUP_EXTRASMALL,
+                LPN_EXTEND_EXTRASMALL,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )?;
+            Ok(())
         } else {
             bail!("Unknown or unsupported field {:?}", field);
         }
-        self.eval.push(back);
-        Ok(())
     }
 
     fn load_backend_multithreaded_f2(
