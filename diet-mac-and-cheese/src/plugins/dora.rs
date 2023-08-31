@@ -154,7 +154,7 @@ impl Plugin for DisjunctionV0 {
         // retrieve function bodies
         let mut clauses = vec![];
         for (guard, name) in functions.into_iter() {
-            let fun_decl = fun_store.get(name)?;
+            let fun_decl = fun_store.get_func_by_name(name)?;
             let gates: &[GateM] = match fun_decl.body() {
                 FunctionBody::Gates(gates) => gates.gates(),
                 FunctionBody::Plugin(_) => {

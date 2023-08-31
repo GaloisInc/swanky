@@ -174,7 +174,7 @@ mod tests {
             &fun_store,
         )
         .unwrap();
-        fun_store.insert(name.clone(), func);
+        let fun_id = fun_store.insert(name.clone(), func).unwrap();
         let mut gates = vec![GateM::New(0, 0, total * 2)];
         for i in 0..total {
             gates.push(GateM::Witness(0, i));
@@ -183,7 +183,7 @@ mod tests {
             gates.push(GateM::Instance(0, total + i));
         }
         gates.push(GateM::Call(Box::new((
-            name.clone(),
+            fun_id,
             vec![],
             vec![(0, total - 1), (total, 2 * total - 1)],
         ))));

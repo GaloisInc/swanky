@@ -5,7 +5,7 @@ use crate::{
     fields::modulus_to_type_id,
     plugins::{DisjunctionV0, Plugin, PluginBody, PluginType},
 };
-use eyre::{bail, eyre, Result};
+use eyre::{bail, ensure, eyre, Result};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
@@ -32,7 +32,7 @@ pub type ConvGate = (TypeId, WireRange, TypeId, WireRange);
 /// The call gate representation. The [`String`] denotes the function name, the
 /// first [`Vec`] denotes the _output_ wires, and the second [`Vec`] denotes the
 /// _input_ wires.
-pub type CallGate = (String, Vec<WireRange>, Vec<WireRange>);
+pub type CallGate = (FunId, Vec<WireRange>, Vec<WireRange>);
 
 /// The internal circuit representation gate types.
 ///
@@ -529,19 +529,56 @@ impl FuncDecl {
     }
 }
 
+/// Integer type to identify functions in a `FunStore`.
+pub type FunId = u32;
+
 /// A mapping of function names to their [`FuncDecl`]s.
 #[derive(Clone, Default)]
-pub struct FunStore(BTreeMap<String, FuncDecl>);
+pub struct FunStore(BTreeMap<String, FunId>, Vec<(String, FuncDecl)>);
 
 impl FunStore {
-    pub fn insert(&mut self, name: String, func: FuncDecl) {
-        self.0.insert(name, func);
+    /// Insert a function to the `FunStore` with its name and returns an associated `FunId`.
+    /// It returns an error if the `FunStore` already contains a function associated with the same
+    /// name.
+    pub fn insert(&mut self, name: String, func: FuncDecl) -> eyre::Result<FunId> {
+        ensure!(!self.0.contains_key(&name), "");
+        let fun_id = self.0.len().try_into().unwrap();
+        self.0.insert(name.clone(), fun_id);
+        self.1.push((name, func));
+        Ok(fun_id.try_into().unwrap())
     }
 
-    pub fn get(&self, name: &String) -> eyre::Result<&FuncDecl> {
+    /// Get function from [`FunStore`].
+    pub fn get_func(&self, fun_id: FunId) -> eyre::Result<&FuncDecl> {
+        ensure!(
+            (fun_id as usize) < self.1.len(),
+            "Missing function id {} in func store",
+            fun_id
+        );
+        Ok(&self.1[fun_id as usize].1)
+    }
+
+    /// Get function by its name.
+    pub fn get_func_by_name(&self, name: &String) -> eyre::Result<&FuncDecl> {
+        let fun_id = self.name_to_fun_id(name)?;
+        self.get_func(*fun_id)
+    }
+
+    /// Get the id associated with a function name.
+    pub fn name_to_fun_id(&self, name: &String) -> eyre::Result<&FunId> {
         self.0
             .get(name)
-            .ok_or_else(|| eyre!("Missing function name '{name}' in `FuncStore`"))
+            .ok_or_else(|| eyre!("Missing function {name}"))
+    }
+
+    /// Get the name associated to a `FunId`.
+    pub fn id_to_name(&self, fun_id: FunId) -> eyre::Result<&String> {
+        ensure!(
+            (fun_id as usize) < self.1.len(),
+            "No function name asociated to function id {}",
+            fun_id
+        );
+        Ok(&self.1[fun_id as usize].0)
     }
 }
 

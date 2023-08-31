@@ -118,11 +118,10 @@ impl FunctionBodyVisitor for TextRelation {
             inids.push((i.start, i.end));
         }
 
-        self.gates.push(GateM::Call(Box::new((
-            std::str::from_utf8(name)?.into(),
-            outids,
-            inids,
-        ))));
+        let name = std::str::from_utf8(name)?.into();
+        let fun_id = self.fun_store.name_to_fun_id(&name).unwrap();
+        self.gates
+            .push(GateM::Call(Box::new((*fun_id, outids, inids))));
         Ok(())
     }
 }
@@ -162,7 +161,7 @@ impl RelationVisitor for TextRelation {
             fun_body.compiled_info.body_max,
             fun_body.compiled_info.type_ids
         );
-        self.fun_store.insert(name_s, fun_body);
+        self.fun_store.insert(name_s, fun_body).unwrap();
         Ok(())
     }
 
@@ -196,6 +195,7 @@ impl RelationVisitor for TextRelation {
             &self.type_store,
             &self.fun_store,
         )?;
+
         info!(
             "plugin {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
             name_s,
@@ -203,7 +203,7 @@ impl RelationVisitor for TextRelation {
             fun_body.compiled_info.body_max,
             fun_body.compiled_info.type_ids
         );
-        self.fun_store.insert(name_s, fun_body);
+        self.fun_store.insert(name_s, fun_body).unwrap();
         Ok(())
     }
 }

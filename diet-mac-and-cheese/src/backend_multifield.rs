@@ -14,8 +14,8 @@ use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{
     circuit_ir::{
-        CircInputs, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
-        WireRange,
+        CircInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount,
+        WireId, WireRange,
     },
     gadgets::GadgetLessThanEqWithPublic,
 };
@@ -1609,12 +1609,12 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
     #[inline]
     fn evaluate_call_gate(
         &mut self,
-        name: &String,
+        fun_id: FunId,
         out_ranges: &[WireRange],
         in_ranges: &[WireRange],
         fun_store: &FunStore,
     ) -> Result<()> {
-        let func = fun_store.get(name)?;
+        let func = fun_store.get_func(fun_id)?;
         match &func.body() {
             FunctionBody::Gates(body) => {
                 self.callframe_start(func, out_ranges, in_ranges)?;
@@ -1683,8 +1683,8 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 self.eval[i].evaluate_gate(gate, None, self.inputs.pop_witness(i))?;
             }
             GateM::Call(arg) => {
-                let (name, out_ranges, in_ranges) = arg.as_ref();
-                self.evaluate_call_gate(name, out_ranges, in_ranges, fun_store)?;
+                let (fun_id, out_ranges, in_ranges) = arg.as_ref();
+                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
             }
             GateM::Comment(str) => {
                 debug!("Comment: {:?}", str);
@@ -1725,8 +1725,8 @@ impl<C: AbstractChannel + 'static> EvaluatorCirc<C> {
                 self.eval[i].evaluate_gate(gate, None, inputs.pop_witness(i))?;
             }
             GateM::Call(arg) => {
-                let (name, out_ranges, in_ranges) = arg.as_ref();
-                self.evaluate_call_gate(name, out_ranges, in_ranges, fun_store)?;
+                let (fun_id, out_ranges, in_ranges) = arg.as_ref();
+                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
             }
             GateM::Comment(str) => {
                 debug!("Comment: {:?}", str);
@@ -2214,7 +2214,7 @@ pub(crate) mod tests {
         // The following instruction disable the vector optimization
         func.compiled_info.body_max = None;
 
-        func_store.insert("myadd".into(), func);
+        let fun_id = func_store.insert("myadd".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
@@ -2223,7 +2223,7 @@ pub(crate) mod tests {
             GateM::Witness(FF0, 2),
             GateM::Witness(FF0, 3),
             GateM::Call(Box::new((
-                "myadd".into(),
+                fun_id,
                 vec![(4, 4), (5, 5)],
                 vec![(0, 1), (2, 3)],
             ))),
@@ -2266,7 +2266,7 @@ pub(crate) mod tests {
             vec![(FF0, 1), (FF0, 1)],
             vec![(FF0, 2), (FF0, 2)],
         );
-        func_store.insert("myadd".into(), func);
+        let fun_id = func_store.insert("myadd".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
@@ -2275,7 +2275,7 @@ pub(crate) mod tests {
             GateM::Witness(FF0, 2),
             GateM::Witness(FF0, 3),
             GateM::Call(Box::new((
-                "myadd".into(),
+                fun_id,
                 vec![(4, 4), (5, 5)],
                 vec![(0, 1), (2, 3)],
             ))),
@@ -2321,7 +2321,7 @@ pub(crate) mod tests {
 
         // The following instruction disable the vector optimization
         func.compiled_info.body_max = None;
-        func_store.insert("myfun".into(), func);
+        let fun_id = func_store.insert("myfun".into(), func).unwrap();
 
         let two = (F61p::ONE + F61p::ONE).into_int();
         let minus_four = (-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int();
@@ -2346,7 +2346,7 @@ pub(crate) mod tests {
             GateM::Instance(FF0, 2),
             GateM::Witness(FF0, 3),
             GateM::Call(Box::new((
-                "myfun".into(),
+                fun_id,
                 vec![(4, 5), (6, 6)],
                 vec![(0, 2), (3, 3)],
             ))),
