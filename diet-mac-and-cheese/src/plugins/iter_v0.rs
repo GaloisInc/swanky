@@ -198,7 +198,7 @@ impl Plugin for IterV0 {
                 ));
 
                 let fun_id = fun_store.name_to_fun_id(func_name)?;
-                gates.push(GateM::Call(Box::new((*fun_id, outs, ins))));
+                gates.push(GateM::Call(Box::new((fun_id, outs, ins))));
 
                 counter_wire += 1;
             }
@@ -220,7 +220,7 @@ impl Plugin for IterV0 {
                 ));
 
                 let fun_id = fun_store.name_to_fun_id(func_name)?;
-                gates.push(GateM::Call(Box::new((*fun_id, outs, ins))));
+                gates.push(GateM::Call(Box::new((fun_id, outs, ins))));
             }
         }
 

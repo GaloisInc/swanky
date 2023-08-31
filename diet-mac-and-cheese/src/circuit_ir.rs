@@ -29,8 +29,8 @@ pub type WireRange = (WireId, WireId);
 /// pairing denotes the _output_ of the conversion, and the second pairing
 /// denotes the _input_ of the conversion.
 pub type ConvGate = (TypeId, WireRange, TypeId, WireRange);
-/// The call gate representation. The [`String`] denotes the function name, the
-/// first [`Vec`] denotes the _output_ wires, and the second [`Vec`] denotes the
+/// The call gate representation. The [`FunId`] denotes a unique id associated with a function,
+/// the first [`Vec`] denotes the _output_ wires, and the second [`Vec`] denotes the
 /// _input_ wires.
 pub type CallGate = (FunId, Vec<WireRange>, Vec<WireRange>);
 
@@ -532,23 +532,42 @@ impl FuncDecl {
 /// Integer type to identify functions in a `FunStore`.
 pub type FunId = u32;
 
-/// A mapping of function names to their [`FuncDecl`]s.
+/// The function store.
+///
+/// It maps function names `String` or `FunId` into  the [`FuncDecl`]
+/// associated with functions. Functions inserted into the store are assigned unique [`FunId`].
+/// The retrieval of [`FuncDecl`] by the name of a function has a runtime complexity
+/// $log(n)$ where $n$ is the number of functions in the store.
+/// The retrieval of [`FuncDecl`] by [`FunId`] is done in constant time; this is
+/// important for performance of circuits using extensively function and call gates.
 #[derive(Clone, Default)]
-pub struct FunStore(BTreeMap<String, FunId>, Vec<(String, FuncDecl)>);
+pub struct FunStore(
+    // The internal representation maintains two mappings, one from names to `FunId` using a `BTreeMap`,
+    // and another one associating a [`FunId`] to the [`FuncDecl`] using a vector indexed by [`FunId`].
+    BTreeMap<String, FunId>,
+    Vec<(String, FuncDecl)>,
+);
 
 impl FunStore {
-    /// Insert a function to the `FunStore` with its name and returns an associated `FunId`.
+    /// Insert a function to the `FunStore` with its name and returns a fresh `FunId`.
     /// It returns an error if the `FunStore` already contains a function associated with the same
     /// name.
     pub fn insert(&mut self, name: String, func: FuncDecl) -> eyre::Result<FunId> {
-        ensure!(!self.0.contains_key(&name), "");
-        let fun_id = self.0.len().try_into().unwrap();
+        ensure!(
+            !self.0.contains_key(&name),
+            "Function with name {name} already exists."
+        );
+        let fun_id = self
+            .0
+            .len()
+            .try_into()
+            .expect("Function store length greater than 2^32 - 1");
         self.0.insert(name.clone(), fun_id);
         self.1.push((name, func));
-        Ok(fun_id.try_into().unwrap())
+        Ok(fun_id)
     }
 
-    /// Get function from [`FunStore`].
+    /// Get function associated with a given [`FunId`].
     pub fn get_func(&self, fun_id: FunId) -> eyre::Result<&FuncDecl> {
         ensure!(
             (fun_id as usize) < self.1.len(),
@@ -558,20 +577,21 @@ impl FunStore {
         Ok(&self.1[fun_id as usize].1)
     }
 
-    /// Get function by its name.
+    /// Get function associated with a given name.
     pub fn get_func_by_name(&self, name: &String) -> eyre::Result<&FuncDecl> {
         let fun_id = self.name_to_fun_id(name)?;
-        self.get_func(*fun_id)
+        self.get_func(fun_id)
     }
 
     /// Get the id associated with a function name.
-    pub fn name_to_fun_id(&self, name: &String) -> eyre::Result<&FunId> {
+    pub fn name_to_fun_id(&self, name: &String) -> eyre::Result<FunId> {
         self.0
             .get(name)
+            .copied()
             .ok_or_else(|| eyre!("Missing function {name}"))
     }
 
-    /// Get the name associated to a `FunId`.
+    /// Get the name associated with a `FunId`.
     pub fn id_to_name(&self, fun_id: FunId) -> eyre::Result<&String> {
         ensure!(
             (fun_id as usize) < self.1.len(),

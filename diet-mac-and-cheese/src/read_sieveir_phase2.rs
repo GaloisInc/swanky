@@ -308,7 +308,7 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate, fun_store: &FunStore) -> GateM {
                 inids.push((i.first_id(), i.last_id()));
             }
             let fun_id = fun_store.name_to_fun_id(&u.name().unwrap().into()).unwrap();
-            GateM::Call(Box::new((*fun_id, outids, inids)))
+            GateM::Call(Box::new((fun_id, outids, inids)))
         }
         gs::GateConvert => {
             let u = the_gate.gate_as_gate_convert().unwrap();
