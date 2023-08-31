@@ -173,7 +173,7 @@ where
         let r = self
             .pool
             .range((Bound::Unbounded, Bound::Included(id)))
-            .last();
+            .next_back();
         match r {
             None => {
                 panic!("It had to be allocated");
@@ -197,7 +197,7 @@ where
         let r = self
             .pool
             .range((Bound::Unbounded, Bound::Included(id)))
-            .last();
+            .next_back();
         match r {
             None => false,
             Some((k, v)) => {
