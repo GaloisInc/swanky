@@ -3,9 +3,9 @@ use std::{fs::File, path::PathBuf, time::Instant};
 use clap::{Args, Subcommand};
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_ir::circuit_builder::build_privates;
-use mac_n_cheese_party::{private::ProverPrivate, Party, WhichParty, IS_VERIFIER};
 use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
+use swanky_party::{private::ProverPrivate, Party, WhichParty, IS_VERIFIER};
 
 use self::{
     circuit_ir::CircuitChunk,
@@ -191,13 +191,13 @@ pub fn sieve_compiler_main(args: SieveArgs) -> eyre::Result<()> {
                     let witness_path: ProverPrivate<_, &[PathBuf]> = ProverPrivate::new(witness);
                     if args.text {
                         sieve_compiler_main_party::<
-                            mac_n_cheese_party::Prover,
+                            swanky_party::Prover,
                             mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
                             mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
                         >(&args, witness_path)?;
                     } else {
                         sieve_compiler_main_party::<
-                            mac_n_cheese_party::Prover,
+                            swanky_party::Prover,
                             mac_n_cheese_sieve_parser::fb_reader::RelationReader,
                             mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
                         >(&args, witness_path)?;
@@ -206,13 +206,13 @@ pub fn sieve_compiler_main(args: SieveArgs) -> eyre::Result<()> {
                 Command::CompileVerifier => {
                     if args.text {
                         sieve_compiler_main_party::<
-                            mac_n_cheese_party::Verifier,
+                            swanky_party::Verifier,
                             mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
                             mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
                         >(&args, ProverPrivate::empty(IS_VERIFIER))?
                     } else {
                         sieve_compiler_main_party::<
-                            mac_n_cheese_party::Verifier,
+                            swanky_party::Verifier,
                             mac_n_cheese_sieve_parser::fb_reader::RelationReader,
                             mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
                         >(&args, ProverPrivate::empty(IS_VERIFIER))?

@@ -15,11 +15,11 @@ use generic_array::GenericArray;
 use mac_n_cheese_ir::compilation_format::{
     fb::DataChunkAddress, Manifest, PrivateDataAddress, TaskId, TaskPriority,
 };
-use mac_n_cheese_party::{either::PartyEither, private::ProverPrivate, Party, WhichParty};
 use moka::sync::SegmentedCache;
 use parking_lot::Mutex;
 use rand::RngCore;
 use rustc_hash::FxHashMap;
+use swanky_party::{either::PartyEither, private::ProverPrivate, Party, WhichParty};
 
 use crate::{
     alloc::{BytesFromDisk, OwnedAlignedBytes},

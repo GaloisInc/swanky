@@ -12,12 +12,12 @@ ocelot.workspace = true
 vectoreyes.workspace = true
 generic-array.workspace = true
 bytemuck.workspace = true
-mac-n-cheese-party.workspace = true
 eyre.workspace = true
 rand.workspace = true
 keyed_arena.workspace = true
 blake3.workspace = true
 arrayvec.workspace = true
+swanky-party.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

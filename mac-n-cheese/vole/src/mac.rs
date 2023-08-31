@@ -1,12 +1,12 @@
 use bytemuck::{TransparentWrapper, Zeroable};
-use mac_n_cheese_party as party;
-use mac_n_cheese_party::either::PartyEitherCopy;
-use mac_n_cheese_party::private::ProverPrivateCopy;
-use mac_n_cheese_party::{IsParty, Party, Prover, Verifier, WhichParty};
 use party::IS_PROVER;
 use scuttlebutt::field::{FiniteField, IsSubFieldOf, SmallBinaryField, F2};
 use scuttlebutt::ring::FiniteRing;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use swanky_party as party;
+use swanky_party::either::PartyEitherCopy;
+use swanky_party::private::ProverPrivateCopy;
+use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
 use crate::specialization::{FiniteFieldSpecialization, SmallBinaryFieldSpecialization};
 
