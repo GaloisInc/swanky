@@ -413,7 +413,7 @@ mod tests {
             &fun_store,
         )
         .unwrap();
-        fun_store.insert(name.clone(), func);
+        let fun_id = fun_store.insert(name.clone(), func).unwrap();
 
         let mut gates = vec![GateM::New(0, 0, wire_count)];
         // Add witness gates for p0
@@ -429,7 +429,7 @@ mod tests {
             gates.push(GateM::Instance(0, i))
         }
         gates.push(GateM::Call(Box::new((
-            name.clone(),
+            fun_id,
             vec![],
             vec![
                 (0, p0_size - 1),
@@ -492,7 +492,7 @@ mod tests {
             &fun_store,
         )
         .unwrap();
-        fun_store.insert(name.clone(), func);
+        let fun_id = fun_store.insert(name.clone(), func).unwrap();
 
         let mut gates = vec![GateM::New(0, 0, wire_count)];
         // Add witness gates for p
@@ -505,8 +505,9 @@ mod tests {
         for i in p_size + 1..wire_count {
             gates.push(GateM::Instance(0, i))
         }
+
         gates.push(GateM::Call(Box::new((
-            name.clone(),
+            fun_id,
             vec![],
             vec![
                 (0, p_size - 1),

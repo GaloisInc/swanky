@@ -58,7 +58,7 @@ impl Plugin for IterV0 {
             output_counts: f_output_counts,
             input_counts: f_input_counts,
             ..
-        } = fun_store.get(func_name).with_context(|| {
+        } = fun_store.get_func_by_name(func_name).with_context(|| {
             eyre::eyre!(
                 "{}: A function named {func_name} was not found.",
                 Self::NAME
@@ -197,7 +197,8 @@ impl Plugin for IterV0 {
                     &f_input_counts[input_start..],
                 ));
 
-                gates.push(GateM::Call(Box::new((func_name.clone(), outs, ins))));
+                let fun_id = fun_store.name_to_fun_id(func_name)?;
+                gates.push(GateM::Call(Box::new((fun_id, outs, ins))));
 
                 counter_wire += 1;
             }
@@ -218,7 +219,8 @@ impl Plugin for IterV0 {
                     &f_input_counts[input_start..],
                 ));
 
-                gates.push(GateM::Call(Box::new((func_name.clone(), outs, ins))));
+                let fun_id = fun_store.name_to_fun_id(func_name)?;
+                gates.push(GateM::Call(Box::new((fun_id, outs, ins))));
             }
         }
 
@@ -260,7 +262,7 @@ mod tests {
             vec![(FF0, 1), (FF0, 2), (FF0, 3)],
         );
 
-        func_store.insert("f".into(), func);
+        func_store.insert("f".into(), func).unwrap();
 
         let map_func = FuncDecl::new_plugin(
             vec![(FF0, 5)],
@@ -279,7 +281,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_map".into(), map_func);
+        let fun_id = func_store.insert("my_map".into(), map_func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 4),
@@ -313,7 +315,7 @@ mod tests {
             GateM::Witness(FF0, 313),
             GateM::Witness(FF0, 314),
             GateM::Call(Box::new((
-                "my_map".into(),
+                fun_id,
                 vec![(0, 4)],
                 vec![(100, 100), (200, 209), (300, 314)],
             ))),
@@ -376,7 +378,7 @@ mod tests {
             vec![(FF0, 1), (FF0, 1), (FF0, 2), (FF0, 3)],
         );
 
-        func_store.insert("f".into(), func);
+        func_store.insert("f".into(), func).unwrap();
 
         let map_func = FuncDecl::new_plugin(
             vec![(FF0, 5)],
@@ -395,7 +397,9 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_map_enumerated".into(), map_func);
+        let fun_id = func_store
+            .insert("my_map_enumerated".into(), map_func)
+            .unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 4),
@@ -429,7 +433,7 @@ mod tests {
             GateM::Witness(FF0, 313),
             GateM::Witness(FF0, 314),
             GateM::Call(Box::new((
-                "my_map_enumerated".into(),
+                fun_id,
                 vec![(0, 4)],
                 vec![(100, 100), (200, 209), (300, 314)],
             ))),
