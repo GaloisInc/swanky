@@ -27,6 +27,11 @@ use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
 
+use jemallocator::Jemalloc;
+
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 // Transform a path that could be either a file or a directory containing files into a vector of filenames.
 // Passing `/dev/null` returns an empty vector.
 fn path_to_files(path: PathBuf) -> Result<Vec<PathBuf>> {
