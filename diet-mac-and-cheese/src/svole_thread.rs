@@ -1,6 +1,6 @@
 //! Multithreading Svole.
 
-use crate::svole_trait::SvoleT;
+use crate::svole_trait::{field_name, SvoleStopSignal, SvoleT};
 use eyre::Result;
 use log::{debug, info, warn};
 use ocelot::svole::{LpnParams, Receiver, Sender};
@@ -47,6 +47,13 @@ impl<X: Copy + Default> SvoleAtomic<X> {
 
     pub fn set_delta(&mut self, delta: X) {
         *self.delta.lock().unwrap() = Some(delta);
+    }
+}
+
+impl<X: Copy + Default + std::fmt::Debug> SvoleStopSignal for SvoleAtomic<X> {
+    fn send_stop_signal(&mut self) -> Result<()> {
+        *self.stop_signal.lock().unwrap() = true;
+        Ok(())
     }
 }
 
@@ -156,6 +163,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadSender<V, T> {
         let mut sleep_time = SLEEP_TIME;
         loop {
             if *self.svole_atomic.stop_signal.lock().unwrap() {
+                info!("Stop running svole functionality for {}", field_name::<T>());
                 break;
             }
 
@@ -221,6 +229,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
         let mut sleep_time = SLEEP_TIME;
         loop {
             if *self.svole_atomic.stop_signal.lock().unwrap() {
+                info!("Stop running svole functionality for {}", field_name::<T>());
                 break;
             }
             let last_done = *self.svole_atomic.last_done.lock().unwrap();

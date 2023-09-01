@@ -320,6 +320,10 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
             let relation_file = File::open(relation_path)?;
             let relation_reader = BufReader::new(relation_file);
             evaluator.evaluate_relation_text(relation_reader)?;
+            evaluator.terminate()?;
+            for handle in handles {
+                handle.join().unwrap();
+            }
             info!("circ exec time: {:?}", start.elapsed());
 
             info!("total time: {:?}", total_time.elapsed());
@@ -377,6 +381,10 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
             let relation_file = File::open(relation_path)?;
             let relation_reader = BufReader::new(relation_file);
             evaluator.evaluate_relation_text(relation_reader)?;
+            evaluator.terminate()?;
+            for handle in handles {
+                handle.join().unwrap();
+            }
             info!("circ exec time: {:?}", start.elapsed());
 
             info!("total time: {:?}", total_time.elapsed());
@@ -542,6 +550,10 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
 
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path).unwrap();
+            evaluator.terminate()?;
+            for handle in handles {
+                handle.join().unwrap();
+            }
             info!("circ exec time: {:?}", start.elapsed());
 
             info!("total time: {:?}", total_time.elapsed());
@@ -596,6 +608,10 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
             info!("init time: {:?}", init_time.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;
+            evaluator.terminate()?;
+            for handle in handles {
+                handle.join().unwrap();
+            }
             info!("circ exec time: {:?}", start.elapsed());
 
             info!("total time: {:?}", total_time.elapsed());

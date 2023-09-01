@@ -10,7 +10,7 @@ use crate::memory::Memory;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
 use crate::svole_thread::{SvoleAtomic, ThreadReceiver, ThreadSender};
-use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleT};
+use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleStopSignal, SvoleT};
 use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
@@ -1359,6 +1359,7 @@ pub struct EvaluatorCirc<
     f2_idx: usize,
     party: Party,
     rng: AesRng,
+    multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
     phantom: PhantomData<C>,
 }
@@ -1413,6 +1414,7 @@ impl<
             eval: Vec::new(),
             f2_idx: 42,
             rng,
+            multithreaded_voles: vec![],
             no_batching,
             phantom: PhantomData,
         })
@@ -1439,6 +1441,7 @@ impl<
         if party == Party::Prover {
             let svole_atomic = SvoleAtomic::<(F2, F40b)>::create();
             let svole_atomic2 = svole_atomic.duplicate();
+            let svole_atomic3 = svole_atomic.duplicate();
             let svole_thread = std::thread::spawn(move || {
                 let mut rng2 = AesRng::new();
                 let mut svole_sender = ThreadSender::<F2, F40b>::init(
@@ -1462,6 +1465,7 @@ impl<
                     eval: Vec::new(),
                     f2_idx: 42,
                     rng,
+                    multithreaded_voles: vec![Box::new(svole_atomic3)],
                     no_batching,
                     phantom: PhantomData,
                 },
@@ -1470,6 +1474,7 @@ impl<
         } else {
             let svole_atomic = SvoleAtomic::<F40b>::create();
             let svole_atomic2 = svole_atomic.duplicate();
+            let svole_atomic3 = svole_atomic.duplicate();
             let svole_thread = std::thread::spawn(move || {
                 let mut rng2 = AesRng::new();
                 let mut svole_receiver = ThreadReceiver::<F2, F40b>::init(
@@ -1494,6 +1499,7 @@ impl<
                     eval: Vec::new(),
                     f2_idx: 42,
                     rng,
+                    multithreaded_voles: vec![Box::new(svole_atomic3)],
                     no_batching,
                     phantom: PhantomData,
                 },
@@ -1746,6 +1752,7 @@ impl<
         if self.party == Party::Prover {
             let svole_atomic = SvoleAtomic::<(FE, FE)>::create();
             let svole_atomic2 = svole_atomic.duplicate();
+            let svole_atomic3 = svole_atomic.duplicate();
 
             let svole_thread = std::thread::spawn(move || {
                 let mut rng2 = AesRng::new();
@@ -1777,10 +1784,12 @@ impl<
             debug!("Starting DietMacAndCheeseConvProver ... DONE");
             back = Box::new(EvaluatorSingle::new(dmc, false));
             self.eval.push(back);
+            self.multithreaded_voles.push(Box::new(svole_atomic3));
             Ok(svole_thread)
         } else {
             let svole_atomic = SvoleAtomic::<FE>::create();
             let svole_atomic2 = svole_atomic.duplicate();
+            let svole_atomic3 = svole_atomic.duplicate();
 
             let svole_thread = std::thread::spawn(move || {
                 let mut rng2 = AesRng::new();
@@ -1809,6 +1818,7 @@ impl<
                 )?;
             back = Box::new(EvaluatorSingle::new(dmc, false));
             self.eval.push(back);
+            self.multithreaded_voles.push(Box::new(svole_atomic3));
             Ok(svole_thread)
         }
     }
@@ -1974,6 +1984,7 @@ impl<
         Ok(())
     }
 
+    /// Evaluate a relation provided as a path.
     pub fn evaluate_relation(&mut self, path: &PathBuf) -> Result<()> {
         let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
@@ -1991,6 +2002,7 @@ impl<
         self.finish()
     }
 
+    // Evaluate a relation provided as text.
     pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
         let rel = RelationReader::new(rel)?;
 
@@ -2180,6 +2192,31 @@ impl<
             }
         }
         Ok(())
+    }
+
+    /// Terminate the evaluator.
+    ///
+    /// This functions sends stop signals to all the registered svole functionalities.
+    pub fn terminate(&mut self) -> Result<()> {
+        for e in self.multithreaded_voles.iter_mut() {
+            info!("Sending stop signal");
+            e.send_stop_signal()?;
+        }
+        self.multithreaded_voles = vec![];
+        Ok(())
+    }
+}
+
+impl<C: AbstractChannel, SvoleF2Prover: SvoleT<(F2, F40b)>, SvoleF2Verifier: SvoleT<F40b>> Drop
+    for EvaluatorCirc<C, SvoleF2Prover, SvoleF2Verifier>
+{
+    fn drop(&mut self) {
+        if !self.multithreaded_voles.is_empty() {
+            warn!(
+                "Need to call terminate()? There are {} multithreaded voles not terminated.",
+                self.multithreaded_voles.len()
+            );
+        }
     }
 }
 

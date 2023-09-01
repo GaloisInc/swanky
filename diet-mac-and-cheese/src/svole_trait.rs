@@ -18,7 +18,7 @@ use std::{
 /// The same trait is used for both the sender and the receiver.
 /// The trait is parametric over a type `M`. Typically `M` is pair value/tag `(V,T)`
 /// for a sender and tag `T` for a receiver.
-pub trait SvoleT<M> {
+pub trait SvoleT<M>: SvoleStopSignal {
     /// Initialize function.
     fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -45,10 +45,26 @@ pub trait SvoleT<M> {
     fn delta(&self) -> Option<M>;
 }
 
+/// This trait provides an interface function for sending stop signals.
+pub trait SvoleStopSignal {
+    /// Send a stop signal.
+    ///
+    /// In the context of multithreading, the main thread would start the svole functionalities in child threads.
+    /// The child threads would run forever. When the main thread is done, he needs to send a signal to the child threads
+    /// so they can stop.
+    ///
+    /// The default implementation panics.
+    fn send_stop_signal(&mut self) -> Result<()> {
+        panic!("Should not try to send a stop_signal")
+    }
+}
+
 /// Name of a field
 pub(crate) fn field_name<F: FiniteField>() -> &'static str {
     type_name::<F>().split("::").last().unwrap()
 }
+
+impl<T: FiniteField> SvoleStopSignal for Sender<T> {}
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<(V, T)> for Sender<T>
 where
@@ -114,6 +130,8 @@ pub struct SvoleSender<T: FiniteField> {
     sender: RcRefCell<Sender<T>>,
 }
 
+impl<T: FiniteField> SvoleStopSignal for SvoleSender<T> {}
+
 impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<(V, T)> for SvoleSender<T>
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
@@ -167,6 +185,8 @@ impl<V, T: FiniteField> SvoleReceiver<V, T> {
         }
     }
 }
+
+impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleStopSignal for SvoleReceiver<V, T> {}
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<T> for SvoleReceiver<V, T>
 where
