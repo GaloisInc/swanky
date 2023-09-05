@@ -449,7 +449,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 4, 14),
@@ -466,13 +466,13 @@ mod tests {
             GateM::Instance(FF0, 10),
             GateM::Instance(FF0, 11),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(12, 12)],
                 vec![(0, 0), (4, 4), (8, 8)],
             ))),
             GateM::AssertZero(FF0, 12),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(13, 13)],
                 vec![(1, 1), (4, 4), (8, 8)],
             ))),
@@ -515,7 +515,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 14),
@@ -528,13 +528,13 @@ mod tests {
             GateM::Instance(FF0, 6),
             GateM::Instance(FF0, 7),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(10, 10)],
                 vec![(0, 1), (4, 4), (5, 5), (6, 6), (7, 7)],
             ))),
             GateM::AssertZero(FF0, 12),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(11, 11)],
                 vec![(2, 3), (4, 4), (5, 5), (6, 6), (7, 7)],
             ))),
@@ -569,7 +569,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let mut gates = vec![
             GateM::New(FF0, 0, 14),
@@ -581,12 +581,12 @@ mod tests {
             GateM::Instance(FF0, 5),
             GateM::Instance(FF0, 6),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(10, 10)],
                 vec![(0, 1), (4, 4), (5, 5), (6, 6)],
             ))),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(11, 11)],
                 vec![(2, 3), (4, 4), (5, 5), (6, 6)],
             ))),
@@ -621,7 +621,8 @@ mod tests {
             &func_store,
         )
         .unwrap();
-        func_store.insert("my_mux".into(), func);
+        let id = func_store.insert("my_mux".into(), func).unwrap();
+        assert_eq!(fun_id, id);
 
         // We add the checks to make sure the computation is correct
         gates.push(GateM::AddConstant(
@@ -649,7 +650,8 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let id = func_store.insert("my_mux".into(), func).unwrap();
+        assert_eq!(fun_id, id);
 
         let gates = vec![
             GateM::New(FF0, 0, 14),
@@ -665,12 +667,12 @@ mod tests {
             GateM::Instance(FF0, 9),
             GateM::Instance(FF0, 10),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(11, 11)],
                 vec![(0, 3), (8, 8), (9, 9), (10, 10)],
             ))),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(12, 12)],
                 vec![(4, 7), (8, 8), (9, 9), (10, 10)],
             ))),
@@ -714,7 +716,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 4, 11),
@@ -730,7 +732,7 @@ mod tests {
             GateM::Instance(FF0, 10),
             GateM::Instance(FF0, 11),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(12, 14), (15, 15)],
                 vec![(0, 0), (4, 6), (7, 7), (8, 10), (11, 11)],
             ))),
@@ -739,7 +741,7 @@ mod tests {
             GateM::AssertZero(FF0, 14),
             GateM::AssertZero(FF0, 15),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(16, 18), (19, 19)],
                 vec![(1, 1), (4, 6), (7, 7), (8, 10), (11, 11)],
             ))),
@@ -788,7 +790,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 100),
@@ -807,7 +809,7 @@ mod tests {
             GateM::Instance(FF0, 20),
             GateM::Instance(FF0, 21),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(30, 32)],
                 vec![(0, 0), (10, 12), (13, 15), (16, 18), (19, 21)],
             ))),
@@ -815,7 +817,7 @@ mod tests {
             GateM::AssertZero(FF0, 31),
             GateM::AssertZero(FF0, 32),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(40, 42)],
                 vec![(1, 1), (10, 12), (13, 15), (16, 18), (19, 21)],
             ))),
@@ -867,7 +869,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 4, 11),
@@ -883,7 +885,7 @@ mod tests {
             GateM::Instance(FF0, 10),
             GateM::Instance(FF0, 11),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(12, 14), (15, 15)],
                 vec![(0, 0), (4, 6), (7, 7), (8, 10), (11, 11)],
             ))),
@@ -892,7 +894,7 @@ mod tests {
             GateM::AssertZero(FF0, 14),
             GateM::AssertZero(FF0, 15),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(16, 18), (19, 19)],
                 vec![(1, 1), (4, 6), (7, 7), (8, 10), (11, 11)],
             ))),
@@ -941,7 +943,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 100),
@@ -959,7 +961,7 @@ mod tests {
             GateM::Instance(FF0, 20),
             GateM::Instance(FF0, 21),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(30, 32)],
                 vec![(0, 0), (10, 12), (13, 15), (16, 18), (19, 21)],
             ))),
@@ -1007,7 +1009,7 @@ mod tests {
         )
         .unwrap();
 
-        func_store.insert("my_mux".into(), func);
+        let fun_id = func_store.insert("my_mux".into(), func).unwrap();
 
         let gates = vec![
             GateM::New(FF0, 0, 100),
@@ -1026,7 +1028,7 @@ mod tests {
             GateM::Instance(FF0, 20),
             GateM::Instance(FF0, 21),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(30, 32)],
                 vec![(0, 0), (10, 12), (13, 15), (16, 18), (19, 21)],
             ))),
@@ -1037,7 +1039,7 @@ mod tests {
             GateM::AssertZero(FF0, 36),
             GateM::AssertZero(FF0, 37),
             GateM::Call(Box::new((
-                "my_mux".into(),
+                fun_id,
                 vec![(40, 42)],
                 vec![(1, 1), (10, 12), (13, 15), (16, 18), (19, 21)],
             ))),

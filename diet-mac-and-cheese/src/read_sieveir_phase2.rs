@@ -231,7 +231,7 @@ impl BufRelation {
     }
 }
 
-fn flatbuffer_gate_to_gate(the_gate: g::Gate) -> GateM {
+fn flatbuffer_gate_to_gate(the_gate: g::Gate, fun_store: &FunStore) -> GateM {
     match the_gate.gate_type() {
         gs::GateConstant => {
             let u = the_gate.gate_as_gate_constant().unwrap();
@@ -307,8 +307,8 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate) -> GateM {
             for i in vi {
                 inids.push((i.first_id(), i.last_id()));
             }
-
-            GateM::Call(Box::new((u.name().unwrap().into(), outids, inids)))
+            let fun_id = fun_store.name_to_fun_id(&u.name().unwrap().into()).unwrap();
+            GateM::Call(Box::new((fun_id, outids, inids)))
         }
         gs::GateConvert => {
             let u = the_gate.gate_as_gate_convert().unwrap();
@@ -374,7 +374,10 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
 
         match t {
             ds::Gate => {
-                let gate = flatbuffer_gate_to_gate(directive_read.directive_as_gate().unwrap());
+                let gate = flatbuffer_gate_to_gate(
+                    directive_read.directive_as_gate().unwrap(),
+                    &rel.fun_store,
+                );
                 rel.gates.push(gate);
             }
             ds::Function => {
@@ -437,34 +440,40 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             &rel.fun_store,
                         )
                         .unwrap();
+
+                        let fun_id = rel.fun_store.insert(name.clone(), fun_body).unwrap();
+                        let fun_body = rel.fun_store.get_func(fun_id).unwrap();
                         info!(
-                            "plugin {:?} args_size:{:?} body_max:{:?} type_ids:{:?}",
-                            name.clone(),
+                            "plugin {:?} fun_id:{} args_size:{:?} body_max:{:?} type_ids:{:?}",
+                            name,
+                            fun_id,
                             fun_body.compiled_info.args_count,
                             fun_body.compiled_info.body_max,
                             fun_body.compiled_info.type_ids
                         );
-                        rel.fun_store.insert(name, fun_body);
                     }
                     g::FunctionBody::Gates => {
                         let u = the_function.body_as_gates().unwrap().gates().unwrap();
                         let n = u.len();
                         for i in 0..n {
-                            let gate = flatbuffer_gate_to_gate(u.get(i));
+                            let gate = flatbuffer_gate_to_gate(u.get(i), &rel.fun_store);
                             gates_body.push(gate);
                         }
                         let fun_body =
                             FuncDecl::new_function(gates_body, output_counts, input_counts);
+
+                        let fun_id = rel.fun_store.insert(name.clone(), fun_body).unwrap();
+                        let fun_body = rel.fun_store.get_func(fun_id).unwrap();
                         info!(
-                            "function {:?} args_size:{:?} body_max:{:?} type_ids:{:?} output_ranges:{:?} input_ranges:{:?}",
+                            "function {:?} fun_id:{} args_size:{:?} body_max:{:?} type_ids:{:?} output_ranges:{:?} input_ranges:{:?}",
                             name.clone(),
+                            fun_id,
                             fun_body.compiled_info.args_count,
                             fun_body.compiled_info.body_max,
                             fun_body.compiled_info.type_ids,
                             output_count.len(),
                             input_count.len()
                         );
-                        rel.fun_store.insert(name, fun_body);
                     }
                     _ => {
                         panic!("Unhandled case")

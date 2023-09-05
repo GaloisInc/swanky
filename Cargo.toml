@@ -183,4 +183,8 @@ debug = true
 debug-assertions = true
 overflow-checks = true
 
+[profile.dev.package]
+# See #147
+jemalloc-sys.opt-level = 3
+
 
