@@ -11,6 +11,8 @@ mkShell {
   buildInputs = [
     (writeShellScriptBin "start_sccache" ''
       source ${./env.sh}
+      export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
+      export NIX_SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
       tmp=$(mktemp -d)
       mkfifo "$tmp/ready"
       function cleanup() {
