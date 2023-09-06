@@ -108,7 +108,7 @@ def test_rust(
 )
 @click.pass_context
 def ci(ctx: click.Context, cache_dir: Path) -> None:
-    "CI Entry Points"
+    "Commands used by CI system (you probably don't want to invoke them manually)"
     # Set up the environment for cach
     cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
     extra_env = {

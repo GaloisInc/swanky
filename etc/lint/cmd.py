@@ -48,7 +48,7 @@ LINTS: Sequence[Callable[[click.Context], LintResult]] = (
 @click.command()
 @click.pass_context
 def lint(ctx: click.Context) -> None:
-    "Run lints!"
+    "Run lints! (These lints are checked in CI.)"
     failures = []
     for lint in LINTS:
         lint_name = lint.__doc__.strip().split("\n")[0].strip()
