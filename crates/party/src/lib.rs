@@ -97,24 +97,63 @@ use std::marker::PhantomData;
 mod is_party {
     use super::*;
 
-    /// Evidence that two [`Party`] are the same.
+    /// Value-level representation of evidence that two [`Party`] are the same.
     ///
-    /// Use parameters of this type to indicate a function is party-specific,
-    /// and to allow the use of party-specific APIs in such functions'
-    /// definitions without having to match on `P::WHICH`.
+    /// By definition, the only sound instantiations of this type are
+    /// `IsParty<Prover, Prover>` and `IsParty<Verifier, Verifier>`. These are
+    /// provided as compile-time constants [`IS_PROVER`] and [`IS_VERIFIER`].
     ///
-    /// ## Example
+    /// In your own code, values of this type will show up in a few places:
+    ///
+    /// - As evidence when matching on [`Party::WHICH`]
+    /// - As the type of an evidence parameter to party-specific functions
+    ///
+    /// The former enables the use of party-specific APIs, and the latter is
+    /// how party-specific APIs are defined. In general, writing a function of
+    /// the form:
     ///
     /// ```
-    /// fn prover_do_something<P: Party>(ev: IsParty<P, Prover>, x: Foo<P>) { /* ... */ }
+    /// fn f_prover<P: Party>(ev: IsParty<P, Prover>, ...) -> ...
+    /// ```
+    ///
+    /// makes it prover-specific, and dually the form:
+    ///
+    /// ```
+    /// fn f_verifier<P: Party>(ev: IsParty<P, Verifier>, ...) -> ...
+    /// ```
+    ///
+    /// makes it verifier-specific.
+    ///
+    /// ## Examples
+    ///
+    /// The variants of [`WhichParty`] distinguish parties at the value-level
+    /// by name, but also carry value-level evidence of a type-level equality:
+    ///
+    /// ```
+    /// match P::WHICH {
+    ///     WhichParty::Prover(ev_p) => {
+    ///         // ...
+    ///     }
+    ///     WhichParty::Verifier(ev_v) => {
+    ///         // ...
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// `ev_p` in the first arm could be used to call a function of the
+    /// following type. Trying to call the same function with `ev_v` would be a
+    /// type error:
+    ///
+    /// ```
+    /// fn prover_do_something<P: Party>(ev: IsParty<P, Prover>) { /* ... */ }
     /// ```
     #[derive(Clone, Copy)]
     pub struct IsParty<P1: Party, P2: Party>(PhantomData<(P1, P2)>);
 
-    /// Trivial evidence that a party is [`Prover`].
+    /// Value-level representation of the type equality `Prover ~ Prover`.
     pub const IS_PROVER: IsParty<Prover, Prover> = IsParty(PhantomData);
 
-    /// Trivial evidence that a party is [`Verifier`].
+    /// Value-level representation of the type equality `Verifier ~ Verifier`.
     pub const IS_VERIFIER: IsParty<Verifier, Verifier> = IsParty(PhantomData);
 }
 use bytemuck::{Pod, Zeroable};
