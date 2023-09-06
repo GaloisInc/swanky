@@ -104,10 +104,10 @@ mod is_party {
     #[derive(Clone, Copy)]
     pub struct IsParty<P1: Party, P2: Party>(PhantomData<(P1, P2)>);
 
-    /// Trivial evidence/an assertion that the party is [`Prover`].
+    /// Trivial evidence that a party is [`Prover`].
     pub const IS_PROVER: IsParty<Prover, Prover> = IsParty(PhantomData);
 
-    /// Trivial evidence/an assertion that the party is [`Verifier`].
+    /// Trivial evidence that a party is [`Verifier`].
     pub const IS_VERIFIER: IsParty<Verifier, Verifier> = IsParty(PhantomData);
 }
 use bytemuck::{Pod, Zeroable};
