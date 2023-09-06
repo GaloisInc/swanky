@@ -30,6 +30,22 @@ args = sys.argv[2:]
 assert exe.exists()
 
 
+# os.getxattr and os.setxattr only exist on Linux. These stubs exist so that this file can
+# typecheck on macOS, even if it's not supposed to run on the mac.
+def getxattr(path: Path, attr: str) -> bytes:
+    if sys.platform == "linux":
+        return os.getxattr(path, attr)
+    else:
+        assert False
+
+
+def setxattr(path: Path, attr: str, value: bytes) -> None:
+    if sys.platform == "linux":
+        os.setxattr(path, attr, value)
+    else:
+        assert False
+
+
 def cached_hash(exe: Path) -> bytes:
     """
     Some of our test executables, especially with debug symbols, can be in the
@@ -49,7 +65,7 @@ def cached_hash(exe: Path) -> bytes:
     ]
     attr = "user.caching_test_runner_hash_cache"
     try:
-        raw_data = os.getxattr(exe, attr)  # type: ignore
+        raw_data = getxattr(exe, attr)
     except:
         raw_data = None
     if raw_data is not None:
@@ -58,7 +74,7 @@ def cached_hash(exe: Path) -> bytes:
             assert isinstance(cbor_hash, bytes)
             return cbor_hash
     out = sha256(exe.read_bytes()).digest()
-    os.setxattr(exe, attr, cbor2.dumps((out, stat_data)))  # type: ignore
+    setxattr(exe, attr, cbor2.dumps((out, stat_data)))
     return out
 
 
