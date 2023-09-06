@@ -72,7 +72,9 @@
 //!
 //! The value `ev` can be used to invoke prover-specific functionality, such as
 //! safely casting to the underlying type associated with `Prover` via
-//! `PartyEither`.
+//! `PartyEither`. Of course, if instead the behavior is verifier-specific, one
+//! can use `IsParty<P, Verifier>` instead. There are many examples of this in
+//! the API of `PartyEither`.
 //!
 //! Since this library was intended for use specifically in zero-knowledge
 //! contexts, the `private` module exposes the types [`private::ProverPrivate`]
