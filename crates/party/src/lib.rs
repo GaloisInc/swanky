@@ -159,12 +159,27 @@ mod is_party {
 use bytemuck::{Pod, Zeroable};
 pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
 
-/// Distinguish between type-level parties, with evidence.
+/// Value-level party distinction.
 ///
-/// Values of this type should almost never be constructed explicitly. The
-/// constant [`Party::WHICH`] exposes a value of this type for any `P: Party`
-/// that allows for safe value-level inspection of the type `P`. The evidence
-/// carried may be used to safely call party-specific functions/methods.
+/// NOTE: Values of this type can only safely be constructed using the
+/// associated constant [`Party::WHICH`]. Don't construct values yourself!
+///
+/// ## Example
+///
+/// ```
+/// match P::WHICH {
+///     WhichParty::Prover(ev_p) => {
+///         // ...
+///     }
+///     WhichParty::Verifier(ev_v) => {
+///         // ...
+///     }
+/// }
+/// ```
+///
+/// Note that the safety requirements of [`Party`] imply that
+/// `P ~ Prover` iff `P::WHICH == WhichParty::Prover(IS_PROVER)` and
+/// `P ~ Verifier` iff `P::WHICH == WhichParty::Verifier(IS_VERIFIER)`.
 #[derive(Clone, Copy)]
 pub enum WhichParty<P: Party> {
     Prover(IsParty<P, Prover>),
