@@ -1,0 +1,26 @@
+#!/usr/bin/env nix-shell
+#!nix-shell --pure --keep NIX_REMOTE --keep NIX_PATH --keep TMPDIR --pure -i python3 ./etc/nix/cli.nix
+# This is the launcher script for some utilities which can be helpful for developing Swanky.
+# It depends on Nix (https://nixos.org/download), but the use of this script isn't required to
+# develop Swanky
+
+if __name__ == '__main__':
+    import logging
+
+    import rich.traceback
+    from rich.logging import RichHandler
+    import rich_click.cli
+
+    rich.traceback.install(show_locals=True)
+
+    logging.basicConfig(
+        level="NOTSET",
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True)],
+    )
+    
+    rich_click.cli.patch()
+    
+    from etc.main import main
+    main()

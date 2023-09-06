@@ -11,26 +11,23 @@ default:
     - mkdir -p -m 1777 /nix/var/nix/gcroots/per-user
     - mkdir -p -m 1777 /nix/var/nix/profiles/per-user
     - mkdir -p -m 0755 /nix/var/nix/profiles/per-user/root
+    - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
+    - export PATH="/nix/var/nix/profiles/default/bin/:$PATH"
 
 variables:
   GIT_STRATEGY: clone
   NIX_REMOTE: daemon
-  SWANKY_CACHE_DIR: /var/lib/swanky-sccache/
 
 normal-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
   script:
-    - pwd
-    - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
-    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/run.sh
+    - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ quick
 
 nightly-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
   script:
-    - pwd
-    - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
-    - /nix/var/nix/profiles/default/bin/nix-shell etc/ci/run.sh --nightly
+    - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ nightly
