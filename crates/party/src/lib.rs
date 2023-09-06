@@ -112,13 +112,13 @@ mod is_party {
     /// how party-specific APIs are defined. In general, writing a function of
     /// the form:
     ///
-    /// ```
+    /// ```rust,ignore
     /// fn f_prover<P: Party>(ev: IsParty<P, Prover>, ...) -> ...
     /// ```
     ///
     /// makes it prover-specific, and dually the form:
     ///
-    /// ```
+    /// ```rust,ignore
     /// fn f_verifier<P: Party>(ev: IsParty<P, Verifier>, ...) -> ...
     /// ```
     ///
@@ -129,7 +129,7 @@ mod is_party {
     /// The variants of [`WhichParty`] distinguish parties at the value-level
     /// by name, but also carry value-level evidence of a type-level equality:
     ///
-    /// ```
+    /// ```rust,ignore
     /// match P::WHICH {
     ///     WhichParty::Prover(ev_p) => {
     ///         // ...
@@ -144,7 +144,7 @@ mod is_party {
     /// following type. Trying to call the same function with `ev_v` would be a
     /// type error:
     ///
-    /// ```
+    /// ```rust,ignore
     /// fn prover_do_something<P: Party>(ev: IsParty<P, Prover>) { /* ... */ }
     /// ```
     #[derive(Clone, Copy)]
@@ -166,7 +166,7 @@ pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
 ///
 /// ## Example
 ///
-/// ```
+/// ```rust,ignore
 /// match P::WHICH {
 ///     WhichParty::Prover(ev_p) => {
 ///         // ...
@@ -193,7 +193,7 @@ pub enum WhichParty<P: Party> {
 ///
 /// ## Example
 ///
-/// ```
+/// ```rust,ignore
 /// fn party_time<P: Party>(x: PartyThing<P>) {
 ///     // ... Do some party-generic stuff ...
 ///     match P::WHICH {
