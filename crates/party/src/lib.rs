@@ -229,6 +229,8 @@ pub unsafe trait Party:
     + Zeroable
     + either::internal::PartyEitherInternal
 {
+    /// Compile-time constant distinguishing the implementing type at the
+    /// value-level from other implementing types.
     const WHICH: WhichParty<Self>;
 }
 
