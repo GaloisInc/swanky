@@ -30,8 +30,8 @@
 //! struct Info<P: Party> {
 //!     // ... other fields common to both parties ...
 //!
-//!     // A field that is `ProverSpecificData` when `P ~ Prover`, and
-//!     // `VerifierSpecificData` when `P ~ Verifier`. The `PartyEither` type
+//!     // A field that is `ProverSpecificData` when `P = Prover`, and
+//!     // `VerifierSpecificData` when `P = Verifier`. The `PartyEither` type
 //!     // incurs no additional memory cost.
 //!     party_specific_data: PartyEither<P, ProverSpecificData, VerifierSpecificData>,
 //! }
@@ -150,10 +150,10 @@ mod is_party {
     #[derive(Clone, Copy)]
     pub struct IsParty<P1: Party, P2: Party>(PhantomData<(P1, P2)>);
 
-    /// Value-level representation of the type equality `Prover ~ Prover`.
+    /// Value-level representation of the type equality `Prover = Prover`.
     pub const IS_PROVER: IsParty<Prover, Prover> = IsParty(PhantomData);
 
-    /// Value-level representation of the type equality `Verifier ~ Verifier`.
+    /// Value-level representation of the type equality `Verifier = Verifier`.
     pub const IS_VERIFIER: IsParty<Verifier, Verifier> = IsParty(PhantomData);
 }
 use bytemuck::{Pod, Zeroable};
@@ -178,8 +178,8 @@ pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
 /// ```
 ///
 /// Note that the safety requirements of [`Party`] imply that
-/// `P ~ Prover` iff `P::WHICH == WhichParty::Prover(IS_PROVER)` and
-/// `P ~ Verifier` iff `P::WHICH == WhichParty::Verifier(IS_VERIFIER)`.
+/// `P = Prover` iff `P::WHICH == WhichParty::Prover(IS_PROVER)` and
+/// `P = Verifier` iff `P::WHICH == WhichParty::Verifier(IS_VERIFIER)`.
 #[derive(Clone, Copy)]
 pub enum WhichParty<P: Party> {
     Prover(IsParty<P, Prover>),
