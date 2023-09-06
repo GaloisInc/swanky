@@ -5,18 +5,22 @@ import os
 import typing
 import xml.etree.ElementTree as ET
 from collections import namedtuple
+from functools import cache
 from pathlib import Path
 from uuid import uuid4
 
-from cgtypes import *
+from .cgtypes import *
 
 INTEL_INTRINSICS_XML_XZ = (
     Path(__file__).resolve().parent / "intel-intrinsics-3.4.5.xml.xz"
 )
-with lzma.open(INTEL_INTRINSICS_XML_XZ) as compressed_xml:
-    INTEL_INTRINSICS_XML = {
-        x.get("name"): x for x in ET.parse(compressed_xml).getroot()
-    }
+
+
+@cache
+def intel_intrinsics_xml():
+    with lzma.open(INTEL_INTRINSICS_XML_XZ) as compressed_xml:
+        return {x.get("name"): x for x in ET.parse(compressed_xml).getroot()}
+
 
 if "UOPS_INFO_XML" in os.environ:
     UOPS_INFO_DB = dict()
@@ -67,12 +71,6 @@ if "UOPS_INFO_XML" in os.environ:
             UOPS_INFO_DB[key] = data
 else:
     UOPS_INFO_DB = None
-
-SWANKY_CACHE_DIR = (
-    Path(os.environ["SWANKY_CACHE_DIR"]) / "avx2-uops.info-dbm-cache"
-    if "SWANKY_CACHE_DIR" in os.environ
-    else Path(__file__).resolve().parent
-)
 
 
 def uops_info(iform):
@@ -136,7 +134,7 @@ class IntelInstruction:
 class IntelIntrinsic(namedtuple("IntelIntrinsic", "name")):
     @property
     def xml(self):
-        return INTEL_INTRINSICS_XML[self.name]
+        return intel_intrinsics_xml()[self.name]
 
     def intel_reference_url(self):
         return f"https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text={self.name}"
@@ -417,7 +415,7 @@ class IntelIntrinsicBuilder:
 
         line("#![allow(non_upper_case_globals, non_snake_case)]")
         for name in sorted(list(self.needed_intrinsics)):
-            intrinsic = INTEL_INTRINSICS_XML[name]
+            intrinsic = intel_intrinsics_xml()[name]
             assert intrinsic.tag == "intrinsic"
             immediate_override = INTRINSIC_IMMEDIATE_ARGUMENT_OVERRIDES.get(name)
             required_cpuid = set(x.text for x in intrinsic.findall("CPUID"))

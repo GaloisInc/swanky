@@ -1,5 +1,6 @@
-with import ./pkgs.nix {};
-(mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
+with import ./pkgs.nix { };
+let isLinux = !builtins.isNull (builtins.match "^.*linux$" system);
+in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
   shellHook = ''
     export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
     export NIX_SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
@@ -8,18 +9,24 @@ with import ./pkgs.nix {};
     (import ./rust-toolchain.nix)
     cargo-nextest
     cargo-deny
-    lld_16
+    llvmPackages_16.bintools
     git
     (python311.withPackages (py: [
       py.black
       py.cbor2
+      py.click
       py.isort
+      py.jinja2
       py.rich
+      py.rich-click
       py.toml
-      py.typer
+      py.mypy
+      py.types-toml
     ]))
     sccache
     cacert
+    niv
     nix
+    nixpkgs-fmt
   ];
 }

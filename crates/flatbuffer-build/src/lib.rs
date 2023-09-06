@@ -71,6 +71,10 @@ pub fn compile_flatbuffer(src: &str, dst: &str) {
     println!("cargo:rerun-if-changed={src}");
     println!("cargo:rerun-if-changed={dst}");
     if needs_recompile(src, dst) {
+        // We don't need to tell cargo to rerun if this env var has changed.
+        if std::env::var_os("SWANKY_FLATBUFFER_DO_NOT_GENERATE").is_some() {
+            panic!("{dst:?} is out of date for source {src:?}. Refusing to regenerate flatbuffers because 'SWANKY_FLATBUFFER_DO_NOT_GENERATE' is set.");
+        }
         let src_contents = std::fs::read(src).unwrap();
         std::env::set_var("PWD", std::env::current_dir().unwrap());
         let actual_flatc_version = String::from_utf8(

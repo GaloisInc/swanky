@@ -16,9 +16,10 @@ import tempfile
 import threading
 from hashlib import sha256
 from pathlib import Path
+from typing import IO, Optional
 from uuid import uuid4
 
-import cbor2
+import cbor2  # type: ignore
 
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
@@ -27,6 +28,22 @@ TEST_RESULTS.mkdir(exist_ok=True, parents=True)
 exe = Path(sys.argv[1])
 args = sys.argv[2:]
 assert exe.exists()
+
+
+# os.getxattr and os.setxattr only exist on Linux. These stubs exist so that this file can
+# typecheck on macOS, even if it's not supposed to run on the mac.
+def getxattr(path: Path, attr: str) -> bytes:
+    if sys.platform == "linux":
+        return os.getxattr(path, attr)
+    else:
+        assert False
+
+
+def setxattr(path: Path, attr: str, value: bytes) -> None:
+    if sys.platform == "linux":
+        os.setxattr(path, attr, value)
+    else:
+        assert False
 
 
 def cached_hash(exe: Path) -> bytes:
@@ -48,15 +65,16 @@ def cached_hash(exe: Path) -> bytes:
     ]
     attr = "user.caching_test_runner_hash_cache"
     try:
-        raw_data = os.getxattr(exe, attr)
+        raw_data = getxattr(exe, attr)
     except:
         raw_data = None
     if raw_data is not None:
-        out, read_stat_data = cbor2.loads(raw_data)
+        cbor_hash, read_stat_data = cbor2.loads(raw_data)
         if read_stat_data == stat_data:
-            return out
+            assert isinstance(cbor_hash, bytes)
+            return cbor_hash
     out = sha256(exe.read_bytes()).digest()
-    os.setxattr(exe, attr, cbor2.dumps((out, stat_data)))
+    setxattr(exe, attr, cbor2.dumps((out, stat_data)))
     return out
 
 
@@ -82,9 +100,10 @@ else:
     lock = threading.Lock()
     output = []
 
-    def reader(name, stream, dst):
+    def reader(name: str, stream: Optional[IO[bytes]], dst: IO[bytes]) -> None:
         global lock
         global output
+        assert stream is not None
         while True:
             buf = stream.read(8192)
             if len(buf) == 0:
@@ -95,12 +114,12 @@ else:
             dst.flush()
 
     print(f"TEST CACHE MISS {exe} with {args}", file=sys.stderr)
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory() as tmp_str:
         # try to sandbox by changing the cwd
-        tmp = Path(tmp)
+        tmp = Path(tmp_str)
         # We use the this dir so that we can hard link
         proc = subprocess.Popen(
-            [exe] + args,
+            [str(exe)] + args,
             cwd=tmp,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
