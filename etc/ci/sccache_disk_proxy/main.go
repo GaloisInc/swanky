@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"golang.org/x/sys/unix"
 )
 
 var bind = flag.String("bind", "", "the address to bind to")
@@ -75,31 +73,24 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			}
 			// This is the key part that sccache doesn't do which makes it not safe for concurrent
 			// accesses. We want to get a temporary file in the directory we're trying to write,
-			// write its contents, and then hard-link it into the right place. In addition, we'd
-			// like the temporary file to not have a directory entry, so that if this process
-			// crashes, there's nothing to clean up (since an inode that isn't open, with no
-			// directory entry will be garbage collected by the OS). Once we've successfully
-			// written all of our data to the file, we hard-link it into the correct place.
-			// Because the hard-linking operation is atomic, it means that every reader will either
-			// see (A) GET(path) does not exist, or (B) GET(path) returns the complete contents of
-			// the "last" successful PUT(path).
-			// NOTE: that this doesn't fsync or fdatasync, and so might not be fully correct across
-			// power loss.
-			f, err := os.OpenFile(parent, os.O_RDWR|unix.O_TMPFILE, 0644)
+			// write its contents, and then (atomically) rename it over the destination.
+			f, err := os.CreateTemp(parent, "TMP-swanky_sccache_proxy-*")
 			if err != nil {
 				log.Panicf("Unable to open temporary file in %q: %s", parent, err)
 			}
+			// This will fail once we've renamed f. But that's fine.
+			defer os.Remove(f.Name())
 			defer f.Close()
 			_, err = io.Copy(f, r.Body)
 			if err != nil {
 				log.Panicf("Error copying into file %q: %s", path, err)
 			}
-			srcPath := fmt.Sprintf("/proc/self/fd/%d", f.Fd())
-			err = unix.Linkat(unix.AT_FDCWD, srcPath, unix.AT_FDCWD, path, unix.AT_SYMLINK_FOLLOW)
+			err = os.Rename(f.Name(), path)
 			if err != nil {
-				log.Panicf("Error linkat-ing to file %q: %s", path, err)
+				log.Panicf("Error renaming %q to file %q: %s", f.Name(), path, err)
 			}
-			w.WriteHeader(204)
+			// Sccache doesn't like a 204 response (which is proper for an empty body)
+			w.WriteHeader(200)
 		}
 	} else {
 		w.WriteHeader(405)
