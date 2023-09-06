@@ -126,18 +126,32 @@ macro_rules! define_prover_either {
             contents: Pa::$EitherStorage<P, V>,
         }
         impl<Pa: Party, P $(: $Copy)?, V $(: $Copy)?> $PartyEither<Pa, P, V> {
+            /// Given evidence that `Pa ~ Prover`, create a new
+            /// `PartyEither(Copy)` from a value of the prover-data type.
             pub fn prover_new(_ev: IsParty<Pa, Prover>, x: P) -> Self {
                 Self { contents: Pa::$EitherStorage::<P, V>::new_prover(x) }
             }
+
+            /// Given evidence that `Pa ~ Verifier`, create a new
+            /// `PartyEither(Copy)` from a value of the verifier-data type.
             pub fn verifier_new(_ev: IsParty<Pa, Verifier>, x: V) -> Self {
                 Self { contents: Pa::$EitherStorage::<P, V>::new_verifier(x) }
             }
+
+            /// Given evidence that `Pa ~ Prover`, cast to the underlying
+            /// prover-data type.
             pub fn prover_into(self, _ev: IsParty<Pa, Prover>) -> P {
                 Pa::$EitherStorage::<P, V>::into_prover(self.contents)
             }
+
+            /// Given evidence that `Pa ~ Verifier`, cast to the underlying
+            /// verifier-data type.
             pub fn verifier_into(self, _ev: IsParty<Pa, Verifier>) -> V {
                 Pa::$EitherStorage::<P, V>::into_verifier(self.contents)
             }
+
+            /// Convert from `PartyEither(Copy)<Pa, P, V>` to
+            /// `PartyEither(Copy)<Pa, &P, &V>`.
             pub fn as_ref(&self) -> $PartyEither<Pa, &P, &V> {
                 match Pa::WHICH {
                     WhichParty::Prover(e) =>
@@ -146,6 +160,9 @@ macro_rules! define_prover_either {
                         $PartyEither::verifier_new(e, Pa::$EitherStorage::<P, V>::ref_verifier(&self.contents)),
                 }
             }
+
+            /// Convert from `PartyEither(Copy)<Pa, P, V>` to
+            /// `PartyEither(Copy)<Pa, &mut P, &mut V>`.
             pub fn as_mut(&mut self) -> PartyEither<Pa, &mut P, &mut V> {
                 match Pa::WHICH {
                     WhichParty::Prover(e) =>
@@ -154,6 +171,8 @@ macro_rules! define_prover_either {
                         PartyEither::verifier_new(e, Pa::$EitherStorage::<P, V>::mut_verifier(&mut self.contents)),
                 }
             }
+
+            /// Zip two `PartyEither(Copy)` in the natural way.
             pub fn zip<
                 P2 $(: $Copy)?,
                 V2 $(: $Copy)?,
@@ -169,6 +188,12 @@ macro_rules! define_prover_either {
                     )),
                 }
             }
+
+            /// Given a function for each of the prover- and verifier-data
+            /// types, map over a `PartyEither(Copy)` in the natural way.
+            ///
+            /// Note that only one of the provided functions will run for a
+            /// given call to `map`.
             pub fn map<
                 P2 $(: $Copy)?,
                 V2 $(: $Copy)?,
