@@ -12,6 +12,11 @@
 //! `Prover`, then this entire type effectively collapses to `P`. Likewise, if
 //! `Pa` is `Verifier`, the type collapses to `V`.
 //!
+//! Due to some outstanding Rust issues, we provide a separate
+//! `PartyEitherCopy<Pa: Party, P: Copy, V: Copy>` type. Both types implement
+//! the same API, and conveniences are provided to convert between these types
+//! where appropriate.
+//!
 //! This is extremely general. For a particularly useful specialization for
 //! zero-knowledge contexts, see [`private`].
 
