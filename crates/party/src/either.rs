@@ -18,7 +18,7 @@
 //! where appropriate.
 //!
 //! This is extremely general. For a particularly useful specialization for
-//! zero-knowledge contexts, see [`private`].
+//! secure computation contexts, see [`private`].
 
 use std::io::{Read, Write};
 
