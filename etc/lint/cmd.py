@@ -1,4 +1,4 @@
-from typing import Callable, Sequence
+from typing import Any, Callable, List
 
 import click
 import rich
@@ -7,10 +7,13 @@ from etc.fmt import fmt
 from etc.lint import LintResult
 from etc.lint import flatbuffers as lint_flatbuffers
 from etc.lint import rust as lint_rust
+from etc.lint.mypy import mypy as lint_mypy
 from vectoreyes.cmd import generate as vectoreyes_generate
 
 
-def existing_command_as_lint(doc: str, cmd: click.Command, **kwargs) -> LintResult:
+def existing_command_as_lint(
+    doc: str, cmd: click.Command, **kwargs: Any
+) -> Callable[[click.Context], LintResult]:
     """
     Run cmd (which is already exposed via ./swanky) as a lint
 
@@ -31,18 +34,19 @@ def existing_command_as_lint(doc: str, cmd: click.Command, **kwargs) -> LintResu
     return out
 
 
-LINTS: Sequence[Callable[[click.Context], LintResult]] = (
+LINTS: List[Callable[[click.Context], LintResult]] = [
     existing_command_as_lint("Run ./swanky fmt --check", fmt, check=True),
     existing_command_as_lint(
         "Run ./swanky vectoreyes generate --check", vectoreyes_generate, check=True
     ),
+    lint_mypy,
     lint_flatbuffers.check_version_matches,
     lint_rust.check_cargo_lock,
     lint_rust.validate_crate_manifests,
     lint_rust.crates_enumerated_in_workspace,
     lint_rust.workspace_members_are_defined_in_workspace,
     lint_rust.cargo_deny,
-)
+]
 
 
 @click.command()
@@ -51,7 +55,9 @@ def lint(ctx: click.Context) -> None:
     "Run lints! (These lints are checked in CI.)"
     failures = []
     for lint in LINTS:
-        lint_name = lint.__doc__.strip().split("\n")[0].strip()
+        doc = lint.__doc__
+        assert doc is not None, f"lint {lint} is missing docs!"
+        lint_name = doc.strip().split("\n")[0].strip()
         rich.get_console().rule(lint_name)
         if lint(ctx) == LintResult.FAILURE:
             failures.append(lint_name)

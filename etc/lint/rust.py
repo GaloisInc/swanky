@@ -2,7 +2,7 @@ import itertools
 import subprocess
 from collections import defaultdict
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 import click
 import rich
@@ -48,7 +48,7 @@ def check_cargo_lock(ctx: click.Context) -> LintResult:
     return LintResult.SUCCESS
 
 
-def root_cargo_toml():
+def root_cargo_toml() -> Any:
     return toml.loads((ROOT / "Cargo.toml").read_text())
 
 
