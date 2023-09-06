@@ -12,10 +12,8 @@
 //! `Prover`, then this entire type effectively collapses to `P`. Likewise, if
 //! `Pa` is `Verifier`, the type collapses to `V`.
 //!
-//! That's a bit oversimplified - to complete the 'collapse', we need to
-//! provide evidence that the type is correct via [`IsParty`].
-//!
-//! All of this is resolved at compile-time, and comes at no additional cost.
+//! This is extremely general. For a particularly useful specialization useful
+//! in zero-knowledge contexts, see [`private`].
 
 use std::io::{Read, Write};
 
