@@ -252,6 +252,7 @@ macro_rules! define_prover_either {
             }
         }*/
         impl<'a, Pa: Party, P $(: $Copy)?, V $(: $Copy)?> $PartyEither<Pa, &'a [P], &'a [V]> {
+            /// Convert a slice of `PartyEither` to a `PartyEither` of slices.
             pub fn pull_either_outside(slice: &'a [$PartyEither<Pa, P, V>]) -> Self {
                 match Pa::WHICH {
                     WhichParty::Prover(e) => {
@@ -272,6 +273,8 @@ macro_rules! define_prover_either {
                     }
                 }
             }
+
+            /// Convert a `PartyEither` of slices to a slice of `PartyEither`.
             pub fn push_either_inside(self) -> &'a [$PartyEither<Pa, P, V>] {
                 match Pa::WHICH {
                     WhichParty::Prover(e) => {
@@ -312,6 +315,7 @@ unsafe impl PartyEitherInternal for Verifier {
 }
 
 // TODO: fix these impls
+/// Convert a `PartyEither` over `Copy` values to a `PartyEitherCopy`.
 impl<Pa: Party, P: Copy, V: Copy> PartyEither<Pa, P, V> {
     pub fn into_copy(self) -> PartyEitherCopy<Pa, P, V> {
         match Pa::WHICH {
@@ -344,6 +348,8 @@ unsafe impl<Pa: Party, P: Copy + Zeroable, V: Copy + Zeroable> Zeroable
 unsafe impl<Pa: Party, P: Copy + Pod, V: Copy + Pod> Pod for PartyEitherCopy<Pa, P, V> {}
 
 impl<'a, Pa: Party, P, V> PartyEither<Pa, &'a mut [P], &'a mut [V]> {
+    /// Convert a mutable slice of `PartyEither` to a `PartyEither` of mutable
+    /// slices.
     pub fn pull_either_outside(slice: &'a mut [PartyEither<Pa, P, V>]) -> Self {
         match Pa::WHICH {
             WhichParty::Prover(e) => Self::prover_new(e, unsafe {
@@ -354,7 +360,10 @@ impl<'a, Pa: Party, P, V> PartyEither<Pa, &'a mut [P], &'a mut [V]> {
             }),
         }
     }
+
     // TODO: there ought to be a better way of doing this.
+    /// Convert a mutable slice of `PartyEitherCopy` to a `PartyEither` of
+    /// mutable slices.
     pub fn pull_either_outside_copy(slice: &'a mut [PartyEitherCopy<Pa, P, V>]) -> Self
     where
         P: Copy,
