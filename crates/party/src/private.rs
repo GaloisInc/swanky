@@ -15,7 +15,7 @@
 //!
 //! Using this type is straightforward:
 //!
-//! ```
+//! ```rust,ignore
 //! // Some secrets only the prover knows
 //! struct ProverSecrets;
 //!
