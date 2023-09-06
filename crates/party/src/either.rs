@@ -12,8 +12,8 @@
 //! `Prover`, then this entire type effectively collapses to `P`. Likewise, if
 //! `Pa` is `Verifier`, the type collapses to `V`.
 //!
-//! This is extremely general. For a particularly useful specialization useful
-//! in zero-knowledge contexts, see [`private`].
+//! This is extremely general. For a particularly useful specialization for
+//! zero-knowledge contexts, see [`private`].
 
 use std::io::{Read, Write};
 
