@@ -87,7 +87,8 @@
 //! contexts, the `private` module exposes the types [`private::ProverPrivate`]
 //! and [`private::ProverPrivateCopy`], which describe (as the names suggest)
 //! values that only meaningfully exist from the prover's point of view (e.g.
-//! the witness the prover is trying to prove knowledge of.) See the module
+//! the witness the prover is trying to prove knowledge of). Indeed, these
+//! types are useful in generic secure computation contexts. See the module
 //! documentation for further details.
 
 use std::fmt::Debug;
