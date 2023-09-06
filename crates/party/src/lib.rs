@@ -87,14 +87,36 @@ use std::marker::PhantomData;
 
 mod is_party {
     use super::*;
+
+    /// Evidence that two [`Party`] are the same.
+    ///
+    /// Use parameters of this type to indicate a function is party-specific,
+    /// and to allow the use of party-specific APIs in such functions'
+    /// definitions without having to match on `P::WHICH`.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// fn prover_do_something<P: Party>(ev: IsParty<P, Prover>, x: Foo<P>) { /* ... */ }
+    /// ```
     #[derive(Clone, Copy)]
     pub struct IsParty<P1: Party, P2: Party>(PhantomData<(P1, P2)>);
+
+    /// Trivial evidence/an assertion that the party is [`Prover`].
     pub const IS_PROVER: IsParty<Prover, Prover> = IsParty(PhantomData);
+
+    /// Trivial evidence/an assertion that the party is [`Verifier`].
     pub const IS_VERIFIER: IsParty<Verifier, Verifier> = IsParty(PhantomData);
 }
 use bytemuck::{Pod, Zeroable};
 pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
 
+/// Distinguish between type-level parties, with evidence.
+///
+/// Values of this type should almost never be constructed explicitly: The
+/// constant [`Party::WHICH`] exposes a value of this type for any `P: Party`
+/// that allows for safe value-level inspection of the type `P`. The evidence
+/// carried may be used in party-specific APIs.
 #[derive(Clone, Copy)]
 pub enum WhichParty<P: Party> {
     Prover(IsParty<P, Prover>),
