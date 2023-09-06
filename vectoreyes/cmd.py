@@ -9,7 +9,7 @@ from etc import ROOT
 
 @click.group()
 def vectoreyes():
-    "Commands for working with the vectoreyes library."
+    """Commands for working with the vectoreyes library."""
 
 
 @vectoreyes.command()
@@ -20,7 +20,7 @@ def vectoreyes():
     help="Don't change any files, just fail if files would be formatted",
 )
 def generate(check: bool) -> None:
-    "Regenerate the vectoreyes generated code."
+    """Regenerate the vectoreyes generated code."""
     # Do the import inside the command, to avoid importing extra stuff on every ./swanky invocation
     from .src.codegen.generate import CODEGEN, generate  # type: ignore
 

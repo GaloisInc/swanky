@@ -34,7 +34,7 @@ def list_cargo_toml_files() -> List[Path]:
 
 
 def check_cargo_lock(ctx: click.Context) -> LintResult:
-    "Check Cargo.lock is up-to-date"
+    """Check Cargo.lock is up-to-date"""
     if (
         subprocess.call(
             ["cargo", "metadata", "--format-version=1", "--locked"],
@@ -61,7 +61,7 @@ def crates_in_manifest() -> List[Path]:
 
 
 def crates_enumerated_in_workspace(ctx: click.Context) -> LintResult:
-    "Check that all crates in Swanky are listed in the workspace"
+    """Check that all crates in Swanky are listed in the workspace"""
     crates_in_manifest_cargo_tomls = set(
         crate / "Cargo.toml" for crate in crates_in_manifest()
     )
@@ -78,7 +78,7 @@ def crates_enumerated_in_workspace(ctx: click.Context) -> LintResult:
 
 
 def workspace_members_are_defined_in_workspace(ctx: click.Context) -> LintResult:
-    "Check that all crates in Swanky are defined as workspace dependencies"
+    """Check that all crates in Swanky are defined as workspace dependencies"""
     missing = (
         set(
             toml.loads((crate / "Cargo.toml").read_text())["package"]["name"]
@@ -98,7 +98,7 @@ def workspace_members_are_defined_in_workspace(ctx: click.Context) -> LintResult
 
 
 def validate_crate_manifests(ctx: click.Context) -> LintResult:
-    "Validate crate manifests to ensure they adhere to workspace rules."
+    """Validate crate manifests to ensure they adhere to workspace rules."""
     any_errors = False
     inherited_keys = set(root_cargo_toml()["workspace"]["package"].keys())
     for crate in crates_in_manifest():

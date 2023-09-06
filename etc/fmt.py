@@ -15,7 +15,7 @@ from etc import ROOT
     help="Don't change any files, just fail if files would be formatted",
 )
 def fmt(check: bool) -> None:
-    "Reformat Rust and Python code in Swanky."
+    """Reformat Rust and Python code in Swanky."""
     commands = [
         ["cargo", "fmt"] + (["--", "--check"] if check else []),
         ["black", "."] + (["--check"] if check else []),

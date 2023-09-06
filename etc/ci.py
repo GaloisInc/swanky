@@ -17,7 +17,7 @@ from etc import NIX_CACHE_KEY, ROOT
 from etc.lint.cmd import lint
 
 CI_EXTRA_ENV = "CI_EXTRA_ENV"
-"ClickContext.obj[CI_EXTRA_ENV] is a dictionary of environment variables to apply CI settings"
+"""ClickContext.obj[CI_EXTRA_ENV] is a dictionary of environment variables to apply CI settings"""
 
 
 def test_rust(
@@ -108,7 +108,7 @@ def test_rust(
 )
 @click.pass_context
 def ci(ctx: click.Context, cache_dir: Path) -> None:
-    "Commands used by CI system (you probably don't want to invoke them manually)"
+    """Commands used by CI system (you probably don't want to invoke them manually)"""
     # Set up the environment for cach
     cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
     extra_env = {
@@ -166,7 +166,7 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
 @ci.command()
 @click.pass_context
 def nightly(ctx: click.Context):
-    "Run the nightly CI tests"
+    """Run the nightly CI tests"""
     ctx.invoke(lint)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
     test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
@@ -176,6 +176,6 @@ def nightly(ctx: click.Context):
 @ci.command()
 @click.pass_context
 def quick(ctx: click.Context):
-    "Run the quick (non-nightly) CI tests"
+    """Run the quick (non-nightly) CI tests"""
     ctx.invoke(lint)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)

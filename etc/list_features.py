@@ -17,7 +17,7 @@ def cargo_metadata():
 
 @click.command()
 def list_features() -> None:
-    "List cargo features defined in Swanky."
+    """List cargo features defined in Swanky."""
     metadata = cargo_metadata()
     workspace_member_ids = set(metadata["workspace_members"])
     workspace_members = [
