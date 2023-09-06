@@ -1,3 +1,42 @@
+//! Zero-cost representation of prover-private data.
+//!
+//! In the context of zero-knowledge, the prover is a party with privileged
+//! information (particularly, the secret witness that is the subject of the
+//! proof.)
+//!
+//! This module implements the [`ProverPrivate`] type, a specialization of
+//! [`PartyEither`] for this case of privileged information.
+//!
+//! The type `ProverPrivate<P: Party, T>` collapses to `T` when `P` is `Prover`
+//! and a unit/"do nothing" type when `P` is `Verifier`. Like with
+//! `PartyEither`, we provide a separate `ProverPrivateCopy<P: Party, T: Copy>`
+//! with the same API (and conveniences to convert between these types where
+//! appropriate.)
+//!
+//! Using this type is straightforward:
+//!
+//! ```
+//! // Some secrets only the prover knows
+//! struct ProverSecrets;
+//!
+//! // A party-generic structure with access to secrets in the prover context
+//! struct PartyManager<P: Party> {
+//!     secrets: ProverPrivate<P, ProverSecrets>
+//! }
+//!
+//! // Do something with the secrets if they're available
+//! fn foo<P: Party>(x: PartyManager<P>) {
+//!     // ...
+//!     x.secrets.map(|ps| /* ... ps is a ProverSecrets ... */)
+//!     // ...
+//! }
+//! ```
+//!
+//! The API provides methods to combine/split prover secrets, safely cast to
+//! the inner type in known prover contexts, and operate in a "monadic chain"
+//! of operations via `and_then` (analogous to the same method on e.g.
+//! `Option`.) See the relevant method documentation for details.
+
 use super::either::*;
 use super::*;
 
