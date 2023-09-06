@@ -113,10 +113,10 @@ pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
 
 /// Distinguish between type-level parties, with evidence.
 ///
-/// Values of this type should almost never be constructed explicitly: The
+/// Values of this type should almost never be constructed explicitly. The
 /// constant [`Party::WHICH`] exposes a value of this type for any `P: Party`
 /// that allows for safe value-level inspection of the type `P`. The evidence
-/// carried may be used in party-specific APIs.
+/// carried may be used to safely call party-specific functions/methods.
 #[derive(Clone, Copy)]
 pub enum WhichParty<P: Party> {
     Prover(IsParty<P, Prover>),
