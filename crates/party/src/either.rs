@@ -1,3 +1,22 @@
+//! Party-based type selection.
+//!
+//! This module implements the [`PartyEither`] type. For basic usage examples,
+//! see the [`crate`] documentation.
+//!
+//! Party-generic code will naturally involve some data that is prover-specific
+//! and some that is verifier-specific. The [`Party`] trait (and associated
+//! type reflection shenanigans) allow us to, at compile-time, decide between
+//! types based on whether a given `P: Party` is [`Prover`] or [`Verifier`].
+//!
+//! The type `PartyEither<Pa: Party, P, V>` represents this choice. If `Pa` is
+//! `Prover`, then this entire type effectively collapses to `P`. Likewise, if
+//! `Pa` is `Verifier`, the type collapses to `V`.
+//!
+//! That's a bit oversimplified - to complete the 'collapse', we need to
+//! provide evidence that the type is correct via [`IsParty`].
+//!
+//! All of this is resolved at compile-time, and comes at no additional cost.
+
 use std::io::{Read, Write};
 
 use super::*;
