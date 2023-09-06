@@ -1,8 +1,7 @@
 //! Zero-cost representation of prover-private data.
 //!
-//! In the context of zero-knowledge, the prover is a party with privileged
-//! information (particularly, the secret witness that is the subject of the
-//! proof.)
+//! It is often the case that in a multi-party protocol, one of the two parties
+//! has access to information that the other does not.
 //!
 //! This module implements the [`ProverPrivate`] type, a specialization of
 //! [`PartyEither`] for this case of privileged information.
