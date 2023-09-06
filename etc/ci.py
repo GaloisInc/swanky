@@ -6,7 +6,7 @@ import socket
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 import click
 import rich
@@ -39,7 +39,7 @@ def test_rust(
     else:
         features_args = []
     # tag is a helper for generating the header for this output
-    tag = lambda flag, msg: f" {msg}" if flag else ""
+    tag: Callable[[bool, str], str] = lambda flag, msg: f" {msg}" if flag else ""
     rich.get_console().rule(
         "Test Rust%s%s features=%r"
         % (
@@ -134,8 +134,8 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
     sccache_cache_dir.mkdir(exist_ok=True, parents=True)
     # When this process exits, stdin will be closed, and it'll clean up the subprocess.
     # This only happens once, so we're not gonna worry about a zombie.
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp = Path(tmp_str)
         # sccache signals readyness by writing some bytes to a unix domain socket.
         sccache_ready_path = tmp / "rdy"
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sccache_ready_sock:
@@ -149,6 +149,7 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
                 ],
                 stdin=subprocess.PIPE,
             )
+            assert sccache_server.stdin is not None
             # Closing stdin will shut everything down (see sccache_disk_proxy/shell.nix)
             ctx.call_on_close(sccache_server.stdin.close)
             rich.print("Waiting for sccache to start...")
@@ -165,7 +166,7 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
 
 @ci.command()
 @click.pass_context
-def nightly(ctx: click.Context):
+def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
     ctx.invoke(lint)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
@@ -175,7 +176,7 @@ def nightly(ctx: click.Context):
 
 @ci.command()
 @click.pass_context
-def quick(ctx: click.Context):
+def quick(ctx: click.Context) -> None:
     """Run the quick (non-nightly) CI tests"""
     ctx.invoke(lint)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
