@@ -121,7 +121,7 @@ use internal::*;
 
 macro_rules! define_prover_either {
     ($PartyEither:ident $(: $Copy:ident)? => $EitherStorage:ident) => {
-        /// A type that is `repr(transparent)` to `P` when `Pa = Party` and
+        /// A type that is `repr(transparent)` to `P` when `Pa = Prover` and
         /// `repr(transparent)` to `V` when `Pa = Verifier`.
         #[repr(transparent)]
         pub struct $PartyEither<Pa: Party, P $(: $Copy)?, V $(: $Copy)?> {
