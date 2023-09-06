@@ -50,7 +50,7 @@ def test_rust(
     )
     env = dict(os.environ) | ctx.obj[CI_EXTRA_ENV]
     if force_haswell:
-        if platform.machine() != "AMD64":
+        if platform.machine() not in ("AMD64", "x86_64"):
             raise click.UsageError(
                 f"The host machine is {platform.machine()}, and so can't run haswell code."
             )
