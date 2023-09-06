@@ -77,7 +77,7 @@ zkv = { path = "zkv" }
 # Patched Dependencies
 ff = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }
 ff_codegen = { git = "https://github.com/GaloisInc/ff", rev = "1a4c6138e2e76e13f8d54fae81857e2cea3cbc4d" }
-curve25519-dalek = { version = "4.0.0", features = ["rand_core"] }
+curve25519-dalek = { version = "4.1.0", features = ["rand_core"] }
 
 # External Dependencies
 aes = "0.8.3"
@@ -93,18 +93,18 @@ blake3 = { version = "1.4.1", features = ["no_avx512"] }
 bufstream = "0.1.4"
 bumpalo = "3.13.0"
 bumpalo-herd = "0.1.2"
-bytemuck = { version = "1.13.1", features = ["min_const_generics", "extern_crate_alloc"] }
+bytemuck = { version = "1.14.0", features = ["min_const_generics", "extern_crate_alloc"] }
 bytes = "1.4.0"
 cc = "1.0.83"
 ciborium = "0.2.1"
-clap = { version = "4.3.23", features = ["derive"] }
+clap = { version = "4.4.2", features = ["derive"] }
 color-eyre = "0.6.2"
 console_error_panic_hook = "0.1.7"
 console_log = { version = "1.0", features = ["color"] }
 criterion = "0.5.1"
 crossbeam = "0.8.2"
 crossbeam-queue = "0.3.8"
-crypto-bigint = { version =  "0.5.2", features = ["generic-array"] }
+crypto-bigint = { version =  "0.5.3", features = ["generic-array"] }
 dhat = "0.3.2"
 digest = "0.10.7"
 env_logger = "0.10.0"
@@ -120,17 +120,17 @@ lazy_static = "1.4.0"
 libc = "0.2.147"
 log = "0.4.20"
 lz4 = "1.24.0"
-memchr = "2.5.0"
+memchr = "2.6.3"
 memmap2 = "0.7.1"
 merkle-cbt = "0.3.2"
-mimalloc = { version = "0.1.37", default-features = false }
+mimalloc = { version = "0.1.38", default-features = false }
 moka = "0.11.3"
 ndarray = "0.15.6"
-nix = "0.26.2"
+nix = "0.27.1"
 num-bigint = "0.4.4"
 num-traits = "0.2.16"
 num_cpus = "1.16.0"
-openssl = "0.10.56"
+openssl = "0.10.57"
 parking_lot = "0.12.1"
 pretty_env_logger = "0.5"
 proptest = "1.2.0"
@@ -138,13 +138,13 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_core = "0.6.4"
 rayon = "1.7.0"
-regex = "1.9.3"
+regex = "1.9.5"
 ring = "0.16.20"
 rpmalloc = "0.2.2"
 rustc-hash = "1.1.0"
-rustls = "0.21.6"
+rustls = "0.21.7"
 rustls-pemfile = "1.0.3"
-serde = "1.0.185"
+serde = "1.0.188"
 serde_json = "1.0.105"
 sha2 = "0.10.7"
 smallvec = { version = "1.11.0" , features = ["const_generics", "union", "const_new"] }
@@ -153,7 +153,7 @@ snmalloc-rs = { version = "0.3.4", default-features = false, features = ["build_
 sprs = "=0.11.0" # See issue #123
 subtle = { version = "2.5.0", features = ["core_hint_black_box", "const-generics"] }
 tempfile = "3.8.0"
-thiserror = "1.0.47"
+thiserror = "1.0.48"
 tungstenite = { version="0.20.0", features = ["rustls"] }
 twox-hash = "1.6.3"
 wasm-bindgen = "0.2.87"
