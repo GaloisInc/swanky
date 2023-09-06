@@ -58,10 +58,17 @@
 //!
 //! The `e` values here are _evidence_ that `P` is indeed the party named by
 //! the [`WhichParty`] variant. These values are at the heart of the
-//! compile-time benefits of the crate, and may indeed be useful in your own
-//! code (besides their required use in the `either` and `private` modules.)
-//! For this reason, evidence is exposed via the [`IsParty`] type and its
-//! associated constants [`IS_PROVER`] and [`IS_VERIFIER`].
+//! compile-time benefits of the crate.
+//!
+//! Evidence is represented by the [`IsParty`] type, which expresses the
+//! type relation "Party `P1` is the same as party `P2`". The only sound
+//! instantiations of this type are given by the constants [`IS_PROVER`] and
+//! [`IS_VERIFIER`], which are associated with the types [`Prover`] and
+//! [`Verifier`] by the `Party` trait, closing the loop on reflecting the
+//! type-level party equality at the value-level.
+//!
+//! We can leverage these evidence values to write party-specific functions
+//! in a party-generic context.
 //!
 //! Suppose that we know `do_something` in the example above is actually
 //! specific to provers. We can change its type to:
