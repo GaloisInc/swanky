@@ -186,7 +186,30 @@ pub enum WhichParty<P: Party> {
     Verifier(IsParty<P, Verifier>),
 }
 
-/// # Safety
+/// Types representing a party in a multi-party computation.
+///
+/// Comes with a value-level representation that can be used to write code
+/// that is "party-conditional" in a completely type-safe way.
+///
+/// ## Example
+///
+/// ```
+/// fn party_time<P: Party>(x: PartyThing<P>) {
+///     // ... Do some party-generic stuff ...
+///     match P::WHICH {
+///         WhichParty::Prover(e) => {
+///             // ... Use evidence e to do prover-only things ...
+///         }
+///         WhichParty::Verifier(e) => {
+///             // ... Use evidence e to do verifier-only things ...
+///         }
+///     }
+///     // ... More party-generic stuff ...
+/// }
+/// ```
+///
+/// ## Safety
+///
 /// `WHICH` must be accurate.
 pub unsafe trait Party:
     'static
@@ -209,6 +232,13 @@ pub unsafe trait Party:
     const WHICH: WhichParty<Self>;
 }
 
+/// The prover party.
+///
+/// NOTE: Despite the name, this party type is completely equivalent to
+/// [`Verifier`] outside of the context of [`private`].
+///
+/// There is never any reason to construct values of this type - it only exists
+/// to be used at the type-level.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Default, Pod, Zeroable)]
 pub struct Prover(());
@@ -217,6 +247,13 @@ unsafe impl Party for Prover {
     const WHICH: WhichParty<Self> = WhichParty::Prover(is_party::IS_PROVER);
 }
 
+/// The verifier party.
+///
+/// NOTE: Despite the name, this party type is completely equivalent to
+/// [`Prover`] outside of the context of [`private`].
+///
+/// There is never any reason to construct values of this type - it only exists
+/// to be used at the type-level.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Default, Pod, Zeroable)]
 pub struct Verifier(());
