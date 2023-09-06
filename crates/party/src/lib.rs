@@ -17,7 +17,7 @@
 //!
 //! As a contrived example of usage, consider the following types:
 //!
-//! ```
+//! ```rust,ignore
 //! struct ProverSpecificData;
 //! struct VerifierSpecificData;
 //! ```
@@ -26,7 +26,7 @@
 //! contains data common to both parties, _plus_ a field that is either a
 //! `ProverSpecificData` or `VerifierSpecificData`, depending on context:
 //!
-//! ```
+//! ```rust,ignore
 //! struct Info<P: Party> {
 //!     // ... other fields common to both parties ...
 //!
@@ -42,14 +42,14 @@
 //!
 //! We can similarly define functions that are generic over a party:
 //!
-//! ```
+//! ```rust,ignore
 //! fn do_something<P: Party>(info: Info<P>) { /* ... */ }
 //! ```
 //!
 //! If part of the function definition is party-specific, we can inspect
 //! [`Party::WHICH`]:
 //!
-//! ```
+//! ```rust,ignore
 //! match P::WHICH {
 //!     WhichParty::Prover(e) => { /* ... */ }
 //!     WhichParty::Verifier(e) => { /* ... */ }
@@ -73,7 +73,7 @@
 //! Suppose that we know `do_something` in the example above is actually
 //! specific to provers. We can change its type to:
 //!
-//! ```
+//! ```rust,ignore
 //! fn do_something<P: Party>(info: Info<P>, ev: IsParty<P, Prover>)
 //! ```
 //!
