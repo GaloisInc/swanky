@@ -3,6 +3,10 @@
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_trait::Party;
+use crate::circuit_ir::{
+    CircInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
+    WireRange,
+};
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
 use crate::homcom::{MacProver, MacVerifier};
@@ -15,15 +19,8 @@ use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{
-    circuit_ir::{
-        CircInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount,
-        WireId, WireRange,
-    },
-    gadgets::GadgetLessThanEqWithPublic,
-};
-use crate::{
     dora::{Disjunction, DoraProver, DoraVerifier},
-    gadgets::GadgetPermutationCheck,
+    gadgets::less_than_eq_with_public,
 };
 use crate::{DietMacAndCheeseProver, DietMacAndCheeseVerifier};
 use eyre::{bail, ensure, Result};
@@ -540,7 +537,8 @@ impl<
             v.push(MacProver::new(b2, mac));
         }
 
-        self.dmc_f2.less_than_eq_with_public(
+        less_than_eq_with_public(
+            &mut self.dmc_f2,
             &v,
             (-FE::ONE)
                 .bit_decomposition()
@@ -892,7 +890,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
             v.push(mac);
         }
 
-        self.dmc_f2.less_than_eq_with_public(
+        less_than_eq_with_public(
+            &mut self.dmc_f2,
             &v,
             (-FE::ONE)
                 .bit_decomposition()
@@ -1084,9 +1083,7 @@ impl<B: BackendT> EvaluatorSingle<B> {
     }
 }
 
-impl<B: BackendConvT + BackendDisjunctionT + GadgetPermutationCheck> EvaluatorT
-    for EvaluatorSingle<B>
-{
+impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
     #[inline]
     fn evaluate_gate(
         &mut self,
@@ -2227,18 +2224,12 @@ pub(crate) mod tests {
     use crate::{
         backend_multifield::{EvaluatorCirc, Party},
         fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
-        gadgets::GadgetLessThanEqWithPublic,
-    };
-    use crate::{
-        backend_trait::BackendT,
-        homcom::{FComProver, FComVerifier},
     };
     use crate::{
         circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
         fields::{F384P_MODULUS, F384Q_MODULUS},
     };
     use mac_n_cheese_sieve_parser::Number;
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use pretty_env_logger;
     use rand::SeedableRng;
     use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
@@ -2253,8 +2244,6 @@ pub(crate) mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-
-    use super::{DietMacAndCheeseConvProver, DietMacAndCheeseConvVerifier};
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
@@ -2845,243 +2834,6 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
-    fn test_less_eq_than_1() {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-
-            let fcom = FComProver::<F2, F40b, SvoleSender<F40b>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )
-            .unwrap();
-            let rfcom = fcom;
-
-            let mut party =
-                DietMacAndCheeseConvProver::<F61p, _, SvoleSender<F40b>, SvoleSender<F61p>>::init(
-                    &mut channel,
-                    rng,
-                    &rfcom,
-                    LPN_SETUP_SMALL,
-                    LPN_EXTEND_SMALL,
-                    false,
-                )
-                .unwrap();
-            let zero = party.dmc_f2.input_private(Some(F2::ZERO)).unwrap();
-            let one = party.dmc_f2.input_private(Some(F2::ONE)).unwrap();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-            party
-                .dmc_f2
-                .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ONE].as_slice())
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-            party
-                .dmc_f2
-                .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ONE].as_slice())
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-            party
-                .dmc_f2
-                .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ZERO].as_slice())
-                .unwrap();
-            let _ = party.dmc_f2.finalize().unwrap_err();
-            party.dmc_f2.reset();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(
-                    vec![one, one, zero].as_slice(),
-                    vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
-                )
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(
-                    vec![one, one, one].as_slice(),
-                    vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
-                )
-                .unwrap();
-            let _ = party.dmc_f2.finalize().unwrap_err();
-            party.dmc_f2.reset();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(
-                    vec![one, zero, zero].as_slice(),
-                    vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
-                )
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(
-                    vec![one, one, one].as_slice(),
-                    vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
-                )
-                .unwrap();
-            party.dmc_f2.finalize().unwrap();
-
-            party
-                .dmc_f2
-                .less_than_eq_with_public(
-                    vec![one, zero, one, one].as_slice(),
-                    vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
-                )
-                .unwrap();
-            let _ = party.dmc_f2.finalize().unwrap_err();
-            party.dmc_f2.reset();
-
-            // that's testing the little-endianness of the function
-            party
-                .dmc_f2
-                .less_than_eq_with_public(
-                    vec![one, one].as_slice(),
-                    vec![F2::ZERO, F2::ONE].as_slice(),
-                )
-                .unwrap();
-            let _ = party.dmc_f2.finalize().unwrap_err();
-            party.dmc_f2.reset();
-        });
-
-        let mut rng = AesRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let fcom = FComVerifier::<F2, F40b, SvoleReceiver<F2, F40b>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-        )
-        .unwrap();
-        let rfcom = fcom;
-
-        let mut party = DietMacAndCheeseConvVerifier::<
-            F61p,
-            _,
-            SvoleReceiver<F2, F40b>,
-            SvoleReceiver<F61p, F61p>,
-        >::init(
-            &mut channel,
-            rng,
-            &rfcom,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
-        )
-        .unwrap();
-        let zero = party.dmc_f2.input_private(None).unwrap();
-        let one = party.dmc_f2.input_private(None).unwrap();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-        party
-            .dmc_f2
-            .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ONE].as_slice())
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-        party
-            .dmc_f2
-            .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ONE].as_slice())
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-        party
-            .dmc_f2
-            .less_than_eq_with_public(vec![one].as_slice(), vec![F2::ZERO].as_slice())
-            .unwrap();
-        let _ = party.dmc_f2.finalize().unwrap_err();
-        party.dmc_f2.reset();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(vec![zero].as_slice(), vec![F2::ZERO].as_slice())
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(
-                vec![one, one, zero].as_slice(),
-                vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
-            )
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(
-                vec![one, one, one].as_slice(),
-                vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
-            )
-            .unwrap();
-        let _ = party.dmc_f2.finalize().unwrap_err();
-        party.dmc_f2.reset();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(
-                vec![one, zero, zero].as_slice(),
-                vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
-            )
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(
-                vec![one, one, one].as_slice(),
-                vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
-            )
-            .unwrap();
-        party.dmc_f2.finalize().unwrap();
-
-        party
-            .dmc_f2
-            .less_than_eq_with_public(
-                vec![one, zero, one, one].as_slice(),
-                vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
-            )
-            .unwrap();
-        let _ = party.dmc_f2.finalize().unwrap_err();
-        party.dmc_f2.reset();
-
-        // that's testing the little-endianness of the function
-        party
-            .dmc_f2
-            .less_than_eq_with_public(
-                vec![one, one].as_slice(),
-                vec![F2::ZERO, F2::ONE].as_slice(),
-            )
-            .unwrap();
-        let _ = party.dmc_f2.finalize().unwrap_err();
-        party.dmc_f2.reset();
-
-        handle.join().unwrap();
-    }
-
     #[test]
     fn test_multifield_conv() {
         test_conv_00();
@@ -3103,10 +2855,5 @@ pub(crate) mod tests {
         test4_simple_fun();
         test5_simple_fun_with_vec();
         test6_fun_slice_and_unallocated()
-    }
-
-    #[test]
-    fn test_less_eq_than_circuit() {
-        test_less_eq_than_1();
     }
 }
