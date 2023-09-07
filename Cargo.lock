@@ -1272,7 +1272,6 @@ dependencies = [
  "flume",
  "lazy_static",
  "mac-n-cheese-ir",
- "mac-n-cheese-party",
  "mac-n-cheese-sieve-parser",
  "mac-n-cheese-wire-map",
  "mimalloc",
@@ -1282,6 +1281,7 @@ dependencies = [
  "rustc-hash",
  "scuttlebutt",
  "smallvec",
+ "swanky-party",
  "vectoreyes",
 ]
 
@@ -1342,13 +1342,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mac-n-cheese-party"
-version = "0.5.0"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
 name = "mac-n-cheese-runner"
 version = "0.5.0"
 dependencies = [
@@ -1372,7 +1365,6 @@ dependencies = [
  "lz4",
  "mac-n-cheese-event-log",
  "mac-n-cheese-ir",
- "mac-n-cheese-party",
  "mac-n-cheese-vole",
  "mimalloc",
  "moka",
@@ -1390,6 +1382,7 @@ dependencies = [
  "smallvec",
  "snmalloc-rs",
  "subtle",
+ "swanky-party",
  "vectoreyes",
 ]
 
@@ -1418,11 +1411,11 @@ dependencies = [
  "eyre",
  "generic-array",
  "keyed_arena",
- "mac-n-cheese-party",
  "mimalloc",
  "ocelot",
  "rand",
  "scuttlebutt",
+ "swanky-party",
  "vectoreyes",
 ]
 
@@ -2538,6 +2531,13 @@ name = "swanky-generic-array"
 version = "0.5.0"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "swanky-party"
+version = "0.5.0"
+dependencies = [
+ "bytemuck",
 ]
 
 [[package]]

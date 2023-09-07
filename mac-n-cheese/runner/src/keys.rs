@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 // We use the aes_gcm library because ring doesn't have an API to provide a separate tag on decrypt
 use aes_gcm::{AeadInPlace, Aes128Gcm, KeyInit};
 use mac_n_cheese_ir::compilation_format::TaskId;
-use mac_n_cheese_party::{Party, WhichParty};
 use rand::RngCore;
+use swanky_party::{Party, WhichParty};
 use vectoreyes::{Aes128, AesBlockCipher, AesBlockCipherDecrypt, U8x16};
 
 #[repr(C)]
@@ -123,7 +123,7 @@ impl<P: Party> Keys<P> {
 
 #[test]
 fn test_task_encryption() {
-    use mac_n_cheese_party::{Prover, Verifier};
+    use swanky_party::{Prover, Verifier};
     let key = [45; 32];
     let pk: Keys<Prover> = Keys::from_base_key(&key);
     let pv: Keys<Verifier> = Keys::from_base_key(&key);

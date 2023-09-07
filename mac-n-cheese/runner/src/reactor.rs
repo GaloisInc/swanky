@@ -9,8 +9,8 @@ use crate::{
     thread_spawner::ThreadSpawner,
 };
 use mac_n_cheese_ir::compilation_format::{fb::DataChunkAddress, Manifest, PrivateDataAddress};
-use mac_n_cheese_party::{private::ProverPrivate, Party};
 use std::fs::File;
+use swanky_party::{private::ProverPrivate, Party};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ReactorRequest {

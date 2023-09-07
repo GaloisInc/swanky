@@ -14,10 +14,10 @@ use mac_n_cheese_ir::compilation_format::{
     fb, AtomicGraphDegreeCount, Manifest, NumericalEnumType, PrivatesManifest, TaskId, TaskKind,
     Type,
 };
-use mac_n_cheese_party::{private::ProverPrivate, Party, WhichParty};
 use parking_lot::{Condvar, Mutex, RwLock};
 use rustc_hash::FxHashMap;
 use scuttlebutt::AesRng;
+use swanky_party::{private::ProverPrivate, Party, WhichParty};
 
 use crate::{
     alloc::OwnedAlignedBytes,

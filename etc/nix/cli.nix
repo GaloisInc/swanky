@@ -20,6 +20,8 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
       py.rich
       py.rich-click
       py.toml
+      py.mypy
+      py.types-toml
     ]))
     sccache
     cacert

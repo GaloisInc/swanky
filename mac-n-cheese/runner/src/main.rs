@@ -15,13 +15,13 @@ use mac_n_cheese_ir::compilation_format::fb::{self, DataChunkAddress};
 use mac_n_cheese_ir::compilation_format::{
     read_private_manifest, AtomicGraphDegreeCount, Manifest, Type,
 };
-use mac_n_cheese_party as party;
-use mac_n_cheese_party::Party;
 use party::either::PartyEitherCopy;
 use party::private::{ProverPrivate, ProverPrivateCopy};
 use party::{WhichParty, IS_PROVER, IS_VERIFIER};
 use rand::SeedableRng;
 use scuttlebutt::AesRng;
+use swanky_party as party;
+use swanky_party::Party;
 use types::visit_type;
 
 use crate::runner::RunQueue;
