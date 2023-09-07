@@ -126,7 +126,10 @@ merkle-cbt = "0.3.2"
 mimalloc = { version = "0.1.38", default-features = false }
 moka = "0.11.3"
 ndarray = "0.15.6"
-nix = "0.27.1"
+# Rather than enabling nix features on a per-crate basis (which could lead to issues where
+# compiling the whole workspace might succeed, but compiling an individual crate might fail),
+# we just enable all the features we need at the workspace root.
+nix = { version = "0.27.1", features = ["sched"] }
 num-bigint = "0.4.4"
 num-traits = "0.2.16"
 num_cpus = "1.16.0"
