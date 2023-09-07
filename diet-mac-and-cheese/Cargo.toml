@@ -32,6 +32,8 @@ subtle.workspace = true
 ocelot.workspace = true
 flatbuffers.workspace = true
 nix.workspace = true
+serde.workspace = true
+toml = { workspace = true, features = ["display", "parse"] }
 
 [build-dependencies]
 swanky-flatbuffer-build.workspace = true

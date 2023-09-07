@@ -157,6 +157,7 @@ sprs = "=0.11.0" # See issue #123
 subtle = { version = "2.5.0", features = ["core_hint_black_box", "const-generics"] }
 tempfile = "3.8.0"
 thiserror = "1.0.48"
+toml = "0.7.6"
 tungstenite = { version="0.20.0", features = ["rustls"] }
 twox-hash = "1.6.3"
 wasm-bindgen = "0.2.87"
