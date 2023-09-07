@@ -25,7 +25,7 @@ pub struct SvoleAtomic<X: Copy> {
     voles: Vec<Arc<Mutex<Vec<X>>>>,
     last_done: Arc<Mutex<usize>>,
     next_todo: Arc<Mutex<usize>>,
-    stop_signal: Arc<Mutex<bool>>, // TODO: implement the logic to handle the stop signal
+    stop_signal: Arc<Mutex<bool>>,
     delta: Arc<Mutex<Option<X>>>,
 }
 
