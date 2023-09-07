@@ -4,7 +4,7 @@ use swanky_field::IsSubFieldOf;
 
 use crate::{
     dora::{comm::CommittedCrossTerms, tx::TxChannel},
-    homcom::MacVerifier,
+    mac::MacVerifier,
     svole_trait::SvoleT,
     DietMacAndCheeseVerifier,
 };

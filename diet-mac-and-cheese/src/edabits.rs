@@ -4,7 +4,8 @@
 
 //! Field switching functionality based on protocol with Edabits.
 
-use crate::homcom::{FComProver, FComVerifier, MacProver, MacVerifier};
+use crate::homcom::{FComProver, FComVerifier};
+use crate::mac::{MacProver, MacVerifier};
 use crate::svole_trait::{field_name, SvoleT};
 use eyre::{eyre, Result};
 use generic_array::typenum::Unsigned;
@@ -1555,7 +1556,7 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
 #[cfg(test)]
 mod tests {
 
-    use super::super::homcom::{MacProver, MacVerifier};
+    use super::super::mac::{MacProver, MacVerifier};
     use super::convert_bits_to_field;
     use super::{
         f2_to_fe, DabitProver, DabitVerifier, EdabitsProver, EdabitsVerifier, ProverConv,

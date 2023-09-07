@@ -1,9 +1,8 @@
 use std::marker::PhantomData;
 
 use crate::backend_trait::{BackendT, Party};
-use crate::homcom::{
-    FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
-};
+use crate::homcom::{FComProver, FComVerifier, StateMultCheckProver, StateMultCheckVerifier};
+use crate::mac::{MacProver, MacVerifier};
 use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
 use eyre::{eyre, Result};
@@ -647,7 +646,7 @@ mod tests {
     use crate::{
         backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier},
         backend_trait::BackendT,
-        homcom::validate,
+        mac::validate,
     };
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;

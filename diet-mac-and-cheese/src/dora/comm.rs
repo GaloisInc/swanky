@@ -5,7 +5,8 @@ use swanky_field::IsSubFieldOf;
 
 use crate::{
     backend_trait::BackendT,
-    homcom::{FComProver, FComVerifier, MacProver, MacVerifier},
+    homcom::{FComProver, FComVerifier},
+    mac::{MacProver, MacVerifier},
     svole_trait::SvoleT,
     DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };

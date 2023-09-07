@@ -9,7 +9,7 @@ use crate::circuit_ir::{
 };
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
-use crate::homcom::{MacProver, MacVerifier};
+use crate::mac::{MacProver, MacVerifier};
 use crate::memory::Memory;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
@@ -552,7 +552,7 @@ impl<
 
         let bit_width = v.len();
         self.edabits_map
-            .push_elem(bit_width, EdabitsProver { bits: v, value: *a });
+            .push_elem(bit_width, EdabitsProver::<FE> { bits: v, value: *a });
         self.maybe_do_conversion_check(bit_width)?;
 
         Ok(r)
@@ -600,7 +600,7 @@ impl<
 
         let bit_width = bits.len();
         self.edabits_map
-            .push_elem(bit_width, EdabitsProver { bits, value: mac });
+            .push_elem(bit_width, EdabitsProver::<FE> { bits, value: mac });
         self.maybe_do_conversion_check(bit_width)?;
         Ok(mac)
     }
@@ -906,7 +906,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
 
         let bit_width = v.len();
         self.edabits_map
-            .push_elem(bit_width, EdabitsVerifier { bits: v, value: *a });
+            .push_elem(bit_width, EdabitsVerifier::<FE> { bits: v, value: *a });
         self.maybe_do_conversion_check(bit_width)?;
 
         Ok(r)
@@ -940,7 +940,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
 
         let bit_width = bits.len();
         self.edabits_map
-            .push_elem(bit_width, EdabitsVerifier { bits, value: mac });
+            .push_elem(bit_width, EdabitsVerifier::<FE> { bits, value: mac });
         self.maybe_do_conversion_check(bit_width)?;
 
         Ok(mac)
