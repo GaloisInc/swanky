@@ -1,5 +1,4 @@
 mod cli;
-mod config;
 
 use clap::Parser;
 use cli::{Cli, LpnSize, Prover::*};
