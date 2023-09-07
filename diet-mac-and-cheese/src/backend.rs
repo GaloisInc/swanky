@@ -1,7 +1,11 @@
+use std::marker::PhantomData;
+
 use crate::backend_trait::{BackendT, Party};
 use crate::homcom::{
     FComProver, FComVerifier, MacProver, MacVerifier, StateMultCheckProver, StateMultCheckVerifier,
 };
+use crate::svole_trait::field_name;
+use crate::svole_trait::SvoleT;
 use eyre::{eyre, Result};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
@@ -21,7 +25,7 @@ const QUEUE_CAPACITY: usize = 3_000_000;
 const TICK_TIMER: usize = 5_000_000;
 
 #[derive(Default)]
-struct Monitor {
+struct Monitor<T> {
     tick: usize,
     monitor_instance: usize,
     monitor_witness: usize,
@@ -33,9 +37,10 @@ struct Monitor {
     monitor_check_zero: usize,
     monitor_zk_check_zero: usize,
     monitor_zk_mult_check: usize,
+    phantom: PhantomData<T>,
 }
 
-impl Monitor {
+impl<T: FiniteField> Monitor<T> {
     fn tick(&mut self) {
         self.tick += 1;
         if self.tick >= TICK_TIMER {
@@ -86,12 +91,17 @@ impl Monitor {
 
     fn log_monitor(&self) {
         info!(
-            "inp:{:<11} witn:{:<11} mul:{:<11} czero:{:<11}",
-            self.monitor_instance, self.monitor_witness, self.monitor_mul, self.monitor_check_zero,
+            "field:{} inp:{:<11} witn:{:<11} mul:{:<11} czero:{:<11}",
+            field_name::<T>(),
+            self.monitor_instance,
+            self.monitor_witness,
+            self.monitor_mul,
+            self.monitor_check_zero,
         );
     }
 
     fn log_final_monitor(&self) {
+        info!("Monitor for field: {}", field_name::<T>());
         if self.monitor_mul != self.monitor_zk_mult_check {
             warn!(
                 "diff numb of mult gates {} and mult_check {}",
@@ -111,22 +121,26 @@ impl Monitor {
 }
 
 /// Prover for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseProver<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel>
-where
+pub struct DietMacAndCheeseProver<
+    V: IsSubFieldOf<T>,
+    T: FiniteField,
+    C: AbstractChannel,
+    VOLE: SvoleT<(V, T)>,
+> where
     T::PrimeField: IsSubFieldOf<V>,
 {
     is_ok: bool,
-    pub(crate) prover: FComProver<V, T>,
+    pub(crate) prover: FComProver<V, T, VOLE>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacProver<V, T>>,
-    monitor: Monitor,
+    monitor: Monitor<T>,
     state_mult_check: StateMultCheckProver<T>,
     no_batching: bool,
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> BackendT
-    for DietMacAndCheeseProver<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>> BackendT
+    for DietMacAndCheeseProver<V, T, C, VOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -249,7 +263,8 @@ where
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> DietMacAndCheeseProver<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>>
+    DietMacAndCheeseProver<V, T, C, VOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -278,7 +293,7 @@ where
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         rng: AesRng,
-        fcom: &FComProver<V, T>,
+        fcom: &FComProver<V, T, VOLE>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckProver::init(channel)?;
@@ -295,7 +310,7 @@ where
     }
 
     /// Get party
-    pub(crate) fn get_party(&self) -> &FComProver<V, T> {
+    pub(crate) fn get_party(&self) -> &FComProver<V, T, VOLE> {
         &self.prover
     }
 
@@ -355,13 +370,12 @@ where
     }
 
     fn log_final_monitor(&self) {
-        info!("field largest value: {:?}", (T::ZERO - T::ONE).to_bytes());
         self.monitor.log_final_monitor();
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> Drop
-    for DietMacAndCheeseProver<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>> Drop
+    for DietMacAndCheeseProver<V, T, C, VOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -373,22 +387,26 @@ where
 }
 
 /// Verifier for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseVerifier<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel>
-where
+pub struct DietMacAndCheeseVerifier<
+    V: IsSubFieldOf<T>,
+    T: FiniteField,
+    C: AbstractChannel,
+    VOLE: SvoleT<T>,
+> where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    pub(crate) verifier: FComVerifier<V, T>,
+    pub(crate) verifier: FComVerifier<V, T, VOLE>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     check_zero_list: Vec<MacVerifier<T>>,
-    monitor: Monitor,
+    monitor: Monitor<T>,
     state_mult_check: StateMultCheckVerifier<T>,
     is_ok: bool,
     no_batching: bool,
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> BackendT
-    for DietMacAndCheeseVerifier<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>> BackendT
+    for DietMacAndCheeseVerifier<V, T, C, VOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -471,7 +489,7 @@ where
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
         if val.is_some() {
-            return Err(eyre!("Private input given to the verifier"));
+            Err(eyre!("Private input given to the verifier"))
         } else {
             self.check_is_ok()?;
             self.monitor.incr_monitor_witness();
@@ -501,7 +519,8 @@ where
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> DietMacAndCheeseVerifier<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>>
+    DietMacAndCheeseVerifier<V, T, C, VOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -530,7 +549,7 @@ where
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         mut rng: AesRng,
-        fcom: &FComVerifier<V, T>,
+        fcom: &FComVerifier<V, T, VOLE>,
         no_batching: bool,
     ) -> Result<Self> {
         let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
@@ -547,7 +566,7 @@ where
     }
 
     /// Get party
-    pub(crate) fn get_party(&self) -> &FComVerifier<V, T> {
+    pub(crate) fn get_party(&self) -> &FComVerifier<V, T, VOLE> {
         &self.verifier
     }
 
@@ -606,13 +625,12 @@ where
     }
 
     fn log_final_monitor(&self) {
-        info!("field largest value: {:?}", (T::ZERO - T::ONE).to_bytes());
         self.monitor.log_final_monitor();
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> Drop
-    for DietMacAndCheeseVerifier<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>> Drop
+    for DietMacAndCheeseVerifier<V, T, C, VOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -625,6 +643,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::svole_trait::{SvoleReceiver, SvoleSender};
     use crate::{
         backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier},
         backend_trait::BackendT,
@@ -653,14 +672,15 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<V, T, _> = DietMacAndCheeseProver::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
+            let mut dmc: DietMacAndCheeseProver<V, T, _, SvoleSender<T>> =
+                DietMacAndCheeseProver::init(
+                    &mut channel,
+                    rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    false,
+                )
+                .unwrap();
 
             // one1        = public(1)
             // one2        = public(1)
@@ -701,14 +721,15 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<V, T, _> = DietMacAndCheeseVerifier::init(
-            &mut channel,
-            rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
-        )
-        .unwrap();
+        let mut dmc: DietMacAndCheeseVerifier<V, T, _, SvoleReceiver<V, T>> =
+            DietMacAndCheeseVerifier::init(
+                &mut channel,
+                rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                false,
+            )
+            .unwrap();
 
         let one = V::ONE;
         let two = one + one;
@@ -743,14 +764,15 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<V, T, _> = DietMacAndCheeseProver::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
+            let mut dmc: DietMacAndCheeseProver<V, T, _, SvoleSender<T>> =
+                DietMacAndCheeseProver::init(
+                    &mut channel,
+                    rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    false,
+                )
+                .unwrap();
 
             let challenge = dmc.random().unwrap();
             let challenge = dmc.input_public(challenge).unwrap();
@@ -765,14 +787,15 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<V, T, _> = DietMacAndCheeseVerifier::init(
-            &mut channel,
-            rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
-        )
-        .unwrap();
+        let mut dmc: DietMacAndCheeseVerifier<V, T, _, SvoleReceiver<V, T>> =
+            DietMacAndCheeseVerifier::init(
+                &mut channel,
+                rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                false,
+            )
+            .unwrap();
 
         let challenge = dmc.random().unwrap();
         let verifier = dmc.input_public(challenge).unwrap();

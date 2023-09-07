@@ -4,19 +4,15 @@
 //! `check_zero`, `open` and `check_multiply`.
 //! These functionalities are used for diet Mac'n'Cheese and in the edabits
 //! conversion protocol for field-switching.
+use crate::svole_trait::SvoleT;
 use eyre::{bail, eyre, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
-use log::{debug, info, warn};
-use ocelot::svole::{LpnParams, Receiver, Sender};
+use log::{debug, warn};
+use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
-use std::{
-    cell::{RefCell, RefMut},
-    fmt::Debug,
-    rc::Rc,
-};
-use std::{marker::PhantomData, time::Instant};
+use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 
 /// This type holds the prover-side data associated with a MAC between a prover
@@ -32,9 +28,7 @@ pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
     V,
     /// The prover's MAC tag `t`.
     T,
-)
-where
-    T::PrimeField: IsSubFieldOf<V>;
+);
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T>
 where
@@ -171,41 +165,13 @@ impl<T: FiniteField> StateMultCheckProver<T> {
     }
 }
 
-/// Generic Type synonym to Rc<RefCell<X>>.
-pub struct RcRefCell<X>(Rc<RefCell<X>>);
-
-impl<X> RcRefCell<X> {
-    /// Create new.
-    pub fn new(x: X) -> Self {
-        RcRefCell(Rc::new(RefCell::new(x)))
-    }
-
-    /// Get access to the mutable reference.
-    pub fn get_refmut(&self) -> RefMut<X> {
-        (*self.0).borrow_mut()
-    }
-}
-
-impl<X> Clone for RcRefCell<X> {
-    fn clone(&self) -> Self {
-        RcRefCell(Rc::clone(&self.0))
-    }
-}
-
 /// Homomorphic commitment scheme from the prover's point-of-view.
-pub struct FComProver<V: IsSubFieldOf<T>, T: FiniteField> {
-    // We use a Rc<RefCell<>> here so that the underlying svole functionality can be shared among
-    // other components of diet mac'n'cheese. This is specifically relevant for field switching, where
-    // the svole functionality for F2 can be shared while converting from A to B using F2 in the middle, or
-    // A to F2 or F2 to B.
-    svole_sender: RcRefCell<Sender<T>>,
+pub struct FComProver<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> {
+    svole_sender: VOLE,
     voles: Vec<(V, T)>,
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> FComProver<V, T>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
+impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, VOLE> {
     /// Initialize the commitment scheme.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -214,7 +180,14 @@ where
         lpn_extend: LpnParams,
     ) -> Result<Self> {
         Ok(Self {
-            svole_sender: RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend)?),
+            svole_sender: VOLE::init(channel, rng, lpn_setup, lpn_extend)?,
+            voles: Vec::new(),
+        })
+    }
+
+    pub fn init_with_vole(vole: VOLE) -> Result<Self> {
+        Ok(Self {
+            svole_sender: vole,
             voles: Vec::new(),
         })
     }
@@ -222,7 +195,7 @@ where
     /// Duplicate the commitment scheme.
     pub fn duplicate(&self) -> Result<Self> {
         Ok(Self {
-            svole_sender: self.svole_sender.clone(),
+            svole_sender: self.svole_sender.duplicate(),
             voles: Vec::new(),
         })
     }
@@ -236,9 +209,7 @@ where
         match self.voles.pop() {
             Some(e) => Ok(MacProver(e.0, e.1)),
             None => {
-                self.svole_sender
-                    .get_refmut()
-                    .send(channel, rng, &mut self.voles)?;
+                self.svole_sender.extend(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => Ok(MacProver(e.0, e.1)),
                     None => Err(eyre!("svole failed for random")),
@@ -255,6 +226,7 @@ where
         rng: &mut AesRng,
         x: &[V],
     ) -> Result<Vec<T>> {
+        debug!("input");
         let mut out = Vec::with_capacity(x.len());
         self.input_low_level(channel, rng, x, &mut out)?;
         Ok(out)
@@ -268,6 +240,7 @@ where
         x: &[V],
         out: &mut Vec<T>,
     ) -> Result<()> {
+        debug!("input_low_level");
         for x_i in x {
             let tag = self.input1(channel, rng, *x_i)?;
             out.push(tag);
@@ -282,6 +255,7 @@ where
         rng: &mut AesRng,
         x: V,
     ) -> Result<T> {
+        debug!("input1");
         let r = self.random(channel, rng)?;
         let y = x - r.0;
         channel.write_serializable::<V>(&y)?;
@@ -329,6 +303,7 @@ where
         channel: &mut C,
         x_mac_batch: &[MacProver<V, T>],
     ) -> Result<()> {
+        debug!("check_zero");
         let seed = channel.read_block()?;
         let mut rng = AesRng::from_seed(seed);
 
@@ -356,6 +331,7 @@ where
         channel: &mut C,
         batch: &[MacProver<V, T>],
     ) -> Result<()> {
+        debug!("open");
         let mut hasher = blake3::Hasher::new();
         for MacProver(x, _) in batch.iter() {
             channel.write_serializable::<V>(x)?;
@@ -383,6 +359,7 @@ where
         rng: &mut AesRng,
         triples: &[(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>)],
     ) -> Result<()> {
+        debug!("quicksilver_check_multiply");
         let mut sum_a0 = T::ZERO;
         let mut sum_a1 = T::ZERO;
 
@@ -426,6 +403,7 @@ where
         state: &mut StateMultCheckProver<T>,
         triple: &(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>),
     ) -> Result<()> {
+        debug!("quicksilver_push");
         let (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) = triple;
         let a0 = *x_mac * *y_mac;
         let a1 = *y * *x_mac + *x * *y_mac - *z_mac;
@@ -445,6 +423,7 @@ where
         rng: &mut AesRng,
         state: &mut StateMultCheckProver<T>,
     ) -> Result<usize> {
+        debug!("quicksilver_finalize");
         // The following block implements VOPE(1)
         let mut mask = T::ZERO;
         let mut mask_mac = T::ZERO;
@@ -471,17 +450,18 @@ where
     /// Reset [`StateMultCheckProver`].
     // TODO: Why is this a method on `FComProver`?
     pub fn reset(&mut self, quick_state: &mut StateMultCheckProver<T>) {
+        debug!("reset");
         quick_state.reset();
     }
 }
 
 /// Homomorphic commitment scheme from the verifier's point-of-view.
-pub struct FComVerifier<V: IsSubFieldOf<T>, T: FiniteField>
+pub struct FComVerifier<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<T>>
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
     delta: T,
-    svole_receiver: RcRefCell<Receiver<T>>,
+    svole_receiver: VOLE,
     voles: Vec<T>,
     phantom: PhantomData<V>,
 }
@@ -525,7 +505,7 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> FComVerifier<V, T>
+impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<T>> FComVerifier<V, T, VOLE>
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -536,10 +516,19 @@ where
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
-        let recv = Receiver::init(channel, rng, lpn_setup, lpn_extend)?;
+        let recv = VOLE::init(channel, rng, lpn_setup, lpn_extend)?;
         Ok(Self {
-            delta: recv.delta(),
-            svole_receiver: RcRefCell::new(recv),
+            delta: recv.delta().unwrap(),
+            svole_receiver: recv,
+            voles: Vec::new(),
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn init_with_vole(vole: VOLE) -> Result<Self> {
+        Ok(Self {
+            delta: vole.delta().unwrap(), // That's going to block until delta is set
+            svole_receiver: vole,
             voles: Vec::new(),
             phantom: PhantomData,
         })
@@ -549,7 +538,7 @@ where
     pub fn duplicate(&self) -> Result<Self> {
         Ok(Self {
             delta: self.get_delta(),
-            svole_receiver: self.svole_receiver.clone(),
+            svole_receiver: self.svole_receiver.duplicate(),
             voles: Vec::new(),
             phantom: PhantomData,
         })
@@ -570,15 +559,7 @@ where
         match self.voles.pop() {
             Some(e) => Ok(MacVerifier(e)),
             None => {
-                let _start = Instant::now();
-                self.svole_receiver
-                    .get_refmut()
-                    .receive::<_, V>(channel, rng, &mut self.voles)?;
-                info!(
-                    "SVOLE<time:{:?} field:{:?}>",
-                    _start.elapsed(),
-                    (T::ZERO - T::ONE).to_bytes()
-                );
+                self.svole_receiver.extend(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
                     Some(e) => Ok(MacVerifier(e)),
                     None => Err(eyre!("svole failed for random")),
@@ -831,11 +812,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::{FComProver, FComVerifier, MacProver};
+    use crate::svole_thread::{SvoleAtomic, ThreadReceiver, ThreadSender};
+    use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleT};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{
         field::{F40b, F61p, FiniteField, IsSubFieldOf, F2},
-        AbstractChannel, AesRng, Channel,
+        AbstractChannel, AesRng, Channel, SyncChannel,
     };
     use std::{
         io::{BufReader, BufWriter},
@@ -853,9 +836,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<V, T, SvoleSender<T>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut v = Vec::with_capacity(count);
             for _ in 0..count {
@@ -868,9 +855,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom =
-            FComVerifier::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fcom = FComVerifier::<V, T, SvoleReceiver<V, T>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
         let mut v = Vec::with_capacity(count);
         for _ in 0..count {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
@@ -897,9 +888,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<V, T, SvoleSender<T>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -919,9 +914,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom =
-            FComVerifier::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fcom = FComVerifier::<V, T, SvoleReceiver<V, T>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
@@ -954,9 +953,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<V, T, SvoleSender<T>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -979,9 +982,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom =
-            FComVerifier::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fcom = FComVerifier::<V, T, SvoleReceiver<V, T>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
@@ -1007,9 +1014,13 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom =
-                FComProver::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                    .unwrap();
+            let mut fcom = FComProver::<V, T, SvoleSender<T>>::init(
+                &mut channel,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+            )
+            .unwrap();
 
             for n in 0..count {
                 // ZEROs
@@ -1041,9 +1052,13 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom =
-            FComVerifier::<V, T>::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
+        let mut fcom = FComVerifier::<V, T, SvoleReceiver<V, T>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )
+        .unwrap();
 
         for n in 0..count {
             // ZEROs
@@ -1070,9 +1085,104 @@ mod tests {
         handle.join().unwrap();
     }
 
+    fn test_fcom_multiplication_multithreaded<V: IsSubFieldOf<T>, T: FiniteField>()
+    where
+        T::PrimeField: IsSubFieldOf<V>,
+    {
+        let count = 50;
+        let (sender_vole, receiver_vole) = UnixStream::pair().unwrap();
+        let (sender, receiver) = UnixStream::pair().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            let mut rng = AesRng::from_seed(Default::default());
+            let reader = BufReader::new(sender_vole.try_clone().unwrap());
+            let writer = BufWriter::new(sender_vole);
+            let mut channel_vole = SyncChannel::new(reader, writer);
+
+            let svole_atomic = SvoleAtomic::<(V, T)>::create();
+            let svole_atomic2 = svole_atomic.duplicate();
+
+            let _svole_thread = std::thread::spawn(move || {
+                let mut svole_prover = ThreadSender::<V, T>::init(
+                    &mut channel_vole,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    svole_atomic2,
+                )
+                .unwrap();
+                svole_prover.run(&mut channel_vole, &mut rng).unwrap();
+            });
+
+            let mut rng = AesRng::from_seed(Default::default());
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+
+            let mut fcom =
+                FComProver::<V, T, SvoleAtomic<(V, T)>>::init_with_vole(svole_atomic).unwrap();
+
+            let mut v = Vec::new();
+            for _ in 0..count {
+                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let MacProver(y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let z = x * y;
+                let z_mac = fcom.input(&mut channel, &mut rng, &[z]).unwrap()[0];
+                v.push((
+                    MacProver(x, x_mac),
+                    MacProver(y, y_mac),
+                    MacProver(z, z_mac),
+                ));
+            }
+            channel.flush().unwrap();
+            fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
+                .unwrap();
+            v
+        });
+        let mut rng = AesRng::from_seed(Default::default());
+        let reader = BufReader::new(receiver_vole.try_clone().unwrap());
+        let writer = BufWriter::new(receiver_vole);
+        let mut channel_vole = SyncChannel::new(reader, writer);
+
+        let svole_atomic = SvoleAtomic::<T>::create();
+        let svole_atomic2 = svole_atomic.duplicate();
+
+        let _svole_thread = std::thread::spawn(move || {
+            let mut svole_receiver = ThreadReceiver::<V, T>::init(
+                &mut channel_vole,
+                &mut rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                svole_atomic2,
+            )
+            .unwrap();
+            svole_receiver.run(&mut channel_vole, &mut rng).unwrap();
+        });
+
+        let mut rng = AesRng::from_seed(Default::default());
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+
+        let mut fcom = FComVerifier::<V, T, SvoleAtomic<T>>::init_with_vole(svole_atomic).unwrap();
+
+        let mut v = Vec::new();
+        for _ in 0..count {
+            let xmac = fcom.random(&mut channel, &mut rng).unwrap();
+            let ymac = fcom.random(&mut channel, &mut rng).unwrap();
+            let zmac = fcom.input(&mut channel, &mut rng, 1).unwrap()[0];
+            v.push((xmac, ymac, zmac));
+        }
+        fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
+            .unwrap();
+
+        handle.join().unwrap();
+    }
+
     #[test]
     fn test_fcom_f61p() {
         test_fcom_random::<F61p, F61p>();
+
         test_fcom_affine::<F61p, F61p>();
         test_fcom_multiplication::<F61p, F61p>();
         test_fcom_check_zero::<F61p, F61p>();
@@ -1092,5 +1202,15 @@ mod tests {
         test_fcom_affine::<F40b, F40b>();
         test_fcom_multiplication::<F40b, F40b>();
         test_fcom_check_zero::<F40b, F40b>();
+    }
+
+    #[test]
+    fn test_fcom_singlethread_multiplication() {
+        test_fcom_multiplication::<F61p, F61p>();
+    }
+
+    #[test]
+    fn test_fcom_multithreaded() {
+        test_fcom_multiplication_multithreaded::<F61p, F61p>();
     }
 }

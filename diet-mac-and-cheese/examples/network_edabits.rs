@@ -1,5 +1,6 @@
 use clap::{Arg, ArgAction, Command};
 use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
+use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::fs;
@@ -8,9 +9,10 @@ use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::time::Instant;
+use swanky_field_binary::{F40b, F2};
 
-type Prover = ProverConv<F61p>;
-type Verifier = VerifierConv<F61p>;
+type Prover = ProverConv<F61p, SvoleSender<F40b>, SvoleSender<F61p>>;
+type Verifier = VerifierConv<F61p, SvoleReceiver<F2, F40b>, SvoleReceiver<F61p, F61p>>;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NB_BITS: &str = "38";

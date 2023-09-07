@@ -2,6 +2,7 @@ use crate::js_channel::ShimChannel;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
+use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
 use log::info;
 use log::Level;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -10,6 +11,7 @@ use scuttlebutt::{AesRng, TrackChannel};
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::panic;
+use swanky_field_binary::{F40b, F2};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -69,7 +71,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     alert("*** RELATION LOADING: done!");
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::new(
+    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
         Party::Prover,
         &mut channel,
         rng,

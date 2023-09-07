@@ -21,6 +21,7 @@ use crate::{
     backend_multifield::{DietMacAndCheeseConvProver, DietMacAndCheeseConvVerifier},
     backend_trait::BackendT,
     homcom::{MacProver, MacVerifier},
+    svole_trait::SvoleT,
     DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };
 use eyre::{ensure, Result};
@@ -104,9 +105,15 @@ pub(crate) trait GadgetLessThanEqWithPublic: BackendT<FieldElement = F2> {
 }
 
 /// Enable [`GadgetLessThanEqWithPublic`] for the DMC prover over [`F2`].
-impl<C: AbstractChannel> GadgetLessThanEqWithPublic for DietMacAndCheeseProver<F2, F40b, C> {}
+impl<C: AbstractChannel, Svole: SvoleT<(F2, F40b)>> GadgetLessThanEqWithPublic
+    for DietMacAndCheeseProver<F2, F40b, C, Svole>
+{
+}
 /// Enable [`GadgetLessThanEqWithPublic`] for the DMC verifier over [`F2`].
-impl<C: AbstractChannel> GadgetLessThanEqWithPublic for DietMacAndCheeseVerifier<F2, F40b, C> {}
+impl<C: AbstractChannel, Svole: SvoleT<F40b>> GadgetLessThanEqWithPublic
+    for DietMacAndCheeseVerifier<F2, F40b, C, Svole>
+{
+}
 
 /// This trait implements a "dotproduct" gadget.
 ///
@@ -130,27 +137,31 @@ pub(crate) trait GadgetDotProduct: BackendT {
 }
 
 /// Enable [`GadgetDotProduct`] for the prover over all fields.
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> GadgetDotProduct
-    for DietMacAndCheeseProver<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, Svole: SvoleT<(V, T)>> GadgetDotProduct
+    for DietMacAndCheeseProver<V, T, C, Svole>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
 }
 /// Enable [`GadgetDotProduct`] for the verifier over all fields.
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel> GadgetDotProduct
-    for DietMacAndCheeseVerifier<V, T, C>
+impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, Svole: SvoleT<T>> GadgetDotProduct
+    for DietMacAndCheeseVerifier<V, T, C, Svole>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
 }
 /// Enable [`GadgetDotProduct`] for the conversion prover over all fields.
-impl<T: PrimeFiniteField, C: AbstractChannel> GadgetDotProduct
-    for DietMacAndCheeseConvProver<T, C>
+impl<
+        T: PrimeFiniteField,
+        C: AbstractChannel,
+        SvoleF2: SvoleT<(F2, F40b)>,
+        SvoleFE: SvoleT<(T, T)>,
+    > GadgetDotProduct for DietMacAndCheeseConvProver<T, C, SvoleF2, SvoleFE>
 {
 }
 /// Enable [`GadgetDotProduct`] for the conversion verifier over all fields.
-impl<T: PrimeFiniteField, C: AbstractChannel> GadgetDotProduct
-    for DietMacAndCheeseConvVerifier<T, C>
+impl<T: PrimeFiniteField, C: AbstractChannel, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<T>>
+    GadgetDotProduct for DietMacAndCheeseConvVerifier<T, C, SvoleF2, SvoleFE>
 {
 }
 
@@ -211,16 +222,30 @@ pub(crate) trait GadgetPermutationCheck: BackendT + GadgetDotProduct {
     }
 }
 
-impl<T: PrimeFiniteField + StatisticallySecureField, C: AbstractChannel> GadgetPermutationCheck
-    for DietMacAndCheeseConvProver<T, C>
+impl<
+        T: PrimeFiniteField + StatisticallySecureField,
+        C: AbstractChannel,
+        SvoleF2: SvoleT<(F2, F40b)>,
+        SvoleFE: SvoleT<(T, T)>,
+    > GadgetPermutationCheck for DietMacAndCheeseConvProver<T, C, SvoleF2, SvoleFE>
 {
 }
-impl<T: PrimeFiniteField + StatisticallySecureField, C: AbstractChannel> GadgetPermutationCheck
-    for DietMacAndCheeseConvVerifier<T, C>
+impl<
+        T: PrimeFiniteField + StatisticallySecureField,
+        C: AbstractChannel,
+        SvoleF2: SvoleT<F40b>,
+        SvoleFE: SvoleT<T>,
+    > GadgetPermutationCheck for DietMacAndCheeseConvVerifier<T, C, SvoleF2, SvoleFE>
 {
 }
 
 /// Note: This is not correct! F2 is NOT secure! Need to use extension fields here.
-impl<C: AbstractChannel> GadgetPermutationCheck for DietMacAndCheeseProver<F2, F40b, C> {}
+impl<C: AbstractChannel, Svole: SvoleT<(F2, F40b)>> GadgetPermutationCheck
+    for DietMacAndCheeseProver<F2, F40b, C, Svole>
+{
+}
 /// Note: This is not correct! F2 is NOT secure! Need to use extension fields here.
-impl<C: AbstractChannel> GadgetPermutationCheck for DietMacAndCheeseVerifier<F2, F40b, C> {}
+impl<C: AbstractChannel, Svole: SvoleT<F40b>> GadgetPermutationCheck
+    for DietMacAndCheeseVerifier<F2, F40b, C, Svole>
+{
+}

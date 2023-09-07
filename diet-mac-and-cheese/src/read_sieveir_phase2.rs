@@ -346,6 +346,7 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate, fun_store: &FunStore) -> GateM {
 /// May panic with io error or flatbuffer error.
 pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<()> {
     // Checked version
+    /*
     let v = g::size_prefixed_root_as_root_with_opts(
         &flatbuffers::VerifierOptions {
             max_tables: u32::MAX as usize,
@@ -355,15 +356,14 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
     )
     .unwrap()
     .message_as_relation()
-    .unwrap();
+    .unwrap();*/
 
-    /* // Unchecked
+    // Unchecked
     let v = unsafe {
         g::size_prefixed_root_as_root_unchecked(rel.buffer_bytes.as_slice())
             .message_as_relation()
             .unwrap()
     };
-    */
 
     let v1 = v.directives().unwrap();
     let n = v1.len();
