@@ -1,5 +1,4 @@
 use keyed_arena::KeyedArena;
-use mac_n_cheese_party::{IS_PROVER, IS_VERIFIER};
 use rand::SeedableRng;
 use scuttlebutt::{
     field::{F128p, F56b, F61p, F63b, FiniteField, IsSubFieldOf, F2},
@@ -7,6 +6,7 @@ use scuttlebutt::{
 };
 use std::str::FromStr;
 use std::{any::type_name, hint::black_box, time::Instant};
+use swanky_party::{IS_PROVER, IS_VERIFIER};
 
 use mac_n_cheese_vole::{
     mac::Mac,

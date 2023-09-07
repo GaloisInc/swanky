@@ -7,14 +7,14 @@ use mac_n_cheese_ir::circuit_builder::{
     build_circuit, vole_supplier::VoleSupplier, CircuitBuilder, PrivateBuilder, TaskOutputRef,
     TaskPrototypeRef,
 };
-use mac_n_cheese_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
-    Party, WhichParty,
-};
 use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use scuttlebutt::field::F2;
+use swanky_party::{
+    private::{ProverPrivate, ProverPrivateCopy},
+    Party, WhichParty,
+};
 
 use super::{
     circuit_ir::{

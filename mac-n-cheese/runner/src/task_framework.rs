@@ -9,11 +9,6 @@ use mac_n_cheese_ir::compilation_format::{
     },
     FieldMacType, TaskId, Type,
 };
-use mac_n_cheese_party::{
-    either::PartyEither,
-    private::{ProverPrivate, ProverPrivateCopy},
-    Party, WhichParty,
-};
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
     specialization::SmallBinaryFieldSpecialization,
@@ -25,6 +20,11 @@ use scuttlebutt::{
     AesRng,
 };
 use smallvec::SmallVec;
+use swanky_party::{
+    either::PartyEither,
+    private::{ProverPrivate, ProverPrivateCopy},
+    Party, WhichParty,
+};
 use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
     I32x4, SimdBase, SimdBaseGatherable, U32x4, U64x4,

@@ -1,3 +1,25 @@
+//! Party-based type selection.
+//!
+//! This module implements the [`PartyEither`] type. For basic usage examples,
+//! see the [`crate`] documentation.
+//!
+//! Party-generic code will naturally involve some data that is prover-specific
+//! and some that is verifier-specific. The [`Party`] trait (and associated
+//! type reflection shenanigans) allow us to, at compile-time, decide between
+//! types based on whether a given `P: Party` is [`Prover`] or [`Verifier`].
+//!
+//! The type `PartyEither<Pa: Party, P, V>` represents this choice. If `Pa` is
+//! `Prover`, then this entire type effectively collapses to `P`. Likewise, if
+//! `Pa` is `Verifier`, the type collapses to `V`.
+//!
+//! Due to some outstanding Rust issues, we provide a separate
+//! `PartyEitherCopy<Pa: Party, P: Copy, V: Copy>` type. Both types implement
+//! the same API, and conveniences are provided to convert between these types
+//! where appropriate.
+//!
+//! This is extremely general. For a particularly useful specialization for
+//! secure computation contexts, see [`private`].
+
 use std::io::{Read, Write};
 
 use super::*;
@@ -99,23 +121,39 @@ use internal::*;
 
 macro_rules! define_prover_either {
     ($PartyEither:ident $(: $Copy:ident)? => $EitherStorage:ident) => {
+        /// A type that is `repr(transparent)` to `P` when `Pa = Prover` and
+        /// `repr(transparent)` to `V` when `Pa = Verifier`.
         #[repr(transparent)]
         pub struct $PartyEither<Pa: Party, P $(: $Copy)?, V $(: $Copy)?> {
             contents: Pa::$EitherStorage<P, V>,
         }
         impl<Pa: Party, P $(: $Copy)?, V $(: $Copy)?> $PartyEither<Pa, P, V> {
+            /// Given evidence that `Pa = Prover`, create a new
+            /// `PartyEither(Copy)` from a value of the prover-data type.
             pub fn prover_new(_ev: IsParty<Pa, Prover>, x: P) -> Self {
                 Self { contents: Pa::$EitherStorage::<P, V>::new_prover(x) }
             }
+
+            /// Given evidence that `Pa = Verifier`, create a new
+            /// `PartyEither(Copy)` from a value of the verifier-data type.
             pub fn verifier_new(_ev: IsParty<Pa, Verifier>, x: V) -> Self {
                 Self { contents: Pa::$EitherStorage::<P, V>::new_verifier(x) }
             }
+
+            /// Given evidence that `Pa = Prover`, cast to the underlying
+            /// prover-data type.
             pub fn prover_into(self, _ev: IsParty<Pa, Prover>) -> P {
                 Pa::$EitherStorage::<P, V>::into_prover(self.contents)
             }
+
+            /// Given evidence that `Pa = Verifier`, cast to the underlying
+            /// verifier-data type.
             pub fn verifier_into(self, _ev: IsParty<Pa, Verifier>) -> V {
                 Pa::$EitherStorage::<P, V>::into_verifier(self.contents)
             }
+
+            /// Convert from `PartyEither(Copy)<Pa, P, V>` to
+            /// `PartyEither(Copy)<Pa, &P, &V>`.
             pub fn as_ref(&self) -> $PartyEither<Pa, &P, &V> {
                 match Pa::WHICH {
                     WhichParty::Prover(e) =>
@@ -124,6 +162,9 @@ macro_rules! define_prover_either {
                         $PartyEither::verifier_new(e, Pa::$EitherStorage::<P, V>::ref_verifier(&self.contents)),
                 }
             }
+
+            /// Convert from `PartyEither(Copy)<Pa, P, V>` to
+            /// `PartyEither(Copy)<Pa, &mut P, &mut V>`.
             pub fn as_mut(&mut self) -> PartyEither<Pa, &mut P, &mut V> {
                 match Pa::WHICH {
                     WhichParty::Prover(e) =>
@@ -132,6 +173,8 @@ macro_rules! define_prover_either {
                         PartyEither::verifier_new(e, Pa::$EitherStorage::<P, V>::mut_verifier(&mut self.contents)),
                 }
             }
+
+            /// Zip two `PartyEither(Copy)` in the natural way.
             pub fn zip<
                 P2 $(: $Copy)?,
                 V2 $(: $Copy)?,
@@ -147,6 +190,12 @@ macro_rules! define_prover_either {
                     )),
                 }
             }
+
+            /// Given a function for each of the prover- and verifier-data
+            /// types, map over a `PartyEither(Copy)` in the natural way.
+            ///
+            /// Note that only one of the provided functions will run for a
+            /// given call to `map`.
             pub fn map<
                 P2 $(: $Copy)?,
                 V2 $(: $Copy)?,
@@ -205,6 +254,7 @@ macro_rules! define_prover_either {
             }
         }*/
         impl<'a, Pa: Party, P $(: $Copy)?, V $(: $Copy)?> $PartyEither<Pa, &'a [P], &'a [V]> {
+            /// Convert a slice of `PartyEither` to a `PartyEither` of slices.
             pub fn pull_either_outside(slice: &'a [$PartyEither<Pa, P, V>]) -> Self {
                 match Pa::WHICH {
                     WhichParty::Prover(e) => {
@@ -225,6 +275,8 @@ macro_rules! define_prover_either {
                     }
                 }
             }
+
+            /// Convert a `PartyEither` of slices to a slice of `PartyEither`.
             pub fn push_either_inside(self) -> &'a [$PartyEither<Pa, P, V>] {
                 match Pa::WHICH {
                     WhichParty::Prover(e) => {
@@ -265,6 +317,7 @@ unsafe impl PartyEitherInternal for Verifier {
 }
 
 // TODO: fix these impls
+/// Convert a `PartyEither` over `Copy` values to a `PartyEitherCopy`.
 impl<Pa: Party, P: Copy, V: Copy> PartyEither<Pa, P, V> {
     pub fn into_copy(self) -> PartyEitherCopy<Pa, P, V> {
         match Pa::WHICH {
@@ -297,6 +350,8 @@ unsafe impl<Pa: Party, P: Copy + Zeroable, V: Copy + Zeroable> Zeroable
 unsafe impl<Pa: Party, P: Copy + Pod, V: Copy + Pod> Pod for PartyEitherCopy<Pa, P, V> {}
 
 impl<'a, Pa: Party, P, V> PartyEither<Pa, &'a mut [P], &'a mut [V]> {
+    /// Convert a mutable slice of `PartyEither` to a `PartyEither` of mutable
+    /// slices.
     pub fn pull_either_outside(slice: &'a mut [PartyEither<Pa, P, V>]) -> Self {
         match Pa::WHICH {
             WhichParty::Prover(e) => Self::prover_new(e, unsafe {
@@ -307,7 +362,10 @@ impl<'a, Pa: Party, P, V> PartyEither<Pa, &'a mut [P], &'a mut [V]> {
             }),
         }
     }
+
     // TODO: there ought to be a better way of doing this.
+    /// Convert a mutable slice of `PartyEitherCopy` to a `PartyEither` of
+    /// mutable slices.
     pub fn pull_either_outside_copy(slice: &'a mut [PartyEitherCopy<Pa, P, V>]) -> Self
     where
         P: Copy,

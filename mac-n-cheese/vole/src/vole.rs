@@ -3,7 +3,6 @@ use bytemuck::TransparentWrapper;
 use eyre::Context;
 use generic_array::{typenum::Unsigned, GenericArray};
 use keyed_arena::{AllocationKey, KeyedArena};
-use mac_n_cheese_party as party;
 use ocelot::ot::explicit_round::{KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2};
 use ocelot::svole::ggm_utils::*;
 use party::{Party, IS_PROVER, IS_VERIFIER};
@@ -18,6 +17,7 @@ use scuttlebutt::{
     AbstractChannel, AesRng, Block,
 };
 use std::{marker::PhantomData, ops::Deref};
+use swanky_party as party;
 
 mod lpn_params;
 mod sizes;

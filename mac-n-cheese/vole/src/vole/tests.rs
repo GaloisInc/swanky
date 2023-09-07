@@ -1,10 +1,10 @@
 use keyed_arena::KeyedArena;
-use mac_n_cheese_party::{IS_PROVER, IS_VERIFIER};
 use rand::SeedableRng;
 use scuttlebutt::{
     field::{F128p, F56b, F61p, F63b, FiniteField, IsSubFieldOf, F2},
     AbstractChannel, AesRng, Block,
 };
+use swanky_party::{IS_PROVER, IS_VERIFIER};
 
 use crate::{
     mac::Mac,

@@ -20,7 +20,6 @@ generic-array.workspace = true
 keyed_arena.workspace = true
 lz4.workspace = true
 mac-n-cheese-ir.workspace = true
-mac-n-cheese-party.workspace = true
 mac-n-cheese-vole.workspace = true
 mac-n-cheese-event-log.workspace = true
 libc.workspace = true
@@ -40,6 +39,7 @@ vectoreyes.workspace = true
 bufstream.workspace = true
 flatbuffers.workspace = true
 crossbeam-queue.workspace = true
+swanky-party.workspace = true
 
 # Memory allocators
 jemallocator = { workspace = true, optional = true }

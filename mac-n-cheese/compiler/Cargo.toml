@@ -8,7 +8,6 @@ version.workspace = true
 
 [dependencies]
 mac-n-cheese-ir.workspace = true
-mac-n-cheese-party.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 scuttlebutt.workspace = true
 vectoreyes.workspace = true
@@ -29,6 +28,7 @@ bitvec.workspace = true
 crypto-bigint.workspace = true
 dhat.workspace = true
 smallvec.workspace = true
+swanky-party.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

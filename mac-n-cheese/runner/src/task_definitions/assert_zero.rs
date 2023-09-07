@@ -3,11 +3,11 @@ use std::io::Write;
 use std::marker::PhantomData;
 
 use mac_n_cheese_ir::compilation_format::wire_format::AssertZeroPrototypeWireFormat;
-use mac_n_cheese_party::Party;
 use mac_n_cheese_vole::mac::Mac;
 use mac_n_cheese_vole::mac::MacTypes;
 use parking_lot::Mutex;
 use scuttlebutt::serialization::CanonicalSerialize;
+use swanky_party::Party;
 use vectoreyes::SimdBase;
 use vectoreyes::U8x32;
 
@@ -51,8 +51,8 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
             acu ^= *out.get_mut();
         }
         match P::WHICH {
-            mac_n_cheese_party::WhichParty::Prover(_) => c.write_all(bytemuck::bytes_of(&acu))?,
-            mac_n_cheese_party::WhichParty::Verifier(_) => {
+            swanky_party::WhichParty::Prover(_) => c.write_all(bytemuck::bytes_of(&acu))?,
+            swanky_party::WhichParty::Verifier(_) => {
                 let mut got = U8x32::ZERO;
                 c.read_exact(bytemuck::bytes_of_mut(&mut got))?;
                 eyre::ensure!(got == acu, "Assert zero hash mismatch.");
@@ -77,8 +77,8 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertZeroTask<P, T> {
             AssertZeroPrototypeWireFormat::default(),
             |[(mac, ())]| {
                 let fe = match P::WHICH {
-                    mac_n_cheese_party::WhichParty::Prover(e) => mac.beta().into_inner(e),
-                    mac_n_cheese_party::WhichParty::Verifier(e) => mac.tag(e),
+                    swanky_party::WhichParty::Prover(e) => mac.beta().into_inner(e),
+                    swanky_party::WhichParty::Verifier(e) => mac.tag(e),
                 };
                 h.update(&fe.to_bytes());
                 Ok([])

@@ -6,7 +6,6 @@ use mac_n_cheese_ir::compilation_format::wire_format::{
     AssertMultiplyPrototypeNoSpecWireFormat, AssertMultiplyPrototypeSmallBinaryWireFormat,
 };
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_party as party;
 use mac_n_cheese_vole::mac::{Mac, MacConstantContext, MacTypes};
 use mac_n_cheese_vole::specialization::SmallBinaryFieldSpecialization;
 use parking_lot::Mutex;
@@ -18,6 +17,7 @@ use scuttlebutt::generic_array_length::Arr;
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::AesRng;
+use swanky_party as party;
 
 use std::io::Read;
 use std::io::Write;

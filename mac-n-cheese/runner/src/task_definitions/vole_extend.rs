@@ -3,7 +3,6 @@ use std::{any::TypeId, sync::Arc};
 use bytemuck::TransparentWrapper;
 use keyed_arena::{KeyedArenaFromPool, KeyedArenaPool};
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_party::{either::PartyEither, Party, WhichParty};
 use mac_n_cheese_vole::{
     mac::{Mac, MacTypes},
     specialization::SmallBinaryFieldSpecialization,
@@ -13,6 +12,7 @@ use mac_n_cheese_vole::{
     },
 };
 use smallvec::SmallVec;
+use swanky_party::{either::PartyEither, Party, WhichParty};
 
 use crate::{
     alloc::TaskDataBuffer,

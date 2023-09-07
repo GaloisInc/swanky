@@ -9,10 +9,10 @@ use std::{
 
 use bufstream::BufStream;
 use eyre::Context;
-use mac_n_cheese_party::{self as party, either::PartyEither, Party};
 use party::{either::PartyEitherCopy, WhichParty};
 use rand::RngCore;
 use rustls::{ClientConnection, ServerConnection, StreamOwned};
+use swanky_party::{self as party, either::PartyEither, Party};
 use vectoreyes::SimdBase;
 
 use crate::{keys::Keys, MAC_N_CHEESE_RUNNER_VERSION};
