@@ -51,7 +51,10 @@ impl Plugin for IterV0 {
         );
 
         let PluginTypeArg::String(ref func_name) = params[0] else {
-            eyre::bail!("{}: The function name parameter must be a string.", Self::NAME);
+            eyre::bail!(
+                "{}: The function name parameter must be a string.",
+                Self::NAME
+            );
         };
 
         let FuncDecl {
@@ -89,7 +92,10 @@ impl Plugin for IterV0 {
         let num_env = num_env.as_words()[0];
 
         let PluginTypeArg::Number(iter_count) = params[2] else {
-            eyre::bail!("{}: The iteration count parameter must be numeric.", Self::NAME);
+            eyre::bail!(
+                "{}: The iteration count parameter must be numeric.",
+                Self::NAME
+            );
         };
         // TODO: Should we assume this param fits in a u64?
         let iter_count: u64 = iter_count.as_words()[0].into();

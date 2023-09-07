@@ -127,7 +127,10 @@ impl Plugin for VectorsV1 {
                 let s = output_counts[0].1;
 
                 let PluginTypeArg::Number(c) = params[0] else {
-                    eyre::bail!("{}: The constant parameter must be numeric, not a string.", Self::NAME);
+                    eyre::bail!(
+                        "{}: The constant parameter must be numeric, not a string.",
+                        Self::NAME
+                    );
                 };
 
                 let mut gates = Vec::with_capacity(s as usize);

@@ -92,7 +92,10 @@ impl Plugin for PermutationCheckV1 {
             params.len()
         );
         let PluginTypeArg::Number(tuple_size) = params[0] else {
-            bail!("{}: The tuple size parameter must be numeric, not a string.", Self::NAME);
+            bail!(
+                "{}: The tuple size parameter must be numeric, not a string.",
+                Self::NAME
+            );
         };
         // TODO: Should we assume this param fits in a u64?
         let tuple_size: u64 = tuple_size.as_words()[0].into();
