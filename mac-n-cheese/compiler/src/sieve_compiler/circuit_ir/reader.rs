@@ -449,7 +449,9 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
                     let size_hint = func.size_hint;
 
                     let counter_info = if enumerated {
-                        let (Type::Field(field_type), num_wires) = func.input_sizes[num_env as usize] else {
+                        let (Type::Field(field_type), num_wires) =
+                            func.input_sizes[num_env as usize]
+                        else {
                             eyre::bail!("iteration index wire range must have field type")
                         };
 
@@ -587,7 +589,9 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                     .context("mux requires an input wire range for the condition")?;
 
                 // let-else <3
-                let (Type::Field(field_type), cond_count) = (self.lookup_type(cond_tc.ty)?, cond_tc.count) else {
+                let (Type::Field(field_type), cond_count) =
+                    (self.lookup_type(cond_tc.ty)?, cond_tc.count)
+                else {
                     eyre::bail!("mux only operates over field types")
                 };
 
@@ -677,8 +681,15 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
                 };
 
                 // Check basic input/output compatibility
-                let Def::FunctionDefinition(id, func) = self.sink.functions().get(func_name.as_bytes()).context("Function to be iterated has not been defined")? else {
-                    eyre::bail!("map and map_enumerated only support iterating user-defined functions")
+                let Def::FunctionDefinition(id, func) = self
+                    .sink
+                    .functions()
+                    .get(func_name.as_bytes())
+                    .context("Function to be iterated has not been defined")?
+                else {
+                    eyre::bail!(
+                        "map and map_enumerated only support iterating user-defined functions"
+                    )
                 };
 
                 eyre::ensure!(
