@@ -179,7 +179,7 @@ where
 
     fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
         self.monitor.incr_monitor_check_zero();
-        self.push_check_zero_list(wire)?;
+        self.push_check_zero(wire)?;
         Ok(())
     }
 
@@ -201,7 +201,7 @@ where
 
         let out = self.input(product)?;
         self.prover
-            .quicksilver_push(&mut self.state_mult_check, &(*a, *b, out))?;
+            .quicksilver_accumulate(&mut self.state_mult_check, &(*a, *b, out))?;
         Ok(out)
     }
 
@@ -333,7 +333,7 @@ where
         Ok(cnt)
     }
 
-    fn push_check_zero_list(&mut self, e: &MacProver<V, T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &MacProver<V, T>) -> Result<()> {
         if self.no_batching {
             self.prover.check_zero(&mut self.channel, &[*e])?;
             return Ok(());
@@ -422,7 +422,7 @@ where
 
     fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
         self.monitor.incr_monitor_check_zero();
-        self.push_check_zero_list(wire)?;
+        self.push_check_zero(wire)?;
         Ok(())
     }
 
@@ -440,7 +440,7 @@ where
         self.monitor.incr_monitor_mul();
         let tag = self.input()?;
         self.verifier
-            .quicksilver_push(&mut self.state_mult_check, &(*a, *b, tag))?;
+            .quicksilver_accumulate(&mut self.state_mult_check, &(*a, *b, tag))?;
         Ok(tag)
     }
 
@@ -567,7 +567,7 @@ where
         Ok(cnt)
     }
 
-    fn push_check_zero_list(&mut self, e: &MacVerifier<T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &MacVerifier<T>) -> Result<()> {
         if self.no_batching {
             self.verifier
                 .check_zero(&mut self.channel, &mut self.rng, &[*e])?;

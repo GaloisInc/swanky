@@ -396,8 +396,8 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         Ok(())
     }
 
-    /// Push a multiplication triplet for later checking.
-    pub fn quicksilver_push(
+    /// Accumulate multiplication triple into state.
+    pub fn quicksilver_accumulate(
         &mut self,
         state: &mut StateMultCheckProver<T>,
         triple: &(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>),
@@ -829,8 +829,8 @@ where
         }
     }
 
-    /// Push multiplication triple for later check.
-    pub fn quicksilver_push(
+    /// Accumulate multiplication triple into state.
+    pub fn quicksilver_accumulate(
         &mut self,
         state: &mut StateMultCheckVerifier<T>,
         triple: &(MacVerifier<T>, MacVerifier<T>, MacVerifier<T>),
