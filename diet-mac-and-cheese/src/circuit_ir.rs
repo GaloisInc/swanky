@@ -73,6 +73,35 @@ fn size_of_gate_m_less_than_32_bytes() {
     assert!(std::mem::size_of::<GateM>() <= 32);
 }
 
+pub type WireIdOpt = u32;
+
+/// Optimized gates where wires can be u32.
+#[derive(Clone, Debug)]
+pub enum GateMOpt {
+    Constant(TypeId, WireIdOpt, Box<Number>),
+    AssertZero(TypeId, WireIdOpt),
+    Copy(TypeId, WireIdOpt, WireIdOpt),
+    Add(TypeId, WireIdOpt, WireIdOpt, WireIdOpt),
+    Sub(TypeId, WireIdOpt, WireIdOpt, WireIdOpt),
+    Mul(TypeId, WireIdOpt, WireIdOpt, WireIdOpt),
+    AddConstant(TypeId, WireIdOpt, Box<(WireIdOpt, Box<Number>)>),
+    MulConstant(TypeId, WireIdOpt, Box<(WireIdOpt, Box<Number>)>),
+    Instance(TypeId, WireIdOpt),
+    Witness(TypeId, WireIdOpt),
+    Conv(Box<ConvGate>),
+    New(TypeId, WireIdOpt, WireIdOpt),
+    Delete(TypeId, WireIdOpt, WireIdOpt),
+    Call(Box<CallGate>),
+    Challenge(TypeId, WireIdOpt),
+    Comment(Box<String>),
+}
+
+#[test]
+fn size_of_gate_m_opt_less_than_16_bytes2() {
+    // Enforce that `GateM` fits in 32 bytes.
+    assert!(std::mem::size_of::<GateMOpt>() <= 16);
+}
+
 impl GateM {
     /// Return the [`TypeId`] associated with this gate.
     pub(crate) fn type_id(&self) -> TypeId {
@@ -123,8 +152,92 @@ impl GateM {
             }
         }
     }
+
+    fn to_gates_opt(gates: &[GateM]) -> Option<Vec<GateMOpt>> {
+        let mut r = Vec::with_capacity(gates.len());
+        use GateM::*;
+        for gate in gates.iter() {
+            let gate2 = match gate {
+                Constant(ty, out, n) => Some(GateMOpt::Constant(*ty, *out as WireIdOpt, n.clone())),
+                Copy(ty, out, inp) => {
+                    Some(GateMOpt::Copy(*ty, *out as WireIdOpt, *inp as WireIdOpt))
+                }
+                Add(ty, out, left, right) => Some(GateMOpt::Add(
+                    *ty,
+                    *out as WireIdOpt,
+                    *left as WireIdOpt,
+                    *right as WireIdOpt,
+                )),
+                Sub(ty, out, left, right) => Some(GateMOpt::Sub(
+                    *ty,
+                    *out as WireIdOpt,
+                    *left as WireIdOpt,
+                    *right as WireIdOpt,
+                )),
+                Mul(ty, out, left, right) => Some(GateMOpt::Mul(
+                    *ty,
+                    *out as WireIdOpt,
+                    *left as WireIdOpt,
+                    *right as WireIdOpt,
+                )),
+                AddConstant(ty, out, left, number) => Some(GateMOpt::AddConstant(
+                    *ty,
+                    *out as WireIdOpt,
+                    Box::new((*left as WireIdOpt, number.clone())),
+                )),
+                MulConstant(ty, out, left, number) => Some(GateMOpt::MulConstant(
+                    *ty,
+                    *out as WireIdOpt,
+                    Box::new((*left as WireIdOpt, number.clone())),
+                )),
+                Instance(ty, out) => Some(GateMOpt::Instance(*ty, *out as WireIdOpt)),
+                Witness(ty, out) => Some(GateMOpt::Witness(*ty, *out as WireIdOpt)),
+                New(ty, start, end) => {
+                    Some(GateMOpt::New(*ty, *start as WireIdOpt, *end as WireIdOpt))
+                }
+                Delete(ty, start, end) => Some(GateMOpt::Delete(
+                    *ty,
+                    *start as WireIdOpt,
+                    *end as WireIdOpt,
+                )),
+                AssertZero(ty, out) => Some(GateMOpt::AssertZero(*ty, *out as WireIdOpt)),
+                Conv(_) => None, // Conversion gates are the gates that make this function return None.
+                Call(arg) => Some(GateMOpt::Call(arg.clone())),
+                Comment(s) => Some(GateMOpt::Comment(Box::new(s.clone()))),
+                Challenge(ty, out) => Some(GateMOpt::Challenge(*ty, *out as WireIdOpt)),
+            };
+            if gate2.is_none() {
+                return None;
+            }
+            r.push(gate2.unwrap());
+        }
+        Some(r)
+    }
 }
 
+impl GateMOpt {
+    /// Return the [`TypeId`] associated with this gate.
+    pub(crate) fn type_id(&self) -> TypeId {
+        use GateMOpt::*;
+        match self {
+            Constant(ty, _, _)
+            | AssertZero(ty, _)
+            | Copy(ty, _, _)
+            | Add(ty, _, _, _)
+            | Sub(ty, _, _, _)
+            | Mul(ty, _, _, _)
+            | AddConstant(ty, _, _)
+            | MulConstant(ty, _, _)
+            | New(ty, _, _)
+            | Delete(ty, _, _)
+            | Instance(ty, _)
+            | Witness(ty, _)
+            | Challenge(ty, _) => *ty,
+            Conv(_) | Call(_) => todo!(),
+            Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
+        }
+    }
+}
 /// Specification for Circuit IR types.
 ///
 /// This corresponds to the `@type` specifier. A type can either be a `Field` or
@@ -266,7 +379,7 @@ impl TypeIdMapping {
     }
 
     /// Convert [`TypeIdMapping`] to a [`Vec`] containing the set [`TypeId`]s.
-    fn to_type_ids(self) -> Vec<TypeId> {
+    fn to_type_ids(&self) -> Vec<TypeId> {
         self.0
             .iter()
             .enumerate()
@@ -329,6 +442,8 @@ impl GatesBody {
 pub(crate) enum FunctionBody {
     /// The function body as a sequence of gates.
     Gates(GatesBody),
+    /// The function body as a sequence of optimized gates.
+    GatesOpt(Vec<GateMOpt>),
     /// The function body as a plugin.
     Plugin(PluginBody),
 }
@@ -337,11 +452,14 @@ pub(crate) enum FunctionBody {
 #[derive(Clone)]
 pub(crate) struct CompiledInfo {
     /// Count of wires for output/input arguments to the function.
-    pub(crate) args_count: Option<WireId>,
+    pub(crate) args_count: WireId,
     // The maximum [`WireId`] in the function body.
     pub(crate) body_max: Option<WireId>,
     /// [`TypeId`]s encountered in the function body.
     pub(crate) type_ids: Vec<TypeId>,
+
+    pub(crate) outputs_cnt: WireId,
+    pub(crate) inputs_cnt: WireId,
 }
 
 /// A Circuit IR function declaration.
@@ -369,18 +487,20 @@ pub struct FuncDecl {
 pub(crate) fn first_unused_wire_id(
     output_counts: &[(TypeId, WireCount)],
     input_counts: &[(TypeId, WireCount)],
-) -> WireId {
-    let mut first_unused_wire_id = 0;
+) -> (WireId, WireId) {
+    let mut first_unused_wire_outputs = 0;
 
     for (_, wc) in output_counts.iter() {
-        first_unused_wire_id += wc;
+        first_unused_wire_outputs += wc;
     }
+
+    let mut first_unused_wire_inputs = first_unused_wire_outputs;
 
     for (_, wc) in input_counts.iter() {
-        first_unused_wire_id += wc;
+        first_unused_wire_inputs += wc;
     }
 
-    first_unused_wire_id
+    (first_unused_wire_outputs, first_unused_wire_inputs)
 }
 
 impl FuncDecl {
@@ -397,29 +517,44 @@ impl FuncDecl {
         input_counts: Vec<(TypeId, WireCount)>,
     ) -> Self {
         let gates = GatesBody::new(gates);
-        let body_max = gates.output_wire_max();
         let mut type_presence = TypeIdMapping::from(&gates);
-        let mut args_count = 0;
-        for (ty, wc) in output_counts.iter() {
+
+        for (ty, _) in output_counts.iter() {
             type_presence.set(*ty);
-            args_count += wc;
         }
-        for (ty, wc) in input_counts.iter() {
+        for (ty, _) in input_counts.iter() {
             type_presence.set(*ty);
-            args_count += wc;
         }
 
-        let body = FunctionBody::Gates(gates);
+        let (first_unused_output, first_unused_input) =
+            first_unused_wire_id(&output_counts, &input_counts);
+
+        let body_max = gates
+            .output_wire_max()
+            .map(|out| std::cmp::max(first_unused_input, out));
+
         let type_ids = type_presence.to_type_ids();
+        let body = if body_max.is_some() && body_max.unwrap() < (u32::MAX - 1) as WireId {
+            let gates_opt = GateM::to_gates_opt(&gates.gates());
+            if gates_opt.is_some() {
+                FunctionBody::GatesOpt(gates_opt.unwrap())
+            } else {
+                FunctionBody::Gates(gates)
+            }
+        } else {
+            FunctionBody::Gates(gates)
+        };
 
         FuncDecl {
             body,
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count: Some(args_count),
+                args_count: first_unused_input,
                 body_max,
                 type_ids,
+                outputs_cnt: first_unused_output,
+                inputs_cnt: first_unused_input,
             },
         }
     }
@@ -508,8 +643,11 @@ impl FuncDecl {
             name => bail!("Unsupported plugin: {name}"),
         };
 
-        let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
-        let body_max = execution.output_wire_max();
+        let (first_unused_output, first_unused_input) =
+            first_unused_wire_id(&output_counts, &input_counts);
+        let body_max = execution
+            .output_wire_max()
+            .map(|out| std::cmp::max(first_unused_input, out));
 
         let mut type_presence = execution.type_id_mapping();
         for (ty, _) in output_counts.iter() {
@@ -527,9 +665,11 @@ impl FuncDecl {
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count,
+                args_count: first_unused_input,
                 body_max,
                 type_ids,
+                outputs_cnt: first_unused_output,
+                inputs_cnt: first_unused_input,
             },
         })
     }
