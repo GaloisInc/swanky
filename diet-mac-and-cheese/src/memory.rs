@@ -1,3 +1,4 @@
+use crate::circuit_ir::CompiledInfo;
 use crate::circuit_ir::WireId;
 #[allow(unused_imports)]
 use log::{debug, info};
@@ -6,12 +7,17 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Bound;
-
 use std::ptr::null_mut;
 
 const VEC_SIZE_INIT: usize = 10;
-const VEC_SIZE_CALLFRAME_THRESHOLD: usize = 1000;
-const VEC_SIZE_MEMFRAME_THRESHOLD: usize = 10_000;
+
+//const VEC_SIZE_CALLFRAME_THRESHOLD: usize = 1000;
+//const VEC_SIZE_MEMFRAME_THRESHOLD: usize = 10_000;
+const VEC_SIZE_CALLFRAME_THRESHOLD: usize = 255;
+const VEC_SIZE_MEMFRAME_THRESHOLD: usize = 100_023;
+
+// That is pretty high. Lower it to try to save memory.
+const CLEAR_FRAME_PERIOD: usize = 10_000;
 
 #[repr(transparent)]
 #[derive(Clone)]
@@ -103,14 +109,14 @@ impl<X> AbsoluteAddr<X> {
 // Same idea for the Stack frame. Another possible solution would be to use Mac'n'Cheese Wire map
 #[derive(Debug)]
 pub(crate) struct Pool<X> {
-    pool: BTreeMap<WireId, Vec<X>>,
     cache: RefCell<Cache<X>>, // We use a RefCell here, so that we can mutate the cache without having to declare the functions on `&mut self`. This is useful for implementing `get`
+    pool: BTreeMap<WireId, Box<Vec<X>>>, // The `Box` around `Vec` is useful for performance reason. It makes searching in the BTreeMap faster.
 }
 
 struct Cache<X> {
+    vector: Option<Pointer<X>>,
     first: WireId,
     last: WireId,
-    vector: Option<Pointer<X>>,
 }
 
 impl<X> Default for Cache<X> {
@@ -140,15 +146,15 @@ impl<X> Cache<X> {
     }
 
     fn set_cache(&mut self, first: WireId, last: WireId, ptr: Pointer<X>) {
+        self.vector = Some(ptr);
         self.first = first;
         self.last = last;
-        self.vector = Some(ptr);
     }
 
     fn invalidate(&mut self) {
+        self.vector = None;
         self.first = 0;
         self.last = 0;
-        self.vector = None;
     }
 }
 
@@ -180,7 +186,7 @@ where
             }
             Some((k, v)) => {
                 let last = *k + (v.len() as WireId) - 1;
-                assert!(*k <= id && id <= last);
+                debug_assert!(*k <= id && id <= last);
                 let mut cache = self.cache.borrow_mut();
                 cache.set_cache(*k, last, Pointer(v.as_ptr() as *mut X));
             }
@@ -222,19 +228,22 @@ where
         self.load_cache(id);
     }
 
-    fn get(&self, id: WireId) -> &X {
-        self.move_to_cache_if_necessary(id);
+    fn get_when_in_cache(&self, id: WireId) -> &X {
         let cache = self.cache.borrow();
         unsafe {
-            cache
+            &*(cache
                 .vector
                 .as_ref()
                 .unwrap()
                 .0
-                .offset((id - cache.first) as isize)
-                .as_ref()
-                .unwrap()
+                .offset((id - cache.first) as isize))
         }
+    }
+
+    #[cfg(test)]
+    fn get(&self, id: WireId) -> &X {
+        self.move_to_cache_if_necessary(id);
+        self.get_when_in_cache(id)
     }
 
     fn get_ptr(&self, id: WireId) -> Pointer<X> {
@@ -253,9 +262,7 @@ where
         }
     }
 
-    fn set(&mut self, id: WireId, x: &X) {
-        self.move_to_cache_if_necessary(id);
-        // TODO: maybe there is something more efficient here
+    fn set_when_in_cache(&mut self, id: WireId, x: &X) {
         let cache = self.cache.borrow();
         unsafe {
             let ptr = cache
@@ -268,10 +275,19 @@ where
         }
     }
 
+    #[cfg(test)]
+    fn set(&mut self, id: WireId, x: &X) {
+        self.move_to_cache_if_necessary(id);
+        self.set_when_in_cache(id, x);
+    }
+
     fn insert(&mut self, first: WireId, last: WireId) {
         self.pool.insert(
             first,
-            vec![Default::default(); (last - first + 1).try_into().unwrap()],
+            Box::new(vec![
+                Default::default();
+                (last - first + 1).try_into().unwrap()
+            ]),
         );
         self.cache.borrow_mut().invalidate();
     }
@@ -391,10 +407,10 @@ fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> F
 
 #[derive(Debug)]
 struct Callframe<X> {
-    outputs: Vec<CallframeElm<X>>,
     outputs_cnt: WireId,
-    inputs: Vec<CallframeElm<X>>,
     inputs_cnt: WireId,
+    outputs: Vec<CallframeElm<X>>,
+    inputs: Vec<CallframeElm<X>>,
 }
 
 impl<X> Callframe<X>
@@ -415,20 +431,22 @@ where
         if id < self.outputs_cnt {
             //2 println!("SEARCH OUTPUTS {:?} {:?}", self.outputs_cnt, id);
             search_callframe(&self.outputs, id)
-        } else if id < self.inputs_cnt {
+        } else {
+            debug_assert!(id < self.inputs_cnt);
             //2 println!("SEARCH INPUTS {:?} {:?}", self.inputs_cnt, id);
             search_callframe(&self.inputs, id)
-        } else {
-            panic!("Not found")
         }
     }
 
     #[inline]
     fn get(&self, id: WireId) -> FoundOrLevel<&X> {
         let r = self.get_either(id);
-        match r {
-            FoundOrLevel::Found(ptr) => FoundOrLevel::Found(unsafe { ptr.0.as_ref().unwrap() }),
-            FoundOrLevel::Ref { level, idx } => FoundOrLevel::Ref { level, idx },
+        match &r {
+            FoundOrLevel::Found(ptr) => FoundOrLevel::Found(unsafe { &*ptr.0 }),
+            FoundOrLevel::Ref { level, idx } => FoundOrLevel::Ref {
+                level: *level,
+                idx: *idx,
+            },
         }
     }
 
@@ -438,10 +456,9 @@ where
         //println!("IN CNT: {:?}", self.inputs_cnt);
         if id < self.outputs_cnt {
             set_callframe_if_ptr(&self.outputs, id, x)
-        } else if id < self.inputs_cnt {
-            set_callframe_if_ptr(&self.inputs, id, x)
         } else {
-            panic!("UNREACHABLE");
+            debug_assert!(id < self.inputs_cnt);
+            set_callframe_if_ptr(&self.inputs, id, x)
         }
     }
 
@@ -462,46 +479,42 @@ where
         }
     }
 
+    #[inline]
     fn allocate_outputs_ptr(&mut self, first: WireId, last: WireId, ptr: Pointer<X>) {
         self.outputs
             .push(CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }));
-        let more = last - first + 1;
-        self.outputs_cnt += more;
-        self.inputs_cnt += more;
     }
 
-    fn allocate_outputs(&mut self, count: WireId, slice: CallframeElm<X>) {
+    #[inline]
+    fn allocate_outputs(&mut self, slice: CallframeElm<X>) {
         self.outputs.push(slice);
-        self.outputs_cnt += count;
-        self.inputs_cnt += count;
     }
 
+    #[inline]
     fn allocate_outputs_unallocated(&mut self, first: WireId, addr: &UnallocatedAddr) {
         self.outputs.push(CallframeElm::Unallocated {
             first,
             unalloc: Box::new(addr.clone()),
         });
-        self.outputs_cnt += 1;
-        self.inputs_cnt += 1;
     }
 
+    #[inline]
     fn allocate_inputs_ptr(&mut self, first: WireId, last: WireId, ptr: Pointer<X>) {
         self.inputs
             .push(CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }));
-        self.inputs_cnt += last - first + 1;
     }
 
-    fn allocate_inputs(&mut self, count: WireId, slice: CallframeElm<X>) {
+    #[inline]
+    fn allocate_inputs(&mut self, slice: CallframeElm<X>) {
         self.inputs.push(slice);
-        self.inputs_cnt += count;
     }
 
+    #[inline]
     fn allocate_inputs_unallocated(&mut self, first: WireId, addr: &UnallocatedAddr) {
         self.inputs.push(CallframeElm::Unallocated {
             first,
             unalloc: Box::new(addr.clone()),
         });
-        self.inputs_cnt += 1;
     }
 
     fn clear(&mut self) {
@@ -521,15 +534,15 @@ where
 // provided the information about the `args_count` and `body_max`
 #[derive(Debug)]
 struct Frame<X> {
-    callframe: Callframe<X>,
     callframe_size: WireId,
-    callframe_vector: Vec<AbsoluteAddr<X>>,
+    callframe: Callframe<X>,
     callframe_is_vector: bool,
+    callframe_vector: Vec<AbsoluteAddr<X>>,
 
     memframe_pool: Pool<X>,
-    memframe_unallocated: HashMap<WireId, X>,
-    memframe_vector: Vec<X>,
     memframe_is_vector: bool,
+    memframe_vector: Vec<X>,
+    memframe_unallocated: HashMap<WireId, X>,
     counter: usize,
 }
 
@@ -539,14 +552,14 @@ where
 {
     fn new() -> Self {
         Frame {
-            callframe: Callframe::new(),
             callframe_size: 0,
-            callframe_vector: vec![],
+            callframe: Callframe::new(),
             callframe_is_vector: false,
+            callframe_vector: vec![],
             memframe_pool: Pool::new(),
+            memframe_is_vector: false,
             memframe_unallocated: HashMap::new(),
             memframe_vector: vec![Default::default(); VEC_SIZE_INIT],
-            memframe_is_vector: false,
             counter: 0,
         }
     }
@@ -554,17 +567,17 @@ where
     fn tick(&mut self) {
         self.counter += 1;
 
-        if self.counter < 100 {
+        if self.counter < CLEAR_FRAME_PERIOD {
             return;
         }
 
-        self.callframe = Callframe::new();
+        self.callframe.clear();
         self.callframe_size = 0;
-        self.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
+        self.callframe_vector.clear();
 
-        self.memframe_pool = Pool::new();
-        self.memframe_unallocated = HashMap::new();
-        self.memframe_vector = vec![Default::default(); VEC_SIZE_INIT];
+        self.memframe_pool.clear();
+        self.memframe_unallocated.clear();
+        self.memframe_vector.clear();
         self.memframe_is_vector = false;
         self.counter = 0;
     }
@@ -587,13 +600,13 @@ where
         }
     }
 
-    pub(crate) fn push_frame(&mut self, args_count: &Option<WireId>, vector_size: &Option<WireId>) {
-        let callframe_is_vector = args_count.is_some()
-            && <WireId as TryInto<usize>>::try_into(args_count.unwrap()).unwrap()
-                < VEC_SIZE_CALLFRAME_THRESHOLD;
+    pub(crate) fn push_frame(&mut self, compiled_info: &CompiledInfo) {
+        let callframe_is_vector = <WireId as TryInto<usize>>::try_into(compiled_info.args_count)
+            .unwrap()
+            < VEC_SIZE_CALLFRAME_THRESHOLD;
 
-        let memframe_is_vector = vector_size.is_some()
-            && <WireId as TryInto<usize>>::try_into(vector_size.unwrap()).unwrap()
+        let memframe_is_vector = compiled_info.body_max.is_some()
+            && <WireId as TryInto<usize>>::try_into(compiled_info.body_max.unwrap()).unwrap()
                 < VEC_SIZE_MEMFRAME_THRESHOLD;
 
         self.top += 1;
@@ -623,39 +636,43 @@ where
 
         self.stack[self.top].tick();
 
+        let frame = &mut self.stack[self.top];
+
+        frame.callframe.outputs_cnt = compiled_info.outputs_cnt;
+        frame.callframe.inputs_cnt = compiled_info.inputs_cnt;
+
         // Resizing the callframe if necessary
         if callframe_is_vector {
-            match args_count {
-                None => {}
-                Some(s) => {
-                    if (s + 1)
-                        > (self.stack[self.top].callframe_vector.len())
-                            .try_into()
-                            .unwrap()
-                    {
-                        self.stack[self.top]
-                            .callframe_vector
-                            .resize((s + 1).try_into().unwrap(), Default::default());
-                    }
-                }
+            let s = compiled_info.args_count;
+            if (s + 1)
+                > (self.stack[self.top].callframe_vector.len())
+                    .try_into()
+                    .unwrap()
+            {
+                self.stack[self.top]
+                    .callframe_vector
+                    .resize((s + 1).try_into().unwrap(), Default::default());
             }
         }
 
         // Resizing the memframe_vector if necessary
-        match vector_size {
-            None => {}
-            Some(s) => {
-                if memframe_is_vector
-                    && (*s + 1)
-                        > self.stack[self.top]
-                            .memframe_vector
-                            .len()
-                            .try_into()
-                            .unwrap()
+        if memframe_is_vector {
+            if let Some(s) = compiled_info.body_max {
+                if (s + 1)
+                    > self.stack[self.top]
+                        .memframe_vector
+                        .len()
+                        .try_into()
+                        .unwrap()
                 {
+                    let how_many = if s + 1 < compiled_info.args_count {
+                        1
+                    } else {
+                        s + 1 - compiled_info.args_count
+                    };
                     self.stack[self.top]
                         .memframe_vector
-                        .resize((s + 1).try_into().unwrap(), Default::default());
+                        .resize(how_many.try_into().unwrap(), Default::default());
                 }
             }
         }
@@ -680,10 +697,10 @@ where
     #[inline]
     fn get_callframe(&self, id: WireId) -> &X {
         let r = self.stack[self.top].callframe.get(id);
-        match r {
-            FoundOrLevel::Found(ptr) => ptr,
+        match &r {
+            FoundOrLevel::Found(ptr) => *ptr,
             FoundOrLevel::Ref { level, idx } => {
-                self.stack[level].memframe_unallocated.get(&idx).unwrap()
+                self.stack[*level].memframe_unallocated.get(&idx).unwrap()
             }
         }
     }
@@ -691,10 +708,10 @@ where
     #[inline]
     fn set_callframe(&mut self, id: WireId, x: &X) {
         let r = self.stack[self.top].callframe.set(id, x);
-        match r {
+        match &r {
             FoundOrLevel::Found(_) => {}
             FoundOrLevel::Ref { level, idx } => {
-                self.stack[level].memframe_unallocated.insert(idx, *x);
+                self.stack[*level].memframe_unallocated.insert(*idx, *x);
             }
         }
     }
@@ -705,7 +722,7 @@ where
             AbsoluteAddr::PoolAllocated(loc) => {
                 //debug!("get_elem_previously: pool allocated");
                 unsafe {
-                    return loc.ptr.0.as_ref().unwrap();
+                    return &*loc.ptr.0;
                 }
             }
             AbsoluteAddr::Unallocated(loc) => {
@@ -718,7 +735,7 @@ where
             AbsoluteAddr::VectorAllocated(loc) => {
                 //debug!("GET VEC");
                 unsafe {
-                    return loc.ptr.0.as_ref().unwrap();
+                    return &*loc.ptr.0;
                 }
             }
         }
@@ -773,8 +790,8 @@ where
 
     pub(crate) fn get(&self, id: WireId) -> &X {
         let frame = self.get_frame();
-
-        if id < frame.callframe_size {
+        let callframe_size = frame.callframe_size;
+        if id < callframe_size {
             if !frame.callframe_is_vector {
                 return self.get_callframe(id);
             } else {
@@ -790,12 +807,12 @@ where
 
         // 1)
         if frame.memframe_is_vector {
-            return &frame.memframe_vector[(id - frame.callframe_size) as usize];
+            return &frame.memframe_vector[(id - callframe_size) as usize];
         }
 
         // 2) a)
         if frame.memframe_pool.present(id) {
-            return frame.memframe_pool.get(id);
+            return frame.memframe_pool.get_when_in_cache(id);
         }
 
         // 2) b)
@@ -807,7 +824,8 @@ where
         //debug!("SET {:?}", self.stack);
         //println!("CALLFRAME SIZE: {:?}", self.stack[self.top].callframe_size);
         let frame = self.get_frame_mut();
-        if id < frame.callframe_size {
+        let callframe_size = frame.callframe_size;
+        if id < callframe_size {
             if !frame.callframe_is_vector {
                 //debug!("DEBUG GET in CALLFRAME {:?}", self.get_callframe(addr));
                 self.set_callframe(id, x);
@@ -827,7 +845,7 @@ where
         // 1)
         if frame.memframe_is_vector {
             // println!("DEBUG SET in VECTOR {:?}", x,);
-            frame.memframe_vector[(id - frame.callframe_size) as usize] = *x;
+            frame.memframe_vector[(id - callframe_size) as usize] = *x;
             return;
         }
 
@@ -835,7 +853,7 @@ where
         if frame.memframe_pool.present(id) {
             //debug!("set: allocated");
             //debug!("mem set: {:?} <- {:?}", id, x);
-            frame.memframe_pool.set(id, x);
+            frame.memframe_pool.set_when_in_cache(id, x);
             return;
         }
 
@@ -861,7 +879,7 @@ where
         count: WireId,
         allow_allocation: bool,
     ) {
-        assert_eq!(count, src_last - src_first + 1);
+        debug_assert_eq!(count, src_last - src_first + 1);
 
         // In any case we are going to increase the size of the Call Frame by count
         self.get_frame_mut().callframe_size += count;
@@ -875,7 +893,7 @@ where
         // 1) wire from callframe
         if src_first < previous_callframe_size {
             //println!("1: in previous_callframe_size");
-            assert!(src_last < previous_callframe_size);
+            debug_assert!(src_last < previous_callframe_size);
             if callframe_is_vector {
                 //println!("callframe is vector");
                 let addr = if previous_callframe_is_vector {
@@ -909,11 +927,11 @@ where
                 let last_frame = self.get_frame_mut();
                 if allow_allocation {
                     //println!("output");
-                    last_frame.callframe.allocate_outputs(count, slice);
+                    last_frame.callframe.allocate_outputs(slice);
                     return;
                 } else {
                     //println!("input");
-                    last_frame.callframe.allocate_inputs(count, slice);
+                    last_frame.callframe.allocate_inputs(slice);
                     return;
                 }
             }
@@ -1063,7 +1081,7 @@ where
             let mut curr = first;
             loop {
                 let how_many: WireId = frame.memframe_pool.remove(curr).try_into().unwrap();
-                assert!(how_many <= remaining);
+                debug_assert!(how_many <= remaining);
                 remaining -= how_many;
                 curr += how_many;
                 if remaining == 0 {
