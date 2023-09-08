@@ -11,11 +11,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 const SLEEP_TIME: u64 = 1;
-const SLEEP_TIME_MAX: u64 = 200;
+const SLEEP_TIME_MAX: u64 = 100;
 
 // number of VOLE extension vectors cannot be smaller than 2.
-const VOLE_VEC_NUM_MIN: usize = 2;
-const VOLE_VEC_NUM: usize = 2;
+const VOLE_VEC_NUM_MIN: usize = 3;
+const VOLE_VEC_NUM: usize = 3;
 
 /// Multithreading Svole using some atomic data-structures.
 ///
