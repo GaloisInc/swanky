@@ -46,8 +46,10 @@ pub trait BackendT {
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire>;
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire>;
 
+    /// Finalize the internal checks.
     fn finalize(&mut self) -> Result<()>;
-    fn reset(&mut self);
+    /// Reset the internal state of the backend.
+    fn reset(&mut self) -> Result<()>;
 }
 
 /// Backends that admit a conversion from [`Number`] to the underlying field

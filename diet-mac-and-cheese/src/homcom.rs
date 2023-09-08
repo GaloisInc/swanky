@@ -23,6 +23,7 @@ fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     T::from_subfield(&v)
 }
 
+/// State to accumulate multiplication checks.
 pub struct StateMultCheckProver<T> {
     sum_a0: T,
     sum_a1: T,
@@ -43,6 +44,7 @@ impl<FE> Drop for StateMultCheckProver<FE> {
 }
 
 impl<T: FiniteField> StateMultCheckProver<T> {
+    /// Initialize the state.
     pub fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self> {
         channel.flush()?;
         let chi = channel.read_serializable()?;
@@ -55,11 +57,68 @@ impl<T: FiniteField> StateMultCheckProver<T> {
         })
     }
 
+    /// Reset the state.
     pub fn reset(&mut self) {
         self.sum_a0 = T::ZERO;
         self.sum_a1 = T::ZERO;
         self.chi_power = self.chi;
         self.cnt = 0;
+    }
+
+    /// Return the number of checks accumulated.
+    pub fn count(&self) -> usize {
+        self.cnt
+    }
+}
+
+/// State to accumulate check zero.
+pub struct StateZeroCheckProver<T> {
+    rng: AesRng,
+    m: T,
+    cnt: usize,
+    b: bool,
+}
+
+impl<T> Drop for StateZeroCheckProver<T> {
+    fn drop(&mut self) {
+        if self.cnt != 0 {
+            warn!(
+                "State for check_zero dropped before check finished, cnt: {:?}",
+                self.cnt
+            );
+        }
+    }
+}
+
+impl<T: FiniteField> StateZeroCheckProver<T> {
+    /// Initialize the state.
+    pub fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self> {
+        let seed = channel.read_block()?;
+        let rng = AesRng::from_seed(seed);
+
+        Ok(StateZeroCheckProver {
+            rng,
+            m: T::ZERO,
+            cnt: 0,
+            b: true,
+        })
+    }
+
+    /// Reset the state.
+    pub fn reset<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<()> {
+        let seed = channel.read_block()?;
+        let rng = AesRng::from_seed(seed);
+
+        self.rng = rng;
+        self.m = T::ZERO;
+        self.cnt = 0;
+        self.b = true;
+        Ok(())
+    }
+
+    /// Return the number of checks accumulated.
+    pub fn count(&self) -> usize {
+        self.cnt
     }
 }
 
@@ -224,6 +283,44 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         }
     }
 
+    /// Accumulate a value to zero check into a state.
+    pub fn check_zero_accumulate(
+        &mut self,
+        a: &MacProver<V, T>,
+        state: &mut StateZeroCheckProver<T>,
+    ) -> Result<()> {
+        debug!("check_zero_accumulate");
+        let MacProver(x, x_mac) = a;
+        let b = *x == V::ZERO;
+        let chi = T::random(&mut state.rng);
+        state.m += chi * *x_mac;
+
+        if !b {
+            warn!("accumulating a value that's not zero");
+        }
+        state.b = state.b && b;
+        Ok(())
+    }
+
+    /// Finalize zero check of a state and returns how many values were checked.
+    pub fn check_zero_finalize<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        state: &mut StateZeroCheckProver<T>,
+    ) -> Result<usize> {
+        debug!("check_zero_finalize");
+        channel.write_serializable::<T>(&state.m)?;
+        channel.flush()?;
+
+        if !state.b {
+            state.reset(channel)?;
+            return Err(eyre!("check_zero failed"));
+        }
+        let cnt = state.cnt;
+        state.reset(channel)?;
+        Ok(cnt)
+    }
+
     /// Open a batch of [`MacProver`]s.
     pub fn open<C: AbstractChannel>(
         &mut self,
@@ -344,16 +441,8 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         channel.write_serializable(&v)?;
         channel.flush()?;
         let c = state.cnt;
-        debug!("ERASE ME: quick.cnt {:?}", c);
         state.reset();
         Ok(c)
-    }
-
-    /// Reset [`StateMultCheckProver`].
-    // TODO: Why is this a method on `FComProver`?
-    pub fn reset(&mut self, quick_state: &mut StateMultCheckProver<T>) {
-        debug!("reset");
-        quick_state.reset();
     }
 }
 
@@ -368,6 +457,7 @@ where
     phantom: PhantomData<V>,
 }
 
+/// State to accumulate multiplication checks.
 pub struct StateMultCheckVerifier<T> {
     sum_b: T,
     power_chi: T,
@@ -387,6 +477,7 @@ impl<T> Drop for StateMultCheckVerifier<T> {
 }
 
 impl<T: FiniteField> StateMultCheckVerifier<T> {
+    /// Initialize the state.
     pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let chi = T::random(rng);
         channel.write_serializable::<T>(&chi)?;
@@ -400,10 +491,68 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
         })
     }
 
+    /// Reset the state.
     pub fn reset(&mut self) {
         self.sum_b = T::ZERO;
         self.power_chi = self.chi;
         self.cnt = 0;
+    }
+
+    /// Return the number of checks accumulated.
+    pub fn count(&self) -> usize {
+        self.cnt
+    }
+}
+
+/// State to accumulate check zero.
+pub struct StateZeroCheckVerifier<T> {
+    rng: AesRng,
+    key_chi: T,
+    cnt: usize,
+}
+
+impl<T> Drop for StateZeroCheckVerifier<T> {
+    fn drop(&mut self) {
+        if self.cnt != 0 {
+            warn!(
+                "State for check_zero dropped before check finished, cnt: {:?}",
+                self.cnt
+            );
+        }
+    }
+}
+
+impl<T: FiniteField> StateZeroCheckVerifier<T> {
+    /// Initialize the state.
+    pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+        let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
+        channel.flush()?;
+        let rng = AesRng::from_seed(seed);
+
+        Ok(StateZeroCheckVerifier {
+            rng,
+            key_chi: T::ZERO,
+            cnt: 0,
+        })
+    }
+
+    /// Reset the state.
+    pub fn reset<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<()> {
+        let seed = rng.gen::<Block>();
+        channel.write_block(&seed)?;
+        channel.flush()?;
+        let rng = AesRng::from_seed(seed);
+
+        self.rng = rng;
+        self.key_chi = T::ZERO;
+        self.cnt = 0;
+        Ok(())
+    }
+
+    /// Return the number of checks accumulated.
+    pub fn count(&self) -> usize {
+        self.cnt
     }
 }
 
@@ -570,6 +719,36 @@ where
         }
     }
 
+    /// Accumulate a value to zero check into a state.
+    pub fn check_zero_accumulate(
+        &mut self,
+        key: &MacVerifier<T>,
+        state: &mut StateZeroCheckVerifier<T>,
+    ) -> Result<()> {
+        let chi = T::random(&mut state.rng);
+        state.key_chi += chi * key.0;
+        Ok(())
+    }
+
+    /// Finalize zero check of a state and returns how many values were checked.
+    pub fn check_zero_finalize<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+        state: &mut StateZeroCheckVerifier<T>,
+    ) -> Result<usize> {
+        let m = channel.read_serializable::<T>()?;
+
+        let b = state.key_chi == m;
+        let cnt = state.cnt;
+        state.reset(channel, rng)?;
+        if b {
+            Ok(cnt)
+        } else {
+            Err(eyre!("check_zero failed"))
+        }
+    }
+
     /// Open a batch of [`MacVerifier`]s.
     pub fn open<C: AbstractChannel>(
         &mut self,
@@ -689,19 +868,12 @@ where
         if b_plus == (u + (-self.delta) * v) {
             // - because of delta
             let c = state.cnt;
-            debug!("ERASE ME: quick.cnt {:?}", c);
             state.reset();
             Ok(c)
         } else {
             state.reset();
             bail!("QuickSilver multiplication check failed.")
         }
-    }
-
-    /// Reset [`StateMultCheckVerifier`].
-    // TODO: Why is this a method on `FComVerifier`?
-    pub fn reset(&mut self, quick_state: &mut StateMultCheckVerifier<T>) {
-        quick_state.reset();
     }
 }
 

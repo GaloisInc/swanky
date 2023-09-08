@@ -385,8 +385,8 @@ impl<
         self.dmc_f2.finalize()?;
         Ok(())
     }
-    fn reset(&mut self) {
-        self.dmc.reset();
+    fn reset(&mut self) -> Result<()> {
+        self.dmc.reset()
     }
 }
 
@@ -812,8 +812,8 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
         self.dmc_f2.finalize()?;
         Ok(())
     }
-    fn reset(&mut self) {
-        self.dmc.reset();
+    fn reset(&mut self) -> Result<()> {
+        self.dmc.reset()
     }
 }
 
