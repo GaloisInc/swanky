@@ -44,8 +44,10 @@ struct PoolAddr<X> {
 }
 
 impl<X> PoolAddr<X> {
-    fn incr(&mut self, i: WireId) {
-        self.ptr = Pointer(unsafe { self.ptr.0.add(i as usize) });
+    fn incr(&self, i: WireId) -> Self {
+        Self {
+            ptr: Pointer(unsafe { self.ptr.0.add(i as usize) }),
+        }
     }
 }
 
@@ -56,8 +58,9 @@ struct UnallocatedAddr {
 }
 
 impl UnallocatedAddr {
-    fn incr(&mut self, i: WireId) {
-        assert_eq!(i, 0);
+    fn incr(&self, i: WireId) -> Self {
+        debug_assert_eq!(i, 0);
+        self.clone()
         // does not make sense to increment an unallocated address
         //self.idx += i;
     }
@@ -70,8 +73,10 @@ struct VectorAddr<X> {
 }
 
 impl<X> VectorAddr<X> {
-    fn incr(&mut self, i: WireId) {
-        self.ptr = Pointer(unsafe { self.ptr.0.add(i as usize) });
+    fn incr(&self, i: WireId) -> Self {
+        Self {
+            ptr: Pointer(unsafe { self.ptr.0.add(i as usize) }),
+        }
     }
 }
 
@@ -84,17 +89,11 @@ impl<X> Default for AbsoluteAddr<X> {
 }
 
 impl<X> AbsoluteAddr<X> {
-    fn incr(&mut self, i: WireId) {
+    fn incr(&self, i: WireId) -> Self {
         match self {
-            Self::PoolAllocated(loc) => {
-                loc.incr(i);
-            }
-            Self::Unallocated(loc) => {
-                loc.incr(i);
-            }
-            Self::VectorAllocated(loc) => {
-                loc.incr(i);
-            }
+            Self::PoolAllocated(loc) => Self::PoolAllocated(loc.incr(i)),
+            Self::Unallocated(loc) => Self::Unallocated(Box::new(loc.incr(i))),
+            Self::VectorAllocated(loc) => Self::VectorAllocated(loc.incr(i)),
         }
     }
 }
@@ -257,7 +256,7 @@ where
                     .as_ref()
                     .unwrap()
                     .0
-                    .offset((id - cache.first) as isize) as *mut X,
+                    .offset((id - cache.first) as isize),
             );
         }
     }
@@ -270,7 +269,7 @@ where
                 .as_ref()
                 .unwrap()
                 .0
-                .offset((id - cache.first) as isize) as *mut X;
+                .offset((id - cache.first) as isize);
             *ptr = *x;
         }
     }
@@ -386,7 +385,7 @@ fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> F
             CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }) => {
                 if *first <= id && id <= *last {
                     unsafe {
-                        let addr = ptr.0.offset((id - first) as isize) as *mut X;
+                        let addr = ptr.0.offset((id - first) as isize);
                         *addr = x.clone();
                     }
                     return FoundOrLevel::Found(());
@@ -909,8 +908,7 @@ where
                 let last_frame = self.get_frame_mut();
                 for i in 0..count {
                     let idx = (start + i) as usize;
-                    last_frame.callframe_vector[idx] = addr.clone();
-                    last_frame.callframe_vector[idx].incr(i);
+                    last_frame.callframe_vector[idx] = addr.incr(i);
                 }
                 return;
             } else {
@@ -945,12 +943,12 @@ where
                 //println!("callframe is vector");
                 // for the vector slice we need to shift by callframe_size so that the
                 // indexing in the vector is correct using a slice_idx
-                let new_slice = AbsoluteAddr::VectorAllocated(VectorAddr { ptr });
+                let new_slice = VectorAddr { ptr };
                 let last_frame = self.get_frame_mut();
                 for i in 0..count {
                     let idx = (start + i) as usize;
-                    last_frame.callframe_vector[idx] = new_slice.clone();
-                    last_frame.callframe_vector[idx].incr(i);
+                    last_frame.callframe_vector[idx] =
+                        AbsoluteAddr::VectorAllocated(new_slice.incr(i));
                 }
                 return;
             } else {
@@ -980,12 +978,12 @@ where
             if callframe_is_vector {
                 //println!("callframe is vector");
                 let ptr = frame.memframe_pool.get_ptr(src_first);
-                new_slice = AbsoluteAddr::PoolAllocated(PoolAddr { ptr });
+                new_slice = PoolAddr { ptr };
                 let last_frame = self.get_frame_mut();
                 for i in 0..count {
                     let idx = (start + i) as usize;
-                    last_frame.callframe_vector[idx] = new_slice.clone();
-                    last_frame.callframe_vector[idx].incr(i);
+                    last_frame.callframe_vector[idx] =
+                        AbsoluteAddr::PoolAllocated(new_slice.incr(i));
                 }
                 return;
             } else {
@@ -1023,12 +1021,12 @@ where
 
                 if callframe_is_vector {
                     //println!("callframe is vector");
-                    new_slice = AbsoluteAddr::PoolAllocated(PoolAddr { ptr });
+                    new_slice = PoolAddr { ptr };
                     let last_frame = self.get_frame_mut();
                     for i in 0..count {
                         let idx = (start + i) as usize;
-                        last_frame.callframe_vector[idx] = new_slice.clone();
-                        last_frame.callframe_vector[idx].incr(i);
+                        last_frame.callframe_vector[idx] =
+                            AbsoluteAddr::PoolAllocated(new_slice.incr(i));
                     }
                     return;
                 } else {
