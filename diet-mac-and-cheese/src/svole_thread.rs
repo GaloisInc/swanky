@@ -162,13 +162,16 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadSender<V, T> {
     {
         let mut sleep_time = SLEEP_TIME;
         loop {
-            if *self.svole_atomic.stop_signal.lock().unwrap() {
+            let last_done = *self.svole_atomic.last_done.lock().unwrap();
+            let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
+
+            // We stop when the all the svole vectors are full, to avoid concurrency issue.
+            // In particular if one side decide to fill up a svole while the other has received a
+            // stop signal
+            if *self.svole_atomic.stop_signal.lock().unwrap() && next_todo == last_done {
                 info!("Stop running svole functionality for {}", field_name::<T>());
                 break;
             }
-
-            let last_done = *self.svole_atomic.last_done.lock().unwrap();
-            let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
 
             if next_todo != last_done {
                 debug!("multithread prover extend");
@@ -228,12 +231,16 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
     {
         let mut sleep_time = SLEEP_TIME;
         loop {
-            if *self.svole_atomic.stop_signal.lock().unwrap() {
+            let last_done = *self.svole_atomic.last_done.lock().unwrap();
+            let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
+
+            // We stop when the all the svole vectors are full, to avoid concurrency issue.
+            // In particular if one side decide to fill up a svole while the other has received a
+            // stop signal
+            if *self.svole_atomic.stop_signal.lock().unwrap() && next_todo == last_done {
                 info!("Stop running svole functionality for {}", field_name::<T>());
                 break;
             }
-            let last_done = *self.svole_atomic.last_done.lock().unwrap();
-            let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
 
             if next_todo != last_done {
                 debug!("multithread verifier extend");
