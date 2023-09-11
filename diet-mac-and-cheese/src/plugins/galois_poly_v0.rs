@@ -101,7 +101,7 @@ impl GaloisPolyV0 {
         let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, &type_store)?;
 
         let mut gates = vec![];
-        let (_, mut loop_first_wire) = first_unused_wire_id(output_counts, input_counts);
+        let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
         for _ in 0..number_of_challenges {
             // We evaluate the polynomials in a single challenge point.
             let challenge_wire = loop_first_wire;
@@ -209,7 +209,7 @@ impl GaloisPolyV0 {
         let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, &type_store)?;
 
         let mut gates = vec![];
-        let (_, mut loop_first_wire) = first_unused_wire_id(output_counts, input_counts);
+        let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
         for _ in 0..number_of_challenges {
             let challenge_wire = loop_first_wire;
             gates.push(GateM::Challenge(type_id, challenge_wire));

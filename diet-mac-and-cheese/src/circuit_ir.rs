@@ -468,15 +468,15 @@ pub struct FuncDecl {
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
-/// Return the first [`WireId`] available for allocation in the `Plugin`'s
-/// [`GateBody`].
+/// Convenience function returning a pair of [`WireId`] for the next wire id following the last output,
+/// and the next wire id following the last input.
 ///
 /// Arguments:
 /// - `output_counts`: A slice containing the outputs given as a tuple of
 /// [`TypeId`] and [`WireCount`].
 /// - `input_counts`: A slice containing the inputs given as a tuple of
 /// [`TypeId`] and [`WireCount`].
-pub(crate) fn first_unused_wire_id(
+pub(crate) fn output_input_counts(
     output_counts: &[(TypeId, WireCount)],
     input_counts: &[(TypeId, WireCount)],
 ) -> (WireId, WireId) {
@@ -493,6 +493,22 @@ pub(crate) fn first_unused_wire_id(
     }
 
     (first_unused_wire_outputs, first_unused_wire_inputs)
+}
+
+/// Return the first [`WireId`] available for allocation in the `Plugin`'s
+/// [`GateBody`].
+///
+/// Arguments:
+/// - `output_counts`: A slice containing the outputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+/// - `input_counts`: A slice containing the inputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+pub(crate) fn first_unused_wire_id(
+    output_counts: &[(TypeId, WireCount)],
+    input_counts: &[(TypeId, WireCount)],
+) -> WireId {
+    let (_, first_unused_wire_inputs) = output_input_counts(output_counts, input_counts);
+    first_unused_wire_inputs
 }
 
 impl FuncDecl {
@@ -519,7 +535,7 @@ impl FuncDecl {
         }
 
         let (first_unused_output, first_unused_input) =
-            first_unused_wire_id(&output_counts, &input_counts);
+            output_input_counts(&output_counts, &input_counts);
 
         let body_max = gates
             .output_wire_max()
@@ -632,7 +648,7 @@ impl FuncDecl {
         };
 
         let (first_unused_output, first_unused_input) =
-            first_unused_wire_id(&output_counts, &input_counts);
+            output_input_counts(&output_counts, &input_counts);
         let body_max = execution
             .output_wire_max()
             .map(|out| std::cmp::max(first_unused_input, out));

@@ -191,8 +191,8 @@ impl Plugin for VectorsV1 {
 
                 let s = output_counts[0].1;
 
-                let (_, first_unused_input) = first_unused_wire_id(output_counts, input_counts);
-                let scalar = first_unused_input - 1;
+                let scalar = first_unused_wire_id(output_counts, input_counts) - 1;
+
                 let mut gates = Vec::with_capacity(s as usize);
                 for i in 0..s {
                     gates.push(match operation {
@@ -253,7 +253,7 @@ impl Plugin for VectorsV1 {
                         _ => unreachable!(),
                     }),
                     _ => {
-                        let (_, mut res) = first_unused_wire_id(output_counts, input_counts);
+                        let mut res = first_unused_wire_id(output_counts, input_counts);
 
                         gates.push(match operation {
                             "sum" => GateM::Add(t, res, 1, 2),
@@ -325,7 +325,7 @@ impl Plugin for VectorsV1 {
 
                 let s = input_counts[0].1;
 
-                let (_, first_mul) = first_unused_wire_id(output_counts, input_counts);
+                let first_mul = first_unused_wire_id(output_counts, input_counts);
 
                 let mut gates = Vec::with_capacity(match s {
                     0 | 1 => 1,

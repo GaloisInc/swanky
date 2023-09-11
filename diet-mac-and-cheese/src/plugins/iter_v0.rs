@@ -170,7 +170,7 @@ impl Plugin for IterV0 {
 
         if enumerated {
             let counter_type = f_input_counts[num_env as usize].0;
-            let (_, mut counter_wire) = first_unused_wire_id(output_counts, input_counts);
+            let mut counter_wire = first_unused_wire_id(output_counts, input_counts);
 
             for i in 0..iter_count {
                 gates.push(GateM::Constant(
