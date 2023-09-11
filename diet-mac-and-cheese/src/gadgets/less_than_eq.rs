@@ -82,36 +82,31 @@ mod tests {
     #[test]
     fn less_than_eq_with_public_works() {
         fn run<B: BackendT<FieldElement = F2>>(party: &mut B, zero: B::Wire, one: B::Wire) {
-            less_than_eq_with_public(party, vec![zero].as_slice(), vec![F2::ZERO].as_slice())
-                .unwrap();
+            less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
             party.finalize().unwrap();
-            less_than_eq_with_public(party, vec![zero].as_slice(), vec![F2::ONE].as_slice())
-                .unwrap();
+            less_than_eq_with_public(party, &vec![zero], &vec![F2::ONE]).unwrap();
             party.finalize().unwrap();
-            less_than_eq_with_public(party, vec![one].as_slice(), vec![F2::ONE].as_slice())
-                .unwrap();
+            less_than_eq_with_public(party, &vec![one], &vec![F2::ONE]).unwrap();
             party.finalize().unwrap();
-            less_than_eq_with_public(party, vec![one].as_slice(), vec![F2::ZERO].as_slice())
-                .unwrap();
+            less_than_eq_with_public(party, &vec![one], &vec![F2::ZERO]).unwrap();
             let _ = party.finalize().unwrap_err();
             party.reset();
 
-            less_than_eq_with_public(party, vec![zero].as_slice(), vec![F2::ZERO].as_slice())
-                .unwrap();
+            less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
             party.finalize().unwrap();
 
             less_than_eq_with_public(
                 party,
-                vec![one, one, zero].as_slice(),
-                vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
+                &vec![one, one, zero],
+                &vec![F2::ONE, F2::ONE, F2::ZERO],
             )
             .unwrap();
             party.finalize().unwrap();
 
             less_than_eq_with_public(
                 party,
-                vec![one, one, one].as_slice(),
-                vec![F2::ONE, F2::ONE, F2::ZERO].as_slice(),
+                &vec![one, one, one],
+                &vec![F2::ONE, F2::ONE, F2::ZERO],
             )
             .unwrap();
             let _ = party.finalize().unwrap_err();
@@ -119,36 +114,31 @@ mod tests {
 
             less_than_eq_with_public(
                 party,
-                vec![one, zero, zero].as_slice(),
-                vec![F2::ONE, F2::ZERO, F2::ONE].as_slice(),
+                &vec![one, zero, zero],
+                &vec![F2::ONE, F2::ZERO, F2::ONE],
             )
             .unwrap();
             party.finalize().unwrap();
 
             less_than_eq_with_public(
                 party,
-                vec![one, one, one].as_slice(),
-                vec![F2::ONE, F2::ONE, F2::ONE].as_slice(),
+                &vec![one, one, one],
+                &vec![F2::ONE, F2::ONE, F2::ONE],
             )
             .unwrap();
             party.finalize().unwrap();
 
             less_than_eq_with_public(
                 party,
-                vec![one, zero, one, one].as_slice(),
-                vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE].as_slice(),
+                &vec![one, zero, one, one],
+                &vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE],
             )
             .unwrap();
             let _ = party.finalize().unwrap_err();
             party.reset();
 
             // that's testing the little-endianness of the function
-            less_than_eq_with_public(
-                party,
-                vec![one, one].as_slice(),
-                vec![F2::ZERO, F2::ONE].as_slice(),
-            )
-            .unwrap();
+            less_than_eq_with_public(party, &vec![one, one], &vec![F2::ZERO, F2::ONE]).unwrap();
             let _ = party.finalize().unwrap_err();
             party.reset();
         }
