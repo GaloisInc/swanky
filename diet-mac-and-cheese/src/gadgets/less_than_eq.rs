@@ -90,7 +90,7 @@ mod tests {
             party.finalize().unwrap();
             less_than_eq_with_public(party, &vec![one], &vec![F2::ZERO]).unwrap();
             let _ = party.finalize().unwrap_err();
-            party.reset();
+            party.reset().unwrap();
 
             less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
             party.finalize().unwrap();
@@ -110,7 +110,7 @@ mod tests {
             )
             .unwrap();
             let _ = party.finalize().unwrap_err();
-            party.reset();
+            party.reset().unwrap();
 
             less_than_eq_with_public(
                 party,
@@ -135,12 +135,12 @@ mod tests {
             )
             .unwrap();
             let _ = party.finalize().unwrap_err();
-            party.reset();
+            party.reset().unwrap();
 
             // that's testing the little-endianness of the function
             less_than_eq_with_public(party, &vec![one, one], &vec![F2::ZERO, F2::ONE]).unwrap();
             let _ = party.finalize().unwrap_err();
-            party.reset();
+            party.reset().unwrap();
         }
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
