@@ -4,7 +4,10 @@
 //! `check_zero`, `open` and `check_multiply`.
 //! These functionalities are used for diet Mac'n'Cheese and in the edabits
 //! conversion protocol for field-switching.
-use crate::svole_trait::SvoleT;
+use crate::{
+    mac::{MacProver, MacVerifier},
+    svole_trait::SvoleT,
+};
 use eyre::{bail, eyre, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, warn};
@@ -13,111 +16,6 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use std::marker::PhantomData;
-use subtle::{Choice, ConditionallySelectable};
-
-/// This type holds the prover-side data associated with a MAC between a prover
-/// and verifier (see [`MacVerifier`] for the verifier-side data).
-///
-/// The main property associated with the two types is that, given a
-/// `MacProver(v, t)` and its corresponding `MacVerifier(k)`, the following
-/// equation holds for a global key `Δ` known only to the verifier: `t = v · Δ +
-/// k`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
-    /// The prover's value `v`.
-    V,
-    /// The prover's MAC tag `t`.
-    T,
-);
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    pub fn new(x: V, m: T) -> Self {
-        Self(x, m)
-    }
-
-    pub fn value(&self) -> V {
-        self.0
-    }
-
-    pub fn mac(&self) -> T {
-        self.1
-    }
-
-    pub fn decompose(&self) -> (V, T) {
-        (self.0, self.1)
-    }
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> Default for MacProver<V, T>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    fn default() -> Self {
-        Self::new(V::ZERO, T::ZERO)
-    }
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> ConditionallySelectable for MacProver<V, T>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        MacProver(
-            V::conditional_select(&a.0, &b.0, choice),
-            T::conditional_select(&a.1, &b.1, choice),
-        )
-    }
-}
-
-/// This type holds the verifier-side data associated with a MAC between a
-/// prover and verifier (see [`MacProver`] for the prover-side data).
-///
-/// The main property associated with the two types is that, given a
-/// `MacProver(v, t)` and its corresponding `MacVerifier(k)`, the following
-/// equation holds for a global key `Δ` known only to the verifier: `t = v · Δ +
-/// k`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MacVerifier<T: FiniteField>(
-    /// The verifier's MAC key `k`.
-    T,
-);
-
-impl<T: FiniteField> MacVerifier<T> {
-    pub fn new(k: T) -> Self {
-        Self(k)
-    }
-
-    pub fn mac(&self) -> T {
-        self.0
-    }
-}
-
-impl<T: FiniteField> Default for MacVerifier<T> {
-    fn default() -> Self {
-        Self::new(T::ZERO)
-    }
-}
-
-impl<T: FiniteField> ConditionallySelectable for MacVerifier<T> {
-    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        MacVerifier(T::conditional_select(&a.0, &b.0, choice))
-    }
-}
-
-#[cfg(test)]
-pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
-    prover: MacProver<V, T>,
-    verifier: MacVerifier<T>,
-    delta: T,
-) -> bool
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    prover.value() * delta + verifier.mac() == prover.mac()
-}
 
 fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
@@ -207,11 +105,11 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         rng: &mut AesRng,
     ) -> Result<MacProver<V, T>> {
         match self.voles.pop() {
-            Some(e) => Ok(MacProver(e.0, e.1)),
+            Some(e) => Ok(MacProver::new(e.0, e.1)),
             None => {
                 self.svole_sender.extend(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
-                    Some(e) => Ok(MacProver(e.0, e.1)),
+                    Some(e) => Ok(MacProver::new(e.0, e.1)),
                     None => Err(eyre!("svole failed for random")),
                 }
             }
@@ -257,44 +155,44 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
     ) -> Result<T> {
         debug!("input1");
         let r = self.random(channel, rng)?;
-        let y = x - r.0;
+        let y = x - r.value();
         channel.write_serializable::<V>(&y)?;
-        Ok(r.1)
+        Ok(r.mac())
     }
 
     /// Add a constant.
     #[inline]
     pub fn affine_add_cst(&self, cst: V, x: MacProver<V, T>) -> MacProver<V, T> {
-        MacProver(cst + x.0, x.1)
+        MacProver::new(cst + x.value(), x.mac())
     }
 
     /// Multiply by a constant.
     #[inline]
     pub fn affine_mult_cst(&self, cst: V, x: MacProver<V, T>) -> MacProver<V, T> {
-        MacProver(cst * x.0, cst * (x.1))
+        MacProver::new(cst * x.value(), cst * x.mac())
     }
 
     /// Add two [`MacProver`]s.
     #[inline]
     pub fn add(&self, a: MacProver<V, T>, b: MacProver<V, T>) -> MacProver<V, T> {
-        let MacProver(a, a_mac) = a;
-        let MacProver(b, b_mac) = b;
-        MacProver(a + b, a_mac + b_mac)
+        let (a, a_mac) = a.decompose();
+        let (b, b_mac) = b.decompose();
+        MacProver::new(a + b, a_mac + b_mac)
     }
 
     /// Negate a [`MacProver`].
     #[inline]
     pub fn neg(&self, a: MacProver<V, T>) -> MacProver<V, T> {
-        let MacProver(a, a_mac) = a;
-        MacProver(-a, -a_mac)
+        let (a, a_mac) = a.decompose();
+        MacProver::new(-a, -a_mac)
     }
 
     /// Subtract two [`MacProver`]s.
     #[inline]
     pub fn sub(&self, a: MacProver<V, T>, b: MacProver<V, T>) -> MacProver<V, T> {
-        let MacProver(a, a_mac) = a;
-        let MacProver(b, b_mac) = b;
-        MacProver(a - b, a_mac - b_mac)
+        let (a, a_mac) = a.decompose();
+        let (b, b_mac) = b.decompose();
+        MacProver::new(a - b, a_mac - b_mac)
     }
 
     /// Check that a batch of [`MacProver`]s are zero.
@@ -309,10 +207,11 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
 
         let mut m = T::ZERO;
         let mut b = true;
-        for MacProver(x, x_mac) in x_mac_batch.iter() {
-            b = b && *x == V::ZERO;
+        for mac in x_mac_batch.iter() {
+            let (x, x_mac) = mac.decompose();
+            b = b && x == V::ZERO;
             let chi = T::random(&mut rng);
-            m += chi * *x_mac;
+            m += chi * x_mac;
         }
         channel.write_serializable::<T>(&m)?;
         channel.flush()?;
@@ -333,18 +232,18 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
     ) -> Result<()> {
         debug!("open");
         let mut hasher = blake3::Hasher::new();
-        for MacProver(x, _) in batch.iter() {
-            channel.write_serializable::<V>(x)?;
-            hasher.update(&x.to_bytes());
+        for mac in batch.iter() {
+            channel.write_serializable::<V>(&mac.value())?;
+            hasher.update(&mac.value().to_bytes());
         }
 
         let seed = Block::try_from_slice(&hasher.finalize().as_bytes()[0..16]).unwrap();
         let mut rng = AesRng::from_seed(seed);
 
         let mut m = T::ZERO;
-        for MacProver(_, x_mac) in batch.iter() {
+        for mac in batch.iter() {
             let chi = T::random(&mut rng);
-            m += chi * *x_mac;
+            m += chi * mac.mac();
         }
         channel.write_serializable::<T>(&m)?;
         channel.flush()?;
@@ -366,9 +265,12 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         let chi = channel.read_serializable()?;
         let mut chi_power = chi;
 
-        for (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) in triples.iter() {
-            let a0 = *x_mac * *y_mac;
-            let a1 = *y * *x_mac + *x * *y_mac - *z_mac;
+        for ((x, x_mac), (y, y_mac), (_z, z_mac)) in triples
+            .iter()
+            .map(|(x, y, z)| (x.decompose(), y.decompose(), z.decompose()))
+        {
+            let a0 = x_mac * y_mac;
+            let a1 = y * x_mac + x * y_mac - z_mac;
 
             sum_a0 += a0 * chi_power;
             sum_a1 += a1 * chi_power;
@@ -381,10 +283,10 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         let mut mask_mac = T::ZERO;
 
         for i in 0..DegreeModulo::<V, T>::USIZE {
-            let MacProver(u, u_mac) = self.random(channel, rng)?;
+            let u = self.random(channel, rng)?;
             let x_i: T = make_x_i::<V, T>(i);
-            mask += u * x_i;
-            mask_mac += u_mac * x_i;
+            mask += u.value() * x_i;
+            mask_mac += u.mac() * x_i;
         }
 
         let u = sum_a0 + mask_mac;
@@ -404,9 +306,9 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         triple: &(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>),
     ) -> Result<()> {
         debug!("quicksilver_push");
-        let (MacProver(x, x_mac), MacProver(y, y_mac), MacProver(_z, z_mac)) = triple;
-        let a0 = *x_mac * *y_mac;
-        let a1 = *y * *x_mac + *x * *y_mac - *z_mac;
+        let (x, y, z) = triple;
+        let a0 = x.mac() * y.mac();
+        let a1 = y.value() * x.mac() + x.value() * y.mac() - z.mac();
 
         state.sum_a0 += a0 * state.chi_power;
         state.sum_a1 += a1 * state.chi_power;
@@ -429,10 +331,10 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         let mut mask_mac = T::ZERO;
 
         for i in 0..DegreeModulo::<V, T>::USIZE {
-            let MacProver(u, u_mac) = self.random(channel, rng)?;
+            let u = self.random(channel, rng)?;
             let x_i: T = make_x_i::<V, T>(i);
-            mask += u * x_i;
-            mask_mac += u_mac * x_i;
+            mask += u.value() * x_i;
+            mask_mac += u.mac() * x_i;
         }
 
         let u = state.sum_a0 + mask_mac;
@@ -557,11 +459,11 @@ where
         rng: &mut AesRng,
     ) -> Result<MacVerifier<T>> {
         match self.voles.pop() {
-            Some(e) => Ok(MacVerifier(e)),
+            Some(e) => Ok(MacVerifier::new(e)),
             None => {
                 self.svole_receiver.extend(channel, rng, &mut self.voles)?;
                 match self.voles.pop() {
-                    Some(e) => Ok(MacVerifier(e)),
+                    Some(e) => Ok(MacVerifier::new(e)),
                     None => Err(eyre!("svole failed for random")),
                 }
             }
@@ -592,7 +494,7 @@ where
         for _i in 0..num {
             let r = self.random(channel, rng)?;
             let y = channel.read_serializable::<V>()?;
-            out.push(MacVerifier(r.0 - y * self.delta));
+            out.push(MacVerifier::new(r.mac() - y * self.delta));
         }
         Ok(())
     }
@@ -605,44 +507,39 @@ where
     ) -> Result<MacVerifier<T>> {
         let r = self.random(channel, rng)?;
         let y = channel.read_serializable::<V>()?;
-        let out = MacVerifier(r.0 - y * self.delta);
+        let out = MacVerifier::new(r.mac() - y * self.delta);
         Ok(out)
     }
 
     /// Add a constant.
     // TODO: Should these be method on `MacVerifier` instead?
     #[inline]
-    pub fn affine_add_cst(&self, cst: V, x_mac: MacVerifier<T>) -> MacVerifier<T> {
-        MacVerifier(x_mac.0 - cst * self.delta)
+    pub fn affine_add_cst(&self, cst: V, x: MacVerifier<T>) -> MacVerifier<T> {
+        MacVerifier::new(x.mac() - cst * self.delta)
     }
 
     /// Multiply by a constant.
     #[inline]
-    pub fn affine_mult_cst(&self, cst: V, x_mac: MacVerifier<T>) -> MacVerifier<T> {
-        MacVerifier(cst * x_mac.0)
+    pub fn affine_mult_cst(&self, cst: V, x: MacVerifier<T>) -> MacVerifier<T> {
+        MacVerifier::new(cst * x.mac())
     }
 
     /// Add two [`MacVerifier`]s.
     #[inline]
     pub fn add(&self, a: MacVerifier<T>, b: MacVerifier<T>) -> MacVerifier<T> {
-        let MacVerifier(a_mac) = a;
-        let MacVerifier(b_mac) = b;
-        MacVerifier(a_mac + b_mac)
+        MacVerifier::new(a.mac() + b.mac())
     }
 
     /// Negate a [`MacVerifier`].
     #[inline]
     pub fn neg(&self, a: MacVerifier<T>) -> MacVerifier<T> {
-        let MacVerifier(a_mac) = a;
-        MacVerifier(-a_mac)
+        MacVerifier::new(-a.mac())
     }
 
     /// Subtract two [`MacVerifier`]s.
     #[inline]
     pub fn sub(&self, a: MacVerifier<T>, b: MacVerifier<T>) -> MacVerifier<T> {
-        let MacVerifier(a_mac) = a;
-        let MacVerifier(b_mac) = b;
-        MacVerifier(a_mac - b_mac)
+        MacVerifier::new(a.mac() - b.mac())
     }
 
     /// Check that a batch of [`MacVerifier`]s are zero.
@@ -658,9 +555,9 @@ where
         let mut rng = AesRng::from_seed(seed);
 
         let mut key_chi = T::ZERO;
-        for MacVerifier(key) in key_batch.iter() {
+        for key in key_batch.iter() {
             let chi = T::random(&mut rng);
-            key_chi += chi * *key;
+            key_chi += chi * key.mac();
         }
         let m = channel.read_serializable::<T>()?;
 
@@ -694,10 +591,9 @@ where
         let mut x_chi = T::ZERO;
         for i in 0..keys.len() {
             let chi = T::random(&mut rng);
-            let MacVerifier(key) = keys[i];
             let x = out[i];
 
-            key_chi += chi * key;
+            key_chi += chi * keys[i].mac();
             x_chi += x * chi;
         }
         let m = channel.read_serializable::<T>()?;
@@ -725,10 +621,10 @@ where
         let mut sum_b = T::ZERO;
         let mut power_chi = chi;
 
-        for (MacVerifier(x_mac), MacVerifier(y_mac), MacVerifier(z_mac)) in triples.iter() {
+        for (x, y, z) in triples.iter() {
             //  should be `- (-delta)` with our conventions compared to
             //  quicksilver but simplified out.
-            let b = (*x_mac) * (*y_mac) + self.delta * *z_mac;
+            let b = (x.mac()) * (y.mac()) + self.delta * z.mac();
 
             sum_b += b * power_chi;
             power_chi *= chi;
@@ -737,9 +633,9 @@ where
         // The following block implements VOPE(1)
         let mut mask_mac = T::ZERO;
         for i in 0..DegreeModulo::<V, T>::USIZE {
-            let MacVerifier(v_m) = self.random(channel, rng)?;
+            let v = self.random(channel, rng)?;
             let x_i: T = make_x_i::<V, T>(i);
-            mask_mac += v_m * x_i;
+            mask_mac += v.mac() * x_i;
         }
 
         let u = channel.read_serializable::<T>()?;
@@ -760,10 +656,10 @@ where
         state: &mut StateMultCheckVerifier<T>,
         triple: &(MacVerifier<T>, MacVerifier<T>, MacVerifier<T>),
     ) -> Result<()> {
-        let (MacVerifier(x_mac), MacVerifier(y_mac), MacVerifier(z_mac)) = triple;
+        let (x, y, z) = triple;
         //  should be `- (-delta)` with our conventions compared to
         //  quicksilver but simplified out.
-        let b = (*x_mac) * (*y_mac) + self.delta * *z_mac;
+        let b = (x.mac()) * (y.mac()) + self.delta * z.mac();
 
         state.sum_b += b * state.power_chi;
         state.power_chi *= state.chi;
@@ -781,9 +677,9 @@ where
         // The following block implements VOPE(1)
         let mut mask_mac = T::ZERO;
         for i in 0..DegreeModulo::<V, T>::USIZE {
-            let MacVerifier(v_m) = self.random(channel, rng)?;
+            let v = self.random(channel, rng)?;
             let x_i: T = make_x_i::<V, T>(i);
-            mask_mac += v_m * x_i;
+            mask_mac += v.mac() * x_i;
         }
 
         let u = channel.read_serializable::<T>()?;
@@ -873,7 +769,7 @@ mod tests {
         let resprover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], resprover[i].0);
+            assert_eq!(r[i], resprover[i].value());
         }
     }
 
@@ -898,13 +794,13 @@ mod tests {
 
             let mut v = Vec::new();
             for _ in 0..count {
-                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
+                let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let cst = V::random(&mut rng);
                 channel.write_serializable::<V>(&cst).unwrap();
                 channel.flush().unwrap();
-                let m = fcom.affine_mult_cst(cst, MacProver(x, x_mac));
+                let m = fcom.affine_mult_cst(cst, x);
                 v.push(m);
-                let a = fcom.affine_add_cst(cst, MacProver(x, x_mac));
+                let a = fcom.affine_add_cst(cst, x);
                 v.push(a);
             }
             fcom.open(&mut channel, &v).unwrap();
@@ -938,7 +834,7 @@ mod tests {
         let batch_prover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], batch_prover[i].0);
+            assert_eq!(r[i], batch_prover[i].value());
         }
     }
 
@@ -963,15 +859,11 @@ mod tests {
 
             let mut v = Vec::new();
             for _ in 0..count {
-                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
-                let MacProver(y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x * y;
+                let x = fcom.random(&mut channel, &mut rng).unwrap();
+                let y = fcom.random(&mut channel, &mut rng).unwrap();
+                let z = x.value() * y.value();
                 let z_mac = fcom.input(&mut channel, &mut rng, &[z]).unwrap()[0];
-                v.push((
-                    MacProver(x, x_mac),
-                    MacProver(y, y_mac),
-                    MacProver(z, z_mac),
-                ));
+                v.push((x, y, MacProver::new(z, z_mac)));
             }
             channel.flush().unwrap();
             fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
@@ -1028,7 +920,7 @@ mod tests {
                 for _ in 0..n {
                     let x = V::ZERO;
                     let xmac = fcom.input1(&mut channel, &mut rng, x).unwrap();
-                    v.push(MacProver(x, xmac));
+                    v.push(MacProver::new(x, xmac));
                 }
                 channel.flush().unwrap();
                 let r = fcom.check_zero(&mut channel, v.as_slice());
@@ -1041,7 +933,7 @@ mod tests {
                 for _ in 0..n {
                     let x = V::random_nonzero(&mut rng);
                     let xmac = fcom.input1(&mut channel, &mut rng, x).unwrap();
-                    v.push(MacProver(x, xmac));
+                    v.push(MacProver::new(x, xmac));
                 }
                 channel.flush().unwrap();
                 let r = fcom.check_zero(&mut channel, v.as_slice());
@@ -1124,15 +1016,11 @@ mod tests {
 
             let mut v = Vec::new();
             for _ in 0..count {
-                let MacProver(x, x_mac) = fcom.random(&mut channel, &mut rng).unwrap();
-                let MacProver(y, y_mac) = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x * y;
+                let x = fcom.random(&mut channel, &mut rng).unwrap();
+                let y = fcom.random(&mut channel, &mut rng).unwrap();
+                let z = x.value() * y.value();
                 let z_mac = fcom.input(&mut channel, &mut rng, &[z]).unwrap()[0];
-                v.push((
-                    MacProver(x, x_mac),
-                    MacProver(y, y_mac),
-                    MacProver(z, z_mac),
-                ));
+                v.push((x, y, MacProver::new(z, z_mac)));
             }
             channel.flush().unwrap();
             fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)

@@ -27,6 +27,7 @@ mod dora;
 pub mod edabits;
 pub mod fields;
 pub mod homcom;
+pub mod mac;
 mod memory;
 #[allow(clippy::all)]
 pub mod read_sieveir_phase2;

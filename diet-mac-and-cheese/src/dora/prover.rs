@@ -5,7 +5,7 @@ use swanky_field::IsSubFieldOf;
 
 use crate::{
     dora::{comm::CommittedWitness, tx::TxChannel},
-    homcom::MacProver,
+    mac::MacProver,
     svole_trait::SvoleT,
     DietMacAndCheeseProver,
 };
