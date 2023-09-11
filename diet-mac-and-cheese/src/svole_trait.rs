@@ -49,14 +49,14 @@ pub trait SvoleT<M>: SvoleStopSignal {
 pub trait SvoleStopSignal {
     // NOTE: It is essential to separate this trait and its api function from `SvoleT<M>`,
     // so that the `EvaluatorCirc` can store the `SvoleT<M>` functionalities in
-    // `Vec<Box<dyn SvoleStopSingnal>>` for different `M`.
-    // This would not be possible for different `M` in the same `EvaluatorCirc`.
+    // `Vec<Box<dyn SvoleStopSignal>>` for different `M`.
+    // Otherwise, it would not be possible to store the functionalities with different `M` in the same `EvaluatorCirc`.
 
     /// Send a stop signal.
     ///
     /// In the context of multithreading, the main thread spawns svole functionalities in child threads.
-    /// The svole threads run forever producing voles. When the main thread is done, it sends a signal to all the child threads
-    /// so they stop producing voles and terminate.
+    /// The svole threads run forever producing voles. When the main thread is done, it sends a signal
+    /// to all the child threads so that they know when to stop producing voles and terminate.
     ///
     /// The default implementation panics.
     fn send_stop_signal(&mut self) -> Result<()> {

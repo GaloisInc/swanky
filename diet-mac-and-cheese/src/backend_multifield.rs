@@ -2308,6 +2308,7 @@ impl<
         Ok(())
     }
 
+    // This function is identical to `eval_gate`, except that it operates on `GateMOpt` instead of `GateM`.
     fn eval_gate_opt(&mut self, gate: &GateMOpt, fun_store: &FunStore) -> Result<()> {
         debug!("GATE: {:?}", gate);
         match gate {

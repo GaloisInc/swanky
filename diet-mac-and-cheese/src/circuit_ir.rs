@@ -120,7 +120,7 @@ impl GateM {
             | Instance(ty, _)
             | Witness(ty, _)
             | Challenge(ty, _) => *ty,
-            Conv(_) | Call(_) => todo!(),
+            Conv(_) | Call(_) => unreachable!("Should not ask the type_id for conv/call gates"),
             Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
         }
     }
@@ -153,65 +153,57 @@ impl GateM {
         }
     }
 
-    fn to_gates_opt(gates: &[GateM]) -> Option<Vec<GateMOpt>> {
+    // Convert a slice of `GateM` into `GateMOpt`.
+    fn to_gates_opt(gates: &[GateM]) -> Vec<GateMOpt> {
         let mut r = Vec::with_capacity(gates.len());
         use GateM::*;
         for gate in gates.iter() {
             let gate2 = match gate {
-                Constant(ty, out, n) => Some(GateMOpt::Constant(*ty, *out as WireIdOpt, n.clone())),
-                Copy(ty, out, inp) => {
-                    Some(GateMOpt::Copy(*ty, *out as WireIdOpt, *inp as WireIdOpt))
-                }
-                Add(ty, out, left, right) => Some(GateMOpt::Add(
+                Constant(ty, out, n) => GateMOpt::Constant(*ty, *out as WireIdOpt, n.clone()),
+                Copy(ty, out, inp) => GateMOpt::Copy(*ty, *out as WireIdOpt, *inp as WireIdOpt),
+                Add(ty, out, left, right) => GateMOpt::Add(
                     *ty,
                     *out as WireIdOpt,
                     *left as WireIdOpt,
                     *right as WireIdOpt,
-                )),
-                Sub(ty, out, left, right) => Some(GateMOpt::Sub(
+                ),
+                Sub(ty, out, left, right) => GateMOpt::Sub(
                     *ty,
                     *out as WireIdOpt,
                     *left as WireIdOpt,
                     *right as WireIdOpt,
-                )),
-                Mul(ty, out, left, right) => Some(GateMOpt::Mul(
+                ),
+                Mul(ty, out, left, right) => GateMOpt::Mul(
                     *ty,
                     *out as WireIdOpt,
                     *left as WireIdOpt,
                     *right as WireIdOpt,
-                )),
-                AddConstant(ty, out, left, number) => Some(GateMOpt::AddConstant(
+                ),
+                AddConstant(ty, out, left, number) => GateMOpt::AddConstant(
                     *ty,
                     *out as WireIdOpt,
                     Box::new((*left as WireIdOpt, number.clone())),
-                )),
-                MulConstant(ty, out, left, number) => Some(GateMOpt::MulConstant(
+                ),
+                MulConstant(ty, out, left, number) => GateMOpt::MulConstant(
                     *ty,
                     *out as WireIdOpt,
                     Box::new((*left as WireIdOpt, number.clone())),
-                )),
-                Instance(ty, out) => Some(GateMOpt::Instance(*ty, *out as WireIdOpt)),
-                Witness(ty, out) => Some(GateMOpt::Witness(*ty, *out as WireIdOpt)),
-                New(ty, start, end) => {
-                    Some(GateMOpt::New(*ty, *start as WireIdOpt, *end as WireIdOpt))
+                ),
+                Instance(ty, out) => GateMOpt::Instance(*ty, *out as WireIdOpt),
+                Witness(ty, out) => GateMOpt::Witness(*ty, *out as WireIdOpt),
+                New(ty, start, end) => GateMOpt::New(*ty, *start as WireIdOpt, *end as WireIdOpt),
+                Delete(ty, start, end) => {
+                    GateMOpt::Delete(*ty, *start as WireIdOpt, *end as WireIdOpt)
                 }
-                Delete(ty, start, end) => Some(GateMOpt::Delete(
-                    *ty,
-                    *start as WireIdOpt,
-                    *end as WireIdOpt,
-                )),
-                AssertZero(ty, out) => Some(GateMOpt::AssertZero(*ty, *out as WireIdOpt)),
-                Conv(_) => None, // Conversion gates are the gates that make this function return None.
-                Call(arg) => Some(GateMOpt::Call(arg.clone())),
-                Comment(s) => Some(GateMOpt::Comment(Box::new(s.clone()))),
-                Challenge(ty, out) => Some(GateMOpt::Challenge(*ty, *out as WireIdOpt)),
+                AssertZero(ty, out) => GateMOpt::AssertZero(*ty, *out as WireIdOpt),
+                Conv(c) => GateMOpt::Conv(c.clone()),
+                Call(arg) => GateMOpt::Call(arg.clone()),
+                Comment(s) => GateMOpt::Comment(Box::new(s.clone())),
+                Challenge(ty, out) => GateMOpt::Challenge(*ty, *out as WireIdOpt),
             };
-            if gate2.is_none() {
-                return None;
-            }
-            r.push(gate2.unwrap());
+            r.push(gate2);
         }
-        Some(r)
+        r
     }
 }
 
@@ -233,7 +225,7 @@ impl GateMOpt {
             | Instance(ty, _)
             | Witness(ty, _)
             | Challenge(ty, _) => *ty,
-            Conv(_) | Call(_) => todo!(),
+            Conv(_) | Call(_) => unreachable!("Should not ask the type_id for conv/call gates"),
             Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
         }
     }
@@ -536,11 +528,7 @@ impl FuncDecl {
         let type_ids = type_presence.to_type_ids();
         let body = if body_max.is_some() && body_max.unwrap() < (u32::MAX - 1) as WireId {
             let gates_opt = GateM::to_gates_opt(&gates.gates());
-            if gates_opt.is_some() {
-                FunctionBody::GatesOpt(gates_opt.unwrap())
-            } else {
-                FunctionBody::Gates(gates)
-            }
+            FunctionBody::GatesOpt(gates_opt)
         } else {
             FunctionBody::Gates(gates)
         };
