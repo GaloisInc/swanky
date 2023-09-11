@@ -290,10 +290,10 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         state: &mut StateZeroCheckProver<T>,
     ) -> Result<()> {
         debug!("check_zero_accumulate");
-        let MacProver(x, x_mac) = a;
-        let b = *x == V::ZERO;
+        let (x, x_mac) = a.decompose();
+        let b = x == V::ZERO;
         let chi = T::random(&mut state.rng);
-        state.m += chi * *x_mac;
+        state.m += chi * x_mac;
         state.cnt += 1;
 
         if !b {
@@ -729,7 +729,7 @@ where
         state: &mut StateZeroCheckVerifier<T>,
     ) -> Result<()> {
         let chi = T::random(&mut state.rng);
-        state.key_chi += chi * key.0;
+        state.key_chi += chi * key.mac();
         state.cnt += 1;
         Ok(())
     }
