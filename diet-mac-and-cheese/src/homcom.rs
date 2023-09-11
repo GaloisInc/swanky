@@ -8,7 +8,7 @@ use crate::{
     mac::{MacProver, MacVerifier},
     svole_trait::SvoleT,
 };
-use eyre::{bail, eyre, Result};
+use eyre::{bail, ensure, eyre, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use log::{debug, warn};
 use ocelot::svole::LpnParams;
@@ -294,6 +294,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         let b = *x == V::ZERO;
         let chi = T::random(&mut state.rng);
         state.m += chi * *x_mac;
+        state.cnt += 1;
 
         if !b {
             warn!("accumulating a value that's not zero");
@@ -317,7 +318,9 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
             return Err(eyre!("check_zero failed"));
         }
         let cnt = state.cnt;
+        let b = state.b;
         state.reset(channel)?;
+        ensure!(b, "check zero failed");
         Ok(cnt)
     }
 
@@ -727,6 +730,7 @@ where
     ) -> Result<()> {
         let chi = T::random(&mut state.rng);
         state.key_chi += chi * key.0;
+        state.cnt += 1;
         Ok(())
     }
 
@@ -742,11 +746,8 @@ where
         let b = state.key_chi == m;
         let cnt = state.cnt;
         state.reset(channel, rng)?;
-        if b {
-            Ok(cnt)
-        } else {
-            Err(eyre!("check_zero failed"))
-        }
+        ensure!(b, "check zero failed");
+        Ok(cnt)
     }
 
     /// Open a batch of [`MacVerifier`]s.
