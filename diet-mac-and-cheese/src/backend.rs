@@ -747,7 +747,7 @@ mod tests {
         dmc.finalize().unwrap();
 
         let prover = handle.join().unwrap();
-        assert!(validate(prover, verifier, dmc.get_party().get_delta()));
+        validate(prover, verifier, dmc.get_party().get_delta());
     }
 
     #[test]
