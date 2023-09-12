@@ -216,7 +216,6 @@ mod tests {
         let (sender, receiver) = UnixStream::pair().unwrap();
         let handle = std::thread::spawn(move || {
             let rng = AesRng::new();
-            let rng2 = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);

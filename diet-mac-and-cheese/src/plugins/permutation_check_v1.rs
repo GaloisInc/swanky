@@ -23,7 +23,7 @@
 use super::{Plugin, PluginExecution};
 use crate::{
     backend_trait::BackendT,
-    circuit_ir::{FunStore, TypeId, TypeStore, WireCount},
+    circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount},
     gadgets::{permutation_check, permutation_check_binary},
     mac::Mac,
 };
@@ -36,6 +36,7 @@ use swanky_field_binary::{F40b, F2};
 pub(crate) struct PermutationCheckV1 {
     /// The [`TypeId`] associated with this permutation check.
     type_id: TypeId,
+    field_type_id: std::any::TypeId,
     /// The number of tuples to check.
     ntuples: usize,
     /// The number of elements in each tuple.
@@ -46,9 +47,15 @@ impl PermutationCheckV1 {
     /// Create a new [`PermutationCheckV1`] instantiation for the field
     /// associated with the provided [`TypeId`] and the provided number of
     /// tuples and tuple size.
-    pub(crate) fn new(type_id: TypeId, ntuples: usize, tuple_size: usize) -> Self {
+    pub(crate) fn new(
+        type_id: TypeId,
+        field_type_id: std::any::TypeId,
+        ntuples: usize,
+        tuple_size: usize,
+    ) -> Self {
         Self {
             type_id,
+            field_type_id,
             ntuples,
             tuple_size,
         }
@@ -67,7 +74,11 @@ impl PermutationCheckV1 {
         ys: &[B::Wire],
         backend: &mut B,
     ) -> Result<()> {
-        permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+        if self.field_type_id == std::any::TypeId::of::<F2>() {
+            permutation_check_binary(backend, xs, ys, self.ntuples, self.tuple_size)
+        } else {
+            permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+        }
     }
 }
 
@@ -79,7 +90,7 @@ impl Plugin for PermutationCheckV1 {
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
-        _type_store: &TypeStore,
+        type_store: &TypeStore,
         _fun_store: &FunStore,
     ) -> eyre::Result<PluginExecution> {
         ensure!(
@@ -132,8 +143,16 @@ impl Plugin for PermutationCheckV1 {
         );
         let ntuples = nwires / tuple_size;
 
+        let field_type_id = match type_store.get(&type_id).unwrap() {
+            TypeSpecification::Field(f) => *f,
+            _ => {
+                bail!("Plugin does not support plugin types");
+            }
+        };
+
         Ok(PluginExecution::PermutationCheck(PermutationCheckV1::new(
             type_id,
+            field_type_id,
             ntuples as usize,
             tuple_size as usize,
         )))
