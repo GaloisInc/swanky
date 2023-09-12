@@ -2,7 +2,7 @@
 Cli utilities.
 
 */
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use ocelot::svole::{
     LpnParams, LPN_EXTEND_LARGE, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_LARGE,
     LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
@@ -34,16 +34,6 @@ pub(crate) fn map_lpn_size(lpn_param: &LpnSize) -> (LpnParams, LpnParams) {
             return (LPN_SETUP_LARGE, LPN_EXTEND_LARGE);
         }
     }
-}
-
-#[derive(Subcommand)]
-pub(crate) enum Prover {
-    /// Set for prover mode
-    Prover {
-        /// witness path
-        #[clap(long)]
-        witness: PathBuf,
-    },
 }
 
 /// Configuration options.
@@ -82,6 +72,7 @@ pub(crate) struct Cli {
     #[clap(long)]
     pub config: PathBuf,
 
-    #[clap(subcommand)]
-    pub command: Option<Prover>,
+    /// witness path
+    #[clap(long)]
+    pub witness: Option<PathBuf>,
 }

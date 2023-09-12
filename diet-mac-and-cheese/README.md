@@ -43,7 +43,7 @@ To run diet Mac'n'Cheese with inputs in flatbuffers:
 cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve
 
 cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
-  prover --witness <PATH>/*.sieve
+  --witness <PATH>/*.sieve
 ```
 
 To run diet Mac'n'Cheese with inputs in text format, add a `--text` flag:
@@ -52,7 +52,7 @@ To run diet Mac'n'Cheese with inputs in text format, add a `--text` flag:
 cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text
 
 cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text \
-  prover --witness <PATH>/*.sieve
+  --witness <PATH>/*.sieve
 ```
 
 ## Compile flatbuffer sieveir

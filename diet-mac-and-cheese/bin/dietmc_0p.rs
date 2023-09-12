@@ -1,7 +1,7 @@
 mod cli;
 
 use clap::Parser;
-use cli::{Cli, LpnSize, Prover::*};
+use cli::{Cli, LpnSize};
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
@@ -79,7 +79,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
         );
     }
 
-    if let Some(Prover { witness }) = &args.command {
+    if let Some(witness) = &args.witness {
         // Prover mode
         info!("witness: {:?}", witness);
         let witness_paths = path_to_files(witness.to_path_buf())?;
@@ -105,7 +105,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
 
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
-    match args.command {
+    match args.witness {
         None => {
             // Verifier mode
             let listener = TcpListener::bind(&args.connection_addr)?;
@@ -141,7 +141,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
                 Err(e) => info!("couldn't get client: {:?}", e),
             }
         }
-        Some(Prover { witness: _ }) => {
+        Some(_) => {
             // Prover mode
             let stream;
             loop {
@@ -206,7 +206,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
         );
     }
 
-    if let Some(Prover { witness }) = &args.command {
+    if let Some(witness) = &args.witness {
         // Prover mode
         info!("witness: {:?}", witness);
         let witness_paths = path_to_files(witness.to_path_buf())?;
@@ -224,7 +224,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
 
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
-    match args.command {
+    match args.witness {
         None => {
             // Verifier mode
             let listener = TcpListener::bind(args.connection_addr.clone())?;
@@ -258,7 +258,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
                 Err(e) => info!("couldn't get client: {:?}", e),
             }
         }
-        Some(Prover { witness: _ }) => {
+        Some(_) => {
             // Prover mode
             let stream;
             loop {
@@ -300,7 +300,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
 fn run(args: &Cli) -> Result<()> {
     let config: Config = toml::from_str(&std::fs::read_to_string(args.config.clone())?)?;
 
-    if args.command.is_some() {
+    if args.witness.is_some() {
         info!("prover mode");
     } else {
         info!("verifier mode");
