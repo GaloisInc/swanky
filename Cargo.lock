@@ -717,6 +717,7 @@ dependencies = [
  "eyre",
  "flatbuffers",
  "generic-array",
+ "jemallocator",
  "log",
  "mac-n-cheese-sieve-parser",
  "nix",
@@ -3019,6 +3020,7 @@ dependencies = [
  "pretty_env_logger",
  "rand",
  "scuttlebutt",
+ "swanky-field-binary",
  "wasm-bindgen",
 ]
 
@@ -3038,6 +3040,7 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "scuttlebutt",
+ "swanky-field-binary",
  "tungstenite",
 ]
 

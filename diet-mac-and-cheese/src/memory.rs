@@ -339,6 +339,7 @@ enum FoundOrLevel<T> {
     Ref { level: usize, idx: WireId },
 }
 
+#[inline]
 fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> FoundOrLevel<Pointer<X>> {
     for r in v.iter() {
         match r {
@@ -362,6 +363,7 @@ fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> FoundOrLevel<Pointe
     panic!("Not found")
 }
 
+#[inline]
 fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> FoundOrLevel<()> {
     for r in v.iter() {
         match r {
@@ -407,6 +409,8 @@ where
             inputs_cnt: 0,
         }
     }
+
+    #[inline]
     fn get_either(&self, id: WireId) -> FoundOrLevel<Pointer<X>> {
         if id < self.outputs_cnt {
             //2 println!("SEARCH OUTPUTS {:?} {:?}", self.outputs_cnt, id);
@@ -419,6 +423,7 @@ where
         }
     }
 
+    #[inline]
     fn get(&self, id: WireId) -> FoundOrLevel<&X> {
         let r = self.get_either(id);
         match r {
@@ -427,6 +432,7 @@ where
         }
     }
 
+    #[inline]
     fn set(&mut self, id: WireId, x: &X) -> FoundOrLevel<()> {
         //println!("OUT CNT: {:?}", self.outputs_cnt);
         //println!("IN CNT: {:?}", self.inputs_cnt);
@@ -503,10 +509,6 @@ where
         self.outputs_cnt = 0;
         self.inputs.clear();
         self.inputs_cnt = 0;
-    }
-
-    fn len(&mut self) -> usize {
-        self.outputs.len() + self.inputs.len()
     }
 }
 
@@ -663,14 +665,13 @@ where
         // TODO: Is there some cleanup to do here to keep to the memory peak under control???
         let frame = self.get_frame_mut();
 
-        if frame.callframe_vector.len() >= (VEC_SIZE_CALLFRAME_THRESHOLD / 5) {
-            frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
-            frame.callframe_size = 0;
-        }
-
-        if frame.callframe.len() >= (VEC_SIZE_CALLFRAME_THRESHOLD / 5) {
-            frame.callframe = Callframe::new();
-            frame.callframe_size = 0;
+        if frame.callframe_is_vector {
+            if frame.callframe_vector.len()
+                > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT)
+            {
+                frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
+                frame.callframe_size = 0;
+            }
         }
 
         self.top -= 1;

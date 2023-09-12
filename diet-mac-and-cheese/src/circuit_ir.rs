@@ -3,7 +3,7 @@
 
 use crate::{
     fields::modulus_to_type_id,
-    plugins::{DisjunctionV0, Plugin, PluginBody, PluginType},
+    plugins::{Plugin, PluginBody, PluginType},
 };
 use eyre::{bail, ensure, eyre, Result};
 use log::debug;
@@ -428,7 +428,9 @@ impl FuncDecl {
         type_store: &TypeStore,
         fun_store: &FunStore,
     ) -> Result<Self> {
-        use crate::plugins::{GaloisPolyV0, IterV0, MuxV0, MuxV1, PermutationCheckV1, VectorsV1};
+        use crate::plugins::{
+            DisjunctionV0, GaloisPolyV0, IterV0, MuxV0, MuxV1, PermutationCheckV1, VectorsV1,
+        };
 
         let execution = match plugin_name.as_str() {
             MuxV0::NAME => MuxV0::instantiate(

@@ -24,7 +24,7 @@ use super::{Plugin, PluginExecution};
 use crate::{
     backend_trait::BackendT,
     circuit_ir::{FunStore, TypeId, TypeStore, WireCount},
-    gadgets::GadgetPermutationCheck,
+    gadgets::permutation_check,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
@@ -59,13 +59,13 @@ impl PermutationCheckV1 {
 
     /// Run the permutation check on two lists provided by `xs` and `ys`,
     /// utilizing the provided `backend`.
-    pub(crate) fn execute<B: BackendT + GadgetPermutationCheck>(
+    pub(crate) fn execute<B: BackendT>(
         &self,
         xs: &[B::Wire],
         ys: &[B::Wire],
         backend: &mut B,
     ) -> Result<()> {
-        backend.permutation_check(xs, ys, self.ntuples, self.tuple_size)
+        permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
     }
 }
 

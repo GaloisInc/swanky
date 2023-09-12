@@ -18,6 +18,7 @@ rand.workspace = true
 clap.workspace = true
 eyre.workspace = true
 generic-array.workspace = true
+jemallocator.workspace = true
 log.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 pretty_env_logger.workspace = true
