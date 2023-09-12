@@ -105,7 +105,7 @@ impl<T: FiniteField> StateZeroCheckProver<T> {
     }
 
     /// Reset the state.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         // After reset, we assume the internal rng is still synchronized between the prover and the verifier.
         self.m = T::ZERO;
         self.cnt = 0;
@@ -491,7 +491,7 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
     }
 
     /// Reset the state.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.sum_b = T::ZERO;
         self.power_chi = self.chi;
         self.cnt = 0;
