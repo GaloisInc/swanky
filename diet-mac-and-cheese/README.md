@@ -31,8 +31,8 @@ internal behavior of Diet Mac'n'Cheese, such as the LPN parameter size (for SVOL
 the assert-zero checks. We currently support the following configurable parameters:
 
 ```toml
-lpn = 'small' # or 'medium' or 'large'
-no_batching = true
+lpn = 'Small' # or 'Medium' or 'Large'
+no_batching = false
 ```
 
 These _must_ be defined to run Diet Mac'n'Cheese.

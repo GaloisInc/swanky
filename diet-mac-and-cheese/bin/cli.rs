@@ -2,7 +2,7 @@
 Cli utilities.
 
 */
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use ocelot::svole::{
     LpnParams, LPN_EXTEND_LARGE, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_LARGE,
     LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 
 /// Lpn params as small, medium or large.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Deserialize)]
 pub(crate) enum LpnSize {
     Small,
     Medium,
