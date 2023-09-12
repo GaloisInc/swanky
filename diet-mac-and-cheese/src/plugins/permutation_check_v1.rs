@@ -24,10 +24,12 @@ use super::{Plugin, PluginExecution};
 use crate::{
     backend_trait::BackendT,
     circuit_ir::{FunStore, TypeId, TypeStore, WireCount},
-    gadgets::permutation_check,
+    gadgets::{permutation_check, permutation_check_binary},
+    mac::Mac,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use swanky_field_binary::{F40b, F2};
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]

@@ -195,10 +195,7 @@ where
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mul();
-        let a_clr = a.value();
-        let b_clr = b.value();
-        let product = a_clr * b_clr;
-
+        let product = a.value() * b.value();
         let out = self.input(product)?;
         self.state_mult_check.accumulate(&(*a, *b, out));
         Ok(out)
@@ -294,6 +291,22 @@ where
             state_zero_check,
             no_batching,
         })
+    }
+
+    /// "Lifts" a prover operating over `(V, T)` into a prover operating over `(T, T)`.
+    pub fn lift<VOLE2: SvoleT<(T, T)>>(
+        &mut self,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+    ) -> Result<DietMacAndCheeseProver<T, T, C, VOLE2>> {
+        self.channel.flush()?;
+        DietMacAndCheeseProver::<T, T, C, VOLE2>::init(
+            &mut self.channel,
+            self.rng.fork(),
+            lpn_setup,
+            lpn_extend,
+            self.no_batching,
+        )
     }
 
     /// Get party
@@ -516,6 +529,48 @@ where
             state_zero_check,
             no_batching,
         })
+    }
+
+    pub(crate) fn init_with_delta(
+        channel: &mut C,
+        mut rng: AesRng,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        no_batching: bool,
+        delta: T,
+    ) -> Result<Self> {
+        let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
+        let state_zero_check = StateZeroCheckVerifier::init(channel, &mut rng)?;
+        Ok(Self {
+            verifier: FComVerifier::init_with_delta(
+                channel, &mut rng, lpn_setup, lpn_extend, delta,
+            )?,
+            channel: channel.clone(),
+            rng,
+            monitor: Monitor::default(),
+            state_mult_check,
+            state_zero_check,
+            no_batching,
+        })
+    }
+
+    /// "Lifts" a verifier operating over `(V, T)` into one operating over `(T, T)`.
+    ///
+    /// This enforces that the same `Δ` is shared between the old and new verifier.
+    pub fn lift<VOLE2: SvoleT<T>>(
+        &mut self,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+    ) -> Result<DietMacAndCheeseVerifier<T, T, C, VOLE2>> {
+        self.channel.flush()?;
+        DietMacAndCheeseVerifier::<T, T, C, VOLE2>::init_with_delta(
+            &mut self.channel,
+            self.rng.fork(),
+            lpn_setup,
+            lpn_extend,
+            self.no_batching,
+            self.verifier.get_delta(),
+        )
     }
 
     /// Get party

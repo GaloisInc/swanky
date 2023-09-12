@@ -25,6 +25,7 @@ pub trait SvoleT<M>: SvoleStopSignal {
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<M>,
     ) -> Result<Self>
     where
         Self: Sized;
@@ -80,7 +81,9 @@ where
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<(V, T)>,
     ) -> Result<Self> {
+        assert!(delta.is_none());
         Ok(Sender::init(channel, rng, lpn_setup, lpn_extend)?)
     }
 
@@ -146,7 +149,9 @@ where
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<(V, T)>,
     ) -> Result<Self> {
+        assert!(delta.is_none());
         Ok(SvoleSender {
             sender: RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend)?),
         })
@@ -202,9 +207,10 @@ where
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<T>,
     ) -> Result<Self> {
         Ok(SvoleReceiver::new(RcRefCell::new(Receiver::init(
-            channel, rng, lpn_setup, lpn_extend,
+            channel, rng, lpn_setup, lpn_extend, delta,
         )?)))
     }
 

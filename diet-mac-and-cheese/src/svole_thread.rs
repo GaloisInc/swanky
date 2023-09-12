@@ -63,6 +63,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         _rng: &mut AesRng,
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
+        _delta: Option<X>,
     ) -> Result<Self> {
         panic!("Should not be initialized")
     }
@@ -213,7 +214,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
         lpn_extend: LpnParams,
         mut svole_atomic: SvoleAtomic<T>,
     ) -> Result<Self> {
-        let recv = Receiver::init(channel, rng, lpn_setup, lpn_extend)?;
+        let recv = Receiver::init(channel, rng, lpn_setup, lpn_extend, None)?;
         svole_atomic.set_delta(recv.delta());
         debug!("DELTA is {:?}", svole_atomic.delta());
         debug!("INIT  MultithreadedReceiver");

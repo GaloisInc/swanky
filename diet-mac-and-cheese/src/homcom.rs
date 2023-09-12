@@ -185,7 +185,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         lpn_extend: LpnParams,
     ) -> Result<Self> {
         Ok(Self {
-            svole_sender: VOLE::init(channel, rng, lpn_setup, lpn_extend)?,
+            svole_sender: VOLE::init(channel, rng, lpn_setup, lpn_extend, None)?,
             voles: Vec::new(),
         })
     }
@@ -580,7 +580,7 @@ where
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
-        let recv = VOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+        let recv = VOLE::init(channel, rng, lpn_setup, lpn_extend, None)?;
         Ok(Self {
             delta: recv.delta().unwrap(),
             svole_receiver: recv,
@@ -594,6 +594,22 @@ where
             delta: vole.delta().unwrap(), // That's going to block until delta is set
             svole_receiver: vole,
             voles: Vec::new(),
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn init_with_delta<C: AbstractChannel>(
+        channel: &mut C,
+        rng: &mut AesRng,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        delta: T,
+    ) -> Result<Self> {
+        let svole_receiver = VOLE::init(channel, rng, lpn_setup, lpn_extend, Some(delta))?;
+        Ok(Self {
+            delta,
+            svole_receiver,
+            voles: Default::default(),
             phantom: PhantomData,
         })
     }
