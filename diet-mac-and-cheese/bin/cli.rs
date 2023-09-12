@@ -46,6 +46,9 @@ pub(crate) struct Config {
 
     /// No batching for check_zero
     pub no_batching: bool,
+
+    /// number of threads
+    pub threads: usize,
 }
 
 impl Default for Config {
@@ -92,8 +95,4 @@ pub(crate) struct Cli {
     /// witness path
     #[clap(long)]
     pub witness: Option<PathBuf>,
-
-    /// number of threads
-    #[clap(long, default_value_t = DEFAULT_THREADS)]
-    pub threads: usize,
 }

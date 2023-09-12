@@ -266,7 +266,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     let (inputs, type_store) = build_inputs_types_text(args)?;
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
-    let addresses: Vec<String> = parse_addresses(args);
+    let addresses: Vec<String> = parse_addresses(args, config);
 
     let relation_path = args.relation.clone();
     match args.witness {
@@ -466,7 +466,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn parse_addresses(args: &Cli) -> Vec<String> {
+fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
     let mut addresses: Vec<String> = args
         .connection_addr
         .clone()
@@ -481,7 +481,7 @@ fn parse_addresses(args: &Cli) -> Vec<String> {
             .clone()
             .parse::<usize>()
             .unwrap_or_else(|_| panic!("cant parse port"));
-        for i in 1..args.threads {
+        for i in 1..config.threads {
             let mut new_addr = addr.clone();
             new_addr.push_str(":".into());
             let new_port = format!("{:?}", port + i);
@@ -498,7 +498,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     let (inputs, type_store) = build_inputs_flatbuffers(args)?;
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
-    let addresses: Vec<String> = parse_addresses(args);
+    let addresses: Vec<String> = parse_addresses(args, config);
 
     let relation_path = args.relation.clone();
     match args.witness {
@@ -640,20 +640,20 @@ fn run(args: &Cli) -> Result<()> {
     info!("nobatching: {:?}", config.no_batching);
     info!("instance:   {:?}", args.instance);
     info!("text fmt:   {:?}", args.text);
-    info!("threads:    {:?}", args.threads);
+    info!("threads:    {:?}", config.threads);
 
     if args.text {
-        if args.threads == 1 {
+        if config.threads == 1 {
             run_text(args, &config)
         } else {
-            assert!(args.threads > 1);
+            assert!(config.threads > 1);
             run_text_multihtreaded(args, &config)
         }
     } else {
-        if args.threads == 1 {
+        if config.threads == 1 {
             run_flatbuffers(args, &config)
         } else {
-            assert!(args.threads > 1);
+            assert!(config.threads > 1);
             run_flatbuffers_multihtreaded(args, &config)
         }
     }

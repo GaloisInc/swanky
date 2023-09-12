@@ -33,6 +33,7 @@ the assert-zero checks. We currently support the following configurable paramete
 ```toml
 lpn = 'Small' # or 'Medium' or 'Large'
 no_batching = true
+threads = 4
 ```
 
 If no configuration file is provided, Diet Mac'n'Cheese assumes the following defaults:
@@ -40,6 +41,7 @@ If no configuration file is provided, Diet Mac'n'Cheese assumes the following de
 ```toml
 lpn = 'Medium'
 no_batching = false
+threads = 1
 ```
 
 To run diet Mac'n'Cheese with inputs in flatbuffers:
