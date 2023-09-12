@@ -34,7 +34,6 @@ flatbuffers.workspace = true
 nix.workspace = true
 serde.workspace = true
 toml = { workspace = true, features = ["display", "parse"] }
-clap-serde-derive.workspace = true
 
 [build-dependencies]
 swanky-flatbuffer-build.workspace = true
