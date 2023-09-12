@@ -7,13 +7,13 @@ use ocelot::svole::{
     LpnParams, LPN_EXTEND_LARGE, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_LARGE,
     LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
 };
+use serde::Deserialize;
 use std::path::PathBuf;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
-const DEFAULT_LPN: LpnSize = LpnSize::Medium;
 
 /// Lpn params as small, medium or large.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum, Deserialize)]
 pub(crate) enum LpnSize {
     Small,
     Medium,
@@ -46,6 +46,16 @@ pub(crate) enum Prover {
     },
 }
 
+/// Configuration options.
+#[derive(Deserialize)]
+pub(crate) struct Config {
+    /// Select lpn parameter
+    pub lpn: LpnSize,
+
+    /// No batching for check_zero
+    pub no_batching: bool,
+}
+
 /// Cli.
 #[derive(Parser)]
 #[clap(name = "Diet Mac'n'Cheese")]
@@ -56,17 +66,9 @@ pub(crate) struct Cli {
     #[clap(default_value_t = DEFAULT_ADDR.to_string(), short, long)]
     pub connection_addr: String,
 
-    /// Select lpn parameter
-    #[clap(value_enum, default_value_t = DEFAULT_LPN, long)]
-    pub lpn: LpnSize,
-
     /// Text
     #[arg(long)]
     pub text: bool,
-
-    /// No batching for check_zero
-    #[arg(long)]
-    pub nobatching: bool,
 
     /// instance path
     #[clap(long)]
@@ -75,6 +77,10 @@ pub(crate) struct Cli {
     /// relation path
     #[clap(long)]
     pub relation: PathBuf,
+
+    /// Config file for internal options.
+    #[clap(long)]
+    pub config: PathBuf,
 
     #[clap(subcommand)]
     pub command: Option<Prover>,

@@ -24,6 +24,8 @@ use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
 
+use crate::cli::Config;
+
 // Transform a path that could be either a file or a directory containing files into a vector of filenames.
 // Passing `/dev/null` returns an empty vector.
 fn path_to_files(path: PathBuf) -> Result<Vec<PathBuf>> {
@@ -50,7 +52,7 @@ fn path_to_files(path: PathBuf) -> Result<Vec<PathBuf>> {
 }
 
 // Run with relation in text format
-fn run_text(args: &Cli) -> Result<()> {
+fn run_text(args: &Cli, config: &Config) -> Result<()> {
     info!("relation: {:?}", args.relation);
 
     let instance_path = args.instance.clone();
@@ -123,10 +125,10 @@ fn run_text(args: &Cli) -> Result<()> {
                         rng,
                         inputs,
                         TypeStore::try_from(rel.header().types.clone())?,
-                        args.lpn == LpnSize::Small,
-                        args.nobatching,
+                        config.lpn == LpnSize::Small,
+                        config.no_batching,
                     )?;
-                    evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+                    evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
@@ -165,10 +167,10 @@ fn run_text(args: &Cli) -> Result<()> {
                 rng,
                 inputs,
                 TypeStore::try_from(rel.header().types.clone())?,
-                args.lpn == LpnSize::Small,
-                args.nobatching,
+                config.lpn == LpnSize::Small,
+                config.no_batching,
             )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             let relation_file = File::open(relation_path)?;
@@ -182,7 +184,7 @@ fn run_text(args: &Cli) -> Result<()> {
 }
 
 // Run with relation in flatbuffers format
-fn run_flatbuffers(args: &Cli) -> Result<()> {
+fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
     info!("relation: {:?}", args.relation);
 
     let instance_path = args.instance.clone();
@@ -242,10 +244,10 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                         rng,
                         inputs,
                         fields,
-                        args.lpn == LpnSize::Small,
-                        args.nobatching,
+                        config.lpn == LpnSize::Small,
+                        config.no_batching,
                     )?;
-                    evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+                    evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
                     info!("init time: {:?}", start.elapsed());
 
                     let start = Instant::now();
@@ -282,10 +284,10 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                 rng,
                 inputs,
                 fields.clone(),
-                args.lpn == LpnSize::Small,
-                args.nobatching,
+                config.lpn == LpnSize::Small,
+                config.no_batching,
             )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;
@@ -296,20 +298,22 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
 }
 
 fn run(args: &Cli) -> Result<()> {
+    let config: Config = toml::from_str(&std::fs::read_to_string(args.config.clone())?)?;
+
     if args.command.is_some() {
         info!("prover mode");
     } else {
         info!("verifier mode");
     }
     info!("addr: {:?}", args.connection_addr);
-    info!("lpn: {:?}", args.lpn);
+    info!("lpn: {:?}", config.lpn);
     info!("instance: {:?}", args.instance);
     info!("text format: {:?}", args.text);
 
     if args.text {
-        run_text(args)
+        run_text(args, &config)
     } else {
-        run_flatbuffers(args)
+        run_flatbuffers(args, &config)
     }
 }
 
