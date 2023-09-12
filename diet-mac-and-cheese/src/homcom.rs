@@ -105,15 +105,11 @@ impl<T: FiniteField> StateZeroCheckProver<T> {
     }
 
     /// Reset the state.
-    pub fn reset<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<()> {
-        let seed = channel.read_block()?;
-        let rng = AesRng::from_seed(seed);
-
-        self.rng = rng;
+    pub fn reset(&mut self) {
+        // After reset, we assume the internal rng is still synchronized between the prover and the verifier.
         self.m = T::ZERO;
         self.cnt = 0;
         self.b = true;
-        Ok(())
     }
 
     /// Return the number of checks accumulated.
@@ -303,7 +299,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         Ok(())
     }
 
-    /// Finalize zero check of a state and returns how many values were checked.
+    /// Finalize check zero of a state and return how many values were checked.
     pub fn check_zero_finalize<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -314,12 +310,12 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         channel.flush()?;
 
         if !state.b {
-            state.reset(channel)?;
+            state.reset();
             return Err(eyre!("check_zero failed"));
         }
         let cnt = state.cnt;
         let b = state.b;
-        state.reset(channel)?;
+        state.reset();
         ensure!(b, "check zero failed");
         Ok(cnt)
     }
@@ -418,7 +414,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         Ok(())
     }
 
-    /// Finalize the check for the list of pushed multiplication triples.
+    /// Finalize the multiplication check for a state return how many triples were checked.
     pub fn quicksilver_finalize<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -541,16 +537,10 @@ impl<T: FiniteField> StateZeroCheckVerifier<T> {
     }
 
     /// Reset the state.
-    pub fn reset<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<()> {
-        let seed = rng.gen::<Block>();
-        channel.write_block(&seed)?;
-        channel.flush()?;
-        let rng = AesRng::from_seed(seed);
-
-        self.rng = rng;
+    pub fn reset(&mut self) {
+        // After reset, we assume the internal rng is still synchronized between the prover and the verifier.
         self.key_chi = T::ZERO;
         self.cnt = 0;
-        Ok(())
     }
 
     /// Return the number of checks accumulated.
@@ -734,18 +724,17 @@ where
         Ok(())
     }
 
-    /// Finalize zero check of a state and returns how many values were checked.
+    /// Finalize check zero of a state and return how many values were checked.
     pub fn check_zero_finalize<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut AesRng,
         state: &mut StateZeroCheckVerifier<T>,
     ) -> Result<usize> {
         let m = channel.read_serializable::<T>()?;
 
         let b = state.key_chi == m;
         let cnt = state.cnt;
-        state.reset(channel, rng)?;
+        state.reset();
         ensure!(b, "check zero failed");
         Ok(cnt)
     }
@@ -847,7 +836,7 @@ where
         Ok(())
     }
 
-    /// Finalize the check for the list of pushed multiplication triples.
+    /// Finalize the multiplication check for a state return how many triples were checked.
     pub fn quicksilver_finalize<C: AbstractChannel>(
         &mut self,
         channel: &mut C,

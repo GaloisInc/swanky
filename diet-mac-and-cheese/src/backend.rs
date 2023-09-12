@@ -249,11 +249,6 @@ where
         self.log_final_monitor();
         Ok(())
     }
-    fn reset(&mut self) -> Result<()> {
-        self.state_mult_check.reset();
-        self.state_zero_check.reset(&mut self.channel)?;
-        Ok(())
-    }
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>>
@@ -480,13 +475,6 @@ where
         self.log_final_monitor();
         Ok(())
     }
-
-    fn reset(&mut self) -> Result<()> {
-        self.state_mult_check.reset();
-        self.state_zero_check
-            .reset(&mut self.channel, &mut self.rng)?;
-        Ok(())
-    }
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>>
@@ -558,11 +546,9 @@ where
 
     fn do_check_zero(&mut self) -> Result<usize> {
         self.channel.flush()?;
-        let cnt = self.verifier.check_zero_finalize(
-            &mut self.channel,
-            &mut self.rng,
-            &mut self.state_zero_check,
-        )?;
+        let cnt = self
+            .verifier
+            .check_zero_finalize(&mut self.channel, &mut self.state_zero_check)?;
         self.monitor.incr_zk_check_zero(cnt);
         Ok(cnt)
     }

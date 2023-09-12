@@ -48,8 +48,6 @@ pub trait BackendT {
 
     /// Finalize the internal checks.
     fn finalize(&mut self) -> Result<()>;
-    /// Reset the internal state of the backend.
-    fn reset(&mut self) -> Result<()>;
 }
 
 /// Backends that admit a conversion from [`Number`] to the underlying field
