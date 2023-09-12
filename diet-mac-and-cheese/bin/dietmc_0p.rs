@@ -624,7 +624,11 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 }
 
 fn run(args: &Cli) -> Result<()> {
-    let config: Config = toml::from_str(&std::fs::read_to_string(args.config.clone())?)?;
+    let config = if let Some(config) = &args.config {
+        toml::from_str(&std::fs::read_to_string(config)?)?
+    } else {
+        Config::default()
+    };
 
     if args.witness.is_some() {
         info!("prover mode");

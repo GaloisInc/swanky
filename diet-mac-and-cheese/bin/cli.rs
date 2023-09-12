@@ -11,6 +11,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
+const DEFAULT_LPN: LpnSize = LpnSize::Medium;
 const DEFAULT_THREADS: usize = 1;
 
 /// Lpn params as small, medium or large.
@@ -47,6 +48,16 @@ pub(crate) struct Config {
     pub no_batching: bool,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            lpn: DEFAULT_LPN,
+            no_batching: false,
+            threads: DEFAULT_THREADS,
+        }
+    }
+}
+
 /// Cli.
 #[derive(Parser)]
 #[clap(name = "Diet Mac'n'Cheese")]
@@ -76,7 +87,7 @@ pub(crate) struct Cli {
 
     /// Config file for internal options.
     #[clap(long)]
-    pub config: PathBuf,
+    pub config: Option<PathBuf>,
 
     /// witness path
     #[clap(long)]
