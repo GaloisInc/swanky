@@ -13,7 +13,7 @@ fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     T::from_subfield(&v)
 }
 
-/// A trait defining a MAC type.
+/// A trait defining a MAC type that can be "lifted".
 ///
 /// A MAC is parameterized with a value field `V` and a tag field `T`, where `V`
 /// must be a subfield of `T`.
@@ -30,6 +30,10 @@ pub trait Mac<V: IsSubFieldOf<T>, T: FiniteField>:
     /// Lift an array of MACs from the value field to the tag field.
     fn lift(xs: &Arr<Self, DegreeModulo<V, T>>) -> Self::LiftedMac;
 }
+
+// pub trait Mac<T: FiniteField>: Clone + Copy + Debug + Default + Add + Sub + Neg {
+//     fn check_zero(&self, acc: &mut T, rng: &mut AesRng);
+// }
 
 /// This type holds the prover-side data associated with a MAC between a prover
 /// and verifier (see [`MacVerifier`] for the verifier-side data).
@@ -48,19 +52,19 @@ pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T> {
     #[inline]
-    pub fn new(x: V, m: T) -> Self {
+    pub(crate) fn new(x: V, m: T) -> Self {
         Self(x, m)
     }
     #[inline]
-    pub fn value(&self) -> V {
+    pub(crate) fn value(&self) -> V {
         self.0
     }
     #[inline]
-    pub fn mac(&self) -> T {
+    pub(crate) fn mac(&self) -> T {
         self.1
     }
     #[inline]
-    pub fn decompose(&self) -> (V, T) {
+    pub(crate) fn decompose(&self) -> (V, T) {
         (self.0, self.1)
     }
 }
