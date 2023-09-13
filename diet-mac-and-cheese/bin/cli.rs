@@ -154,7 +154,7 @@ pub(crate) struct Cli {
     incrementing the port number to match the number of threads.")]
     pub connection_addr: String,
 
-    /// Text
+    /// Text format for instance/witness/relation
     #[arg(long)]
     pub text: bool,
 
