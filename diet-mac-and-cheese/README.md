@@ -39,7 +39,7 @@ threads = 4
 If no configuration file is provided, Diet Mac'n'Cheese assumes the following defaults:
 
 ```toml
-lpn = 'Medium'
+lpn = 'medium'
 no_batching = false
 threads = 1
 ```
