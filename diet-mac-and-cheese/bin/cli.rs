@@ -106,7 +106,14 @@ pub(crate) struct Cli {
     pub relation: PathBuf,
 
     /// Config file for internal options.
-    #[clap(long)]
+    #[clap(long, help = format!("\
+    Path to an (optional) Diet Mac'n'Cheese configuration file.
+    Sets parameters internal to the operation of Diet Mac'n'Cheese that can usually be left as the defaults.
+    Presently, the parameters we support (and their defaults) are:
+    - lpn = ${}
+    - no_batching = ${}
+    - threads = ${}
+    ", LpnSize::default(), DEFAULT_NO_BATCHING, DEFAULT_THREADS))]
     pub config: Option<PathBuf>,
 
     /// witness path
