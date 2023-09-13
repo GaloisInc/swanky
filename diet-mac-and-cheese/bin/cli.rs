@@ -8,7 +8,7 @@ use ocelot::svole::{
     LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
 };
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_LPN: LpnSize = LpnSize::Medium;
@@ -21,6 +21,22 @@ pub(crate) enum LpnSize {
     Small,
     Medium,
     Large,
+}
+
+impl Default for LpnSize {
+    fn default() -> Self {
+        LpnSize::Medium
+    }
+}
+
+impl Display for LpnSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LpnSize::Small => write!(f, "small"),
+            LpnSize::Medium => write!(f, "medium"),
+            LpnSize::Large => write!(f, "large"),
+        }
+    }
 }
 
 /// Map an `LpnSize` to a pair of Lpn parameters for the init and extension phase.
