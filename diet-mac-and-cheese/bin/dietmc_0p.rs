@@ -1,7 +1,7 @@
 mod cli;
 
 use clap::Parser;
-use cli::{Cli, LpnSize, Prover::*};
+use cli::{Cli, LpnSize};
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
@@ -28,6 +28,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use jemallocator::Jemalloc;
+
+use crate::cli::Config;
 
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
@@ -116,7 +118,7 @@ fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
         );
     }
 
-    if let Some(Prover { witness }) = &args.command {
+    if let Some(witness) = &args.witness {
         // Prover mode
         info!("witness: {:?}", witness);
         let witness_paths = path_to_files(witness.to_path_buf())?;
@@ -163,7 +165,7 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
         );
     }
 
-    if let Some(Prover { witness }) = &args.command {
+    if let Some(witness) = &args.witness {
         // Prover mode
         info!("witness: {:?}", witness);
         let witness_paths = path_to_files(witness.to_path_buf())?;
@@ -184,13 +186,13 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
 }
 
 // Run with relation in text format
-fn run_text(args: &Cli) -> Result<()> {
+fn run_text(args: &Cli, config: &Config) -> Result<()> {
     let start = Instant::now();
     let (inputs, type_store) = build_inputs_types_text(args)?;
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
     let relation_path = args.relation.clone();
-    match args.command {
+    match args.witness {
         None => {
             // Verifier mode
             let mut conns = start_connection_verifier(&vec![args.connection_addr.clone()])?;
@@ -210,10 +212,10 @@ fn run_text(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.lpn == LpnSize::Small,
-                    args.nobatching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -223,7 +225,7 @@ fn run_text(args: &Cli) -> Result<()> {
             info!("time circ exec: {:?}", start.elapsed());
             info!("VERIFIER DONE!");
         }
-        Some(Prover { witness: _ }) => {
+        Some(_) => {
             // Prover mode
             let mut conns = start_connection_prover(&vec![args.connection_addr.clone()])?;
             let stream = conns.pop().unwrap();
@@ -242,10 +244,10 @@ fn run_text(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.lpn == LpnSize::Small,
-                    args.nobatching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             let relation_file = File::open(relation_path)?;
@@ -259,15 +261,15 @@ fn run_text(args: &Cli) -> Result<()> {
 }
 
 // Run with relation in flatbuffers format
-fn run_text_multihtreaded(args: &Cli) -> Result<()> {
+fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     let start = Instant::now();
     let (inputs, type_store) = build_inputs_types_text(args)?;
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
-    let addresses: Vec<String> = parse_addresses(args);
+    let addresses: Vec<String> = parse_addresses(args, config);
 
     let relation_path = args.relation.clone();
-    match args.command {
+    match args.witness {
         None => {
             // Verifier mode
             let mut conns = start_connection_verifier(&addresses)?;
@@ -290,8 +292,8 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.nobatching,
-                    args.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -311,7 +313,7 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                args.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -329,7 +331,7 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
             info!("total time: {:?}", total_time.elapsed());
             info!("VERIFIER DONE!");
         }
-        Some(Prover { witness: _ }) => {
+        Some(_) => {
             // Prover mode
             let mut conns = start_connection_prover(&addresses)?;
 
@@ -351,8 +353,8 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.nobatching,
-                    args.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -372,7 +374,7 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                args.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -395,13 +397,13 @@ fn run_text_multihtreaded(args: &Cli) -> Result<()> {
 }
 
 // Run with relation in flatbuffers format
-fn run_flatbuffers(args: &Cli) -> Result<()> {
+fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
     let start = Instant::now();
     let (inputs, type_store) = build_inputs_flatbuffers(args)?;
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
     let relation_path = args.relation.clone();
-    match args.command {
+    match args.witness {
         None => {
             // Verifier mode
             let mut conns = start_connection_verifier(&vec![args.connection_addr.clone()])?;
@@ -421,10 +423,10 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.lpn == LpnSize::Small,
-                    args.nobatching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -432,7 +434,7 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
             info!("time circ exec: {:?}", start.elapsed());
             info!("VERIFIER DONE!");
         }
-        Some(Prover { witness: _ }) => {
+        Some(_) => {
             // Prover mode
             let mut conns = start_connection_prover(&vec![args.connection_addr.clone()])?;
             let stream = conns.pop().unwrap();
@@ -451,10 +453,10 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.lpn == LpnSize::Small,
-                    args.nobatching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, args.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;
@@ -464,7 +466,7 @@ fn run_flatbuffers(args: &Cli) -> Result<()> {
     Ok(())
 }
 
-fn parse_addresses(args: &Cli) -> Vec<String> {
+fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
     let mut addresses: Vec<String> = args
         .connection_addr
         .clone()
@@ -479,7 +481,7 @@ fn parse_addresses(args: &Cli) -> Vec<String> {
             .clone()
             .parse::<usize>()
             .unwrap_or_else(|_| panic!("cant parse port"));
-        for i in 1..args.threads {
+        for i in 1..config.threads() {
             let mut new_addr = addr.clone();
             new_addr.push_str(":".into());
             let new_port = format!("{:?}", port + i);
@@ -491,15 +493,15 @@ fn parse_addresses(args: &Cli) -> Vec<String> {
 }
 
 // Run with relation in flatbuffers format
-fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
+fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     let start = Instant::now();
     let (inputs, type_store) = build_inputs_flatbuffers(args)?;
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
-    let addresses: Vec<String> = parse_addresses(args);
+    let addresses: Vec<String> = parse_addresses(args, config);
 
     let relation_path = args.relation.clone();
-    match args.command {
+    match args.witness {
         None => {
             // Verifier mode
             let mut conns = start_connection_verifier(&addresses)?;
@@ -522,8 +524,8 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.nobatching,
-                    args.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -543,7 +545,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                args.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -559,7 +561,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
             info!("total time: {:?}", total_time.elapsed());
             info!("VERIFIER DONE!");
         }
-        Some(Prover { witness: _ }) => {
+        Some(_) => {
             // Prover mode
             let mut conns = start_connection_prover(&addresses)?;
 
@@ -580,8 +582,8 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    args.nobatching,
-                    args.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -601,7 +603,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                args.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
 
@@ -622,31 +624,37 @@ fn run_flatbuffers_multihtreaded(args: &Cli) -> Result<()> {
 }
 
 fn run(args: &Cli) -> Result<()> {
-    if args.command.is_some() {
+    let config = if let Some(config) = &args.config {
+        Config::from_toml_file(config)?
+    } else {
+        Config::default()
+    };
+
+    if args.witness.is_some() {
         info!("prover mode");
     } else {
         info!("verifier mode");
     }
     info!("addr:       {:?}", args.connection_addr);
-    info!("lpn:        {:?}", args.lpn);
-    info!("nobatching: {:?}", args.nobatching);
+    info!("lpn:        {:?}", config.lpn());
+    info!("nobatching: {:?}", config.no_batching());
     info!("instance:   {:?}", args.instance);
     info!("text fmt:   {:?}", args.text);
-    info!("threads:    {:?}", args.threads);
+    info!("threads:    {:?}", config.threads());
 
     if args.text {
-        if args.threads == 1 {
-            run_text(args)
+        if config.threads() == 1 {
+            run_text(args, &config)
         } else {
-            assert!(args.threads > 1);
-            run_text_multihtreaded(args)
+            assert!(config.threads() > 1);
+            run_text_multihtreaded(args, &config)
         }
     } else {
-        if args.threads == 1 {
-            run_flatbuffers(args)
+        if config.threads() == 1 {
+            run_flatbuffers(args, &config)
         } else {
-            assert!(args.threads > 1);
-            run_flatbuffers_multihtreaded(args)
+            assert!(config.threads() > 1);
+            run_flatbuffers_multihtreaded(args, &config)
         }
     }
 }
