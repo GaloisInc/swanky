@@ -16,6 +16,7 @@ const DEFAULT_THREADS: usize = 1;
 
 /// Lpn params as small, medium or large.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum LpnSize {
     Small,
     Medium,
