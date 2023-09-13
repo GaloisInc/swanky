@@ -20,82 +20,25 @@ const VEC_SIZE_MEMFRAME_THRESHOLD: usize = 100_023;
 const CLEAR_FRAME_PERIOD: usize = 10_000;
 
 #[repr(transparent)]
-#[derive(Clone)]
-struct Pointer<X>(*mut X);
-
-impl<X> std::fmt::Debug for Pointer<X> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "***")?;
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug)]
-enum AbsoluteAddr<X> {
-    PoolAllocated(PoolAddr<X>),
-    Unallocated(Box<UnallocatedAddr>),
-    VectorAllocated(VectorAddr<X>),
-}
+struct WirePointer<X>(*mut X);
 
-#[repr(transparent)]
-#[derive(Clone, Debug)]
-struct PoolAddr<X> {
-    ptr: Pointer<X>,
-}
-
-impl<X> PoolAddr<X> {
-    fn incr(&self, i: WireId) -> Self {
-        Self {
-            ptr: Pointer(unsafe { self.ptr.0.add(i as usize) }),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-struct UnallocatedAddr {
-    level: usize,
-    idx: WireId,
-}
-
-impl UnallocatedAddr {
-    fn incr(&self, i: WireId) -> Self {
-        debug_assert_eq!(i, 0);
-        self.clone()
-        // does not make sense to increment an unallocated address
-        //self.idx += i;
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct VectorAddr<X> {
-    ptr: Pointer<X>,
-}
-
-impl<X> VectorAddr<X> {
-    fn incr(&self, i: WireId) -> Self {
-        Self {
-            ptr: Pointer(unsafe { self.ptr.0.add(i as usize) }),
-        }
-    }
-}
-
-impl<X> Default for AbsoluteAddr<X> {
+impl<X> Default for WirePointer<X> {
     fn default() -> Self {
-        Self::VectorAllocated(VectorAddr {
-            ptr: Pointer(null_mut()),
-        })
+        Self(null_mut())
     }
 }
 
-impl<X> AbsoluteAddr<X> {
+impl<X> WirePointer<X> {
     fn incr(&self, i: WireId) -> Self {
-        match self {
-            Self::PoolAllocated(loc) => Self::PoolAllocated(loc.incr(i)),
-            Self::Unallocated(loc) => Self::Unallocated(Box::new(loc.incr(i))),
-            Self::VectorAllocated(loc) => Self::VectorAllocated(loc.incr(i)),
-        }
+        Self(unsafe { self.0.add(i as usize) })
     }
+}
+
+#[test]
+fn test_size_wire_ptr() {
+    // X is instantiated with a big object on purpose
+    assert!(std::mem::size_of::<WirePointer<Vec<usize>>>() <= 8);
 }
 
 // A Pool of wires.
@@ -113,7 +56,7 @@ pub(crate) struct Pool<X> {
 }
 
 struct Cache<X> {
-    vector: Option<Pointer<X>>,
+    vector: Option<WirePointer<X>>,
     first: WireId,
     last: WireId,
 }
@@ -144,7 +87,7 @@ impl<X> Cache<X> {
         }
     }
 
-    fn set_cache(&mut self, first: WireId, last: WireId, ptr: Pointer<X>) {
+    fn set_cache(&mut self, first: WireId, last: WireId, ptr: WirePointer<X>) {
         self.vector = Some(ptr);
         self.first = first;
         self.last = last;
@@ -187,7 +130,7 @@ where
                 let last = *k + (v.len() as WireId) - 1;
                 debug_assert!(*k <= id && id <= last);
                 let mut cache = self.cache.borrow_mut();
-                cache.set_cache(*k, last, Pointer(v.as_ptr() as *mut X));
+                cache.set_cache(*k, last, WirePointer(v.as_ptr() as *mut X));
             }
         }
     }
@@ -209,7 +152,7 @@ where
                 let last = *k + (v.len() as WireId) - 1;
                 if *k <= id && id <= last {
                     let mut cache = self.cache.borrow_mut();
-                    cache.set_cache(*k, last, Pointer(v.as_ptr() as *mut X));
+                    cache.set_cache(*k, last, WirePointer(v.as_ptr() as *mut X));
                     true
                 } else {
                     false
@@ -245,12 +188,10 @@ where
         self.get_when_in_cache(id)
     }
 
-    fn get_ptr(&self, id: WireId) -> Pointer<X> {
-        self.move_to_cache_if_necessary(id);
-
+    fn get_ptr_when_in_cache(&self, id: WireId) -> WirePointer<X> {
         let cache = self.cache.borrow();
         unsafe {
-            return Pointer(
+            return WirePointer(
                 cache
                     .vector
                     .as_ref()
@@ -259,6 +200,11 @@ where
                     .offset((id - cache.first) as isize),
             );
         }
+    }
+
+    fn get_ptr(&self, id: WireId) -> WirePointer<X> {
+        self.move_to_cache_if_necessary(id);
+        self.get_ptr_when_in_cache(id)
     }
 
     fn set_when_in_cache(&mut self, id: WireId, x: &X) {
@@ -297,80 +243,24 @@ where
     }
 }
 
-// A slice in a pool or a vec
 #[derive(Debug)]
-struct PoolVecSlice<X> {
+struct CallframeElm<X> {
     first: WireId,
     last: WireId,
-    ptr: Pointer<X>,
-}
-
-#[derive(Debug)]
-enum CallframeElm<X> {
-    PoolVec(PoolVecSlice<X>),
-    Unallocated {
-        first: WireId,
-        unalloc: Box<UnallocatedAddr>,
-    },
-}
-
-fn mk_from_absadr<X>(first: WireId, last: WireId, addr: AbsoluteAddr<X>) -> CallframeElm<X> {
-    match addr {
-        AbsoluteAddr::PoolAllocated(PoolAddr { ptr }) => {
-            CallframeElm::PoolVec(PoolVecSlice { first, last, ptr })
-        }
-        AbsoluteAddr::VectorAllocated(VectorAddr { ptr }) => {
-            CallframeElm::PoolVec(PoolVecSlice { first, last, ptr })
-        }
-        AbsoluteAddr::Unallocated(unalloc) => {
-            assert_eq!(first, last);
-            CallframeElm::Unallocated { first, unalloc }
-        }
-    }
-}
-
-impl<X> CallframeElm<X> {
-    fn to_absolute_addr(&self) -> AbsoluteAddr<X> {
-        match self {
-            CallframeElm::PoolVec(PoolVecSlice {
-                first: _,
-                last: _,
-                ptr,
-            }) => AbsoluteAddr::VectorAllocated(VectorAddr {
-                ptr: Pointer(ptr.0),
-            }),
-            CallframeElm::Unallocated { first: _, unalloc } => {
-                AbsoluteAddr::Unallocated(Box::new(UnallocatedAddr {
-                    level: unalloc.level,
-                    idx: unalloc.idx,
-                }))
-            }
-        }
-    }
-}
-
-enum FoundOrLevel<T> {
-    Found(T),
-    Ref { level: usize, idx: WireId },
+    wire_ptr: WirePointer<X>,
 }
 
 #[inline]
-fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> FoundOrLevel<Pointer<X>> {
+fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> WirePointer<X> {
     for r in v.iter() {
         match r {
-            CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }) => {
+            CallframeElm {
+                first,
+                last,
+                wire_ptr,
+            } => {
                 if *first <= id && id <= *last {
-                    return FoundOrLevel::Found(Pointer(unsafe {
-                        ptr.0.offset((id - first) as isize)
-                    }));
-                }
-            }
-            CallframeElm::Unallocated { first, unalloc } => {
-                if *first == id {
-                    return FoundOrLevel::Ref {
-                        level: unalloc.level,
-                        idx: unalloc.idx,
-                    };
+                    return WirePointer(unsafe { wire_ptr.0.offset((id - first) as isize) });
                 }
             }
         }
@@ -379,24 +269,20 @@ fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> FoundOrLevel<Pointe
 }
 
 #[inline]
-fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> FoundOrLevel<()> {
+fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> () {
     for r in v.iter() {
         match r {
-            CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }) => {
+            CallframeElm {
+                first,
+                last,
+                wire_ptr,
+            } => {
                 if *first <= id && id <= *last {
                     unsafe {
-                        let addr = ptr.0.offset((id - first) as isize);
+                        let addr = wire_ptr.0.offset((id - first) as isize);
                         *addr = x.clone();
                     }
-                    return FoundOrLevel::Found(());
-                }
-            }
-            CallframeElm::Unallocated { first, unalloc } => {
-                if *first == id {
-                    return FoundOrLevel::Ref {
-                        level: unalloc.level,
-                        idx: unalloc.idx,
-                    };
+                    return ();
                 }
             }
         }
@@ -425,34 +311,25 @@ where
         }
     }
 
+    // Get in either outputs or inputs
     #[inline]
-    fn get_either(&self, id: WireId) -> FoundOrLevel<Pointer<X>> {
+    fn get_either(&self, id: WireId) -> WirePointer<X> {
         if id < self.outputs_cnt {
-            //2 println!("SEARCH OUTPUTS {:?} {:?}", self.outputs_cnt, id);
             search_callframe(&self.outputs, id)
         } else {
             debug_assert!(id < self.inputs_cnt);
-            //2 println!("SEARCH INPUTS {:?} {:?}", self.inputs_cnt, id);
             search_callframe(&self.inputs, id)
         }
     }
 
     #[inline]
-    fn get(&self, id: WireId) -> FoundOrLevel<&X> {
-        let r = self.get_either(id);
-        match &r {
-            FoundOrLevel::Found(ptr) => FoundOrLevel::Found(unsafe { &*ptr.0 }),
-            FoundOrLevel::Ref { level, idx } => FoundOrLevel::Ref {
-                level: *level,
-                idx: *idx,
-            },
-        }
+    fn get(&self, id: WireId) -> &X {
+        let ptr = self.get_either(id);
+        unsafe { &*ptr.0 }
     }
 
     #[inline]
-    fn set(&mut self, id: WireId, x: &X) -> FoundOrLevel<()> {
-        //println!("OUT CNT: {:?}", self.outputs_cnt);
-        //println!("IN CNT: {:?}", self.inputs_cnt);
+    fn set(&mut self, id: WireId, x: &X) -> () {
         if id < self.outputs_cnt {
             set_callframe_if_ptr(&self.outputs, id, x)
         } else {
@@ -461,61 +338,25 @@ where
         }
     }
 
-    fn get_slice(
-        &self,
-        src_first: WireId,
-        _src_last: WireId,
-        first: WireId,
-        last: WireId,
-    ) -> CallframeElm<X> {
-        let r = self.get_either(src_first);
-        match r {
-            FoundOrLevel::Found(ptr) => CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }),
-            FoundOrLevel::Ref { level, idx } => CallframeElm::Unallocated {
-                first,
-                unalloc: Box::new(UnallocatedAddr { level, idx }),
-            },
-        }
-    }
-
     #[inline]
-    fn allocate_outputs_ptr(&mut self, first: WireId, last: WireId, ptr: Pointer<X>) {
-        self.outputs
-            .push(CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }));
-    }
-
-    #[inline]
-    fn allocate_outputs(&mut self, slice: CallframeElm<X>) {
-        self.outputs.push(slice);
-    }
-
-    #[inline]
-    fn allocate_outputs_unallocated(&mut self, first: WireId, addr: &UnallocatedAddr) {
-        self.outputs.push(CallframeElm::Unallocated {
+    fn allocate_outputs_ptr(&mut self, first: WireId, last: WireId, wire_ptr: WirePointer<X>) {
+        self.outputs.push(CallframeElm {
             first,
-            unalloc: Box::new(addr.clone()),
+            last,
+            wire_ptr,
         });
     }
 
     #[inline]
-    fn allocate_inputs_ptr(&mut self, first: WireId, last: WireId, ptr: Pointer<X>) {
-        self.inputs
-            .push(CallframeElm::PoolVec(PoolVecSlice { first, last, ptr }));
-    }
-
-    #[inline]
-    fn allocate_inputs(&mut self, slice: CallframeElm<X>) {
-        self.inputs.push(slice);
-    }
-
-    #[inline]
-    fn allocate_inputs_unallocated(&mut self, first: WireId, addr: &UnallocatedAddr) {
-        self.inputs.push(CallframeElm::Unallocated {
+    fn allocate_inputs_ptr(&mut self, first: WireId, last: WireId, wire_ptr: WirePointer<X>) {
+        self.inputs.push(CallframeElm {
             first,
-            unalloc: Box::new(addr.clone()),
+            last,
+            wire_ptr,
         });
     }
 
+    #[inline]
     fn clear(&mut self) {
         self.outputs.clear();
         self.outputs_cnt = 0;
@@ -536,12 +377,12 @@ struct Frame<X> {
     callframe_size: WireId,
     callframe: Callframe<X>,
     callframe_is_vector: bool,
-    callframe_vector: Vec<AbsoluteAddr<X>>,
+    callframe_vector: Vec<WirePointer<X>>,
 
     memframe_pool: Pool<X>,
     memframe_is_vector: bool,
     memframe_vector: Vec<X>,
-    memframe_unallocated: HashMap<WireId, X>,
+    memframe_unallocated: HashMap<WireId, Box<X>>,
     counter: usize,
 }
 
@@ -695,76 +536,24 @@ where
 
     #[inline]
     fn get_callframe(&self, id: WireId) -> &X {
-        let r = self.stack[self.top].callframe.get(id);
-        match &r {
-            FoundOrLevel::Found(ptr) => *ptr,
-            FoundOrLevel::Ref { level, idx } => {
-                self.stack[*level].memframe_unallocated.get(&idx).unwrap()
-            }
-        }
+        self.stack[self.top].callframe.get(id)
     }
 
     #[inline]
     fn set_callframe(&mut self, id: WireId, x: &X) {
-        let r = self.stack[self.top].callframe.set(id, x);
-        match &r {
-            FoundOrLevel::Found(_) => {}
-            FoundOrLevel::Ref { level, idx } => {
-                self.stack[*level].memframe_unallocated.insert(*idx, *x);
-            }
-        }
+        self.stack[self.top].callframe.set(id, x);
     }
 
     #[inline]
-    fn get_callframe_vector(&self, addr: &AbsoluteAddr<X>) -> &X {
-        match addr {
-            AbsoluteAddr::PoolAllocated(loc) => {
-                //debug!("get_elem_previously: pool allocated");
-                unsafe {
-                    return &*loc.ptr.0;
-                }
-            }
-            AbsoluteAddr::Unallocated(loc) => {
-                //debug!("get_elem_previously: unallocated");
-                self.stack[loc.level]
-                    .memframe_unallocated
-                    .get(&loc.idx)
-                    .unwrap()
-            }
-            AbsoluteAddr::VectorAllocated(loc) => {
-                //debug!("GET VEC");
-                unsafe {
-                    return &*loc.ptr.0;
-                }
-            }
-        }
+    fn get_callframe_vector(wire_ptr: &WirePointer<X>) -> &X {
+        return unsafe { &*wire_ptr.0 };
     }
 
     #[inline]
-    fn set_callframe_vector(&mut self, addr: &AbsoluteAddr<X>, x: &X) {
-        match addr {
-            AbsoluteAddr::PoolAllocated(loc) => {
-                //debug!("set_elem_previously: pool allocated");
-                /*let lvl = loc.level;
-                let frame = &mut self.stack[lvl];
-                frame.memframe_allocated.get_mut().set(loc.first, x);
-                */
-                unsafe {
-                    loc.ptr.0.write(*x);
-                }
-            }
-            AbsoluteAddr::Unallocated(loc) => {
-                //debug!("set_elem_previously: unallocated");
-                self.stack[loc.level]
-                    .memframe_unallocated
-                    .insert(loc.idx, *x);
-            }
-            AbsoluteAddr::VectorAllocated(loc) => {
-                //debug!("SET VEC");
-                unsafe {
-                    loc.ptr.0.write(*x);
-                }
-            }
+    fn set_callframe_vector(wire_ptr: &WirePointer<X>, x: &X) {
+        //debug!("SET VEC");
+        unsafe {
+            wire_ptr.0.write(*x);
         }
     }
 
@@ -795,7 +584,7 @@ where
                 return self.get_callframe(id);
             } else {
                 let addr = &frame.callframe_vector[id as usize];
-                return self.get_callframe_vector(addr);
+                return Self::get_callframe_vector(addr);
             }
         }
 
@@ -820,18 +609,15 @@ where
     }
 
     pub(crate) fn set(&mut self, id: WireId, x: &X) {
-        //debug!("SET {:?}", self.stack);
-        //println!("CALLFRAME SIZE: {:?}", self.stack[self.top].callframe_size);
         let frame = self.get_frame_mut();
         let callframe_size = frame.callframe_size;
         if id < callframe_size {
             if !frame.callframe_is_vector {
-                //debug!("DEBUG GET in CALLFRAME {:?}", self.get_callframe(addr));
                 self.set_callframe(id, x);
                 return;
             } else {
                 let addr = &frame.callframe_vector[id as usize].clone();
-                self.set_callframe_vector(addr, x);
+                Self::set_callframe_vector(addr, x);
                 return;
             }
         }
@@ -843,22 +629,49 @@ where
 
         // 1)
         if frame.memframe_is_vector {
-            // println!("DEBUG SET in VECTOR {:?}", x,);
             frame.memframe_vector[(id - callframe_size) as usize] = *x;
             return;
         }
 
         // 2) a)
         if frame.memframe_pool.present(id) {
-            //debug!("set: allocated");
-            //debug!("mem set: {:?} <- {:?}", id, x);
             frame.memframe_pool.set_when_in_cache(id, x);
             return;
         }
 
         // 2) b)
         debug!("set {:?}", x);
-        frame.memframe_unallocated.insert(id, *x);
+        frame.memframe_unallocated.insert(id, Box::new(*x));
+    }
+
+    fn place_ptr_in_callframe(
+        &mut self,
+        start: WireId,
+        count: WireId,
+        allow_allocation: bool,
+        wire_ptr: WirePointer<X>,
+    ) {
+        let frame = self.get_frame_mut();
+
+        if frame.callframe_is_vector {
+            for i in 0..count {
+                let idx = (start + i) as usize;
+                frame.callframe_vector[idx] = wire_ptr.incr(i);
+            }
+            return;
+        } else {
+            if allow_allocation {
+                frame
+                    .callframe
+                    .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
+                return;
+            } else {
+                frame
+                    .callframe
+                    .allocate_inputs_ptr(start, start + count - 1, wire_ptr);
+                return;
+            }
+        }
     }
 
     // This functions takes the first and last index of the caller,
@@ -869,6 +682,8 @@ where
     // 2) in vector memframe
     // 3) in allocated memframe
     // 4) in unallocated memframe
+    // In addition, both the callframe and the memframe have a second mode, where the underlying structure
+    // is a vector. For the callframe the vector holds addresses, for the memfarame it holds wires.
     #[allow(clippy::needless_return)]
     pub(crate) fn allocate_slice(
         &mut self,
@@ -891,82 +706,25 @@ where
 
         // 1) wire from callframe
         if src_first < previous_callframe_size {
-            //println!("1: in previous_callframe_size");
             debug_assert!(src_last < previous_callframe_size);
-            if callframe_is_vector {
-                //println!("callframe is vector");
-                let addr = if previous_callframe_is_vector {
-                    //println!("previous callframe is vector");
-                    frame.callframe_vector[src_first as usize].clone()
-                } else {
-                    frame
-                        .callframe
-                        .get_slice(src_first, src_last, start, start + count - 1)
-                        .to_absolute_addr()
-                };
 
-                let last_frame = self.get_frame_mut();
-                for i in 0..count {
-                    let idx = (start + i) as usize;
-                    last_frame.callframe_vector[idx] = addr.incr(i);
-                }
-                return;
+            let wire_ptr = if previous_callframe_is_vector {
+                frame.callframe_vector[src_first as usize].clone()
             } else {
-                let slice = if previous_callframe_is_vector {
-                    //println!("previous callframe is vector");
-                    let new_slice = frame.callframe_vector[src_first as usize].clone();
-                    mk_from_absadr(start, start + count - 1, new_slice)
-                } else {
-                    frame
-                        .callframe
-                        .get_slice(src_first, src_last, start, start + count - 1)
-                };
-
-                let last_frame = self.get_frame_mut();
-                if allow_allocation {
-                    //println!("output");
-                    last_frame.callframe.allocate_outputs(slice);
-                    return;
-                } else {
-                    //println!("input");
-                    last_frame.callframe.allocate_inputs(slice);
-                    return;
-                }
-            }
+                frame.callframe.get_either(src_first)
+            };
+            self.place_ptr_in_callframe(start, count, allow_allocation, wire_ptr);
+            return;
         }
         // else 2) the slice is in a vector memframe
         if frame.memframe_is_vector {
-            //println!("2: previous memframe is vector");
-            let ptr =
-                Pointer(&mut frame.memframe_vector[(src_first - previous_callframe_size) as usize]);
-            if callframe_is_vector {
-                //println!("callframe is vector");
-                // for the vector slice we need to shift by callframe_size so that the
-                // indexing in the vector is correct using a slice_idx
-                let new_slice = VectorAddr { ptr };
-                let last_frame = self.get_frame_mut();
-                for i in 0..count {
-                    let idx = (start + i) as usize;
-                    last_frame.callframe_vector[idx] =
-                        AbsoluteAddr::VectorAllocated(new_slice.incr(i));
-                }
-                return;
-            } else {
-                let last_frame = self.get_frame_mut();
-                if allow_allocation {
-                    //println!("output");
-                    last_frame
-                        .callframe
-                        .allocate_outputs_ptr(start, start + count - 1, ptr);
-                    return;
-                } else {
-                    //println!("input");
-                    last_frame
-                        .callframe
-                        .allocate_inputs_ptr(start, start + count - 1, ptr);
-                    return;
-                }
-            }
+            // for the vector slice we need to shift by callframe_size so that the
+            // indexing in the vector is correct using a slice_idx
+            let wire_ptr = WirePointer(
+                &mut frame.memframe_vector[(src_first - previous_callframe_size) as usize],
+            );
+            self.place_ptr_in_callframe(start, count, allow_allocation, wire_ptr);
+            return;
         }
 
         // else slice in either
@@ -975,39 +733,14 @@ where
         let new_slice;
         if frame.memframe_pool.present(src_first) {
             //println!("3) present in pool");
-            if callframe_is_vector {
-                //println!("callframe is vector");
-                let ptr = frame.memframe_pool.get_ptr(src_first);
-                new_slice = PoolAddr { ptr };
-                let last_frame = self.get_frame_mut();
-                for i in 0..count {
-                    let idx = (start + i) as usize;
-                    last_frame.callframe_vector[idx] =
-                        AbsoluteAddr::PoolAllocated(new_slice.incr(i));
-                }
-                return;
-            } else {
-                let ptr = frame.memframe_pool.get_ptr(src_first);
-                let last_frame = self.get_frame_mut();
-                if allow_allocation {
-                    //println!("output");
-                    last_frame
-                        .callframe
-                        .allocate_outputs_ptr(start, start + count - 1, ptr);
-                    return;
-                } else {
-                    //println!("input");
-                    last_frame
-                        .callframe
-                        .allocate_inputs_ptr(start, start + count - 1, ptr);
-                    return;
-                }
-            }
+            let wire_ptr = frame.memframe_pool.get_ptr_when_in_cache(src_first);
+            self.place_ptr_in_callframe(start, count, allow_allocation, wire_ptr);
+            return;
         } else {
             //println!("4) unallocated");
             // if it is in unallocated then we need to allocate it
-            let frame = self.get_frame_previous_mut();
             if src_first != src_last {
+                // Allocate single wires in pool now
                 //println!("ALLOC NEW");
                 if !allow_allocation {
                     panic!(
@@ -1017,48 +750,59 @@ where
                 }
                 // println!("ALLOCATE_FRAME: EXTRA");
                 frame.memframe_pool.insert(src_first, src_last);
-                let ptr = frame.memframe_pool.get_ptr(src_first);
+                // NOTE: cannot use get_when_in_cache
+                let wire_ptr = frame.memframe_pool.get_ptr(src_first);
 
                 if callframe_is_vector {
                     //println!("callframe is vector");
-                    new_slice = PoolAddr { ptr };
+                    new_slice = wire_ptr;
                     let last_frame = self.get_frame_mut();
                     for i in 0..count {
                         let idx = (start + i) as usize;
-                        last_frame.callframe_vector[idx] =
-                            AbsoluteAddr::PoolAllocated(new_slice.incr(i));
+                        last_frame.callframe_vector[idx] = new_slice.incr(i);
                     }
                     return;
                 } else {
                     let last_frame = self.get_frame_mut();
                     last_frame
                         .callframe
-                        .allocate_outputs_ptr(start, start + count - 1, ptr);
+                        .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
                     return;
                 }
             } else {
-                //println!("INDIVIDUAL NEW");
-                // if it's not an interval then we just leave it unallocated
-                // debug!("ALLOCATE_FRAME: UNALLOCATED {:?}", src_first);
-                let unallocated_addr = UnallocatedAddr {
-                    level: self.top - 1,
-                    idx: src_first,
-                };
+                // Unallocated single wire
+                let wire_ptr;
+                if allow_allocation {
+                    frame
+                        .memframe_unallocated
+                        .insert(src_first, Box::new(X::default()));
+                    wire_ptr = WirePointer(
+                        ((&**frame.memframe_unallocated.get(&src_first).unwrap()) as *const X)
+                            .cast_mut(),
+                    );
+                } else {
+                    // it is an input, and in that case we cant allocate, so it must be already assigned.
+                    let ptr = frame.memframe_unallocated.get(&src_first);
+                    if ptr.is_none() {
+                        panic!("input passed but not previously assigned");
+                    }
+                    wire_ptr = WirePointer(((&**ptr.unwrap()) as *const X).cast_mut());
+                }
+
                 let last_frame = self.get_frame_mut();
                 if callframe_is_vector {
-                    //println!("callframe is vector");
-                    last_frame.callframe_vector[start as usize] =
-                        AbsoluteAddr::Unallocated(Box::new(unallocated_addr));
-                    return;
-                } else if allow_allocation {
-                    last_frame
-                        .callframe
-                        .allocate_outputs_unallocated(start, &unallocated_addr);
+                    last_frame.callframe_vector[start as usize] = wire_ptr;
                     return;
                 } else {
-                    last_frame
-                        .callframe
-                        .allocate_inputs_unallocated(start, &unallocated_addr);
+                    if allow_allocation {
+                        last_frame
+                            .callframe
+                            .allocate_outputs_ptr(start, start, wire_ptr);
+                    } else {
+                        last_frame
+                            .callframe
+                            .allocate_inputs_ptr(start, start, wire_ptr);
+                    }
                     return;
                 }
             }
