@@ -73,14 +73,6 @@ MIT License
 
 You can contact the `swanky` team at `swanky@galois.com`.
 
-# Contributors
-
-- Brent Carmer
-- Ben Hamlin
-- Alex J. Malozemoff
-- Benoit Razet
-- Marc Rosen
-
 # Acknowledgments
 
 This material is based upon work supported in part by ARO, SSC Pacific, IARPA

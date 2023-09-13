@@ -1,6 +1,6 @@
 default:
   tags: [docker-nix]
-  image: "debian/snapshot:stable-20230814"
+  image: "bitnami/git:2.42.0-debian-11-r20"
   interruptible: true
   before_script:
     - mkdir -p -m 0755 /nix/var/log/nix/drvs
@@ -15,14 +15,16 @@ default:
     - export PATH="/nix/var/nix/profiles/default/bin/:$PATH"
 
 variables:
-  GIT_STRATEGY: clone
+  GIT_STRATEGY: fetch
   NIX_REMOTE: daemon
+  TMPDIR: /tmp
 
 normal-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: on_success
   script:
+    - ./etc/ci/swanky_releasing_check.sh
     - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ quick
 
 nightly-test:
