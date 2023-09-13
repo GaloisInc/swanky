@@ -212,10 +212,10 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.lpn == LpnSize::Small,
-                    config.no_batching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -244,10 +244,10 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.lpn == LpnSize::Small,
-                    config.no_batching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             let relation_file = File::open(relation_path)?;
@@ -292,8 +292,8 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.no_batching,
-                    config.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -313,7 +313,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                config.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -353,8 +353,8 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.no_batching,
-                    config.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -374,7 +374,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                config.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -423,10 +423,10 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.lpn == LpnSize::Small,
-                    config.no_batching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -453,10 +453,10 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.lpn == LpnSize::Small,
-                    config.no_batching,
+                    config.lpn() == LpnSize::Small,
+                    config.no_batching(),
                 )?;
-            evaluator.load_backends(&mut channel, config.lpn == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;
@@ -481,7 +481,7 @@ fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
             .clone()
             .parse::<usize>()
             .unwrap_or_else(|_| panic!("cant parse port"));
-        for i in 1..config.threads {
+        for i in 1..config.threads() {
             let mut new_addr = addr.clone();
             new_addr.push_str(":".into());
             let new_port = format!("{:?}", port + i);
@@ -524,8 +524,8 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.no_batching,
-                    config.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -545,7 +545,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                config.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -582,8 +582,8 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     rng,
                     inputs,
                     type_store,
-                    config.no_batching,
-                    config.lpn == LpnSize::Small,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
                 )?;
             handles.push(handle_f2);
 
@@ -603,7 +603,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                config.lpn == LpnSize::Small,
+                config.lpn() == LpnSize::Small,
             )?;
             handles.extend(handles_fields);
 
@@ -625,7 +625,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
 fn run(args: &Cli) -> Result<()> {
     let config = if let Some(config) = &args.config {
-        toml::from_str(&std::fs::read_to_string(config)?)?
+        Config::from_toml_file(config)?
     } else {
         Config::default()
     };
@@ -636,24 +636,24 @@ fn run(args: &Cli) -> Result<()> {
         info!("verifier mode");
     }
     info!("addr:       {:?}", args.connection_addr);
-    info!("lpn:        {:?}", config.lpn);
-    info!("nobatching: {:?}", config.no_batching);
+    info!("lpn:        {:?}", config.lpn());
+    info!("nobatching: {:?}", config.no_batching());
     info!("instance:   {:?}", args.instance);
     info!("text fmt:   {:?}", args.text);
-    info!("threads:    {:?}", config.threads);
+    info!("threads:    {:?}", config.threads());
 
     if args.text {
-        if config.threads == 1 {
+        if config.threads() == 1 {
             run_text(args, &config)
         } else {
-            assert!(config.threads > 1);
+            assert!(config.threads() > 1);
             run_text_multihtreaded(args, &config)
         }
     } else {
-        if config.threads == 1 {
+        if config.threads() == 1 {
             run_flatbuffers(args, &config)
         } else {
-            assert!(config.threads > 1);
+            assert!(config.threads() > 1);
             run_flatbuffers_multihtreaded(args, &config)
         }
     }

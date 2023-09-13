@@ -11,7 +11,7 @@ use serde::Deserialize;
 use std::{fmt::Display, path::PathBuf};
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
-const DEFAULT_LPN: LpnSize = LpnSize::Medium;
+const DEFAULT_NO_BATCHING: bool = false;
 const DEFAULT_THREADS: usize = 1;
 
 /// Lpn params as small, medium or large.
@@ -55,26 +55,87 @@ pub(crate) fn map_lpn_size(lpn_param: &LpnSize) -> (LpnParams, LpnParams) {
     }
 }
 
-/// Configuration options.
+/// Internal Diet Mac'n'Cheese configurations.
+///
+/// Use this to add configurable parameters from an optional TOML file.
+/// To add a new parameter:
+///
+/// 1. Name it what you want the TOML key to be
+/// 2. Wrap the parameter's type in `Option`. Note that enumerations are OK! We
+///    recommend using #[serde(rename_all = "...")] with an appropriate case
+///    convention for your use-case (and a matching `Display` instance).
+/// 3. Update the `Default` implementation for `Config` to provide
+///    `Some(value)` for your parameter. If you can't pick a sensible default,
+///    consider making the parameter a required command-line argument instead!
+///    We also recommend using a `const` for this value (or a `Default`
+///    implementation, if using an `enum` or `struct` - we do have the full
+///    power of TOML, after all!)
+/// 4. Provide an `unwrap`ping accessor for your parameter. This is safe since
+///    the only way to construct a `Config` is with `Default` or via the
+///    associated function [`Config::from_toml_file`]. Speaking of...
+/// 5. Update `Config::from_toml_file` with an `if let` for your new parameter,
+///    which can be modeled after the existing `if let`s.
+/// 6. Update the --help text for the configuration path to show the default
+///    values in case a config file isn't provided. When possible, do this
+///    programmatically so the help text stays up-to-date!
 #[derive(Deserialize)]
 pub(crate) struct Config {
-    /// Select lpn parameter
-    pub lpn: LpnSize,
+    /// The LPN size to use for SVOLE.
+    lpn: Option<LpnSize>,
 
-    /// No batching for check_zero
-    pub no_batching: bool,
+    /// If set, do not batch check_zero tasks.
+    no_batching: Option<bool>,
 
-    /// number of threads
-    pub threads: usize,
+    /// The number of threads to use (for SVOLE).
+    threads: Option<usize>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            lpn: DEFAULT_LPN,
-            no_batching: false,
-            threads: DEFAULT_THREADS,
+            lpn: Some(LpnSize::default()),
+            no_batching: Some(DEFAULT_NO_BATCHING),
+            threads: Some(DEFAULT_THREADS),
         }
+    }
+}
+
+impl Config {
+    /// Construct a new [`Config`] from a TOML file. Any missing fields are
+    /// initialized using the `Default` instance.
+    pub fn from_toml_file(toml_file: &PathBuf) -> eyre::Result<Self> {
+        let mut res = Config::default();
+
+        let toml_contents: Config = toml::from_str(&std::fs::read_to_string(toml_file)?)?;
+
+        if let Some(lpn) = toml_contents.lpn {
+            res.lpn = Some(lpn)
+        }
+
+        if let Some(no_batching) = toml_contents.no_batching {
+            res.no_batching = Some(no_batching)
+        }
+
+        if let Some(threads) = toml_contents.threads {
+            res.threads = Some(threads)
+        }
+
+        Ok(res)
+    }
+
+    /// The SVOLE LPN size.
+    pub fn lpn(&self) -> LpnSize {
+        self.lpn.unwrap()
+    }
+
+    /// The value of the no-batching flag.
+    pub fn no_batching(&self) -> bool {
+        self.no_batching.unwrap()
+    }
+
+    /// The number of threads to use for SVOLE.
+    pub fn threads(&self) -> usize {
+        self.threads.unwrap()
     }
 }
 
