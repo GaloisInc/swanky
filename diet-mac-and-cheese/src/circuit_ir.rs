@@ -73,35 +73,6 @@ fn size_of_gate_m_less_than_32_bytes() {
     assert!(std::mem::size_of::<GateM>() <= 32);
 }
 
-pub type WireIdOpt = u32;
-
-/// Optimized gates where wires can be u32.
-#[derive(Clone, Debug)]
-pub enum GateMOpt {
-    Constant(TypeId, WireIdOpt, Box<Number>),
-    AssertZero(TypeId, WireIdOpt),
-    Copy(TypeId, WireIdOpt, WireIdOpt),
-    Add(TypeId, WireIdOpt, WireIdOpt, WireIdOpt),
-    Sub(TypeId, WireIdOpt, WireIdOpt, WireIdOpt),
-    Mul(TypeId, WireIdOpt, WireIdOpt, WireIdOpt),
-    AddConstant(TypeId, WireIdOpt, Box<(WireIdOpt, Box<Number>)>),
-    MulConstant(TypeId, WireIdOpt, Box<(WireIdOpt, Box<Number>)>),
-    Instance(TypeId, WireIdOpt),
-    Witness(TypeId, WireIdOpt),
-    Conv(Box<ConvGate>),
-    New(TypeId, WireIdOpt, WireIdOpt),
-    Delete(TypeId, WireIdOpt, WireIdOpt),
-    Call(Box<CallGate>),
-    Challenge(TypeId, WireIdOpt),
-    Comment(Box<String>),
-}
-
-#[test]
-fn size_of_gate_m_opt_less_than_16_bytes2() {
-    // Enforce that `GateM` fits in 32 bytes.
-    assert!(std::mem::size_of::<GateMOpt>() <= 16);
-}
-
 impl GateM {
     /// Return the [`TypeId`] associated with this gate.
     pub(crate) fn type_id(&self) -> TypeId {
@@ -152,84 +123,8 @@ impl GateM {
             }
         }
     }
-
-    // Convert a slice of `GateM` into `GateMOpt`.
-    fn to_gates_opt(gates: &[GateM]) -> Vec<GateMOpt> {
-        let mut r = Vec::with_capacity(gates.len());
-        use GateM::*;
-        for gate in gates.iter() {
-            let gate2 = match gate {
-                Constant(ty, out, n) => GateMOpt::Constant(*ty, *out as WireIdOpt, n.clone()),
-                Copy(ty, out, inp) => GateMOpt::Copy(*ty, *out as WireIdOpt, *inp as WireIdOpt),
-                Add(ty, out, left, right) => GateMOpt::Add(
-                    *ty,
-                    *out as WireIdOpt,
-                    *left as WireIdOpt,
-                    *right as WireIdOpt,
-                ),
-                Sub(ty, out, left, right) => GateMOpt::Sub(
-                    *ty,
-                    *out as WireIdOpt,
-                    *left as WireIdOpt,
-                    *right as WireIdOpt,
-                ),
-                Mul(ty, out, left, right) => GateMOpt::Mul(
-                    *ty,
-                    *out as WireIdOpt,
-                    *left as WireIdOpt,
-                    *right as WireIdOpt,
-                ),
-                AddConstant(ty, out, left, number) => GateMOpt::AddConstant(
-                    *ty,
-                    *out as WireIdOpt,
-                    Box::new((*left as WireIdOpt, number.clone())),
-                ),
-                MulConstant(ty, out, left, number) => GateMOpt::MulConstant(
-                    *ty,
-                    *out as WireIdOpt,
-                    Box::new((*left as WireIdOpt, number.clone())),
-                ),
-                Instance(ty, out) => GateMOpt::Instance(*ty, *out as WireIdOpt),
-                Witness(ty, out) => GateMOpt::Witness(*ty, *out as WireIdOpt),
-                New(ty, start, end) => GateMOpt::New(*ty, *start as WireIdOpt, *end as WireIdOpt),
-                Delete(ty, start, end) => {
-                    GateMOpt::Delete(*ty, *start as WireIdOpt, *end as WireIdOpt)
-                }
-                AssertZero(ty, out) => GateMOpt::AssertZero(*ty, *out as WireIdOpt),
-                Conv(c) => GateMOpt::Conv(c.clone()),
-                Call(arg) => GateMOpt::Call(arg.clone()),
-                Comment(s) => GateMOpt::Comment(Box::new(s.clone())),
-                Challenge(ty, out) => GateMOpt::Challenge(*ty, *out as WireIdOpt),
-            };
-            r.push(gate2);
-        }
-        r
-    }
 }
 
-impl GateMOpt {
-    /// Return the [`TypeId`] associated with this gate.
-    pub(crate) fn type_id(&self) -> TypeId {
-        use GateMOpt::*;
-        match self {
-            Constant(ty, _, _)
-            | AssertZero(ty, _)
-            | Copy(ty, _, _)
-            | Add(ty, _, _, _)
-            | Sub(ty, _, _, _)
-            | Mul(ty, _, _, _)
-            | AddConstant(ty, _, _)
-            | MulConstant(ty, _, _)
-            | New(ty, _, _)
-            | Delete(ty, _, _)
-            | Instance(ty, _)
-            | Witness(ty, _)
-            | Challenge(ty, _) => *ty,
-            Conv(_) | Call(_) => unreachable!("Should not ask the type_id for conv/call gates"),
-            Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
-        }
-    }
-}
 /// Specification for Circuit IR types.
 ///
 /// This corresponds to the `@type` specifier. A type can either be a `Field` or
@@ -434,8 +329,6 @@ impl GatesBody {
 pub(crate) enum FunctionBody {
     /// The function body as a sequence of gates.
     Gates(GatesBody),
-    /// The function body as a sequence of optimized gates.
-    GatesOpt(Vec<GateMOpt>),
     /// The function body as a plugin.
     Plugin(PluginBody),
 }
@@ -542,12 +435,7 @@ impl FuncDecl {
             .map(|out| std::cmp::max(first_unused_input, out));
 
         let type_ids = type_presence.to_type_ids();
-        let body = if body_max.is_some() && body_max.unwrap() < (u32::MAX - 1) as WireId {
-            let gates_opt = GateM::to_gates_opt(&gates.gates());
-            FunctionBody::GatesOpt(gates_opt)
-        } else {
-            FunctionBody::Gates(gates)
-        };
+        let body = FunctionBody::Gates(gates);
 
         FuncDecl {
             body,

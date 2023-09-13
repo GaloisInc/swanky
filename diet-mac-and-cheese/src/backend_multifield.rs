@@ -4,8 +4,8 @@
 
 use crate::backend_trait::Party;
 use crate::circuit_ir::{
-    CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, GateMOpt, TypeSpecification,
-    TypeStore, WireCount, WireId, WireRange,
+    CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore,
+    WireCount, WireId, WireRange,
 };
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
@@ -1054,13 +1054,6 @@ trait EvaluatorT {
         witness: Option<Number>,
     ) -> Result<()>;
 
-    fn evaluate_gate_opt(
-        &mut self,
-        gate: &GateMOpt,
-        instance: Option<Number>,
-        witness: Option<Number>,
-    ) -> Result<()>;
-
     /// Start the conversion for a [`ConvGate`].
     fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<MacBitGeneric>>;
     /// Finish the conversion for a [`ConvGate`].
@@ -1209,122 +1202,6 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
             }
         }
         Ok(())
-    }
-
-    #[inline]
-    fn evaluate_gate_opt(
-        &mut self,
-        gate: &GateMOpt,
-        instance: Option<Number>,
-        witness: Option<Number>,
-    ) -> Result<()> {
-        use GateMOpt::*;
-
-        match gate {
-            Constant(_, out, value) => {
-                let v = self.backend.constant(B::from_number(value)?)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            AssertZero(_, inp) => {
-                let wire = self.memory.get(*inp as WireId);
-                debug!("AssertZero wire: {wire:?}");
-                if self.backend.assert_zero(wire).is_err() {
-                    bail!("Assert zero fails on wire {}", *inp);
-                }
-                Ok(())
-            }
-
-            Copy(_, out, inp) => {
-                let in_wire = self.memory.get(*inp as WireId);
-                let out_wire = self.backend.copy(in_wire)?;
-                self.memory.set(*out as WireId, &out_wire);
-                Ok(())
-            }
-
-            Add(_, out, left, right) => {
-                let l = self.memory.get(*left as WireId);
-                let r = self.memory.get(*right as WireId);
-                let v = self.backend.add(l, r)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            Sub(_, out, left, right) => {
-                let l = self.memory.get(*left as WireId);
-                let r = self.memory.get(*right as WireId);
-                let v = self.backend.sub(l, r)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            Mul(_, out, left, right) => {
-                let l = self.memory.get(*left as WireId);
-                let r = self.memory.get(*right as WireId);
-                let v = self.backend.mul(l, r)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            AddConstant(_, out, p) => {
-                let (inp, constant) = p.as_ref();
-                let l = self.memory.get(*inp as WireId);
-                let r = constant;
-                let v = self.backend.add_constant(l, B::from_number(r)?)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            MulConstant(_, out, p) => {
-                let (inp, constant) = p.as_ref();
-                let l = self.memory.get(*inp as WireId);
-                let r = constant;
-                let v = self.backend.mul_constant(l, B::from_number(r)?)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            Instance(_, out) => {
-                let v = self
-                    .backend
-                    .input_public(B::from_number(&instance.unwrap())?)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-
-            Witness(_, out) => {
-                let w = witness.and_then(|v| B::from_number(&v).ok());
-                let v = self.backend.input_private(w)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-            New(_, first, last) => {
-                self.memory
-                    .allocation_new(*first as WireId, *last as WireId);
-                Ok(())
-            }
-            Delete(_, first, last) => {
-                self.memory
-                    .allocation_delete(*first as WireId, *last as WireId);
-                Ok(())
-            }
-            Call(_) => {
-                panic!("Call should be intercepted earlier")
-            }
-            Conv(_) => {
-                panic!("Conv should be intercepted earlier")
-            }
-            Challenge(_, out) => {
-                let v = self.backend.random()?;
-                let v = self.backend.input_public(v)?;
-                self.memory.set(*out as WireId, &v);
-                Ok(())
-            }
-            Comment(_) => {
-                panic!("Comment should be intercepted earlier")
-            }
-        }
     }
 
     fn plugin_call_gate(
@@ -2112,17 +1989,6 @@ impl<
         Ok(())
     }
 
-    fn evaluate_gates_opt_passed(
-        &mut self,
-        gates: &[GateMOpt],
-        fun_store: &FunStore,
-    ) -> Result<()> {
-        for gate in gates.iter() {
-            self.eval_gate_opt(gate, fun_store)?;
-        }
-        Ok(())
-    }
-
     // This is an almost copy of `eval_gate` for Cybernetica
     pub fn evaluate_gates_with_inputs(
         &mut self,
@@ -2235,11 +2101,6 @@ impl<
                 self.evaluate_gates_passed(body.gates(), fun_store)?;
                 self.callframe_end(func);
             }
-            FunctionBody::GatesOpt(gates2) => {
-                self.callframe_start(func, out_ranges, in_ranges)?;
-                self.evaluate_gates_opt_passed(gates2, fun_store)?;
-                self.callframe_end(func);
-            }
             FunctionBody::Plugin(body) => match &body.execution() {
                 PluginExecution::Gates(body) => {
                     self.callframe_start(func, out_ranges, in_ranges)?;
@@ -2303,42 +2164,6 @@ impl<
             _ => {
                 let ty = gate.type_id();
                 self.eval[ty as usize].evaluate_gate(gate, None, None)?;
-            }
-        }
-        Ok(())
-    }
-
-    // This function is identical to `eval_gate`, except that it operates on `GateMOpt` instead of `GateM`.
-    fn eval_gate_opt(&mut self, gate: &GateMOpt, fun_store: &FunStore) -> Result<()> {
-        debug!("GATE: {:?}", gate);
-        match gate {
-            GateMOpt::Conv(gate) => {
-                debug!("CONV IN");
-                let (ty1, _, ty2, _) = gate.as_ref();
-                // First we get the bits from the input and then we convert to the output.
-                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref())?;
-                // then we convert the bits to the out field.
-                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
-                debug!("CONV OUT");
-            }
-            GateMOpt::Instance(ty, _) => {
-                let i = *ty as usize;
-                self.eval[i].evaluate_gate_opt(gate, self.inputs.pop_instance(i), None)?;
-            }
-            GateMOpt::Witness(ty, _) => {
-                let i = *ty as usize;
-                self.eval[i].evaluate_gate_opt(gate, None, self.inputs.pop_witness(i))?;
-            }
-            GateMOpt::Call(arg) => {
-                let (fun_id, out_ranges, in_ranges) = arg.as_ref();
-                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
-            }
-            GateMOpt::Comment(str) => {
-                debug!("Comment: {:?}", str);
-            }
-            _ => {
-                let ty = gate.type_id();
-                self.eval[ty as usize].evaluate_gate_opt(gate, None, None)?;
             }
         }
         Ok(())

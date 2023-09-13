@@ -157,9 +157,6 @@ impl Plugin for DisjunctionV0 {
             let fun_decl = fun_store.get_func_by_name(name)?;
             let gates: &[GateM] = match fun_decl.body() {
                 FunctionBody::Gates(gates) => gates.gates(),
-                FunctionBody::GatesOpt(_) => {
-                    return Err(eyre!("a clause not supported on optimized gates"));
-                }
                 FunctionBody::Plugin(_) => {
                     return Err(eyre!("a clause is a plugin, not supported"));
                 }

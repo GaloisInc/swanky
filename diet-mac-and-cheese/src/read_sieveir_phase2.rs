@@ -460,7 +460,7 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                             gates_body.push(gate);
                         }
                         let fun_body =
-                            FuncDecl::new_function(gates_body.clone(), output_counts, input_counts);
+                            FuncDecl::new_function(gates_body, output_counts, input_counts);
 
                         let fun_id = rel.fun_store.insert(name.clone(), fun_body).unwrap();
                         let fun_body = rel.fun_store.get_func(fun_id).unwrap();
