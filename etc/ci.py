@@ -16,9 +16,6 @@ import rich.syntax
 from etc import NIX_CACHE_KEY, ROOT
 from etc.lint.cmd import lint
 
-CI_EXTRA_ENV = "CI_EXTRA_ENV"
-"""ClickContext.obj[CI_EXTRA_ENV] is a dictionary of environment variables to apply CI settings"""
-
 
 def test_rust(
     ctx: click.Context,
@@ -48,7 +45,7 @@ def test_rust(
             features,
         )
     )
-    env = dict(os.environ) | ctx.obj[CI_EXTRA_ENV]
+    env = dict(os.environ)
     if force_haswell:
         if platform.machine() not in ("AMD64", "x86_64"):
             raise click.UsageError(
@@ -128,7 +125,7 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
             continue
         k, v = entry.split("=")
         extra_env[k] = v
-    ctx.obj[CI_EXTRA_ENV] = extra_env
+    os.environ.update(extra_env)
     # Start sccache!
     sccache_cache_dir = cache_dir / "sccache"
     sccache_cache_dir.mkdir(exist_ok=True, parents=True)
