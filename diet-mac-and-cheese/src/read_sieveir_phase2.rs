@@ -534,7 +534,9 @@ pub fn read_types(path: &PathBuf) -> Option<TypeStore> {
                 );
                 type_id += 1;
             }
-            g::TypeU::ExtField => {}
+            g::TypeU::ExtField => {
+                panic!("Extension field type not yet supported!");
+            }
             g::TypeU::PluginType => {
                 let plugin = t.element_as_plugin_type().unwrap();
                 let name = plugin.name().unwrap().into();

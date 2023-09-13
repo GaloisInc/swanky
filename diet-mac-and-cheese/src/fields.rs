@@ -70,7 +70,7 @@ fn f384q_modulus_is_correct() {
 }
 
 /// Map a modulus, provided as a [`Number`]s, to its [`TypeId`].
-pub(crate) fn modulus_to_type_id(modulus: Number) -> Result<TypeId> {
+pub fn modulus_to_type_id(modulus: Number) -> Result<TypeId> {
     if modulus == F2_MODULUS {
         Ok(TypeId::of::<F2>())
     } else if modulus == F61P_MODULUS {
