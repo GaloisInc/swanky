@@ -16,22 +16,13 @@ use scuttlebutt::{
 };
 use std::marker::PhantomData;
 use swanky_party::either::PartyEitherCopy;
-use swanky_party::private::ProverPrivateCopy;
+use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
 use swanky_party::{Party, Prover, Verifier, WhichParty, IS_PROVER, IS_VERIFIER};
 
-#[derive(Clone, Copy, Default)]
-struct MultCheckProverState<T> {
-    sum_a0: T,
-    sum_a1: T,
-}
-
-#[derive(Clone, Copy, Default)]
-struct MultCheckVerifierState<T> {
-    sum_b: T,
-}
-
 pub struct MultCheckState<P: Party, T: Copy> {
-    party_sums: PartyEitherCopy<P, MultCheckProverState<T>, MultCheckVerifierState<T>>,
+    sum_a0: ProverPrivateCopy<P, T>,
+    sum_a1: ProverPrivateCopy<P, T>,
+    sum_b: VerifierPrivateCopy<P, T>,
     chi_power: T,
     chi: T,
     count: usize,
@@ -40,34 +31,24 @@ pub struct MultCheckState<P: Party, T: Copy> {
 impl<P: Party, T: FiniteField> MultCheckState<P, T> {
     /// Initialize the state.
     pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
-        let (chi, party_sums) = match P::WHICH {
-            WhichParty::Prover(ev) => {
+        let chi = match P::WHICH {
+            WhichParty::Prover(_) => {
                 channel.flush()?;
-                let chi: T = channel.read_serializable()?;
-                let party_sums: PartyEitherCopy<
-                    P,
-                    MultCheckProverState<T>,
-                    MultCheckVerifierState<T>,
-                > = PartyEitherCopy::prover_new(ev, MultCheckProverState::default());
-
-                (chi, party_sums)
+                channel.read_serializable()?
             }
-            WhichParty::Verifier(ev) => {
+            WhichParty::Verifier(_) => {
                 let chi = T::random(rng);
                 channel.write_serializable::<T>(&chi)?;
                 channel.flush()?;
-                let party_sums: PartyEitherCopy<
-                    P,
-                    MultCheckProverState<T>,
-                    MultCheckVerifierState<T>,
-                > = PartyEitherCopy::verifier_new(ev, MultCheckVerifierState::default());
 
-                (chi, party_sums)
+                chi
             }
         };
 
         Ok(Self {
-            party_sums,
+            sum_a0: ProverPrivateCopy::default(),
+            sum_a1: ProverPrivateCopy::default(),
+            sum_b: VerifierPrivateCopy::default(),
             chi_power: chi,
             chi,
             count: 0,
@@ -76,19 +57,11 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
 
     /// Reset the state.
     fn reset(&mut self) {
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                self.party_sums = PartyEitherCopy::prover_new(ev, MultCheckProverState::default());
-                self.chi_power = self.chi;
-                self.count = 0;
-            }
-            WhichParty::Verifier(ev) => {
-                self.party_sums =
-                    PartyEitherCopy::verifier_new(ev, MultCheckVerifierState::default());
-                self.chi_power = self.chi;
-                self.count = 0;
-            }
-        }
+        self.sum_a0 = ProverPrivateCopy::default();
+        self.sum_a1 = ProverPrivateCopy::default();
+        self.sum_b = VerifierPrivateCopy::default();
+        self.chi_power = self.chi;
+        self.count = 0;
     }
 
     /// Return the number of checks accumulated.
@@ -162,6 +135,12 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
     pub fn count(&self) -> usize {
         self.count
     }
+}
+
+/// Homomorphic commitment scheme.
+pub struct FCom<P: Party, V: Copy, T: Copy, VOLE: SvoleT<PartyEitherCopy<P, (V, T), T>>> {
+    svole: VOLE,
+    voles: Vec<PartyEitherCopy<P, (V, T), T>>,
 }
 
 /// Homomorphic commitment scheme from the prover's point-of-view.
@@ -445,8 +424,8 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         let a0 = x.mac() * y.mac();
         let a1 = y.value(IS_PROVER) * x.mac() + x.value(IS_PROVER) * y.mac() - z.mac();
 
-        state.party_sums.prover_into(IS_PROVER).sum_a0 += a0 * state.chi_power;
-        state.party_sums.prover_into(IS_PROVER).sum_a1 += a1 * state.chi_power;
+        *state.sum_a0.as_mut().into_inner(IS_PROVER) += a0 * state.chi_power;
+        *state.sum_a1.as_mut().into_inner(IS_PROVER) += a1 * state.chi_power;
         state.chi_power *= state.chi;
         state.count += 1;
 
@@ -468,8 +447,8 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         }
         let mask = Mac::<Prover, V, T>::lift(&us);
 
-        let u = state.party_sums.prover_into(IS_PROVER).sum_a0 + mask.mac();
-        let v = state.party_sums.prover_into(IS_PROVER).sum_a1 + mask.value(IS_PROVER);
+        let u = state.sum_a0.into_inner(IS_PROVER) + mask.mac();
+        let v = state.sum_a1.into_inner(IS_PROVER) + mask.value(IS_PROVER);
 
         channel.write_serializable(&u)?;
         channel.write_serializable(&v)?;
@@ -786,7 +765,7 @@ where
         //  quicksilver but simplified out.
         let b = x.mac() * y.mac() + self.delta * z.mac();
 
-        state.party_sums.verifier_into(IS_VERIFIER).sum_b += b * state.chi_power;
+        *state.sum_b.as_mut().into_inner(IS_VERIFIER) += b * state.chi_power;
         state.chi_power *= state.chi;
         state.count += 1;
         Ok(())
@@ -810,7 +789,7 @@ where
         let u = channel.read_serializable::<T>()?;
         let v = channel.read_serializable::<T>()?;
 
-        let b_plus = state.party_sums.verifier_into(IS_VERIFIER).sum_b + mask.mac();
+        let b_plus = state.sum_b.into_inner(IS_VERIFIER) + mask.mac();
         if b_plus == (u + (-self.delta) * v) {
             // - because of delta
             let c = state.count;
