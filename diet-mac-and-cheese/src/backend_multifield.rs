@@ -1508,7 +1508,7 @@ impl<
                     self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
                 }
                 _ => {
-                    todo!("Type not supported yet: {:?}", spec);
+                    bail!("Type not supported yet: {:?}", spec);
                 }
             }
         }

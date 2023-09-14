@@ -2,7 +2,7 @@
 //! SIEVE Circuit IR.
 
 use crate::{
-    fields::modulus_to_type_id,
+    fields::{extension_field_to_type_id, modulus_to_type_id},
     plugins::{Plugin, PluginBody, PluginType},
 };
 use eyre::{bail, ensure, eyre, Result};
@@ -131,9 +131,9 @@ impl GateM {
 /// a `Plugin`.
 #[derive(Clone, Debug)]
 pub enum TypeSpecification {
-    /// The field, stored as a [`TypeId`](std::any::TypeId).
+    /// A field, stored as a [`TypeId`](std::any::TypeId).
     Field(std::any::TypeId),
-    /// The plugin type.
+    /// A plugin type.
     Plugin(PluginType),
 }
 
@@ -180,8 +180,24 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                 mac_n_cheese_sieve_parser::Type::Field { modulus } => {
                     TypeSpecification::Field(modulus_to_type_id(modulus)?)
                 }
-                mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
-                    bail!("Extension fields not supported!")
+                mac_n_cheese_sieve_parser::Type::ExtField {
+                    index,
+                    degree,
+                    modulus,
+                } => {
+                    if index >= i as TypeId {
+                        bail!("Type index too large.");
+                    }
+                    let spec = store.get(&index)?;
+                    let base_type_id = match spec {
+                        TypeSpecification::Field(ty) => *ty,
+                        _ => bail!("Invalid type specification for base field"),
+                    };
+                    TypeSpecification::Field(extension_field_to_type_id(
+                        base_type_id,
+                        degree,
+                        modulus,
+                    )?)
                 }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
