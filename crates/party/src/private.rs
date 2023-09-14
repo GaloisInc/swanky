@@ -187,3 +187,20 @@ impl<P: Party, T: Copy> From<ProverPrivateCopy<P, T>> for ProverPrivate<P, T> {
         Self(x.0.into())
     }
 }
+impl<P: Party, T: PartialEq> PartialEq for ProverPrivate<P, T> {
+    fn eq(&self, other: &Self) -> bool {
+        match P::WHICH {
+            WhichParty::Prover(ev) => self.as_ref().into_inner(ev) == other.as_ref().into_inner(ev),
+            WhichParty::Verifier(_) => true,
+        }
+    }
+}
+
+impl<P: Party, T: Copy + PartialEq> PartialEq for ProverPrivateCopy<P, T> {
+    fn eq(&self, other: &Self) -> bool {
+        match P::WHICH {
+            WhichParty::Prover(ev) => self.into_inner(ev) == other.into_inner(ev),
+            WhichParty::Verifier(_) => true,
+        }
+    }
+}
