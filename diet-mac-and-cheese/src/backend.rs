@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::backend_trait::{BackendT, Party};
-use crate::homcom::{
-    FComProver, FComVerifier, StateMultCheckProver, StateMultCheckVerifier, StateZeroCheckProver,
-    StateZeroCheckVerifier,
-};
+use crate::homcom::{FComProver, FComVerifier, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
 use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
@@ -136,8 +133,8 @@ pub struct DietMacAndCheeseProver<
     pub(crate) prover: FComProver<V, T, VOLE>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    state_mult_check: StateMultCheckProver<T>,
-    state_zero_check: StateZeroCheckProver<T>,
+    state_mult_check: MultCheckState<Prover, T>,
+    state_zero_check: ZeroCheckState<Prover, T>,
     no_batching: bool,
     monitor: Monitor<T>,
 }
@@ -266,8 +263,8 @@ where
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let state_mult_check = StateMultCheckProver::init(channel)?;
-        let state_zero_check = StateZeroCheckProver::init(channel)?;
+        let state_mult_check = MultCheckState::init(channel, &mut rng)?;
+        let state_zero_check = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             prover: FComProver::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
@@ -282,12 +279,12 @@ where
     /// Initialize the verifier by providing a reference to a fcom.
     pub(crate) fn init_with_fcom(
         channel: &mut C,
-        rng: AesRng,
+        mut rng: AesRng,
         fcom: &FComProver<V, T, VOLE>,
         no_batching: bool,
     ) -> Result<Self> {
-        let state_mult_check = StateMultCheckProver::init(channel)?;
-        let state_zero_check = StateZeroCheckProver::init(channel)?;
+        let state_mult_check = MultCheckState::init(channel, &mut rng)?;
+        let state_zero_check = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             prover: fcom.duplicate()?,
             channel: channel.clone(),
@@ -374,8 +371,8 @@ pub struct DietMacAndCheeseVerifier<
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     monitor: Monitor<T>,
-    state_mult_check: StateMultCheckVerifier<T>,
-    state_zero_check: StateZeroCheckVerifier<T>,
+    state_mult_check: MultCheckState<Verifier, T>,
+    state_zero_check: ZeroCheckState<Verifier, T>,
     no_batching: bool,
 }
 
@@ -495,8 +492,8 @@ where
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
-        let state_zero_check = StateZeroCheckVerifier::init(channel, &mut rng)?;
+        let state_mult_check = MultCheckState::init(channel, &mut rng)?;
+        let state_zero_check = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             verifier: FComVerifier::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
@@ -515,8 +512,8 @@ where
         fcom: &FComVerifier<V, T, VOLE>,
         no_batching: bool,
     ) -> Result<Self> {
-        let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
-        let state_zero_check = StateZeroCheckVerifier::init(channel, &mut rng)?;
+        let state_mult_check = MultCheckState::init(channel, &mut rng)?;
+        let state_zero_check = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             verifier: fcom.duplicate()?,
             channel: channel.clone(),
