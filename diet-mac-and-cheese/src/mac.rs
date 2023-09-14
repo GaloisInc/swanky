@@ -19,7 +19,7 @@ fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
 /// The following holds for a global key known `Δ` known only to the verifier:
 /// `t = v · Δ + k`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Mac<P: Party, V: IsSubFieldOf<T>, T: FiniteField>(ProverPrivateCopy<P, V>, T);
+pub struct Mac<P: Party, V: Copy, T>(ProverPrivateCopy<P, V>, T);
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     #[inline]
