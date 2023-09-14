@@ -149,8 +149,13 @@ impl<B: BackendT> ComittedAcc<B> {
     }
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
-    ComittedAcc<DietMacAndCheeseProver<V, F, C, SVOLE>>
+impl<
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel,
+        SvoleFSender: SvoleT<(V, F)>,
+        SvoleFReceiver: SvoleT<F>,
+    > ComittedAcc<DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

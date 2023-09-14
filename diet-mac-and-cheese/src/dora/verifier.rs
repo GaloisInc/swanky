@@ -17,18 +17,28 @@ use super::{
     perm::permutation,
 };
 
-pub struct DoraVerifier<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
-where
+pub struct DoraVerifier<
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel,
+    SvoleFSender: SvoleT<(V, F)>,
+    SvoleFReceiver: SvoleT<F>,
+> where
     F::PrimeField: IsSubFieldOf<V>,
 {
     _ph: std::marker::PhantomData<(F, C)>,
     disj: Disjunction<V>,
-    trace: Vec<Trace<DietMacAndCheeseVerifier<V, F, C, SVOLE>>>,
+    trace: Vec<Trace<DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>>>,
     tx: blake3::Hasher,
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
-    DoraVerifier<V, F, C, SVOLE>
+impl<
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel,
+        SvoleFSender: SvoleT<(V, F)>,
+        SvoleFReceiver: SvoleT<F>,
+    > DoraVerifier<V, F, C, SvoleFSender, SvoleFReceiver>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -43,7 +53,7 @@ where
 
     pub fn mux(
         &mut self,
-        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
+        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
         input: &[Mac<Verifier, V, F>],
     ) -> Result<Vec<Mac<Verifier, V, F>>> {
         // wrap channel in transcript
@@ -73,7 +83,10 @@ where
     }
 
     /// Verifies all the disjuctions and consumes the verifier.
-    pub fn finalize(self, verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>) -> Result<()> {
+    pub fn finalize(
+        self,
+        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
+    ) -> Result<()> {
         // commit and verify all final accumulators
         let mut accs = Vec::with_capacity(self.disj.clauses().len());
         for r1cs in self.disj.clauses() {

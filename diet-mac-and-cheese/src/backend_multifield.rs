@@ -8,7 +8,7 @@ use crate::circuit_ir::{
     WireRange,
 };
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
-use crate::homcom::{FComProver, FComVerifier};
+use crate::homcom::FCom;
 use crate::mac::Mac;
 use crate::memory::Memory;
 use crate::plugins::{DisjunctionBody, PluginExecution};
@@ -45,8 +45,9 @@ use swanky_field::{
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
+use swanky_party::either::PartyEither;
 use swanky_party::private::ProverPrivateCopy;
-use swanky_party::{Prover, Verifier, IS_PROVER};
+use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
 //
@@ -127,8 +128,12 @@ pub trait BackendDisjunctionT: BackendT {
     ) -> Result<Vec<Self::Wire>>;
 }
 
-impl<V: IsSubFieldOf<F40b>, C: AbstractChannel, SVOLE: SvoleT<(V, F40b)>> BackendDisjunctionT
-    for DietMacAndCheeseProver<V, F40b, C, SVOLE>
+impl<
+        V: IsSubFieldOf<F40b>,
+        C: AbstractChannel,
+        SvoleSender: SvoleT<(V, F40b)>,
+        SvoleReceiver: SvoleT<F40b>,
+    > BackendDisjunctionT for DietMacAndCheeseProver<V, F40b, C, SvoleSender, SvoleReceiver>
 where
     <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -141,8 +146,8 @@ where
     }
 }
 
-impl<C: AbstractChannel, SVOLE: SvoleT<(F2, F40b)>> BackendConvT
-    for DietMacAndCheeseProver<F2, F40b, C, SVOLE>
+impl<C: AbstractChannel, SvoleSender: SvoleT<(F2, F40b)>, SvoleReceiver: SvoleT<F40b>> BackendConvT
+    for DietMacAndCheeseProver<F2, F40b, C, SvoleSender, SvoleReceiver>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", w);
@@ -166,8 +171,12 @@ impl<C: AbstractChannel, SVOLE: SvoleT<(F2, F40b)>> BackendConvT
     }
 }
 
-impl<V: IsSubFieldOf<F40b>, C: AbstractChannel, SVOLE: SvoleT<F40b>> BackendDisjunctionT
-    for DietMacAndCheeseVerifier<V, F40b, C, SVOLE>
+impl<
+        V: IsSubFieldOf<F40b>,
+        C: AbstractChannel,
+        SvoleSender: SvoleT<(V, F40b)>,
+        SvoleReceiver: SvoleT<F40b>,
+    > BackendDisjunctionT for DietMacAndCheeseVerifier<V, F40b, C, SvoleSender, SvoleReceiver>
 where
     <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -180,8 +189,8 @@ where
     }
 }
 
-impl<C: AbstractChannel, SVOLE: SvoleT<F40b>> BackendConvT
-    for DietMacAndCheeseVerifier<F2, F40b, C, SVOLE>
+impl<C: AbstractChannel, SvoleSender: SvoleT<(F2, F40b)>, SvoleReceiver: SvoleT<F40b>> BackendConvT
+    for DietMacAndCheeseVerifier<F2, F40b, C, SvoleSender, SvoleReceiver>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         Ok(vec![MacBitGeneric::BitVerifier(*w)])
@@ -234,34 +243,46 @@ impl<E> EdabitsMap<E> {
 pub(crate) struct DietMacAndCheeseConvProver<
     FE: FiniteField,
     C: AbstractChannel,
-    SVOLE1: SvoleT<(F2, F40b)>,
-    SVOLE2: SvoleT<(FE, FE)>,
+    SvoleF2Sender: SvoleT<(F2, F40b)>,
+    SvoleF2Receiver: SvoleT<F40b>,
+    SvoleFESender: SvoleT<(FE, FE)>,
+    SvoleFEReceiver: SvoleT<FE>,
 > {
-    dmc: DietMacAndCheeseProver<FE, FE, C, SVOLE2>,
-    conv: ProverConv<FE, SVOLE1, SVOLE2>,
-    dora: HashMap<usize, DoraState<FE, FE, C, SVOLE2>>,
+    dmc: DietMacAndCheeseProver<FE, FE, C, SvoleFESender, SvoleFEReceiver>,
+    conv: ProverConv<FE, SvoleF2Sender, SvoleF2Receiver, SvoleFESender, SvoleFEReceiver>,
+    dora: HashMap<usize, DoraState<FE, FE, C, SvoleFESender, SvoleFEReceiver>>,
     edabits_map: EdabitsMap<EdabitsProver<FE>>,
-    dmc_f2: DietMacAndCheeseProver<F2, F40b, C, SVOLE1>,
+    dmc_f2: DietMacAndCheeseProver<F2, F40b, C, SvoleF2Sender, SvoleF2Receiver>,
     no_batching: bool,
 }
 
 impl<
         FE: PrimeFiniteField,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, F40b)>,
-        SVOLE2: SvoleT<(FE, FE)>,
-    > DietMacAndCheeseConvProver<FE, C, SVOLE1, SVOLE2>
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    >
+    DietMacAndCheeseConvProver<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &FComProver<F2, F40b, SVOLE1>,
+        fcom_f2: &FCom<Prover, F2, F40b, SvoleF2Sender, SvoleF2Receiver>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let dmc = DietMacAndCheeseProver::<FE, FE, C, SVOLE2>::init(
+        let dmc = DietMacAndCheeseProver::<FE, FE, C, SvoleFESender, SvoleFEReceiver>::init(
             channel,
             rng,
             lpn_setup,
@@ -274,7 +295,7 @@ impl<
             conv,
             dora: Default::default(),
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseProver::<F2, F40b, C, SVOLE1>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseProver::<F2, F40b, C, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -287,22 +308,24 @@ impl<
     pub fn init_with_svole(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &FComProver<F2, F40b, SVOLE1>,
-        svole2: SVOLE2,
+        fcom_f2: &FCom<Prover, F2, F40b, SvoleF2Sender, SvoleF2Receiver>,
+        svole_fe_sender: SvoleFESender,
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
 
         debug!("Steps in init_with_svole: 5 steps");
         debug!("1...");
-        let fcom_prover = FComProver::init_with_vole(svole2)?;
+        let fcom_prover =
+            FCom::init_with_vole(PartyEither::prover_new(IS_PROVER, svole_fe_sender))?;
         debug!("2...");
-        let dmc = DietMacAndCheeseProver::<FE, FE, C, SVOLE2>::init_with_fcom(
-            channel,
-            rng,
-            &fcom_prover,
-            no_batching,
-        )?;
+        let dmc =
+            DietMacAndCheeseProver::<FE, FE, C, SvoleFESender, SvoleFEReceiver>::init_with_fcom(
+                channel,
+                rng,
+                &fcom_prover,
+                no_batching,
+            )?;
         debug!("3...");
         let conv = ProverConv::init_with_fcoms(fcom_f2, dmc.get_party())?;
         debug!("4...");
@@ -311,7 +334,7 @@ impl<
             conv,
             dora: Default::default(),
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseProver::<F2, F40b, C, SVOLE1>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseProver::<F2, F40b, C, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -327,12 +350,23 @@ impl<
 impl<
         FE: PrimeFiniteField,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, F40b)>,
-        SVOLE2: SvoleT<(FE, FE)>,
-    > BackendT for DietMacAndCheeseConvProver<FE, C, SVOLE1, SVOLE2>
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    > BackendT
+    for DietMacAndCheeseConvProver<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
-    type Wire = <DietMacAndCheeseProver<FE, FE, C, SVOLE2> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseProver<FE, FE, C, SVOLE2> as BackendT>::FieldElement;
+    type Wire =
+        <DietMacAndCheeseProver<FE, FE, C, SvoleFESender, SvoleFEReceiver> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseProver<FE, FE, C, SvoleFESender, SvoleFEReceiver> as BackendT>::FieldElement;
 
     fn party(&self) -> Party {
         Party::Prover
@@ -392,9 +426,19 @@ impl<
 impl<
         FE: PrimeFiniteField,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, F40b)>,
-        SVOLE2: SvoleT<(FE, FE)>,
-    > DietMacAndCheeseConvProver<FE, C, SVOLE1, SVOLE2>
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    >
+    DietMacAndCheeseConvProver<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
     fn maybe_do_conversion_check(&mut self, bit_width: usize) -> Result<()> {
         let edabits = self.edabits_map.get_edabits(bit_width).unwrap();
@@ -437,14 +481,15 @@ pub(super) struct DoraState<
     V: IsSubFieldOf<F>,
     F: FiniteField,
     C: AbstractChannel,
-    SVOLE: SvoleT<(V, F)>,
+    SvoleFSender: SvoleT<(V, F)>,
+    SvoleFReceiver: SvoleT<F>,
 > where
     F::PrimeField: IsSubFieldOf<V>,
 {
     // map used to lookup the guard -> active clause index
     clause_resolver: HashMap<F, usize>,
     // dora prover for this particular switch/mux
-    dora: DoraProver<V, F, C, SVOLE>,
+    dora: DoraProver<V, F, C, SvoleFSender, SvoleFReceiver>,
 }
 
 // Note: The restriction to a primefield is not caused by Dora
@@ -452,9 +497,19 @@ pub(super) struct DoraState<
 impl<
         FP: PrimeFiniteField,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, F40b)>,
-        SVOLE2: SvoleT<(FP, FP)>,
-    > BackendDisjunctionT for DietMacAndCheeseConvProver<FP, C, SVOLE1, SVOLE2>
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFPSender: SvoleT<(FP, FP)>,
+        SvoleFPReceiver: SvoleT<FP>,
+    > BackendDisjunctionT
+    for DietMacAndCheeseConvProver<
+        FP,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFPSender,
+        SvoleFPReceiver,
+    >
 {
     fn disjunction(
         &mut self,
@@ -464,13 +519,16 @@ impl<
         fn execute_branch<
             F: FiniteField<PrimeField = F>,
             C: AbstractChannel,
-            SVOLE3: SvoleT<(F, F)>,
+            SvoleFSender: SvoleT<(F, F)>,
+            SvoleFReceiver: SvoleT<F>,
         >(
-            prover: &mut DietMacAndCheeseProver<F, F, C, SVOLE3>,
-            inputs: &[<DietMacAndCheeseProver<F, F, C, SVOLE3> as BackendT>::Wire],
+            prover: &mut DietMacAndCheeseProver<F, F, C, SvoleFSender, SvoleFReceiver>,
+            inputs: &[<DietMacAndCheeseProver<F, F, C, SvoleFSender, SvoleFReceiver> as BackendT>::Wire],
             cond: usize,
-            st: &mut DoraState<F, F, C, SVOLE3>,
-        ) -> Result<Vec<<DietMacAndCheeseProver<F, F, C, SVOLE3> as BackendT>::Wire>> {
+            st: &mut DoraState<F, F, C, SvoleFSender, SvoleFReceiver>,
+        ) -> Result<
+            Vec<<DietMacAndCheeseProver<F, F, C, SvoleFSender, SvoleFReceiver> as BackendT>::Wire>,
+        > {
             // currently only support 1 field element switch
             debug_assert_eq!(cond, 1);
 
@@ -518,9 +576,19 @@ impl<
 impl<
         FE: PrimeFiniteField,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, F40b)>,
-        SVOLE2: SvoleT<(FE, FE)>,
-    > BackendConvT for DietMacAndCheeseConvProver<FE, C, SVOLE1, SVOLE2>
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    > BackendConvT
+    for DietMacAndCheeseConvProver<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", a);
@@ -532,7 +600,12 @@ impl<
             let mac = self
                 .conv
                 .fcom_f2
-                .input1(&mut self.dmc.channel, &mut self.dmc.rng, b2)?;
+                .input1(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    ProverPrivateCopy::new(b2),
+                )?
+                .prover_into(IS_PROVER);
             v.push(Mac::new(ProverPrivateCopy::new(b2), mac));
         }
 
@@ -592,7 +665,7 @@ impl<
         }
 
         debug!("CONV_FROM_BITS {:?}", recomposed_value);
-        let mac = <DietMacAndCheeseProver<FE, FE, C, SVOLE2> as BackendT>::input_private(
+        let mac = <DietMacAndCheeseProver<FE, FE, C, SvoleFESender, SvoleFEReceiver> as BackendT>::input_private(
             &mut self.dmc,
             Some(recomposed_value),
         )?;
@@ -675,30 +748,46 @@ impl<
 pub(crate) struct DietMacAndCheeseConvVerifier<
     FE: FiniteField,
     C: AbstractChannel,
-    SVOLE1: SvoleT<F40b>,
-    SVOLE2: SvoleT<FE>,
+    SvoleF2Sender: SvoleT<(F2, F40b)>,
+    SvoleF2Receiver: SvoleT<F40b>,
+    SvoleFESender: SvoleT<(FE, FE)>,
+    SvoleFEReceiver: SvoleT<FE>,
 > {
-    dmc: DietMacAndCheeseVerifier<FE, FE, C, SVOLE2>,
-    conv: VerifierConv<FE, SVOLE1, SVOLE2>,
-    dora: HashMap<usize, DoraVerifier<FE, FE, C, SVOLE2>>,
+    dmc: DietMacAndCheeseVerifier<FE, FE, C, SvoleFESender, SvoleFEReceiver>,
+    conv: VerifierConv<FE, SvoleF2Sender, SvoleF2Receiver, SvoleFESender, SvoleFEReceiver>,
+    dora: HashMap<usize, DoraVerifier<FE, FE, C, SvoleFESender, SvoleFEReceiver>>,
     edabits_map: EdabitsMap<EdabitsVerifier<FE>>,
-    dmc_f2: DietMacAndCheeseVerifier<F2, F40b, C, SVOLE1>,
+    dmc_f2: DietMacAndCheeseVerifier<F2, F40b, C, SvoleF2Sender, SvoleF2Receiver>,
     no_batching: bool,
 }
 
-impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<FE>>
-    DietMacAndCheeseConvVerifier<FE, C, SVOLE1, SVOLE2>
+impl<
+        FE: PrimeFiniteField,
+        C: AbstractChannel,
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    >
+    DietMacAndCheeseConvVerifier<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &FComVerifier<F2, F40b, SVOLE1>,
+        fcom_f2: &FCom<Verifier, F2, F40b, SvoleF2Sender, SvoleF2Receiver>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
-        let dmc = DietMacAndCheeseVerifier::<FE, FE, C, SVOLE2>::init(
+        let dmc = DietMacAndCheeseVerifier::<FE, FE, C, SvoleFESender, SvoleFEReceiver>::init(
             channel,
             rng,
             lpn_setup,
@@ -711,7 +800,7 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
             conv,
             dora: Default::default(),
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseVerifier::<F2, F40b, C, SVOLE1>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseVerifier::<F2, F40b, C, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -724,26 +813,27 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
     pub fn init_with_svole(
         channel: &mut C,
         mut rng: AesRng,
-        fcom_f2: &FComVerifier<F2, F40b, SVOLE1>,
-        svole2: SVOLE2,
+        fcom_f2: &FCom<Verifier, F2, F40b, SvoleF2Sender, SvoleF2Receiver>,
+        svole2: SvoleFEReceiver,
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = rng.fork();
 
-        let fcom_prover = FComVerifier::init_with_vole(svole2)?;
-        let dmc = DietMacAndCheeseVerifier::<FE, FE, C, SVOLE2>::init_with_fcom(
-            channel,
-            rng,
-            &fcom_prover,
-            no_batching,
-        )?;
+        let fcom_prover = FCom::init_with_vole(PartyEither::verifier_new(IS_VERIFIER, svole2))?;
+        let dmc =
+            DietMacAndCheeseVerifier::<FE, FE, C, SvoleFESender, SvoleFEReceiver>::init_with_fcom(
+                channel,
+                rng,
+                &fcom_prover,
+                no_batching,
+            )?;
         let conv = VerifierConv::init_with_fcoms(fcom_f2, dmc.get_party())?;
         Ok(DietMacAndCheeseConvVerifier {
             dmc,
             conv,
             dora: Default::default(),
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheeseVerifier::<F2, F40b, C, SVOLE1>::init_with_fcom(
+            dmc_f2: DietMacAndCheeseVerifier::<F2, F40b, C, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                 channel,
                 rng2,
                 fcom_f2,
@@ -754,11 +844,26 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
     }
 }
 
-impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<FE>> BackendT
-    for DietMacAndCheeseConvVerifier<FE, C, SVOLE1, SVOLE2>
+impl<
+        FE: PrimeFiniteField,
+        C: AbstractChannel,
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    > BackendT
+    for DietMacAndCheeseConvVerifier<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
-    type Wire = <DietMacAndCheeseVerifier<FE, FE, C, SVOLE2> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseVerifier<FE, FE, C, SVOLE2> as BackendT>::FieldElement;
+    type Wire =
+        <DietMacAndCheeseVerifier<FE, FE, C, SvoleFESender, SvoleFEReceiver> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseVerifier<FE, FE, C, SvoleFESender, SvoleFEReceiver> as BackendT>::FieldElement;
 
     fn party(&self) -> Party {
         Party::Verifier
@@ -813,8 +918,22 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
     }
 }
 
-impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<FE>>
-    DietMacAndCheeseConvVerifier<FE, C, SVOLE1, SVOLE2>
+impl<
+        FE: PrimeFiniteField,
+        C: AbstractChannel,
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    >
+    DietMacAndCheeseConvVerifier<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
     fn maybe_do_conversion_check(&mut self, bit_width: usize) -> Result<()> {
         let edabits = self.edabits_map.get_edabits(bit_width).unwrap();
@@ -853,8 +972,22 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
     }
 }
 
-impl<FP: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<FP>>
-    BackendDisjunctionT for DietMacAndCheeseConvVerifier<FP, C, SVOLE1, SVOLE2>
+impl<
+        FP: PrimeFiniteField,
+        C: AbstractChannel,
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF40bReceiver: SvoleT<F40b>,
+        SvoleFPSender: SvoleT<(FP, FP)>,
+        SvoleFPReceiver: SvoleT<FP>,
+    > BackendDisjunctionT
+    for DietMacAndCheeseConvVerifier<
+        FP,
+        C,
+        SvoleF2Sender,
+        SvoleF40bReceiver,
+        SvoleFPSender,
+        SvoleFPReceiver,
+    >
 {
     fn disjunction(
         &mut self,
@@ -873,8 +1006,22 @@ impl<FP: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
     }
 }
 
-impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<FE>>
-    BackendConvT for DietMacAndCheeseConvVerifier<FE, C, SVOLE1, SVOLE2>
+impl<
+        FE: PrimeFiniteField,
+        C: AbstractChannel,
+        SvoleF2Sender: SvoleT<(F2, F40b)>,
+        SvoleF2Receiver: SvoleT<F40b>,
+        SvoleFESender: SvoleT<(FE, FE)>,
+        SvoleFEReceiver: SvoleT<FE>,
+    > BackendConvT
+    for DietMacAndCheeseConvVerifier<
+        FE,
+        C,
+        SvoleF2Sender,
+        SvoleF2Receiver,
+        SvoleFESender,
+        SvoleFEReceiver,
+    >
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         let mut v = Vec::with_capacity(FE::NumberOfBitsInBitDecomposition::to_usize());
@@ -882,7 +1029,12 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
             let mac = self
                 .conv
                 .fcom_f2
-                .input1(&mut self.dmc.channel, &mut self.dmc.rng)?;
+                .input1(
+                    &mut self.dmc.channel,
+                    &mut self.dmc.rng,
+                    ProverPrivateCopy::empty(IS_VERIFIER),
+                )?
+                .verifier_into(IS_VERIFIER);
             v.push(mac);
         }
 
@@ -929,10 +1081,11 @@ impl<FE: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: Svo
             }
         }
 
-        let mac = <DietMacAndCheeseVerifier<FE, FE, _, SVOLE2> as BackendT>::input_private(
-            &mut self.dmc,
-            None,
-        )?;
+        let mac =
+            <DietMacAndCheeseVerifier<FE, FE, _, SvoleFESender, SvoleFEReceiver> as BackendT>::input_private(
+                &mut self.dmc,
+                None,
+            )?;
 
         let bit_width = bits.len();
         self.edabits_map
@@ -1341,12 +1494,12 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
 /// Evaluator for Circuit IR (a.k.a. SIEVE IR0+)
 pub struct EvaluatorCirc<
     C: AbstractChannel + 'static,
-    SvoleF2Prover: SvoleT<(F2, F40b)>,
-    SvoleF2Verifier: SvoleT<F40b>,
+    SvoleF2Sender: SvoleT<(F2, F40b)>,
+    SvoleF2Receiver: SvoleT<F40b>,
 > {
     inputs: CircInputs,
-    fcom_f2_prover: Option<FComProver<F2, F40b, SvoleF2Prover>>,
-    fcom_f2_verifier: Option<FComVerifier<F2, F40b, SvoleF2Verifier>>,
+    fcom_f2_prover: Option<FCom<Prover, F2, F40b, SvoleF2Sender, SvoleF2Receiver>>,
+    fcom_f2_verifier: Option<FCom<Verifier, F2, F40b, SvoleF2Sender, SvoleF2Receiver>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT>>,
     f2_idx: usize,
@@ -1359,9 +1512,9 @@ pub struct EvaluatorCirc<
 
 impl<
         C: AbstractChannel + 'static,
-        SvoleF2Prover: SvoleT<(F2, F40b)> + 'static,
-        SvoleF2Verifier: SvoleT<F40b> + 'static,
-    > EvaluatorCirc<C, SvoleF2Prover, SvoleF2Verifier>
+        SvoleF2Sender: SvoleT<(F2, F40b)> + 'static,
+        SvoleF2Receiver: SvoleT<F40b> + 'static,
+    > EvaluatorCirc<C, SvoleF2Sender, SvoleF2Receiver>
 {
     // TODO: Factorize interface for `new_with_prover` and `new_with_verifier`
     pub fn new(
@@ -1383,17 +1536,13 @@ impl<
             lpn_extend = LPN_EXTEND_MEDIUM;
         }
         let fcom_f2_prover = if party == Party::Prover {
-            Some(FComProver::<F2, F40b, SvoleF2Prover>::init(
-                channel, &mut rng, lpn_setup, lpn_extend,
-            )?)
+            Some(FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?)
         } else {
             None
         };
 
         let fcom_f2_verifier = if party == Party::Verifier {
-            Some(FComVerifier::<F2, F40b, SvoleF2Verifier>::init(
-                channel, &mut rng, lpn_setup, lpn_extend,
-            )?)
+            Some(FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?)
         } else {
             None
         };
@@ -1447,7 +1596,10 @@ impl<
                 .unwrap();
                 svole_sender.run(&mut channel_vole, &mut rng2).unwrap();
             });
-            let fcom_f2_prover = Some(FComProver::<F2, F40b, _>::init_with_vole(svole_atomic2)?);
+            let fcom_f2_prover = Some(FCom::init_with_vole(PartyEither::prover_new(
+                IS_PROVER,
+                svole_atomic2,
+            ))?);
             Ok((
                 EvaluatorCirc {
                     party,
@@ -1480,8 +1632,10 @@ impl<
                 .unwrap();
                 svole_receiver.run(&mut channel_vole, &mut rng2).unwrap();
             });
-            let fcom_f2_verifier =
-                Some(FComVerifier::<F2, F40b, _>::init_with_vole(svole_atomic2)?);
+            let fcom_f2_verifier = Some(FCom::init_with_vole(PartyEither::verifier_new(
+                IS_VERIFIER,
+                svole_atomic2,
+            ))?);
             Ok((
                 EvaluatorCirc {
                     party,
@@ -1537,7 +1691,14 @@ impl<
         };
         if self.party == Party::Prover {
             let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-            let dmc = DietMacAndCheeseConvProver::<FE, _, SvoleF2Prover, SvoleSender<FE>>::init(
+            let dmc = DietMacAndCheeseConvProver::<
+                FE,
+                _,
+                SvoleF2Sender,
+                SvoleF2Receiver,
+                SvoleSender<FE>,
+                SvoleReceiver<FE, FE>,
+            >::init(
                 channel,
                 rng,
                 fcom_f2,
@@ -1553,7 +1714,9 @@ impl<
             let dmc = DietMacAndCheeseConvVerifier::<
                 FE,
                 _,
-                SvoleF2Verifier,
+                SvoleF2Sender,
+                SvoleF2Receiver,
+                SvoleSender<FE>,
                 SvoleReceiver<FE, FE>,
             >::init(
                 channel,
@@ -1585,7 +1748,7 @@ impl<
             // Note for F2 we do not use the backend with Conv, simply dietMC
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseProver::<F2, F40b, _, SvoleF2Prover>::init_with_fcom(
+                let dmc = DietMacAndCheeseProver::<F2, F40b, _, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                     channel,
                     rng,
                     fcom_f2,
@@ -1594,7 +1757,7 @@ impl<
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             } else {
                 let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleF2Verifier>::init_with_fcom(
+                let dmc = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                     channel,
                     rng,
                     fcom_f2,
@@ -1698,7 +1861,7 @@ impl<
         info!("loading field F2");
         let back: Box<dyn EvaluatorT> = if self.party == Party::Prover {
             let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-            let dmc = DietMacAndCheeseProver::<F2, F40b, _, SvoleF2Prover>::init_with_fcom(
+            let dmc = DietMacAndCheeseProver::<F2, F40b, _, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                 channel,
                 rng,
                 fcom_f2,
@@ -1707,7 +1870,7 @@ impl<
             Box::new(EvaluatorSingle::new(dmc, true))
         } else {
             let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-            let dmc = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleF2Verifier>::init_with_fcom(
+            let dmc = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleF2Sender, SvoleF2Receiver>::init_with_fcom(
                 channel,
                 rng,
                 fcom_f2,
@@ -1765,14 +1928,12 @@ impl<
             let dmc = DietMacAndCheeseConvProver::<
                 FE,
                 _,
-                SvoleF2Prover,
+                SvoleF2Sender,
+                SvoleF2Receiver,
                 SvoleAtomic<(FE, FE)>,
+                SvoleAtomic<FE>,
             >::init_with_svole(
-                channel,
-                rng,
-                fcom_f2,
-                svole_atomic2,
-                self.no_batching,
+                channel, rng, fcom_f2, svole_atomic2, self.no_batching
             )?;
             debug!("Starting DietMacAndCheeseConvProver ... DONE");
             back = Box::new(EvaluatorSingle::new(dmc, false));
@@ -1798,17 +1959,15 @@ impl<
             });
             let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
             let dmc = DietMacAndCheeseConvVerifier::<
-                    FE,
-                    _,
-                    SvoleF2Verifier,
-                    SvoleAtomic<FE>,
-                >::init_with_svole(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    svole_atomic2,
-                    self.no_batching,
-                )?;
+                FE,
+                _,
+                SvoleF2Sender,
+                SvoleF2Receiver,
+                SvoleAtomic<(FE, FE)>,
+                SvoleAtomic<FE>,
+            >::init_with_svole(
+                channel, rng, fcom_f2, svole_atomic2, self.no_batching
+            )?;
             back = Box::new(EvaluatorSingle::new(dmc, false));
             self.eval.push(back);
             self.multithreaded_voles.push(Box::new(svole_atomic3));

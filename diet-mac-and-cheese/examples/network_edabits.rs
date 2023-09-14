@@ -11,8 +11,20 @@ use std::path::Path;
 use std::time::Instant;
 use swanky_field_binary::{F40b, F2};
 
-type Prover = ProverConv<F61p, SvoleSender<F40b>, SvoleSender<F61p>>;
-type Verifier = VerifierConv<F61p, SvoleReceiver<F2, F40b>, SvoleReceiver<F61p, F61p>>;
+type Prover = ProverConv<
+    F61p,
+    SvoleSender<F40b>,
+    SvoleReceiver<F2, F40b>,
+    SvoleSender<F61p>,
+    SvoleReceiver<F61p, F61p>,
+>;
+type Verifier = VerifierConv<
+    F61p,
+    SvoleSender<F40b>,
+    SvoleReceiver<F2, F40b>,
+    SvoleSender<F61p>,
+    SvoleReceiver<F61p, F61p>,
+>;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NB_BITS: &str = "38";

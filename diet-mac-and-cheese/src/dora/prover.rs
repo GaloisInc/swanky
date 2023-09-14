@@ -18,8 +18,13 @@ use super::{
     perm::permutation,
 };
 
-pub struct DoraProver<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
-where
+pub struct DoraProver<
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel,
+    SvoleFSender: SvoleT<(V, F)>,
+    SvoleFReceiver: SvoleT<F>,
+> where
     F::PrimeField: IsSubFieldOf<V>,
 {
     calls: usize,
@@ -27,11 +32,16 @@ where
     _ph: std::marker::PhantomData<(F, C)>,
     accs: Vec<acc::Accumulator<V>>, // current state of accumulator
     disj: Disjunction<V>,
-    trace: Vec<Trace<DietMacAndCheeseProver<V, F, C, SVOLE>>>,
+    trace: Vec<Trace<DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>>,
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
-    DoraProver<V, F, C, SVOLE>
+impl<
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel,
+        SvoleFSender: SvoleT<(V, F)>,
+        SvoleFReceiver: SvoleT<F>,
+    > DoraProver<V, F, C, SvoleFSender, SvoleFReceiver>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -56,7 +66,7 @@ where
     // returns commitments to the output
     pub fn mux(
         &mut self,
-        prover: &mut DietMacAndCheeseProver<V, F, C, SVOLE>,
+        prover: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
         input: &[Mac<Prover, V, F>],
         opt: usize,
     ) -> Result<Vec<Mac<Prover, V, F>>> {
@@ -113,7 +123,10 @@ where
     }
 
     /// Simply verify all the final accumulators using MacAndCheese
-    pub fn finalize(self, prover: &mut DietMacAndCheeseProver<V, F, C, SVOLE>) -> Result<()>
+    pub fn finalize(
+        self,
+        prover: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
+    ) -> Result<()>
     where
         F::PrimeField: IsSubFieldOf<V>,
     {
@@ -205,17 +218,25 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut prover: DietMacAndCheeseProver<F61p, F61p, _, SvoleSender<F61p>> =
-                DietMacAndCheeseProver::init(
-                    &mut channel,
-                    rng,
-                    LPN_SETUP_SMALL,
-                    LPN_EXTEND_SMALL,
-                    false,
-                )
-                .unwrap();
+            let mut prover: DietMacAndCheeseProver<
+                F61p,
+                F61p,
+                _,
+                SvoleSender<F61p>,
+                SvoleReceiver<F61p, F61p>,
+            > = DietMacAndCheeseProver::init(
+                &mut channel,
+                rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                false,
+            )
+            .unwrap();
 
-            let mut disj = DoraProver::<F61p, F61p, _, SvoleSender<F61p>>::new(range_check);
+            let mut disj =
+                DoraProver::<F61p, F61p, _, SvoleSender<F61p>, SvoleReceiver<F61p, F61p>>::new(
+                    range_check,
+                );
 
             println!("warm up");
             prover.input_private(Some(F61p::ONE)).unwrap();
@@ -241,15 +262,20 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<F61p, F61p, _, SvoleReceiver<F61p, F61p>> =
-            DietMacAndCheeseVerifier::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
+        let mut dmc: DietMacAndCheeseVerifier<
+            F61p,
+            F61p,
+            _,
+            SvoleSender<F61p>,
+            SvoleReceiver<F61p, F61p>,
+        > = DietMacAndCheeseVerifier::init(
+            &mut channel,
+            rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+            false,
+        )
+        .unwrap();
 
         dmc.input_private(None).unwrap();
 
