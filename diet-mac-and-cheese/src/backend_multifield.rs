@@ -4,8 +4,8 @@
 
 use crate::backend_trait::Party;
 use crate::circuit_ir::{
-    CircInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
-    WireRange,
+    CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore,
+    WireCount, WireId, WireRange,
 };
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
@@ -1066,7 +1066,7 @@ trait EvaluatorT {
         plugin: &PluginExecution,
     ) -> Result<()>;
 
-    fn push_frame(&mut self, args_count: &Option<WireId>, vector_size: &Option<WireId>);
+    fn push_frame(&mut self, compiled_info: &CompiledInfo);
     fn pop_frame(&mut self);
     fn allocate_new(&mut self, first_id: WireId, last_id: WireId);
     // TODO: Make allocate_slice return a result in case the operation violate some memory management
@@ -1328,8 +1328,8 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
         }
     }
 
-    fn push_frame(&mut self, args_count: &Option<WireId>, vector_size: &Option<WireId>) {
-        self.memory.push_frame(args_count, vector_size);
+    fn push_frame(&mut self, compiled_info: &CompiledInfo) {
+        self.memory.push_frame(compiled_info);
     }
 
     fn pop_frame(&mut self) {
@@ -2042,8 +2042,7 @@ impl<
         // We use the analysis on function body to find the types used in the body and only push a frame to those field backends.
         // TODO: currently push the size of args or vec without differentiating based on type.
         for ty in func.compiled_info.type_ids.iter() {
-            self.eval[*ty as usize]
-                .push_frame(&func.compiled_info.args_count, &func.compiled_info.body_max);
+            self.eval[*ty as usize].push_frame(&func.compiled_info);
         }
 
         let mut prev = 0;
