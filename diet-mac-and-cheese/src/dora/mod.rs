@@ -33,6 +33,19 @@ pub use verifier::DoraVerifier;
 
 use crate::circuit_ir::{GateM, TypeId};
 
+use generic_array::typenum::Unsigned;
+
+// We periodically compact the trace to ensure a constant memory consumption.
+//
+// Making this a multiple of the number of clauses ensures that the
+// asymptotic cost of a disjunction is the cost of a single clause
+const COMPACT_MUL: usize = 10;
+const COMPACT_MIN: usize = 1000;
+
+fn fiat_shamir<F: FiniteField>() -> bool {
+    <F as FiniteField>::NumberOfBitsInBitDecomposition::to_usize() > 100
+}
+
 // a restricted set of gates possible in clauses
 #[derive(Debug, Clone, Copy)]
 enum DisjGate<F: FiniteField> {
@@ -41,6 +54,7 @@ enum DisjGate<F: FiniteField> {
     Sub(WireId, WireId, WireId),
     Mul(WireId, WireId, WireId),
     Copy(WireId, WireId),
+    // not yet supported
     Witness(WireId),
     Constant(WireId, F),
     AddConstant(WireId, WireId, F),
