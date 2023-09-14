@@ -9,7 +9,7 @@ use crate::circuit_ir::{
 };
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::{FComProver, FComVerifier};
-use crate::mac::{MacProver, MacVerifier};
+use crate::mac::Mac;
 use crate::memory::Memory;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
@@ -45,6 +45,8 @@ use swanky_field::{
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
+use swanky_party::private::ProverPrivateCopy;
+use swanky_party::{Prover, Verifier, IS_PROVER};
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
 //
@@ -100,8 +102,8 @@ fn conversion_param_b_valid() {
 
 #[derive(Clone, Debug)]
 pub enum MacBitGeneric {
-    BitProver(MacProver<F2, F40b>),
-    BitVerifier(MacVerifier<F40b>),
+    BitProver(Mac<Prover, F2, F40b>),
+    BitVerifier(Mac<Verifier, F2, F40b>),
     BitPublic(F2),
 }
 
@@ -473,7 +475,7 @@ impl<
             debug_assert_eq!(cond, 1);
 
             // so the guard is the last input
-            let guard_val = inputs[inputs.len() - 1].value();
+            let guard_val = inputs[inputs.len() - 1].value(IS_PROVER);
 
             // lookup the clause based on the guard
             let opt = *st
@@ -522,7 +524,7 @@ impl<
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         debug!("CONV_TO_BITS {:?}", a);
-        let bits = a.value().bit_decomposition();
+        let bits = a.value(IS_PROVER).bit_decomposition();
 
         let mut v = Vec::with_capacity(bits.len());
         for b in bits {
@@ -531,7 +533,7 @@ impl<
                 .conv
                 .fcom_f2
                 .input1(&mut self.dmc.channel, &mut self.dmc.rng, b2)?;
-            v.push(MacProver::new(b2, mac));
+            v.push(Mac::new(ProverPrivateCopy::new(b2), mac));
         }
 
         less_than_eq_with_public(
@@ -563,7 +565,7 @@ impl<
         for xx in x {
             match xx {
                 MacBitGeneric::BitProver(m) => {
-                    recomposed_value += (if m.value() == F2::ONE {
+                    recomposed_value += (if m.value(IS_PROVER) == F2::ONE {
                         FE::ONE
                     } else {
                         FE::ZERO

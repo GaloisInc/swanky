@@ -2,6 +2,7 @@ use eyre::Result;
 
 use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel};
 use swanky_field::IsSubFieldOf;
+use swanky_party::IS_PROVER;
 
 use crate::{backend_trait::BackendT, svole_trait::SvoleT, DietMacAndCheeseProver};
 
@@ -161,11 +162,11 @@ where
         debug_assert!(self.err.len() >= clause.rows());
 
         for i in 0..clause.dim() {
-            wit.push(self.wit[i].value());
+            wit.push(self.wit[i].value(IS_PROVER));
         }
 
         for i in 0..clause.rows() {
-            err.push(self.err[i].value());
+            err.push(self.err[i].value(IS_PROVER));
         }
 
         let acc = Accumulator { wit, err };

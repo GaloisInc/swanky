@@ -2,11 +2,12 @@ use eyre::Result;
 use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
 use std::iter;
 use swanky_field::IsSubFieldOf;
+use swanky_party::{private::ProverPrivateCopy, Prover, Verifier, IS_PROVER};
 
 use crate::{
     backend_trait::BackendT,
     homcom::{FComProver, FComVerifier},
-    mac::{MacProver, MacVerifier},
+    mac::Mac,
     svole_trait::SvoleT,
     DietMacAndCheeseProver, DietMacAndCheeseVerifier,
 };
@@ -39,7 +40,7 @@ fn prover_commit_vec<
     rng: &mut AesRng,
     sec: impl IntoIterator<Item = V>, // secret values
     len: usize,                       // padded length
-) -> Result<impl Iterator<Item = MacProver<V, F>>>
+) -> Result<impl Iterator<Item = Mac<Prover, V, F>>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -54,7 +55,7 @@ where
     Ok(tag
         .into_iter()
         .zip(pad.into_iter())
-        .map(|(t, v)| MacProver::new(v, t)))
+        .map(|(t, v)| Mac::new(ProverPrivateCopy::new(v), t)))
 }
 
 fn verifier_commit_vec<
@@ -68,7 +69,7 @@ fn verifier_commit_vec<
     channel: &mut C,
     rng: &mut AesRng,
     len: usize, // padded length
-) -> Result<impl Iterator<Item = MacVerifier<F>>>
+) -> Result<impl Iterator<Item = Mac<Verifier, V, F>>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -173,7 +174,7 @@ where
         let mut wit = Vec::with_capacity(clause.dim());
         debug_assert!(self.wit.len() >= clause.dim());
         for i in 0..clause.dim() {
-            wit.push(self.wit[i].value());
+            wit.push(self.wit[i].value(IS_PROVER));
         }
         ExtendedWitness {
             inputs: clause.input,

@@ -1,10 +1,11 @@
 use eyre::Result;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
+use swanky_party::Verifier;
 
 use crate::{
     dora::{comm::CommittedCrossTerms, tx::TxChannel},
-    mac::MacVerifier,
+    mac::Mac,
     svole_trait::SvoleT,
     DietMacAndCheeseVerifier,
 };
@@ -43,8 +44,8 @@ where
     pub fn mux(
         &mut self,
         verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
-        input: &[MacVerifier<F>],
-    ) -> Result<Vec<MacVerifier<F>>> {
+        input: &[Mac<Verifier, V, F>],
+    ) -> Result<Vec<Mac<Verifier, V, F>>> {
         // wrap channel in transcript
         let mut ch = TxChannel::new(verifier.channel.clone(), &mut self.tx);
 

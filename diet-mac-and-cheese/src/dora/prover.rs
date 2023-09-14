@@ -2,10 +2,11 @@ use eyre::Result;
 
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
+use swanky_party::{Prover, IS_PROVER};
 
 use crate::{
     dora::{comm::CommittedWitness, tx::TxChannel},
-    mac::MacProver,
+    mac::Mac,
     svole_trait::SvoleT,
     DietMacAndCheeseProver,
 };
@@ -56,14 +57,14 @@ where
     pub fn mux(
         &mut self,
         prover: &mut DietMacAndCheeseProver<V, F, C, SVOLE>,
-        input: &[MacProver<V, F>],
+        input: &[Mac<Prover, V, F>],
         opt: usize,
-    ) -> Result<Vec<MacProver<V, F>>> {
+    ) -> Result<Vec<Mac<Prover, V, F>>> {
         // retrieve R1CS for active clause
         let clause = self.disj.clause(opt);
 
         // compute extended witness for the clause
-        let wit = clause.compute_witness(input.iter().map(|inp| inp.value()));
+        let wit = clause.compute_witness(input.iter().map(|inp| inp.value(IS_PROVER)));
         debug_assert!(wit.check(clause));
 
         // compute cross terms with accumulator

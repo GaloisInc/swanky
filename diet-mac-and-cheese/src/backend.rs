@@ -5,7 +5,7 @@ use crate::homcom::{
     FComProver, FComVerifier, StateMultCheckProver, StateMultCheckVerifier, StateZeroCheckProver,
     StateZeroCheckVerifier,
 };
-use crate::mac::{MacProver, MacVerifier};
+use crate::mac::Mac;
 use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
 use eyre::{eyre, Result};
@@ -13,6 +13,8 @@ use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_party::private::ProverPrivateCopy;
+use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -145,14 +147,14 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    type Wire = MacProver<V, T>;
+    type Wire = Mac<Prover, V, T>;
     type FieldElement = V;
 
     fn party(&self) -> Party {
         Party::Prover
     }
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
-        Some(wire.value())
+        Some(wire.value(IS_PROVER))
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
@@ -195,8 +197,8 @@ where
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mul();
-        let a_clr = a.value();
-        let b_clr = b.value();
+        let a_clr = a.value(IS_PROVER);
+        let b_clr = b.value(IS_PROVER);
         let product = a_clr * b_clr;
 
         let out = self.input(product)?;
@@ -225,7 +227,7 @@ where
 
     fn input_public(&mut self, value: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
-        Ok(MacProver::new(value, T::ZERO))
+        Ok(Mac::new(ProverPrivateCopy::new(value), T::ZERO))
     }
 
     fn input_private(&mut self, value: Option<Self::FieldElement>) -> Result<Self::Wire> {
@@ -302,9 +304,9 @@ where
         &self.prover
     }
 
-    fn input(&mut self, v: V) -> Result<MacProver<V, T>> {
+    fn input(&mut self, v: V) -> Result<Mac<Prover, V, T>> {
         let tag = self.prover.input1(&mut self.channel, &mut self.rng, v);
-        Ok(MacProver::new(v, tag?))
+        Ok(Mac::new(ProverPrivateCopy::new(v), tag?))
     }
 
     fn do_mult_check(&mut self) -> Result<usize> {
@@ -328,7 +330,7 @@ where
         Ok(cnt)
     }
 
-    fn push_check_zero(&mut self, e: &MacProver<V, T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &Mac<Prover, V, T>) -> Result<()> {
         if self.no_batching {
             self.prover.check_zero(&mut self.channel, &[*e])?;
             return Ok(());
@@ -382,7 +384,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>> Ba
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    type Wire = MacVerifier<T>;
+    type Wire = Mac<Verifier, V, T>;
     type FieldElement = V;
 
     fn party(&self) -> Party {
@@ -451,7 +453,10 @@ where
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
-        Ok(MacVerifier::new(-val * self.get_party().get_delta()))
+        Ok(Mac::new(
+            ProverPrivateCopy::empty(IS_VERIFIER),
+            -val * self.get_party().get_delta(),
+        ))
     }
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
@@ -528,7 +533,7 @@ where
         &self.verifier
     }
 
-    fn input(&mut self) -> Result<MacVerifier<T>> {
+    fn input(&mut self) -> Result<Mac<Verifier, V, T>> {
         self.verifier.input1(&mut self.channel, &mut self.rng)
     }
 
@@ -553,7 +558,7 @@ where
         Ok(cnt)
     }
 
-    fn push_check_zero(&mut self, e: &MacVerifier<T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &Mac<Verifier, V, T>) -> Result<()> {
         if self.no_batching {
             self.verifier
                 .check_zero(&mut self.channel, &mut self.rng, &[*e])?;
@@ -605,6 +610,7 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_party::IS_PROVER;
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()
     where
@@ -650,7 +656,7 @@ mod tests {
             let two_priv = dmc.input_private(Some(two)).unwrap();
             let six = dmc.mul(&two_priv, &three_pub).unwrap();
             let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-            assert_eq!(twelve_priv.value(), three * two * two);
+            assert_eq!(twelve_priv.value(IS_PROVER), three * two * two);
             let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
             let r_zero_priv = dmc
                 .add_constant(&n24_priv, -(three * two * two * two))
