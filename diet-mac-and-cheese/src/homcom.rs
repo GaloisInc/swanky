@@ -41,7 +41,7 @@ impl<FE> Drop for StateMultCheckProver<FE> {
 
 impl<T: FiniteField> StateMultCheckProver<T> {
     /// Initialize the state.
-    pub fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self> {
         channel.flush()?;
         let chi = channel.read_serializable()?;
         Ok(StateMultCheckProver {
@@ -54,15 +54,45 @@ impl<T: FiniteField> StateMultCheckProver<T> {
     }
 
     /// Reset the state.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.sum_a0 = T::ZERO;
         self.sum_a1 = T::ZERO;
         self.chi_power = self.chi;
         self.cnt = 0;
     }
 
+    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(
+        &mut self,
+        triple: &(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>),
+    ) {
+        let (x, y, z) = triple;
+        let a0 = x.mac() * y.mac();
+        let a1 = y.value() * x.mac() + x.value() * y.mac() - z.mac();
+
+        self.sum_a0 += a0 * self.chi_power;
+        self.sum_a1 += a1 * self.chi_power;
+        self.chi_power *= self.chi;
+        self.cnt += 1;
+    }
+
+    pub(crate) fn finalize<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        mask: MacProver<T, T>,
+    ) -> Result<usize> {
+        let u = self.sum_a0 + mask.mac();
+        let v = self.sum_a1 + mask.value();
+
+        channel.write_serializable(&u)?;
+        channel.write_serializable(&v)?;
+        channel.flush()?;
+        let c = self.cnt;
+        self.reset();
+        Ok(c)
+    }
+
     /// Return the number of checks accumulated.
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.cnt
     }
 }
@@ -88,7 +118,7 @@ impl<T> Drop for StateZeroCheckProver<T> {
 
 impl<T: FiniteField> StateZeroCheckProver<T> {
     /// Initialize the state.
-    pub fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel>(channel: &mut C) -> Result<Self> {
         let seed = channel.read_block()?;
         let rng = AesRng::from_seed(seed);
 
@@ -108,8 +138,34 @@ impl<T: FiniteField> StateZeroCheckProver<T> {
         self.b = true;
     }
 
+    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(&mut self, mac: &MacProver<V, T>) -> Result<()> {
+        let chi = T::random(&mut self.rng);
+        self.m += chi * mac.mac();
+        self.cnt += 1;
+        let result = mac.value() == V::ZERO;
+        if !result {
+            warn!("accumulating a value that's not zero");
+        }
+        self.b = self.b && result;
+        Ok(())
+    }
+
+    pub(crate) fn finalize<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<usize> {
+        channel.write_serializable::<T>(&self.m)?;
+        channel.flush()?;
+
+        if self.b {
+            let cnt = self.cnt;
+            self.reset();
+            Ok(cnt)
+        } else {
+            self.reset();
+            bail!("check zero failed")
+        }
+    }
+
     /// Return the number of checks accumulated.
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.cnt
     }
 }
@@ -159,10 +215,12 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
             Some(e) => Ok(MacProver::new(e.0, e.1)),
             None => {
                 self.svole_sender.extend(channel, rng, &mut self.voles)?;
-                match self.voles.pop() {
-                    Some(e) => Ok(MacProver::new(e.0, e.1)),
-                    None => Err(eyre!("svole failed for random")),
-                }
+                assert_ne!(
+                    self.voles.len(),
+                    0,
+                    "VOLE extension should always produce VOLEs"
+                );
+                self.random(channel, rng)
             }
         }
     }
@@ -254,61 +312,15 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         let mut m = T::ZERO;
         let mut b = true;
         for mac in x_mac_batch.iter() {
-            let (x, x_mac) = mac.decompose();
-            b = b && x == V::ZERO;
             let chi = T::random(&mut rng);
-            m += chi * x_mac;
+            m += chi * mac.mac();
+            b = b && mac.value() == V::ZERO;
         }
         channel.write_serializable::<T>(&m)?;
         channel.flush()?;
 
-        if b {
-            Ok(())
-        } else {
-            warn!("check_zero fails");
-            Err(eyre!("check_zero failed"))
-        }
-    }
-
-    /// Accumulate a value to zero check into a state.
-    pub fn check_zero_accumulate(
-        &mut self,
-        a: &MacProver<V, T>,
-        state: &mut StateZeroCheckProver<T>,
-    ) -> Result<()> {
-        debug!("check_zero_accumulate");
-        let (x, x_mac) = a.decompose();
-        let b = x == V::ZERO;
-        let chi = T::random(&mut state.rng);
-        state.m += chi * x_mac;
-        state.cnt += 1;
-
-        if !b {
-            warn!("accumulating a value that's not zero");
-        }
-        state.b = state.b && b;
-        Ok(())
-    }
-
-    /// Finalize check zero of a state and return how many values were checked.
-    pub fn check_zero_finalize<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        state: &mut StateZeroCheckProver<T>,
-    ) -> Result<usize> {
-        debug!("check_zero_finalize");
-        channel.write_serializable::<T>(&state.m)?;
-        channel.flush()?;
-
-        if !state.b {
-            state.reset();
-            return Err(eyre!("check_zero failed"));
-        }
-        let cnt = state.cnt;
-        let b = state.b;
-        state.reset();
         ensure!(b, "check zero failed");
-        Ok(cnt)
+        Ok(())
     }
 
     /// Open a batch of [`MacProver`]s.
@@ -381,25 +393,6 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
         Ok(())
     }
 
-    /// Accumulate multiplication triple into state.
-    pub fn quicksilver_accumulate(
-        &mut self,
-        state: &mut StateMultCheckProver<T>,
-        triple: &(MacProver<V, T>, MacProver<V, T>, MacProver<V, T>),
-    ) -> Result<()> {
-        debug!("quicksilver_push");
-        let (x, y, z) = triple;
-        let a0 = x.mac() * y.mac();
-        let a1 = y.value() * x.mac() + x.value() * y.mac() - z.mac();
-
-        state.sum_a0 += a0 * state.chi_power;
-        state.sum_a1 += a1 * state.chi_power;
-        state.chi_power *= state.chi;
-        state.cnt += 1;
-
-        Ok(())
-    }
-
     /// Finalize the multiplication check for a state return how many triples were checked.
     pub fn quicksilver_finalize<C: AbstractChannel>(
         &mut self,
@@ -414,16 +407,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, VOLE: SvoleT<(V, T)>> FComProver<V, T, 
             *u = self.random(channel, rng)?;
         }
         let mask = MacProver::<V, T>::lift(&us);
-
-        let u = state.sum_a0 + mask.mac();
-        let v = state.sum_a1 + mask.value();
-
-        channel.write_serializable(&u)?;
-        channel.write_serializable(&v)?;
-        channel.flush()?;
-        let c = state.cnt;
-        state.reset();
-        Ok(c)
+        state.finalize(channel, mask)
     }
 }
 
@@ -459,7 +443,7 @@ impl<T> Drop for StateMultCheckVerifier<T> {
 
 impl<T: FiniteField> StateMultCheckVerifier<T> {
     /// Initialize the state.
-    pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let chi = T::random(rng);
         channel.write_serializable::<T>(&chi)?;
         channel.flush()?;
@@ -479,8 +463,46 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
         self.cnt = 0;
     }
 
+    /// Accumulate a triple into the state.
+    pub(crate) fn accumulate(
+        &mut self,
+        triple: &(MacVerifier<T>, MacVerifier<T>, MacVerifier<T>),
+        delta: T,
+    ) {
+        let (x, y, z) = triple;
+        //  should be `- (-delta)` with our conventions compared to
+        //  quicksilver but simplified out.
+        let b = x.mac() * y.mac() + delta * z.mac();
+
+        self.sum_b += b * self.power_chi;
+        self.power_chi *= self.chi;
+        self.cnt += 1;
+    }
+
+    /// Finalize the state.
+    pub(crate) fn finalize<C: AbstractChannel>(
+        &mut self,
+        mask: MacVerifier<T>,
+        channel: &mut C,
+        delta: T,
+    ) -> Result<usize> {
+        let u = channel.read_serializable::<T>()?;
+        let v = channel.read_serializable::<T>()?;
+
+        let b_plus = self.sum_b + mask.mac();
+        if b_plus == (u + (-delta) * v) {
+            // - because of delta
+            let c = self.cnt;
+            self.reset();
+            Ok(c)
+        } else {
+            self.reset();
+            bail!("QuickSilver multiplication check failed.")
+        }
+    }
+
     /// Return the number of checks accumulated.
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.cnt
     }
 }
@@ -505,7 +527,7 @@ impl<T> Drop for StateZeroCheckVerifier<T> {
 
 impl<T: FiniteField> StateZeroCheckVerifier<T> {
     /// Initialize the state.
-    pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let seed = rng.gen::<Block>();
         channel.write_block(&seed)?;
         channel.flush()?;
@@ -519,14 +541,30 @@ impl<T: FiniteField> StateZeroCheckVerifier<T> {
     }
 
     /// Reset the state.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         // After reset, we assume the internal rng is still synchronized between the prover and the verifier.
         self.key_chi = T::ZERO;
         self.cnt = 0;
     }
 
+    pub(crate) fn accumulate(&mut self, mac: &MacVerifier<T>) -> Result<()> {
+        let chi = T::random(&mut self.rng);
+        self.key_chi += chi * mac.mac();
+        self.cnt += 1;
+        Ok(())
+    }
+
+    pub(crate) fn finalize<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<usize> {
+        let m = channel.read_serializable::<T>()?;
+        let b = self.key_chi == m;
+        let cnt = self.cnt;
+        self.reset();
+        ensure!(b, "check zero failed");
+        Ok(cnt)
+    }
+
     /// Return the number of checks accumulated.
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.cnt
     }
 }
@@ -693,33 +731,6 @@ where
         }
     }
 
-    /// Accumulate a value to zero check into a state.
-    pub fn check_zero_accumulate(
-        &mut self,
-        key: &MacVerifier<T>,
-        state: &mut StateZeroCheckVerifier<T>,
-    ) -> Result<()> {
-        let chi = T::random(&mut state.rng);
-        state.key_chi += chi * key.mac();
-        state.cnt += 1;
-        Ok(())
-    }
-
-    /// Finalize check zero of a state and return how many values were checked.
-    pub fn check_zero_finalize<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        state: &mut StateZeroCheckVerifier<T>,
-    ) -> Result<usize> {
-        let m = channel.read_serializable::<T>()?;
-
-        let b = state.key_chi == m;
-        let cnt = state.cnt;
-        state.reset();
-        ensure!(b, "check zero failed");
-        Ok(cnt)
-    }
-
     /// Open a batch of [`MacVerifier`]s.
     pub fn open<C: AbstractChannel>(
         &mut self,
@@ -741,10 +752,8 @@ where
         let mut x_chi = T::ZERO;
         for i in 0..keys.len() {
             let chi = T::random(&mut rng);
-            let x = out[i];
-
             key_chi += chi * keys[i].mac();
-            x_chi += x * chi;
+            x_chi += out[i] * chi;
         }
         let m = channel.read_serializable::<T>()?;
 
@@ -798,23 +807,6 @@ where
         }
     }
 
-    /// Accumulate multiplication triple into state.
-    pub fn quicksilver_accumulate(
-        &mut self,
-        state: &mut StateMultCheckVerifier<T>,
-        triple: &(MacVerifier<T>, MacVerifier<T>, MacVerifier<T>),
-    ) -> Result<()> {
-        let (x, y, z) = triple;
-        //  should be `- (-delta)` with our conventions compared to
-        //  quicksilver but simplified out.
-        let b = x.mac() * y.mac() + self.delta * z.mac();
-
-        state.sum_b += b * state.power_chi;
-        state.power_chi *= state.chi;
-        state.cnt += 1;
-        Ok(())
-    }
-
     /// Finalize the multiplication check for a state return how many triples were checked.
     pub fn quicksilver_finalize<C: AbstractChannel>(
         &mut self,
@@ -829,20 +821,7 @@ where
             *v = self.random(channel, rng)?;
         }
         let mask = <MacVerifier<T> as Mac<V, T>>::lift(&vs);
-
-        let u = channel.read_serializable::<T>()?;
-        let v = channel.read_serializable::<T>()?;
-
-        let b_plus = state.sum_b + mask.mac();
-        if b_plus == (u + (-self.delta) * v) {
-            // - because of delta
-            let c = state.cnt;
-            state.reset();
-            Ok(c)
-        } else {
-            state.reset();
-            bail!("QuickSilver multiplication check failed.")
-        }
+        state.finalize(mask, channel, self.delta)
     }
 }
 

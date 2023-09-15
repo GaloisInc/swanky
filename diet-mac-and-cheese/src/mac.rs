@@ -48,19 +48,19 @@ pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T> {
     #[inline]
-    pub fn new(x: V, m: T) -> Self {
+    pub(crate) fn new(x: V, m: T) -> Self {
         Self(x, m)
     }
     #[inline]
-    pub fn value(&self) -> V {
+    pub(crate) fn value(&self) -> V {
         self.0
     }
     #[inline]
-    pub fn mac(&self) -> T {
+    pub(crate) fn mac(&self) -> T {
         self.1
     }
     #[inline]
-    pub fn decompose(&self) -> (V, T) {
+    pub(crate) fn decompose(&self) -> (V, T) {
         (self.0, self.1)
     }
 }
