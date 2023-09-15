@@ -23,22 +23,22 @@ pub struct Mac<P: Party, V: Copy, T>(ProverPrivateCopy<P, V>, T);
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     #[inline]
-    pub fn new(x: ProverPrivateCopy<P, V>, m: T) -> Self {
+    pub(crate) fn new(x: ProverPrivateCopy<P, V>, m: T) -> Self {
         Self(x, m)
     }
 
     #[inline]
-    pub fn value(&self, ev: IsParty<P, Prover>) -> V {
+    pub(crate) fn value(&self, ev: IsParty<P, Prover>) -> V {
         self.0.into_inner(ev)
     }
 
     #[inline]
-    pub fn mac(&self) -> T {
+    pub(crate) fn mac(&self) -> T {
         self.1
     }
 
     #[inline]
-    pub fn decompose(&self, ev: IsParty<P, Prover>) -> (V, T) {
+    pub(crate) fn decompose(&self, ev: IsParty<P, Prover>) -> (V, T) {
         (self.0.into_inner(ev), self.1)
     }
 
