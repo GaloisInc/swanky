@@ -4,8 +4,8 @@
 
 use crate::backend_trait::Party;
 use crate::circuit_ir::{
-    CircInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore, WireCount, WireId,
-    WireRange,
+    CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore,
+    WireCount, WireId, WireRange,
 };
 use crate::edabits::{EdabitsProver, EdabitsVerifier, ProverConv, VerifierConv};
 use crate::homcom::FCom;
@@ -121,6 +121,10 @@ pub trait BackendConvT: PrimeBackendT {
 }
 
 pub trait BackendDisjunctionT: BackendT {
+    // finalize the disjunctions, by running the final Dora checks
+    fn finalize_disj(&mut self) -> Result<()>;
+
+    // execute a disjunction on the given inputs
     fn disjunction(
         &mut self,
         inputs: &[Self::Wire],
@@ -143,6 +147,10 @@ where
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
         unimplemented!("disjunction plugin is not sound for GF(2)")
+    }
+
+    fn finalize_disj(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -186,6 +194,10 @@ where
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
         unimplemented!("disjunction plugin is not sound for GF(2)")
+    }
+
+    fn finalize_disj(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -511,6 +523,13 @@ impl<
         SvoleFPReceiver,
     >
 {
+    fn finalize_disj(&mut self) -> Result<()> {
+        for (_, disj) in std::mem::take(&mut self.dora) {
+            disj.dora.finalize(&mut self.dmc)?;
+        }
+        Ok(())
+    }
+
     fn disjunction(
         &mut self,
         inputs: &[Self::Wire],
@@ -1004,6 +1023,13 @@ impl<
             }
         }
     }
+
+    fn finalize_disj(&mut self) -> Result<()> {
+        for (_, dora) in std::mem::take(&mut self.dora) {
+            dora.finalize(&mut self.dmc)?;
+        }
+        Ok(())
+    }
 }
 
 impl<
@@ -1195,7 +1221,7 @@ trait EvaluatorT {
         plugin: &PluginExecution,
     ) -> Result<()>;
 
-    fn push_frame(&mut self, args_count: &Option<WireId>, vector_size: &Option<WireId>);
+    fn push_frame(&mut self, compiled_info: &CompiledInfo);
     fn pop_frame(&mut self);
     fn allocate_new(&mut self, first_id: WireId, last_id: WireId);
     // TODO: Make allocate_slice return a result in case the operation violate some memory management
@@ -1457,8 +1483,8 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
         }
     }
 
-    fn push_frame(&mut self, args_count: &Option<WireId>, vector_size: &Option<WireId>) {
-        self.memory.push_frame(args_count, vector_size);
+    fn push_frame(&mut self, compiled_info: &CompiledInfo) {
+        self.memory.push_frame(compiled_info);
     }
 
     fn pop_frame(&mut self) {
@@ -1484,6 +1510,7 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
     fn finalize(&mut self) -> Result<()> {
         debug!("Finalize in EvaluatorSingle");
         self.backend.finalize_conv()?;
+        self.backend.finalize_disj()?;
         self.backend.finalize()?;
         Ok(())
     }
@@ -1664,7 +1691,7 @@ impl<
                     self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
                 }
                 _ => {
-                    todo!("Type not supported yet: {:?}", spec);
+                    bail!("Type not supported yet: {:?}", spec);
                 }
             }
         }
@@ -2176,8 +2203,7 @@ impl<
         // We use the analysis on function body to find the types used in the body and only push a frame to those field backends.
         // TODO: currently push the size of args or vec without differentiating based on type.
         for ty in func.compiled_info.type_ids.iter() {
-            self.eval[*ty as usize]
-                .push_frame(&func.compiled_info.args_count, &func.compiled_info.body_max);
+            self.eval[*ty as usize].push_frame(&func.compiled_info);
         }
 
         let mut prev = 0;

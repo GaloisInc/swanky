@@ -348,7 +348,6 @@ where
             return Ok(());
         }
         self.state_zero_check.accumulate(e)?;
-
         if self.state_zero_check.count() == QUEUE_CAPACITY {
             self.do_check_zero()?;
         }
@@ -585,11 +584,9 @@ where
 
     fn do_check_zero(&mut self) -> Result<usize> {
         self.channel.flush()?;
-        let cnt = self
-            .state_zero_check
-            .finalize(&mut self.channel)?;
-        self.monitor.incr_zk_check_zero(cnt);
-        Ok(cnt)
+        let count = self.state_zero_check.finalize(&mut self.channel)?;
+        self.monitor.incr_zk_check_zero(count);
+        Ok(count)
     }
 
     fn push_check_zero(&mut self, e: &Mac<Verifier, V, T>) -> Result<()> {
@@ -791,7 +788,11 @@ mod tests {
         dmc.finalize().unwrap();
 
         let prover = handle.join().unwrap();
-        validate(prover, verifier, dmc.get_party().get_delta().into_inner(IS_VERIFIER));
+        validate(
+            prover,
+            verifier,
+            dmc.get_party().get_delta().into_inner(IS_VERIFIER),
+        );
     }
 
     #[test]

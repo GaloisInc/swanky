@@ -1,6 +1,6 @@
 use eyre::Result;
 
-use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel};
+use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
 use swanky_party::IS_PROVER;
 
@@ -8,7 +8,6 @@ use crate::{backend_trait::BackendT, svole_trait::SvoleT, DietMacAndCheeseProver
 
 use super::{
     comm::{CommittedCrossTerms, CommittedWitness},
-    disjunction::Disjunction,
     r1cs::R1CS,
 };
 
@@ -106,46 +105,6 @@ impl<B: BackendT> ComittedAcc<B> {
             wit: nwit,
             err: nerr,
         })
-    }
-
-    pub fn new<'a>(
-        backend: &mut B,
-        disj: &Disjunction<B::FieldElement>,
-        acc: Option<&Accumulator<B::FieldElement>>,
-    ) -> Result<Self> {
-        let mut wit = Vec::with_capacity(disj.dim_wit());
-        let mut err = Vec::with_capacity(disj.dim_err());
-
-        let zero = <<B as BackendT>::FieldElement as FiniteRing>::ZERO;
-
-        match acc {
-            Some(acc) => {
-                debug_assert!(acc.wit.len() <= disj.dim_ext());
-                debug_assert!(acc.err.len() <= disj.dim_err());
-                for i in 0..disj.dim_ext() {
-                    let w = acc.wit.get(i).unwrap_or(&zero);
-                    wit.push(backend.input_private(Some(*w))?);
-                }
-                for i in 0..disj.dim_err() {
-                    let e = acc.err.get(i).unwrap_or(&zero);
-                    err.push(backend.input_private(Some(*e))?);
-                }
-            }
-            None => {
-                for _ in 0..disj.dim_ext() {
-                    wit.push(backend.input_private(None)?);
-                }
-                for _ in 0..disj.dim_err() {
-                    err.push(backend.input_private(None)?);
-                }
-            }
-        }
-
-        // check that it pads the length to hide the active branch
-        debug_assert_eq!(wit.len(), disj.dim_ext());
-        debug_assert_eq!(err.len(), disj.dim_err());
-
-        Ok(ComittedAcc { wit, err })
     }
 }
 

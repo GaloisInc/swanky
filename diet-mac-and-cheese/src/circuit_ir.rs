@@ -2,7 +2,7 @@
 //! SIEVE Circuit IR.
 
 use crate::{
-    fields::modulus_to_type_id,
+    fields::{extension_field_to_type_id, modulus_to_type_id},
     plugins::{Plugin, PluginBody, PluginType},
 };
 use eyre::{bail, ensure, eyre, Result};
@@ -91,7 +91,7 @@ impl GateM {
             | Instance(ty, _)
             | Witness(ty, _)
             | Challenge(ty, _) => *ty,
-            Conv(_) | Call(_) => todo!(),
+            Conv(_) | Call(_) => unreachable!("Should not ask the type_id for conv/call gates"),
             Comment(_) => panic!("There's no `TypeId` associated with a comment!"),
         }
     }
@@ -131,9 +131,9 @@ impl GateM {
 /// a `Plugin`.
 #[derive(Clone, Debug)]
 pub enum TypeSpecification {
-    /// The field, stored as a [`TypeId`](std::any::TypeId).
+    /// A field, stored as a [`TypeId`](std::any::TypeId).
     Field(std::any::TypeId),
-    /// The plugin type.
+    /// A plugin type.
     Plugin(PluginType),
 }
 
@@ -180,8 +180,24 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                 mac_n_cheese_sieve_parser::Type::Field { modulus } => {
                     TypeSpecification::Field(modulus_to_type_id(modulus)?)
                 }
-                mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
-                    bail!("Extension fields not supported!")
+                mac_n_cheese_sieve_parser::Type::ExtField {
+                    index,
+                    degree,
+                    modulus,
+                } => {
+                    if index >= i as TypeId {
+                        bail!("Type index too large.");
+                    }
+                    let spec = store.get(&index)?;
+                    let base_type_id = match spec {
+                        TypeSpecification::Field(ty) => *ty,
+                        _ => bail!("Invalid type specification for base field"),
+                    };
+                    TypeSpecification::Field(extension_field_to_type_id(
+                        base_type_id,
+                        degree,
+                        modulus,
+                    )?)
                 }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
@@ -250,7 +266,7 @@ impl TypeIdMapping {
     }
 
     /// Convert [`TypeIdMapping`] to a [`Vec`] containing the set [`TypeId`]s.
-    fn to_type_ids(self) -> Vec<TypeId> {
+    fn to_type_ids(&self) -> Vec<TypeId> {
         self.0
             .iter()
             .enumerate()
@@ -321,11 +337,14 @@ pub(crate) enum FunctionBody {
 #[derive(Clone)]
 pub(crate) struct CompiledInfo {
     /// Count of wires for output/input arguments to the function.
-    pub(crate) args_count: Option<WireId>,
+    pub(crate) args_count: WireId,
     // The maximum [`WireId`] in the function body.
     pub(crate) body_max: Option<WireId>,
     /// [`TypeId`]s encountered in the function body.
     pub(crate) type_ids: Vec<TypeId>,
+
+    pub(crate) outputs_cnt: WireId,
+    pub(crate) inputs_cnt: WireId,
 }
 
 /// A Circuit IR function declaration.
@@ -342,6 +361,33 @@ pub struct FuncDecl {
     pub(crate) compiled_info: CompiledInfo, // pub(crate) to ease logging
 }
 
+/// Convenience function returning a pair of [`WireId`] for the next wire id following the last output,
+/// and the next wire id following the last input.
+///
+/// Arguments:
+/// - `output_counts`: A slice containing the outputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+/// - `input_counts`: A slice containing the inputs given as a tuple of
+/// [`TypeId`] and [`WireCount`].
+pub(crate) fn output_input_counts(
+    output_counts: &[(TypeId, WireCount)],
+    input_counts: &[(TypeId, WireCount)],
+) -> (WireId, WireId) {
+    let mut first_unused_wire_outputs = 0;
+
+    for (_, wc) in output_counts.iter() {
+        first_unused_wire_outputs += wc;
+    }
+
+    let mut first_unused_wire_inputs = first_unused_wire_outputs;
+
+    for (_, wc) in input_counts.iter() {
+        first_unused_wire_inputs += wc;
+    }
+
+    (first_unused_wire_outputs, first_unused_wire_inputs)
+}
+
 /// Return the first [`WireId`] available for allocation in the `Plugin`'s
 /// [`GateBody`].
 ///
@@ -354,17 +400,8 @@ pub(crate) fn first_unused_wire_id(
     output_counts: &[(TypeId, WireCount)],
     input_counts: &[(TypeId, WireCount)],
 ) -> WireId {
-    let mut first_unused_wire_id = 0;
-
-    for (_, wc) in output_counts.iter() {
-        first_unused_wire_id += wc;
-    }
-
-    for (_, wc) in input_counts.iter() {
-        first_unused_wire_id += wc;
-    }
-
-    first_unused_wire_id
+    let (_, first_unused_wire_inputs) = output_input_counts(output_counts, input_counts);
+    first_unused_wire_inputs
 }
 
 impl FuncDecl {
@@ -381,29 +418,35 @@ impl FuncDecl {
         input_counts: Vec<(TypeId, WireCount)>,
     ) -> Self {
         let gates = GatesBody::new(gates);
-        let body_max = gates.output_wire_max();
         let mut type_presence = TypeIdMapping::from(&gates);
-        let mut args_count = 0;
-        for (ty, wc) in output_counts.iter() {
+
+        for (ty, _) in output_counts.iter() {
             type_presence.set(*ty);
-            args_count += wc;
         }
-        for (ty, wc) in input_counts.iter() {
+        for (ty, _) in input_counts.iter() {
             type_presence.set(*ty);
-            args_count += wc;
         }
 
-        let body = FunctionBody::Gates(gates);
+        let (first_unused_output, first_unused_input) =
+            output_input_counts(&output_counts, &input_counts);
+
+        let body_max = gates
+            .output_wire_max()
+            .map(|out| std::cmp::max(first_unused_input, out));
+
         let type_ids = type_presence.to_type_ids();
+        let body = FunctionBody::Gates(gates);
 
         FuncDecl {
             body,
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count: Some(args_count),
+                args_count: first_unused_input,
                 body_max,
                 type_ids,
+                outputs_cnt: first_unused_output,
+                inputs_cnt: first_unused_input,
             },
         }
     }
@@ -492,8 +535,11 @@ impl FuncDecl {
             name => bail!("Unsupported plugin: {name}"),
         };
 
-        let args_count = Some(first_unused_wire_id(&output_counts, &input_counts));
-        let body_max = execution.output_wire_max();
+        let (first_unused_output, first_unused_input) =
+            output_input_counts(&output_counts, &input_counts);
+        let body_max = execution
+            .output_wire_max()
+            .map(|out| std::cmp::max(first_unused_input, out));
 
         let mut type_presence = execution.type_id_mapping();
         for (ty, _) in output_counts.iter() {
@@ -511,9 +557,11 @@ impl FuncDecl {
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
-                args_count,
+                args_count: first_unused_input,
                 body_max,
                 type_ids,
+                outputs_cnt: first_unused_output,
+                inputs_cnt: first_unused_input,
             },
         })
     }

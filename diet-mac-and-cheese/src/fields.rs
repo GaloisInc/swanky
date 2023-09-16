@@ -3,28 +3,35 @@
 //! Note: Any fields added here need to also be added to
 //! `backend_multifield::load_backend`!
 
-use eyre::{bail, Result};
+use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::Number;
 use std::any::TypeId;
 #[cfg(test)]
 use swanky_field::PrimeFiniteField;
-use swanky_field_binary::F2;
+use swanky_field_binary::{F40b, F63b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
 
 // Note: We can't use `PrimeFiniteField::modulus_int` because it is not `const`.
 
-pub(crate) const F2_MODULUS: Number = Number::from_u64(2);
-pub(crate) const F61P_MODULUS: Number = Number::from_u64((1 << 61) - 1);
-pub(crate) const F128P_MODULUS: Number =
+/// The modulus for [`F2`], as a [`Number`].
+pub const F2_MODULUS: Number = Number::from_u64(2);
+/// The modulus for [`F61p`], as a [`Number`].
+pub const F61P_MODULUS: Number = Number::from_u64((1 << 61) - 1);
+/// The modulus for [`F128p`], as a [`Number`].
+pub const F128P_MODULUS: Number =
     Number::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffff61");
-pub(crate) const SECP256K1_MODULUS: Number =
+/// The modulus for [`Secp256k1`], as a [`Number`].
+pub const SECP256K1_MODULUS: Number =
     Number::from_be_hex("00000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f");
-pub(crate) const SECP256K1ORDER_MODULUS: Number =
+/// The modulus for [`Secp256k1order`], as a [`Number`].
+pub const SECP256K1ORDER_MODULUS: Number =
     Number::from_be_hex("00000000000000000000000000000000fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");
-pub(crate) const F384P_MODULUS: Number =
+/// The modulus for [`F384p`], as a [`Number`].
+pub const F384P_MODULUS: Number =
     Number::from_be_hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff");
-pub(crate) const F384Q_MODULUS: Number =
+/// The modulus for [`F384q`], as a [`Number`].
+pub const F384Q_MODULUS: Number =
     Number::from_be_hex("ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973");
 
 #[test]
@@ -80,5 +87,44 @@ pub fn modulus_to_type_id(modulus: Number) -> Result<TypeId> {
         Ok(TypeId::of::<F384q>())
     } else {
         bail!("Field with modulus {modulus} not supported")
+    }
+}
+
+/// The polynomial modulus for [`F40b`], as a [`Number`].
+const F40B_POLYNOMIAL_MODULUS: Number = Number::from_u64(1099511627805);
+/// The polynomial modulus for [`F63b`], as a [`Number`].
+const F63B_POLYNOMIAL_MODULUS: Number = Number::from_u64(9223372036854775811);
+
+/// Map an extension field to its [`TypeId`].
+///
+/// The extension field is specified as (1) the [`TypeId`] associated with its
+/// base field, (2) the degree of the extension field's polynomial modulus, and
+/// (3) the polynomial modulus, provided as a [`Number`] where the coefficients
+/// are the digits of the integer when interpreted in the base field.
+pub(crate) fn extension_field_to_type_id(
+    base_field: TypeId,
+    degree: u64,
+    modulus: Number,
+) -> Result<TypeId> {
+    ensure!(
+        base_field == TypeId::of::<F2>(),
+        "Only extension fields with a base field of `F2` are supported."
+    );
+    match degree {
+        40 => {
+            ensure!(
+                modulus != F40B_POLYNOMIAL_MODULUS,
+                "Invalid modulus {modulus} provided. Expected {F40B_POLYNOMIAL_MODULUS}."
+            );
+            Ok(TypeId::of::<F40b>())
+        }
+        63 => {
+            ensure!(
+                modulus != F63B_POLYNOMIAL_MODULUS,
+                "Invalid modulus {modulus} provided. Expected {F63B_POLYNOMIAL_MODULUS}."
+            );
+            Ok(TypeId::of::<F63b>())
+        }
+        _ => bail!("Degree {degree} not supported. Only degrees of 40 and 63 are supported."),
     }
 }

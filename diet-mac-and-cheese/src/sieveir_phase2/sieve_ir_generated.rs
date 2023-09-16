@@ -1,4 +1,4 @@
-// CACHE KEY 7046b74e70bbb13104595681784a919ecb149d21b2d06b06647bbeed60925992
+// CACHE KEY 27551a54b658245f7adb331c10d739d467c135746e2de8bd6180d975e894d71e
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(clippy::all)]
 #![allow(unused_imports)]
@@ -211,12 +211,13 @@ pub struct DirectiveSetUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_TYPE_U: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_TYPE_U: u8 = 2;
+pub const ENUM_MAX_TYPE_U: u8 = 3;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_TYPE_U: [TypeU; 3] = [
+pub const ENUM_VALUES_TYPE_U: [TypeU; 4] = [
   TypeU::NONE,
   TypeU::Field,
+  TypeU::ExtField,
   TypeU::PluginType,
 ];
 
@@ -227,13 +228,15 @@ pub struct TypeU(pub u8);
 impl TypeU {
   pub const NONE: Self = Self(0);
   pub const Field: Self = Self(1);
-  pub const PluginType: Self = Self(2);
+  pub const ExtField: Self = Self(2);
+  pub const PluginType: Self = Self(3);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 2;
+  pub const ENUM_MAX: u8 = 3;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::Field,
+    Self::ExtField,
     Self::PluginType,
   ];
   /// Returns the variant's name or "" if unknown.
@@ -241,6 +244,7 @@ impl TypeU {
     match self {
       Self::NONE => Some("NONE"),
       Self::Field => Some("Field"),
+      Self::ExtField => Some("ExtField"),
       Self::PluginType => Some("PluginType"),
       _ => None,
     }
@@ -1621,6 +1625,21 @@ impl<'a> Type<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
+  pub fn element_as_ext_field(&self) -> Option<ExtField<'a>> {
+    if self.element_type() == TypeU::ExtField {
+      self.element().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { ExtField::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
   pub fn element_as_plugin_type(&self) -> Option<PluginType<'a>> {
     if self.element_type() == TypeU::PluginType {
       self.element().map(|t| {
@@ -1646,6 +1665,7 @@ impl flatbuffers::Verifiable for Type<'_> {
      .visit_union::<TypeU, _>("element_type", Self::VT_ELEMENT_TYPE, "element", Self::VT_ELEMENT, false, |key, v, pos| {
         match key {
           TypeU::Field => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Field>>("TypeU::Field", pos),
+          TypeU::ExtField => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExtField>>("TypeU::ExtField", pos),
           TypeU::PluginType => v.verify_union_variant::<flatbuffers::ForwardsUOffset<PluginType>>("TypeU::PluginType", pos),
           _ => Ok(()),
         }
@@ -1703,6 +1723,13 @@ impl core::fmt::Debug for Type<'_> {
       match self.element_type() {
         TypeU::Field => {
           if let Some(x) = self.element_as_field() {
+            ds.field("element", &x)
+          } else {
+            ds.field("element", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        TypeU::ExtField => {
+          if let Some(x) = self.element_as_ext_field() {
             ds.field("element", &x)
           } else {
             ds.field("element", &"InvalidFlatbuffer: Union discriminant does not match value.")
@@ -1817,6 +1844,137 @@ impl core::fmt::Debug for Field<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     let mut ds = f.debug_struct("Field");
       ds.field("modulo", &self.modulo());
+      ds.finish()
+  }
+}
+pub enum ExtFieldOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct ExtField<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ExtField<'a> {
+  type Inner = ExtField<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table::new(buf, loc) }
+  }
+}
+
+impl<'a> ExtField<'a> {
+  pub const VT_INDEX: flatbuffers::VOffsetT = 4;
+  pub const VT_DEGREE: flatbuffers::VOffsetT = 6;
+  pub const VT_MODULUS: flatbuffers::VOffsetT = 8;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    ExtField { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+    args: &'args ExtFieldArgs<'args>
+  ) -> flatbuffers::WIPOffset<ExtField<'bldr>> {
+    let mut builder = ExtFieldBuilder::new(_fbb);
+    if let Some(x) = args.modulus { builder.add_modulus(x); }
+    if let Some(x) = args.degree { builder.add_degree(x); }
+    if let Some(x) = args.index { builder.add_index(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn index(&self) -> Option<Value<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<Value>>(ExtField::VT_INDEX, None)}
+  }
+  #[inline]
+  pub fn degree(&self) -> Option<Value<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<Value>>(ExtField::VT_DEGREE, None)}
+  }
+  #[inline]
+  pub fn modulus(&self) -> Option<Value<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<Value>>(ExtField::VT_MODULUS, None)}
+  }
+}
+
+impl flatbuffers::Verifiable for ExtField<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<Value>>("index", Self::VT_INDEX, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<Value>>("degree", Self::VT_DEGREE, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<Value>>("modulus", Self::VT_MODULUS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct ExtFieldArgs<'a> {
+    pub index: Option<flatbuffers::WIPOffset<Value<'a>>>,
+    pub degree: Option<flatbuffers::WIPOffset<Value<'a>>>,
+    pub modulus: Option<flatbuffers::WIPOffset<Value<'a>>>,
+}
+impl<'a> Default for ExtFieldArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    ExtFieldArgs {
+      index: None,
+      degree: None,
+      modulus: None,
+    }
+  }
+}
+
+pub struct ExtFieldBuilder<'a: 'b, 'b> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> ExtFieldBuilder<'a, 'b> {
+  #[inline]
+  pub fn add_index(&mut self, index: flatbuffers::WIPOffset<Value<'b >>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<Value>>(ExtField::VT_INDEX, index);
+  }
+  #[inline]
+  pub fn add_degree(&mut self, degree: flatbuffers::WIPOffset<Value<'b >>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<Value>>(ExtField::VT_DEGREE, degree);
+  }
+  #[inline]
+  pub fn add_modulus(&mut self, modulus: flatbuffers::WIPOffset<Value<'b >>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<Value>>(ExtField::VT_MODULUS, modulus);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ExtFieldBuilder<'a, 'b> {
+    let start = _fbb.start_table();
+    ExtFieldBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<ExtField<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for ExtField<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("ExtField");
+      ds.field("index", &self.index());
+      ds.field("degree", &self.degree());
+      ds.field("modulus", &self.modulus());
       ds.finish()
   }
 }

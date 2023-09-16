@@ -5,7 +5,7 @@ use swanky_field::IsSubFieldOf;
 use swanky_party::{Prover, IS_PROVER};
 
 use crate::{
-    dora::{comm::CommittedWitness, tx::TxChannel},
+    dora::{comm::CommittedWitness, tx::TxChannel, COMPACT_MIN, COMPACT_MUL},
     mac::Mac,
     svole_trait::SvoleT,
     DietMacAndCheeseProver,
@@ -15,6 +15,7 @@ use super::{
     acc::{self, collapse_trace, Accumulator, ComittedAcc, Trace},
     comm::CommittedCrossTerms,
     disjunction::Disjunction,
+    fiat_shamir,
     perm::permutation,
 };
 
@@ -32,7 +33,9 @@ pub struct DoraProver<
     _ph: std::marker::PhantomData<(F, C)>,
     accs: Vec<acc::Accumulator<V>>, // current state of accumulator
     disj: Disjunction<V>,
+    init: Vec<ComittedAcc<DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>>,
     trace: Vec<Trace<DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>>,
+    max_trace: usize, // maximum trace len before compactification
 }
 
 impl<
@@ -51,11 +54,14 @@ where
             .iter()
             .map(|rel| Accumulator::init(rel))
             .collect();
+        let max_trace = std::cmp::max(disj.clauses().len() * COMPACT_MUL, COMPACT_MIN);
         Self {
             _ph: std::marker::PhantomData,
             tx: blake3::Hasher::new(),
+            max_trace,
             accs,
-            trace: vec![],
+            trace: Vec::with_capacity(max_trace),
+            init: vec![],
             calls: 0,
             disj,
         }
@@ -70,6 +76,11 @@ where
         input: &[Mac<Prover, V, F>],
         opt: usize,
     ) -> Result<Vec<Mac<Prover, V, F>>> {
+        // check if we should compact the trace first
+        if self.trace.len() >= self.max_trace {
+            self.compact(prover)?;
+        }
+
         // retrieve R1CS for active clause
         let clause = self.disj.clause(opt);
 
@@ -124,50 +135,74 @@ where
 
     /// Simply verify all the final accumulators using MacAndCheese
     pub fn finalize(
-        self,
+        mut self,
         prover: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
     ) -> Result<()>
     where
         F::PrimeField: IsSubFieldOf<V>,
     {
         log::info!(
-            "Finalizing Dora proof: {} calls (of dimension {})",
+            "finalizing Dora proof: {} calls (of dimension {}) to disjunction of {} clauses",
             self.calls,
-            self.disj.dim_ext()
+            self.disj.dim_ext(),
+            self.disj.clauses().len()
         );
 
-        // commit and verify all final accumulators
-        let mut accs = Vec::with_capacity(self.disj.clauses().len());
-        for (acc, r1cs) in self.accs.iter().zip(self.disj.clauses()) {
-            let acc = ComittedAcc::new(prover, &self.disj, Some(acc))?;
+        // compact trace into single set of accumulators
+        self.compact(prover)?;
+
+        // verify accumulors
+        for (acc, r1cs) in self.init.into_iter().zip(self.disj.clauses()) {
             acc.verify(prover, r1cs)?;
-            accs.push(acc);
         }
-
-        // challenges for permutation proof
-        prover.channel.flush()?;
-        let chal_perm = prover.channel.read_serializable::<V>()?;
-        let chal_cmbn = prover.channel.read_serializable::<V>()?;
-
-        // combine elements from trace into single field elements
-        let (mut lhs, mut rhs) = collapse_trace(prover, &self.trace, chal_cmbn)?;
-
-        // handle final accumulators
-        for (acc, r1cs) in accs.iter().zip(self.disj.clauses()) {
-            // add initial / final accumulator to permutation proof
-            lhs.push(acc.combine(prover, chal_cmbn)?);
-            rhs.push(Accumulator::init(r1cs).combine(prover, chal_cmbn)?);
-        }
-
-        // execute permutation proof
-        permutation(prover, chal_perm, &lhs, &rhs)
+        Ok(())
     }
 
     // "compact" the disjunction trace (without verification)
     //
     // Commits to all the accumulators and executes the permutation proof.
     // This reduces the trace to a single element per branch.
-    fn compact(&mut self) {}
+    fn compact(
+        &mut self,
+        prover: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
+    ) -> Result<()> {
+        // commit to all accumulators
+        let mut ch = TxChannel::new(prover.channel.clone(), &mut self.tx);
+        let mut accs = Vec::with_capacity(self.disj.clauses().len());
+        for acc in self.accs.iter() {
+            accs.push(ComittedAcc::commit_prover(
+                &mut ch, prover, &self.disj, acc,
+            )?);
+        }
+
+        // obtain challenges for permutation proof
+        let (chal_perm, chal_cmbn) = if fiat_shamir::<V>() {
+            (ch.challenge(), ch.challenge())
+        } else {
+            ch.flush()?;
+            (
+                prover.channel.read_serializable::<V>()?,
+                prover.channel.read_serializable::<V>()?,
+            )
+        };
+
+        // combine elements from trace into single field elements
+        let (mut lhs, mut rhs) = collapse_trace(prover, &self.trace, chal_cmbn)?;
+
+        // add initial / final accumulator to permutation proof
+        for (i, (acc, r1cs)) in accs.iter().zip(self.disj.clauses()).enumerate() {
+            lhs.push(acc.combine(prover, chal_cmbn)?);
+            rhs.push(match self.init.get(i) {
+                Some(acc) => acc.combine(prover, chal_cmbn)?,
+                None => Accumulator::init(r1cs).combine(prover, chal_cmbn)?,
+            });
+        }
+
+        // execute permutation proof
+        self.trace.clear();
+        self.init = accs;
+        permutation(prover, chal_perm, &lhs, &rhs)
+    }
 }
 
 #[cfg(test)]
