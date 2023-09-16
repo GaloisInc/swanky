@@ -20,7 +20,6 @@ use std::time::Instant;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F40b, F2};
-use swanky_party::either::{PartyEither, PartyEitherCopy};
 use swanky_party::private::ProverPrivateCopy;
 use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
@@ -273,24 +272,22 @@ impl<
 
         // input c0
         let mut ci_batch = vec![F2::ZERO; num];
-        let mut ci_mac_batch = self.fcom_f2.input(
-            channel,
-            rng,
-            PartyEitherCopy::prover_new(IS_PROVER, &ci_batch),
-        )?;
+        let mut ci_mac_batch = self
+            .fcom_f2
+            .input_prover(IS_PROVER, channel, rng, &ci_batch)?;
 
         // loop on the m bits over the batch of n addition
         let mut triples = Vec::with_capacity(num * m);
         let mut aux_batch = Vec::with_capacity(num);
         let mut and_res_batch = Vec::with_capacity(num);
         let mut z_batch = vec![Vec::with_capacity(m); num];
-        let mut and_res_mac_batch = PartyEither::prover_new(IS_PROVER, Vec::with_capacity(num));
+        let mut and_res_mac_batch = Vec::with_capacity(num);
         for i in 0..m {
             and_res_batch.clear();
             aux_batch.clear();
             for n in 0..num {
                 let ci_clr = ci_batch[n];
-                let ci_mac = ci_mac_batch.as_ref().prover_into(IS_PROVER)[n];
+                let ci_mac = ci_mac_batch[n];
 
                 let ci = Mac::new(ProverPrivateCopy::new(ci_clr), ci_mac);
 
@@ -319,28 +316,29 @@ impl<
                 and_res_batch.push(and_res);
                 aux_batch.push((and1, and2));
             }
-            and_res_mac_batch.as_mut().prover_into(IS_PROVER).clear();
-            self.fcom_f2.input_low_level(
+            and_res_mac_batch.clear();
+            self.fcom_f2.input_prover_low_level(
+                IS_PROVER,
                 channel,
                 rng,
-                PartyEitherCopy::prover_new(IS_PROVER, &and_res_batch),
+                &and_res_batch,
                 &mut and_res_mac_batch,
             )?;
 
             for n in 0..num {
                 let (and1, and2) = aux_batch[n];
                 let and_res = and_res_batch[n];
-                let and_res_mac = and_res_mac_batch.as_ref().prover_into(IS_PROVER)[n];
+                let and_res_mac = and_res_mac_batch[n];
                 triples.push((
                     and1,
                     and2,
                     Mac::new(ProverPrivateCopy::new(and_res), and_res_mac),
                 ));
 
-                let ci_mac = ci_mac_batch.as_ref().prover_into(IS_PROVER)[n];
+                let ci_mac = ci_mac_batch[n];
                 let c_mac = ci_mac + and_res_mac;
 
-                ci_mac_batch.as_mut().prover_into(IS_PROVER)[n] = c_mac;
+                ci_mac_batch[n] = c_mac;
             }
         }
 
@@ -355,10 +353,7 @@ impl<
         for (i, zs) in z_batch.into_iter().enumerate() {
             res.push((
                 zs,
-                Mac::new(
-                    ProverPrivateCopy::new(ci_batch[i]),
-                    ci_mac_batch.as_ref().prover_into(IS_PROVER)[i],
-                ),
+                Mac::new(ProverPrivateCopy::new(ci_batch[i]), ci_mac_batch[i]),
             ));
         }
 
@@ -384,10 +379,7 @@ impl<
                     .collect::<Vec<F2>>()
                     .as_slice(),
             );
-            let r_m_mac = self
-                .fcom_fe
-                .input(channel, rng, PartyEitherCopy::prover_new(IS_PROVER, &[r_m]))?
-                .prover_into(IS_PROVER)[0];
+            let r_m_mac = self.fcom_fe.input_prover(IS_PROVER, channel, rng, &[r_m])?[0];
 
             edabits_vec.push(EdabitsProver {
                 bits,
@@ -427,12 +419,7 @@ impl<
 
         let aux_r_m_mac: Vec<FE> = self
             .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::prover_new(IS_PROVER, &aux_r_m),
-            )?
-            .prover_into(IS_PROVER);
+            .input_prover(IS_PROVER, channel, rng, &aux_r_m)?;
 
         for (i, aux_bits) in aux_bits.into_iter().enumerate() {
             edabits_vec.push(EdabitsProver {
@@ -459,12 +446,7 @@ impl<
         }
         let aux_r_m_mac: Vec<FE> = self
             .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::prover_new(IS_PROVER, &aux_r_m),
-            )?
-            .prover_into(IS_PROVER);
+            .input_prover(IS_PROVER, channel, rng, &aux_r_m)?;
 
         let mut aux_bits = Vec::with_capacity(num);
         for r_m in aux_r_m.iter() {
@@ -476,10 +458,7 @@ impl<
             assert_eq!(*r_m, convert_bits_to_field(&bits));
             let mut bits_mac = Vec::with_capacity(nb_bits);
             for &bit in bits.iter() {
-                let bit_mac = self
-                    .fcom_f2
-                    .input1(channel, rng, ProverPrivateCopy::new(bit))?
-                    .prover_into(IS_PROVER);
+                let bit_mac = self.fcom_f2.input1_prover(IS_PROVER, channel, rng, bit)?;
                 bits_mac.push(Mac::new(ProverPrivateCopy::new(bit), bit_mac));
             }
             aux_bits.push(bits_mac);
@@ -513,12 +492,7 @@ impl<
 
         let b_m_mac_batch = self
             .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::prover_new(IS_PROVER, &b_m_batch),
-            )?
-            .prover_into(IS_PROVER);
+            .input_prover(IS_PROVER, channel, rng, &b_m_batch)?;
 
         for i in 0..num {
             dabit_vec.push(DabitProver {
@@ -550,18 +524,14 @@ impl<
             pairs.push((x, y));
             zs.push(z);
         }
-        let mut zs_mac = PartyEither::prover_new(IS_PROVER, Vec::with_capacity(num));
-        self.fcom_f2.input_low_level(
-            channel,
-            rng,
-            PartyEitherCopy::prover_new(IS_PROVER, &zs),
-            &mut zs_mac,
-        )?;
+        let mut zs_mac = Vec::with_capacity(num);
+        self.fcom_f2
+            .input_prover_low_level(IS_PROVER, channel, rng, &zs, &mut zs_mac)?;
 
         for i in 0..num {
             let (x, y) = pairs[i];
             let z = zs[i];
-            let z_mac = zs_mac.as_ref().prover_into(IS_PROVER)[i];
+            let z_mac = zs_mac[i];
             out.push((x, y, Mac::new(ProverPrivateCopy::new(z), z_mac)));
         }
         channel.flush()?;
@@ -608,12 +578,7 @@ impl<
         for k in 0..s {
             let b_m_mac = self
                 .fcom_fe
-                .input(
-                    channel,
-                    rng,
-                    PartyEitherCopy::prover_new(IS_PROVER, c_m[k].as_slice()),
-                )?
-                .prover_into(IS_PROVER);
+                .input_prover(IS_PROVER, channel, rng, c_m[k].as_slice())?;
             c_m_mac.push(b_m_mac);
         }
 
@@ -625,10 +590,7 @@ impl<
                 c1.push(F2::ONE);
             }
         }
-        let c1_mac = self
-            .fcom_f2
-            .input(channel, rng, PartyEitherCopy::prover_new(IS_PROVER, &c1))?
-            .prover_into(IS_PROVER);
+        let c1_mac = self.fcom_f2.input_prover(IS_PROVER, channel, rng, &c1)?;
 
         // step 2)
         let mut triples = Vec::with_capacity(gamma * s);
@@ -653,14 +615,9 @@ impl<
                 and_res_batch.push(and_res);
             }
         }
-        let and_res_mac_batch = self
-            .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::prover_new(IS_PROVER, &and_res_batch),
-            )?
-            .prover_into(IS_PROVER);
+        let and_res_mac_batch =
+            self.fcom_fe
+                .input_prover(IS_PROVER, channel, rng, &and_res_batch)?;
 
         for j in 0..s * gamma {
             triples.push((
@@ -1086,18 +1043,13 @@ impl<
         // input c0
         let mut ci_batch = self
             .fcom_f2
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, num),
-            )?
-            .verifier_into(IS_VERIFIER);
+            .input_verifier(IS_VERIFIER, channel, rng, num)?;
 
         // loop on the m bits over the batch of n addition
         let mut triples = Vec::with_capacity(num * m);
         let mut aux_batch = Vec::with_capacity(num);
         let mut z_batch = vec![Vec::with_capacity(m); num];
-        let mut and_res_mac_batch = PartyEither::verifier_new(IS_VERIFIER, Vec::with_capacity(num));
+        let mut and_res_mac_batch = Vec::with_capacity(num);
         for i in 0..m {
             aux_batch.clear();
             for n in 0..num {
@@ -1118,20 +1070,18 @@ impl<
                 z_batch[n].push(z);
                 aux_batch.push((and1, and2));
             }
-            and_res_mac_batch
-                .as_mut()
-                .verifier_into(IS_VERIFIER)
-                .clear();
-            self.fcom_f2.input_low_level(
+            and_res_mac_batch.clear();
+            self.fcom_f2.input_verifier_low_level(
+                IS_VERIFIER,
                 channel,
                 rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, num),
+                num,
                 &mut and_res_mac_batch,
             )?;
 
             for n in 0..num {
                 let (and1_mac, and2_mac) = aux_batch[n];
-                let and_res_mac = and_res_mac_batch.as_ref().verifier_into(IS_VERIFIER)[n];
+                let and_res_mac = and_res_mac_batch[n];
                 triples.push((and1_mac, and2_mac, and_res_mac));
 
                 let ci = ci_batch[n];
@@ -1165,10 +1115,7 @@ impl<
         let mut edabits_vec = Vec::with_capacity(num);
 
         for bits in aux_bits.into_iter() {
-            let r_m_mac = self
-                .fcom_fe
-                .input(channel, rng, PartyEitherCopy::verifier_new(IS_VERIFIER, 1))?
-                .verifier_into(IS_VERIFIER)[0];
+            let r_m_mac = self.fcom_fe.input_verifier(IS_VERIFIER, channel, rng, 1)?[0];
 
             edabits_vec.push(EdabitsVerifier {
                 bits,
@@ -1199,12 +1146,7 @@ impl<
 
         let aux_r_m_mac = self
             .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, num),
-            )?
-            .verifier_into(IS_VERIFIER);
+            .input_verifier(IS_VERIFIER, channel, rng, num)?;
 
         for (i, aux_bits) in aux_bits.into_iter().enumerate() {
             edabits_vec_mac.push(EdabitsVerifier {
@@ -1225,22 +1167,13 @@ impl<
     ) -> Result<Vec<EdabitsVerifier<FE>>> {
         let aux_r_m_mac = self
             .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, num),
-            )?
-            .verifier_into(IS_VERIFIER);
+            .input_verifier(IS_VERIFIER, channel, rng, num)?;
         let mut edabits_vec_mac = Vec::with_capacity(num);
         let mut aux_bits = Vec::with_capacity(num);
         for _ in 0..num {
             let mut bits = Vec::with_capacity(nb_bits);
             for _ in 0..nb_bits {
-                bits.push(
-                    self.fcom_f2
-                        .input1(channel, rng, ProverPrivateCopy::empty(IS_VERIFIER))?
-                        .verifier_into(IS_VERIFIER),
-                );
+                bits.push(self.fcom_f2.input1_verifier(IS_VERIFIER, channel, rng)?);
             }
             aux_bits.push(bits);
         }
@@ -1267,12 +1200,7 @@ impl<
         }
         let b_m_mac_batch = self
             .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, num),
-            )?
-            .verifier_into(IS_VERIFIER);
+            .input_verifier(IS_VERIFIER, channel, rng, num)?;
         for i in 0..num {
             dabit_vec_mac.push(DabitVerifier {
                 bit: b_mac_batch[i],
@@ -1300,17 +1228,13 @@ impl<
             let y = self.fcom_f2.random(channel, rng)?;
             pairs.push((x, y));
         }
-        let mut zs = PartyEither::verifier_new(IS_VERIFIER, Vec::with_capacity(num));
-        self.fcom_f2.input_low_level(
-            channel,
-            rng,
-            PartyEitherCopy::verifier_new(IS_VERIFIER, num),
-            &mut zs,
-        )?;
+        let mut zs = Vec::with_capacity(num);
+        self.fcom_f2
+            .input_verifier_low_level(IS_VERIFIER, channel, rng, num, &mut zs)?;
 
         for i in 0..num {
             let (x, y) = pairs[i];
-            let z = zs.as_ref().verifier_into(IS_VERIFIER)[i];
+            let z = zs[i];
             out.push((x, y, z));
         }
         Ok(())
@@ -1337,19 +1261,11 @@ impl<
         for _ in 0..s {
             let b_m_mac = self
                 .fcom_fe
-                .input(
-                    channel,
-                    rng,
-                    PartyEitherCopy::verifier_new(IS_VERIFIER, gamma),
-                )?
-                .verifier_into(IS_VERIFIER);
+                .input_verifier(IS_VERIFIER, channel, rng, gamma)?;
             c_m_mac.push(b_m_mac);
         }
 
-        let c1_mac = self
-            .fcom_f2
-            .input(channel, rng, PartyEitherCopy::verifier_new(IS_VERIFIER, s))?
-            .verifier_into(IS_VERIFIER);
+        let c1_mac = self.fcom_f2.input_verifier(IS_VERIFIER, channel, rng, s)?;
 
         // step 2)
         let mut triples = Vec::with_capacity(gamma * s);
@@ -1367,14 +1283,9 @@ impl<
             }
         }
 
-        let and_res_mac_batch = self
-            .fcom_fe
-            .input(
-                channel,
-                rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, gamma * s),
-            )?
-            .verifier_into(IS_VERIFIER);
+        let and_res_mac_batch =
+            self.fcom_fe
+                .input_verifier(IS_VERIFIER, channel, rng, gamma * s)?;
         for j in 0..s * gamma {
             triples.push((
                 andl_mac_batch[j],
@@ -1746,7 +1657,6 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_party::either::PartyEitherCopy;
     use swanky_party::private::ProverPrivateCopy;
     use swanky_party::{IS_PROVER, IS_VERIFIER};
 
@@ -1782,13 +1692,8 @@ mod tests {
                 let rm = f2_to_fe(rb);
                 let rm_mac = fconv
                     .fcom_fe
-                    .input(
-                        &mut channel,
-                        &mut rng,
-                        PartyEitherCopy::prover_new(IS_PROVER, &[rm]),
-                    )
-                    .unwrap()
-                    .prover_into(IS_PROVER)[0];
+                    .input_prover(IS_PROVER, &mut channel, &mut rng, &[rm])
+                    .unwrap()[0];
                 let (x_f2, x_f2_mac) = fconv
                     .fcom_f2
                     .random(&mut channel, &mut rng)
@@ -1841,13 +1746,8 @@ mod tests {
             let rb_mac = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
             let r_m_mac = fconv
                 .fcom_fe
-                .input(
-                    &mut channel,
-                    &mut rng,
-                    PartyEitherCopy::verifier_new(IS_VERIFIER, 1),
-                )
-                .unwrap()
-                .verifier_into(IS_VERIFIER)[0];
+                .input_verifier(IS_VERIFIER, &mut channel, &mut rng, 1)
+                .unwrap()[0];
             let x_f2_mac = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
 
             let mut convert_bit_2_field_aux1 = Vec::new();
@@ -1913,22 +1813,12 @@ mod tests {
 
             let x_mac = fconv
                 .fcom_f2
-                .input(
-                    &mut channel,
-                    &mut rng,
-                    PartyEitherCopy::prover_new(IS_PROVER, &x),
-                )
-                .unwrap()
-                .prover_into(IS_PROVER);
+                .input_prover(IS_PROVER, &mut channel, &mut rng, &x)
+                .unwrap();
             let y_mac = fconv
                 .fcom_f2
-                .input(
-                    &mut channel,
-                    &mut rng,
-                    PartyEitherCopy::prover_new(IS_PROVER, &y),
-                )
-                .unwrap()
-                .prover_into(IS_PROVER);
+                .input_prover(IS_PROVER, &mut channel, &mut rng, &y)
+                .unwrap();
 
             let mut vx = Vec::new();
             for i in 0..power {
@@ -1976,22 +1866,12 @@ mod tests {
 
         let x_mac = fconv
             .fcom_f2
-            .input(
-                &mut channel,
-                &mut rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, power),
-            )
-            .unwrap()
-            .verifier_into(IS_VERIFIER);
+            .input_verifier(IS_VERIFIER, &mut channel, &mut rng, power)
+            .unwrap();
         let y_mac = fconv
             .fcom_f2
-            .input(
-                &mut channel,
-                &mut rng,
-                PartyEitherCopy::verifier_new(IS_VERIFIER, power),
-            )
-            .unwrap()
-            .verifier_into(IS_VERIFIER);
+            .input_verifier(IS_VERIFIER, &mut channel, &mut rng, power)
+            .unwrap();
 
         let default_fe = Mac::new(ProverPrivateCopy::empty(IS_VERIFIER), FE::ZERO);
         let (res_mac, c_mac) = fconv

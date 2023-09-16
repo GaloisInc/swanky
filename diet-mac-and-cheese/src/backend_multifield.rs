@@ -614,15 +614,12 @@ impl<
         let mut v = Vec::with_capacity(bits.len());
         for b in bits {
             let b2 = F2::from(b);
-            let mac = self
-                .conv
-                .fcom_f2
-                .input1(
-                    &mut self.dmc.channel,
-                    &mut self.dmc.rng,
-                    ProverPrivateCopy::new(b2),
-                )?
-                .prover_into(IS_PROVER);
+            let mac = self.conv.fcom_f2.input1_prover(
+                IS_PROVER,
+                &mut self.dmc.channel,
+                &mut self.dmc.rng,
+                b2,
+            )?;
             v.push(Mac::new(ProverPrivateCopy::new(b2), mac));
         }
 
@@ -1050,15 +1047,11 @@ impl<
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
         let mut v = Vec::with_capacity(FE::NumberOfBitsInBitDecomposition::to_usize());
         for _ in 0..FE::NumberOfBitsInBitDecomposition::to_usize() {
-            let mac = self
-                .conv
-                .fcom_f2
-                .input1(
-                    &mut self.dmc.channel,
-                    &mut self.dmc.rng,
-                    ProverPrivateCopy::empty(IS_VERIFIER),
-                )?
-                .verifier_into(IS_VERIFIER);
+            let mac = self.conv.fcom_f2.input1_verifier(
+                IS_VERIFIER,
+                &mut self.dmc.channel,
+                &mut self.dmc.rng,
+            )?;
             v.push(mac);
         }
 

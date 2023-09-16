@@ -3,7 +3,7 @@ use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng}
 use std::iter;
 use swanky_field::IsSubFieldOf;
 use swanky_party::{
-    either::PartyEitherCopy, private::ProverPrivateCopy, Prover, Verifier, IS_PROVER, IS_VERIFIER,
+    private::ProverPrivateCopy, Prover, Verifier, IS_PROVER, IS_VERIFIER,
 };
 
 use crate::{
@@ -50,8 +50,7 @@ where
 
     // mac vector
     let tag = backend
-        .input(channel, rng, PartyEitherCopy::prover_new(IS_PROVER, &pad))?
-        .prover_into(IS_PROVER);
+        .input_prover(IS_PROVER, channel, rng, &pad)?;
 
     // combine
     Ok(tag
@@ -77,12 +76,12 @@ where
     F::PrimeField: IsSubFieldOf<V>,
 {
     let inp = backend
-        .input(
+        .input_verifier(
+            IS_VERIFIER,
             channel,
             rng,
-            PartyEitherCopy::verifier_new(IS_VERIFIER, len),
-        )?
-        .verifier_into(IS_VERIFIER);
+            len,
+        )?;
     Ok(inp.into_iter())
 }
 

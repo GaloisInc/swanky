@@ -14,7 +14,7 @@ use scuttlebutt::{
     field::{DegreeModulo, IsSubFieldOf},
     generic_array_length::Arr,
 };
-use swanky_party::either::{PartyEither, PartyEitherCopy};
+use swanky_party::either::PartyEither;
 use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
@@ -365,84 +365,99 @@ where
         self.random(channel, rng)
     }
 
-    /// Input a slice or number of commitment values and return the associated
-    /// MACs.
-    // TODO: Should we remove this and just use `input_low_level`?
-    pub fn input<C: AbstractChannel>(
+    /// Input a slice and return the associated MACs.
+    pub fn input_prover<C: AbstractChannel>(
         &mut self,
+        ev: IsParty<P, Prover>,
         channel: &mut C,
         rng: &mut AesRng,
-        source: PartyEitherCopy<P, &[V], usize>,
-    ) -> Result<PartyEither<P, Vec<T>, Vec<Mac<P, V, T>>>> {
+        source: &[V],
+    ) -> Result<Vec<T>> {
         debug!("input");
-        let mut out = match P::WHICH {
-            WhichParty::Prover(ev) => {
-                let capacity = source.prover_into(ev).len();
-                PartyEither::prover_new(ev, Vec::with_capacity(capacity))
-            }
-            WhichParty::Verifier(ev) => {
-                let capacity = source.verifier_into(ev);
-                PartyEither::verifier_new(ev, Vec::with_capacity(capacity))
-            }
-        };
-        self.input_low_level(channel, rng, source, &mut out)?;
+        let capacity = source.len();
+        let mut out = Vec::with_capacity(capacity);
+        self.input_prover_low_level(ev, channel, rng, source, &mut out)?;
         Ok(out)
     }
 
-    /// Implementation of `input` with a pre-defined output vector.
-    pub fn input_low_level<C: AbstractChannel>(
+    /// Input a number of commitment values and return the associated MACs.
+    pub fn input_verifier<C: AbstractChannel>(
         &mut self,
+        ev: IsParty<P, Verifier>,
         channel: &mut C,
         rng: &mut AesRng,
-        source: PartyEitherCopy<P, &[V], usize>,
-        out: &mut PartyEither<P, Vec<T>, Vec<Mac<P, V, T>>>,
+        source: usize,
+    ) -> Result<Vec<Mac<P, V, T>>> {
+        debug!("input");
+        let mut out = Vec::with_capacity(source);
+        self.input_verifier_low_level(ev, channel, rng, source, &mut out)?;
+        Ok(out)
+    }
+
+    pub fn input_prover_low_level<C: AbstractChannel>(
+        &mut self,
+        ev: IsParty<P, Prover>,
+        channel: &mut C,
+        rng: &mut AesRng,
+        source: &[V],
+        out: &mut Vec<T>,
     ) -> Result<()> {
         debug!("input_low_level");
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                for x_i in source.prover_into(ev) {
-                    let tag = self.input1(channel, rng, ProverPrivateCopy::new(*x_i))?;
-                    out.as_mut().prover_into(ev).push(tag.prover_into(ev));
-                }
-            }
-            WhichParty::Verifier(ev) => {
-                for _i in 0..source.verifier_into(ev) {
-                    let r = self.random(channel, rng)?;
-                    let y = channel.read_serializable::<V>()?;
-                    out.as_mut().verifier_into(ev).push(Mac::new(
-                        ProverPrivateCopy::empty(ev),
-                        r.mac() - y * self.delta.into_inner(ev),
-                    ));
-                }
-            }
+        for &x_i in source {
+            let tag = self.input1_prover(ev, channel, rng, x_i)?;
+            out.push(tag);
         }
         Ok(())
     }
 
-    /// Input a single value and returns its MAC.
-    pub fn input1<C: AbstractChannel>(
+    pub fn input_verifier_low_level<C: AbstractChannel>(
         &mut self,
+        ev: IsParty<P, Verifier>,
         channel: &mut C,
         rng: &mut AesRng,
-        x: ProverPrivateCopy<P, V>,
-    ) -> Result<PartyEitherCopy<P, T, Mac<P, V, T>>> {
+        source: usize,
+        out: &mut Vec<Mac<P, V, T>>,
+    ) -> Result<()> {
+        debug!("input_low_level");
+        for _ in 0..source {
+            let r = self.random(channel, rng)?;
+            let y = channel.read_serializable::<V>()?;
+            out.push(Mac::new(
+                ProverPrivateCopy::empty(ev),
+                r.mac() - y * self.delta.into_inner(ev),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn input1_prover<C: AbstractChannel>(
+        &mut self,
+        ev: IsParty<P, Prover>,
+        channel: &mut C,
+        rng: &mut AesRng,
+        x: V,
+    ) -> Result<T> {
         debug!("input1");
         let r = self.random(channel, rng)?;
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                let y = x.into_inner(ev) - r.value(ev);
-                channel.write_serializable::<V>(&y)?;
-                Ok(PartyEitherCopy::prover_new(ev, r.mac()))
-            }
-            WhichParty::Verifier(ev) => {
-                let y = channel.read_serializable::<V>()?;
-                let out = Mac::new(
-                    ProverPrivateCopy::empty(ev),
-                    r.mac() - y * self.delta.into_inner(ev),
-                );
-                Ok(PartyEitherCopy::verifier_new(ev, out))
-            }
-        }
+        let y = x - r.value(ev);
+        channel.write_serializable(&y)?;
+        Ok(r.mac())
+    }
+
+    pub fn input1_verifier<C: AbstractChannel>(
+        &mut self,
+        ev: IsParty<P, Verifier>,
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<Mac<P, V, T>> {
+        debug!("input1");
+        let r = self.random(channel, rng)?;
+        let y = channel.read_serializable::<V>()?;
+        let out = Mac::new(
+            ProverPrivateCopy::empty(ev),
+            r.mac() - y * self.delta.into_inner(ev),
+        );
+        Ok(out)
     }
 
     /// Add a constant.
@@ -707,7 +722,6 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_party::either::PartyEitherCopy;
     use swanky_party::private::ProverPrivateCopy;
     use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
@@ -853,13 +867,8 @@ mod tests {
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
                 let z = x.value(IS_PROVER) * y.value(IS_PROVER);
                 let z_mac = fcom
-                    .input(
-                        &mut channel,
-                        &mut rng,
-                        PartyEitherCopy::prover_new(IS_PROVER, &[z]),
-                    )
-                    .unwrap()
-                    .prover_into(IS_PROVER)[0];
+                    .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
+                    .unwrap()[0];
                 v.push((x, y, Mac::new(ProverPrivateCopy::new(z), z_mac)));
             }
             channel.flush().unwrap();
@@ -884,13 +893,8 @@ mod tests {
             let xmac = fcom.random(&mut channel, &mut rng).unwrap();
             let ymac = fcom.random(&mut channel, &mut rng).unwrap();
             let zmac = fcom
-                .input(
-                    &mut channel,
-                    &mut rng,
-                    PartyEitherCopy::verifier_new(IS_VERIFIER, 1),
-                )
-                .unwrap()
-                .verifier_into(IS_VERIFIER)[0];
+                .input_verifier(IS_VERIFIER, &mut channel, &mut rng, 1)
+                .unwrap()[0];
             v.push((xmac, ymac, zmac));
         }
         fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
@@ -924,12 +928,9 @@ mod tests {
                 for _ in 0..n {
                     let x = V::ZERO;
                     let xmac = fcom
-                        .input1(&mut channel, &mut rng, ProverPrivateCopy::new(x))
+                        .input1_prover(IS_PROVER, &mut channel, &mut rng, x)
                         .unwrap();
-                    v.push(Mac::new(
-                        ProverPrivateCopy::new(x),
-                        xmac.prover_into(IS_PROVER),
-                    ));
+                    v.push(Mac::new(ProverPrivateCopy::new(x), xmac));
                 }
                 channel.flush().unwrap();
                 let r = fcom.check_zero(&mut channel, &mut rng, v.as_slice());
@@ -942,12 +943,9 @@ mod tests {
                 for _ in 0..n {
                     let x = V::random_nonzero(&mut rng);
                     let xmac = fcom
-                        .input1(&mut channel, &mut rng, ProverPrivateCopy::new(x))
+                        .input1_prover(IS_PROVER, &mut channel, &mut rng, x)
                         .unwrap();
-                    v.push(Mac::new(
-                        ProverPrivateCopy::new(x),
-                        xmac.prover_into(IS_PROVER),
-                    ));
+                    v.push(Mac::new(ProverPrivateCopy::new(x), xmac));
                 }
                 channel.flush().unwrap();
                 let r = fcom.check_zero(&mut channel, &mut rng, v.as_slice());
@@ -971,13 +969,8 @@ mod tests {
             let mut v = Vec::new();
             for _ in 0..n {
                 let xmac = fcom
-                    .input1(
-                        &mut channel,
-                        &mut rng,
-                        ProverPrivateCopy::empty(IS_VERIFIER),
-                    )
-                    .unwrap()
-                    .verifier_into(IS_VERIFIER);
+                    .input1_verifier(IS_VERIFIER, &mut channel, &mut rng)
+                    .unwrap();
                 v.push(xmac);
             }
             let r = fcom.check_zero(&mut channel, &mut rng, &v);
@@ -989,13 +982,8 @@ mod tests {
             let mut v = Vec::new();
             for _ in 0..n {
                 let xmac = fcom
-                    .input1(
-                        &mut channel,
-                        &mut rng,
-                        ProverPrivateCopy::empty(IS_VERIFIER),
-                    )
-                    .unwrap()
-                    .verifier_into(IS_VERIFIER);
+                    .input1_verifier(IS_VERIFIER, &mut channel, &mut rng)
+                    .unwrap();
                 v.push(xmac);
             }
             let r = fcom.check_zero(&mut channel, &mut rng, &v);
@@ -1052,13 +1040,8 @@ mod tests {
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
                 let z = x.value(IS_PROVER) * y.value(IS_PROVER);
                 let z_mac = fcom
-                    .input(
-                        &mut channel,
-                        &mut rng,
-                        PartyEitherCopy::prover_new(IS_PROVER, &[z]),
-                    )
-                    .unwrap()
-                    .prover_into(IS_PROVER)[0];
+                    .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
+                    .unwrap()[0];
                 v.push((x, y, Mac::new(ProverPrivateCopy::new(z), z_mac)));
             }
             channel.flush().unwrap();
@@ -1103,13 +1086,8 @@ mod tests {
             let xmac = fcom.random(&mut channel, &mut rng).unwrap();
             let ymac = fcom.random(&mut channel, &mut rng).unwrap();
             let zmac = fcom
-                .input(
-                    &mut channel,
-                    &mut rng,
-                    PartyEitherCopy::verifier_new(IS_VERIFIER, 1),
-                )
-                .unwrap()
-                .verifier_into(IS_VERIFIER)[0];
+                .input_verifier(IS_VERIFIER, &mut channel, &mut rng, 1)
+                .unwrap()[0];
             v.push((xmac, ymac, zmac));
         }
         fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)

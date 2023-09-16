@@ -315,11 +315,8 @@ where
     fn input(&mut self, v: V) -> Result<Mac<Prover, V, T>> {
         let tag = self
             .prover
-            .input1(&mut self.channel, &mut self.rng, ProverPrivateCopy::new(v));
-        Ok(Mac::new(
-            ProverPrivateCopy::new(v),
-            tag?.prover_into(IS_PROVER),
-        ))
+            .input1_prover(IS_PROVER, &mut self.channel, &mut self.rng, v);
+        Ok(Mac::new(ProverPrivateCopy::new(v), tag?))
     }
 
     fn do_mult_check(&mut self) -> Result<usize> {
@@ -562,12 +559,7 @@ where
     fn input(&mut self) -> Result<Mac<Verifier, V, T>> {
         Ok(self
             .verifier
-            .input1(
-                &mut self.channel,
-                &mut self.rng,
-                ProverPrivateCopy::empty(IS_VERIFIER),
-            )?
-            .verifier_into(IS_VERIFIER))
+            .input1_verifier(IS_VERIFIER, &mut self.channel, &mut self.rng)?)
     }
 
     fn do_mult_check(&mut self) -> Result<usize> {
