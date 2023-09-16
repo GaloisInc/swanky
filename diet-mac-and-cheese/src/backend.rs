@@ -205,8 +205,8 @@ where
         let product = a_clr * b_clr;
 
         let out = self.input(product)?;
-        self.prover
-            .quicksilver_accumulate(&mut self.state_mult_check, &(*a, *b, out))?;
+        self.state_mult_check
+            .accumulate(&(*a, *b, out), self.prover.get_delta());
         Ok(out)
     }
 
@@ -336,9 +336,7 @@ where
 
     fn do_check_zero(&mut self) -> Result<usize> {
         self.channel.flush()?;
-        let cnt = self
-            .prover
-            .check_zero_finalize(&mut self.channel, &mut self.state_zero_check)?;
+        let cnt = self.state_zero_check.finalize(&mut self.channel)?;
         self.monitor.incr_zk_check_zero(cnt);
         Ok(cnt)
     }
@@ -349,8 +347,7 @@ where
                 .check_zero(&mut self.channel, &mut self.rng, &[*e])?;
             return Ok(());
         }
-        self.prover
-            .check_zero_accumulate(e, &mut self.state_zero_check)?;
+        self.state_zero_check.accumulate(e)?;
 
         if self.state_zero_check.count() == QUEUE_CAPACITY {
             self.do_check_zero()?;
@@ -450,19 +447,19 @@ where
 
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.monitor.incr_monitor_add();
-        Ok(self.verifier.add(*a, *b))
+        Ok(*a + *b)
     }
 
     fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.monitor.incr_monitor_sub();
-        Ok(self.verifier.sub(*a, *b))
+        Ok(*a - *b)
     }
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mul();
         let tag = self.input()?;
-        self.verifier
-            .quicksilver_accumulate(&mut self.state_mult_check, &(*a, *b, tag))?;
+        self.state_mult_check
+            .accumulate(&(*a, *b, tag), self.verifier.get_delta());
         Ok(tag)
     }
 
@@ -473,14 +470,14 @@ where
 
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mulc();
-        Ok(self.verifier.affine_mult_cst(b, *a))
+        Ok(*a * b)
     }
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
         Ok(Mac::new(
             ProverPrivateCopy::empty(IS_VERIFIER),
-            -val * self.get_party().get_delta(IS_VERIFIER),
+            -val * self.verifier.get_delta().into_inner(IS_VERIFIER),
         ))
     }
 
@@ -589,8 +586,8 @@ where
     fn do_check_zero(&mut self) -> Result<usize> {
         self.channel.flush()?;
         let cnt = self
-            .verifier
-            .check_zero_finalize(&mut self.channel, &mut self.state_zero_check)?;
+            .state_zero_check
+            .finalize(&mut self.channel)?;
         self.monitor.incr_zk_check_zero(cnt);
         Ok(cnt)
     }
@@ -602,8 +599,7 @@ where
             return Ok(());
         }
 
-        self.verifier
-            .check_zero_accumulate(e, &mut self.state_zero_check)?;
+        self.state_zero_check.accumulate(e)?;
 
         if self.state_zero_check.count() == QUEUE_CAPACITY {
             self.do_check_zero()?;
@@ -795,7 +791,7 @@ mod tests {
         dmc.finalize().unwrap();
 
         let prover = handle.join().unwrap();
-        validate(prover, verifier, dmc.get_party().get_delta(IS_VERIFIER));
+        validate(prover, verifier, dmc.get_party().get_delta().into_inner(IS_VERIFIER));
     }
 
     #[test]

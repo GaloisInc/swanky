@@ -16,7 +16,7 @@ use scuttlebutt::{
 };
 use swanky_party::either::{PartyEither, PartyEitherCopy};
 use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
-use swanky_party::{IsParty, Party, Verifier, WhichParty};
+use swanky_party::{Party, WhichParty};
 
 pub struct MultCheckState<P: Party, T: Copy> {
     sum_a0: ProverPrivateCopy<P, T>,
@@ -29,7 +29,7 @@ pub struct MultCheckState<P: Party, T: Copy> {
 
 impl<P: Party, T: FiniteField> MultCheckState<P, T> {
     /// Initialize the state.
-    pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let chi = match P::WHICH {
             WhichParty::Prover(_) => {
                 channel.flush()?;
@@ -63,8 +63,69 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         self.count = 0;
     }
 
+    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(
+        &mut self,
+        triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
+        delta: VerifierPrivateCopy<P, T>,
+    ) {
+        let (x, y, z) = triple;
+
+        match P::WHICH {
+            WhichParty::Prover(ev) => {
+                let a0 = x.mac() * y.mac();
+                let a1 = y.value(ev) * x.mac() + x.value(ev) * y.mac() - z.mac();
+
+                *self.sum_a0.as_mut().into_inner(ev) += a0 * self.chi_power;
+                *self.sum_a1.as_mut().into_inner(ev) += a1 * self.chi_power;
+            }
+            WhichParty::Verifier(ev) => {
+                let b = x.mac() * y.mac() + delta.into_inner(ev) * z.mac();
+                *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power;
+            }
+        }
+
+        self.chi_power *= self.chi;
+        self.count += 1;
+    }
+
+    pub(crate) fn finalize<C: AbstractChannel>(
+        &mut self,
+        mask: Mac<P, T, T>,
+        channel: &mut C,
+        delta: VerifierPrivateCopy<P, T>,
+    ) -> Result<usize> {
+        match P::WHICH {
+            WhichParty::Prover(ev) => {
+                let u = self.sum_a0.into_inner(ev) + mask.mac();
+                let v = self.sum_a1.into_inner(ev) + mask.value(ev);
+
+                channel.write_serializable(&u)?;
+                channel.write_serializable(&v)?;
+                channel.flush()?;
+
+                let c = self.count;
+                self.reset();
+                Ok(c)
+            }
+            WhichParty::Verifier(ev) => {
+                let u = channel.read_serializable::<T>()?;
+                let v = channel.read_serializable::<T>()?;
+
+                let b_plus = self.sum_b.into_inner(ev) + mask.mac();
+                if b_plus == (u + (-delta.into_inner(ev)) * v) {
+                    let c = self.count;
+                    self.reset();
+                    Ok(c)
+                } else {
+                    self.reset();
+                    bail!("QuickSilver multiplication check failed.")
+                }
+            }
+        }
+    }
+
     /// Return the number of checks accumulated.
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.count
     }
 }
@@ -101,7 +162,7 @@ impl<P: Party, T: Copy> Drop for ZeroCheckState<P, T> {
 
 impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
     /// Initialize the state.
-    pub fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel.read_block()?,
             WhichParty::Verifier(_) => {
@@ -123,15 +184,57 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
     }
 
     /// Reset the state.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         // After reset, we assume the internal rng is still synchronized between the prover and the verifier.
         self.key_chi = T::ZERO;
         self.count = 0;
         self.b = ProverPrivateCopy::new(true);
     }
 
+    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(&mut self, mac: &Mac<P, V, T>) -> Result<()> {
+        let chi = T::random(&mut self.rng);
+
+        match P::WHICH {
+            WhichParty::Prover(ev) => {
+                self.key_chi += chi * mac.mac();
+
+                let b = mac.value(ev) == V::ZERO;
+                if !b {
+                    warn!("accumulating a value that's not zero");
+                }
+
+                *self.b.as_mut().into_inner(ev) &= b;
+            }
+            WhichParty::Verifier(_) => self.key_chi += chi * mac.mac(),
+        }
+
+        self.count += 1;
+        Ok(())
+    }
+
+    pub(crate) fn finalize<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<usize> {
+        let b = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                channel.write_serializable(&self.key_chi)?;
+                channel.flush()?;
+
+                self.b.into_inner(ev)
+            }
+            WhichParty::Verifier(_) => {
+                let m = channel.read_serializable::<T>()?;
+
+                self.key_chi == m
+            }
+        };
+
+        let count = self.count;
+        self.reset();
+        ensure!(b, "check zero failed");
+        Ok(count)
+    }
+
     /// Return the number of checks accumulated.
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.count
     }
 }
@@ -212,8 +315,8 @@ where
 
     /// Return the `Δ` value associated with the commitment scheme.
     #[inline]
-    pub fn get_delta(&self, ev: IsParty<P, Verifier>) -> T {
-        self.delta.into_inner(ev)
+    pub fn get_delta(&self) -> VerifierPrivateCopy<P, T> {
+        self.delta
     }
 
     /// Return a random [`Mac`].
@@ -224,7 +327,7 @@ where
     ) -> Result<Mac<P, V, T>> {
         match P::WHICH {
             WhichParty::Prover(ev) => match self.voles.as_mut().prover_into(ev).pop() {
-                Some(e) => Ok(Mac::new(ProverPrivateCopy::new(e.0), e.1)),
+                Some(e) => return Ok(Mac::new(ProverPrivateCopy::new(e.0), e.1)),
                 None => {
                     self.svole.as_mut().prover_into(ev).extend(
                         channel,
@@ -232,14 +335,15 @@ where
                         self.voles.as_mut().prover_into(ev),
                     )?;
 
-                    match self.voles.as_mut().prover_into(ev).pop() {
-                        Some(e) => Ok(Mac::new(ProverPrivateCopy::new(e.0), e.1)),
-                        None => bail!("svole failed for random"),
-                    }
+                    assert_ne!(
+                        self.voles.as_ref().prover_into(ev).len(),
+                        0,
+                        "VOLE extension should always produce VOLEs",
+                    );
                 }
             },
             WhichParty::Verifier(ev) => match self.voles.as_mut().verifier_into(ev).pop() {
-                Some(e) => Ok(Mac::new(ProverPrivateCopy::empty(ev), e)),
+                Some(e) => return Ok(Mac::new(ProverPrivateCopy::empty(ev), e)),
                 None => {
                     self.svole.as_mut().verifier_into(ev).extend(
                         channel,
@@ -247,13 +351,15 @@ where
                         self.voles.as_mut().verifier_into(ev),
                     )?;
 
-                    match self.voles.as_mut().verifier_into(ev).pop() {
-                        Some(e) => Ok(Mac::new(ProverPrivateCopy::empty(ev), e)),
-                        None => bail!("svole failed for random"),
-                    }
+                    assert_ne!(
+                        self.voles.as_ref().verifier_into(ev).len(),
+                        0,
+                        "VOLE extension should always produce VOLEs",
+                    );
                 }
             },
         }
+        self.random(channel, rng)
     }
 
     /// Input a slice or number of commitment values and return the associated
@@ -396,10 +502,9 @@ where
                 let mut m = T::ZERO;
                 let mut b = true;
                 for mac in mac_batch.iter() {
-                    let (x, x_mac) = mac.decompose(ev);
-                    b = b && x == V::ZERO;
                     let chi = T::random(&mut rng);
-                    m += chi * x_mac;
+                    m += chi * mac.mac();
+                    b &= mac.value(ev) == V::ZERO;
                 }
                 channel.write_serializable::<T>(&m)?;
                 channel.flush()?;
@@ -418,77 +523,8 @@ where
             }
         };
 
-        if b {
-            Ok(())
-        } else {
-            bail!("check_zero failed")
-        }
-    }
-
-    /// Accumulate a value to zero check into a state.
-    pub fn check_zero_accumulate(
-        &mut self,
-        a: &Mac<P, V, T>,
-        state: &mut ZeroCheckState<P, T>,
-    ) -> Result<()> {
-        debug!("check_zero_accumulate");
-
-        let chi = T::random(&mut state.rng);
-
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                let (x, x_mac) = a.decompose(ev);
-                let b = x == V::ZERO;
-                state.key_chi += chi * x_mac;
-
-                if !b {
-                    warn!("accumulating a value that's not zero");
-                }
-                *state.b.as_mut().into_inner(ev) &= b;
-            }
-            WhichParty::Verifier(_) => {
-                state.key_chi += chi * a.mac();
-            }
-        }
-
-        state.count += 1;
-
-        Ok(())
-    }
-
-    /// Finalize check zero of a state and return how many values were checked.
-    pub fn check_zero_finalize<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        state: &mut ZeroCheckState<P, T>,
-    ) -> Result<usize> {
-        debug!("check_zero_finalize");
-
-        let b = match P::WHICH {
-            WhichParty::Prover(ev) => {
-                channel.write_serializable::<T>(&state.key_chi)?;
-                channel.flush()?;
-
-                let b = state.b.into_inner(ev);
-
-                if !b {
-                    state.reset();
-                    bail!("check_zero failed");
-                }
-
-                b
-            }
-            WhichParty::Verifier(_) => {
-                let m = channel.read_serializable::<T>()?;
-
-                state.key_chi == m
-            }
-        };
-
-        let count = state.count;
-        state.reset();
         ensure!(b, "check zero failed");
-        Ok(count)
+        Ok(())
     }
 
     /// Open a batch of [`Mac`]s. Only verifiers write to `out`.
@@ -538,10 +574,9 @@ where
                 let mut x_chi = T::ZERO;
                 for i in 0..batch.len() {
                     let chi = T::random(&mut rng);
-                    let x = out[i];
 
                     key_chi += chi * batch[i].mac();
-                    x_chi += x * chi;
+                    x_chi += out[i] * chi;
                 }
                 let m = channel.read_serializable::<T>()?;
 
@@ -633,35 +668,6 @@ where
         }
     }
 
-    /// Accumulate multiplication triple into state.
-    pub fn quicksilver_accumulate(
-        &mut self,
-        state: &mut MultCheckState<P, T>,
-        triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
-    ) -> Result<()> {
-        debug!("quicksilver_push");
-        let (x, y, z) = triple;
-
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                let a0 = x.mac() * y.mac();
-                let a1 = y.value(ev) * x.mac() + x.value(ev) * y.mac() - z.mac();
-
-                *state.sum_a0.as_mut().into_inner(ev) += a0 * state.chi_power;
-                *state.sum_a1.as_mut().into_inner(ev) += a1 * state.chi_power;
-            }
-            WhichParty::Verifier(ev) => {
-                let b = x.mac() * y.mac() + self.delta.into_inner(ev) * z.mac();
-
-                *state.sum_b.as_mut().into_inner(ev) += b * state.chi_power;
-            }
-        }
-
-        state.chi_power *= state.chi;
-        state.count += 1;
-        Ok(())
-    }
-
     /// Finalize the multiplication check for a state.
     ///
     /// Return the number of triples checked.
@@ -679,34 +685,7 @@ where
         }
         let mask = Mac::lift(&macs);
 
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                let u = state.sum_a0.into_inner(ev) + mask.mac();
-                let v = state.sum_a1.into_inner(ev) + mask.value(ev);
-
-                channel.write_serializable(&u)?;
-                channel.write_serializable(&v)?;
-                channel.flush()?;
-
-                let c = state.count;
-                state.reset();
-                Ok(c)
-            }
-            WhichParty::Verifier(ev) => {
-                let u = channel.read_serializable::<T>()?;
-                let v = channel.read_serializable::<T>()?;
-
-                let b_plus = state.sum_b.into_inner(ev) + mask.mac();
-                if b_plus == (u + (-self.delta.into_inner(ev)) * v) {
-                    let c = state.count;
-                    state.reset();
-                    Ok(c)
-                } else {
-                    state.reset();
-                    bail!("QuickSilver multiplication check failed.")
-                }
-            }
-        }
+        state.finalize(mask, channel, self.delta)
     }
 }
 
