@@ -45,7 +45,6 @@ use swanky_field::{
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
-use swanky_party::either::PartyEither;
 use swanky_party::private::ProverPrivateCopy;
 use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
@@ -328,8 +327,7 @@ impl<
 
         debug!("Steps in init_with_svole: 5 steps");
         debug!("1...");
-        let fcom_prover =
-            FCom::init_with_vole(PartyEither::prover_new(IS_PROVER, svole_fe_sender))?;
+        let fcom_prover = FCom::init_prover_with_vole(IS_PROVER, svole_fe_sender)?;
         debug!("2...");
         let dmc =
             DietMacAndCheeseProver::<FE, FE, C, SvoleFESender, SvoleFEReceiver>::init_with_fcom(
@@ -838,7 +836,7 @@ impl<
     ) -> Result<Self> {
         let rng2 = rng.fork();
 
-        let fcom_prover = FCom::init_with_vole(PartyEither::verifier_new(IS_VERIFIER, svole2))?;
+        let fcom_prover = FCom::init_verifier_with_vole(IS_VERIFIER, svole2)?;
         let dmc =
             DietMacAndCheeseVerifier::<FE, FE, C, SvoleFESender, SvoleFEReceiver>::init_with_fcom(
                 channel,
@@ -1623,10 +1621,7 @@ impl<
                 .unwrap();
                 svole_sender.run(&mut channel_vole, &mut rng2).unwrap();
             });
-            let fcom_f2_prover = Some(FCom::init_with_vole(PartyEither::prover_new(
-                IS_PROVER,
-                svole_atomic2,
-            ))?);
+            let fcom_f2_prover = Some(FCom::init_prover_with_vole(IS_PROVER, svole_atomic2)?);
             Ok((
                 EvaluatorCirc {
                     party,
@@ -1659,10 +1654,7 @@ impl<
                 .unwrap();
                 svole_receiver.run(&mut channel_vole, &mut rng2).unwrap();
             });
-            let fcom_f2_verifier = Some(FCom::init_with_vole(PartyEither::verifier_new(
-                IS_VERIFIER,
-                svole_atomic2,
-            ))?);
+            let fcom_f2_verifier = Some(FCom::init_verifier_with_vole(IS_VERIFIER, svole_atomic2)?);
             Ok((
                 EvaluatorCirc {
                     party,

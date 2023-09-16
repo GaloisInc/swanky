@@ -16,7 +16,7 @@ use scuttlebutt::{
 };
 use swanky_party::either::{PartyEither, PartyEitherCopy};
 use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
-use swanky_party::{Party, WhichParty};
+use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
 pub struct MultCheckState<P: Party, T: Copy> {
     sum_a0: ProverPrivateCopy<P, T>,
@@ -288,15 +288,18 @@ where
         })
     }
 
-    pub fn init_with_vole(svole: PartyEither<P, SvoleSender, SvoleReceiver>) -> Result<Self> {
+    pub fn init_prover_with_vole(ev: IsParty<P, Prover>, svole: SvoleSender) -> Result<Self> {
         Ok(Self {
-            delta: match P::WHICH {
-                WhichParty::Prover(ev) => VerifierPrivateCopy::empty(ev),
-                WhichParty::Verifier(ev) => {
-                    VerifierPrivateCopy::new(svole.as_ref().verifier_into(ev).delta().unwrap())
-                }
-            },
-            svole,
+            delta: VerifierPrivateCopy::empty(ev),
+            svole: PartyEither::prover_new(ev, svole),
+            voles: PartyEither::default(),
+        })
+    }
+
+    pub fn init_verifier_with_vole(ev: IsParty<P, Verifier>, svole: SvoleReceiver) -> Result<Self> {
+        Ok(Self {
+            delta: VerifierPrivateCopy::new(svole.delta().unwrap()),
+            svole: PartyEither::verifier_new(ev, svole),
             voles: PartyEither::default(),
         })
     }
@@ -704,7 +707,7 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_party::either::{PartyEither, PartyEitherCopy};
+    use swanky_party::either::PartyEitherCopy;
     use swanky_party::private::ProverPrivateCopy;
     use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
@@ -1037,8 +1040,9 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
 
             let mut fcom =
-                FCom::<Prover, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_with_vole(
-                    PartyEither::prover_new(IS_PROVER, svole_atomic),
+                FCom::<Prover, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_prover_with_vole(
+                    IS_PROVER,
+                    svole_atomic,
                 )
                 .unwrap();
 
@@ -1087,10 +1091,12 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut fcom = FCom::<Verifier, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_with_vole(
-            PartyEither::verifier_new(IS_VERIFIER, svole_atomic),
-        )
-        .unwrap();
+        let mut fcom =
+            FCom::<Verifier, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_verifier_with_vole(
+                IS_VERIFIER,
+                svole_atomic,
+            )
+            .unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
