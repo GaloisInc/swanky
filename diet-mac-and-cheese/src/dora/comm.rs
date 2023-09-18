@@ -2,9 +2,7 @@ use eyre::Result;
 use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
 use std::iter;
 use swanky_field::IsSubFieldOf;
-use swanky_party::{
-    private::ProverPrivateCopy, Prover, Verifier, IS_PROVER, IS_VERIFIER,
-};
+use swanky_party::{private::ProverPrivateCopy, Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
 use crate::{
     backend_trait::BackendT, homcom::FCom, mac::Mac, svole_trait::SvoleT, DietMacAndCheeseProver,
@@ -49,8 +47,7 @@ where
     pad.extend(sec.into_iter().chain(iter::repeat(V::ZERO)).take(len));
 
     // mac vector
-    let tag = backend
-        .input_prover(IS_PROVER, channel, rng, &pad)?;
+    let tag = backend.input_prover(IS_PROVER, channel, rng, &pad)?;
 
     // combine
     Ok(tag
@@ -75,13 +72,7 @@ fn verifier_commit_vec<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    let inp = backend
-        .input_verifier(
-            IS_VERIFIER,
-            channel,
-            rng,
-            len,
-        )?;
+    let inp = backend.input_verifier(IS_VERIFIER, channel, rng, len)?;
     Ok(inp.into_iter())
 }
 
