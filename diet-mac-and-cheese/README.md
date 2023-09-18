@@ -22,7 +22,7 @@ supported, and `〜` denotes partially supported.
 
 ## Running Diet Mac'n'Cheese
 
-The main program is called `dietmc_0p`.
+The main program is called `dietmc`.
 It is expecting inputs for the relation/instance/witness following the standard SIEVE Circuit IR (a.k.a IR0+).
 This standard currently has two binary format: flatbuffers and text.
 
@@ -47,18 +47,18 @@ threads = 1
 To run diet Mac'n'Cheese with inputs in flatbuffers:
 
 ```bash
-cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve
+cargo run --bin dietmc --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve
 
-cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
+cargo run --bin dietmc --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
   --witness <PATH>/*.sieve
 ```
 
 To run diet Mac'n'Cheese with inputs in text format, add a `--text` flag:
 
 ```bash
-cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text
+cargo run --bin dietmc --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text
 
-cargo run --bin dietmc_0p --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text \
+cargo run --bin dietmc --release -- --config <PATH>/dmc.toml --instance <PATH>/*.sieve --relation <PATH>/*.sieve --text \
   --witness <PATH>/*.sieve
 ```
 
