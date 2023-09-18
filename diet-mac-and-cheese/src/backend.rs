@@ -380,8 +380,8 @@ pub struct DietMacAndCheeseVerifier<
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     monitor: Monitor<T>,
-    state_mult_check: StateMultCheckVerifier<T>,
-    state_zero_check: StateZeroCheckVerifier<T>,
+    state_mult_check: StateMultCheckVerifier<V, T>,
+    state_zero_check: StateZeroCheckVerifier<V, T>,
     no_batching: bool,
 }
 
@@ -390,7 +390,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>> Ba
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    type Wire = MacVerifier<T>;
+    type Wire = MacVerifier<V, T>;
     type FieldElement = V;
 
     fn party(&self) -> Party {
@@ -578,7 +578,7 @@ where
         &self.verifier
     }
 
-    fn input(&mut self) -> Result<MacVerifier<T>> {
+    fn input(&mut self) -> Result<MacVerifier<V, T>> {
         self.verifier.input1(&mut self.channel, &mut self.rng)
     }
 
@@ -601,7 +601,7 @@ where
         Ok(cnt)
     }
 
-    fn push_check_zero(&mut self, e: &MacVerifier<T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &MacVerifier<V, T>) -> Result<()> {
         if self.no_batching {
             self.verifier
                 .check_zero(&mut self.channel, &mut self.rng, &[*e])?;

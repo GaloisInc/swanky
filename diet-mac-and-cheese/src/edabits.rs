@@ -47,9 +47,9 @@ fn copy_edabits_prover<FE: FiniteField>(edabits: &EdabitsProver<FE>) -> EdabitsP
 #[derive(Clone)]
 pub struct EdabitsVerifier<FE: FiniteField> {
     #[allow(missing_docs)]
-    pub bits: Vec<MacVerifier<F40b>>,
+    pub bits: Vec<MacVerifier<F2, F40b>>,
     #[allow(missing_docs)]
-    pub value: MacVerifier<FE>,
+    pub value: MacVerifier<FE, FE>,
 }
 
 #[allow(unused)]
@@ -74,8 +74,8 @@ struct DabitProver<FE: FiniteField> {
 /// DabitVerifier struct
 #[derive(Clone)]
 struct DabitVerifier<FE: FiniteField> {
-    bit: MacVerifier<F40b>,
-    value: MacVerifier<FE>,
+    bit: MacVerifier<F2, F40b>,
+    value: MacVerifier<FE, FE>,
 }
 
 const FDABIT_SECURITY_PARAMETER: usize = 38;
@@ -934,10 +934,10 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         &mut self,
         channel: &mut C,
         r_batch: &[DabitVerifier<FE>],
-        x_batch: &[MacVerifier<F40b>],
-        r_mac_plus_x_mac: &mut Vec<MacVerifier<F40b>>,
+        x_batch: &[MacVerifier<F2, F40b>],
+        r_mac_plus_x_mac: &mut Vec<MacVerifier<F2, F40b>>,
         c_batch: &mut Vec<F2>,
-        x_m_batch: &mut Vec<MacVerifier<FE>>,
+        x_m_batch: &mut Vec<MacVerifier<FE, FE>>,
     ) -> Result<()> {
         let n = r_batch.len();
         debug_assert!(n == x_batch.len());
@@ -973,7 +973,7 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         rng: &mut AesRng,
         x_batch: &[EdabitsVerifier<FE>],
         y_batch: &[EdabitsVerifier<FE>],
-    ) -> Result<Vec<(Vec<MacVerifier<F40b>>, MacVerifier<F40b>)>> {
+    ) -> Result<Vec<(Vec<MacVerifier<F2, F40b>>, MacVerifier<F2, F40b>)>> {
         let num = x_batch.len();
         if num != y_batch.len() {
             return Err(eyre!("incompatible input vectors in bit_add_carry"));
@@ -1041,7 +1041,7 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        aux_bits: Vec<Vec<MacVerifier<F40b>>>,
+        aux_bits: Vec<Vec<MacVerifier<F2, F40b>>>,
     ) -> Result<Vec<EdabitsVerifier<FE>>> {
         let num = aux_bits.len();
         debug!("HOW MANY {:?}", num);
@@ -1144,7 +1144,11 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         channel: &mut C,
         rng: &mut AesRng,
         num: usize,
-        out: &mut Vec<(MacVerifier<F40b>, MacVerifier<F40b>, MacVerifier<F40b>)>,
+        out: &mut Vec<(
+            MacVerifier<F2, F40b>,
+            MacVerifier<F2, F40b>,
+            MacVerifier<F2, F40b>,
+        )>,
     ) -> Result<()> {
         let mut pairs = Vec::with_capacity(num);
         for _ in 0..num {
@@ -1180,7 +1184,7 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         let mut res = true;
 
         // step 1)
-        let mut c_m_mac: Vec<Vec<MacVerifier<FE>>> = Vec::with_capacity(s);
+        let mut c_m_mac: Vec<Vec<MacVerifier<FE, FE>>> = Vec::with_capacity(s);
         for _ in 0..s {
             let b_m_mac = self.fcom_fe.input(channel, rng, gamma)?;
             c_m_mac.push(b_m_mac);
@@ -1300,9 +1304,9 @@ impl<FE: FiniteField<PrimeField = FE>, SvoleF2: SvoleT<F40b>, SvoleFE: SvoleT<FE
         edabits_vector_mac: &[EdabitsVerifier<FE>],
         r_mac: &[EdabitsVerifier<FE>],
         dabits_mac: &[DabitVerifier<FE>],
-        convert_bit_2_field_aux1: &mut Vec<MacVerifier<F40b>>,
+        convert_bit_2_field_aux1: &mut Vec<MacVerifier<F2, F40b>>,
         convert_bit_2_field_aux2: &mut Vec<F2>,
-        e_m_batch: &mut Vec<MacVerifier<FE>>,
+        e_m_batch: &mut Vec<MacVerifier<FE, FE>>,
         ei_batch: &mut Vec<F2>,
     ) -> Result<()> {
         let n = edabits_vector_mac.len();

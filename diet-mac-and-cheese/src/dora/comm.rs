@@ -68,7 +68,7 @@ fn verifier_commit_vec<
     channel: &mut C,
     rng: &mut AesRng,
     len: usize, // padded length
-) -> Result<impl Iterator<Item = MacVerifier<F>>>
+) -> Result<impl Iterator<Item = MacVerifier<V, F>>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

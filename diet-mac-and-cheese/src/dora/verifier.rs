@@ -50,8 +50,8 @@ where
     pub fn mux(
         &mut self,
         verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
-        input: &[MacVerifier<F>],
-    ) -> Result<Vec<MacVerifier<F>>> {
+        input: &[MacVerifier<V, F>],
+    ) -> Result<Vec<MacVerifier<V, F>>> {
         // check if we should compact the trace first
         if self.trace.len() >= self.max_trace {
             self.compact(verifier)?;

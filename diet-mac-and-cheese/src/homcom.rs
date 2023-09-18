@@ -423,14 +423,15 @@ where
 }
 
 /// State to accumulate multiplication checks.
-pub struct StateMultCheckVerifier<T> {
+pub struct StateMultCheckVerifier<V, T> {
     sum_b: T,
     power_chi: T,
     chi: T,
     cnt: usize,
+    phantom: PhantomData<V>,
 }
 
-impl<T> Drop for StateMultCheckVerifier<T> {
+impl<V, T> Drop for StateMultCheckVerifier<V, T> {
     fn drop(&mut self) {
         if self.cnt != 0 {
             warn!(
@@ -441,7 +442,7 @@ impl<T> Drop for StateMultCheckVerifier<T> {
     }
 }
 
-impl<T: FiniteField> StateMultCheckVerifier<T> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> StateMultCheckVerifier<V, T> {
     /// Initialize the state.
     pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let chi = T::random(rng);
@@ -453,6 +454,7 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
             power_chi: chi,
             chi,
             cnt: 0,
+            phantom: PhantomData,
         })
     }
 
@@ -466,7 +468,7 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
     /// Accumulate a triple into the state.
     pub(crate) fn accumulate(
         &mut self,
-        triple: &(MacVerifier<T>, MacVerifier<T>, MacVerifier<T>),
+        triple: &(MacVerifier<V, T>, MacVerifier<V, T>, MacVerifier<V, T>),
         delta: T,
     ) {
         let (x, y, z) = triple;
@@ -482,7 +484,7 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
     /// Finalize the state.
     pub(crate) fn finalize<C: AbstractChannel>(
         &mut self,
-        mask: MacVerifier<T>,
+        mask: MacVerifier<T, T>,
         channel: &mut C,
         delta: T,
     ) -> Result<usize> {
@@ -508,13 +510,14 @@ impl<T: FiniteField> StateMultCheckVerifier<T> {
 }
 
 /// State to accumulate check zero.
-pub struct StateZeroCheckVerifier<T> {
+pub struct StateZeroCheckVerifier<V, T> {
     rng: AesRng,
     key_chi: T,
     cnt: usize,
+    phantom: PhantomData<V>,
 }
 
-impl<T> Drop for StateZeroCheckVerifier<T> {
+impl<V, T> Drop for StateZeroCheckVerifier<V, T> {
     fn drop(&mut self) {
         if self.cnt != 0 {
             warn!(
@@ -525,7 +528,7 @@ impl<T> Drop for StateZeroCheckVerifier<T> {
     }
 }
 
-impl<T: FiniteField> StateZeroCheckVerifier<T> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> StateZeroCheckVerifier<V, T> {
     /// Initialize the state.
     pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
         let seed = rng.gen::<Block>();
@@ -537,6 +540,7 @@ impl<T: FiniteField> StateZeroCheckVerifier<T> {
             rng,
             key_chi: T::ZERO,
             cnt: 0,
+            phantom: PhantomData,
         })
     }
 
@@ -547,7 +551,7 @@ impl<T: FiniteField> StateZeroCheckVerifier<T> {
         self.cnt = 0;
     }
 
-    pub(crate) fn accumulate(&mut self, mac: &MacVerifier<T>) -> Result<()> {
+    pub(crate) fn accumulate(&mut self, mac: &MacVerifier<V, T>) -> Result<()> {
         let chi = T::random(&mut self.rng);
         self.key_chi += chi * mac.mac();
         self.cnt += 1;
@@ -635,7 +639,7 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-    ) -> Result<MacVerifier<T>> {
+    ) -> Result<MacVerifier<V, T>> {
         match self.voles.pop() {
             Some(e) => Ok(MacVerifier::new(e)),
             None => {
@@ -655,7 +659,7 @@ where
         channel: &mut C,
         rng: &mut AesRng,
         num: usize,
-    ) -> Result<Vec<MacVerifier<T>>> {
+    ) -> Result<Vec<MacVerifier<V, T>>> {
         let mut out = Vec::with_capacity(num);
         self.input_low_level(channel, rng, num, &mut out)?;
         Ok(out)
@@ -667,7 +671,7 @@ where
         channel: &mut C,
         rng: &mut AesRng,
         num: usize,
-        out: &mut Vec<MacVerifier<T>>,
+        out: &mut Vec<MacVerifier<V, T>>,
     ) -> Result<()> {
         for _i in 0..num {
             let r = self.random(channel, rng)?;
@@ -682,7 +686,7 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-    ) -> Result<MacVerifier<T>> {
+    ) -> Result<MacVerifier<V, T>> {
         let r = self.random(channel, rng)?;
         let y = channel.read_serializable::<V>()?;
         let out = MacVerifier::new(r.mac() - y * self.delta);
@@ -691,31 +695,31 @@ where
 
     /// Add a constant.
     #[inline]
-    pub fn affine_add_cst(&self, cst: V, x: MacVerifier<T>) -> MacVerifier<T> {
+    pub fn affine_add_cst(&self, cst: V, x: MacVerifier<V, T>) -> MacVerifier<V, T> {
         MacVerifier::new(x.mac() - cst * self.delta)
     }
 
     /// Multiply by a constant.
     #[inline]
-    pub fn affine_mult_cst(&self, cst: V, x: MacVerifier<T>) -> MacVerifier<T> {
+    pub fn affine_mult_cst(&self, cst: V, x: MacVerifier<V, T>) -> MacVerifier<V, T> {
         x * cst
     }
 
     /// Add two [`MacVerifier`]s.
     #[inline]
-    pub fn add(&self, a: MacVerifier<T>, b: MacVerifier<T>) -> MacVerifier<T> {
+    pub fn add(&self, a: MacVerifier<V, T>, b: MacVerifier<V, T>) -> MacVerifier<V, T> {
         a + b
     }
 
     /// Negate a [`MacVerifier`].
     #[inline]
-    pub fn neg(&self, a: MacVerifier<T>) -> MacVerifier<T> {
+    pub fn neg(&self, a: MacVerifier<V, T>) -> MacVerifier<V, T> {
         -a
     }
 
     /// Subtract two [`MacVerifier`]s.
     #[inline]
-    pub fn sub(&self, a: MacVerifier<T>, b: MacVerifier<T>) -> MacVerifier<T> {
+    pub fn sub(&self, a: MacVerifier<V, T>, b: MacVerifier<V, T>) -> MacVerifier<V, T> {
         a - b
     }
 
@@ -724,7 +728,7 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        key_batch: &[MacVerifier<T>],
+        key_batch: &[MacVerifier<V, T>],
     ) -> Result<()> {
         let seed = rng.gen::<Block>();
         channel.write_block(&seed)?;
@@ -751,7 +755,7 @@ where
     pub fn open<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        keys: &[MacVerifier<T>],
+        keys: &[MacVerifier<V, T>],
         out: &mut Vec<V>,
     ) -> Result<()> {
         let mut hasher = blake3::Hasher::new();
@@ -787,7 +791,7 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        triples: &[(MacVerifier<T>, MacVerifier<T>, MacVerifier<T>)],
+        triples: &[(MacVerifier<V, T>, MacVerifier<V, T>, MacVerifier<V, T>)],
     ) -> Result<()> {
         let chi = T::random(rng);
         channel.write_serializable::<T>(&chi)?;
@@ -809,7 +813,7 @@ where
         for v in vs.iter_mut() {
             *v = self.random(channel, rng)?;
         }
-        let mask = <MacVerifier<T> as Mac<V, T>>::lift(&vs);
+        let mask = <MacVerifier<V, T> as Mac>::lift(&vs);
 
         let u = channel.read_serializable::<T>()?;
         let v = channel.read_serializable::<T>()?;
@@ -828,7 +832,7 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        state: &mut StateMultCheckVerifier<T>,
+        state: &mut StateMultCheckVerifier<V, T>,
     ) -> Result<usize> {
         debug!("FComVerifier: quicksilver_finalize");
 
@@ -836,7 +840,7 @@ where
         for v in vs.iter_mut() {
             *v = self.random(channel, rng)?;
         }
-        let mask = <MacVerifier<T> as Mac<V, T>>::lift(&vs);
+        let mask = <MacVerifier<V, T> as Mac>::lift(&vs);
         state.finalize(mask, channel, self.delta)
     }
 }

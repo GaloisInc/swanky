@@ -2,7 +2,6 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
-use crate::backend_trait::Party;
 use crate::circuit_ir::{
     CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore,
     WireCount, WireId, WireRange,
@@ -17,6 +16,7 @@ use crate::svole_thread::{SvoleAtomic, ThreadReceiver, ThreadSender};
 use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleStopSignal, SvoleT};
 use crate::text_reader::TextRelation;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
+use crate::{backend_trait::Party, mac::Mac};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{
     dora::{Disjunction, DoraProver, DoraVerifier},
@@ -101,7 +101,7 @@ fn conversion_param_b_valid() {
 #[derive(Clone, Debug)]
 pub enum MacBitGeneric {
     BitProver(MacProver<F2, F40b>),
-    BitVerifier(MacVerifier<F40b>),
+    BitVerifier(MacVerifier<F2, F40b>),
     BitPublic(F2),
 }
 
@@ -115,6 +115,56 @@ pub trait BackendConvT: PrimeBackendT {
 
     // Finalize the field switching conversions, by running edabits conversion checks
     fn finalize_conv(&mut self) -> Result<()>;
+}
+
+pub trait BackendLiftT: BackendT {
+    type LiftedBackend: BackendT<Wire = <Self::Wire as Mac>::LiftedMac>;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend;
+}
+
+impl<
+        T: PrimeFiniteField,
+        C: AbstractChannel,
+        SVOLE1: SvoleT<(F2, F40b)>,
+        SVOLE2: SvoleT<(T, T)>,
+    > BackendLiftT for DietMacAndCheeseConvProver<T, C, SVOLE1, SVOLE2>
+{
+    type LiftedBackend = Self;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
+    }
+}
+
+impl<T: PrimeFiniteField, C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<T>> BackendLiftT
+    for DietMacAndCheeseConvVerifier<T, C, SVOLE1, SVOLE2>
+{
+    type LiftedBackend = Self;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
+    }
+}
+
+impl<T: PrimeFiniteField, C: AbstractChannel, SVOLE: SvoleT<(T, T)>> BackendLiftT
+    for DietMacAndCheeseProver<T, T, C, SVOLE>
+{
+    type LiftedBackend = Self;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
+    }
+}
+
+impl<T: PrimeFiniteField, C: AbstractChannel, SVOLE: SvoleT<T>> BackendLiftT
+    for DietMacAndCheeseVerifier<T, T, C, SVOLE>
+{
+    type LiftedBackend = Self;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
+    }
 }
 
 pub trait BackendDisjunctionT: BackendT {
@@ -240,6 +290,302 @@ impl<E> EdabitsMap<E> {
         self.0.insert(bit_width, edabits);
     }
 }
+
+pub(crate) struct DietMacAndCheeseExtFieldProver<
+    T: FiniteField<PrimeField = F2>,
+    C: AbstractChannel,
+    SVOLE1: SvoleT<(F2, T)>,
+    SVOLE2: SvoleT<(T, T)>,
+> where
+    F2: IsSubFieldOf<T>,
+{
+    dmc: DietMacAndCheeseProver<F2, T, C, SVOLE1>,
+    lifted_dmc: DietMacAndCheeseProver<T, T, C, SVOLE2>,
+}
+
+impl<
+        T: FiniteField<PrimeField = F2>,
+        C: AbstractChannel,
+        SVOLE1: SvoleT<(F2, T)>,
+        SVOLE2: SvoleT<(T, T)>,
+    > DietMacAndCheeseExtFieldProver<T, C, SVOLE1, SVOLE2>
+where
+    F2: IsSubFieldOf<T>,
+{
+    fn init_with_fcom(
+        channel: &mut C,
+        rng: AesRng,
+        fcom: &FComProver<F2, T, SVOLE1>,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        no_batching: bool,
+    ) -> Result<Self> {
+        let mut dmc = DietMacAndCheeseProver::init_with_fcom(channel, rng, fcom, no_batching)?;
+        let lifted_dmc = dmc.lift(lpn_setup, lpn_extend)?;
+        Ok(Self { dmc, lifted_dmc })
+    }
+}
+
+impl<
+        T: FiniteField<PrimeField = F2>,
+        C: AbstractChannel,
+        SVOLE1: SvoleT<(F2, T)>,
+        SVOLE2: SvoleT<(T, T)>,
+    > BackendT for DietMacAndCheeseExtFieldProver<T, C, SVOLE1, SVOLE2>
+where
+    F2: IsSubFieldOf<T>,
+{
+    type Wire = <DietMacAndCheeseProver<F2, T, C, SVOLE1> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseProver<F2, T, C, SVOLE1> as BackendT>::FieldElement;
+
+    fn party(&self) -> Party {
+        Party::Prover
+    }
+
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+        self.dmc.wire_value(wire)
+    }
+
+    fn one(&self) -> Result<Self::FieldElement> {
+        self.dmc.one()
+    }
+    fn zero(&self) -> Result<Self::FieldElement> {
+        self.dmc.zero()
+    }
+    fn random(&mut self) -> Result<Self::FieldElement> {
+        self.dmc.random()
+    }
+    fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.copy(wire)
+    }
+    fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.constant(val)
+    }
+    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+        self.dmc.assert_zero(wire)
+    }
+    fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.add(a, b)
+    }
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.sub(a, b)
+    }
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.mul(a, b)
+    }
+    fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.add_constant(a, b)
+    }
+    fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.mul_constant(a, b)
+    }
+
+    fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.input_public(val)
+    }
+    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
+        self.dmc.input_private(val)
+    }
+    fn finalize(&mut self) -> Result<()> {
+        self.dmc.finalize()?;
+        self.lifted_dmc.finalize()?;
+        Ok(())
+    }
+}
+
+impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)>> BackendConvT
+    for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
+{
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
+        debug!("CONV_TO_BITS {:?}", w);
+        Ok(vec![MacBitGeneric::BitProver(*w)])
+    }
+
+    fn assert_conv_from_bits(&mut self, x: &[MacBitGeneric]) -> Result<Self::Wire> {
+        match x[0] {
+            MacBitGeneric::BitProver(m) => Ok(m),
+            MacBitGeneric::BitVerifier(_) => {
+                panic!("Should be a prover bit");
+            }
+            MacBitGeneric::BitPublic(m) => self.input_public(m),
+        }
+    }
+
+    fn finalize_conv(&mut self) -> Result<()> {
+        // We dont need to finalize the conversion
+        // for the binary functionality because they are for free.
+        Ok(())
+    }
+}
+
+impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)>>
+    BackendDisjunctionT for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
+{
+    fn disjunction(
+        &mut self,
+        _inputs: &[Self::Wire],
+        _disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>> {
+        unimplemented!("disjunction plugin is not sound for GF(2)")
+    }
+
+    fn finalize_disj(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)>> BackendLiftT
+    for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
+{
+    type LiftedBackend = DietMacAndCheeseProver<F40b, F40b, C, SVOLE2>;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        &mut self.lifted_dmc
+    }
+}
+
+//////////////////////////////////////
+
+pub(crate) struct DietMacAndCheeseExtFieldVerifier<
+    T: FiniteField<PrimeField = F2>,
+    C: AbstractChannel,
+    SVOLE: SvoleT<T>,
+> where
+    F2: IsSubFieldOf<T>,
+{
+    dmc: DietMacAndCheeseVerifier<F2, T, C, SVOLE>,
+    lifted_dmc: DietMacAndCheeseVerifier<T, T, C, SVOLE>,
+}
+
+impl<T: FiniteField<PrimeField = F2>, C: AbstractChannel, SVOLE: SvoleT<T>>
+    DietMacAndCheeseExtFieldVerifier<T, C, SVOLE>
+where
+    F2: IsSubFieldOf<T>,
+{
+    fn init_with_fcom(
+        channel: &mut C,
+        rng: AesRng,
+        fcom: &FComVerifier<F2, T, SVOLE>,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        no_batching: bool,
+    ) -> Result<Self> {
+        let mut dmc = DietMacAndCheeseVerifier::init_with_fcom(channel, rng, fcom, no_batching)?;
+        let lifted_dmc = dmc.lift(lpn_setup, lpn_extend)?;
+        Ok(Self { dmc, lifted_dmc })
+    }
+}
+
+impl<T: FiniteField<PrimeField = F2>, C: AbstractChannel, SVOLE: SvoleT<T>> BackendT
+    for DietMacAndCheeseExtFieldVerifier<T, C, SVOLE>
+where
+    F2: IsSubFieldOf<T>,
+{
+    type Wire = <DietMacAndCheeseVerifier<F2, T, C, SVOLE> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheeseVerifier<F2, T, C, SVOLE> as BackendT>::FieldElement;
+
+    fn party(&self) -> Party {
+        Party::Prover
+    }
+
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+        self.dmc.wire_value(wire)
+    }
+
+    fn one(&self) -> Result<Self::FieldElement> {
+        self.dmc.one()
+    }
+    fn zero(&self) -> Result<Self::FieldElement> {
+        self.dmc.zero()
+    }
+    fn random(&mut self) -> Result<Self::FieldElement> {
+        self.dmc.random()
+    }
+    fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.copy(wire)
+    }
+    fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.constant(val)
+    }
+    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+        self.dmc.assert_zero(wire)
+    }
+    fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.add(a, b)
+    }
+    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.sub(a, b)
+    }
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+        self.dmc.mul(a, b)
+    }
+    fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.add_constant(a, b)
+    }
+    fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.mul_constant(a, b)
+    }
+
+    fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
+        self.dmc.input_public(val)
+    }
+    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
+        self.dmc.input_private(val)
+    }
+    fn finalize(&mut self) -> Result<()> {
+        self.dmc.finalize()?;
+        self.lifted_dmc.finalize()?;
+        Ok(())
+    }
+}
+
+impl<T: FiniteField<PrimeField = F2>, C: AbstractChannel, SVOLE: SvoleT<T>> BackendConvT
+    for DietMacAndCheeseExtFieldVerifier<T, C, SVOLE>
+where
+    F2: IsSubFieldOf<T>,
+{
+    fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
+        unimplemented!()
+    }
+
+    fn assert_conv_from_bits(&mut self, x: &[MacBitGeneric]) -> Result<Self::Wire> {
+        unimplemented!()
+    }
+
+    fn finalize_conv(&mut self) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+impl<T: FiniteField<PrimeField = F2>, C: AbstractChannel, SVOLE: SvoleT<T>> BackendDisjunctionT
+    for DietMacAndCheeseExtFieldVerifier<T, C, SVOLE>
+where
+    F2: IsSubFieldOf<T>,
+{
+    fn finalize_disj(&mut self) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn disjunction(
+        &mut self,
+        inputs: &[Self::Wire],
+        disj: &DisjunctionBody,
+    ) -> Result<Vec<Self::Wire>> {
+        unimplemented!()
+    }
+}
+
+impl<C: AbstractChannel, SVOLE: SvoleT<F40b>> BackendLiftT
+    for DietMacAndCheeseExtFieldVerifier<F40b, C, SVOLE>
+{
+    type LiftedBackend = DietMacAndCheeseVerifier<F40b, F40b, C, SVOLE>;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        &mut self.lifted_dmc
+    }
+}
+
+//////////////////////////////////////////
 
 pub(crate) struct DietMacAndCheeseConvProver<
     FE: FiniteField,
@@ -1103,7 +1449,7 @@ impl<B: BackendT> EvaluatorSingle<B> {
     }
 }
 
-impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
+impl<B: BackendConvT + BackendDisjunctionT + BackendLiftT> EvaluatorT for EvaluatorSingle<B> {
     #[inline]
     fn evaluate_gate(
         &mut self,
@@ -1367,6 +1713,7 @@ impl<B: BackendConvT + BackendDisjunctionT> EvaluatorT for EvaluatorSingle<B> {
 pub struct EvaluatorCirc<
     C: AbstractChannel + 'static,
     SvoleF2Prover: SvoleT<(F2, F40b)>,
+    SvoleF40bProver: SvoleT<(F40b, F40b)>,
     SvoleF2Verifier: SvoleT<F40b>,
 > {
     inputs: CircInputs,
@@ -1379,14 +1726,15 @@ pub struct EvaluatorCirc<
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
-    phantom: PhantomData<C>,
+    phantom: PhantomData<(C, SvoleF40bProver)>,
 }
 
 impl<
         C: AbstractChannel + 'static,
         SvoleF2Prover: SvoleT<(F2, F40b)> + 'static,
+        SvoleF40bProver: SvoleT<(F40b, F40b)> + 'static,
         SvoleF2Verifier: SvoleT<F40b> + 'static,
-    > EvaluatorCirc<C, SvoleF2Prover, SvoleF2Verifier>
+    > EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier>
 {
     // TODO: Factorize interface for `new_with_prover` and `new_with_verifier`
     pub fn new(
@@ -1448,7 +1796,7 @@ impl<
         no_batching: bool,
         lpn_small: bool,
     ) -> Result<(
-        EvaluatorCirc<C, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>,
+        EvaluatorCirc<C, SvoleAtomic<(F2, F40b)>, SvoleAtomic<(F40b, F40b)>, SvoleAtomic<F40b>>,
         std::thread::JoinHandle<()>,
     )> {
         let (lpn_setup, lpn_extend) = if lpn_small {
@@ -1610,21 +1958,27 @@ impl<
             // Note for F2 we do not use the backend with Conv, simply dietMC
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-                let dmc = DietMacAndCheeseProver::<F2, F40b, _, SvoleF2Prover>::init_with_fcom(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    self.no_batching,
-                )?;
+                let dmc =
+                    DietMacAndCheeseExtFieldProver::<F40b, _, SvoleF2Prover, SvoleF40bProver>::init_with_fcom(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_SMALL,
+                        LPN_EXTEND_SMALL,
+                        self.no_batching,
+                    )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             } else {
                 let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleF2Verifier>::init_with_fcom(
-                    channel,
-                    rng,
-                    fcom_f2,
-                    self.no_batching,
-                )?;
+                let dmc =
+                    DietMacAndCheeseExtFieldVerifier::<F40b, _, SvoleF2Verifier>::init_with_fcom(
+                        channel,
+                        rng,
+                        fcom_f2,
+                        LPN_SETUP_SMALL,
+                        LPN_EXTEND_SMALL,
+                        self.no_batching,
+                    )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             }
             self.f2_idx = self.eval.len();
@@ -1723,19 +2077,23 @@ impl<
         info!("loading field F2");
         let back: Box<dyn EvaluatorT> = if self.party == Party::Prover {
             let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-            let dmc = DietMacAndCheeseProver::<F2, F40b, _, SvoleF2Prover>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtFieldProver::<F40b, _, SvoleF2Prover, SvoleF40bProver>::init_with_fcom(
                 channel,
                 rng,
                 fcom_f2,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
         } else {
             let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-            let dmc = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleF2Verifier>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtFieldVerifier::<F40b, _, SvoleF2Verifier>::init_with_fcom(
                 channel,
                 rng,
                 fcom_f2,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
@@ -2224,8 +2582,12 @@ impl<
     }
 }
 
-impl<C: AbstractChannel, SvoleF2Prover: SvoleT<(F2, F40b)>, SvoleF2Verifier: SvoleT<F40b>> Drop
-    for EvaluatorCirc<C, SvoleF2Prover, SvoleF2Verifier>
+impl<
+        C: AbstractChannel,
+        SvoleF2Prover: SvoleT<(F2, F40b)>,
+        SvoleF40bProver: SvoleT<(F40b, F40b)>,
+        SvoleF2Verifier: SvoleT<F40b>,
+    > Drop for EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier>
 {
     fn drop(&mut self) {
         if !self.multithreaded_voles.is_empty() {
@@ -2352,7 +2714,12 @@ pub(crate) mod tests {
                 inputs.ingest_witnesses(id, VecDeque::from(witnesses));
             }
 
-            let mut eval = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+            let mut eval = EvaluatorCirc::<
+                _,
+                SvoleSender<F40b>,
+                SvoleSender<F40b>,
+                SvoleReceiver<F2, F40b>,
+            >::new(
                 Party::Prover,
                 &mut channel,
                 rng,
@@ -2377,16 +2744,17 @@ pub(crate) mod tests {
             inputs.ingest_instances(id, VecDeque::from(inst));
         }
 
-        let mut eval = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-            Party::Verifier,
-            &mut channel,
-            rng,
-            inputs,
-            type_store,
-            true,
-            false,
-        )
-        .unwrap();
+        let mut eval =
+            EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                Party::Verifier,
+                &mut channel,
+                rng,
+                inputs,
+                type_store,
+                true,
+                false,
+            )
+            .unwrap();
         eval.load_backends(&mut channel, true)?;
         eval.evaluate_gates(&gates, &func_store)?;
 

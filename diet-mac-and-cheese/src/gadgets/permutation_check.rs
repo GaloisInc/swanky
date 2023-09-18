@@ -1,8 +1,11 @@
-use crate::{backend_trait::BackendT, gadgets::dotproduct_with_public, mac::Mac};
+use crate::{
+    backend_multifield::BackendLiftT, backend_trait::BackendT, gadgets::dotproduct_with_public,
+    mac::Mac,
+};
 use eyre::{ensure, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use scuttlebutt::generic_array_length::Arr;
-use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
+use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
@@ -65,28 +68,28 @@ pub(crate) fn permutation_check<B: BackendT>(
     backend.assert_zero(&z)
 }
 
-pub(crate) fn permutation_check_binary<
-    M: Mac<F2, F40b>,
-    B: BackendT<Wire = M, FieldElement = F2>,
->(
-    backend: &mut impl BackendT<Wire = M::LiftedMac>,
+pub(crate) fn permutation_check_binary<M: Mac<Value = F2>, B: BackendLiftT<Wire = M>>(
+    backend: &mut B::LiftedBackend,
     xs: &[B::Wire],
     ys: &[B::Wire],
     ntuples: usize,
     tuple_size: usize,
-) -> Result<()> {
-    let xs: Vec<M::LiftedMac> = xs
+) -> Result<()>
+where
+    M::Value: IsSubFieldOf<M::Tag>,
+{
+    let xs: Vec<_> = xs
         .iter()
         .map(|x| {
-            let mut array: Arr<M, DegreeModulo<F2, F40b>> = GenericArray::default();
+            let mut array: Arr<M, DegreeModulo<F2, M::Tag>> = GenericArray::default();
             array[0] = *x;
             M::lift(&array)
         })
         .collect();
-    let ys: Vec<M::LiftedMac> = ys
+    let ys: Vec<_> = ys
         .iter()
         .map(|y| {
-            let mut array: Arr<M, DegreeModulo<F2, F40b>> = GenericArray::default();
+            let mut array: Arr<M, DegreeModulo<F2, M::Tag>> = GenericArray::default();
             array[0] = *y;
             M::lift(&array)
         })
@@ -109,6 +112,7 @@ mod tests {
     use swanky_field_f61p::F61p;
 
     use crate::{
+        backend_multifield::{DietMacAndCheeseExtFieldProver, DietMacAndCheeseExtFieldVerifier},
         backend_trait::BackendT,
         mac::{MacProver, MacVerifier},
         svole_trait::{SvoleReceiver, SvoleSender},
@@ -178,12 +182,12 @@ mod tests {
             false,
         )
         .unwrap();
-        let xs: Vec<MacVerifier<F>> = xs
+        let xs: Vec<MacVerifier<F, F>> = xs
             .clone()
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
-        let ys: Vec<MacVerifier<F>> = ys
+        let ys: Vec<MacVerifier<F, F>> = ys
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
@@ -242,10 +246,10 @@ mod tests {
 
             permutation_check_binary::<
                 MacProver<F2, F40b>,
-                DietMacAndCheeseProver<
-                    F2,
+                DietMacAndCheeseExtFieldProver<
                     F40b,
                     Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
+                    SvoleSender<F40b>,
                     SvoleSender<F40b>,
                 >,
             >(&mut party2, &xs, &ys, ntuples, tuple_size)
@@ -275,23 +279,22 @@ mod tests {
         let mut party2 = party
             .lift::<SvoleReceiver<F40b, F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
             .unwrap();
-        let xs: Vec<MacVerifier<F40b>> = xs
+        let xs: Vec<MacVerifier<F2, F40b>> = xs
             .clone()
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
-        let ys: Vec<MacVerifier<F40b>> = ys
+        let ys: Vec<MacVerifier<F2, F40b>> = ys
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
 
         permutation_check_binary::<
-            MacVerifier<F40b>,
-            DietMacAndCheeseVerifier<
-                F2,
+            MacVerifier<F2, F40b>,
+            DietMacAndCheeseExtFieldVerifier<
                 F40b,
                 Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                SvoleReceiver<F2, F40b>,
+                SvoleReceiver<F40b, F40b>,
             >,
         >(&mut party2, &xs, &ys, ntuples, tuple_size)
         .unwrap();

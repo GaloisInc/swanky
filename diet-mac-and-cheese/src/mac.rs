@@ -2,6 +2,7 @@ use generic_array::GenericArray;
 use scuttlebutt::generic_array_length::Arr;
 use std::{
     fmt::Debug,
+    marker::PhantomData,
     ops::{Add, Mul, Neg, Sub},
 };
 use subtle::{Choice, ConditionallySelectable};
@@ -15,20 +16,19 @@ fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
 
 /// A trait defining a MAC type.
 ///
-/// A MAC is parameterized with a value field `V` and a tag field `T`, where `V`
-/// must be a subfield of `T`.
-///
 /// There are two realizations of [`Mac`]: [`MacProver`] and [`MacVerifier`].
 /// These are used by the prover and verifier, respectively, as the underlying
 /// data type in the circuit evaluation.
-pub trait Mac<V: IsSubFieldOf<T>, T: FiniteField>:
-    Clone + Copy + Debug + Default + Add + Sub + Neg + Mul<V>
-{
+pub trait Mac: Clone + Copy + Debug + Default + Add + Sub + Neg + Mul<Self::Value> {
+    /// The value field.
+    type Value: IsSubFieldOf<Self::Tag>;
+    /// The tag field.
+    type Tag: FiniteField;
     /// A MAC lifted to its tag field.
-    type LiftedMac: Mac<T, T>;
+    type LiftedMac: Mac<Value = Self::Tag, Tag = Self::Tag>;
 
     /// Lift an array of MACs from the value field to the tag field.
-    fn lift(xs: &Arr<Self, DegreeModulo<V, T>>) -> Self::LiftedMac;
+    fn lift(xs: &Arr<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac;
 }
 
 /// This type holds the prover-side data associated with a MAC between a prover
@@ -42,7 +42,7 @@ pub trait Mac<V: IsSubFieldOf<T>, T: FiniteField>:
 pub struct MacProver<V: IsSubFieldOf<T>, T: FiniteField>(
     /// The prover's value `v`.
     V,
-    /// The prover's MAC tag `t`.
+    /// The prover's tag `t`.
     T,
 );
 
@@ -65,8 +65,10 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> MacProver<V, T> {
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacProver<V, T> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mac for MacProver<V, T> {
     type LiftedMac = MacProver<T, T>;
+    type Value = V;
+    type Tag = T;
 
     fn lift(xs: &Arr<Self, DegreeModulo<V, T>>) -> Self::LiftedMac {
         let mut value = T::ZERO;
@@ -129,14 +131,15 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> Mul<V> for MacProver<V, T> {
 /// equation holds for a global key `Δ` known only to the verifier: `t = v · Δ +
 /// k`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct MacVerifier<T: FiniteField>(
+pub struct MacVerifier<V: IsSubFieldOf<T>, T: FiniteField>(
     /// The verifier's MAC key `k`.
     T,
+    PhantomData<V>,
 );
 
-impl<T: FiniteField> MacVerifier<T> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> MacVerifier<V, T> {
     pub fn new(k: T) -> Self {
-        Self(k)
+        Self(k, PhantomData::<V>)
     }
 
     pub fn mac(&self) -> T {
@@ -144,8 +147,10 @@ impl<T: FiniteField> MacVerifier<T> {
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacVerifier<T> {
-    type LiftedMac = MacVerifier<T>;
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mac for MacVerifier<V, T> {
+    type LiftedMac = MacVerifier<T, T>;
+    type Value = V;
+    type Tag = T;
 
     fn lift(xs: &Arr<Self, DegreeModulo<V, T>>) -> Self::LiftedMac {
         let mut mac = T::ZERO;
@@ -157,48 +162,49 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> Mac<V, T> for MacVerifier<T> {
     }
 }
 
-impl<T: FiniteField> Add for MacVerifier<T> {
-    type Output = MacVerifier<T>;
+impl<V: IsSubFieldOf<T>, T: FiniteField> Add for MacVerifier<V, T> {
+    type Output = MacVerifier<V, T>;
 
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(self.mac() + rhs.mac())
     }
 }
 
-impl<T: FiniteField> Sub for MacVerifier<T> {
-    type Output = MacVerifier<T>;
+impl<V: IsSubFieldOf<T>, T: FiniteField> Sub for MacVerifier<V, T> {
+    type Output = MacVerifier<V, T>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self::new(self.mac() - rhs.mac())
     }
 }
 
-impl<T: FiniteField> Neg for MacVerifier<T> {
-    type Output = MacVerifier<T>;
+impl<V: IsSubFieldOf<T>, T: FiniteField> Neg for MacVerifier<V, T> {
+    type Output = MacVerifier<V, T>;
 
     fn neg(self) -> Self::Output {
         Self::new(-self.mac())
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> Mul<V> for MacVerifier<T> {
-    type Output = MacVerifier<T>;
+impl<V: IsSubFieldOf<T>, T: FiniteField> Mul<V> for MacVerifier<V, T> {
+    type Output = MacVerifier<V, T>;
 
     fn mul(self, rhs: V) -> Self::Output {
         Self::new(rhs * self.mac())
     }
 }
 
-impl<T: FiniteField> ConditionallySelectable for MacVerifier<T> {
+impl<V: IsSubFieldOf<T>, T: FiniteField> ConditionallySelectable for MacVerifier<V, T> {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        MacVerifier(T::conditional_select(&a.0, &b.0, choice))
+        let value = T::conditional_select(&a.mac(), &b.mac(), choice);
+        MacVerifier::new(value)
     }
 }
 
 #[cfg(test)]
 pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
     prover: MacProver<V, T>,
-    verifier: MacVerifier<T>,
+    verifier: MacVerifier<V, T>,
     delta: T,
 ) {
     assert_eq!(prover.value() * delta + verifier.mac(), prover.mac());
@@ -219,7 +225,7 @@ mod tests {
         random: bool,
         delta: T,
         rng: &mut AesRng,
-    ) -> (MacProver<V, T>, MacVerifier<T>) {
+    ) -> (MacProver<V, T>, MacVerifier<V, T>) {
         let value = if random { V::random(rng) } else { V::ZERO };
         let vmac = T::random(rng);
         let prover = MacProver::new(value, value * delta - vmac);
@@ -240,7 +246,7 @@ mod tests {
             verifiers[0] = verifier;
 
             let prover = MacProver::<F2, F40b>::lift(&provers);
-            let verifier = <MacVerifier<F40b> as Mac<F2, F40b>>::lift(&verifiers);
+            let verifier = <MacVerifier<F2, F40b> as Mac>::lift(&verifiers);
 
             validate(prover, verifier, delta);
         }
