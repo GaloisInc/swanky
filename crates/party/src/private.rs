@@ -43,7 +43,7 @@ use super::either::*;
 use super::*;
 
 #[derive(Debug, Clone, Copy)]
-pub struct UnknownProverSecret;
+struct UnknownProverSecret;
 
 macro_rules! make_prover_private_type {
     ($ProverPrivate:ident $PartyEither:ident $(: $Copy:ident)?) => {
@@ -209,7 +209,7 @@ impl<P: Party, T: Copy + PartialEq> PartialEq for ProverPrivateCopy<P, T> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct UnknownVerifierSecret;
+struct UnknownVerifierSecret;
 
 macro_rules! make_verifier_private_type {
     ($VerifierPrivate:ident $PartyEither:ident $(: $Copy:ident)?) => {
