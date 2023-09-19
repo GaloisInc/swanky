@@ -45,9 +45,9 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         };
 
         Ok(Self {
-            sum_a0: ProverPrivateCopy::default(),
-            sum_a1: ProverPrivateCopy::default(),
-            sum_b: VerifierPrivateCopy::default(),
+            sum_a0: ProverPrivateCopy::new(T::ZERO),
+            sum_a1: ProverPrivateCopy::new(T::ZERO),
+            sum_b: VerifierPrivateCopy::new(T::ZERO),
             chi_power: chi,
             chi,
             count: 0,
