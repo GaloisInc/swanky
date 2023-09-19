@@ -6,7 +6,7 @@ use eyre::{ensure, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use scuttlebutt::generic_array_length::Arr;
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::F2;
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
 /// not.
@@ -112,7 +112,7 @@ mod tests {
     use swanky_field_f61p::F61p;
 
     use crate::{
-        backend_multifield::{DietMacAndCheeseExtFieldProver, DietMacAndCheeseExtFieldVerifier},
+        backend_extfield::{DietMacAndCheeseExtFieldProver, DietMacAndCheeseExtFieldVerifier},
         backend_trait::BackendT,
         mac::{MacProver, MacVerifier},
         svole_trait::{SvoleReceiver, SvoleSender},
