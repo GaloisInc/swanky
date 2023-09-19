@@ -1,10 +1,11 @@
 use eyre::Result;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
+use swanky_party::Verifier;
 
 use crate::{
     dora::{comm::CommittedCrossTerms, tx::TxChannel},
-    mac::MacVerifier,
+    mac::Mac,
     svole_trait::SvoleT,
     DietMacAndCheeseVerifier,
 };
@@ -18,20 +19,30 @@ use super::{
     COMPACT_MIN, COMPACT_MUL,
 };
 
-pub struct DoraVerifier<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
-where
+pub struct DoraVerifier<
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel,
+    SvoleFSender: SvoleT<(V, F)>,
+    SvoleFReceiver: SvoleT<F>,
+> where
     F::PrimeField: IsSubFieldOf<V>,
 {
     _ph: std::marker::PhantomData<(F, C)>,
     disj: Disjunction<V>,
-    init: Vec<ComittedAcc<DietMacAndCheeseVerifier<V, F, C, SVOLE>>>,
-    trace: Vec<Trace<DietMacAndCheeseVerifier<V, F, C, SVOLE>>>,
+    init: Vec<ComittedAcc<DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>>>,
+    trace: Vec<Trace<DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>>>,
     max_trace: usize, // maximum trace len before compactification
     tx: blake3::Hasher,
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<F>>
-    DoraVerifier<V, F, C, SVOLE>
+impl<
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel,
+        SvoleFSender: SvoleT<(V, F)>,
+        SvoleFReceiver: SvoleT<F>,
+    > DoraVerifier<V, F, C, SvoleFSender, SvoleFReceiver>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -49,9 +60,9 @@ where
 
     pub fn mux(
         &mut self,
-        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
-        input: &[MacVerifier<F>],
-    ) -> Result<Vec<MacVerifier<F>>> {
+        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
+        input: &[Mac<Verifier, V, F>],
+    ) -> Result<Vec<Mac<Verifier, V, F>>> {
         // check if we should compact the trace first
         if self.trace.len() >= self.max_trace {
             self.compact(verifier)?;
@@ -86,7 +97,7 @@ where
     /// Verifies all the disjuctions and consumes the verifier.
     pub fn finalize(
         mut self,
-        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>,
+        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
     ) -> Result<()> {
         // compact into single set of accumulators
         self.compact(verifier)?;
@@ -102,7 +113,10 @@ where
     //
     // Commits to all the accumulators and executes the permutation proof.
     // This reduces the trace to a single element per branch.
-    fn compact(&mut self, verifier: &mut DietMacAndCheeseVerifier<V, F, C, SVOLE>) -> Result<()> {
+    fn compact(
+        &mut self,
+        verifier: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
+    ) -> Result<()> {
         // commit to all accumulators
         let mut ch = TxChannel::new(verifier.channel.clone(), &mut self.tx);
         let mut accs = Vec::with_capacity(self.disj.clauses().len());

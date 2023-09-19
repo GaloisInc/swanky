@@ -145,12 +145,14 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut party = DietMacAndCheeseProver::<F2, F40b, _, SvoleSender<F40b>>::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
+            let mut party = DietMacAndCheeseProver::<
+                F2,
+                F40b,
+                _,
+                SvoleSender<F40b>,
+                SvoleReceiver<F2, F40b>,
+            >::init(
+                &mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false
             )
             .unwrap();
             let zero = party.input_private(Some(F2::ZERO)).unwrap();
@@ -164,13 +166,13 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut party = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleReceiver<F2, F40b>>::init(
-            &mut channel,
-            rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
-        )
+        let mut party = DietMacAndCheeseVerifier::<
+            F2,
+            F40b,
+            _,
+            SvoleSender<F40b>,
+            SvoleReceiver<F2, F40b>,
+        >::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
         .unwrap();
         let zero = party.input_private(None).unwrap();
         let one = party.input_private(None).unwrap();

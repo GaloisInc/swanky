@@ -734,6 +734,7 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-flatbuffer-build",
+ "swanky-party",
  "toml",
 ]
 
