@@ -4,7 +4,7 @@
 
 //! Field switching functionality based on protocol with Edabits.
 
-use crate::homcom::FCom;
+use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
 use crate::svole_trait::{field_name, SvoleT};
 use eyre::{eyre, Result};
@@ -277,7 +277,7 @@ impl<
             .input_prover(IS_PROVER, channel, rng, &ci_batch)?;
 
         // loop on the m bits over the batch of n addition
-        let mut triples = Vec::with_capacity(num * m);
+        let mut state_mult_check = MultCheckState::<Prover, F40b>::init(channel, rng)?;
         let mut aux_batch = Vec::with_capacity(num);
         let mut and_res_batch = Vec::with_capacity(num);
         let mut z_batch = vec![Vec::with_capacity(m); num];
@@ -329,11 +329,14 @@ impl<
                 let (and1, and2) = aux_batch[n];
                 let and_res = and_res_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
-                triples.push((
-                    and1,
-                    and2,
-                    Mac::new(ProverPrivateCopy::new(and_res), and_res_mac),
-                ));
+                state_mult_check.accumulate(
+                    &(
+                        and1,
+                        and2,
+                        Mac::new(ProverPrivateCopy::new(and_res), and_res_mac),
+                    ),
+                    self.fcom_f2.get_delta(),
+                );
 
                 let ci_mac = ci_mac_batch[n];
                 let c_mac = ci_mac + and_res_mac;
@@ -345,7 +348,7 @@ impl<
         // check all the multiplications in one batch
         channel.flush()?;
         self.fcom_f2
-            .quicksilver_check_multiply(channel, rng, &triples)?;
+            .quicksilver_finalize(channel, rng, &mut state_mult_check)?;
 
         // reconstruct the solution
         let mut res = Vec::with_capacity(num);
@@ -789,16 +792,15 @@ impl<
         // 6)e)
         self.fcom_f2.open(channel, &ei_batch, &mut vec![])?;
 
-        let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
+        let mut state_check_zero = ZeroCheckState::init(channel, rng)?;
         for i in 0..n {
             let sum = convert_bits_to_field_mac::<FE>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
-            e_prime_minus_sum_batch.push(self.fcom_fe.affine_add_cst(-sum, e_prime_batch[i]));
+            state_check_zero.accumulate(&self.fcom_fe.affine_add_cst(-sum, e_prime_batch[i]))?;
         }
 
         // Remark this is not necessary for the prover, bc cst addition dont show up in mac
         // let s = convert_f2_to_field(ei);
-        self.fcom_fe
-            .check_zero(channel, rng, &e_prime_minus_sum_batch)?;
+        state_check_zero.finalize(channel)?;
         Ok(())
     }
 
@@ -1046,7 +1048,7 @@ impl<
             .input_verifier(IS_VERIFIER, channel, rng, num)?;
 
         // loop on the m bits over the batch of n addition
-        let mut triples = Vec::with_capacity(num * m);
+        let mut state_mult_check = MultCheckState::<Verifier, F40b>::init(channel, rng)?;
         let mut aux_batch = Vec::with_capacity(num);
         let mut z_batch = vec![Vec::with_capacity(m); num];
         let mut and_res_mac_batch = Vec::with_capacity(num);
@@ -1082,7 +1084,8 @@ impl<
             for n in 0..num {
                 let (and1_mac, and2_mac) = aux_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
-                triples.push((and1_mac, and2_mac, and_res_mac));
+                state_mult_check
+                    .accumulate(&(and1_mac, and2_mac, and_res_mac), self.fcom_f2.get_delta());
 
                 let ci = ci_batch[n];
                 let c_mac = self.fcom_f2.add(ci, and_res_mac);
@@ -1091,7 +1094,7 @@ impl<
         }
         // check all the multiplications in one batch
         self.fcom_f2
-            .quicksilver_check_multiply(channel, rng, &triples)?;
+            .quicksilver_finalize(channel, rng, &mut state_mult_check)?;
 
         // reconstruct the solution
         let mut res = Vec::with_capacity(num);
@@ -1441,16 +1444,17 @@ impl<
         self.fcom_f2.open(channel, &ei_mac_batch, ei_batch)?;
         debug!("OPEN> {:?}", start.elapsed());
 
-        let mut e_prime_minus_sum_batch = Vec::with_capacity(n);
+        let mut state_check_zero = ZeroCheckState::init(channel, rng)?;
         for i in 0..n {
             let sum =
                 convert_bits_to_field::<FE::PrimeField>(&ei_batch[i * nb_bits..(i + 1) * nb_bits]);
-            e_prime_minus_sum_batch.push(self.fcom_fe.affine_add_cst(-sum, e_prime_mac_batch[i]));
+
+            state_check_zero
+                .accumulate(&self.fcom_fe.affine_add_cst(-sum, e_prime_mac_batch[i]))?;
         }
         debug!("CHECK_Z< ... ");
         let start = Instant::now();
-        self.fcom_fe
-            .check_zero(channel, rng, &e_prime_minus_sum_batch)?;
+        state_check_zero.finalize(channel)?;
         debug!("CHECK_Z> {:?}", start.elapsed());
 
         Ok(())
