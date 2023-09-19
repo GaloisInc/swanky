@@ -277,7 +277,7 @@ impl<
             .input_prover(IS_PROVER, channel, rng, &ci_batch)?;
 
         // loop on the m bits over the batch of n addition
-        let mut triples_state_mult_check = MultCheckState::<Prover, F40b>::init(channel, rng)?;
+        let mut state_mult_check = MultCheckState::<Prover, F40b>::init(channel, rng)?;
         let mut aux_batch = Vec::with_capacity(num);
         let mut and_res_batch = Vec::with_capacity(num);
         let mut z_batch = vec![Vec::with_capacity(m); num];
@@ -329,7 +329,7 @@ impl<
                 let (and1, and2) = aux_batch[n];
                 let and_res = and_res_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
-                triples_state_mult_check.accumulate(
+                state_mult_check.accumulate(
                     &(
                         and1,
                         and2,
@@ -348,7 +348,7 @@ impl<
         // check all the multiplications in one batch
         channel.flush()?;
         self.fcom_f2
-            .quicksilver_finalize(channel, rng, &mut triples_state_mult_check)?;
+            .quicksilver_finalize(channel, rng, &mut state_mult_check)?;
 
         // reconstruct the solution
         let mut res = Vec::with_capacity(num);
@@ -1048,7 +1048,7 @@ impl<
             .input_verifier(IS_VERIFIER, channel, rng, num)?;
 
         // loop on the m bits over the batch of n addition
-        let mut triples_state_mult = MultCheckState::<Verifier, F40b>::init(channel, rng)?;
+        let mut state_mult_check = MultCheckState::<Verifier, F40b>::init(channel, rng)?;
         let mut aux_batch = Vec::with_capacity(num);
         let mut z_batch = vec![Vec::with_capacity(m); num];
         let mut and_res_mac_batch = Vec::with_capacity(num);
@@ -1084,7 +1084,7 @@ impl<
             for n in 0..num {
                 let (and1_mac, and2_mac) = aux_batch[n];
                 let and_res_mac = and_res_mac_batch[n];
-                triples_state_mult
+                state_mult_check
                     .accumulate(&(and1_mac, and2_mac, and_res_mac), self.fcom_f2.get_delta());
 
                 let ci = ci_batch[n];
@@ -1094,7 +1094,7 @@ impl<
         }
         // check all the multiplications in one batch
         self.fcom_f2
-            .quicksilver_finalize(channel, rng, &mut triples_state_mult)?;
+            .quicksilver_finalize(channel, rng, &mut state_mult_check)?;
 
         // reconstruct the solution
         let mut res = Vec::with_capacity(num);
