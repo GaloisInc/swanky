@@ -56,9 +56,9 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
 
     /// Reset the state.
     fn reset(&mut self) {
-        self.sum_a0 = ProverPrivateCopy::default();
-        self.sum_a1 = ProverPrivateCopy::default();
-        self.sum_b = VerifierPrivateCopy::default();
+        self.sum_a0 = ProverPrivateCopy::new(T::ZERO);
+        self.sum_a1 = ProverPrivateCopy::new(T::ZERO);
+        self.sum_b = VerifierPrivateCopy::new(T::ZERO);
         self.chi_power = self.chi;
         self.count = 0;
     }
