@@ -77,7 +77,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let rng = AesRng::new();
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
         Party::Verifier,
         &mut channel,
         rng,

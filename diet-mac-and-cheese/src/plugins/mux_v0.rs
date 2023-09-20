@@ -431,7 +431,7 @@ mod tests {
 
     // Simplest test for mux on f2
     #[test]
-    fn test_f2_mux() {
+    fn test_f2_mux_simple() {
         let fields = vec![F2_MODULUS];
         let mut func_store = FunStore::default();
         let type_store = TypeStore::try_from(fields.clone()).unwrap();

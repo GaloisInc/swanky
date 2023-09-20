@@ -119,15 +119,15 @@ impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)
     for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
-        unimplemented!()
+        self.dmc.assert_conv_to_bits(w)
     }
 
     fn assert_conv_from_bits(&mut self, x: &[MacBitGeneric]) -> Result<Self::Wire> {
-        unimplemented!()
+        self.dmc.assert_conv_from_bits(x)
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
-        unimplemented!()
+        self.dmc.finalize_conv()
     }
 }
 
@@ -252,21 +252,19 @@ where
     }
 }
 
-impl<T: FiniteField<PrimeField = F2>, C: AbstractChannel, SVOLE: SvoleT<T>> BackendConvT
-    for DietMacAndCheeseExtFieldVerifier<T, C, SVOLE>
-where
-    F2: IsSubFieldOf<T>,
+impl<C: AbstractChannel, SVOLE: SvoleT<F40b>> BackendConvT
+    for DietMacAndCheeseExtFieldVerifier<F40b, C, SVOLE>
 {
     fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
-        unimplemented!()
+       self.dmc.assert_conv_to_bits(a)
     }
 
     fn assert_conv_from_bits(&mut self, x: &[MacBitGeneric]) -> Result<Self::Wire> {
-        unimplemented!()
+        self.dmc.assert_conv_from_bits(x)
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
-        unimplemented!()
+        self.dmc.finalize_conv()
     }
 }
 
@@ -276,7 +274,7 @@ where
     F2: IsSubFieldOf<T>,
 {
     fn finalize_disj(&mut self) -> Result<()> {
-        unimplemented!()
+        Ok(())
     }
 
     fn disjunction(

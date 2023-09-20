@@ -206,7 +206,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
 
             let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>,SvoleReceiver<F2, F40b>>::new(
                     Party::Verifier,
                     &mut channel,
                     rng,
@@ -238,7 +238,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
 
             let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>,SvoleReceiver<F2, F40b>>::new(
                     Party::Prover,
                     &mut channel,
                     rng,
@@ -286,7 +286,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<(F40b, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
                     Party::Verifier,
                     channel_f2_svole,
                     rng,
@@ -347,7 +347,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                EvaluatorCirc::<_,  SvoleAtomic<(F2, F40b)>, SvoleAtomic<(F40b, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
                     Party::Prover,
                     channel_f2_svole,
                     rng,
@@ -417,7 +417,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
 
             let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
                     Party::Verifier,
                     &mut channel,
                     rng,
@@ -447,7 +447,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
 
             let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+                EvaluatorCirc::<_, SvoleSender<F40b>,  SvoleSender<F40b>,SvoleReceiver<F2, F40b>>::new(
                     Party::Prover,
                     &mut channel,
                     rng,
@@ -518,7 +518,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<(F40b, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
                     Party::Verifier,
                     channel_f2_svole,
                     rng,
@@ -576,7 +576,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
+                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<(F40b, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
                     Party::Prover,
                     channel_f2_svole,
                     rng,
