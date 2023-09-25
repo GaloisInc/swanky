@@ -2255,9 +2255,8 @@ impl<
                 }
                 PluginExecution::PermutationCheck(plugin) => {
                     let type_id = plugin.type_id() as usize;
-                    self.callframe_start(func, out_ranges, in_ranges)?;
+                    // The permutation plugin does not need to execute `callframe_start` or `callframe_end`
                     self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
-                    self.callframe_end(func);
                 }
                 PluginExecution::Disjunction(plugin) => {
                     // disjunction does not use a callframe:

@@ -20,6 +20,7 @@
 use crate::backend_trait::BackendT;
 use eyre::{ensure, Result};
 use generic_array::typenum::Unsigned;
+use log::warn;
 use swanky_field::{FiniteField, FiniteRing};
 
 mod less_than_eq;
@@ -54,10 +55,10 @@ pub(crate) fn permutation_check<B: BackendT>(
     ntuples: usize,
     tuple_size: usize,
 ) -> Result<()> {
-    ensure!(
-        <B::FieldElement as FiniteField>::NumberOfBitsInBitDecomposition::USIZE >= 40,
-        "Field size must be >= 40 bits"
-    );
+    // TODO: turn this warning into an error once F2 becomes supported with extension fields
+    if !(<B::FieldElement as FiniteField>::NumberOfBitsInBitDecomposition::USIZE >= 40) {
+        warn!("Insecure use of permutation check: Field size must be >= 40 bits");
+    }
 
     ensure!(xs.len() == ys.len(), "Input lengths are not equal",);
     ensure!(
