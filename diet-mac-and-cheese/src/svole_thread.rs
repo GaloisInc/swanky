@@ -50,7 +50,7 @@ impl<X: Copy + Default> SvoleAtomic<X> {
     }
 }
 
-impl<X: Copy + Default + std::fmt::Debug> SvoleStopSignal for SvoleAtomic<X> {
+impl<X: Copy> SvoleStopSignal for SvoleAtomic<X> {
     fn send_stop_signal(&mut self) -> Result<()> {
         *self.stop_signal.lock().unwrap() = true;
         Ok(())
