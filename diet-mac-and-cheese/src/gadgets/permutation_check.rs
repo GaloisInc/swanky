@@ -294,6 +294,7 @@ mod tests {
             DietMacAndCheeseExtFieldVerifier<
                 F40b,
                 Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
+                SvoleReceiver<F2, F40b>,
                 SvoleReceiver<F40b, F40b>,
             >,
         >(&mut party2, &xs, &ys, ntuples, tuple_size)

@@ -423,6 +423,7 @@ where
 }
 
 /// State to accumulate multiplication checks.
+#[derive(Debug)]
 pub struct StateMultCheckVerifier<V, T> {
     sum_b: T,
     power_chi: T,

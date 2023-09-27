@@ -1420,6 +1420,7 @@ pub struct EvaluatorCirc<
     SvoleF2Prover: SvoleT<(F2, F40b)>,
     SvoleF40bProver: SvoleT<(F40b, F40b)>,
     SvoleF2Verifier: SvoleT<F40b>,
+    SvoleF40bVerifier: SvoleT<F40b>,
 > {
     inputs: CircInputs,
     fcom_f2_prover: Option<FComProver<F2, F40b, SvoleF2Prover>>,
@@ -1431,7 +1432,7 @@ pub struct EvaluatorCirc<
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
-    phantom: PhantomData<(C, SvoleF40bProver)>,
+    phantom: PhantomData<(C, SvoleF40bProver, SvoleF40bVerifier)>,
 }
 
 impl<
@@ -1439,7 +1440,8 @@ impl<
         SvoleF2Prover: SvoleT<(F2, F40b)> + 'static,
         SvoleF40bProver: SvoleT<(F40b, F40b)> + 'static,
         SvoleF2Verifier: SvoleT<F40b> + 'static,
-    > EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier>
+        SvoleF40bVerifier: SvoleT<F40b> + 'static,
+    > EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier, SvoleF40bVerifier>
 {
     // TODO: Factorize interface for `new_with_prover` and `new_with_verifier`
     pub fn new(
@@ -1501,7 +1503,13 @@ impl<
         no_batching: bool,
         lpn_small: bool,
     ) -> Result<(
-        EvaluatorCirc<C, SvoleAtomic<(F2, F40b)>, SvoleAtomic<(F40b, F40b)>, SvoleAtomic<F40b>>,
+        EvaluatorCirc<
+            C,
+            SvoleAtomic<(F2, F40b)>,
+            SvoleAtomic<(F40b, F40b)>,
+            SvoleAtomic<F40b>,
+            SvoleAtomic<F40b>,
+        >,
         std::thread::JoinHandle<()>,
     )> {
         let (lpn_setup, lpn_extend) = if lpn_small {
@@ -1675,15 +1683,19 @@ impl<
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             } else {
                 let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-                let dmc =
-                    DietMacAndCheeseExtFieldVerifier::<F40b, _, SvoleF2Verifier>::init_with_fcom(
-                        channel,
-                        rng,
-                        fcom_f2,
-                        LPN_SETUP_SMALL,
-                        LPN_EXTEND_SMALL,
-                        self.no_batching,
-                    )?;
+                let dmc = DietMacAndCheeseExtFieldVerifier::<
+                    F40b,
+                    _,
+                    SvoleF2Verifier,
+                    SvoleF40bVerifier,
+                >::init_with_fcom(
+                    channel,
+                    rng,
+                    fcom_f2,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    self.no_batching,
+                )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
             }
             self.f2_idx = self.eval.len();
@@ -1793,7 +1805,12 @@ impl<
             Box::new(EvaluatorSingle::new(dmc, true))
         } else {
             let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
-            let dmc = DietMacAndCheeseExtFieldVerifier::<F40b, _, SvoleF2Verifier>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtFieldVerifier::<
+                F40b,
+                _,
+                SvoleF2Verifier,
+                SvoleF40bVerifier,
+            >::init_with_fcom(
                 channel,
                 rng,
                 fcom_f2,
@@ -2172,9 +2189,9 @@ impl<
                 }
                 PluginExecution::PermutationCheck(plugin) => {
                     let type_id = plugin.type_id() as usize;
-                    self.callframe_start(func, out_ranges, in_ranges)?;
+                    //self.callframe_start(func, out_ranges, in_ranges)?;
                     self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
-                    self.callframe_end(func);
+                    //self.callframe_end(func);
                 }
                 PluginExecution::Disjunction(plugin) => {
                     // disjunction does not use a callframe:
@@ -2292,7 +2309,9 @@ impl<
         SvoleF2Prover: SvoleT<(F2, F40b)>,
         SvoleF40bProver: SvoleT<(F40b, F40b)>,
         SvoleF2Verifier: SvoleT<F40b>,
-    > Drop for EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier>
+        SvoleF40bVerifier: SvoleT<F40b>,
+    > Drop
+    for EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier, SvoleF40bVerifier>
 {
     fn drop(&mut self) {
         if !self.multithreaded_voles.is_empty() {
@@ -2424,6 +2443,7 @@ pub(crate) mod tests {
                 SvoleSender<F40b>,
                 SvoleSender<F40b>,
                 SvoleReceiver<F2, F40b>,
+                SvoleReceiver<F40b, F40b>,
             >::new(
                 Party::Prover,
                 &mut channel,
@@ -2449,17 +2469,22 @@ pub(crate) mod tests {
             inputs.ingest_instances(id, VecDeque::from(inst));
         }
 
-        let mut eval =
-            EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-                Party::Verifier,
-                &mut channel,
-                rng,
-                inputs,
-                type_store,
-                true,
-                false,
-            )
-            .unwrap();
+        let mut eval = EvaluatorCirc::<
+            _,
+            SvoleSender<F40b>,
+            SvoleSender<F40b>,
+            SvoleReceiver<F2, F40b>,
+            SvoleReceiver<F40b, F40b>,
+        >::new(
+            Party::Verifier,
+            &mut channel,
+            rng,
+            inputs,
+            type_store,
+            true,
+            false,
+        )
+        .unwrap();
         eval.load_backends(&mut channel, true)?;
         eval.evaluate_gates(&gates, &func_store)?;
 
