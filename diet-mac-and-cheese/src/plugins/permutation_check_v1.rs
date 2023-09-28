@@ -23,14 +23,13 @@
 use super::{Plugin, PluginExecution};
 use crate::{
     backend_multifield::BackendLiftT,
-    backend_trait::BackendT,
     circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount},
     gadgets::{permutation_check, permutation_check_binary},
     mac::Mac,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::F2;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]
@@ -67,7 +66,7 @@ impl PermutationCheckV1 {
         self.type_id
     }
 
-    pub(crate) fn execute_binary<M: Mac<Value = F2, Tag = F40b>, B: BackendLiftT<Wire = M>>(
+    pub(crate) fn execute_binary<M: Mac, B: BackendLiftT<Wire = M>>(
         &self,
         xs: &[B::Wire],
         ys: &[B::Wire],
@@ -79,14 +78,18 @@ impl PermutationCheckV1 {
 
     /// Run the permutation check on two lists provided by `xs` and `ys`,
     /// utilizing the provided `backend`.
-    pub(crate) fn execute<B: BackendT>(
+    pub(crate) fn execute<B: BackendLiftT>(
         &self,
         xs: &[B::Wire],
         ys: &[B::Wire],
         backend: &mut B,
     ) -> Result<()> {
-        assert_ne!(self.field_type_id, std::any::TypeId::of::<F2>());
-        permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+        if std::any::TypeId::of::<B::FieldElement>() == std::any::TypeId::of::<F2>() {
+            self.execute_binary::<B::Wire, B>(xs, ys, backend)
+        } else {
+            assert_ne!(self.field_type_id, std::any::TypeId::of::<F2>());
+            permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+        }
     }
 }
 

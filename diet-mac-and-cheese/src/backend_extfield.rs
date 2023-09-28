@@ -280,8 +280,8 @@ where
 
     fn disjunction(
         &mut self,
-        inputs: &[Self::Wire],
-        disj: &DisjunctionBody,
+        _inputs: &[Self::Wire],
+        _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
         unimplemented!()
     }
@@ -304,7 +304,7 @@ mod test {
     use super::{DietMacAndCheeseExtFieldProver, DietMacAndCheeseExtFieldVerifier};
     use crate::backend_trait::BackendT;
     use crate::homcom::{FComProver, FComVerifier};
-    use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleT};
+    use crate::svole_trait::{SvoleReceiver, SvoleSender};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     #[allow(unused_imports)]

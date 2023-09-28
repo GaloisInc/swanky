@@ -5,8 +5,7 @@ use crate::{
 use eyre::{ensure, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use scuttlebutt::generic_array_length::Arr;
-use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::F2;
+use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
 /// not.
@@ -68,20 +67,17 @@ pub(crate) fn permutation_check<B: BackendT>(
     backend.assert_zero(&z)
 }
 
-pub(crate) fn permutation_check_binary<M: Mac<Value = F2>, B: BackendLiftT<Wire = M>>(
+pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
     backend: &mut B::LiftedBackend,
     xs: &[B::Wire],
     ys: &[B::Wire],
     ntuples: usize,
     tuple_size: usize,
-) -> Result<()>
-where
-    M::Value: IsSubFieldOf<M::Tag>,
-{
+) -> Result<()> {
     let xs: Vec<_> = xs
         .iter()
         .map(|x| {
-            let mut array: Arr<M, DegreeModulo<F2, M::Tag>> = GenericArray::default();
+            let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
             array[0] = *x;
             M::lift(&array)
         })
@@ -89,12 +85,12 @@ where
     let ys: Vec<_> = ys
         .iter()
         .map(|y| {
-            let mut array: Arr<M, DegreeModulo<F2, M::Tag>> = GenericArray::default();
+            let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
             array[0] = *y;
             M::lift(&array)
         })
         .collect();
-    permutation_check(backend, &xs, &ys, ntuples, tuple_size)
+    permutation_check::<B::LiftedBackend>(backend, &xs, &ys, ntuples, tuple_size)
 }
 
 #[cfg(test)]
