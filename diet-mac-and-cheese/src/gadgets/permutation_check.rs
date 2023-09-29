@@ -81,16 +81,26 @@ fn pack<M: Mac, B: BackendLiftT<Wire = M>>(
 ) -> Vec<<M as Mac>::LiftedMac> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
-    let mut count = 0;
+    let mut nbits_count = 0;
+    let mut tuple_count = 0;
     let mut packed = vec![];
     for (i, x) in xs.iter().enumerate() {
-        array[count] = *x;
-        count += 1;
-        if count == tuple_size || count == nbits || i + 1 == xs.len() {
+        array[nbits_count] = *x;
+        nbits_count += 1;
+        tuple_count += 1;
+        // There are three conditions in which we push a packed element:
+        // 1. We are out of bits in the superfield (i.e., `nbits_count == nbits`)
+        // 2. We are out of bits in the tuple itself (i.e., `tuple_count == tuple_size`)
+        // 3. We are out of bits in general (i.e., `i + 1 == xs.len()`)
+        if nbits_count == nbits || tuple_count == tuple_size || i + 1 == xs.len() {
             let elem = M::lift(&array);
             packed.push(elem);
             array = GenericArray::default();
-            count = 0;
+            nbits_count = 0;
+            // Only reset `tuple_count` if we've hit `tuple_size`.
+            if tuple_count == tuple_size {
+                tuple_count = 0;
+            }
         }
     }
     packed
@@ -105,8 +115,8 @@ pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
 ) -> Result<()> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let new_tuple_size = (tuple_size + nbits - 1) / nbits;
-    let packed_xs = pack::<M, B>(xs, ntuples);
-    let packed_ys = pack::<M, B>(ys, ntuples);
+    let packed_xs = pack::<M, B>(xs, tuple_size);
+    let packed_ys = pack::<M, B>(ys, tuple_size);
     permutation_check::<B::LiftedBackend>(backend, &packed_xs, &packed_ys, ntuples, new_tuple_size)
 }
 
@@ -328,52 +338,26 @@ mod tests {
         test_permutation_binary(ntuples, tuple_size, is_good);
     }
 
-    #[test]
-    fn permutation_1_1_works() {
-        test_permutation_(1, 1, true);
+    macro_rules! permutation_tester {
+        ( $mod: ident, $ntuples: literal, $tuple_size: literal ) => {
+            mod $mod {
+                #[test]
+                fn permutation_works() {
+                    super::test_permutation_($ntuples, $tuple_size, true);
+                }
+
+                #[test]
+                fn bad_permutation_fails() {
+                    super::test_permutation_($ntuples, $tuple_size, false);
+                }
+            }
+        };
     }
 
-    #[test]
-    fn bad_permutation_1_1_fails() {
-        test_permutation_(1, 1, false);
-    }
-
-    #[test]
-    fn permutation_10_1_works() {
-        test_permutation_(10, 1, true);
-    }
-
-    #[test]
-    fn bad_permutation_10_1_fails() {
-        test_permutation_(10, 1, false);
-    }
-
-    #[test]
-    fn permutation_1_40_works() {
-        test_permutation_(1, 40, true);
-    }
-    #[test]
-    fn bad_permutation_1_40_fails() {
-        test_permutation_(1, 40, false);
-    }
-
-    #[test]
-    fn permutation_1_41_works() {
-        test_permutation_(1, 41, true);
-    }
-
-    #[test]
-    fn bad_permutation_1_41_fails() {
-        test_permutation_(1, 41, false);
-    }
-
-    #[test]
-    fn permutation_10_5_works() {
-        test_permutation_(10, 5, true);
-    }
-
-    #[test]
-    fn bad_permutation_10_5_fails() {
-        test_permutation_(10, 5, false);
-    }
+    permutation_tester!(permutation_1_1, 1, 1);
+    permutation_tester!(permutation_10_1, 10, 1);
+    permutation_tester!(permutation_10_5, 10, 5);
+    permutation_tester!(permutation_1_40, 1, 40);
+    permutation_tester!(permutation_1_41, 1, 41);
+    permutation_tester!(permutation_101_41, 101, 41);
 }
