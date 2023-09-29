@@ -71,7 +71,13 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     alert("*** RELATION LOADING: done!");
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
+    let mut evaluator = EvaluatorCirc::<
+        _,
+        SvoleSender<F40b>,
+        SvoleSender<F40b>,
+        SvoleReceiver<F2, F40b>,
+        SvoleReceiver<F40b, F40b>,
+    >::new(
         Party::Prover,
         &mut channel,
         rng,
