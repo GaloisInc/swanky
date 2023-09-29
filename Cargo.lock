@@ -2234,7 +2234,6 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-field-fft",
- "swanky-generic-array",
  "swanky-serialization",
  "vectoreyes",
 ]
@@ -2452,7 +2451,6 @@ dependencies = [
  "num-traits",
  "rand",
  "subtle",
- "swanky-generic-array",
  "swanky-serialization",
 ]
 
@@ -2537,13 +2535,6 @@ version = "0.5.0"
 dependencies = [
  "blake3",
  "tempfile",
-]
-
-[[package]]
-name = "swanky-generic-array"
-version = "0.5.0"
-dependencies = [
- "generic-array 1.0.0",
 ]
 
 [[package]]

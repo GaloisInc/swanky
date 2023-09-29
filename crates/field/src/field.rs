@@ -9,7 +9,6 @@ use generic_array::typenum;
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use std::ops::{Div, DivAssign};
 use subtle::CtOption;
-use swanky_generic_array::AnyArrayLength;
 
 /// Types that implement this trait are finite fields.
 pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
@@ -29,7 +28,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// ```
     ///
     /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
-    type NumberOfBitsInBitDecomposition: AnyArrayLength;
+    type NumberOfBitsInBitDecomposition: ArrayLength;
     /// Decompose the given field element into bits.
     ///
     /// This bit decomposition should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
@@ -115,7 +114,7 @@ pub type DegreeModulo<A, B> = <A as IsSubFieldOf<B>>::DegreeModulo;
 /// [`FiniteField::decompose`], [`FiniteField::from_subfield`], or the type alias [`DegreeModulo`].
 pub trait IsSubFieldOf<FE: FiniteField>: FiniteField + IsSubRingOf<FE> {
     /// The value $`n`$ from above.
-    type DegreeModulo: AnyArrayLength;
+    type DegreeModulo: ArrayLength;
     /// Turn `FE` into an array of `Self`, a subfield of `FE`.
     fn decompose_superfield(fe: &FE) -> GenericArray<Self, Self::DegreeModulo>;
     /// Homomorphically lift an array of `Self` into an `FE`.

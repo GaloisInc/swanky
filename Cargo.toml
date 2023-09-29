@@ -65,7 +65,6 @@ swanky-field-fft = { path = "crates/field-fft" }
 swanky-field-test = { path = "crates/field-test" }
 swanky-flatbuffer-build = { path = "crates/flatbuffer-build" }
 swanky-party = { path = "crates/party" }
-swanky-generic-array = { path = "crates/generic-array" }
 swanky-serialization = { path = "crates/serialization" }
 vectoreyes = { path = "vectoreyes" }
 web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }

@@ -13,7 +13,6 @@ use party::either::PartyEitherCopy;
 use party::{IsParty, Party, WhichParty};
 use rand::SeedableRng;
 use scuttlebutt::field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf, SmallBinaryField, F2};
-use scuttlebutt::generic_array_length::Arr;
 use scuttlebutt::ring::FiniteRing;
 use scuttlebutt::serialization::CanonicalSerialize;
 use scuttlebutt::AesRng;
@@ -33,7 +32,7 @@ mod vope {
 
     /// The vector needed to lift `DegreeModulo<T::VF, T::TF>` `T::VF` macs into a single `T::TF`
     /// mac.
-    fn lifting_vector<T: MacTypes>() -> Arr<T::TF, DegreeModulo<T::VF, T::TF>> {
+    fn lifting_vector<T: MacTypes>() -> GenericArray<T::TF, DegreeModulo<T::VF, T::TF>> {
         GenericArray::from_iter((0..DegreeModulo::<T::VF, T::TF>::USIZE).map(|i| {
             let mut out = GenericArray::<T::VF, DegreeModulo<T::VF, T::TF>>::default();
             out[i] = T::VF::ONE;
