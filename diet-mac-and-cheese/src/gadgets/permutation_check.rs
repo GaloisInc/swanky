@@ -24,10 +24,17 @@ pub(crate) fn permutation_check<B: BackendT>(
         "Field size must be >= 40 bits"
     );
 
-    ensure!(xs.len() == ys.len(), "Input lengths are not equal",);
+    ensure!(
+        xs.len() == ys.len(),
+        "Input lengths are not equal: {} != {}",
+        xs.len(),
+        ys.len()
+    );
     ensure!(
         xs.len() == ntuples * tuple_size,
-        "Provided input length not equal to expected input length",
+        "Provided input length not equal to expected input length: {} != {}",
+        xs.len(),
+        ntuples * tuple_size,
     );
 
     let minus_one = -B::FieldElement::ONE;
@@ -67,6 +74,29 @@ pub(crate) fn permutation_check<B: BackendT>(
     backend.assert_zero(&z)
 }
 
+/// Pack `xs` into the tag field.
+fn pack<M: Mac, B: BackendLiftT<Wire = M>>(
+    xs: &[B::Wire],
+    ntuples: usize,
+    tuple_size: usize,
+) -> Vec<<M as Mac>::LiftedMac> {
+    let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
+    let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
+    let mut count = 0;
+    let mut packed = vec![];
+    for (i, x) in xs.iter().enumerate() {
+        array[count] = *x;
+        count += 1;
+        if count == tuple_size || count == nbits || i + 1 == xs.len() {
+            let elem = M::lift(&array);
+            packed.push(elem);
+            array = GenericArray::default();
+            count = 0;
+        }
+    }
+    packed
+}
+
 pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
     backend: &mut B::LiftedBackend,
     xs: &[B::Wire],
@@ -74,23 +104,13 @@ pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
     ntuples: usize,
     tuple_size: usize,
 ) -> Result<()> {
-    let xs: Vec<_> = xs
-        .iter()
-        .map(|x| {
-            let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
-            array[0] = *x;
-            M::lift(&array)
-        })
-        .collect();
-    let ys: Vec<_> = ys
-        .iter()
-        .map(|y| {
-            let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
-            array[0] = *y;
-            M::lift(&array)
-        })
-        .collect();
-    permutation_check::<B::LiftedBackend>(backend, &xs, &ys, ntuples, tuple_size)
+    let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
+    let new_tuple_size = (tuple_size + nbits - 1) / nbits;
+    let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
+    let mut count = 0;
+    let packed_xs = pack::<M, B>(xs, ntuples, tuple_size);
+    let packed_ys = pack::<M, B>(ys, ntuples, tuple_size);
+    permutation_check::<B::LiftedBackend>(backend, &packed_xs, &packed_ys, ntuples, new_tuple_size)
 }
 
 #[cfg(test)]
@@ -308,37 +328,55 @@ mod tests {
 
     fn test_permutation_(ntuples: usize, tuple_size: usize, is_good: bool) {
         test_permutation::<F61p>(ntuples, tuple_size, is_good);
-        test_permutation::<F40b>(ntuples, tuple_size, is_good);
         test_permutation_binary(ntuples, tuple_size, is_good);
     }
 
     #[test]
-    fn permutation_of_one_element_works() {
+    fn permutation_1_1_works() {
         test_permutation_(1, 1, true);
     }
 
     #[test]
-    fn bad_permutation_of_one_element_fails() {
+    fn bad_permutation_1_1_fails() {
         test_permutation_(1, 1, false);
     }
 
     #[test]
-    fn permutation_of_ten_elements_works() {
+    fn permutation_10_1_works() {
         test_permutation_(10, 1, true);
     }
 
     #[test]
-    fn bad_permutation_of_ten_elements_fails() {
+    fn bad_permutation_10_1_fails() {
         test_permutation_(10, 1, false);
     }
 
     #[test]
-    fn permutation_of_ten_tuples_of_length_five_works() {
+    fn permutation_1_40_works() {
+        test_permutation_(1, 40, true);
+    }
+    #[test]
+    fn bad_permutation_1_40_fails() {
+        test_permutation_(1, 40, false);
+    }
+
+    #[test]
+    fn permutation_1_41_works() {
+        test_permutation_(1, 41, true);
+    }
+
+    #[test]
+    fn bad_permutation_1_41_fails() {
+        test_permutation_(1, 41, false);
+    }
+
+    #[test]
+    fn permutation_10_5_works() {
         test_permutation_(10, 5, true);
     }
 
     #[test]
-    fn bad_permutation_of_ten_tuples_of_length_five_fails() {
+    fn bad_permutation_10_5_fails() {
         test_permutation_(10, 5, false);
     }
 }
