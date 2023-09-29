@@ -77,7 +77,6 @@ pub(crate) fn permutation_check<B: BackendT>(
 /// Pack `xs` into the tag field.
 fn pack<M: Mac, B: BackendLiftT<Wire = M>>(
     xs: &[B::Wire],
-    ntuples: usize,
     tuple_size: usize,
 ) -> Vec<<M as Mac>::LiftedMac> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
@@ -106,10 +105,8 @@ pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
 ) -> Result<()> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let new_tuple_size = (tuple_size + nbits - 1) / nbits;
-    let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
-    let mut count = 0;
-    let packed_xs = pack::<M, B>(xs, ntuples, tuple_size);
-    let packed_ys = pack::<M, B>(ys, ntuples, tuple_size);
+    let packed_xs = pack::<M, B>(xs, ntuples);
+    let packed_ys = pack::<M, B>(ys, ntuples);
     permutation_check::<B::LiftedBackend>(backend, &packed_xs, &packed_ys, ntuples, new_tuple_size)
 }
 
