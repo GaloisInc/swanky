@@ -1418,9 +1418,9 @@ impl<B: BackendConvT + BackendDisjunctionT + BackendLiftT> EvaluatorT for Evalua
 pub struct EvaluatorCirc<
     C: AbstractChannel + 'static,
     SvoleF2Prover: SvoleT<(F2, F40b)>,
-    SvoleF40bProver: SvoleT<(F40b, F40b)>,
+    SvoleF40bProver: SvoleT<(F40b, F40b)>, // TODO: we should get rid of this parameter, and instead pass it to the functions that need it
     SvoleF2Verifier: SvoleT<F40b>,
-    SvoleF40bVerifier: SvoleT<F40b>,
+    SvoleF40bVerifier: SvoleT<F40b>, // TODO: we should get rid of this parameter, and instead pass it to the functions that need it
 > {
     inputs: CircInputs,
     fcom_f2_prover: Option<FComProver<F2, F40b, SvoleF2Prover>>,
@@ -1432,7 +1432,7 @@ pub struct EvaluatorCirc<
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
-    phantom: PhantomData<(C, SvoleF40bProver, SvoleF40bVerifier)>,
+    phantom: PhantomData<(C, SvoleF40bProver, SvoleF40bVerifier)>, // TODO: we should get rid of this parameter, and instead pass it to the functions that need it
 }
 
 impl<
@@ -1794,7 +1794,8 @@ impl<
         info!("loading field F2");
         let back: Box<dyn EvaluatorT> = if self.party == Party::Prover {
             let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
-            let dmc = DietMacAndCheeseExtFieldProver::<F40b, _, SvoleF2Prover, SvoleF40bProver>::init_with_fcom(
+            // NOTE: we use the non-multithreaded SvoleSender for the Extension field
+            let dmc = DietMacAndCheeseExtFieldProver::<F40b, _, SvoleF2Prover, SvoleSender<F40b>>::init_with_fcom(
                 channel,
                 rng,
                 fcom_f2,
@@ -1805,11 +1806,12 @@ impl<
             Box::new(EvaluatorSingle::new(dmc, true))
         } else {
             let fcom_f2 = self.fcom_f2_verifier.as_ref().unwrap();
+            // NOTE: we use the non-multithreaded SvoleSender for the Extension field
             let dmc = DietMacAndCheeseExtFieldVerifier::<
                 F40b,
                 _,
                 SvoleF2Verifier,
-                SvoleF40bVerifier,
+                SvoleReceiver<F40b, F40b>,
             >::init_with_fcom(
                 channel,
                 rng,
