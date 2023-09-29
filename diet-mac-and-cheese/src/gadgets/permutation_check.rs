@@ -106,6 +106,11 @@ fn pack<M: Mac, B: BackendLiftT<Wire = M>>(
     packed
 }
 
+/// A permutation check gadget, designed for binary fields, that asserts that
+/// `xs = 𝛑(ys)`, erroring out if not.
+///
+/// **Note!** _Only_ use this circuit on binary values. There is no guarantee
+/// it'll work for non-binary values!
 pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
     backend: &mut B::LiftedBackend,
     xs: &[B::Wire],
