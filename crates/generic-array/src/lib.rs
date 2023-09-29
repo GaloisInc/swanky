@@ -55,25 +55,11 @@
 //! }
 //! ```
 
-use generic_array::{
-    typenum::{UInt, UTerm, B0, B1},
-    ArrayLength, GenericArray,
-};
+use generic_array::{ArrayLength, GenericArray};
 
 /// A marker type denoting that `Self` corresponds to an `ArrayLength` over any type
-pub trait AnyArrayLength {
-    /// The underlying `ArrayLength`, which should always equal `Self`
-    type OutputArrayLength<T>: ArrayLength<T>;
-}
-impl AnyArrayLength for UTerm {
-    type OutputArrayLength<T> = Self;
-}
-impl<N: AnyArrayLength> AnyArrayLength for UInt<N, B0> {
-    type OutputArrayLength<T> = UInt<<N as AnyArrayLength>::OutputArrayLength<T>, B0>;
-}
-impl<N: AnyArrayLength> AnyArrayLength for UInt<N, B1> {
-    type OutputArrayLength<T> = UInt<<N as AnyArrayLength>::OutputArrayLength<T>, B1>;
-}
+pub trait AnyArrayLength: ArrayLength {}
+impl<T: ArrayLength> AnyArrayLength for T {}
 
 /// A [`GenericArray`] of length `N` containing type `T`
 ///
@@ -82,4 +68,4 @@ impl<N: AnyArrayLength> AnyArrayLength for UInt<N, B1> {
 ///
 /// This type alias resolves to a `GenericArray`, and it can be used with any existing
 /// `GenericArray` code.
-pub type Arr<T, N> = GenericArray<T, <N as AnyArrayLength>::OutputArrayLength<T>>;
+pub type Arr<T, N> = GenericArray<T, N>;
