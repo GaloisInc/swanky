@@ -11,7 +11,6 @@ use std::{
 use aes_gcm::{AeadCore, AeadInPlace, Aes128Gcm, Nonce};
 
 use bytemuck::Zeroable;
-use generic_array::GenericArray;
 use mac_n_cheese_ir::compilation_format::{
     fb::DataChunkAddress, Manifest, PrivateDataAddress, TaskId, TaskPriority,
 };
@@ -203,7 +202,13 @@ impl<P: Party> ThreadPoolReactor<P> {
                     nonce[0..8].copy_from_slice(&ctr.to_le_bytes());
                     self.keys
                         .challenges_key()
-                        .decrypt_in_place_detached(&nonce, &[], data, GenericArray::from_slice(tag))
+                        .decrypt_in_place_detached(
+                            &nonce,
+                            &[],
+                            data,
+                            // We need to use the rustcrypto version of GenericArray
+                            aes_gcm::aead::generic_array::GenericArray::from_slice(tag),
+                        )
                         .map_err(|_| eyre::eyre!("Error decrypting challenge"))?;
                     let mut cd = ChallengeData::zeroed();
                     bytemuck::bytes_of_mut(&mut cd).copy_from_slice(data);

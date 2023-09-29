@@ -34,12 +34,11 @@ mod vope {
     /// The vector needed to lift `DegreeModulo<T::VF, T::TF>` `T::VF` macs into a single `T::TF`
     /// mac.
     fn lifting_vector<T: MacTypes>() -> Arr<T::TF, DegreeModulo<T::VF, T::TF>> {
-        GenericArray::from_exact_iter((0..DegreeModulo::<T::VF, T::TF>::USIZE).map(|i| {
+        GenericArray::from_iter((0..DegreeModulo::<T::VF, T::TF>::USIZE).map(|i| {
             let mut out = GenericArray::<T::VF, DegreeModulo<T::VF, T::TF>>::default();
             out[i] = T::VF::ONE;
             <T::VF as IsSubFieldOf<T::TF>>::form_superfield(&out)
         }))
-        .unwrap()
     }
 
     pub(super) const fn voles_needed<T: MacTypes>() -> usize {

@@ -29,7 +29,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// ```
     ///
     /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
-    type NumberOfBitsInBitDecomposition: ArrayLength<bool> + AnyArrayLength;
+    type NumberOfBitsInBitDecomposition: AnyArrayLength;
     /// Decompose the given field element into bits.
     ///
     /// This bit decomposition should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
@@ -115,7 +115,7 @@ pub type DegreeModulo<A, B> = <A as IsSubFieldOf<B>>::DegreeModulo;
 /// [`FiniteField::decompose`], [`FiniteField::from_subfield`], or the type alias [`DegreeModulo`].
 pub trait IsSubFieldOf<FE: FiniteField>: FiniteField + IsSubRingOf<FE> {
     /// The value $`n`$ from above.
-    type DegreeModulo: ArrayLength<Self> + AnyArrayLength;
+    type DegreeModulo: AnyArrayLength;
     /// Turn `FE` into an array of `Self`, a subfield of `FE`.
     fn decompose_superfield(fe: &FE) -> GenericArray<Self, Self::DegreeModulo>;
     /// Homomorphically lift an array of `Self` into an `FE`.
@@ -206,7 +206,7 @@ macro_rules! field_ops {
 }
 
 /// Bit decomposition of `bits` into an array.
-pub fn standard_bit_decomposition<L: ArrayLength<bool>>(bits: u128) -> GenericArray<bool, L> {
+pub fn standard_bit_decomposition<L: ArrayLength>(bits: u128) -> GenericArray<bool, L> {
     let mut out: GenericArray<bool, L> = Default::default();
     for (i, dst) in out.iter_mut().enumerate() {
         *dst = (bits & (1 << (i as u128))) != 0;
