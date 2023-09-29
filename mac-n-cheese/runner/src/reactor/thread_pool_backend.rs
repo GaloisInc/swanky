@@ -464,7 +464,6 @@ pub fn new_reactor<P: Party>(
             WhichParty::Verifier(e) => PartyEither::verifier_new(e, Queue::unbounded(8192)),
         },
         disk_cache: moka::sync::SegmentedCache::builder(4)
-            .thread_pool_enabled(true)
             .time_to_idle(TIME_TO_IDLE_DISK_CACHE)
             .build(),
         manifest: circuit_manifest,
