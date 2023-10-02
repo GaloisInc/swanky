@@ -1668,6 +1668,15 @@ impl<
         if field == std::any::TypeId::of::<F2>() {
             info!("loading field F2");
             assert_eq!(idx, self.eval.len());
+            let lpn_setup;
+            let lpn_extend;
+            if lpn_small {
+                lpn_setup = LPN_SETUP_SMALL;
+                lpn_extend = LPN_EXTEND_SMALL;
+            } else {
+                lpn_setup = LPN_SETUP_MEDIUM;
+                lpn_extend = LPN_EXTEND_MEDIUM;
+            }
             // Note for F2 we do not use the backend with Conv, simply dietMC
             if self.party == Party::Prover {
                 let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
@@ -1676,8 +1685,8 @@ impl<
                         channel,
                         rng,
                         fcom_f2,
-                        LPN_SETUP_SMALL,
-                        LPN_EXTEND_SMALL,
+                        lpn_setup,
+                        lpn_extend,
                         self.no_batching,
                     )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
@@ -1692,8 +1701,8 @@ impl<
                     channel,
                     rng,
                     fcom_f2,
-                    LPN_SETUP_SMALL,
-                    LPN_EXTEND_SMALL,
+                    lpn_setup,
+                    lpn_extend,
                     self.no_batching,
                 )?;
                 back = Box::new(EvaluatorSingle::new(dmc, true));
@@ -1789,9 +1798,18 @@ impl<
         channel: &mut C,
         rng: AesRng,
         _idx: usize,
-        _lpn_small: bool,
+        lpn_small: bool,
     ) -> Result<()> {
         info!("loading field F2");
+        let lpn_setup;
+        let lpn_extend;
+        if lpn_small {
+            lpn_setup = LPN_SETUP_SMALL;
+            lpn_extend = LPN_EXTEND_SMALL;
+        } else {
+            lpn_setup = LPN_SETUP_MEDIUM;
+            lpn_extend = LPN_EXTEND_MEDIUM;
+        }
         let back: Box<dyn EvaluatorT> = if self.party == Party::Prover {
             let fcom_f2 = self.fcom_f2_prover.as_ref().unwrap();
             // NOTE: we use the non-multithreaded SvoleSender for the Extension field
@@ -1799,8 +1817,8 @@ impl<
                 channel,
                 rng,
                 fcom_f2,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+                lpn_setup,
+                lpn_extend,
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
@@ -1816,8 +1834,8 @@ impl<
                 channel,
                 rng,
                 fcom_f2,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+                lpn_setup,
+                lpn_extend,
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
