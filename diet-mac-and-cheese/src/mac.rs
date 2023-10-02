@@ -1,5 +1,4 @@
 use generic_array::GenericArray;
-use scuttlebutt::generic_array_length::Arr;
 use std::{
     fmt::Debug,
     ops::{Add, Mul, Neg, Sub},
@@ -43,7 +42,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     }
 
     /// Lift an array of MACs from the value field to the tag field.
-    pub fn lift(xs: &Arr<Self, DegreeModulo<V, T>>) -> Mac<P, T, T> {
+    pub fn lift(xs: &GenericArray<Self, DegreeModulo<V, T>>) -> Mac<P, T, T> {
         let mut value = ProverPrivateCopy::new(T::ZERO);
         let mut mac = T::ZERO;
 

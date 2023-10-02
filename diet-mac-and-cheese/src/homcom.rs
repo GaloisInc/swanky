@@ -6,14 +6,12 @@
 //! conversion protocol for field-switching.
 use crate::{mac::Mac, svole_trait::SvoleT};
 use eyre::{bail, ensure, Result};
+use generic_array::GenericArray;
 use log::{debug, warn};
 use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
+use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
-use scuttlebutt::{
-    field::{DegreeModulo, IsSubFieldOf},
-    generic_array_length::Arr,
-};
 use swanky_party::either::PartyEither;
 use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
@@ -637,7 +635,7 @@ where
                     chi_power *= chi;
                 }
 
-                let mut us = Arr::<_, DegreeModulo<V, T>>::default();
+                let mut us = GenericArray::<_, DegreeModulo<V, T>>::default();
                 for u in us.iter_mut() {
                     *u = self.random(channel, rng)?;
                 }
@@ -667,7 +665,7 @@ where
                     chi_power *= chi;
                 }
 
-                let mut vs = Arr::<_, DegreeModulo<V, T>>::default();
+                let mut vs = GenericArray::<_, DegreeModulo<V, T>>::default();
                 for v in vs.iter_mut() {
                     *v = self.random(channel, rng)?;
                 }
@@ -697,7 +695,7 @@ where
     ) -> Result<usize> {
         debug!("FCom: quicksilver_finalize");
 
-        let mut macs = Arr::<_, DegreeModulo<V, T>>::default();
+        let mut macs = GenericArray::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
             *mac = self.random(channel, rng)?;
         }
