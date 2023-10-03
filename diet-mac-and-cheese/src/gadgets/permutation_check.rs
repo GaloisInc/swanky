@@ -1,6 +1,8 @@
+use std::{iter::Peekable, marker::PhantomData};
+
 use crate::{
-    backend_multifield::BackendLiftT, backend_trait::BackendT, gadgets::dotproduct_with_public,
-    mac::Mac,
+    backend_multifield::BackendLiftT, backend_trait::BackendT,
+    gadgets::dotproduct_with_public_powers, mac::Mac,
 };
 use eyre::{ensure, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
@@ -12,10 +14,13 @@ use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 ///
 /// This gadget currently only works over fields larger than the statistical
 /// security parameter (which we have harded at 40 bits).
+///
+/// **Note!** This gadget _assumes_ that the lengths of `xs` and `ys` are equal,
+/// and that the length of each equals `ntuples * tuple_size`!
 pub(crate) fn permutation_check<B: BackendT>(
     backend: &mut B,
-    xs: &[B::Wire],
-    ys: &[B::Wire],
+    mut xs: impl Iterator<Item = B::Wire>,
+    mut ys: impl Iterator<Item = B::Wire>,
     ntuples: usize,
     tuple_size: usize,
 ) -> Result<()> {
@@ -24,49 +29,32 @@ pub(crate) fn permutation_check<B: BackendT>(
         "Field size must be >= 40 bits"
     );
 
-    ensure!(
-        xs.len() == ys.len(),
-        "Input lengths are not equal: {} != {}",
-        xs.len(),
-        ys.len()
-    );
-    ensure!(
-        xs.len() == ntuples * tuple_size,
-        "Provided input length not equal to expected input length: {} != {}",
-        xs.len(),
-        ntuples * tuple_size,
-    );
+    // ensure!(
+    //     xs.len() == ys.len(),
+    //     "Input lengths are not equal: {} != {}",
+    //     xs.len(),
+    //     ys.len()
+    // );
+    // ensure!(
+    //     xs.len() == ntuples * tuple_size,
+    //     "Provided input length not equal to expected input length: {} != {}",
+    //     xs.len(),
+    //     ntuples * tuple_size,
+    // );
 
     let minus_one = -B::FieldElement::ONE;
     let random = backend.random()?;
-
-    // TODO: Better would be to generate random values using `random` as a seed.
-    let mut acc = random;
-    let mut challenges = vec![B::FieldElement::ZERO; tuple_size];
-    for challenge in challenges.iter_mut() {
-        *challenge = acc;
-        acc = acc * random;
-    }
-
     let challenge = backend.random()?;
 
     let mut x = backend.constant(B::FieldElement::ONE)?;
-    for i in 0..ntuples {
-        let result = dotproduct_with_public::<B>(
-            backend,
-            &xs[i * tuple_size..(i + 1) * tuple_size],
-            &challenges,
-        )?;
+    for _ in 0..ntuples {
+        let result = dotproduct_with_public_powers::<B>(backend, &mut xs, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
         x = backend.mul(&x, &tmp)?;
     }
     let mut y = backend.constant(B::FieldElement::ONE)?;
-    for i in 0..ntuples {
-        let result = dotproduct_with_public::<B>(
-            backend,
-            &ys[i * tuple_size..(i + 1) * tuple_size],
-            &challenges,
-        )?;
+    for _ in 0..ntuples {
+        let result = dotproduct_with_public_powers::<B>(backend, &mut ys, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
         y = backend.mul(&y, &tmp)?;
     }
@@ -74,36 +62,63 @@ pub(crate) fn permutation_check<B: BackendT>(
     backend.assert_zero(&z)
 }
 
-/// Pack `xs` into the tag field.
-fn pack<M: Mac, B: BackendLiftT<Wire = M>>(
-    xs: &[B::Wire],
+/// This type implements an iterator for packing elements together based on a
+/// given tuple size.
+struct Packer<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> {
+    xs: Peekable<I>,
     tuple_size: usize,
-) -> Vec<<M as Mac>::LiftedMac> {
-    let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
-    let mut array: Arr<M, DegreeModulo<M::Value, M::Tag>> = GenericArray::default();
-    let mut nbits_count = 0;
-    let mut tuple_count = 0;
-    let mut packed = vec![];
-    for (i, x) in xs.iter().enumerate() {
-        array[nbits_count] = *x;
-        nbits_count += 1;
-        tuple_count += 1;
-        // There are three conditions in which we push a packed element:
-        // 1. We are out of bits in the superfield (i.e., `nbits_count == nbits`)
-        // 2. We are out of bits in the tuple itself (i.e., `tuple_count == tuple_size`)
-        // 3. We are out of bits in general (i.e., `i + 1 == xs.len()`)
-        if nbits_count == nbits || tuple_count == tuple_size || i + 1 == xs.len() {
-            let elem = M::lift(&array);
-            packed.push(elem);
-            array = GenericArray::default();
-            nbits_count = 0;
-            // Only reset `tuple_count` if we've hit `tuple_size`.
-            if tuple_count == tuple_size {
-                tuple_count = 0;
-            }
+    array: Arr<M, DegreeModulo<M::Value, M::Tag>>,
+    nbits: usize,
+    nbits_count: usize,
+    tuple_count: usize,
+    _phantom: PhantomData<(M, B)>,
+}
+
+impl<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Packer<M, B, I> {
+    /// Create a new [`Packer`] from an iterator and a given `tuple_size`.
+    pub fn new(xs: I, tuple_size: usize) -> Self {
+        Self {
+            xs: xs.peekable(),
+            tuple_size,
+            array: GenericArray::default(),
+            nbits: <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE,
+            nbits_count: 0,
+            tuple_count: 0,
+            _phantom: PhantomData,
         }
     }
-    packed
+}
+
+impl<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator for Packer<M, B, I> {
+    type Item = <M as Mac>::LiftedMac;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for x in &mut self.xs {
+            self.array[self.nbits_count] = x;
+            self.nbits_count += 1;
+            self.tuple_count += 1;
+            // There are three conditions in which we push a packed element:
+            // 1. We are out of space in the superfield (i.e., `nbits_count == nbits`)
+            // 2. We are out of space in the tuple itself (i.e., `tuple_count == tuple_size`)
+            if self.nbits_count == self.nbits || self.tuple_count == self.tuple_size {
+                let elem = M::lift(&self.array);
+                self.array = GenericArray::default();
+                self.nbits_count = 0;
+                // Only reset `tuple_count` if we've hit `tuple_size`.
+                if self.tuple_count == self.tuple_size {
+                    self.tuple_count = 0;
+                }
+                return Some(elem);
+            }
+        }
+        // 3. We are out of elements in general
+        if self.nbits_count > 0 {
+            let elem = M::lift(&self.array);
+            self.nbits_count = 0;
+            return Some(elem);
+        }
+        None
+    }
 }
 
 /// A permutation check gadget, designed for binary fields, that asserts that
@@ -113,16 +128,16 @@ fn pack<M: Mac, B: BackendLiftT<Wire = M>>(
 /// it'll work for non-binary values!
 pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
     backend: &mut B::LiftedBackend,
-    xs: &[B::Wire],
-    ys: &[B::Wire],
+    xs: impl Iterator<Item = B::Wire>,
+    ys: impl Iterator<Item = B::Wire>,
     ntuples: usize,
     tuple_size: usize,
 ) -> Result<()> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let new_tuple_size = (tuple_size + nbits - 1) / nbits;
-    let packed_xs = pack::<M, B>(xs, tuple_size);
-    let packed_ys = pack::<M, B>(ys, tuple_size);
-    permutation_check::<B::LiftedBackend>(backend, &packed_xs, &packed_ys, ntuples, new_tuple_size)
+    let packed_xs = Packer::<M, B, _>::new(xs, tuple_size);
+    let packed_ys = Packer::<M, B, _>::new(ys, tuple_size);
+    permutation_check::<B::LiftedBackend>(backend, packed_xs, packed_ys, ntuples, new_tuple_size)
 }
 
 #[cfg(test)]
@@ -189,7 +204,14 @@ mod tests {
                 .map(|y| party.input_private(Some(y)).unwrap())
                 .collect();
 
-            permutation_check(&mut party, &xs, &ys, ntuples, tuple_size).unwrap();
+            permutation_check(
+                &mut party,
+                xs.into_iter(),
+                ys.into_iter(),
+                ntuples,
+                tuple_size,
+            )
+            .unwrap();
             if is_good {
                 let _ = party.finalize().unwrap();
             } else {
@@ -220,7 +242,14 @@ mod tests {
             .map(|_| party.input_private(None).unwrap())
             .collect();
 
-        permutation_check(&mut party, &xs, &ys, ntuples, tuple_size).unwrap();
+        permutation_check(
+            &mut party,
+            xs.into_iter(),
+            ys.into_iter(),
+            ntuples,
+            tuple_size,
+        )
+        .unwrap();
         if is_good {
             let _ = party.finalize().unwrap();
         } else {
@@ -280,7 +309,13 @@ mod tests {
                     SvoleSender<F40b>,
                     SvoleSender<F40b>,
                 >,
-            >(&mut party2, &xs, &ys, ntuples, tuple_size)
+            >(
+                &mut party2,
+                xs.into_iter(),
+                ys.into_iter(),
+                ntuples,
+                tuple_size,
+            )
             .unwrap();
             if is_good {
                 let _ = party.finalize().unwrap();
@@ -325,7 +360,13 @@ mod tests {
                 SvoleReceiver<F2, F40b>,
                 SvoleReceiver<F40b, F40b>,
             >,
-        >(&mut party2, &xs, &ys, ntuples, tuple_size)
+        >(
+            &mut party2,
+            xs.into_iter(),
+            ys.into_iter(),
+            ntuples,
+            tuple_size,
+        )
         .unwrap();
         if is_good {
             let _ = party.finalize().unwrap();

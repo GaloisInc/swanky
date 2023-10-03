@@ -27,19 +27,22 @@ pub(crate) use less_than_eq::less_than_eq_with_public;
 mod permutation_check;
 pub(crate) use permutation_check::{permutation_check, permutation_check_binary};
 
-/// A dot product gadget computing `xs · ys`, where `xs` contains MAC'd values
-/// and `ys` contains public values.
+/// A dot product gadget computing `xs · [y, y^2, ..., y^n]`, where `xs`
+/// contains MAC'd values and `ys` contains public values.
 ///
 /// This gadget works over all fields.
-pub(crate) fn dotproduct_with_public<B: BackendT>(
+pub(crate) fn dotproduct_with_public_powers<B: BackendT>(
     backend: &mut B,
-    xs: &[B::Wire],
-    ys: &[B::FieldElement],
+    xs: &mut impl Iterator<Item = B::Wire>,
+    y: B::FieldElement,
+    n: usize,
 ) -> Result<B::Wire> {
     let mut result = backend.input_public(B::FieldElement::ZERO)?;
-    for (x, y) in xs.iter().zip(ys.iter()) {
-        let tmp = backend.mul_constant(x, *y)?;
+    let mut acc = y;
+    for x in xs.take(n) {
+        let tmp = backend.mul_constant(&x, acc)?;
         result = backend.add(&result, &tmp)?;
+        acc = acc * y;
     }
     Ok(result)
 }

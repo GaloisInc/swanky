@@ -68,8 +68,8 @@ impl PermutationCheckV1 {
 
     pub(crate) fn execute_binary<M: Mac, B: BackendLiftT<Wire = M>>(
         &self,
-        xs: &[B::Wire],
-        ys: &[B::Wire],
+        xs: impl Iterator<Item = B::Wire>,
+        ys: impl Iterator<Item = B::Wire>,
         backend: &mut B,
     ) -> Result<()> {
         assert_eq!(self.field_type_id, std::any::TypeId::of::<F2>());
@@ -80,8 +80,8 @@ impl PermutationCheckV1 {
     /// utilizing the provided `backend`.
     pub(crate) fn execute<B: BackendLiftT>(
         &self,
-        xs: &[B::Wire],
-        ys: &[B::Wire],
+        xs: impl Iterator<Item = B::Wire>,
+        ys: impl Iterator<Item = B::Wire>,
         backend: &mut B,
     ) -> Result<()> {
         if std::any::TypeId::of::<B::FieldElement>() == std::any::TypeId::of::<F2>() {

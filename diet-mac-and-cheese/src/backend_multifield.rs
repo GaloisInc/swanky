@@ -1273,9 +1273,9 @@ impl<B: BackendConvT + BackendDisjunctionT + BackendLiftT> EvaluatorT for Evalua
             PluginExecution::PermutationCheck(plugin) => {
                 assert_eq!(outputs.len(), 0);
                 assert_eq!(inputs.len(), 2);
-                let xs: Vec<_> = copy_mem(&self.memory, inputs[0]).copied().collect();
-                let ys: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
-                plugin.execute::<B>(&xs, &ys, &mut self.backend)?
+                let xs = copy_mem(&self.memory, inputs[0]).copied();
+                let ys = copy_mem(&self.memory, inputs[1]).copied();
+                plugin.execute::<B>(xs, ys, &mut self.backend)?
             }
             PluginExecution::Disjunction(disj) => {
                 assert!(inputs.len() >= 1, "must provide condition");
