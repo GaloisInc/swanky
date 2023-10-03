@@ -1418,9 +1418,7 @@ impl<B: BackendConvT + BackendDisjunctionT + BackendLiftT> EvaluatorT for Evalua
 pub struct EvaluatorCirc<
     C: AbstractChannel + 'static,
     SvoleF2Prover: SvoleT<(F2, F40b)>,
-    SvoleF40bProver: SvoleT<(F40b, F40b)>, // TODO: we should get rid of this parameter, and instead pass it to the functions that need it
     SvoleF2Verifier: SvoleT<F40b>,
-    SvoleF40bVerifier: SvoleT<F40b>, // TODO: we should get rid of this parameter, and instead pass it to the functions that need it
 > {
     inputs: CircInputs,
     fcom_f2_prover: Option<FComProver<F2, F40b, SvoleF2Prover>>,
@@ -1432,16 +1430,14 @@ pub struct EvaluatorCirc<
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
-    phantom: PhantomData<(C, SvoleF40bProver, SvoleF40bVerifier)>, // TODO: we should get rid of this parameter, and instead pass it to the functions that need it
+    phantom: PhantomData<C>,
 }
 
 impl<
         C: AbstractChannel + 'static,
         SvoleF2Prover: SvoleT<(F2, F40b)> + 'static,
-        SvoleF40bProver: SvoleT<(F40b, F40b)> + 'static,
         SvoleF2Verifier: SvoleT<F40b> + 'static,
-        SvoleF40bVerifier: SvoleT<F40b> + 'static,
-    > EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier, SvoleF40bVerifier>
+    > EvaluatorCirc<C, SvoleF2Prover, SvoleF2Verifier>
 {
     // TODO: Factorize interface for `new_with_prover` and `new_with_verifier`
     pub fn new(
@@ -1503,13 +1499,7 @@ impl<
         no_batching: bool,
         lpn_small: bool,
     ) -> Result<(
-        EvaluatorCirc<
-            C,
-            SvoleAtomic<(F2, F40b)>,
-            SvoleAtomic<(F40b, F40b)>,
-            SvoleAtomic<F40b>,
-            SvoleAtomic<F40b>,
-        >,
+        EvaluatorCirc<C, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>,
         std::thread::JoinHandle<()>,
     )> {
         let (lpn_setup, lpn_extend) = if lpn_small {
@@ -1587,13 +1577,26 @@ impl<
         }
     }
 
-    pub fn load_backends(&mut self, channel: &mut C, lpn_small: bool) -> Result<()> {
+    pub fn load_backends<
+        SvoleF40bProver: SvoleT<(F40b, F40b)> + 'static,
+        SvoleF40bVerifier: SvoleT<F40b> + 'static,
+    >(
+        &mut self,
+        channel: &mut C,
+        lpn_small: bool,
+    ) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
             let rng = self.rng.fork();
             match spec {
                 TypeSpecification::Field(field) => {
-                    self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
+                    self.load_backend::<SvoleF40bProver, SvoleF40bVerifier>(
+                        channel,
+                        rng,
+                        *field,
+                        *idx as usize,
+                        lpn_small,
+                    )?;
                 }
                 _ => {
                     bail!("Type not supported yet: {:?}", spec);
@@ -1655,7 +1658,10 @@ impl<
         }
     }
 
-    pub fn load_backend(
+    pub fn load_backend<
+        SvoleF40bProver: SvoleT<(F40b, F40b)> + 'static,
+        SvoleF40bVerifier: SvoleT<F40b> + 'static,
+    >(
         &mut self,
         channel: &mut C,
         rng: AesRng,
@@ -2324,14 +2330,8 @@ impl<
     }
 }
 
-impl<
-        C: AbstractChannel,
-        SvoleF2Prover: SvoleT<(F2, F40b)>,
-        SvoleF40bProver: SvoleT<(F40b, F40b)>,
-        SvoleF2Verifier: SvoleT<F40b>,
-        SvoleF40bVerifier: SvoleT<F40b>,
-    > Drop
-    for EvaluatorCirc<C, SvoleF2Prover, SvoleF40bProver, SvoleF2Verifier, SvoleF40bVerifier>
+impl<C: AbstractChannel, SvoleF2Prover: SvoleT<(F2, F40b)>, SvoleF2Verifier: SvoleT<F40b>> Drop
+    for EvaluatorCirc<C, SvoleF2Prover, SvoleF2Verifier>
 {
     fn drop(&mut self) {
         if !self.multithreaded_voles.is_empty() {
@@ -2458,13 +2458,7 @@ pub(crate) mod tests {
                 inputs.ingest_witnesses(id, VecDeque::from(witnesses));
             }
 
-            let mut eval = EvaluatorCirc::<
-                _,
-                SvoleSender<F40b>,
-                SvoleSender<F40b>,
-                SvoleReceiver<F2, F40b>,
-                SvoleReceiver<F40b, F40b>,
-            >::new(
+            let mut eval = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
                 Party::Prover,
                 &mut channel,
                 rng,
@@ -2473,7 +2467,7 @@ pub(crate) mod tests {
                 true,
                 false,
             )?;
-            eval.load_backends(&mut channel, true)?;
+            eval.load_backends::<SvoleSender<F40b>, SvoleReceiver<F40b, F40b>>(&mut channel, true)?;
             eval.evaluate_gates(&gates_prover, &func_store_prover)?;
             eyre::Result::Ok(())
         });
@@ -2489,13 +2483,7 @@ pub(crate) mod tests {
             inputs.ingest_instances(id, VecDeque::from(inst));
         }
 
-        let mut eval = EvaluatorCirc::<
-            _,
-            SvoleSender<F40b>,
-            SvoleSender<F40b>,
-            SvoleReceiver<F2, F40b>,
-            SvoleReceiver<F40b, F40b>,
-        >::new(
+        let mut eval = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
             Party::Verifier,
             &mut channel,
             rng,
@@ -2505,7 +2493,7 @@ pub(crate) mod tests {
             false,
         )
         .unwrap();
-        eval.load_backends(&mut channel, true)?;
+        eval.load_backends::<SvoleSender<F40b>, SvoleReceiver<F40b, F40b>>(&mut channel, true)?;
         eval.evaluate_gates(&gates, &func_store)?;
 
         handle.join().unwrap()
