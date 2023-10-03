@@ -71,13 +71,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     alert("*** RELATION LOADING: done!");
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<
-        _,
-        SvoleSender<F40b>,
-        SvoleSender<F40b>,
-        SvoleReceiver<F2, F40b>,
-        SvoleReceiver<F40b, F40b>,
-    >::new(
+    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
         Party::Prover,
         &mut channel,
         rng,
@@ -88,7 +82,8 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     )
     .unwrap();
     let lpn_is_small = true;
-    let tmp = evaluator.load_backends(&mut channel, lpn_is_small);
+    let tmp = evaluator
+        .load_backends::<SvoleSender<F40b>, SvoleReceiver<F40b, F40b>>(&mut channel, lpn_is_small);
     if tmp.is_err() {
         alert("error while loading backends");
         return false;

@@ -77,13 +77,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let rng = AesRng::new();
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<
-        _,
-        SvoleSender<F40b>,
-        SvoleSender<F40b>,
-        SvoleReceiver<F2, F40b>,
-        SvoleReceiver<F40b, F40b>,
-    >::new(
+    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
         Party::Verifier,
         &mut channel,
         rng,
@@ -93,7 +87,10 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
         no_batching,
     )?;
     let lpn_is_small = true;
-    evaluator.load_backends(&mut channel, lpn_is_small)?;
+    evaluator.load_backends::<SvoleSender<F40b>, SvoleReceiver<F40b, F40b>>(
+        &mut channel,
+        lpn_is_small,
+    )?;
     info!("init time: {:?}", start.elapsed());
 
     let start = Instant::now();
