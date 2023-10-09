@@ -11,7 +11,6 @@ use rand::{distributions::Uniform, CryptoRng, Rng, SeedableRng};
 use scuttlebutt::field::DegreeModulo;
 use scuttlebutt::{
     field::{Degree, FiniteField},
-    generic_array_length::Arr,
     ring::FiniteRing,
     serialization::CanonicalSerialize,
     AbstractChannel, AesRng, Block,
@@ -57,13 +56,13 @@ fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> AesRng {
 /// Generates powers of `FE::GENERATOR`.
 #[derive(Clone)]
 pub struct Powers<FE: FiniteField> {
-    powers: Arr<FE, Degree<FE>>,
+    powers: GenericArray<FE, Degree<FE>>,
 }
 
 impl<FE: FiniteField> Default for Powers<FE> {
     fn default() -> Self {
         let mut acc = FE::ONE;
-        let mut powers: Arr<FE, Degree<FE>> = Default::default();
+        let mut powers: GenericArray<FE, Degree<FE>> = Default::default();
         for item in powers.iter_mut() {
             *item = acc;
             acc *= FE::GENERATOR;
@@ -73,8 +72,8 @@ impl<FE: FiniteField> Default for Powers<FE> {
 }
 
 impl<FE: FiniteField> Deref for Powers<FE> {
-    type Target = Arr<FE, Degree<FE>>;
-    fn deref(&self) -> &Arr<FE, Degree<FE>> {
+    type Target = GenericArray<FE, Degree<FE>>;
+    fn deref(&self) -> &GenericArray<FE, Degree<FE>> {
         &self.powers
     }
 }
@@ -491,7 +490,7 @@ impl<'a, T: MacTypes> VoleReceiverStep4<T> {
         self.ot_stage2
             .stage2(arena, &incoming_bytes[0..KosSenderStage2::INCOMING_BYTES])?;
         incoming_bytes = &incoming_bytes[KosSenderStage2::INCOMING_BYTES..];
-        let mut x_stars: Arr<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
+        let mut x_stars: GenericArray<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
         for x_star in x_stars.iter_mut() {
             let mut bytes: GenericArray<u8, <T::VF as CanonicalSerialize>::ByteReprLen> =
                 Default::default();
