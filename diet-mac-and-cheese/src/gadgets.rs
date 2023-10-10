@@ -25,12 +25,13 @@ use swanky_field::{FiniteField, FiniteRing};
 
 mod less_than_eq;
 pub(crate) use less_than_eq::less_than_eq_with_public;
+use swanky_party::Party;
 
 /// A dot product gadget computing `xs · ys`, where `xs` contains MAC'd values
 /// and `ys` contains public values.
 ///
 /// This gadget works over all fields.
-pub(crate) fn dotproduct_with_public<B: BackendT>(
+pub(crate) fn dotproduct_with_public<P: Party, B: BackendT<P>>(
     backend: &mut B,
     xs: &[B::Wire],
     ys: &[B::FieldElement],
@@ -48,7 +49,7 @@ pub(crate) fn dotproduct_with_public<B: BackendT>(
 ///
 /// This gadget currently only works over fields larger than the statistical
 /// security parameter (which we have harded at 40 bits).
-pub(crate) fn permutation_check<B: BackendT>(
+pub(crate) fn permutation_check<P: Party, B: BackendT<P>>(
     backend: &mut B,
     xs: &[B::Wire],
     ys: &[B::Wire],
@@ -81,7 +82,7 @@ pub(crate) fn permutation_check<B: BackendT>(
 
     let mut x = backend.constant(B::FieldElement::ONE)?;
     for i in 0..ntuples {
-        let result = dotproduct_with_public::<B>(
+        let result = dotproduct_with_public::<P, B>(
             backend,
             &xs[i * tuple_size..(i + 1) * tuple_size],
             &challenges,
@@ -91,7 +92,7 @@ pub(crate) fn permutation_check<B: BackendT>(
     }
     let mut y = backend.constant(B::FieldElement::ONE)?;
     for i in 0..ntuples {
-        let result = dotproduct_with_public::<B>(
+        let result = dotproduct_with_public::<P, B>(
             backend,
             &ys[i * tuple_size..(i + 1) * tuple_size],
             &challenges,
