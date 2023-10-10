@@ -81,7 +81,8 @@ where
                 let clause = self.disj.clause(opt.into_inner(ev));
 
                 // compute extended witness for the clause
-                let wit = clause.compute_witness(input.iter().map(|input| input.value(ev)));
+                let wit =
+                    clause.compute_witness(input.iter().map(|input| input.value().into_inner(ev)));
                 debug_assert!(wit.check(clause));
 
                 //compute cross terms with accumulator

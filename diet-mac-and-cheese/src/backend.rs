@@ -263,7 +263,7 @@ where
 
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         match P::WHICH {
-            WhichParty::Prover(ev) => Some(wire.value(ev)),
+            WhichParty::Prover(ev) => Some(wire.value().into_inner(ev)),
             WhichParty::Verifier(_) => None,
         }
     }
@@ -321,8 +321,8 @@ where
 
         let out = match P::WHICH {
             WhichParty::Prover(ev) => {
-                let a_clr = a.value(ev);
-                let b_clr = b.value(ev);
+                let a_clr = a.value().into_inner(ev);
+                let b_clr = b.value().into_inner(ev);
                 let product = a_clr * b_clr;
 
                 self.input(ProverPrivateCopy::new(product))?
@@ -447,7 +447,7 @@ mod tests {
             let two_priv = dmc.input_private(Some(two)).unwrap();
             let six = dmc.mul(&two_priv, &three_pub).unwrap();
             let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-            assert_eq!(twelve_priv.value(IS_PROVER), three * two * two);
+            assert_eq!(twelve_priv.value().into_inner(IS_PROVER), three * two * two);
             let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
             let r_zero_priv = dmc
                 .add_constant(&n24_priv, -(three * two * two * two))

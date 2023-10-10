@@ -420,7 +420,7 @@ impl<
             debug_assert_eq!(cond, 1);
 
             // so the guard is the last input
-            let guard_val = inputs[inputs.len() - 1].value(ev);
+            let guard_val = inputs[inputs.len() - 1].value().into_inner(ev);
 
             // lookup the clause based on the guard
             let opt = *st
@@ -497,7 +497,7 @@ impl<
 
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                let bits = a.value(ev).bit_decomposition();
+                let bits = a.value().into_inner(ev).bit_decomposition();
 
                 v = Vec::with_capacity(bits.len());
                 for b in bits {
@@ -555,11 +555,12 @@ impl<
             match xx {
                 MacBit::BitParty(m) => {
                     if let WhichParty::Prover(ev) = P::WHICH {
-                        *recomposed_value.as_mut().into_inner(ev) += (if m.value(ev) == F2::ONE {
-                            FE::ONE
-                        } else {
-                            FE::ZERO
-                        }) * power_twos.into_inner(ev);
+                        *recomposed_value.as_mut().into_inner(ev) +=
+                            (if m.value().into_inner(ev) == F2::ONE {
+                                FE::ONE
+                            } else {
+                                FE::ZERO
+                            }) * power_twos.into_inner(ev);
                         power_twos
                             .as_mut()
                             .map(|power_twos| *power_twos += *power_twos);

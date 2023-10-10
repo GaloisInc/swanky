@@ -111,20 +111,6 @@ macro_rules! make_prover_private_type {
                 }
             }
 
-            /// Given a function from the prover-private type (that requires
-            /// knowledge that the party is the prover), map over a
-            /// `ProverPrivate(Copy)` in the natural way.
-            ///
-            /// Note that in verifier contexts, the function will never be
-            /// called.
-            pub fn map_with_ev<U$(: $Copy)?, F: FnOnce(IsParty<P, Prover>, T) -> U>(self, f: F) -> $ProverPrivate<P, U> {
-                match P::WHICH {
-                    WhichParty::Prover(e) =>
-                        $ProverPrivate::new(f(e, self.into_inner(e))),
-                    WhichParty::Verifier(e) => $ProverPrivate::empty(e),
-                }
-            }
-
             /// Return `ProverPrivate(Copy)::empty()` in a verifier context,
             /// otherwise call `f` on the prover-private value and return the
             /// result.

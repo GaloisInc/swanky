@@ -71,7 +71,8 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let a0 = x.mac() * y.mac();
-                let a1 = y.value(ev) * x.mac() + x.value(ev) * y.mac() - z.mac();
+                let a1 = y.value().into_inner(ev) * x.mac() + x.value().into_inner(ev) * y.mac()
+                    - z.mac();
 
                 *self.sum_a0.as_mut().into_inner(ev) += a0 * self.chi_power;
                 *self.sum_a1.as_mut().into_inner(ev) += a1 * self.chi_power;
@@ -95,7 +96,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let u = self.sum_a0.into_inner(ev) + mask.mac();
-                let v = self.sum_a1.into_inner(ev) + mask.value(ev);
+                let v = self.sum_a1.into_inner(ev) + mask.value().into_inner(ev);
 
                 channel.write_serializable(&u)?;
                 channel.write_serializable(&v)?;
@@ -196,7 +197,7 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
             WhichParty::Prover(ev) => {
                 self.key_chi += chi * mac.mac();
 
-                let b = mac.value(ev) == V::ZERO;
+                let b = mac.value().into_inner(ev) == V::ZERO;
                 if !b {
                     warn!("accumulating a value that's not zero");
                 }
@@ -409,7 +410,7 @@ where
     ) -> Result<T> {
         debug!("input1");
         let r = self.random(channel, rng)?;
-        let y = x - r.value(ev);
+        let y = x - r.value().into_inner(ev);
         channel.write_serializable(&y)?;
         Ok(r.mac())
     }
@@ -434,7 +435,10 @@ where
     #[inline]
     pub fn affine_add_cst(&self, cst: V, x: Mac<P, V, T>) -> Mac<P, V, T> {
         match P::WHICH {
-            WhichParty::Prover(ev) => Mac::new(ProverPrivateCopy::new(cst + x.value(ev)), x.mac()),
+            WhichParty::Prover(ev) => Mac::new(
+                ProverPrivateCopy::new(cst + x.value().into_inner(ev)),
+                x.mac(),
+            ),
             WhichParty::Verifier(ev) => Mac::new(
                 ProverPrivateCopy::empty(ev),
                 x.mac() - cst * self.delta.into_inner(ev),
@@ -492,7 +496,7 @@ where
                 for mac in mac_batch.iter() {
                     let chi = T::random(&mut rng);
                     m += chi * mac.mac();
-                    b &= mac.value(ev) == V::ZERO;
+                    b &= mac.value().into_inner(ev) == V::ZERO;
                 }
                 channel.write_serializable::<T>(&m)?;
                 channel.flush()?;
@@ -528,8 +532,8 @@ where
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 for mac in batch.iter() {
-                    channel.write_serializable::<V>(&mac.value(ev))?;
-                    hasher.update(&mac.value(ev).to_bytes());
+                    channel.write_serializable::<V>(&mac.value().into_inner(ev))?;
+                    hasher.update(&mac.value().into_inner(ev).to_bytes());
                 }
             }
             WhichParty::Verifier(ev) => {
@@ -614,7 +618,7 @@ where
                 let mask = Mac::lift(&us);
 
                 let u = sum_a0 + mask.mac();
-                let v = sum_a1 + mask.value(ev);
+                let v = sum_a1 + mask.value().into_inner(ev);
 
                 channel.write_serializable(&u)?;
                 channel.write_serializable(&v)?;
@@ -746,7 +750,7 @@ mod tests {
         for i in 0..count {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
-                resprover[i].value(IS_PROVER)
+                resprover[i].value().into_inner(IS_PROVER)
             );
         }
     }
@@ -815,7 +819,7 @@ mod tests {
         for i in 0..count {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
-                batch_prover[i].value(IS_PROVER)
+                batch_prover[i].value().into_inner(IS_PROVER)
             );
         }
     }
@@ -843,7 +847,7 @@ mod tests {
             for _ in 0..count {
                 let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value(IS_PROVER) * y.value(IS_PROVER);
+                let z = x.value().into_inner(IS_PROVER) * y.value().into_inner(IS_PROVER);
                 let z_mac = fcom
                     .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
                     .unwrap()[0];
@@ -1012,7 +1016,7 @@ mod tests {
             for _ in 0..count {
                 let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value(IS_PROVER) * y.value(IS_PROVER);
+                let z = x.value().into_inner(IS_PROVER) * y.value().into_inner(IS_PROVER);
                 let z_mac = fcom
                     .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
                     .unwrap()[0];

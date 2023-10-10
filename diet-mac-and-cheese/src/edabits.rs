@@ -78,7 +78,7 @@ fn convert_bits_to_field_mac<P: Party, FE: FiniteField>(
 
     for b in v.iter().rev() {
         res += res; // double
-        res += f2_to_fe(b.value(ev));
+        res += f2_to_fe(b.value().into_inner(ev));
     }
     res
 }
@@ -236,7 +236,9 @@ impl<
 
         for i in 0..n {
             let c = match P::WHICH {
-                WhichParty::Prover(ev) => c_batch.as_ref().prover_into(ev)[i].value(ev),
+                WhichParty::Prover(ev) => {
+                    c_batch.as_ref().prover_into(ev)[i].value().into_inner(ev)
+                }
                 WhichParty::Verifier(ev) => c_batch.as_ref().verifier_into(ev)[i],
             };
 
@@ -338,8 +340,8 @@ impl<
                 let and2 = yi + ci;
 
                 if let WhichParty::Prover(ev) = P::WHICH {
-                    let and1_clr = and1.value(ev);
-                    let and_res = and1_clr * and2.value(ev);
+                    let and1_clr = and1.value().into_inner(ev);
+                    let and_res = and1_clr * and2.value().into_inner(ev);
 
                     let c = ci_clr.into_inner(ev) + and_res;
                     // let c_mac = ci_mac + and_res_mac; // is done in the next step
@@ -447,7 +449,7 @@ impl<
                 WhichParty::Prover(ev) => {
                     let r_m: FE::PrimeField = convert_bits_to_field::<FE>(
                         bits.iter()
-                            .map(|x| x.value(ev))
+                            .map(|x| x.value().into_inner(ev))
                             .collect::<Vec<F2>>()
                             .as_slice(),
                     );
@@ -482,7 +484,7 @@ impl<
             if let WhichParty::Prover(ev) = P::WHICH {
                 let r_m: FE::PrimeField = convert_bits_to_field::<FE::PrimeField>(
                     bits.iter()
-                        .map(|x| x.value(ev))
+                        .map(|x| x.value().into_inner(ev))
                         .collect::<Vec<F2>>()
                         .as_slice(),
                 );
@@ -605,7 +607,8 @@ impl<
             b_batch.push(b);
             b_m_batch
                 .as_mut()
-                .map_with_ev(|ev, b_m_batch| b_m_batch.push(f2_to_fe(b.value(ev))));
+                .zip(b.value().into())
+                .map(|(b_m_batch, b)| b_m_batch.push(f2_to_fe(b)));
         }
 
         let b_m_mac_batch = match P::WHICH {
@@ -651,7 +654,7 @@ impl<
             pairs.push((x, y));
 
             if let WhichParty::Prover(ev) = P::WHICH {
-                let z = x.value(ev) * y.value(ev);
+                let z = x.value().into_inner(ev) * y.value().into_inner(ev);
                 zs.as_mut().into_inner(ev).push(z);
             }
         }
@@ -712,10 +715,10 @@ impl<
             for i in 0..n {
                 // making sure the faulty dabits are not faulty
                 debug_assert!(
-                    ((dabits[i].bit.value(ev) == F2::ZERO)
-                        & (dabits[i].value.value(ev) == FE::PrimeField::ZERO))
-                        | ((dabits[i].bit.value(ev) == F2::ONE)
-                            & (dabits[i].value.value(ev) == FE::PrimeField::ONE))
+                    ((dabits[i].bit.value().into_inner(ev) == F2::ZERO)
+                        & (dabits[i].value.value().into_inner(ev) == FE::PrimeField::ZERO))
+                        | ((dabits[i].bit.value().into_inner(ev) == F2::ONE)
+                            & (dabits[i].value.value().into_inner(ev) == FE::PrimeField::ONE))
                 );
             }
         }
@@ -803,13 +806,13 @@ impl<
                             Mac::new(ProverPrivateCopy::new(andl), andl_mac) * -FE::PrimeField::ONE;
                         let one_minus_ci = // 1 - ci
                             self.fcom_fe.affine_add_cst(FE::PrimeField::ONE, minus_ci);
-                        let and_res = andl * one_minus_ci.value(ev);
+                        let and_res = andl * one_minus_ci.value().into_inner(ev);
                         andl_batch.as_mut().into_inner(ev).push(andl);
                         andl_mac_batch.as_mut().prover_into(ev).push(andl_mac);
                         one_minus_ci_batch
                             .as_mut()
                             .into_inner(ev)
-                            .push(one_minus_ci.value(ev));
+                            .push(one_minus_ci.value().into_inner(ev));
                         one_minus_ci_mac_batch
                             .as_mut()
                             .prover_into(ev)
@@ -906,11 +909,12 @@ impl<
                 let tmp = dabits[i].bit * e[k][i];
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
-                        ((e[k][i] == F2::ONE) & (tmp.value(ev) == dabits[i].bit.value(ev)))
-                            | (tmp.value(ev) == F2::ZERO)
+                        ((e[k][i] == F2::ONE)
+                            & (tmp.value().into_inner(ev) == dabits[i].bit.value().into_inner(ev)))
+                            | (tmp.value().into_inner(ev) == F2::ZERO)
                     );
 
-                    *r.as_mut().into_inner(ev) += tmp.value(ev);
+                    *r.as_mut().into_inner(ev) += tmp.value().into_inner(ev);
                 }
                 r_mac += tmp.mac();
             }
@@ -945,10 +949,12 @@ impl<
                 let tmp = dabits[i].value * b;
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
-                        ((b == FE::PrimeField::ONE) & (tmp.value(ev) == dabits[i].value.value(ev)))
-                            | (tmp.value(ev) == FE::PrimeField::ZERO)
+                        ((b == FE::PrimeField::ONE)
+                            & (tmp.value().into_inner(ev)
+                                == dabits[i].value.value().into_inner(ev)))
+                            | (tmp.value().into_inner(ev) == FE::PrimeField::ZERO)
                     );
-                    *r_prime.as_mut().into_inner(ev) += tmp.value(ev);
+                    *r_prime.as_mut().into_inner(ev) += tmp.value().into_inner(ev);
                 }
                 r_prime_mac += tmp.mac();
             }
@@ -987,9 +993,12 @@ impl<
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
                         if i == 0 {
-                            debug_assert_eq!(c_m.as_ref().into_inner(ev)[k][i], tmp.value(ev));
+                            debug_assert_eq!(
+                                c_m.as_ref().into_inner(ev)[k][i],
+                                tmp.value().into_inner(ev)
+                            );
                         }
-                        tau.as_mut().prover_into(ev).0 += tmp.value(ev);
+                        tau.as_mut().prover_into(ev).0 += tmp.value().into_inner(ev);
                         tau.as_mut().prover_into(ev).1 += tmp.mac();
                     }
                     WhichParty::Verifier(ev) => {
@@ -1029,7 +1038,7 @@ impl<
                 // mod2 is computed using the first bit of the bit decomposition.
                 // NOTE: This scales linearly with the size of the bit decomposition and could lead to potential inefficiencies
                 match P::WHICH {
-                    WhichParty::Prover(ev) => (r_mac_batch[k].value(ev) == F2::ONE) == tau_mac_batch[k].value(ev).bit_decomposition()[0],
+                    WhichParty::Prover(ev) => (r_mac_batch[k].value().into_inner(ev) == F2::ONE) == tau_mac_batch[k].value().into_inner(ev).bit_decomposition()[0],
                     WhichParty::Verifier(ev) => (r_batch.as_ref().into_inner(ev)[k] == F2::ONE) == tau_batch.as_ref().into_inner(ev)[k].bit_decomposition()[0],
                 };
             res &= b;
@@ -1322,9 +1331,9 @@ mod tests {
 
                 assert_eq!(
                     f2_to_fe::<FE::PrimeField>(x_f2),
-                    x_m_batch[0].value(IS_PROVER)
+                    x_m_batch[0].value().into_inner(IS_PROVER)
                 );
-                res.push((x_f2, x_m_batch[0].value(IS_PROVER)));
+                res.push((x_f2, x_m_batch[0].value().into_inner(IS_PROVER)));
             }
             res
         });

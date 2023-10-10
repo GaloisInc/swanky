@@ -121,11 +121,11 @@ where
         debug_assert!(self.err.len() >= clause.rows());
 
         for i in 0..clause.dim() {
-            wit.push(self.wit[i].value(ev));
+            wit.push(self.wit[i].value().into_inner(ev));
         }
 
         for i in 0..clause.rows() {
-            err.push(self.err[i].value(ev));
+            err.push(self.err[i].value().into_inner(ev));
         }
 
         let acc = Accumulator { wit, err };
