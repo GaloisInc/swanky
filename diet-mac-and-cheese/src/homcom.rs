@@ -13,7 +13,7 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use swanky_party::either::PartyEither;
-use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
+use swanky_party::private::{ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy};
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
 pub struct MultCheckState<P: Party, T: Copy> {
@@ -520,7 +520,7 @@ where
         &mut self,
         channel: &mut C,
         batch: &[Mac<P, V, T>],
-        out: &mut Vec<V>,
+        out: &mut VerifierPrivate<P, &mut Vec<V>>,
     ) -> Result<()> {
         debug!("open");
         let mut hasher = blake3::Hasher::new();
@@ -532,11 +532,11 @@ where
                     hasher.update(&mac.value(ev).to_bytes());
                 }
             }
-            WhichParty::Verifier(_) => {
-                out.clear();
+            WhichParty::Verifier(ev) => {
+                out.as_mut().into_inner(ev).clear();
                 for _ in 0..batch.len() {
                     let x = channel.read_serializable::<V>()?;
-                    out.push(x);
+                    out.as_mut().into_inner(ev).push(x);
                     hasher.update(&x.to_bytes());
                 }
             }
@@ -564,11 +564,11 @@ where
                     let chi = T::random(&mut rng);
 
                     key_chi += chi * batch[i].mac();
-                    x_chi += out[i] * chi;
+                    x_chi += out.as_ref().into_inner(ev)[i] * chi;
                 }
                 let m = channel.read_serializable::<T>()?;
 
-                assert_eq!(out.len(), batch.len());
+                assert_eq!(out.as_ref().into_inner(ev).len(), batch.len());
                 if key_chi + self.delta.into_inner(ev) * x_chi == m {
                     Ok(())
                 } else {
