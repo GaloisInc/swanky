@@ -238,19 +238,13 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
 }
 
 /// Homomorphic commitment scheme.
-pub struct FCom<P: Party, V, T: Copy, SvoleSender, SvoleReceiver> {
+pub struct FCom<P: Party, V: Copy, T: Copy, SVOLE: SvoleT<P, V, T>> {
     delta: VerifierPrivateCopy<P, T>,
-    svole: PartyEither<P, SvoleSender, SvoleReceiver>,
+    svole: SVOLE,
     voles: PartyEither<P, Vec<(V, T)>, Vec<T>>,
 }
 
-impl<
-        P: Party,
-        V: IsSubFieldOf<T>,
-        T: FiniteField,
-        SvoleSender: SvoleT<(V, T)>,
-        SvoleReceiver: SvoleT<T>,
-    > FCom<P, V, T, SvoleSender, SvoleReceiver>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, SVOLE: SvoleT<P, V, T>> FCom<P, V, T, SVOLE>
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -263,19 +257,13 @@ where
     ) -> Result<Self> {
         let (svole, delta) = match P::WHICH {
             WhichParty::Prover(ev) => {
-                let svole = SvoleSender::init(channel, rng, lpn_setup, lpn_extend)?;
-                (
-                    PartyEither::prover_new(ev, svole),
-                    VerifierPrivateCopy::empty(ev),
-                )
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+                (svole, VerifierPrivateCopy::empty(ev))
             }
             WhichParty::Verifier(ev) => {
-                let svole = SvoleReceiver::init(channel, rng, lpn_setup, lpn_extend)?;
-                let delta = svole.delta().unwrap();
-                (
-                    PartyEither::verifier_new(ev, svole),
-                    VerifierPrivateCopy::new(delta),
-                )
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+                let delta = svole.delta(ev);
+                (svole, VerifierPrivateCopy::new(delta))
             }
         };
 
@@ -286,18 +274,13 @@ where
         })
     }
 
-    pub fn init_prover_with_vole(ev: IsParty<P, Prover>, svole: SvoleSender) -> Result<Self> {
+    pub fn init_with_vole(svole: SVOLE) -> Result<Self> {
         Ok(Self {
-            delta: VerifierPrivateCopy::empty(ev),
-            svole: PartyEither::prover_new(ev, svole),
-            voles: PartyEither::default(),
-        })
-    }
-
-    pub fn init_verifier_with_vole(ev: IsParty<P, Verifier>, svole: SvoleReceiver) -> Result<Self> {
-        Ok(Self {
-            delta: VerifierPrivateCopy::new(svole.delta().unwrap()),
-            svole: PartyEither::verifier_new(ev, svole),
+            delta: match P::WHICH {
+                WhichParty::Prover(ev) => VerifierPrivateCopy::empty(ev),
+                WhichParty::Verifier(ev) => VerifierPrivateCopy::new(svole.delta(ev)),
+            },
+            svole,
             voles: PartyEither::default(),
         })
     }
@@ -306,10 +289,7 @@ where
     pub fn duplicate(&self) -> Result<Self> {
         Ok(Self {
             delta: self.delta,
-            svole: self
-                .svole
-                .as_ref()
-                .map(|svole| svole.duplicate(), |svole| svole.duplicate()),
+            svole: self.svole.duplicate(),
             voles: PartyEither::default(),
         })
     }
@@ -330,11 +310,7 @@ where
             WhichParty::Prover(ev) => match self.voles.as_mut().prover_into(ev).pop() {
                 Some(e) => return Ok(Mac::new(ProverPrivateCopy::new(e.0), e.1)),
                 None => {
-                    self.svole.as_mut().prover_into(ev).extend(
-                        channel,
-                        rng,
-                        self.voles.as_mut().prover_into(ev),
-                    )?;
+                    self.svole.extend(channel, rng, &mut self.voles.as_mut())?;
 
                     assert_ne!(
                         self.voles.as_ref().prover_into(ev).len(),
@@ -346,11 +322,7 @@ where
             WhichParty::Verifier(ev) => match self.voles.as_mut().verifier_into(ev).pop() {
                 Some(e) => return Ok(Mac::new(ProverPrivateCopy::empty(ev), e)),
                 None => {
-                    self.svole.as_mut().verifier_into(ev).extend(
-                        channel,
-                        rng,
-                        self.voles.as_mut().verifier_into(ev),
-                    )?;
+                    self.svole.extend(channel, rng, &mut self.voles.as_mut())?;
 
                     assert_ne!(
                         self.voles.as_ref().verifier_into(ev).len(),
