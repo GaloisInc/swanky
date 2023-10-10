@@ -70,9 +70,14 @@ pub(crate) fn field_name<F: FiniteField>() -> &'static str {
     type_name::<F>().split("::").last().unwrap()
 }
 
-impl<T: FiniteField> SvoleStopSignal for Sender<T> {}
+pub struct Svole<P: Party, V, T: FiniteField>(
+    PartyEither<P, RcRefCell<Sender<T>>, RcRefCell<Receiver<T>>>,
+    PhantomData<V>,
+);
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<(V, T)> for Sender<T>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> SvoleStopSignal for Svole<P, V, T> {}
+
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> SvoleT<P, V, T> for Svole<P, V, T>
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -82,26 +87,58 @@ where
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<Self> {
-        Ok(Sender::init(channel, rng, lpn_setup, lpn_extend)?)
-    }
-
-    fn duplicate(&self) -> Self {
-        panic!("Should not try to duplicate a svole Sender")
+        Ok(match P::WHICH {
+            WhichParty::Prover(ev) => Self(
+                PartyEither::prover_new(
+                    ev,
+                    RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend)?),
+                ),
+                PhantomData,
+            ),
+            WhichParty::Verifier(ev) => Self(
+                PartyEither::verifier_new(
+                    ev,
+                    RcRefCell::new(Receiver::init(channel, rng, lpn_setup, lpn_extend)?),
+                ),
+                PhantomData,
+            ),
+        })
     }
 
     fn extend<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        out: &mut Vec<(V, T)>,
+        out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
-        debug!("prover extend");
-        self.send(channel, rng, out)?;
+        debug!("extend");
+        match P::WHICH {
+            WhichParty::Prover(ev) => {
+                self.0.as_mut().prover_into(ev).get_refmut().send(
+                    channel,
+                    rng,
+                    out.as_mut().prover_into(ev),
+                )?;
+            }
+            WhichParty::Verifier(ev) => {
+                let start = Instant::now();
+                self.0.as_mut().verifier_into(ev).get_refmut().receive(
+                    channel,
+                    rng,
+                    out.as_mut().verifier_into(ev),
+                )?;
+                info!("SVOLE<{} {:?}>", field_name::<T>(), start.elapsed());
+            }
+        }
         Ok(())
     }
 
-    fn delta(&self) -> Option<(V, T)> {
-        None
+    fn duplicate(&self) -> Self {
+        Svole(self.0.clone(), PhantomData)
+    }
+
+    fn delta(&self, ev: IsParty<P, Verifier>) -> T {
+        self.0.as_ref().verifier_into(ev).get_refmut().delta()
     }
 }
 
@@ -123,115 +160,5 @@ impl<X> RcRefCell<X> {
 impl<X> Clone for RcRefCell<X> {
     fn clone(&self) -> Self {
         RcRefCell(Rc::clone(&self.0))
-    }
-}
-
-/// Svole sender.
-#[repr(transparent)]
-pub struct SvoleSender<T: FiniteField> {
-    // We use a Rc<RefCell<>> here so that the underlying svole functionality can be shared among
-    // other components of diet mac'n'cheese. This is specifically relevant for field switching, where
-    // the svole functionality for F2 can be shared while converting from A to B using F2 in the middle, or
-    // A to F2 or F2 to B.
-    sender: RcRefCell<Sender<T>>,
-}
-
-impl<T: FiniteField> SvoleStopSignal for SvoleSender<T> {}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<(V, T)> for SvoleSender<T>
-where
-    <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
-{
-    fn init<C: AbstractChannel>(
-        channel: &mut C,
-        rng: &mut AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-    ) -> Result<Self> {
-        Ok(SvoleSender {
-            sender: RcRefCell::new(Sender::init(channel, rng, lpn_setup, lpn_extend)?),
-        })
-    }
-
-    fn duplicate(&self) -> Self {
-        SvoleSender {
-            sender: self.sender.clone(),
-        }
-    }
-
-    fn extend<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-        out: &mut Vec<(V, T)>,
-    ) -> Result<()> {
-        debug!("prover extend");
-        self.sender.get_refmut().send(channel, rng, out)?;
-        Ok(())
-    }
-
-    fn delta(&self) -> Option<(V, T)> {
-        None
-    }
-}
-
-/// Svole receiver.
-pub struct SvoleReceiver<V, T: FiniteField> {
-    // NOTE: The `V` type is added to solve some trait constraints that pop up later with the
-    // `extend()` function for the `SvoleT` impl.
-    the_receiver: RcRefCell<Receiver<T>>,
-    phantom: PhantomData<V>,
-}
-
-impl<V, T: FiniteField> SvoleReceiver<V, T> {
-    fn new(recv: RcRefCell<Receiver<T>>) -> Self {
-        Self {
-            the_receiver: recv,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleStopSignal for SvoleReceiver<V, T> {}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> SvoleT<T> for SvoleReceiver<V, T>
-where
-    <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
-{
-    fn init<C: AbstractChannel>(
-        channel: &mut C,
-        rng: &mut AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-    ) -> Result<Self> {
-        Ok(SvoleReceiver::new(RcRefCell::new(Receiver::init(
-            channel, rng, lpn_setup, lpn_extend,
-        )?)))
-    }
-
-    fn duplicate(&self) -> Self {
-        SvoleReceiver {
-            the_receiver: self.the_receiver.clone(),
-            phantom: PhantomData,
-        }
-    }
-
-    fn extend<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-        out: &mut Vec<T>,
-    ) -> Result<()> {
-        debug!("verifier extend");
-        let start = Instant::now();
-        self.the_receiver
-            .get_refmut()
-            .receive::<_, V>(channel, rng, out)?;
-        info!("SVOLE<{} {:?}>", field_name::<T>(), start.elapsed());
-        Ok(())
-    }
-
-    fn delta(&self) -> Option<T> {
-        Some(self.the_receiver.get_refmut().delta())
     }
 }
