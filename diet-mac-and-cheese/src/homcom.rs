@@ -680,8 +680,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{FCom, Mac};
-    use crate::svole_thread::{SvoleAtomic, ThreadReceiver, ThreadSender};
-    use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleT};
+    use crate::svole_thread::{SvoleAtomic, ThreadSvole};
+    use crate::svole_trait::{Svole, SvoleT};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{
@@ -692,7 +692,7 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_party::private::ProverPrivateCopy;
+    use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
     use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -706,7 +706,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -718,14 +718,15 @@ mod tests {
             for _ in 0..count {
                 v.push(fcom.random(&mut channel, &mut rng).unwrap());
             }
-            fcom.open(&mut channel, &v, &mut vec![]).unwrap();
+            fcom.open(&mut channel, &v, &mut VerifierPrivate::empty(IS_PROVER))
+                .unwrap();
             v
         });
         let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -737,13 +738,16 @@ mod tests {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
         }
 
-        let mut r = Vec::new();
-        fcom.open(&mut channel, &v, &mut r).unwrap();
+        let mut r = VerifierPrivate::new(Vec::new());
+        fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
 
         let resprover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], resprover[i].value(IS_PROVER));
+            assert_eq!(
+                r.as_ref().into_inner(IS_VERIFIER)[i],
+                resprover[i].value(IS_PROVER)
+            );
         }
     }
 
@@ -758,7 +762,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -777,14 +781,15 @@ mod tests {
                 let a = fcom.affine_add_cst(cst, x);
                 v.push(a);
             }
-            fcom.open(&mut channel, &v, &mut vec![]).unwrap();
+            fcom.open(&mut channel, &v, &mut VerifierPrivate::empty(IS_PROVER))
+                .unwrap();
             v
         });
         let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -802,13 +807,16 @@ mod tests {
             v.push(a_mac);
         }
 
-        let mut r = Vec::new();
-        fcom.open(&mut channel, &v, &mut r).unwrap();
+        let mut r = VerifierPrivate::new(Vec::new());
+        fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
 
         let batch_prover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], batch_prover[i].value(IS_PROVER));
+            assert_eq!(
+                r.as_ref().into_inner(IS_VERIFIER)[i],
+                batch_prover[i].value(IS_PROVER)
+            );
         }
     }
 
@@ -823,7 +831,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -850,7 +858,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<_, _, _, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<_, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -884,7 +892,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -926,7 +934,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -977,11 +985,11 @@ mod tests {
             let writer = BufWriter::new(sender_vole);
             let mut channel_vole = SyncChannel::new(reader, writer);
 
-            let svole_atomic = SvoleAtomic::<(V, T)>::create();
+            let svole_atomic = SvoleAtomic::<Prover, V, T>::create();
             let svole_atomic2 = svole_atomic.duplicate();
 
             let _svole_thread = std::thread::spawn(move || {
-                let mut svole_prover = ThreadSender::<V, T>::init(
+                let mut svole_prover = ThreadSvole::init(
                     &mut channel_vole,
                     &mut rng,
                     LPN_SETUP_SMALL,
@@ -998,11 +1006,7 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
 
             let mut fcom =
-                FCom::<Prover, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_prover_with_vole(
-                    IS_PROVER,
-                    svole_atomic,
-                )
-                .unwrap();
+                FCom::<Prover, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
@@ -1024,11 +1028,11 @@ mod tests {
         let writer = BufWriter::new(receiver_vole);
         let mut channel_vole = SyncChannel::new(reader, writer);
 
-        let svole_atomic = SvoleAtomic::<T>::create();
+        let svole_atomic = SvoleAtomic::create();
         let svole_atomic2 = svole_atomic.duplicate();
 
         let _svole_thread = std::thread::spawn(move || {
-            let mut svole_receiver = ThreadReceiver::<V, T>::init(
+            let mut svole_receiver = ThreadSvole::init(
                 &mut channel_vole,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -1045,11 +1049,7 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
 
         let mut fcom =
-            FCom::<Verifier, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_verifier_with_vole(
-                IS_VERIFIER,
-                svole_atomic,
-            )
-            .unwrap();
+            FCom::<Verifier, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic).unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {
