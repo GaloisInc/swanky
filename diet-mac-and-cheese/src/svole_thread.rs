@@ -6,9 +6,11 @@ use log::{debug, info, warn};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
-use std::marker::PhantomData;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use swanky_party::either::PartyEither;
+use swanky_party::{Party, Verifier, WhichParty};
 
 const SLEEP_TIME: u64 = 1;
 const SLEEP_TIME_MAX: u64 = 100;
@@ -21,20 +23,20 @@ const VOLE_VEC_NUM: usize = 3;
 ///
 /// An Svole functionality can use this structure to store the generated correlations.
 /// The stored correlations can be read by a consumer in a synchronized way.
-pub struct SvoleAtomic<X: Copy> {
-    voles: Vec<Arc<Mutex<Vec<X>>>>,
+pub struct SvoleAtomic<P: Party, V, T: Copy> {
+    voles: Vec<Arc<Mutex<PartyEither<P, Vec<(V, T)>, Vec<T>>>>>,
     last_done: Arc<Mutex<usize>>,
     next_todo: Arc<Mutex<usize>>,
     stop_signal: Arc<Mutex<bool>>,
-    delta: Arc<Mutex<Option<X>>>,
+    delta: Arc<Mutex<Option<T>>>,
 }
 
-impl<X: Copy + Default> SvoleAtomic<X> {
+impl<P: Party, V, T: Copy + Default> SvoleAtomic<P, V, T> {
     pub fn create() -> Self {
         assert!(VOLE_VEC_NUM_MIN <= VOLE_VEC_NUM_MIN);
         let mut v = vec![];
         for _ in 0..VOLE_VEC_NUM {
-            v.push(Arc::new(Mutex::new(vec![])));
+            v.push(Arc::new(Mutex::new(PartyEither::default())));
         }
         Self {
             voles: v,
@@ -45,19 +47,19 @@ impl<X: Copy + Default> SvoleAtomic<X> {
         }
     }
 
-    pub fn set_delta(&mut self, delta: X) {
+    pub fn set_delta(&mut self, delta: T) {
         *self.delta.lock().unwrap() = Some(delta);
     }
 }
 
-impl<X: Copy> SvoleStopSignal for SvoleAtomic<X> {
+impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomic<P, V, T> {
     fn send_stop_signal(&mut self) -> Result<()> {
         *self.stop_signal.lock().unwrap() = true;
         Ok(())
     }
 }
 
-impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
+impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, V, T> {
     fn init<C: AbstractChannel>(
         _channel: &mut C,
         _rng: &mut AesRng,
@@ -85,7 +87,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         &mut self,
         channel: &mut C,
         _rng: &mut AesRng,
-        out: &mut Vec<X>,
+        out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
         let mut sleep_time = SLEEP_TIME;
         loop {
@@ -95,21 +97,26 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
             let candidate = (last_done + 1) % VOLE_VEC_NUM;
             if candidate != next_todo {
                 let _start = Instant::now();
-                out.append(&mut *self.voles[candidate].lock().unwrap());
-                debug!("COPY<time:{:?} >", _start.elapsed(),);
+                out.as_mut()
+                    .zip(self.voles[candidate].lock().unwrap().as_mut())
+                    .map(
+                        |(out, candidate)| out.append(candidate),
+                        |(out, candidate)| out.append(candidate),
+                    );
+                debug!("COPY<time:{:?} >", _start.elapsed());
                 // No need to clear because append() already takes care of it, otherwise
                 // self.voles[candidate].lock().unwrap().clear();
                 *self.last_done.lock().unwrap() = candidate;
                 break;
             } else {
                 // WARNING!!!! This flush is very important to avoid deadlock!!!!!
-                // For example, if the prover input a number of values that is larger
+                // For example, if the prover inputs a number of values that is larger
                 // than the buffer to flush automatically, then it will empty all its voles
-                // and started requesting a svole extension in the other thread, but
+                // and start requesting a svole extension in the other thread, but
                 // the verifier does not receive the values because it's not flushed,
                 // hence it is a deadlock.
                 channel.flush()?;
-                debug!("SLEEP! VoleInterface {:?}", X::default());
+                debug!("SLEEP! VoleInterface {:?}", T::default());
                 // exponential backoff sleep
                 std::thread::sleep(std::time::Duration::from_millis(sleep_time));
                 sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
@@ -119,15 +126,15 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         Ok(())
     }
 
-    fn delta(&self) -> Option<X> {
+    fn delta(&self, _ev: swanky_party::IsParty<P, Verifier>) -> T {
         while (*self.delta.lock().unwrap()).is_none() {
             warn!(
                 "Waiting for DELTA: {:?}",
-                std::any::type_name::<X>().split("::").last().unwrap()
+                std::any::type_name::<T>().split("::").last().unwrap()
             );
             std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
         }
-        Some((*self.delta.lock().unwrap()).unwrap())
+        (*self.delta.lock().unwrap()).unwrap()
     }
 }
 
