@@ -1,9 +1,8 @@
 use clap::{Arg, Command};
 use core::fmt::Debug;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
-use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
+use diet_mac_and_cheese::svole_trait::Svole;
 use eyre::Result;
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -26,6 +25,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
 use swanky_field_binary::{F40b, F2};
+use swanky_party::Verifier;
 use tungstenite::accept;
 use tungstenite::Message;
 use web_mac_n_cheese_websocket::channel_websocket::WsChannel;
@@ -77,8 +77,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let rng = AesRng::new();
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-        Party::Verifier,
+    let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
         &mut channel,
         rng,
         inputs,
