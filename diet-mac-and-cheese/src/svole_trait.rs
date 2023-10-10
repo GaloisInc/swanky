@@ -12,13 +12,15 @@ use std::{
     cell::{RefCell, RefMut},
     rc::Rc,
 };
+use swanky_party::either::PartyEither;
+use swanky_party::{IsParty, Party, Verifier, WhichParty};
 
 /// Svole trait.
 ///
 /// The same trait is used for both the sender and the receiver.
 /// The trait is parametric over a type `M`. Typically `M` is pair value/tag `(V,T)`
 /// for a sender and tag `T` for a receiver.
-pub trait SvoleT<M>: SvoleStopSignal {
+pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     /// Initialize function.
     fn init<C: AbstractChannel>(
         channel: &mut C,
@@ -34,15 +36,14 @@ pub trait SvoleT<M>: SvoleStopSignal {
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        out: &mut Vec<M>,
+        out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()>;
 
     /// Duplicate the functionality.
     fn duplicate(&self) -> Self;
 
     /// Return the delta as a receiver.
-    /// This function returns None as a sender.
-    fn delta(&self) -> Option<M>;
+    fn delta(&self, ev: IsParty<P, Verifier>) -> T;
 }
 
 /// This trait provides an interface function for sending stop signals.
