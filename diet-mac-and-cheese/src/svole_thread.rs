@@ -6,9 +6,11 @@ use log::{debug, info, warn};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
-use std::marker::PhantomData;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use swanky_party::either::PartyEither;
+use swanky_party::{Party, Verifier, WhichParty};
 
 const SLEEP_TIME: u64 = 1;
 const SLEEP_TIME_MAX: u64 = 100;
@@ -21,20 +23,20 @@ const VOLE_VEC_NUM: usize = 3;
 ///
 /// An Svole functionality can use this structure to store the generated correlations.
 /// The stored correlations can be read by a consumer in a synchronized way.
-pub struct SvoleAtomic<X: Copy> {
-    voles: Vec<Arc<Mutex<Vec<X>>>>,
+pub struct SvoleAtomic<P: Party, V, T: Copy> {
+    voles: Vec<Arc<Mutex<PartyEither<P, Vec<(V, T)>, Vec<T>>>>>,
     last_done: Arc<Mutex<usize>>,
     next_todo: Arc<Mutex<usize>>,
     stop_signal: Arc<Mutex<bool>>,
-    delta: Arc<Mutex<Option<X>>>,
+    delta: Arc<Mutex<Option<T>>>,
 }
 
-impl<X: Copy + Default> SvoleAtomic<X> {
+impl<P: Party, V, T: Copy + Default> SvoleAtomic<P, V, T> {
     pub fn create() -> Self {
         assert!(VOLE_VEC_NUM_MIN <= VOLE_VEC_NUM_MIN);
         let mut v = vec![];
         for _ in 0..VOLE_VEC_NUM {
-            v.push(Arc::new(Mutex::new(vec![])));
+            v.push(Arc::new(Mutex::new(PartyEither::default())));
         }
         Self {
             voles: v,
@@ -45,19 +47,19 @@ impl<X: Copy + Default> SvoleAtomic<X> {
         }
     }
 
-    pub fn set_delta(&mut self, delta: X) {
+    pub fn set_delta(&mut self, delta: T) {
         *self.delta.lock().unwrap() = Some(delta);
     }
 }
 
-impl<X: Copy + Default + std::fmt::Debug> SvoleStopSignal for SvoleAtomic<X> {
+impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomic<P, V, T> {
     fn send_stop_signal(&mut self) -> Result<()> {
         *self.stop_signal.lock().unwrap() = true;
         Ok(())
     }
 }
 
-impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
+impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, V, T> {
     fn init<C: AbstractChannel>(
         _channel: &mut C,
         _rng: &mut AesRng,
@@ -85,7 +87,7 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         &mut self,
         channel: &mut C,
         _rng: &mut AesRng,
-        out: &mut Vec<X>,
+        out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
         let mut sleep_time = SLEEP_TIME;
         loop {
@@ -95,21 +97,26 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
             let candidate = (last_done + 1) % VOLE_VEC_NUM;
             if candidate != next_todo {
                 let _start = Instant::now();
-                out.append(&mut *self.voles[candidate].lock().unwrap());
-                debug!("COPY<time:{:?} >", _start.elapsed(),);
+                out.as_mut()
+                    .zip(self.voles[candidate].lock().unwrap().as_mut())
+                    .map(
+                        |(out, candidate)| out.append(candidate),
+                        |(out, candidate)| out.append(candidate),
+                    );
+                debug!("COPY<time:{:?} >", _start.elapsed());
                 // No need to clear because append() already takes care of it, otherwise
                 // self.voles[candidate].lock().unwrap().clear();
                 *self.last_done.lock().unwrap() = candidate;
                 break;
             } else {
                 // WARNING!!!! This flush is very important to avoid deadlock!!!!!
-                // For example, if the prover input a number of values that is larger
+                // For example, if the prover inputs a number of values that is larger
                 // than the buffer to flush automatically, then it will empty all its voles
-                // and started requesting a svole extension in the other thread, but
+                // and start requesting a svole extension in the other thread, but
                 // the verifier does not receive the values because it's not flushed,
                 // hence it is a deadlock.
                 channel.flush()?;
-                debug!("SLEEP! VoleInterface {:?}", X::default());
+                debug!("SLEEP! VoleInterface {:?}", T::default());
                 // exponential backoff sleep
                 std::thread::sleep(std::time::Duration::from_millis(sleep_time));
                 sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
@@ -119,123 +126,69 @@ impl<X: Copy + Default + std::fmt::Debug> SvoleT<X> for SvoleAtomic<X> {
         Ok(())
     }
 
-    fn delta(&self) -> Option<X> {
+    fn delta(&self, _ev: swanky_party::IsParty<P, Verifier>) -> T {
         while (*self.delta.lock().unwrap()).is_none() {
             warn!(
                 "Waiting for DELTA: {:?}",
-                std::any::type_name::<X>().split("::").last().unwrap()
+                std::any::type_name::<T>().split("::").last().unwrap()
             );
             std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
         }
-        Some((*self.delta.lock().unwrap()).unwrap())
+        (*self.delta.lock().unwrap()).unwrap()
     }
 }
 
-/// Svole Sender intended to be run in a separate thread.
-pub struct ThreadSender<V: IsSubFieldOf<T>, T: FiniteField> {
-    vole_sender: Sender<T>,
-    svole_atomic: SvoleAtomic<(V, T)>,
+/// Svole intended to be run in a separate thread.
+pub struct ThreadSvole<P: Party, V, T: FiniteField> {
+    vole_comm: PartyEither<P, Sender<T>, Receiver<T>>,
+    svole_atomic: SvoleAtomic<P, V, T>,
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadSender<V, T> {
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     /// Initialize the functionality.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
-        mut svole_atomic: SvoleAtomic<(V, T)>,
+        mut svole_atomic: SvoleAtomic<P, V, T>,
     ) -> Result<Self> {
-        let sender = Sender::init(channel, rng, lpn_setup, lpn_extend)?;
-        svole_atomic.set_delta((V::default(), T::default())); // we dont really care what it is set with for the prover.
-        debug!("INIT  MultithreadedSender");
-        Ok(Self {
-            vole_sender: sender,
-            svole_atomic,
-        })
-    }
-
-    /// Run the functionality.
-    pub fn run<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<()>
-    where
-        <T as FiniteField>::PrimeField: IsSubFieldOf<V>, // Not sure why rustc cannot figure that one...
-    {
-        let mut sleep_time = SLEEP_TIME;
-        loop {
-            let last_done = *self.svole_atomic.last_done.lock().unwrap();
-            let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
-
-            // We stop when the all the svole vectors are full, to avoid concurrency issue.
-            // In particular if one side decide to fill up a svole while the other has received a
-            // stop signal
-            if *self.svole_atomic.stop_signal.lock().unwrap() && next_todo == last_done {
-                info!("Stop running svole functionality for {}", field_name::<T>());
-                break;
+        let vole_comm = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                PartyEither::prover_new(ev, Sender::init(channel, rng, lpn_setup, lpn_extend)?)
             }
+            WhichParty::Verifier(ev) => {
+                PartyEither::verifier_new(ev, Receiver::init(channel, rng, lpn_setup, lpn_extend)?)
+            }
+        };
 
-            if next_todo != last_done {
-                debug!("multithread prover extend");
-                self.vole_sender.send(
-                    channel,
-                    rng,
-                    &mut *self.svole_atomic.voles[next_todo].lock().unwrap(),
-                )?;
-                debug!("DONE multithread prover extend");
-                *self.svole_atomic.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
-                sleep_time = SLEEP_TIME; // reset sleep time
-            } else {
-                debug!(
-                    "SLEEP! multithreaded sender: {:?}",
-                    std::any::type_name::<T>()
-                );
-                // exponential backoff sleep
-                std::thread::sleep(std::time::Duration::from_millis(sleep_time));
-                sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
+        match P::WHICH {
+            WhichParty::Prover(_) => debug!("INIT MultithreadedSender"),
+            WhichParty::Verifier(ev) => {
+                svole_atomic.set_delta(vole_comm.as_ref().verifier_into(ev).delta());
+                debug!("DELTA is {:?}", svole_atomic.delta(ev));
+                debug!("INIT MultithreadedReceiver");
             }
         }
-        Ok(())
-    }
-}
 
-/// Svole Receiver intended to be run in a separate thread.
-pub struct ThreadReceiver<V: IsSubFieldOf<T>, T: FiniteField> {
-    vole_receiver: Receiver<T>,
-    svole_atomic: SvoleAtomic<T>,
-    phantom: PhantomData<V>,
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
-    /// Initialize the functionality.
-    pub fn init<C: AbstractChannel>(
-        channel: &mut C,
-        rng: &mut AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-        mut svole_atomic: SvoleAtomic<T>,
-    ) -> Result<Self> {
-        let recv = Receiver::init(channel, rng, lpn_setup, lpn_extend)?;
-        svole_atomic.set_delta(recv.delta());
-        debug!("DELTA is {:?}", svole_atomic.delta());
-        debug!("INIT  MultithreadedReceiver");
         Ok(Self {
-            vole_receiver: recv,
+            vole_comm,
             svole_atomic,
-            phantom: PhantomData,
         })
     }
 
     /// Run the functionality.
     pub fn run<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<()>
     where
-        <T as FiniteField>::PrimeField: IsSubFieldOf<V>, // Not sure why rustc cannot figure that one...
+        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
         let mut sleep_time = SLEEP_TIME;
         loop {
             let last_done = *self.svole_atomic.last_done.lock().unwrap();
             let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
 
-            // We stop when the all the svole vectors are full, to avoid concurrency issue.
-            // In particular if one side decide to fill up a svole while the other has received a
+            // We stop when all the svole vectors are full to avoid concurrency issues.
+            // In particular if one side decides to fill up an svole while the other has received a
             // stop signal
             if *self.svole_atomic.stop_signal.lock().unwrap() && next_todo == last_done {
                 info!("Stop running svole functionality for {}", field_name::<T>());
@@ -243,25 +196,47 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> ThreadReceiver<V, T> {
             }
 
             if next_todo != last_done {
-                debug!("multithread verifier extend");
-                debug!("RUN DELTA is {:?}", self.svole_atomic.delta());
-                let start = Instant::now();
-                self.vole_receiver.receive::<_, V>(
-                    channel,
-                    rng,
-                    &mut *self.svole_atomic.voles[next_todo].lock().unwrap(),
-                )?;
-                info!(
-                    "SVOLE<{} {:?}>",
-                    std::any::type_name::<T>().split("::").last().unwrap(),
-                    start.elapsed(),
-                );
-                debug!("DONE multithread verifier extend");
+                match P::WHICH {
+                    WhichParty::Prover(ev) => {
+                        debug!("multithread prover extend");
+                        self.vole_comm.as_mut().prover_into(ev).send(
+                            channel,
+                            rng,
+                            self.svole_atomic.voles[next_todo]
+                                .lock()
+                                .unwrap()
+                                .as_mut()
+                                .prover_into(ev),
+                        )?;
+                        debug!("DONE multithread prover extend");
+                    }
+                    WhichParty::Verifier(ev) => {
+                        debug!("multithread verifier extend");
+                        debug!("RUN DELTA is {:?}", self.svole_atomic.delta(ev));
+                        let start = Instant::now();
+                        self.vole_comm.as_mut().verifier_into(ev).receive::<_, V>(
+                            channel,
+                            rng,
+                            self.svole_atomic.voles[next_todo]
+                                .lock()
+                                .unwrap()
+                                .as_mut()
+                                .verifier_into(ev),
+                        )?;
+                        info!(
+                            "SVOLE<{} {:?}>",
+                            std::any::type_name::<T>().split("::").last().unwrap(),
+                            start.elapsed(),
+                        );
+                        debug!("DONE multithread verifier extend");
+                    }
+                }
+
                 *self.svole_atomic.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
                 sleep_time = SLEEP_TIME; // reset sleep time
             } else {
                 debug!(
-                    "SLEEP! multithreaded receiver:{:?}",
+                    "SLEEP! multithreaded svole: {:?}",
                     std::any::type_name::<T>()
                 );
                 // exponential backoff sleep
@@ -284,8 +259,10 @@ mod test {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_party::either::PartyEither;
+    use swanky_party::{Verifier, IS_VERIFIER};
 
-    fn produce(s: &SvoleAtomic<u32>) {
+    fn produce(s: &SvoleAtomic<Verifier, u32, u32>) {
         loop {
             if *s.stop_signal.lock().unwrap() {
                 break;
@@ -294,7 +271,8 @@ mod test {
             let next_todo = *s.next_todo.lock().unwrap();
 
             if next_todo != last_done {
-                *s.voles[next_todo].lock().unwrap() = vec![42, 43];
+                *s.voles[next_todo].lock().unwrap() =
+                    PartyEither::verifier_new(IS_VERIFIER, vec![42, 43]);
                 *s.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
                 break;
             } else {
@@ -307,7 +285,7 @@ mod test {
     fn test_svole_atomic_concurrency() {
         // generate some random sequence of produce and consume, and test if it reaches the end without
         // a deadlock
-        let t1 = SvoleAtomic::<u32>::create();
+        let t1 = SvoleAtomic::<Verifier, u32, u32>::create();
         let mut t2 = t1.duplicate();
 
         let how_many = 200;
@@ -326,11 +304,12 @@ mod test {
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let mut out = vec![];
+        let mut out = PartyEither::verifier_new(IS_VERIFIER, vec![]);
         for _ in 0..how_many {
             let mut other_rng = rand::thread_rng();
             let random_millis = other_rng.gen_range(0..=SLEEP_TIME);
-            t2.extend::<_>(&mut channel, &mut rng, &mut out).unwrap();
+            t2.extend(&mut channel, &mut rng, &mut out.as_mut())
+                .unwrap();
             std::thread::sleep(std::time::Duration::from_millis(random_millis));
             println!("CONS2");
         }

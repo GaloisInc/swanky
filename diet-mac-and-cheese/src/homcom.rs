@@ -13,7 +13,7 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use swanky_party::either::PartyEither;
-use swanky_party::private::{ProverPrivateCopy, VerifierPrivateCopy};
+use swanky_party::private::{ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy};
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
 pub struct MultCheckState<P: Party, T: Copy> {
@@ -71,7 +71,8 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let a0 = x.mac() * y.mac();
-                let a1 = y.value(ev) * x.mac() + x.value(ev) * y.mac() - z.mac();
+                let a1 = y.value().into_inner(ev) * x.mac() + x.value().into_inner(ev) * y.mac()
+                    - z.mac();
 
                 *self.sum_a0.as_mut().into_inner(ev) += a0 * self.chi_power;
                 *self.sum_a1.as_mut().into_inner(ev) += a1 * self.chi_power;
@@ -95,7 +96,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 let u = self.sum_a0.into_inner(ev) + mask.mac();
-                let v = self.sum_a1.into_inner(ev) + mask.value(ev);
+                let v = self.sum_a1.into_inner(ev) + mask.value().into_inner(ev);
 
                 channel.write_serializable(&u)?;
                 channel.write_serializable(&v)?;
@@ -196,7 +197,7 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
             WhichParty::Prover(ev) => {
                 self.key_chi += chi * mac.mac();
 
-                let b = mac.value(ev) == V::ZERO;
+                let b = mac.value().into_inner(ev) == V::ZERO;
                 if !b {
                     warn!("accumulating a value that's not zero");
                 }
@@ -238,19 +239,13 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
 }
 
 /// Homomorphic commitment scheme.
-pub struct FCom<P: Party, V, T: Copy, SvoleSender, SvoleReceiver> {
+pub struct FCom<P: Party, V: Copy, T: Copy, SVOLE: SvoleT<P, V, T>> {
     delta: VerifierPrivateCopy<P, T>,
-    svole: PartyEither<P, SvoleSender, SvoleReceiver>,
+    svole: SVOLE,
     voles: PartyEither<P, Vec<(V, T)>, Vec<T>>,
 }
 
-impl<
-        P: Party,
-        V: IsSubFieldOf<T>,
-        T: FiniteField,
-        SvoleSender: SvoleT<(V, T)>,
-        SvoleReceiver: SvoleT<T>,
-    > FCom<P, V, T, SvoleSender, SvoleReceiver>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, SVOLE: SvoleT<P, V, T>> FCom<P, V, T, SVOLE>
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -263,19 +258,13 @@ where
     ) -> Result<Self> {
         let (svole, delta) = match P::WHICH {
             WhichParty::Prover(ev) => {
-                let svole = SvoleSender::init(channel, rng, lpn_setup, lpn_extend)?;
-                (
-                    PartyEither::prover_new(ev, svole),
-                    VerifierPrivateCopy::empty(ev),
-                )
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+                (svole, VerifierPrivateCopy::empty(ev))
             }
             WhichParty::Verifier(ev) => {
-                let svole = SvoleReceiver::init(channel, rng, lpn_setup, lpn_extend)?;
-                let delta = svole.delta().unwrap();
-                (
-                    PartyEither::verifier_new(ev, svole),
-                    VerifierPrivateCopy::new(delta),
-                )
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+                let delta = svole.delta(ev);
+                (svole, VerifierPrivateCopy::new(delta))
             }
         };
 
@@ -286,18 +275,13 @@ where
         })
     }
 
-    pub fn init_prover_with_vole(ev: IsParty<P, Prover>, svole: SvoleSender) -> Result<Self> {
+    pub fn init_with_vole(svole: SVOLE) -> Result<Self> {
         Ok(Self {
-            delta: VerifierPrivateCopy::empty(ev),
-            svole: PartyEither::prover_new(ev, svole),
-            voles: PartyEither::default(),
-        })
-    }
-
-    pub fn init_verifier_with_vole(ev: IsParty<P, Verifier>, svole: SvoleReceiver) -> Result<Self> {
-        Ok(Self {
-            delta: VerifierPrivateCopy::new(svole.delta().unwrap()),
-            svole: PartyEither::verifier_new(ev, svole),
+            delta: match P::WHICH {
+                WhichParty::Prover(ev) => VerifierPrivateCopy::empty(ev),
+                WhichParty::Verifier(ev) => VerifierPrivateCopy::new(svole.delta(ev)),
+            },
+            svole,
             voles: PartyEither::default(),
         })
     }
@@ -306,10 +290,7 @@ where
     pub fn duplicate(&self) -> Result<Self> {
         Ok(Self {
             delta: self.delta,
-            svole: self
-                .svole
-                .as_ref()
-                .map(|svole| svole.duplicate(), |svole| svole.duplicate()),
+            svole: self.svole.duplicate(),
             voles: PartyEither::default(),
         })
     }
@@ -330,11 +311,7 @@ where
             WhichParty::Prover(ev) => match self.voles.as_mut().prover_into(ev).pop() {
                 Some(e) => return Ok(Mac::new(ProverPrivateCopy::new(e.0), e.1)),
                 None => {
-                    self.svole.as_mut().prover_into(ev).extend(
-                        channel,
-                        rng,
-                        self.voles.as_mut().prover_into(ev),
-                    )?;
+                    self.svole.extend(channel, rng, &mut self.voles.as_mut())?;
 
                     assert_ne!(
                         self.voles.as_ref().prover_into(ev).len(),
@@ -346,11 +323,7 @@ where
             WhichParty::Verifier(ev) => match self.voles.as_mut().verifier_into(ev).pop() {
                 Some(e) => return Ok(Mac::new(ProverPrivateCopy::empty(ev), e)),
                 None => {
-                    self.svole.as_mut().verifier_into(ev).extend(
-                        channel,
-                        rng,
-                        self.voles.as_mut().verifier_into(ev),
-                    )?;
+                    self.svole.extend(channel, rng, &mut self.voles.as_mut())?;
 
                     assert_ne!(
                         self.voles.as_ref().verifier_into(ev).len(),
@@ -437,7 +410,7 @@ where
     ) -> Result<T> {
         debug!("input1");
         let r = self.random(channel, rng)?;
-        let y = x - r.value(ev);
+        let y = x - r.value().into_inner(ev);
         channel.write_serializable(&y)?;
         Ok(r.mac())
     }
@@ -462,7 +435,10 @@ where
     #[inline]
     pub fn affine_add_cst(&self, cst: V, x: Mac<P, V, T>) -> Mac<P, V, T> {
         match P::WHICH {
-            WhichParty::Prover(ev) => Mac::new(ProverPrivateCopy::new(cst + x.value(ev)), x.mac()),
+            WhichParty::Prover(ev) => Mac::new(
+                ProverPrivateCopy::new(cst + x.value().into_inner(ev)),
+                x.mac(),
+            ),
             WhichParty::Verifier(ev) => Mac::new(
                 ProverPrivateCopy::empty(ev),
                 x.mac() - cst * self.delta.into_inner(ev),
@@ -520,7 +496,7 @@ where
                 for mac in mac_batch.iter() {
                     let chi = T::random(&mut rng);
                     m += chi * mac.mac();
-                    b &= mac.value(ev) == V::ZERO;
+                    b &= mac.value().into_inner(ev) == V::ZERO;
                 }
                 channel.write_serializable::<T>(&m)?;
                 channel.flush()?;
@@ -548,7 +524,7 @@ where
         &mut self,
         channel: &mut C,
         batch: &[Mac<P, V, T>],
-        out: &mut Vec<V>,
+        out: &mut VerifierPrivate<P, &mut Vec<V>>,
     ) -> Result<()> {
         debug!("open");
         let mut hasher = blake3::Hasher::new();
@@ -556,15 +532,15 @@ where
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 for mac in batch.iter() {
-                    channel.write_serializable::<V>(&mac.value(ev))?;
-                    hasher.update(&mac.value(ev).to_bytes());
+                    channel.write_serializable::<V>(&mac.value().into_inner(ev))?;
+                    hasher.update(&mac.value().into_inner(ev).to_bytes());
                 }
             }
-            WhichParty::Verifier(_) => {
-                out.clear();
+            WhichParty::Verifier(ev) => {
+                out.as_mut().into_inner(ev).clear();
                 for _ in 0..batch.len() {
                     let x = channel.read_serializable::<V>()?;
-                    out.push(x);
+                    out.as_mut().into_inner(ev).push(x);
                     hasher.update(&x.to_bytes());
                 }
             }
@@ -592,11 +568,11 @@ where
                     let chi = T::random(&mut rng);
 
                     key_chi += chi * batch[i].mac();
-                    x_chi += out[i] * chi;
+                    x_chi += out.as_ref().into_inner(ev)[i] * chi;
                 }
                 let m = channel.read_serializable::<T>()?;
 
-                assert_eq!(out.len(), batch.len());
+                assert_eq!(out.as_ref().into_inner(ev).len(), batch.len());
                 if key_chi + self.delta.into_inner(ev) * x_chi == m {
                     Ok(())
                 } else {
@@ -642,7 +618,7 @@ where
                 let mask = Mac::lift(&us);
 
                 let u = sum_a0 + mask.mac();
-                let v = sum_a1 + mask.value(ev);
+                let v = sum_a1 + mask.value().into_inner(ev);
 
                 channel.write_serializable(&u)?;
                 channel.write_serializable(&v)?;
@@ -708,8 +684,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{FCom, Mac};
-    use crate::svole_thread::{SvoleAtomic, ThreadReceiver, ThreadSender};
-    use crate::svole_trait::{SvoleReceiver, SvoleSender, SvoleT};
+    use crate::svole_thread::{SvoleAtomic, ThreadSvole};
+    use crate::svole_trait::{Svole, SvoleT};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{
@@ -720,7 +696,7 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
-    use swanky_party::private::ProverPrivateCopy;
+    use swanky_party::private::{ProverPrivateCopy, VerifierPrivate};
     use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
     fn test_fcom_random<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -734,7 +710,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -746,14 +722,15 @@ mod tests {
             for _ in 0..count {
                 v.push(fcom.random(&mut channel, &mut rng).unwrap());
             }
-            fcom.open(&mut channel, &v, &mut vec![]).unwrap();
+            fcom.open(&mut channel, &v, &mut VerifierPrivate::empty(IS_PROVER))
+                .unwrap();
             v
         });
         let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -765,13 +742,16 @@ mod tests {
             v.push(fcom.random(&mut channel, &mut rng).unwrap());
         }
 
-        let mut r = Vec::new();
-        fcom.open(&mut channel, &v, &mut r).unwrap();
+        let mut r = VerifierPrivate::new(Vec::new());
+        fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
 
         let resprover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], resprover[i].value(IS_PROVER));
+            assert_eq!(
+                r.as_ref().into_inner(IS_VERIFIER)[i],
+                resprover[i].value().into_inner(IS_PROVER)
+            );
         }
     }
 
@@ -786,7 +766,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -805,14 +785,15 @@ mod tests {
                 let a = fcom.affine_add_cst(cst, x);
                 v.push(a);
             }
-            fcom.open(&mut channel, &v, &mut vec![]).unwrap();
+            fcom.open(&mut channel, &v, &mut VerifierPrivate::empty(IS_PROVER))
+                .unwrap();
             v
         });
         let mut rng = AesRng::from_seed(Default::default());
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -830,13 +811,16 @@ mod tests {
             v.push(a_mac);
         }
 
-        let mut r = Vec::new();
-        fcom.open(&mut channel, &v, &mut r).unwrap();
+        let mut r = VerifierPrivate::new(Vec::new());
+        fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
 
         let batch_prover = handle.join().unwrap();
 
         for i in 0..count {
-            assert_eq!(r[i], batch_prover[i].value(IS_PROVER));
+            assert_eq!(
+                r.as_ref().into_inner(IS_VERIFIER)[i],
+                batch_prover[i].value().into_inner(IS_PROVER)
+            );
         }
     }
 
@@ -851,7 +835,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -863,7 +847,7 @@ mod tests {
             for _ in 0..count {
                 let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value(IS_PROVER) * y.value(IS_PROVER);
+                let z = x.value().into_inner(IS_PROVER) * y.value().into_inner(IS_PROVER);
                 let z_mac = fcom
                     .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
                     .unwrap()[0];
@@ -878,7 +862,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<_, _, _, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<_, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -912,7 +896,7 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -954,7 +938,7 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, SvoleSender<T>, SvoleReceiver<V, T>>::init(
+        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
@@ -1005,11 +989,11 @@ mod tests {
             let writer = BufWriter::new(sender_vole);
             let mut channel_vole = SyncChannel::new(reader, writer);
 
-            let svole_atomic = SvoleAtomic::<(V, T)>::create();
+            let svole_atomic = SvoleAtomic::<Prover, V, T>::create();
             let svole_atomic2 = svole_atomic.duplicate();
 
             let _svole_thread = std::thread::spawn(move || {
-                let mut svole_prover = ThreadSender::<V, T>::init(
+                let mut svole_prover = ThreadSvole::init(
                     &mut channel_vole,
                     &mut rng,
                     LPN_SETUP_SMALL,
@@ -1026,17 +1010,13 @@ mod tests {
             let mut channel = Channel::new(reader, writer);
 
             let mut fcom =
-                FCom::<Prover, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_prover_with_vole(
-                    IS_PROVER,
-                    svole_atomic,
-                )
-                .unwrap();
+                FCom::<Prover, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic).unwrap();
 
             let mut v = Vec::new();
             for _ in 0..count {
                 let x = fcom.random(&mut channel, &mut rng).unwrap();
                 let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value(IS_PROVER) * y.value(IS_PROVER);
+                let z = x.value().into_inner(IS_PROVER) * y.value().into_inner(IS_PROVER);
                 let z_mac = fcom
                     .input_prover(IS_PROVER, &mut channel, &mut rng, &[z])
                     .unwrap()[0];
@@ -1052,11 +1032,11 @@ mod tests {
         let writer = BufWriter::new(receiver_vole);
         let mut channel_vole = SyncChannel::new(reader, writer);
 
-        let svole_atomic = SvoleAtomic::<T>::create();
+        let svole_atomic = SvoleAtomic::create();
         let svole_atomic2 = svole_atomic.duplicate();
 
         let _svole_thread = std::thread::spawn(move || {
-            let mut svole_receiver = ThreadReceiver::<V, T>::init(
+            let mut svole_receiver = ThreadSvole::init(
                 &mut channel_vole,
                 &mut rng,
                 LPN_SETUP_SMALL,
@@ -1073,11 +1053,7 @@ mod tests {
         let mut channel = Channel::new(reader, writer);
 
         let mut fcom =
-            FCom::<Verifier, V, T, SvoleAtomic<(V, T)>, SvoleAtomic<T>>::init_verifier_with_vole(
-                IS_VERIFIER,
-                svole_atomic,
-            )
-            .unwrap();
+            FCom::<Verifier, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic).unwrap();
 
         let mut v = Vec::new();
         for _ in 0..count {

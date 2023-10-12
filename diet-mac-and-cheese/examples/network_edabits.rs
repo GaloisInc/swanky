@@ -1,6 +1,6 @@
 use clap::{Arg, ArgAction, Command};
-use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
-use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
+use diet_mac_and_cheese::edabits::Conv;
+use diet_mac_and_cheese::svole_trait::Svole;
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{field::F61p, AesRng, SyncChannel, TrackChannel};
 use std::fs;
@@ -10,21 +10,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::time::Instant;
 use swanky_field_binary::{F40b, F2};
-
-type Prover = ProverConv<
-    F61p,
-    SvoleSender<F40b>,
-    SvoleReceiver<F2, F40b>,
-    SvoleSender<F61p>,
-    SvoleReceiver<F61p, F61p>,
->;
-type Verifier = VerifierConv<
-    F61p,
-    SvoleSender<F40b>,
-    SvoleReceiver<F2, F40b>,
-    SvoleSender<F61p>,
-    SvoleReceiver<F61p, F61p>,
->;
+use swanky_party::{Prover, Verifier};
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NB_BITS: &str = "38";
@@ -102,9 +88,13 @@ fn run(
                 let mut rng = AesRng::new();
 
                 let start = Instant::now();
-                let mut fconv =
-                    Verifier::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM)
-                        .unwrap();
+                let mut fconv = Conv::<Verifier, F61p, Svole<_, F2, F40b>, Svole<_, _, _>>::init(
+                    &mut channel,
+                    &mut rng,
+                    LPN_SETUP_MEDIUM,
+                    LPN_EXTEND_MEDIUM,
+                )
+                .unwrap();
                 let end = start.elapsed();
                 println!("Verifier time (init): {:?}", end);
                 file.write_all(format!("init={:?}, ", end).as_bytes())?;
@@ -210,8 +200,13 @@ fn run(
 
         let mut rng = AesRng::new();
         let start = Instant::now();
-        let mut fconv =
-            Prover::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
+        let mut fconv = Conv::<Prover, F61p, Svole<_, F2, F40b>, Svole<_, _, _>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_MEDIUM,
+            LPN_EXTEND_MEDIUM,
+        )
+        .unwrap();
         println!("Prover time (init): {:?}", start.elapsed());
 
         let start = Instant::now();

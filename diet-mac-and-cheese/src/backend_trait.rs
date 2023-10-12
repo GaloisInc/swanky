@@ -5,23 +5,15 @@ use mac_n_cheese_sieve_parser::Number;
 use std::any::type_name;
 use std::fmt::Debug;
 use swanky_field::{FiniteField, PrimeFiniteField};
-
-/// A type indicating whether a party is a prover or a verifier.
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Party {
-    Prover,
-    Verifier,
-}
+use swanky_party::Party;
 
 /// An interface for computing a proof over a single [`FiniteField`].
-pub trait BackendT {
+pub trait BackendT<P: Party> {
     /// The type associated with the input and output wires of the gates.
     type Wire: Default + Clone + Copy + Debug;
     /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 
-    /// Return the [`Party`]
-    fn party(&self) -> Party;
     /// Return the value from a wire when it is a prover.
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement>;
     /// Return [`Self::FieldElement::ONE`].
@@ -52,14 +44,14 @@ pub trait BackendT {
 
 /// Backends that admit a conversion from [`Number`] to the underlying field
 /// element type.
-pub trait PrimeBackendT: BackendT {
+pub trait PrimeBackendT<P: Party>: BackendT<P> {
     /// Try to convert a [`Number`] to a `Self::FieldElement`.
     fn from_number(val: &Number) -> Result<Self::FieldElement>;
 }
 
 /// Blanket implementation of `PrimeBackendT` for all types whose `FieldElement`
 /// is a `PrimeFiniteField`.
-impl<T: BackendT> PrimeBackendT for T
+impl<P: Party, T: BackendT<P>> PrimeBackendT<P> for T
 where
     T::FieldElement: PrimeFiniteField,
 {

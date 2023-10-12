@@ -1,24 +1,10 @@
-use diet_mac_and_cheese::edabits::{ProverConv, VerifierConv};
-use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
+use diet_mac_and_cheese::edabits::Conv;
+use diet_mac_and_cheese::svole_trait::Svole;
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{channel::track_unix_channel_pair, field::F61p, AesRng};
 use std::time::Instant;
 use swanky_field_binary::{F40b, F2};
-
-type Prover = ProverConv<
-    F61p,
-    SvoleSender<F40b>,
-    SvoleReceiver<F2, F40b>,
-    SvoleSender<F61p>,
-    SvoleReceiver<F61p, F61p>,
->;
-type Verifier = VerifierConv<
-    F61p,
-    SvoleSender<F40b>,
-    SvoleReceiver<F2, F40b>,
-    SvoleSender<F61p>,
-    SvoleReceiver<F61p, F61p>,
->;
+use swanky_party::{Prover, Verifier};
 
 fn run() {
     let (mut sender, mut receiver) = track_unix_channel_pair();
@@ -35,8 +21,13 @@ fn run() {
         }
         let mut rng = AesRng::new();
         let start = Instant::now();
-        let mut fconv_sender =
-            Prover::init(&mut sender, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
+        let mut fconv_sender = Conv::<Prover, F61p, Svole<_, F2, F40b>, Svole<_, _, _>>::init(
+            &mut sender,
+            &mut rng,
+            LPN_SETUP_MEDIUM,
+            LPN_EXTEND_MEDIUM,
+        )
+        .unwrap();
         println!("Send time (init): {:?}", start.elapsed());
         let start = Instant::now();
         let edabits = fconv_sender
@@ -57,8 +48,13 @@ fn run() {
     }
     let mut rng = AesRng::new();
     let start = Instant::now();
-    let mut fconv_receiver =
-        Verifier::init(&mut receiver, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
+    let mut fconv_receiver = Conv::<Verifier, F61p, Svole<_, F2, F40b>, Svole<_, _, _>>::init(
+        &mut receiver,
+        &mut rng,
+        LPN_SETUP_MEDIUM,
+        LPN_EXTEND_MEDIUM,
+    )
+    .unwrap();
     println!("Receive time (init): {:?}", start.elapsed());
     println!(
         "Send communication (init): {:.2} Mb",

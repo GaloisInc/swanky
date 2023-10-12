@@ -2,11 +2,13 @@ use eyre::Result;
 use scuttlebutt::{field::FiniteField, ring::FiniteRing, AbstractChannel, AesRng};
 use std::iter;
 use swanky_field::IsSubFieldOf;
-use swanky_party::{private::ProverPrivateCopy, Prover, Verifier, IS_PROVER, IS_VERIFIER};
+use swanky_party::{
+    private::{ProverPrivate, ProverPrivateCopy},
+    IsParty, Party, Prover, WhichParty,
+};
 
 use crate::{
-    backend_trait::BackendT, homcom::FCom, mac::Mac, svole_trait::SvoleT, DietMacAndCheeseProver,
-    DietMacAndCheeseVerifier,
+    backend_trait::BackendT, homcom::FCom, mac::Mac, svole_trait::SvoleT, DietMacAndCheese,
 };
 
 use super::{
@@ -16,7 +18,7 @@ use super::{
 };
 
 #[derive(Debug)]
-pub(super) struct CommittedWitness<'a, B: BackendT> {
+pub(super) struct CommittedWitness<'a, P: Party, B: BackendT<P>> {
     disj: &'a Disjunction<B::FieldElement>,
     pub wit: Vec<B::Wire>,
 }
@@ -24,125 +26,104 @@ pub(super) struct CommittedWitness<'a, B: BackendT> {
 // Low-level commit to vector
 // (allows control of the channel for Fiat-Shamir)
 //
-// Idealy there would be a nicer way to do this.
-fn prover_commit_vec<
+// Ideally there would be a nicer way to do this.
+fn commit_vec<
     'a,
+    P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
     C: AbstractChannel,
-    SvoleFSender: SvoleT<(V, F)>,
-    SvoleFReceiver: SvoleT<F>,
+    SvoleF: SvoleT<P, V, F>,
 >(
-    backend: &mut FCom<Prover, V, F, SvoleFSender, SvoleFReceiver>,
+    backend: &mut FCom<P, V, F, SvoleF>,
     channel: &mut C,
     rng: &mut AesRng,
-    sec: impl IntoIterator<Item = V>, // secret values
-    len: usize,                       // padded length
-) -> Result<impl Iterator<Item = Mac<Prover, V, F>>>
+    sec: ProverPrivate<P, impl IntoIterator<Item = V>>, // secret values
+    len: usize,                                         // padded length
+) -> Result<impl Iterator<Item = Mac<P, V, F>>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    // commit to remaining (padded)
-    let mut pad = Vec::with_capacity(len);
-    pad.extend(sec.into_iter().chain(iter::repeat(V::ZERO)).take(len));
+    match P::WHICH {
+        WhichParty::Prover(ev) => {
+            // commit to remaining (padded)
+            let mut pad = Vec::with_capacity(len);
+            pad.extend(
+                sec.into_inner(ev)
+                    .into_iter()
+                    .chain(iter::repeat(V::ZERO))
+                    .take(len),
+            );
 
-    // mac vector
-    let tag = backend.input_prover(IS_PROVER, channel, rng, &pad)?;
+            // mac vector
+            let tag = backend.input_prover(ev, channel, rng, &pad)?;
 
-    // combine
-    Ok(tag
-        .into_iter()
-        .zip(pad.into_iter())
-        .map(|(t, v)| Mac::new(ProverPrivateCopy::new(v), t)))
-}
-
-fn verifier_commit_vec<
-    'a,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel,
-    SvoleFSender: SvoleT<(V, F)>,
-    SvoleFReceiver: SvoleT<F>,
->(
-    backend: &mut FCom<Verifier, V, F, SvoleFSender, SvoleFReceiver>,
-    channel: &mut C,
-    rng: &mut AesRng,
-    len: usize, // padded length
-) -> Result<impl Iterator<Item = Mac<Verifier, V, F>>>
-where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    let inp = backend.input_verifier(IS_VERIFIER, channel, rng, len)?;
-    Ok(inp.into_iter())
-}
-
-impl<
-        'a,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > CommittedWitness<'a, DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>
-where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    pub fn commit_prover<
-        'b,
-        I: Iterator<Item = <DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver> as BackendT>::Wire>,
-    >(
-        channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
-        disj: &'a Disjunction<V>,
-        input: I,
-        witness: &'b ExtendedWitness<V>,
-    ) -> Result<Self>{
-        // commit to witness
-        let out = witness.outputs().copied();
-        let int = witness.intermediate().copied();
-        let free = prover_commit_vec(
-            &mut backend.prover,
-            channel,
-            &mut backend.rng,
-            out.chain(int),
-            disj.dim_output() + disj.dim_intermediate(),
-        )?;
-        Self::from_parts(backend, disj, input, free)
+            // combine
+            Ok(tag
+                .into_iter()
+                .zip(pad.into_iter())
+                .map(|(t, v)| Mac::new(ProverPrivateCopy::new(v), t))
+                .collect::<Vec<_>>()
+                .into_iter())
+        }
+        WhichParty::Verifier(ev) => {
+            let inp = backend.input_verifier(ev, channel, rng, len)?;
+            Ok(inp.into_iter())
+        }
     }
 }
 
 impl<
         'a,
+        P: Party,
         V: IsSubFieldOf<F>,
         F: FiniteField,
         C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > CommittedWitness<'a, DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>>
+        SvoleF: SvoleT<P, V, F>,
+    > CommittedWitness<'a, P, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn commit_verifer<
+    pub fn commit<
         'b,
-        I: Iterator<Item = <DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver> as BackendT>::Wire>,
+        I: Iterator<Item = <DietMacAndCheese<P, V, F, C, SvoleF> as BackendT<P>>::Wire>,
     >(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
+        backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
         input: I,
-    ) -> Result<Self>{
-        // commit to witness
-        let free = verifier_commit_vec(
-            &mut backend.verifier,
+        witness: ProverPrivate<P, &'b ExtendedWitness<V>>,
+    ) -> Result<Self> {
+        let free = commit_vec(
+            &mut backend.fcom,
             channel,
             &mut backend.rng,
+            witness.map(|witness| {
+                witness
+                    .outputs()
+                    .copied()
+                    .chain(witness.intermediate().copied())
+            }),
             disj.dim_output() + disj.dim_intermediate(),
         )?;
         Self::from_parts(backend, disj, input, free)
     }
+
+    pub fn value(&self, ev: IsParty<P, Prover>, clause: &R1CS<V>) -> ExtendedWitness<V> {
+        let mut wit = Vec::with_capacity(clause.dim());
+        debug_assert!(self.wit.len() >= clause.dim());
+        for i in 0..clause.dim() {
+            wit.push(self.wit[i].value().into_inner(ev));
+        }
+        ExtendedWitness {
+            inputs: clause.input,
+            outputs: clause.output,
+            wit,
+        }
+    }
 }
 
-impl<'a, B: BackendT> CommittedWitness<'a, B> {
+impl<'a, P: Party, B: BackendT<P>> CommittedWitness<'a, P, B> {
     fn from_parts(
         backend: &mut B,
         disj: &'a Disjunction<B::FieldElement>,
@@ -151,7 +132,7 @@ impl<'a, B: BackendT> CommittedWitness<'a, B> {
     ) -> Result<Self> {
         // constant
         let mut wit = Vec::with_capacity(disj.dim_ext());
-        wit.push(backend.input_public(<B as BackendT>::FieldElement::ONE)?);
+        wit.push(backend.input_public(<B as BackendT<P>>::FieldElement::ONE)?);
 
         // output
         for _ in 0..disj.outputs() {
@@ -176,157 +157,64 @@ impl<'a, B: BackendT> CommittedWitness<'a, B> {
     }
 }
 
-impl<
-        'a,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > CommittedWitness<'a, DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>
-where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    pub fn value(&self, clause: &R1CS<V>) -> ExtendedWitness<V> {
-        let mut wit = Vec::with_capacity(clause.dim());
-        debug_assert!(self.wit.len() >= clause.dim());
-        for i in 0..clause.dim() {
-            wit.push(self.wit[i].value(IS_PROVER));
-        }
-        ExtendedWitness {
-            inputs: clause.input,
-            outputs: clause.output,
-            wit,
-        }
-    }
-}
-
-pub(super) struct CommittedCrossTerms<B: BackendT> {
+pub(super) struct CommittedCrossTerms<P: Party, B: BackendT<P>> {
     pub terms: Vec<B::Wire>,
 }
 
 impl<
         'a,
+        P: Party,
         V: IsSubFieldOf<F>,
         F: FiniteField,
         C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > CommittedCrossTerms<DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>
+        SvoleF: SvoleT<P, V, F>,
+    > CommittedCrossTerms<P, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn commit_prover<'b>(
+    pub fn commit<'b>(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
+        backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
-        cxt: &CrossTerms<V>,
+        cxt: ProverPrivate<P, &CrossTerms<V>>,
     ) -> Result<Self> {
         let mut terms = Vec::with_capacity(disj.dim_err());
-        terms.extend(prover_commit_vec(
-            &mut backend.prover,
+        terms.extend(commit_vec(
+            &mut backend.fcom,
             channel,
             &mut backend.rng,
-            cxt.terms.iter().copied(),
+            cxt.map(|cxt| cxt.terms.iter().copied()),
             disj.dim_err(),
         )?);
         Ok(Self { terms })
     }
 }
 
-impl<
-        'a,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > CommittedCrossTerms<DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
+    ComittedAcc<P, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn commit_verifier<'b>(
+    pub fn commit<'a>(
         channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
+        backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
+        acc: &ProverPrivate<P, &Accumulator<V>>,
     ) -> Result<Self> {
-        let mut terms = Vec::with_capacity(disj.dim_err());
-        terms.extend(verifier_commit_vec(
-            &mut backend.verifier,
+        let wit = commit_vec(
+            &mut backend.fcom,
             channel,
             &mut backend.rng,
-            disj.dim_err(),
-        )?);
-        Ok(Self { terms })
-    }
-}
-
-impl<
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > ComittedAcc<DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>>
-where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    pub fn commit_prover<'a>(
-        channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseProver<V, F, C, SvoleFSender, SvoleFReceiver>,
-        disj: &'a Disjunction<V>,
-        acc: &Accumulator<V>,
-    ) -> Result<Self> {
-        let wit = prover_commit_vec(
-            &mut backend.prover,
-            channel,
-            &mut backend.rng,
-            acc.wit.iter().copied(),
+            acc.as_ref().map(|acc| acc.wit.iter().copied()),
             disj.dim_ext(),
         )?
         .collect();
 
-        let err = prover_commit_vec(
-            &mut backend.prover,
+        let err = commit_vec(
+            &mut backend.fcom,
             channel,
             &mut backend.rng,
-            acc.err.iter().copied(),
-            disj.dim_err(),
-        )?
-        .collect();
-
-        Ok(Self { wit, err })
-    }
-}
-
-impl<
-        'a,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel,
-        SvoleFSender: SvoleT<(V, F)>,
-        SvoleFReceiver: SvoleT<F>,
-    > ComittedAcc<DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>>
-where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    pub fn commit_verifier<'b>(
-        channel: &mut impl AbstractChannel,
-        backend: &mut DietMacAndCheeseVerifier<V, F, C, SvoleFSender, SvoleFReceiver>,
-        disj: &'a Disjunction<V>,
-    ) -> Result<Self> {
-        let wit = verifier_commit_vec(
-            &mut backend.verifier,
-            channel,
-            &mut backend.rng,
-            disj.dim_ext(),
-        )?
-        .collect();
-
-        let err = verifier_commit_vec(
-            &mut backend.verifier,
-            channel,
-            &mut backend.rng,
+            acc.as_ref().map(|acc| acc.err.iter().copied()),
             disj.dim_err(),
         )?
         .collect();

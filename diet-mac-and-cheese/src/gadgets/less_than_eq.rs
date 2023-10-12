@@ -2,12 +2,13 @@ use crate::backend_trait::BackendT;
 use eyre::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
+use swanky_party::Party;
 
 /// A "less-than-or-equal" gadget for [`F2`].
 ///
 /// This asserts that `a <= b`, where `a` contains MAC'd values, and `b` is
 /// public.
-pub(crate) fn less_than_eq_with_public<B: BackendT<FieldElement = F2>>(
+pub(crate) fn less_than_eq_with_public<P: Party, B: BackendT<P, FieldElement = F2>>(
     backend: &mut B,
     a: &[B::Wire],
     b: &[B::FieldElement],
@@ -70,18 +71,19 @@ mod tests {
     use scuttlebutt::{AesRng, Channel};
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F40b, F2};
+    use swanky_party::{Party, Prover, Verifier};
 
-    use crate::{
-        backend_trait::BackendT,
-        svole_trait::{SvoleReceiver, SvoleSender},
-        DietMacAndCheeseProver, DietMacAndCheeseVerifier,
-    };
+    use crate::{backend_trait::BackendT, svole_trait::Svole, DietMacAndCheese};
 
     use super::less_than_eq_with_public;
 
     #[test]
     fn less_than_eq_with_public_works() {
-        fn run<B: BackendT<FieldElement = F2>>(party: &mut B, zero: B::Wire, one: B::Wire) {
+        fn run<P: Party, B: BackendT<P, FieldElement = F2>>(
+            party: &mut B,
+            zero: B::Wire,
+            one: B::Wire,
+        ) {
             less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
             party.finalize().unwrap();
             less_than_eq_with_public(party, &vec![zero], &vec![F2::ONE]).unwrap();
@@ -145,14 +147,12 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut party = DietMacAndCheeseProver::<
-                F2,
-                F40b,
-                _,
-                SvoleSender<F40b>,
-                SvoleReceiver<F2, F40b>,
-            >::init(
-                &mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false
+            let mut party = DietMacAndCheese::<Prover, F2, F40b, _, Svole<_, _, _>>::init(
+                &mut channel,
+                rng,
+                LPN_SETUP_SMALL,
+                LPN_EXTEND_SMALL,
+                false,
             )
             .unwrap();
             let zero = party.input_private(Some(F2::ZERO)).unwrap();
@@ -166,13 +166,13 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut party = DietMacAndCheeseVerifier::<
-            F2,
-            F40b,
-            _,
-            SvoleSender<F40b>,
-            SvoleReceiver<F2, F40b>,
-        >::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+        let mut party = DietMacAndCheese::<Verifier, F2, F40b, _, Svole<_, _, _>>::init(
+            &mut channel,
+            rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+            false,
+        )
         .unwrap();
         let zero = party.input_private(None).unwrap();
         let one = party.input_private(None).unwrap();

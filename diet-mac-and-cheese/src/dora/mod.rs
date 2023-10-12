@@ -18,18 +18,14 @@ mod comm;
 // permutation proof
 mod perm;
 
-// Dora prover
-mod prover;
-
-// Dora verifier
-mod verifier;
+// Dora
+mod dora;
 
 type WireId = usize;
 
 pub use disjunction::Disjunction;
-pub use prover::DoraProver;
+pub use dora::Dora;
 use swanky_field::PrimeFiniteField;
-pub use verifier::DoraVerifier;
 
 use crate::circuit_ir::{GateM, TypeId};
 

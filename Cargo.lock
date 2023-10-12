@@ -3011,6 +3011,7 @@ dependencies = [
  "rand",
  "scuttlebutt",
  "swanky-field-binary",
+ "swanky-party",
  "wasm-bindgen",
 ]
 
@@ -3031,6 +3032,7 @@ dependencies = [
  "rustls-pemfile",
  "scuttlebutt",
  "swanky-field-binary",
+ "swanky-party",
  "tungstenite",
 ]
 

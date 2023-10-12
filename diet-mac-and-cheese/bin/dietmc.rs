@@ -3,13 +3,12 @@ mod cli;
 use clap::Parser;
 use cli::{Cli, LpnSize};
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
-use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::read_sieveir_phase2::{
     read_private_inputs, read_public_inputs, read_types,
 };
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;
-use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
+use diet_mac_and_cheese::svole_trait::Svole;
 use eyre::{bail, Result, WrapErr};
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -26,6 +25,7 @@ use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
+use swanky_party::{Prover, Verifier};
 
 use jemallocator::Jemalloc;
 
@@ -205,16 +205,14 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-                    Party::Verifier,
-                    &mut channel,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.lpn() == LpnSize::Small,
-                    config.no_batching(),
-                )?;
+            let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
+                &mut channel,
+                rng,
+                inputs,
+                type_store,
+                config.lpn() == LpnSize::Small,
+                config.no_batching(),
+            )?;
             evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
@@ -237,16 +235,14 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-                    Party::Prover,
-                    &mut channel,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.lpn() == LpnSize::Small,
-                    config.no_batching(),
-                )?;
+            let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>>::new(
+                &mut channel,
+                rng,
+                inputs,
+                type_store,
+                config.lpn() == LpnSize::Small,
+                config.no_batching(),
+            )?;
             evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
@@ -286,8 +282,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
-                    Party::Verifier,
+                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
                     channel_f2_svole,
                     rng,
                     inputs,
@@ -347,8 +342,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
-                    Party::Prover,
+                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
                     channel_f2_svole,
                     rng,
                     inputs,
@@ -416,16 +410,14 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-                    Party::Verifier,
-                    &mut channel,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.lpn() == LpnSize::Small,
-                    config.no_batching(),
-                )?;
+            let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
+                &mut channel,
+                rng,
+                inputs,
+                type_store,
+                config.lpn() == LpnSize::Small,
+                config.no_batching(),
+            )?;
             evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
@@ -446,16 +438,14 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator =
-                EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-                    Party::Prover,
-                    &mut channel,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.lpn() == LpnSize::Small,
-                    config.no_batching(),
-                )?;
+            let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>>::new(
+                &mut channel,
+                rng,
+                inputs,
+                type_store,
+                config.lpn() == LpnSize::Small,
+                config.no_batching(),
+            )?;
             evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
@@ -518,8 +508,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
-                    Party::Verifier,
+                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
                     channel_f2_svole,
                     rng,
                     inputs,
@@ -576,8 +565,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
             let mut handles = vec![];
             let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<_, SvoleAtomic<(F2, F40b)>, SvoleAtomic<F40b>>::new_multithreaded(
-                    Party::Prover,
+                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
                     channel_f2_svole,
                     rng,
                     inputs,

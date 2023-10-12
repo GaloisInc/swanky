@@ -27,8 +27,8 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     }
 
     #[inline]
-    pub(crate) fn value(&self, ev: IsParty<P, Prover>) -> V {
-        self.0.into_inner(ev)
+    pub(crate) fn value(&self) -> ProverPrivateCopy<P, V> {
+        self.0
     }
 
     #[inline]
@@ -119,7 +119,7 @@ pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
     use swanky_party::IS_PROVER;
 
     assert_eq!(
-        prover.value(IS_PROVER) * delta + verifier.mac(),
+        prover.value().into_inner(IS_PROVER) * delta + verifier.mac(),
         prover.mac()
     );
 }

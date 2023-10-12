@@ -1,8 +1,9 @@
 use eyre::Result;
+use swanky_party::Party;
 
 use crate::backend_trait::BackendT;
 
-fn eval_zero_poly<B: BackendT>(
+fn eval_zero_poly<P: Party, B: BackendT<P>>(
     backend: &mut B,
     mx: B::FieldElement, // - x
     zs: &[B::Wire],
@@ -20,7 +21,7 @@ fn eval_zero_poly<B: BackendT>(
     Ok(rs)
 }
 
-pub(super) fn permutation<B: BackendT>(
+pub(super) fn permutation<P: Party, B: BackendT<P>>(
     backend: &mut B,
     x: B::FieldElement,
     lhs: &[B::Wire],
