@@ -22,11 +22,13 @@ use swanky_party::{IsParty, Party, Verifier, WhichParty};
 /// for a sender and tag `T` for a receiver.
 pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     /// Initialize function.
+    /// Initialize with delta when provided.
     fn init<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<T>,
     ) -> Result<Self>
     where
         Self: Sized;
@@ -86,6 +88,7 @@ where
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<T>,
     ) -> Result<Self> {
         Ok(match P::WHICH {
             WhichParty::Prover(ev) => Self(
@@ -98,7 +101,7 @@ where
             WhichParty::Verifier(ev) => Self(
                 PartyEither::verifier_new(
                     ev,
-                    RcRefCell::new(Receiver::init(channel, rng, lpn_setup, lpn_extend)?),
+                    RcRefCell::new(Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)?),
                 ),
                 PhantomData,
             ),

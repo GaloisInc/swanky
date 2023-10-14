@@ -65,6 +65,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
         _rng: &mut AesRng,
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
+        _delta: Option<T>,
     ) -> Result<Self> {
         panic!("Should not be initialized")
     }
@@ -157,9 +158,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
             WhichParty::Prover(ev) => {
                 PartyEither::prover_new(ev, Sender::init(channel, rng, lpn_setup, lpn_extend)?)
             }
-            WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, Receiver::init(channel, rng, lpn_setup, lpn_extend)?)
-            }
+            WhichParty::Verifier(ev) => PartyEither::verifier_new(
+                ev,
+                Receiver::init(channel, rng, lpn_setup, lpn_extend, None)?,
+            ),
         };
 
         match P::WHICH {

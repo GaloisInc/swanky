@@ -79,8 +79,8 @@ impl<FE: FF> Receiver<FE> {
         pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
-        let cp = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
-        Ok(Self { copee: cp, pows })
+        let copee = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
+        Ok(Self { copee, pows })
     }
     /// Initalize the base vole receiver with a supplied `delta`
     pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -89,8 +89,8 @@ impl<FE: FF> Receiver<FE> {
         rng: &mut RNG,
         delta: FE,
     ) -> Result<Self, Error> {
-        let cp = CopeeReceiver::<FE>::init_with_picked_delta(channel, pows.clone(), rng, delta)?;
-        Ok(Self { copee: cp, pows })
+        let copee = CopeeReceiver::<FE>::init_with_picked_delta(channel, pows.clone(), rng, delta)?;
+        Ok(Self { copee, pows })
     }
     /// Return the `delta` associated with this receiver
     pub fn delta(&self) -> FE {

@@ -115,8 +115,14 @@ fn run() {
     let mut channel =
         OurTrackChannel::new(receiver.try_clone().unwrap(), receiver.try_clone().unwrap());
     let start = Instant::now();
-    let mut vole =
-        VReceiver::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
+    let mut vole = VReceiver::init(
+        &mut channel,
+        &mut rng,
+        LPN_SETUP_MEDIUM,
+        LPN_EXTEND_MEDIUM,
+        None,
+    )
+    .unwrap();
     println!("Receive time (init): {:?}", start.elapsed());
     println!(
         "Send communication (init): {:.2} Mbits",

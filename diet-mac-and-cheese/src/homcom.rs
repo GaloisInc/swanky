@@ -258,11 +258,11 @@ where
     ) -> Result<Self> {
         let (svole, delta) = match P::WHICH {
             WhichParty::Prover(ev) => {
-                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend, None)?;
                 (svole, VerifierPrivateCopy::empty(ev))
             }
             WhichParty::Verifier(ev) => {
-                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend)?;
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend, None)?;
                 let delta = svole.delta(ev);
                 (svole, VerifierPrivateCopy::new(delta))
             }
@@ -281,6 +281,30 @@ where
                 WhichParty::Prover(ev) => VerifierPrivateCopy::empty(ev),
                 WhichParty::Verifier(ev) => VerifierPrivateCopy::new(svole.delta(ev)),
             },
+            svole,
+            voles: PartyEither::default(),
+        })
+    }
+
+    pub fn init_with_delta<C: AbstractChannel>(
+        channel: &mut C,
+        rng: &mut AesRng,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        delta: T,
+    ) -> Result<Self> {
+        let (svole, delta) = match P::WHICH {
+            WhichParty::Prover(_) => {
+                bail!("Should not init with delta for a prover");
+            }
+            WhichParty::Verifier(_) => {
+                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend, Some(delta))?;
+                (svole, VerifierPrivateCopy::new(delta))
+            }
+        };
+
+        Ok(Self {
+            delta,
             svole,
             voles: PartyEither::default(),
         })

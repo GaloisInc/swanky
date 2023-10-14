@@ -1,16 +1,16 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
+use crate::mac::MacT;
 use eyre::Result;
 use mac_n_cheese_sieve_parser::Number;
 use std::any::type_name;
-use std::fmt::Debug;
 use swanky_field::{FiniteField, PrimeFiniteField};
 use swanky_party::Party;
 
 /// An interface for computing a proof over a single [`FiniteField`].
 pub trait BackendT<P: Party> {
     /// The type associated with the input and output wires of the gates.
-    type Wire: Default + Clone + Copy + Debug;
+    type Wire: MacT;
     /// The [`FiniteField`] the computation is operating over.
     type FieldElement: FiniteField;
 

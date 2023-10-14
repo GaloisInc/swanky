@@ -81,7 +81,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     )
     .unwrap();
     let lpn_is_small = true;
-    let tmp = evaluator.load_backends(&mut channel, lpn_is_small);
+    let tmp = evaluator.load_backends::<Svole<Prover, F40b, F40b>>(&mut channel, lpn_is_small);
     if tmp.is_err() {
         alert("error while loading backends");
         return false;

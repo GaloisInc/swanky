@@ -186,6 +186,55 @@ where
         })
     }
 
+    pub(crate) fn init_with_delta(
+        channel: &mut C,
+        mut rng: AesRng,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        no_batching: bool,
+        delta: T,
+    ) -> Result<Self> {
+        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
+        Ok(Self {
+            fcom: FCom::init_with_delta(channel, &mut rng, lpn_setup, lpn_extend, delta)?,
+            channel: channel.clone(),
+            rng,
+            monitor: Monitor::default(),
+            mult_check_state,
+            zero_check_state,
+            no_batching,
+        })
+    }
+
+    /// "Lifts" a verifier operating over `(V, T)` into one operating over `(T, T)`.
+    ///
+    /// This enforces that the same `Δ` is shared between the old and new verifier.
+    pub fn lift<VOLE2: SvoleT<P, T, T>>(
+        &mut self,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+    ) -> Result<DietMacAndCheese<P, T, T, C, VOLE2>> {
+        self.channel.flush()?;
+        match P::WHICH {
+            WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, C, VOLE2>::init(
+                &mut self.channel,
+                self.rng.fork(),
+                lpn_setup,
+                lpn_extend,
+                self.no_batching,
+            ),
+            WhichParty::Verifier(ev) => DietMacAndCheese::<P, T, T, C, VOLE2>::init_with_delta(
+                &mut self.channel,
+                self.rng.fork(),
+                lpn_setup,
+                lpn_extend,
+                self.no_batching,
+                self.fcom.get_delta().into_inner(ev),
+            ),
+        }
+    }
+
     fn input(&mut self, v: ProverPrivateCopy<P, V>) -> Result<Mac<P, V, T>> {
         Ok(match P::WHICH {
             WhichParty::Prover(ev) => {

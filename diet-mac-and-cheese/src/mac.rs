@@ -13,6 +13,19 @@ fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     T::from_subfield(&v)
 }
 
+/// A trait defining a MAC type.
+pub trait MacT: Clone + Copy + Debug + Default {
+    /// The value field.
+    type Value: IsSubFieldOf<Self::Tag>;
+    /// The tag field.
+    type Tag: FiniteField;
+    /// A MAC lifted to its tag field.
+    type LiftedMac: MacT<Value = Self::Tag, Tag = Self::Tag>;
+
+    /// Lift an array of MACs from the value field to the tag field.
+    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac;
+}
+
 /// Party-generic MACs.
 ///
 /// The following holds for a global key known `Δ` known only to the verifier:
@@ -56,6 +69,16 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
         }
 
         Mac::new(value, mac)
+    }
+}
+
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MacT for Mac<P, V, T> {
+    type Value = V;
+    type Tag = T;
+    type LiftedMac = Mac<P, Self::Tag, Self::Tag>;
+
+    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
+        Self::lift(xs)
     }
 }
 

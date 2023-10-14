@@ -16,6 +16,7 @@ if any function call returns an error then any subsequent gate function call
 will directly return an error.
 */
 mod backend;
+pub mod backend_extfield;
 pub mod backend_multifield;
 pub mod backend_trait;
 pub mod circuit_ir;
