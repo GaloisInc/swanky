@@ -23,7 +23,7 @@ pub trait CanonicalSerialize: Copy + Serialize + DeserializeOwned {
     type Deserializer: SequenceDeserializer<Self>;
 
     /// The number of bytes in the byte representation for this element.
-    type ByteReprLen: ArrayLength<u8>;
+    type ByteReprLen: ArrayLength;
     /// The error that can result from trying to decode an invalid byte sequence.
     type FromBytesError: std::error::Error + Send + Sync + 'static;
     /// Deserialize an element from a byte array.

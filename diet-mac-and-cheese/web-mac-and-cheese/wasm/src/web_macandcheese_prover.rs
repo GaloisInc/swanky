@@ -1,8 +1,7 @@
 use crate::js_channel::ShimChannel;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
-use diet_mac_and_cheese::backend_trait::Party;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::svole_trait::{SvoleReceiver, SvoleSender};
+use diet_mac_and_cheese::svole_trait::Svole;
 use log::info;
 use log::Level;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -12,6 +11,7 @@ use std::collections::VecDeque;
 use std::io::Cursor;
 use std::panic;
 use swanky_field_binary::{F40b, F2};
+use swanky_party::Prover;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -71,8 +71,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     alert("*** RELATION LOADING: done!");
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<_, SvoleSender<F40b>, SvoleReceiver<F2, F40b>>::new(
-        Party::Prover,
+    let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>>::new(
         &mut channel,
         rng,
         inputs,
@@ -82,8 +81,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     )
     .unwrap();
     let lpn_is_small = true;
-    let tmp = evaluator
-        .load_backends::<SvoleSender<F40b>, SvoleReceiver<F40b, F40b>>(&mut channel, lpn_is_small);
+    let tmp = evaluator.load_backends::<Svole<Prover, F40b, F40b>>(&mut channel, lpn_is_small);
     if tmp.is_err() {
         alert("error while loading backends");
         return false;

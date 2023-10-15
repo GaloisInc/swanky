@@ -1,18 +1,17 @@
 use std::marker::PhantomData;
 
-use crate::backend_trait::{BackendT, Party};
-use crate::homcom::{
-    FComProver, FComVerifier, StateMultCheckProver, StateMultCheckVerifier, StateZeroCheckProver,
-    StateZeroCheckVerifier,
-};
-use crate::mac::{MacProver, MacVerifier};
+use crate::backend_trait::BackendT;
+use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
+use crate::mac::Mac;
 use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
-use eyre::{eyre, Result};
+use eyre::{bail, Result};
 use log::{debug, info, warn};
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_party::private::ProverPrivateCopy;
+use swanky_party::{Party, WhichParty};
 
 // Some design decisions:
 // * There is one queue for the multiplication check and another queue for `assert_zero`s.
@@ -122,137 +121,31 @@ impl<T: FiniteField> Monitor<T> {
     }
 }
 
-/// Prover for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseProver<
+/// Single-Field Diet Mac'n'Cheese.
+pub struct DietMacAndCheese<
+    P: Party,
     V: IsSubFieldOf<T>,
     T: FiniteField,
     C: AbstractChannel,
-    VOLE: SvoleT<(V, T)>,
+    SVOLE: SvoleT<P, V, T>,
 > where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    pub(crate) prover: FComProver<V, T, VOLE>,
+    pub(crate) fcom: FCom<P, V, T, SVOLE>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    state_mult_check: StateMultCheckProver<T>,
-    state_zero_check: StateZeroCheckProver<T>,
+    mult_check_state: MultCheckState<P, T>,
+    zero_check_state: ZeroCheckState<P, T>,
     no_batching: bool,
     monitor: Monitor<T>,
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>> BackendT
-    for DietMacAndCheeseProver<V, T, C, VOLE>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>>
+    DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    type Wire = MacProver<V, T>;
-    type FieldElement = V;
-
-    fn party(&self) -> Party {
-        Party::Prover
-    }
-    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
-        Some(wire.value())
-    }
-
-    fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
-        Ok(*wire)
-    }
-
-    fn random(&mut self) -> Result<Self::FieldElement> {
-        self.channel.flush()?;
-        let challenge = self.channel.read_serializable::<Self::FieldElement>()?;
-        Ok(challenge)
-    }
-
-    fn one(&self) -> Result<Self::FieldElement> {
-        Ok(Self::FieldElement::ONE)
-    }
-
-    fn zero(&self) -> Result<Self::FieldElement> {
-        Ok(Self::FieldElement::ZERO)
-    }
-
-    fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
-        self.input_public(val)
-    }
-
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
-        self.monitor.incr_monitor_check_zero();
-        self.push_check_zero(wire)?;
-        Ok(())
-    }
-
-    fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
-        self.monitor.incr_monitor_add();
-        Ok(self.prover.add(*a, *b))
-    }
-
-    fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
-        self.monitor.incr_monitor_sub();
-        Ok(self.prover.sub(*a, *b))
-    }
-
-    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
-        self.monitor.incr_monitor_mul();
-        let product = a.value() * b.value();
-        let out = self.input(product)?;
-        self.state_mult_check.accumulate(&(*a, *b, out));
-        Ok(out)
-    }
-
-    fn add_constant(
-        &mut self,
-        value: &Self::Wire,
-        constant: Self::FieldElement,
-    ) -> Result<Self::Wire> {
-        self.monitor.incr_monitor_addc();
-        Ok(self.prover.affine_add_cst(constant, *value))
-    }
-
-    fn mul_constant(
-        &mut self,
-        value: &Self::Wire,
-        constant: Self::FieldElement,
-    ) -> Result<Self::Wire> {
-        self.monitor.incr_monitor_mulc();
-        Ok(self.prover.affine_mult_cst(constant, *value))
-    }
-
-    fn input_public(&mut self, value: Self::FieldElement) -> Result<Self::Wire> {
-        self.monitor.incr_monitor_instance();
-        Ok(MacProver::new(value, T::ZERO))
-    }
-
-    fn input_private(&mut self, value: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        if let Some(value) = value {
-            self.monitor.incr_monitor_witness();
-            self.input(value)
-        } else {
-            Err(eyre!("No private input given to the prover"))
-        }
-    }
-
-    fn finalize(&mut self) -> Result<()> {
-        debug!("finalize");
-        self.channel.flush()?;
-        let count_zero_check = self.do_check_zero()?;
-        let count_mult_check = self.do_mult_check()?;
-        debug!(
-            "finalize: mult_check:{:?}, check_zero:{:?} ",
-            count_mult_check, count_zero_check
-        );
-        self.log_final_monitor();
-        Ok(())
-    }
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>>
-    DietMacAndCheeseProver<V, T, C, VOLE>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    /// Initialize the prover by providing a channel, a random generator and a pair of LPN parameters as defined by svole.
+    /// Initialize by providing a channel, a random generator, and a pair of LPN parameters as defined by SVOLE.
     pub fn init(
         channel: &mut C,
         mut rng: AesRng,
@@ -260,93 +153,135 @@ where
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let state_mult_check = StateMultCheckProver::init(channel)?;
-        let state_zero_check = StateZeroCheckProver::init(channel)?;
+        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
-            prover: FComProver::init(channel, &mut rng, lpn_setup, lpn_extend)?,
+            fcom: FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
             rng,
             monitor: Monitor::default(),
-            state_mult_check,
-            state_zero_check,
+            mult_check_state,
+            zero_check_state,
             no_batching,
         })
     }
 
-    /// Initialize the verifier by providing a reference to a fcom.
+    /// Initialize by providing a reference to an FCom.
     pub(crate) fn init_with_fcom(
         channel: &mut C,
-        rng: AesRng,
-        fcom: &FComProver<V, T, VOLE>,
+        mut rng: AesRng,
+        fcom: &FCom<P, V, T, SVOLE>,
         no_batching: bool,
     ) -> Result<Self> {
-        let state_mult_check = StateMultCheckProver::init(channel)?;
-        let state_zero_check = StateZeroCheckProver::init(channel)?;
+        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
-            prover: fcom.duplicate()?,
+            fcom: fcom.duplicate()?,
             channel: channel.clone(),
             rng,
             monitor: Monitor::default(),
-            state_mult_check,
-            state_zero_check,
+            mult_check_state,
+            zero_check_state,
             no_batching,
         })
     }
 
-    /// "Lifts" a prover operating over `(V, T)` into a prover operating over `(T, T)`.
-    pub fn lift<VOLE2: SvoleT<(T, T)>>(
+    pub(crate) fn init_with_delta(
+        channel: &mut C,
+        mut rng: AesRng,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        no_batching: bool,
+        delta: T,
+    ) -> Result<Self> {
+        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
+        Ok(Self {
+            fcom: FCom::init_with_delta(channel, &mut rng, lpn_setup, lpn_extend, delta)?,
+            channel: channel.clone(),
+            rng,
+            monitor: Monitor::default(),
+            mult_check_state,
+            zero_check_state,
+            no_batching,
+        })
+    }
+
+    /// "Lifts" a verifier operating over `(V, T)` into one operating over `(T, T)`.
+    ///
+    /// This enforces that the same `Δ` is shared between the old and new verifier.
+    pub fn lift<VOLE2: SvoleT<P, T, T>>(
         &mut self,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
-    ) -> Result<DietMacAndCheeseProver<T, T, C, VOLE2>> {
+    ) -> Result<DietMacAndCheese<P, T, T, C, VOLE2>> {
         self.channel.flush()?;
-        DietMacAndCheeseProver::<T, T, C, VOLE2>::init(
-            &mut self.channel,
-            self.rng.fork(),
-            lpn_setup,
-            lpn_extend,
-            self.no_batching,
-        )
+        match P::WHICH {
+            WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, C, VOLE2>::init(
+                &mut self.channel,
+                self.rng.fork(),
+                lpn_setup,
+                lpn_extend,
+                self.no_batching,
+            ),
+            WhichParty::Verifier(ev) => DietMacAndCheese::<P, T, T, C, VOLE2>::init_with_delta(
+                &mut self.channel,
+                self.rng.fork(),
+                lpn_setup,
+                lpn_extend,
+                self.no_batching,
+                self.fcom.get_delta().into_inner(ev),
+            ),
+        }
     }
 
-    /// Get party
-    pub(crate) fn get_party(&self) -> &FComProver<V, T, VOLE> {
-        &self.prover
-    }
-
-    fn input(&mut self, v: V) -> Result<MacProver<V, T>> {
-        let tag = self.prover.input1(&mut self.channel, &mut self.rng, v);
-        Ok(MacProver::new(v, tag?))
+    fn input(&mut self, v: ProverPrivateCopy<P, V>) -> Result<Mac<P, V, T>> {
+        Ok(match P::WHICH {
+            WhichParty::Prover(ev) => {
+                let tag =
+                    self.fcom
+                        .input1_prover(ev, &mut self.channel, &mut self.rng, v.into_inner(ev));
+                Mac::new(v, tag?)
+            }
+            WhichParty::Verifier(ev) => {
+                self.fcom
+                    .input1_verifier(ev, &mut self.channel, &mut self.rng)?
+            }
+        })
     }
 
     fn do_mult_check(&mut self) -> Result<usize> {
         debug!("do mult_check");
         self.channel.flush()?;
-        let cnt = self.prover.quicksilver_finalize(
+        let count = self.fcom.quicksilver_finalize(
             &mut self.channel,
             &mut self.rng,
-            &mut self.state_mult_check,
+            &mut self.mult_check_state,
         )?;
-        self.monitor.incr_zk_mult_check(cnt);
-        Ok(cnt)
+        self.monitor.incr_zk_mult_check(count);
+        Ok(count)
     }
 
     fn do_check_zero(&mut self) -> Result<usize> {
         self.channel.flush()?;
-        let cnt = self.state_zero_check.finalize(&mut self.channel)?;
-        self.monitor.incr_zk_check_zero(cnt);
-        Ok(cnt)
+        let count = self.zero_check_state.finalize(&mut self.channel)?;
+        self.monitor.incr_zk_check_zero(count);
+        Ok(count)
     }
 
-    fn push_check_zero(&mut self, e: &MacProver<V, T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &Mac<P, V, T>) -> Result<()> {
         if self.no_batching {
-            self.prover.check_zero(&mut self.channel, &[*e])?;
+            self.fcom
+                .check_zero(&mut self.channel, &mut self.rng, &[*e])?;
             return Ok(());
         }
-        self.state_zero_check.accumulate(e)?;
-        if self.state_zero_check.count() == QUEUE_CAPACITY {
+
+        self.zero_check_state.accumulate(e)?;
+
+        if self.zero_check_state.count() == QUEUE_CAPACITY {
             self.do_check_zero()?;
         }
+
         Ok(())
     }
 
@@ -355,49 +290,31 @@ where
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<(V, T)>> Drop
-    for DietMacAndCheeseProver<V, T, C, VOLE>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>> Drop
+    for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
     fn drop(&mut self) {
-        if self.state_zero_check.count() != 0 || self.state_mult_check.count() != 0 {
+        if self.zero_check_state.count() != 0 || self.mult_check_state.count() != 0 {
             warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
         }
     }
 }
 
-/// Verifier for Diet Mac'n'Cheese.
-pub struct DietMacAndCheeseVerifier<
-    V: IsSubFieldOf<T>,
-    T: FiniteField,
-    C: AbstractChannel,
-    VOLE: SvoleT<T>,
-> where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    pub(crate) verifier: FComVerifier<V, T, VOLE>,
-    pub(crate) channel: C,
-    pub(crate) rng: AesRng,
-    monitor: Monitor<T>,
-    state_mult_check: StateMultCheckVerifier<V, T>,
-    state_zero_check: StateZeroCheckVerifier<V, T>,
-    no_batching: bool,
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>> BackendT
-    for DietMacAndCheeseVerifier<V, T, C, VOLE>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>>
+    BackendT<P> for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
-    type Wire = MacVerifier<V, T>;
+    type Wire = Mac<P, V, T>;
     type FieldElement = V;
 
-    fn party(&self) -> Party {
-        Party::Verifier
-    }
-    fn wire_value(&self, _wire: &Self::Wire) -> Option<Self::FieldElement> {
-        None
+    fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
+        match P::WHICH {
+            WhichParty::Prover(ev) => Some(wire.value().into_inner(ev)),
+            WhichParty::Verifier(_) => None,
+        }
     }
 
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
@@ -405,10 +322,19 @@ where
     }
 
     fn random(&mut self) -> Result<Self::FieldElement> {
-        let challenge = Self::FieldElement::random(&mut self.rng);
-        self.channel.write_serializable(&challenge)?;
-        self.channel.flush()?;
-        Ok(challenge)
+        match P::WHICH {
+            WhichParty::Prover(_) => {
+                self.channel.flush()?;
+                let challenge = self.channel.read_serializable::<Self::FieldElement>()?;
+                Ok(challenge)
+            }
+            WhichParty::Verifier(_) => {
+                let challenge = Self::FieldElement::random(&mut self.rng);
+                self.channel.write_serializable(&challenge)?;
+                self.channel.flush()?;
+                Ok(challenge)
+            }
+        }
     }
 
     fn one(&self) -> Result<Self::FieldElement> {
@@ -441,15 +367,27 @@ where
 
     fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mul();
-        let tag = self.input()?;
-        self.state_mult_check
-            .accumulate(&(*a, *b, tag), self.verifier.get_delta());
-        Ok(tag)
+
+        let out = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                let a_clr = a.value().into_inner(ev);
+                let b_clr = b.value().into_inner(ev);
+                let product = a_clr * b_clr;
+
+                self.input(ProverPrivateCopy::new(product))?
+            }
+            WhichParty::Verifier(ev) => self.input(ProverPrivateCopy::empty(ev))?,
+        };
+
+        self.mult_check_state
+            .accumulate(&(*a, *b, out), self.fcom.get_delta());
+
+        Ok(out)
     }
 
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_addc();
-        Ok(self.verifier.affine_add_cst(b, *a))
+        Ok(self.fcom.affine_add_cst(b, *a))
     }
 
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
@@ -459,186 +397,54 @@ where
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.monitor.incr_monitor_instance();
-        Ok(MacVerifier::new(-val * self.verifier.get_delta()))
+        Ok(match P::WHICH {
+            WhichParty::Prover(_) => Mac::new(ProverPrivateCopy::new(val), T::ZERO),
+            WhichParty::Verifier(ev) => Mac::new(
+                ProverPrivateCopy::empty(ev),
+                -val * self.fcom.get_delta().into_inner(ev),
+            ),
+        })
     }
 
     fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        if val.is_some() {
-            Err(eyre!("Private input given to the verifier"))
-        } else {
-            self.monitor.incr_monitor_witness();
-            self.input()
+        match P::WHICH {
+            WhichParty::Prover(_) => {
+                if let Some(val) = val {
+                    self.monitor.incr_monitor_witness();
+                    self.input(ProverPrivateCopy::new(val))
+                } else {
+                    bail!("No private input given to the prover")
+                }
+            }
+            WhichParty::Verifier(ev) => {
+                if val.is_some() {
+                    bail!("Private input given to the verifier")
+                } else {
+                    self.monitor.incr_monitor_witness();
+                    self.input(ProverPrivateCopy::empty(ev))
+                }
+            }
         }
     }
 
     fn finalize(&mut self) -> Result<()> {
         debug!("finalize");
         self.channel.flush()?;
-        let count_zero_check = self.do_check_zero()?;
-        let count_mult_check = self.do_mult_check()?;
+        let zero_check_count = self.do_check_zero()?;
+        let mult_check_count = self.do_mult_check()?;
         debug!(
-            "finalize: mult_check:{:?}, check_zero:{:?} ",
-            count_mult_check, count_zero_check
+            "finalize: mult_check: {:?}, check_zero: {:?}",
+            mult_check_count, zero_check_count
         );
         self.log_final_monitor();
         Ok(())
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>>
-    DietMacAndCheeseVerifier<V, T, C, VOLE>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    /// Initialize the verifier by providing a channel, a random generator and a pair of LPN parameters as defined by svole.
-    pub fn init(
-        channel: &mut C,
-        mut rng: AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-        no_batching: bool,
-    ) -> Result<Self> {
-        let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
-        let state_zero_check = StateZeroCheckVerifier::init(channel, &mut rng)?;
-        Ok(Self {
-            verifier: FComVerifier::init(channel, &mut rng, lpn_setup, lpn_extend)?,
-            channel: channel.clone(),
-            rng,
-            monitor: Monitor::default(),
-            state_mult_check,
-            state_zero_check,
-            no_batching,
-        })
-    }
-
-    /// Initialize the verifier by providing a reference to a fcom.
-    pub(crate) fn init_with_fcom(
-        channel: &mut C,
-        mut rng: AesRng,
-        fcom: &FComVerifier<V, T, VOLE>,
-        no_batching: bool,
-    ) -> Result<Self> {
-        let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
-        let state_zero_check = StateZeroCheckVerifier::init(channel, &mut rng)?;
-        Ok(Self {
-            verifier: fcom.duplicate()?,
-            channel: channel.clone(),
-            rng,
-            monitor: Monitor::default(),
-            state_mult_check,
-            state_zero_check,
-            no_batching,
-        })
-    }
-
-    pub(crate) fn init_with_delta(
-        channel: &mut C,
-        mut rng: AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-        no_batching: bool,
-        delta: T,
-    ) -> Result<Self> {
-        let state_mult_check = StateMultCheckVerifier::init(channel, &mut rng)?;
-        let state_zero_check = StateZeroCheckVerifier::init(channel, &mut rng)?;
-        Ok(Self {
-            verifier: FComVerifier::init_with_delta(
-                channel, &mut rng, lpn_setup, lpn_extend, delta,
-            )?,
-            channel: channel.clone(),
-            rng,
-            monitor: Monitor::default(),
-            state_mult_check,
-            state_zero_check,
-            no_batching,
-        })
-    }
-
-    /// "Lifts" a verifier operating over `(V, T)` into one operating over `(T, T)`.
-    ///
-    /// This enforces that the same `Δ` is shared between the old and new verifier.
-    pub fn lift<VOLE2: SvoleT<T>>(
-        &mut self,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-    ) -> Result<DietMacAndCheeseVerifier<T, T, C, VOLE2>> {
-        self.channel.flush()?;
-        DietMacAndCheeseVerifier::<T, T, C, VOLE2>::init_with_delta(
-            &mut self.channel,
-            self.rng.fork(),
-            lpn_setup,
-            lpn_extend,
-            self.no_batching,
-            self.verifier.get_delta(),
-        )
-    }
-
-    /// Get party
-    pub(crate) fn get_party(&self) -> &FComVerifier<V, T, VOLE> {
-        &self.verifier
-    }
-
-    fn input(&mut self) -> Result<MacVerifier<V, T>> {
-        self.verifier.input1(&mut self.channel, &mut self.rng)
-    }
-
-    fn do_mult_check(&mut self) -> Result<usize> {
-        debug!("do mult_check");
-        self.channel.flush()?;
-        let cnt = self.verifier.quicksilver_finalize(
-            &mut self.channel,
-            &mut self.rng,
-            &mut self.state_mult_check,
-        )?;
-        self.monitor.incr_zk_mult_check(cnt);
-        Ok(cnt)
-    }
-
-    fn do_check_zero(&mut self) -> Result<usize> {
-        self.channel.flush()?;
-        let cnt = self.state_zero_check.finalize(&mut self.channel)?;
-        self.monitor.incr_zk_check_zero(cnt);
-        Ok(cnt)
-    }
-
-    fn push_check_zero(&mut self, e: &MacVerifier<V, T>) -> Result<()> {
-        if self.no_batching {
-            self.verifier
-                .check_zero(&mut self.channel, &mut self.rng, &[*e])?;
-            return Ok(());
-        }
-        self.state_zero_check.accumulate(e)?;
-        if self.state_zero_check.count() == QUEUE_CAPACITY {
-            self.do_check_zero()?;
-        }
-        Ok(())
-    }
-
-    fn log_final_monitor(&self) {
-        self.monitor.log_final_monitor();
-    }
-}
-
-impl<V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, VOLE: SvoleT<T>> Drop
-    for DietMacAndCheeseVerifier<V, T, C, VOLE>
-where
-    T::PrimeField: IsSubFieldOf<V>,
-{
-    fn drop(&mut self) {
-        if self.state_zero_check.count() != 0 || self.state_mult_check.count() != 0 {
-            warn!("Dropped in unexpected state: either `finalize()` has not been called or an error occured earlier.");
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::svole_trait::{SvoleReceiver, SvoleSender};
-    use crate::{
-        backend::{DietMacAndCheeseProver, DietMacAndCheeseVerifier},
-        backend_trait::BackendT,
-        mac::validate,
-    };
+    use crate::svole_trait::Svole;
+    use crate::{backend::DietMacAndCheese, backend_trait::BackendT, mac::validate};
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::field::{F40b, IsSubFieldOf, F2};
@@ -650,6 +456,7 @@ mod tests {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_party::{Prover, Verifier, IS_PROVER, IS_VERIFIER};
 
     fn test<V: IsSubFieldOf<T>, T: FiniteField>()
     where
@@ -662,15 +469,9 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<V, T, _, SvoleSender<T>> =
-                DietMacAndCheeseProver::init(
-                    &mut channel,
-                    rng,
-                    LPN_SETUP_SMALL,
-                    LPN_EXTEND_SMALL,
-                    false,
-                )
-                .unwrap();
+            let mut dmc: DietMacAndCheese<Prover, V, T, _, Svole<_, _, _>> =
+                DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+                    .unwrap();
 
             // one1        = public(1)
             // one2        = public(1)
@@ -695,7 +496,7 @@ mod tests {
             let two_priv = dmc.input_private(Some(two)).unwrap();
             let six = dmc.mul(&two_priv, &three_pub).unwrap();
             let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-            assert_eq!(twelve_priv.value(), three * two * two);
+            assert_eq!(twelve_priv.value().into_inner(IS_PROVER), three * two * two);
             let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
             let r_zero_priv = dmc
                 .add_constant(&n24_priv, -(three * two * two * two))
@@ -711,15 +512,9 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<V, T, _, SvoleReceiver<V, T>> =
-            DietMacAndCheeseVerifier::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
+        let mut dmc: DietMacAndCheese<Verifier, V, T, _, Svole<_, _, _>> =
+            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+                .unwrap();
 
         let one = V::ONE;
         let two = one + one;
@@ -754,15 +549,9 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut dmc: DietMacAndCheeseProver<V, T, _, SvoleSender<T>> =
-                DietMacAndCheeseProver::init(
-                    &mut channel,
-                    rng,
-                    LPN_SETUP_SMALL,
-                    LPN_EXTEND_SMALL,
-                    false,
-                )
-                .unwrap();
+            let mut dmc: DietMacAndCheese<Prover, V, T, _, Svole<_, _, _>> =
+                DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+                    .unwrap();
 
             let challenge = dmc.random().unwrap();
             let challenge = dmc.input_public(challenge).unwrap();
@@ -777,22 +566,20 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut dmc: DietMacAndCheeseVerifier<V, T, _, SvoleReceiver<V, T>> =
-            DietMacAndCheeseVerifier::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
+        let mut dmc: DietMacAndCheese<Verifier, V, T, _, Svole<_, _, _>> =
+            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+                .unwrap();
 
         let challenge = dmc.random().unwrap();
         let verifier = dmc.input_public(challenge).unwrap();
         dmc.finalize().unwrap();
 
         let prover = handle.join().unwrap();
-        validate(prover, verifier, dmc.get_party().get_delta());
+        validate(
+            prover,
+            verifier,
+            dmc.fcom.get_delta().into_inner(IS_VERIFIER),
+        );
     }
 
     #[test]

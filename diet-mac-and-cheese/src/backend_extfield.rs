@@ -1,68 +1,67 @@
+use crate::{
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, MacBit},
+    backend_trait::BackendT,
+    homcom::FCom,
+    plugins::DisjunctionBody,
+    svole_trait::SvoleT,
+    DietMacAndCheese,
+};
 use eyre::Result;
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
+use swanky_party::Party;
 
-use crate::{
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, MacBitGeneric},
-    backend_trait::{BackendT, Party},
-    homcom::{FComProver, FComVerifier},
-    plugins::DisjunctionBody,
-    svole_trait::SvoleT,
-    DietMacAndCheeseProver, DietMacAndCheeseVerifier,
-};
-
-pub(crate) struct DietMacAndCheeseExtFieldProver<
+pub(crate) struct DietMacAndCheeseExtField<
+    P: Party,
     T: FiniteField<PrimeField = F2>,
     C: AbstractChannel,
-    SVOLE1: SvoleT<(F2, T)>,
-    SVOLE2: SvoleT<(T, T)>,
+    SVOLE1: SvoleT<P, F2, T>,
+    SVOLE2: SvoleT<P, T, T>,
 > where
     F2: IsSubFieldOf<T>,
 {
-    dmc: DietMacAndCheeseProver<F2, T, C, SVOLE1>,
-    lifted_dmc: DietMacAndCheeseProver<T, T, C, SVOLE2>,
+    dmc: DietMacAndCheese<P, F2, T, C, SVOLE1>,
+    lifted_dmc: DietMacAndCheese<P, T, T, C, SVOLE2>,
 }
 
 impl<
+        P: Party,
         T: FiniteField<PrimeField = F2>,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, T)>,
-        SVOLE2: SvoleT<(T, T)>,
-    > DietMacAndCheeseExtFieldProver<T, C, SVOLE1, SVOLE2>
+        SVOLE1: SvoleT<P, F2, T>,
+        SVOLE2: SvoleT<P, T, T>,
+    > DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
     pub(crate) fn init_with_fcom(
         channel: &mut C,
         rng: AesRng,
-        fcom: &FComProver<F2, T, SVOLE1>,
+        fcom: &FCom<P, F2, T, SVOLE1>,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let mut dmc = DietMacAndCheeseProver::init_with_fcom(channel, rng, fcom, no_batching)?;
+        let mut dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom, no_batching)?;
         let lifted_dmc = dmc.lift(lpn_setup, lpn_extend)?;
         Ok(Self { dmc, lifted_dmc })
     }
 }
 
 impl<
+        P: Party,
         T: FiniteField<PrimeField = F2>,
         C: AbstractChannel,
-        SVOLE1: SvoleT<(F2, T)>,
-        SVOLE2: SvoleT<(T, T)>,
-    > BackendT for DietMacAndCheeseExtFieldProver<T, C, SVOLE1, SVOLE2>
+        SVOLE1: SvoleT<P, F2, T>,
+        SVOLE2: SvoleT<P, T, T>,
+    > BackendT<P> for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
-    type Wire = <DietMacAndCheeseProver<F2, T, C, SVOLE1> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheeseProver<F2, T, C, SVOLE1> as BackendT>::FieldElement;
-
-    fn party(&self) -> Party {
-        Party::Prover
-    }
+    type Wire = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT<P>>::Wire;
+    type FieldElement = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT<P>>::FieldElement;
 
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         self.dmc.wire_value(wire)
@@ -115,14 +114,14 @@ where
     }
 }
 
-impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)>> BackendConvT
-    for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
+    BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBitGeneric>> {
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBit<P>>> {
         self.dmc.assert_conv_to_bits(w)
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[MacBitGeneric]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(&mut self, x: &[MacBit<P>]) -> Result<Self::Wire> {
         self.dmc.assert_conv_from_bits(x)
     }
 
@@ -131,8 +130,8 @@ impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)
     }
 }
 
-impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)>>
-    BackendDisjunctionT for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
+    BackendDisjunctionT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn disjunction(
         &mut self,
@@ -147,10 +146,10 @@ impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)
     }
 }
 
-impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)>> BackendLiftT
-    for DietMacAndCheeseExtFieldProver<F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
+    BackendLiftT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
-    type LiftedBackend = DietMacAndCheeseProver<F40b, F40b, C, SVOLE2>;
+    type LiftedBackend = DietMacAndCheese<P, F40b, F40b, C, SVOLE2>;
 
     fn lift(&mut self) -> &mut Self::LiftedBackend {
         &mut self.lifted_dmc
@@ -158,7 +157,7 @@ impl<C: AbstractChannel, SVOLE1: SvoleT<(F2, F40b)>, SVOLE2: SvoleT<(F40b, F40b)
 }
 
 //////////////////////////////////////
-
+/*
 pub(crate) struct DietMacAndCheeseExtFieldVerifier<
     T: FiniteField<PrimeField = F2>,
     C: AbstractChannel,
@@ -296,15 +295,15 @@ impl<C: AbstractChannel, SVOLE1: SvoleT<F40b>, SVOLE2: SvoleT<F40b>> BackendLift
         &mut self.lifted_dmc
     }
 }
-
+*/
 //////////////////////////////////////////
 
 #[cfg(test)]
 mod test {
-    use super::{DietMacAndCheeseExtFieldProver, DietMacAndCheeseExtFieldVerifier};
+    use super::DietMacAndCheeseExtField;
     use crate::backend_trait::BackendT;
-    use crate::homcom::{FComProver, FComVerifier};
-    use crate::svole_trait::{SvoleReceiver, SvoleSender};
+    use crate::homcom::FCom;
+    use crate::svole_trait::Svole;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     #[allow(unused_imports)]
@@ -315,6 +314,7 @@ mod test {
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
+    use swanky_party::{Prover, Verifier};
 
     #[test]
     fn test_backend_ext_field() -> Result<(), eyre::Error> {
@@ -325,18 +325,19 @@ mod test {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let fcom = FComProver::<F2, F40b, SvoleSender<F40b>>::init(
+            let fcom = FCom::<Prover, F2, F40b, Svole<Prover, F2, F40b>>::init(
                 &mut channel,
                 &mut rng,
                 LPN_SETUP_SMALL,
                 LPN_EXTEND_SMALL,
             )?;
 
-            let mut eval = DietMacAndCheeseExtFieldProver::<
+            let mut eval = DietMacAndCheeseExtField::<
+                Prover,
                 F40b,
                 _,
-                SvoleSender<F40b>,
-                SvoleSender<F40b>,
+                Svole<Prover, F2, F40b>,
+                Svole<Prover, F40b, F40b>,
             >::init_with_fcom(
                 &mut channel,
                 rng,
@@ -354,18 +355,19 @@ mod test {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let fcom = FComVerifier::<F2, F40b, SvoleReceiver<F2, F40b>>::init(
+        let fcom = FCom::<Verifier, F2, F40b, Svole<Verifier, F2, F40b>>::init(
             &mut channel,
             &mut rng,
             LPN_SETUP_SMALL,
             LPN_EXTEND_SMALL,
         )?;
 
-        let mut eval = DietMacAndCheeseExtFieldVerifier::<
+        let mut eval = DietMacAndCheeseExtField::<
+            Verifier,
             F40b,
             _,
-            SvoleReceiver<F2, F40b>,
-            SvoleReceiver<F40b, F40b>,
+            Svole<Verifier, F2, F40b>,
+            Svole<Verifier, F40b, F40b>,
         >::init_with_fcom(
             &mut channel,
             rng,

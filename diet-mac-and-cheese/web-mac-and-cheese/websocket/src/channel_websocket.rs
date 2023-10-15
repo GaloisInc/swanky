@@ -57,6 +57,7 @@ impl<Stream: Read + Write> WsChannel<Stream> {
         if self.write_buffer.len() > 0 {
             let msg = Message::binary(&self.write_buffer[0..self.write_buffer_len]);
             self.websocket.write(msg).unwrap();
+            self.websocket.flush().unwrap();
         }
         self.write_buffer_len = 0;
     }

@@ -2,27 +2,28 @@ use eyre::Result;
 
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
+use swanky_party::{IsParty, Party, Prover};
 
-use crate::{backend_trait::BackendT, svole_trait::SvoleT, DietMacAndCheeseProver};
+use crate::{backend_trait::BackendT, svole_trait::SvoleT, DietMacAndCheese};
 
 use super::{
     comm::{CommittedCrossTerms, CommittedWitness},
     r1cs::R1CS,
 };
 
-pub(super) struct ComittedAcc<B: BackendT> {
+pub(super) struct ComittedAcc<P: Party, B: BackendT<P>> {
     pub wit: Vec<B::Wire>, // commitment to witness
     pub err: Vec<B::Wire>, // commitment to error term
 }
 
-pub(super) struct Trace<B: BackendT> {
-    pub old: ComittedAcc<B>,
-    pub new: ComittedAcc<B>,
+pub(super) struct Trace<P: Party, B: BackendT<P>> {
+    pub old: ComittedAcc<P, B>,
+    pub new: ComittedAcc<P, B>,
 }
 
-pub(super) fn collapse_trace<B: BackendT>(
+pub(super) fn collapse_trace<P: Party, B: BackendT<P>>(
     backend: &mut B,
-    trace: &[Trace<B>],
+    trace: &[Trace<P, B>],
     x: B::FieldElement,
 ) -> Result<(Vec<B::Wire>, Vec<B::Wire>)> {
     let mut lhs = Vec::with_capacity(trace.len() + 1);
@@ -34,7 +35,7 @@ pub(super) fn collapse_trace<B: BackendT>(
     Ok((lhs, rhs))
 }
 
-impl<B: BackendT> ComittedAcc<B> {
+impl<P: Party, B: BackendT<P>> ComittedAcc<P, B> {
     /// Verify a committed accumulator using the underlaying proof system
     ///
     /// The accumulator may have junk at the end (which is not verfied)
@@ -76,9 +77,9 @@ impl<B: BackendT> ComittedAcc<B> {
     pub fn fold_witness(
         &self,
         backend: &mut B,
-        chl: <B as BackendT>::FieldElement,
-        cxt: &CommittedCrossTerms<B>,
-        wit: &CommittedWitness<B>,
+        chl: <B as BackendT<P>>::FieldElement,
+        cxt: &CommittedCrossTerms<P, B>,
+        wit: &CommittedWitness<P, B>,
     ) -> Result<Self> {
         debug_assert_eq!(self.err.len(), cxt.terms.len());
         debug_assert_eq!(self.wit.len(), wit.wit.len());
@@ -107,12 +108,12 @@ impl<B: BackendT> ComittedAcc<B> {
     }
 }
 
-impl<V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SVOLE: SvoleT<(V, F)>>
-    ComittedAcc<DietMacAndCheeseProver<V, F, C, SVOLE>>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
+    ComittedAcc<P, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn value(&self, clause: &R1CS<V>) -> Accumulator<V> {
+    pub fn value(&self, ev: IsParty<P, Prover>, clause: &R1CS<V>) -> Accumulator<V> {
         let mut wit = Vec::with_capacity(clause.dim());
         let mut err = Vec::with_capacity(clause.rows());
 
@@ -120,11 +121,11 @@ where
         debug_assert!(self.err.len() >= clause.rows());
 
         for i in 0..clause.dim() {
-            wit.push(self.wit[i].value());
+            wit.push(self.wit[i].value().into_inner(ev));
         }
 
         for i in 0..clause.rows() {
-            err.push(self.err[i].value());
+            err.push(self.err[i].value().into_inner(ev));
         }
 
         let acc = Accumulator { wit, err };
@@ -204,7 +205,7 @@ impl<F: FiniteField> Accumulator<F> {
         Ok(acc)
     }
 
-    pub fn combine<B: BackendT<FieldElement = F>>(
+    pub fn combine<P: Party, B: BackendT<P, FieldElement = F>>(
         &self,
         backend: &mut B,
         x: B::FieldElement,

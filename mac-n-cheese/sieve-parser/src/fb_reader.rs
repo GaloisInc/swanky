@@ -9,7 +9,6 @@ use eyre::{Context, ContextCompat};
 
 #[path = "sieve_ir_generated.rs"]
 mod sieve_ir_generated;
-use generic_array::GenericArray;
 use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
@@ -149,7 +148,11 @@ pub struct RelationReader {
 }
 
 fn bytes2number(bytes: &[u8]) -> eyre::Result<Number> {
-    let mut buf = GenericArray::<u8, <Number as ArrayEncoding>::ByteSize>::default();
+    // We need to use the crypto_bigint version of generic_array.
+    let mut buf = crypto_bigint::generic_array::GenericArray::<
+        u8,
+        <Number as ArrayEncoding>::ByteSize,
+    >::default();
     let to_take = buf.len().min(bytes.len());
     buf[..to_take].copy_from_slice(&bytes[..to_take]);
     eyre::ensure!(

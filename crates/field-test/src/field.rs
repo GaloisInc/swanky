@@ -47,7 +47,7 @@ macro_rules! test_field {
                     }
                 }
 
-                fn make_polynomial_coefficients<L: ArrayLength<PF>>(
+                fn make_polynomial_coefficients<L: ArrayLength>(
                     poly: &Polynomial<PF>,
                 ) -> GenericArray<PF, L> {
                     let mut slice = vec![PF::ZERO; L::USIZE];

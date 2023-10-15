@@ -1,5 +1,5 @@
 use super::{Plugin, PluginExecution};
-use crate::backend_trait::{BackendT, Party};
+use crate::backend_trait::BackendT;
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
 use crate::memory::Memory;
 use eyre::{bail, ensure, Result};
@@ -7,6 +7,7 @@ use mac_n_cheese_sieve_parser::PluginTypeArg;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
+use swanky_party::{Party, WhichParty};
 
 #[derive(Clone, Debug)]
 pub(crate) struct MuxV0 {
@@ -46,7 +47,7 @@ impl MuxVersion {
     }
 
     /// Run the mux on the memory and the backend
-    pub(crate) fn execute<B: BackendT>(
+    pub(crate) fn execute<P: Party, B: BackendT<P>>(
         &self,
         backend: &mut B,
         memory: &mut Memory<B::Wire>,
@@ -85,7 +86,7 @@ impl MuxV0 {
         self.type_id
     }
 
-    fn decode_boolean<B: BackendT>(
+    fn decode_boolean<P: Party, B: BackendT<P>>(
         &self,
         cond_vec: &[B::Wire],
         backend: &mut B,
@@ -150,7 +151,11 @@ impl MuxV0 {
         Ok(ys)
     }
 
-    fn decode<B: BackendT>(&self, cond: B::Wire, backend: &mut B) -> Result<Vec<B::Wire>> {
+    fn decode<P: Party, B: BackendT<P>>(
+        &self,
+        cond: B::Wire,
+        backend: &mut B,
+    ) -> Result<Vec<B::Wire>> {
         // decode `cond` into a vector ys of 0s or 1s such that ys[i] == 1 <=> cond == i
         // The steps are basically:
         // 1) Input(y_i)  for i in 0..n
@@ -173,9 +178,9 @@ impl MuxV0 {
         for _ in 0..self.selector_range {
             // depending on the party running, if it is the prover and the index is matching then
             // it fixes the private input to 1, otherwise it fixes the private input to 0
-            let what_to_input = if backend.party() == Party::Prover {
+            let what_to_input = if let WhichParty::Prover(_) = P::WHICH {
                 let cond_eq_i_f = cond_value.as_ref().unwrap().ct_eq(&i_f);
-                Some(<B as BackendT>::FieldElement::conditional_select(
+                Some(<B as BackendT<P>>::FieldElement::conditional_select(
                     &B::FieldElement::ZERO,
                     &B::FieldElement::ONE,
                     cond_eq_i_f,
@@ -185,7 +190,7 @@ impl MuxV0 {
             };
             inputs.push(what_to_input);
 
-            if backend.party() == Party::Prover {
+            if let WhichParty::Prover(_) = P::WHICH {
                 i_f += B::FieldElement::ONE;
             }
         }
@@ -227,7 +232,7 @@ impl MuxV0 {
     }
 
     /// Execute the mux on the memory and the backend
-    pub(crate) fn execute<B: BackendT>(
+    pub(crate) fn execute<P: Party, B: BackendT<P>>(
         &self,
         backend: &mut B,
         memory: &mut Memory<B::Wire>,

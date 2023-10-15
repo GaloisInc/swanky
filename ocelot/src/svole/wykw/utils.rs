@@ -1,12 +1,10 @@
-use scuttlebutt::{
-    field::{Degree, FiniteField},
-    generic_array_length::Arr,
-};
+use generic_array::GenericArray;
+use scuttlebutt::field::{Degree, FiniteField};
 
 /// Generates powers of `FE::GENERATOR`.
-fn gen_pows<FE: FiniteField>() -> Arr<FE, Degree<FE>> {
+fn gen_pows<FE: FiniteField>() -> GenericArray<FE, Degree<FE>> {
     let mut acc = FE::ONE;
-    let mut pows: Arr<FE, Degree<FE>> = Default::default();
+    let mut pows: GenericArray<FE, Degree<FE>> = Default::default();
     for item in pows.iter_mut() {
         *item = acc;
         acc *= FE::GENERATOR;
@@ -16,7 +14,7 @@ fn gen_pows<FE: FiniteField>() -> Arr<FE, Degree<FE>> {
 
 #[derive(Clone)]
 pub struct Powers<FE: FiniteField> {
-    powers: Arr<FE, Degree<FE>>,
+    powers: GenericArray<FE, Degree<FE>>,
 }
 
 impl<FE: FiniteField> Default for Powers<FE> {
@@ -28,7 +26,7 @@ impl<FE: FiniteField> Default for Powers<FE> {
 }
 
 impl<FE: FiniteField> Powers<FE> {
-    pub fn get(&self) -> &Arr<FE, Degree<FE>> {
+    pub fn get(&self) -> &GenericArray<FE, Degree<FE>> {
         &self.powers
     }
 }

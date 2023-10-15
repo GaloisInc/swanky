@@ -2,12 +2,12 @@ use std::{iter::Peekable, marker::PhantomData};
 
 use crate::{
     backend_multifield::BackendLiftT, backend_trait::BackendT,
-    gadgets::dotproduct_with_public_powers, mac::Mac,
+    gadgets::dotproduct_with_public_powers, mac::MacT,
 };
 use eyre::{ensure, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
-use scuttlebutt::generic_array_length::Arr;
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
+use swanky_party::Party;
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
 /// not.
@@ -17,7 +17,7 @@ use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 ///
 /// **Note!** This gadget _assumes_ that the lengths of `xs` and `ys` are equal,
 /// and that the length of each equals `ntuples * tuple_size`!
-pub(crate) fn permutation_check<B: BackendT>(
+pub(crate) fn permutation_check<P: Party, B: BackendT<P>>(
     backend: &mut B,
     mut xs: impl Iterator<Item = B::Wire>,
     mut ys: impl Iterator<Item = B::Wire>,
@@ -48,13 +48,13 @@ pub(crate) fn permutation_check<B: BackendT>(
 
     let mut x = backend.constant(B::FieldElement::ONE)?;
     for _ in 0..ntuples {
-        let result = dotproduct_with_public_powers::<B>(backend, &mut xs, random, tuple_size)?;
+        let result = dotproduct_with_public_powers::<P, B>(backend, &mut xs, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
         x = backend.mul(&x, &tmp)?;
     }
     let mut y = backend.constant(B::FieldElement::ONE)?;
     for _ in 0..ntuples {
-        let result = dotproduct_with_public_powers::<B>(backend, &mut ys, random, tuple_size)?;
+        let result = dotproduct_with_public_powers::<P, B>(backend, &mut ys, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
         y = backend.mul(&y, &tmp)?;
     }
@@ -64,17 +64,19 @@ pub(crate) fn permutation_check<B: BackendT>(
 
 /// This type implements an iterator for packing elements together based on a
 /// given tuple size.
-struct Packer<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> {
+struct Packer<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire>> {
     xs: Peekable<I>,
     tuple_size: usize,
-    array: Arr<M, DegreeModulo<M::Value, M::Tag>>,
+    array: GenericArray<M, DegreeModulo<M::Value, M::Tag>>,
     nbits: usize,
     nbits_count: usize,
     tuple_count: usize,
-    _phantom: PhantomData<(M, B)>,
+    _phantom: PhantomData<(M, B, P)>,
 }
 
-impl<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Packer<M, B, I> {
+impl<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire>>
+    Packer<P, M, B, I>
+{
     /// Create a new [`Packer`] from an iterator and a given `tuple_size`.
     pub fn new(xs: I, tuple_size: usize) -> Self {
         Self {
@@ -89,8 +91,10 @@ impl<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Packer<M, B
     }
 }
 
-impl<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator for Packer<M, B, I> {
-    type Item = <M as Mac>::LiftedMac;
+impl<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire>> Iterator
+    for Packer<P, M, B, I>
+{
+    type Item = <M as MacT>::LiftedMac;
 
     fn next(&mut self) -> Option<Self::Item> {
         for x in &mut self.xs {
@@ -126,7 +130,7 @@ impl<M: Mac, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator fo
 ///
 /// **Note!** _Only_ use this circuit on binary values. There is no guarantee
 /// it'll work for non-binary values!
-pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
+pub(crate) fn permutation_check_binary<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>>(
     backend: &mut B::LiftedBackend,
     xs: impl Iterator<Item = B::Wire>,
     ys: impl Iterator<Item = B::Wire>,
@@ -135,9 +139,9 @@ pub(crate) fn permutation_check_binary<M: Mac, B: BackendLiftT<Wire = M>>(
 ) -> Result<()> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let new_tuple_size = (tuple_size + nbits - 1) / nbits;
-    let packed_xs = Packer::<M, B, _>::new(xs, tuple_size);
-    let packed_ys = Packer::<M, B, _>::new(ys, tuple_size);
-    permutation_check::<B::LiftedBackend>(backend, packed_xs, packed_ys, ntuples, new_tuple_size)
+    let packed_xs = Packer::<P, M, B, _>::new(xs, tuple_size);
+    let packed_ys = Packer::<P, M, B, _>::new(ys, tuple_size);
+    permutation_check::<P, B::LiftedBackend>(backend, packed_xs, packed_ys, ntuples, new_tuple_size)
 }
 
 #[cfg(test)]
@@ -155,12 +159,10 @@ mod tests {
     use swanky_field_f61p::F61p;
 
     use crate::{
-        backend_extfield::{DietMacAndCheeseExtFieldProver, DietMacAndCheeseExtFieldVerifier},
-        backend_trait::BackendT,
-        mac::{MacProver, MacVerifier},
-        svole_trait::{SvoleReceiver, SvoleSender},
-        DietMacAndCheeseProver, DietMacAndCheeseVerifier,
+        backend_extfield::DietMacAndCheeseExtField, backend_trait::BackendT, mac::Mac,
+        svole_trait::Svole, DietMacAndCheese,
     };
+    use swanky_party::{Prover, Verifier};
 
     use super::{permutation_check, permutation_check_binary};
 
@@ -187,7 +189,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut party = DietMacAndCheeseProver::<F, F, _, SvoleSender<F>>::init(
+            let mut party = DietMacAndCheese::<Prover, F, F, _, Svole<Prover, F, F>>::init(
                 &mut channel,
                 rng,
                 LPN_SETUP_SMALL,
@@ -195,11 +197,11 @@ mod tests {
                 false,
             )
             .unwrap();
-            let xs: Vec<MacProver<F, F>> = xs_
+            let xs: Vec<Mac<Prover, F, F>> = xs_
                 .into_iter()
                 .map(|x| party.input_private(Some(x)).unwrap())
                 .collect();
-            let ys: Vec<MacProver<F, F>> = ys_
+            let ys: Vec<Mac<Prover, F, F>> = ys_
                 .into_iter()
                 .map(|y| party.input_private(Some(y)).unwrap())
                 .collect();
@@ -224,7 +226,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut party = DietMacAndCheeseVerifier::<F, F, _, SvoleReceiver<F, F>>::init(
+        let mut party = DietMacAndCheese::<Verifier, F, F, _, Svole<Verifier, F, F>>::init(
             &mut channel,
             rng,
             LPN_SETUP_SMALL,
@@ -232,12 +234,12 @@ mod tests {
             false,
         )
         .unwrap();
-        let xs: Vec<MacVerifier<F, F>> = xs
+        let xs: Vec<Mac<Verifier, F, F>> = xs
             .clone()
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
-        let ys: Vec<MacVerifier<F, F>> = ys
+        let ys: Vec<Mac<Verifier, F, F>> = ys
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
@@ -281,7 +283,7 @@ mod tests {
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
 
-            let mut party = DietMacAndCheeseProver::<F2, F40b, _, SvoleSender<F40b>>::init(
+            let mut party = DietMacAndCheese::<Prover, F2, F40b, _, Svole<Prover, F2, F40b>>::init(
                 &mut channel,
                 rng,
                 LPN_SETUP_SMALL,
@@ -290,24 +292,26 @@ mod tests {
             )
             .unwrap();
             let mut party2 = party
-                .lift::<SvoleSender<F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+                .lift::<Svole<Prover, F40b, F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
                 .unwrap();
-            let xs: Vec<MacProver<F2, F40b>> = xs_
+            let xs: Vec<Mac<Prover, F2, F40b>> = xs_
                 .into_iter()
                 .map(|x| party.input_private(Some(x)).unwrap())
                 .collect();
-            let ys: Vec<MacProver<F2, F40b>> = ys_
+            let ys: Vec<Mac<Prover, F2, F40b>> = ys_
                 .into_iter()
                 .map(|y| party.input_private(Some(y)).unwrap())
                 .collect();
 
             permutation_check_binary::<
-                MacProver<F2, F40b>,
-                DietMacAndCheeseExtFieldProver<
+                Prover,
+                Mac<Prover, F2, F40b>,
+                DietMacAndCheeseExtField<
+                    Prover,
                     F40b,
                     Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                    SvoleSender<F40b>,
-                    SvoleSender<F40b>,
+                    Svole<Prover, F2, F40b>,
+                    Svole<Prover, F40b, F40b>,
                 >,
             >(
                 &mut party2,
@@ -331,7 +335,7 @@ mod tests {
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
 
-        let mut party = DietMacAndCheeseVerifier::<F2, F40b, _, SvoleReceiver<F2, F40b>>::init(
+        let mut party = DietMacAndCheese::<Verifier, F2, F40b, _, Svole<Verifier, F2, F40b>>::init(
             &mut channel,
             rng,
             LPN_SETUP_SMALL,
@@ -340,25 +344,27 @@ mod tests {
         )
         .unwrap();
         let mut party2 = party
-            .lift::<SvoleReceiver<F40b, F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
+            .lift::<Svole<Verifier, F40b, F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
             .unwrap();
-        let xs: Vec<MacVerifier<F2, F40b>> = xs
+        let xs: Vec<Mac<Verifier, F2, F40b>> = xs
             .clone()
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
-        let ys: Vec<MacVerifier<F2, F40b>> = ys
+        let ys: Vec<Mac<Verifier, F2, F40b>> = ys
             .iter()
             .map(|_| party.input_private(None).unwrap())
             .collect();
 
         permutation_check_binary::<
-            MacVerifier<F2, F40b>,
-            DietMacAndCheeseExtFieldVerifier<
+            Verifier,
+            Mac<Verifier, F2, F40b>,
+            DietMacAndCheeseExtField<
+                Verifier,
                 F40b,
                 Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                SvoleReceiver<F2, F40b>,
-                SvoleReceiver<F40b, F40b>,
+                Svole<Verifier, F2, F40b>,
+                Svole<Verifier, F40b, F40b>,
             >,
         >(
             &mut party2,

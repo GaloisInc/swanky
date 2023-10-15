@@ -13,5 +13,4 @@ subtle.workspace = true
 num-traits.workspace = true
 crypto-bigint.workspace = true
 
-swanky-generic-array.workspace = true
 swanky-serialization.workspace = true
