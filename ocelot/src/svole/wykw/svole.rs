@@ -396,6 +396,8 @@ impl<T: FiniteField> Receiver<T> {
     }
 
     /// Initialize the VOLE receiver.
+    ///
+    /// When provided as argument it uses a particular `delta`.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
