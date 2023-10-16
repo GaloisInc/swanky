@@ -1143,17 +1143,13 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         ))
     }
 
-    pub fn load_backends<SvoleF40b: SvoleT<P, F40b, F40b> + 'static>(
-        &mut self,
-        channel: &mut C,
-        lpn_small: bool,
-    ) -> Result<()> {
+    pub fn load_backends(&mut self, channel: &mut C, lpn_small: bool) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
             let rng = self.rng.fork();
             match spec {
                 TypeSpecification::Field(field) => {
-                    self.load_backend::<SvoleF40b>(channel, rng, *field, *idx as usize, lpn_small)?;
+                    self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
                 }
                 _ => {
                     bail!("Type not supported yet: {:?}", spec);
@@ -1194,7 +1190,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         Ok(())
     }
 
-    pub fn load_backend<SvoleF40b: SvoleT<P, F40b, F40b> + 'static>(
+    pub fn load_backend(
         &mut self,
         channel: &mut C,
         rng: AesRng,
@@ -1218,7 +1214,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
             }
 
             // Note for F2 we do not use the backend with Conv, simply dietMC
-            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, SvoleF40b>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
                 channel,
                 rng,
                 &self.fcom_f2,
@@ -1920,7 +1916,7 @@ pub(crate) mod tests {
                 true,
                 false,
             )?;
-            eval.load_backends::<Svole<Prover, F40b, F40b>>(&mut channel, true)?;
+            eval.load_backends(&mut channel, true)?;
             eval.evaluate_gates(&gates_prover, &func_store_prover)?;
             eyre::Result::Ok(())
         });
@@ -1945,7 +1941,7 @@ pub(crate) mod tests {
             false,
         )
         .unwrap();
-        eval.load_backends::<Svole<Verifier, F40b, F40b>>(&mut channel, true)?;
+        eval.load_backends(&mut channel, true)?;
         eval.evaluate_gates(&gates, &func_store)?;
 
         handle.join().unwrap()

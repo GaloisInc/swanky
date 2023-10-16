@@ -213,10 +213,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
                 config.lpn() == LpnSize::Small,
                 config.no_batching(),
             )?;
-            evaluator.load_backends::<Svole<Verifier, F40b, F40b>>(
-                &mut channel,
-                config.lpn() == LpnSize::Small,
-            )?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -246,10 +243,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
                 config.lpn() == LpnSize::Small,
                 config.no_batching(),
             )?;
-            evaluator.load_backends::<Svole<Prover, F40b, F40b>>(
-                &mut channel,
-                config.lpn() == LpnSize::Small,
-            )?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             let relation_file = File::open(relation_path)?;
@@ -424,10 +418,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
                 config.lpn() == LpnSize::Small,
                 config.no_batching(),
             )?;
-            evaluator.load_backends::<Svole<Verifier, F40b, F40b>>(
-                &mut channel,
-                config.lpn() == LpnSize::Small,
-            )?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -455,10 +446,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
                 config.lpn() == LpnSize::Small,
                 config.no_batching(),
             )?;
-            evaluator.load_backends::<Svole<Prover, F40b, F40b>>(
-                &mut channel,
-                config.lpn() == LpnSize::Small,
-            )?;
+            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             evaluator.evaluate_relation(&relation_path)?;

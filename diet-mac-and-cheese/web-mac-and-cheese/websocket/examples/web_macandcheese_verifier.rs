@@ -86,7 +86,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
         no_batching,
     )?;
     let lpn_is_small = true;
-    evaluator.load_backends::<Svole<Verifier, F40b, F40b>>(&mut channel, lpn_is_small)?;
+    evaluator.load_backends(&mut channel, lpn_is_small)?;
     info!("init time: {:?}", start.elapsed());
 
     let start = Instant::now();
