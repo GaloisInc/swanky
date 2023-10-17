@@ -107,7 +107,7 @@ pub enum MacBit<P: Party> {
 
 /// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
 /// functions to go to bits.
-pub trait BackendConvT<P: Party>: PrimeBackendT<P> {
+pub trait BackendConvT<P: Party>: PrimeBackendT {
     // Convert a wire to bits in lower-endian
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBit<P>>>;
     // convert bits in lower-endian to a wire
@@ -117,7 +117,7 @@ pub trait BackendConvT<P: Party>: PrimeBackendT<P> {
     fn finalize_conv(&mut self) -> Result<()>;
 }
 
-pub trait BackendDisjunctionT<P: Party>: BackendT<P> {
+pub trait BackendDisjunctionT: BackendT {
     // finalize the disjunctions, by running the final Dora checks
     fn finalize_disj(&mut self) -> Result<()>;
 
@@ -130,7 +130,7 @@ pub trait BackendDisjunctionT<P: Party>: BackendT<P> {
 }
 
 impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel, SVOLE: SvoleT<P, V, F40b>>
-    BackendDisjunctionT<P> for DietMacAndCheese<P, V, F40b, C, SVOLE>
+    BackendDisjunctionT for DietMacAndCheese<P, V, F40b, C, SVOLE>
 where
     <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
@@ -327,10 +327,10 @@ impl<
         C: AbstractChannel,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFE: SvoleT<P, FE, FE>,
-    > BackendT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+    > BackendT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
-    type Wire = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT<P>>::Wire;
-    type FieldElement = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT<P>>::FieldElement;
+    type Wire = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT>::FieldElement;
 
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         self.dmc.wire_value(wire)
@@ -390,7 +390,7 @@ impl<
         C: AbstractChannel,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFP: SvoleT<P, FP, FP>,
-    > BackendDisjunctionT<P> for DietMacAndCheeseConv<P, FP, C, SvoleF2, SvoleFP>
+    > BackendDisjunctionT for DietMacAndCheeseConv<P, FP, C, SvoleF2, SvoleFP>
 {
     fn finalize_disj(&mut self) -> Result<()> {
         for (_, disj) in std::mem::take(&mut self.dora_states) {
@@ -412,10 +412,10 @@ impl<
         >(
             ev: IsParty<P, Prover>,
             dmc: &mut DietMacAndCheese<P, F, F, C, SvoleF>,
-            inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT<P>>::Wire],
+            inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire],
             cond: usize,
             st: &mut DoraState<P, F, F, C, SvoleF>,
-        ) -> Result<Vec<<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT<P>>::Wire>> {
+        ) -> Result<Vec<<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire>> {
             // currently only support 1 field element switch
             debug_assert_eq!(cond, 1);
 
@@ -736,13 +736,13 @@ trait EvaluatorT<P: Party> {
 ///
 /// The evaluator uses [`BackendT`] to evaluate the circuit, and uses [`Memory`]
 /// to manage memory for the evaluation.
-pub struct EvaluatorSingle<P: Party, B: BackendT<P>> {
-    memory: Memory<<B as BackendT<P>>::Wire>,
+pub struct EvaluatorSingle<B: BackendT> {
+    memory: Memory<<B as BackendT>::Wire>,
     backend: B,
     is_boolean: bool,
 }
 
-impl<P: Party, B: BackendT<P>> EvaluatorSingle<P, B> {
+impl<B: BackendT> EvaluatorSingle<B> {
     fn new(backend: B, is_boolean: bool) -> Self {
         let memory = Memory::new();
         EvaluatorSingle {
@@ -753,9 +753,7 @@ impl<P: Party, B: BackendT<P>> EvaluatorSingle<P, B> {
     }
 }
 
-impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT<P>> EvaluatorT<P>
-    for EvaluatorSingle<P, B>
-{
+impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT> EvaluatorT<P> for EvaluatorSingle<B> {
     #[inline]
     fn evaluate_gate(
         &mut self,
@@ -876,7 +874,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT<P>> EvaluatorT<P>
                 assert_eq!(inputs.len(), 2);
                 let xs: Vec<_> = copy_mem(&self.memory, inputs[0]).copied().collect();
                 let ys: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
-                plugin.execute::<P, B>(&xs, &ys, &mut self.backend)?
+                plugin.execute(&xs, &ys, &mut self.backend)?
             }
             PluginExecution::Disjunction(disj) => {
                 assert!(inputs.len() >= 1, "must provide condition");

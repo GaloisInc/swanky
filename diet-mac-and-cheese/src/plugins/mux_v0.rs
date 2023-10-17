@@ -47,14 +47,14 @@ impl MuxVersion {
     }
 
     /// Run the mux on the memory and the backend
-    pub(crate) fn execute<P: Party, B: BackendT<P>>(
+    pub(crate) fn execute<P: Party, B: BackendT>(
         &self,
         backend: &mut B,
         memory: &mut Memory<B::Wire>,
     ) -> Result<()> {
         match self {
-            MuxVersion::MuxVerV0(p) => p.execute(backend, memory),
-            MuxVersion::MuxVerV1(p) => p.0.execute(backend, memory),
+            MuxVersion::MuxVerV0(p) => p.execute::<P, _>(backend, memory),
+            MuxVersion::MuxVerV1(p) => p.0.execute::<P, _>(backend, memory),
         }
     }
 }
@@ -86,7 +86,7 @@ impl MuxV0 {
         self.type_id
     }
 
-    fn decode_boolean<P: Party, B: BackendT<P>>(
+    fn decode_boolean<B: BackendT>(
         &self,
         cond_vec: &[B::Wire],
         backend: &mut B,
@@ -151,7 +151,7 @@ impl MuxV0 {
         Ok(ys)
     }
 
-    fn decode<P: Party, B: BackendT<P>>(
+    fn decode<P: Party, B: BackendT>(
         &self,
         cond: B::Wire,
         backend: &mut B,
@@ -180,7 +180,7 @@ impl MuxV0 {
             // it fixes the private input to 1, otherwise it fixes the private input to 0
             let what_to_input = if let WhichParty::Prover(_) = P::WHICH {
                 let cond_eq_i_f = cond_value.as_ref().unwrap().ct_eq(&i_f);
-                Some(<B as BackendT<P>>::FieldElement::conditional_select(
+                Some(<B as BackendT>::FieldElement::conditional_select(
                     &B::FieldElement::ZERO,
                     &B::FieldElement::ONE,
                     cond_eq_i_f,
@@ -232,7 +232,7 @@ impl MuxV0 {
     }
 
     /// Execute the mux on the memory and the backend
-    pub(crate) fn execute<P: Party, B: BackendT<P>>(
+    pub(crate) fn execute<P: Party, B: BackendT>(
         &self,
         backend: &mut B,
         memory: &mut Memory<B::Wire>,
@@ -260,7 +260,7 @@ impl MuxV0 {
         // 1) decode cond to get ys
         let ys = if self.cond_num_wire == 1 && self.field_type_id != std::any::TypeId::of::<F2>() {
             let cond = memory.get(start_cond_wire);
-            self.decode(*cond, backend)?
+            self.decode::<P, _>(*cond, backend)?
         } else {
             let mut cond_vec = Vec::with_capacity(self.cond_num_wire);
             for i in 0..self.cond_num_wire {
