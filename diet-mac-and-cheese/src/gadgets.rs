@@ -20,7 +20,6 @@
 use crate::backend_trait::BackendT;
 use eyre::Result;
 use swanky_field::FiniteRing;
-use swanky_party::Party;
 
 mod less_than_eq;
 pub(crate) use less_than_eq::less_than_eq_with_public;
@@ -32,7 +31,7 @@ pub(crate) use permutation_check::{permutation_check, permutation_check_binary};
 /// contains MAC'd values and `ys` contains public values.
 ///
 /// This gadget works over all fields.
-pub(crate) fn dotproduct_with_public_powers<P: Party, B: BackendT<P>>(
+pub(crate) fn dotproduct_with_public_powers<B: BackendT>(
     backend: &mut B,
     xs: &mut impl Iterator<Item = B::Wire>,
     y: B::FieldElement,

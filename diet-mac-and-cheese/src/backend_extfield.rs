@@ -56,12 +56,12 @@ impl<
         C: AbstractChannel,
         SVOLE1: SvoleT<P, F2, T>,
         SVOLE2: SvoleT<P, T, T>,
-    > BackendT<P> for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
+    > BackendT for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
-    type Wire = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT<P>>::Wire;
-    type FieldElement = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT<P>>::FieldElement;
+    type Wire = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT>::FieldElement;
 
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         self.dmc.wire_value(wire)
@@ -131,7 +131,7 @@ impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P
 }
 
 impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
-    BackendDisjunctionT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+    BackendDisjunctionT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn disjunction(
         &mut self,
@@ -147,7 +147,7 @@ impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P
 }
 
 impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
-    BackendLiftT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+    BackendLiftT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     type LiftedBackend = DietMacAndCheese<P, F40b, F40b, C, SVOLE2>;
 

@@ -29,8 +29,8 @@ pub struct Dora<
     F::PrimeField: IsSubFieldOf<V>,
 {
     disj: Disjunction<V>,
-    init: Vec<ComittedAcc<P, DietMacAndCheese<P, V, F, C, SvoleF>>>,
-    trace: Vec<Trace<P, DietMacAndCheese<P, V, F, C, SvoleF>>>,
+    init: Vec<ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>>,
+    trace: Vec<Trace<DietMacAndCheese<P, V, F, C, SvoleF>>>,
     max_trace: usize, // maximum trace len before compactification
     tx: blake3::Hasher,
     calls: ProverPrivateCopy<P, usize>,

@@ -2,7 +2,6 @@ use std::ops::{Add, Mul, Sub};
 
 use eyre::Result;
 use scuttlebutt::field::FiniteField;
-use swanky_party::Party;
 
 use crate::{backend_trait::BackendT, circuit_ir::WireCount};
 
@@ -96,7 +95,7 @@ impl<F: FiniteField> LinComb<F> {
         comb
     }
 
-    pub fn eval_commit<P: Party, B: BackendT<P, FieldElement = F>>(
+    pub fn eval_commit<B: BackendT<FieldElement = F>>(
         &self,
         backend: &mut B,
         w: &[B::Wire],
@@ -133,7 +132,7 @@ impl<F: FiniteField> Row<F> {
         (self.l.eval(wit), self.r.eval(wit), self.o.eval(wit))
     }
 
-    pub(crate) fn eval_commit<P: Party, B: BackendT<P, FieldElement = F>>(
+    pub(crate) fn eval_commit<B: BackendT<FieldElement = F>>(
         &self,
         backend: &mut B,
         wit: &[B::Wire],

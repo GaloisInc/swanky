@@ -2,13 +2,12 @@ use crate::backend_trait::BackendT;
 use eyre::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_party::Party;
 
 /// A "less-than-or-equal" gadget for [`F2`].
 ///
 /// This asserts that `a <= b`, where `a` contains MAC'd values, and `b` is
 /// public.
-pub(crate) fn less_than_eq_with_public<P: Party, B: BackendT<P, FieldElement = F2>>(
+pub(crate) fn less_than_eq_with_public<B: BackendT<FieldElement = F2>>(
     backend: &mut B,
     a: &[B::Wire],
     b: &[B::FieldElement],
@@ -71,7 +70,7 @@ mod tests {
     use scuttlebutt::{AesRng, Channel};
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F40b, F2};
-    use swanky_party::{Party, Prover, Verifier};
+    use swanky_party::{Prover, Verifier};
 
     use crate::{backend_trait::BackendT, svole_trait::Svole, DietMacAndCheese};
 
@@ -79,11 +78,7 @@ mod tests {
 
     #[test]
     fn less_than_eq_with_public_works() {
-        fn run<P: Party, B: BackendT<P, FieldElement = F2>>(
-            party: &mut B,
-            zero: B::Wire,
-            one: B::Wire,
-        ) {
+        fn run<B: BackendT<FieldElement = F2>>(party: &mut B, zero: B::Wire, one: B::Wire) {
             less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
             party.finalize().unwrap();
             less_than_eq_with_public(party, &vec![zero], &vec![F2::ONE]).unwrap();

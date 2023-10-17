@@ -5,10 +5,9 @@ use eyre::Result;
 use mac_n_cheese_sieve_parser::Number;
 use std::any::type_name;
 use swanky_field::{FiniteField, PrimeFiniteField};
-use swanky_party::Party;
 
 /// An interface for computing a proof over a single [`FiniteField`].
-pub trait BackendT<P: Party> {
+pub trait BackendT {
     /// The type associated with the input and output wires of the gates.
     type Wire: MacT;
     /// The [`FiniteField`] the computation is operating over.
@@ -44,14 +43,14 @@ pub trait BackendT<P: Party> {
 
 /// Backends that admit a conversion from [`Number`] to the underlying field
 /// element type.
-pub trait PrimeBackendT<P: Party>: BackendT<P> {
+pub trait PrimeBackendT: BackendT {
     /// Try to convert a [`Number`] to a `Self::FieldElement`.
     fn from_number(val: &Number) -> Result<Self::FieldElement>;
 }
 
 /// Blanket implementation of `PrimeBackendT` for all types whose `FieldElement`
 /// is a `PrimeFiniteField`.
-impl<P: Party, T: BackendT<P>> PrimeBackendT<P> for T
+impl<T: BackendT> PrimeBackendT for T
 where
     T::FieldElement: PrimeFiniteField,
 {

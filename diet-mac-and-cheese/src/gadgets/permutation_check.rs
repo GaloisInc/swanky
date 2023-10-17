@@ -7,7 +7,6 @@ use crate::{
 use eyre::{ensure, Result};
 use generic_array::{typenum::Unsigned, GenericArray};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
-use swanky_party::Party;
 
 /// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
 /// not.
@@ -17,7 +16,7 @@ use swanky_party::Party;
 ///
 /// **Note!** This gadget _assumes_ that the lengths of `xs` and `ys` are equal,
 /// and that the length of each equals `ntuples * tuple_size`!
-pub(crate) fn permutation_check<P: Party, B: BackendT<P>>(
+pub(crate) fn permutation_check<B: BackendT>(
     backend: &mut B,
     mut xs: impl Iterator<Item = B::Wire>,
     mut ys: impl Iterator<Item = B::Wire>,
@@ -35,13 +34,13 @@ pub(crate) fn permutation_check<P: Party, B: BackendT<P>>(
 
     let mut x = backend.constant(B::FieldElement::ONE)?;
     for _ in 0..ntuples {
-        let result = dotproduct_with_public_powers::<P, B>(backend, &mut xs, random, tuple_size)?;
+        let result = dotproduct_with_public_powers(backend, &mut xs, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
         x = backend.mul(&x, &tmp)?;
     }
     let mut y = backend.constant(B::FieldElement::ONE)?;
     for _ in 0..ntuples {
-        let result = dotproduct_with_public_powers::<P, B>(backend, &mut ys, random, tuple_size)?;
+        let result = dotproduct_with_public_powers(backend, &mut ys, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
         y = backend.mul(&y, &tmp)?;
     }
@@ -51,18 +50,18 @@ pub(crate) fn permutation_check<P: Party, B: BackendT<P>>(
 
 /// This type implements an iterator for packing elements together based on a
 /// given tuple size.
-struct Packer<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire>> {
+struct Packer<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> {
     xs: Peekable<I>,
     tuple_size: usize,
     array: GenericArray<M, DegreeModulo<M::Value, M::Tag>>,
     nbits: usize,
     nbits_count: usize,
     tuple_count: usize,
-    _phantom: PhantomData<(M, B, P)>,
+    _phantom: PhantomData<(M, B)>,
 }
 
-impl<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire>>
-    Packer<P, M, B, I>
+impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>>
+    Packer<M, B, I>
 {
     /// Create a new [`Packer`] from an iterator and a given `tuple_size`.
     pub fn new(xs: I, tuple_size: usize) -> Self {
@@ -78,8 +77,8 @@ impl<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire
     }
 }
 
-impl<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire>> Iterator
-    for Packer<P, M, B, I>
+impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator
+    for Packer<M, B, I>
 {
     type Item = <M as MacT>::LiftedMac;
 
@@ -117,7 +116,7 @@ impl<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>, I: Iterator<Item = B::Wire
 ///
 /// **Note!** _Only_ use this circuit on binary values. There is no guarantee
 /// it'll work for non-binary values!
-pub(crate) fn permutation_check_binary<P: Party, M: MacT, B: BackendLiftT<P, Wire = M>>(
+pub(crate) fn permutation_check_binary<M: MacT, B: BackendLiftT<Wire = M>>(
     backend: &mut B::LiftedBackend,
     xs: impl Iterator<Item = B::Wire>,
     ys: impl Iterator<Item = B::Wire>,
@@ -126,9 +125,9 @@ pub(crate) fn permutation_check_binary<P: Party, M: MacT, B: BackendLiftT<P, Wir
 ) -> Result<()> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let new_tuple_size = (tuple_size + nbits - 1) / nbits;
-    let packed_xs = Packer::<P, M, B, _>::new(xs, tuple_size);
-    let packed_ys = Packer::<P, M, B, _>::new(ys, tuple_size);
-    permutation_check::<P, B::LiftedBackend>(backend, packed_xs, packed_ys, ntuples, new_tuple_size)
+    let packed_xs = Packer::<M, B, _>::new(xs, tuple_size);
+    let packed_ys = Packer::<M, B, _>::new(ys, tuple_size);
+    permutation_check::<B::LiftedBackend>(backend, packed_xs, packed_ys, ntuples, new_tuple_size)
 }
 
 #[cfg(test)]
@@ -291,7 +290,6 @@ mod tests {
                 .collect();
 
             permutation_check_binary::<
-                Prover,
                 Mac<Prover, F2, F40b>,
                 DietMacAndCheeseExtField<
                     Prover,
@@ -344,7 +342,6 @@ mod tests {
             .collect();
 
         permutation_check_binary::<
-            Verifier,
             Mac<Verifier, F2, F40b>,
             DietMacAndCheeseExtField<
                 Verifier,
