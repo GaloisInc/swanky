@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Oblivious transfer benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};

@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use clap::{Arg, ArgAction, Command};
 use diet_mac_and_cheese::edabits::Conv;
 use diet_mac_and_cheese::svole_trait::Svole;

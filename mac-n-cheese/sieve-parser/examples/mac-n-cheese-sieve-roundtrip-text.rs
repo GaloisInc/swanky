@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use std::io::{Cursor, Read};
 
 use mac_n_cheese_sieve_parser::PrintingVisitor;

@@ -1,12 +1,5 @@
 //! `fancy-garbling` provides boolean and arithmetic garbling capabilities.
-#![deny(clippy::all)]
-#![allow(
-    clippy::cast_lossless,
-    clippy::new_without_default,
-    clippy::type_complexity,
-    clippy::many_single_char_names,
-    clippy::needless_range_loop
-)]
+#![allow(clippy::all)]
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 // TODO: when https://git.io/JYTnW gets stabilized add the readme as module docs.

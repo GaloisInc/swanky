@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! `KeyedArena` is a bump allocator which allows for random access to its allocations.
 //!
 //! # Rationale

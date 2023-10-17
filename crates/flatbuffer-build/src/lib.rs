@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Utilities to build flatbuffers code.
 //!
 //! We _require_ that the version of the flatbuffer compiler _exactly_ match the version of the

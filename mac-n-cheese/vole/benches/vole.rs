@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use keyed_arena::KeyedArena;
 use rand::SeedableRng;
 use scuttlebutt::{

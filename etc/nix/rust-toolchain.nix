@@ -4,5 +4,9 @@ let rust-toolchain-version = builtins.head (builtins.match "([^\r\n]+)[\r\n]*" (
 in
 rust-bin.fromRustupToolchain {
   channel = rust-toolchain-version;
-  components = [ "rustfmt" "llvm-tools-preview" ];
+  components = [
+    "rustfmt"
+    "llvm-tools-preview"
+    "clippy"
+  ];
 }

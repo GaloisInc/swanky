@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use ocelot::oprf::{KkrtReceiver, KkrtSender, Receiver, Sender};
 use scuttlebutt::{channel::track_unix_channel_pair, AesRng, Block};
 use std::time::SystemTime;

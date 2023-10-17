@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Benchmarks for semi-honest 2PC using `fancy-garbling`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
