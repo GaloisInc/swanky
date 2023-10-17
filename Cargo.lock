@@ -2214,7 +2214,6 @@ dependencies = [
  "curve25519-dalek",
  "generic-array 1.0.0",
  "hex",
- "ndarray",
  "num-bigint 0.4.4",
  "num-traits",
  "proptest",
