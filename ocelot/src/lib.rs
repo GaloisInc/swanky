@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! `ocelot` provides oblivious transfer, oblivious PRFs and sVOLE extension.
 #![cfg_attr(feature = "nightly", feature(test))]
 #![allow(clippy::many_single_char_names)]

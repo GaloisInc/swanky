@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use mac_n_cheese_ir::{
     circuit_builder::{build_circuit, build_privates, vole_supplier::VoleSupplier},
     compilation_format::{wire_format::Wire, FieldMacType, Type},

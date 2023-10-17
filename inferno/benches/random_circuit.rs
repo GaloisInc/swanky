@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use inferno::Proof;
 use scuttlebutt::field::{F61p, F64b, FiniteField};

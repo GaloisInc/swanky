@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.
 //!
 //! # Backends

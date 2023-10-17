@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use anyhow::{Error, Result};
 use clap::{arg, Arg, ArgAction, ArgMatches, Command};
 use inferno::Proof;

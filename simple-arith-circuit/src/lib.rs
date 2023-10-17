@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Implementation of a very simple (flat) arithmetic circuit representation.
 //!
 //! Circuits are encoded as a vector of gate operations. Each operation encodes

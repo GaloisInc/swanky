@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use humidor::ligero::interactive;
 use rand::SeedableRng;
 use scuttlebutt::AesRng;

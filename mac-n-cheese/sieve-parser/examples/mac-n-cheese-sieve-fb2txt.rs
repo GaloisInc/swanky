@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use std::path::Path;
 
 use mac_n_cheese_sieve_parser::{fb_reader, PrintingVisitor, RelationReader};

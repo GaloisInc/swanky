@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};

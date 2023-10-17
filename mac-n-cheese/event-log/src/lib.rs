@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use crossbeam_queue::SegQueue;
 use eyre::{Context, ContextCompat};
 use parking_lot::{Mutex, MutexGuard, RwLock};

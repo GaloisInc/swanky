@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 #![deny(unused_must_use)]
 
 pub mod fb_reader;

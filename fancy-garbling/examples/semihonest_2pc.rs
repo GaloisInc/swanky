@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use fancy_garbling::{
     circuit::{BinaryCircuit as Circuit, EvaluableCircuit},
     twopac::semihonest::{Evaluator, Garbler},
