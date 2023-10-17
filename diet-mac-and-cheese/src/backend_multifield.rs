@@ -9,6 +9,7 @@ use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
+use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
 use crate::svole_thread::{SvoleAtomic, ThreadSvole};
@@ -1040,7 +1041,7 @@ pub struct EvaluatorCirc<
     SvoleF2: SvoleT<P, F2, F40b>,
 > {
     inputs: CircInputs,
-    fcom_f2: FCom<P, F2, F40b, SvoleF2>,
+    fcom_f2: Option<FCom<P, F2, F40b, SvoleF2>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
     f2_idx: usize,
@@ -1074,13 +1075,27 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
 
         Ok(EvaluatorCirc {
             inputs,
-            fcom_f2,
+            fcom_f2: Some(fcom_f2),
             type_store,
             eval: Vec::new(),
             f2_idx: 42,
             rng,
             multithreaded_voles: vec![],
             no_batching,
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn new_plaintext(inputs: CircInputs, type_store: TypeStore) -> Result<Self> {
+        Ok(EvaluatorCirc {
+            inputs,
+            fcom_f2: None,
+            type_store,
+            eval: Vec::new(),
+            f2_idx: 42,
+            rng: AesRng::new(),
+            multithreaded_voles: vec![],
+            no_batching: false,
             phantom: PhantomData,
         })
     }
@@ -1121,7 +1136,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         Ok((
             EvaluatorCirc {
                 inputs,
-                fcom_f2,
+                fcom_f2: Some(fcom_f2),
                 type_store,
                 eval: Vec::new(),
                 f2_idx: 42,
@@ -1173,7 +1188,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         let dmc = DietMacAndCheeseConv::<P, FE, _, _, Svole<_, FE, FE>>::init(
             channel,
             rng,
-            &self.fcom_f2,
+            self.fcom_f2.as_ref().unwrap(),
             lpn_setup,
             lpn_extend,
             self.no_batching,
@@ -1210,7 +1225,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
                 channel,
                 rng,
-                &self.fcom_f2,
+                self.fcom_f2.as_ref().unwrap(),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,
@@ -1302,6 +1317,75 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         }
     }
 
+    pub fn load_backends_plaintext(&mut self) -> Result<()> {
+        let type_store = self.type_store.clone();
+        for (idx, spec) in type_store.iter() {
+            match spec {
+                TypeSpecification::Field(field) => {
+                    self.load_backend_plaintext(*field, *idx as usize)?;
+                }
+                _ => {
+                    bail!("Type not supported yet: {:?}", spec);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn load_backend_fe_plaintext<FE: PrimeFiniteField + StatisticallySecureField>(
+        &mut self,
+        idx: usize,
+    ) -> Result<()> {
+        assert!(idx == self.eval.len());
+        let back: Box<dyn EvaluatorT<P>>;
+        let dmc = DietMacAndCheesePlaintext::<FE, FE>::new()?;
+        back = Box::new(EvaluatorSingle::new(dmc, false));
+        self.eval.push(back);
+        Ok(())
+    }
+
+    pub fn load_backend_plaintext(&mut self, field: std::any::TypeId, idx: usize) -> Result<()> {
+        // Loading the backends in order
+        let back: Box<dyn EvaluatorT<P>>;
+        if field == std::any::TypeId::of::<F2>() {
+            info!("loading field F2");
+            assert_eq!(idx, self.eval.len());
+
+            // Note for F2 we do not use the backend with Conv, simply dietMC
+            let dmc = DietMacAndCheesePlaintext::<F2, F40b>::new()?;
+            back = Box::new(EvaluatorSingle::new(dmc, true));
+            self.f2_idx = self.eval.len();
+            self.eval.push(back);
+            Ok(())
+        } else if field == std::any::TypeId::of::<F61p>() {
+            info!("loading field F61p");
+            self.load_backend_fe_plaintext::<F61p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F128p>() {
+            info!("loading field F128p");
+            self.load_backend_fe_plaintext::<F128p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<Secp256k1>() {
+            info!("loading field Secp256k1");
+            self.load_backend_fe_plaintext::<Secp256k1>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<Secp256k1order>() {
+            info!("loading field Secp256k1order");
+            self.load_backend_fe_plaintext::<Secp256k1order>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F384p>() {
+            info!("loading field F384p");
+            self.load_backend_fe_plaintext::<F384p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F384q>() {
+            info!("loading field F384q");
+            self.load_backend_fe_plaintext::<F384q>(idx)?;
+            Ok(())
+        } else {
+            bail!("Unknown or unsupported field {:?}", field);
+        }
+    }
+
     fn load_backend_multithreaded_f2(
         &mut self,
         channel: &mut C,
@@ -1324,7 +1408,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b,F40b>>::init_with_fcom(
                 channel,
                 rng,
-                &self.fcom_f2,
+                self.fcom_f2.as_ref().unwrap(),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,
@@ -1382,7 +1466,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomic<P, FE, FE>>::init_with_svole(
                 channel,
                 rng,
-                &self.fcom_f2,
+                self.fcom_f2.as_ref().unwrap(),
                 svole_atomic2,
                 self.no_batching,
             )?;

@@ -141,6 +141,10 @@ pub(crate) struct Cli {
     #[clap(long)]
     pub relation: PathBuf,
 
+    /// plaintext evaluator
+    #[clap(default_value_t = false, short, long)]
+    pub plaintext: bool,
+
     /// Config file for internal options.
     #[clap(long, help = format!("\
     Path to an (optional) Diet Mac'n'Cheese configuration file.

@@ -389,6 +389,33 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     Ok(())
 }
 
+fn run_plaintext(args: &Cli) -> Result<()> {
+    let start = Instant::now();
+    let (inputs, type_store) = build_inputs_flatbuffers(args)?;
+    info!("time reading ins/wit/rel: {:?}", start.elapsed());
+
+    let relation_path = args.relation.clone();
+    match args.witness {
+        None => {}
+        Some(_) => {
+            // Prover mode
+            let start = Instant::now();
+
+            let mut evaluator = EvaluatorCirc::<
+                Prover,
+                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary typpe
+                Svole<_, F2, F40b>,
+            >::new_plaintext(inputs, type_store)?;
+            evaluator.load_backends_plaintext()?;
+            info!("init time: {:?}", start.elapsed());
+            let start = Instant::now();
+            evaluator.evaluate_relation(&relation_path)?;
+            info!("time circ exec: {:?}", start.elapsed());
+        }
+    }
+    Ok(())
+}
+
 // Run with relation in flatbuffers format
 fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
     let start = Instant::now();
@@ -628,6 +655,10 @@ fn run(args: &Cli) -> Result<()> {
     info!("instance:   {:?}", args.instance);
     info!("text fmt:   {:?}", args.text);
     info!("threads:    {:?}", config.threads());
+
+    if args.plaintext {
+        return run_plaintext(args);
+    }
 
     if args.text {
         if config.threads() == 1 {

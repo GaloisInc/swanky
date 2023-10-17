@@ -26,7 +26,7 @@ const QUEUE_CAPACITY: usize = 3_000_000;
 const TICK_TIMER: usize = 5_000_000;
 
 #[derive(Default)]
-struct Monitor<T> {
+pub(crate) struct Monitor<T> {
     tick: usize,
     monitor_instance: usize,
     monitor_witness: usize,
@@ -50,47 +50,47 @@ impl<T: FiniteField> Monitor<T> {
         }
     }
 
-    fn incr_monitor_instance(&mut self) {
+    pub(crate) fn incr_monitor_instance(&mut self) {
         self.tick();
         self.monitor_instance += 1;
     }
-    fn incr_monitor_mul(&mut self) {
+    pub(crate) fn incr_monitor_mul(&mut self) {
         self.tick();
         self.monitor_mul += 1;
     }
-    fn incr_monitor_mulc(&mut self) {
+    pub(crate) fn incr_monitor_mulc(&mut self) {
         self.tick();
         self.monitor_mulc += 1;
     }
-    fn incr_monitor_add(&mut self) {
+    pub(crate) fn incr_monitor_add(&mut self) {
         self.tick();
         self.monitor_add += 1;
     }
-    fn incr_monitor_sub(&mut self) {
+    pub(crate) fn incr_monitor_sub(&mut self) {
         self.tick();
         self.monitor_sub += 1;
     }
-    fn incr_monitor_addc(&mut self) {
+    pub(crate) fn incr_monitor_addc(&mut self) {
         self.tick();
         self.monitor_addc += 1;
     }
-    fn incr_monitor_check_zero(&mut self) {
+    pub(crate) fn incr_monitor_check_zero(&mut self) {
         self.tick();
         self.monitor_check_zero += 1;
     }
-    fn incr_monitor_witness(&mut self) {
+    pub(crate) fn incr_monitor_witness(&mut self) {
         self.tick();
         self.monitor_witness += 1;
     }
 
-    fn incr_zk_mult_check(&mut self, n: usize) {
+    pub(crate) fn incr_zk_mult_check(&mut self, n: usize) {
         self.monitor_zk_mult_check += n;
     }
-    fn incr_zk_check_zero(&mut self, n: usize) {
+    pub(crate) fn incr_zk_check_zero(&mut self, n: usize) {
         self.monitor_zk_check_zero += n;
     }
 
-    fn log_monitor(&self) {
+    pub(crate) fn log_monitor(&self) {
         info!(
             "field:{} inp:{:<11} witn:{:<11} mul:{:<11} czero:{:<11}",
             field_name::<T>(),
@@ -101,7 +101,7 @@ impl<T: FiniteField> Monitor<T> {
         );
     }
 
-    fn log_final_monitor(&self) {
+    pub(crate) fn log_final_monitor(&self) {
         info!("Monitor for field: {}", field_name::<T>());
         if self.monitor_mul != self.monitor_zk_mult_check {
             warn!(
