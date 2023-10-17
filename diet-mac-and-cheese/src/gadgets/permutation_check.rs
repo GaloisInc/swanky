@@ -60,9 +60,7 @@ struct Packer<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> {
     _phantom: PhantomData<(M, B)>,
 }
 
-impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>>
-    Packer<M, B, I>
-{
+impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Packer<M, B, I> {
     /// Create a new [`Packer`] from an iterator and a given `tuple_size`.
     pub fn new(xs: I, tuple_size: usize) -> Self {
         Self {
@@ -77,9 +75,7 @@ impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>>
     }
 }
 
-impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator
-    for Packer<M, B, I>
-{
+impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator for Packer<M, B, I> {
     type Item = <M as MacT>::LiftedMac;
 
     fn next(&mut self) -> Option<Self::Item> {
