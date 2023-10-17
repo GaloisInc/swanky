@@ -29,19 +29,6 @@ pub(crate) fn permutation_check<P: Party, B: BackendT<P>>(
         "Field size must be >= 40 bits"
     );
 
-    // ensure!(
-    //     xs.len() == ys.len(),
-    //     "Input lengths are not equal: {} != {}",
-    //     xs.len(),
-    //     ys.len()
-    // );
-    // ensure!(
-    //     xs.len() == ntuples * tuple_size,
-    //     "Provided input length not equal to expected input length: {} != {}",
-    //     xs.len(),
-    //     ntuples * tuple_size,
-    // );
-
     let minus_one = -B::FieldElement::ONE;
     let random = backend.random()?;
     let challenge = backend.random()?;
