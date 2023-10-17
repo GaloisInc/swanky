@@ -1,6 +1,7 @@
 #![allow(clippy::all)]
 //! `inferno` is an implementation of the non-interactive variant of the
 //! [Limbo zero knowledge proof protocol](https://eprint.iacr.org/2021/215).
+#![deny(missing_docs)]
 
 mod cache;
 mod circuit;
