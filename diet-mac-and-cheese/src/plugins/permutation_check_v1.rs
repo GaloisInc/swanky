@@ -28,7 +28,6 @@ use crate::{
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
-use swanky_party::Party;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]
@@ -60,7 +59,7 @@ impl PermutationCheckV1 {
 
     /// Run the permutation check on two lists provided by `xs` and `ys`,
     /// utilizing the provided `backend`.
-    pub(crate) fn execute<P: Party, B: BackendT<P>>(
+    pub(crate) fn execute<B: BackendT>(
         &self,
         xs: &[B::Wire],
         ys: &[B::Wire],

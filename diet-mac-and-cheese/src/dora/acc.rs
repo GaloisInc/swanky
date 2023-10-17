@@ -11,19 +11,19 @@ use super::{
     r1cs::R1CS,
 };
 
-pub(super) struct ComittedAcc<P: Party, B: BackendT<P>> {
+pub(super) struct ComittedAcc<B: BackendT> {
     pub wit: Vec<B::Wire>, // commitment to witness
     pub err: Vec<B::Wire>, // commitment to error term
 }
 
-pub(super) struct Trace<P: Party, B: BackendT<P>> {
-    pub old: ComittedAcc<P, B>,
-    pub new: ComittedAcc<P, B>,
+pub(super) struct Trace<B: BackendT> {
+    pub old: ComittedAcc<B>,
+    pub new: ComittedAcc<B>,
 }
 
-pub(super) fn collapse_trace<P: Party, B: BackendT<P>>(
+pub(super) fn collapse_trace<B: BackendT>(
     backend: &mut B,
-    trace: &[Trace<P, B>],
+    trace: &[Trace<B>],
     x: B::FieldElement,
 ) -> Result<(Vec<B::Wire>, Vec<B::Wire>)> {
     let mut lhs = Vec::with_capacity(trace.len() + 1);
@@ -35,7 +35,7 @@ pub(super) fn collapse_trace<P: Party, B: BackendT<P>>(
     Ok((lhs, rhs))
 }
 
-impl<P: Party, B: BackendT<P>> ComittedAcc<P, B> {
+impl<B: BackendT> ComittedAcc<B> {
     /// Verify a committed accumulator using the underlaying proof system
     ///
     /// The accumulator may have junk at the end (which is not verfied)
@@ -77,9 +77,9 @@ impl<P: Party, B: BackendT<P>> ComittedAcc<P, B> {
     pub fn fold_witness(
         &self,
         backend: &mut B,
-        chl: <B as BackendT<P>>::FieldElement,
-        cxt: &CommittedCrossTerms<P, B>,
-        wit: &CommittedWitness<P, B>,
+        chl: <B as BackendT>::FieldElement,
+        cxt: &CommittedCrossTerms<B>,
+        wit: &CommittedWitness<B>,
     ) -> Result<Self> {
         debug_assert_eq!(self.err.len(), cxt.terms.len());
         debug_assert_eq!(self.wit.len(), wit.wit.len());
@@ -109,7 +109,7 @@ impl<P: Party, B: BackendT<P>> ComittedAcc<P, B> {
 }
 
 impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
-    ComittedAcc<P, DietMacAndCheese<P, V, F, C, SvoleF>>
+    ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -205,7 +205,7 @@ impl<F: FiniteField> Accumulator<F> {
         Ok(acc)
     }
 
-    pub fn combine<P: Party, B: BackendT<P, FieldElement = F>>(
+    pub fn combine<B: BackendT<FieldElement = F>>(
         &self,
         backend: &mut B,
         x: B::FieldElement,

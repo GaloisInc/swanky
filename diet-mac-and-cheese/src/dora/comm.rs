@@ -18,7 +18,7 @@ use super::{
 };
 
 #[derive(Debug)]
-pub(super) struct CommittedWitness<'a, P: Party, B: BackendT<P>> {
+pub(super) struct CommittedWitness<'a, B: BackendT> {
     disj: &'a Disjunction<B::FieldElement>,
     pub wit: Vec<B::Wire>,
 }
@@ -80,13 +80,13 @@ impl<
         F: FiniteField,
         C: AbstractChannel,
         SvoleF: SvoleT<P, V, F>,
-    > CommittedWitness<'a, P, DietMacAndCheese<P, V, F, C, SvoleF>>
+    > CommittedWitness<'a, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit<
         'b,
-        I: Iterator<Item = <DietMacAndCheese<P, V, F, C, SvoleF> as BackendT<P>>::Wire>,
+        I: Iterator<Item = <DietMacAndCheese<P, V, F, C, SvoleF> as BackendT>::Wire>,
     >(
         channel: &mut impl AbstractChannel,
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<'a, P: Party, B: BackendT<P>> CommittedWitness<'a, P, B> {
+impl<'a, B: BackendT> CommittedWitness<'a, B> {
     fn from_parts(
         backend: &mut B,
         disj: &'a Disjunction<B::FieldElement>,
@@ -132,7 +132,7 @@ impl<'a, P: Party, B: BackendT<P>> CommittedWitness<'a, P, B> {
     ) -> Result<Self> {
         // constant
         let mut wit = Vec::with_capacity(disj.dim_ext());
-        wit.push(backend.input_public(<B as BackendT<P>>::FieldElement::ONE)?);
+        wit.push(backend.input_public(<B as BackendT>::FieldElement::ONE)?);
 
         // output
         for _ in 0..disj.outputs() {
@@ -157,7 +157,7 @@ impl<'a, P: Party, B: BackendT<P>> CommittedWitness<'a, P, B> {
     }
 }
 
-pub(super) struct CommittedCrossTerms<P: Party, B: BackendT<P>> {
+pub(super) struct CommittedCrossTerms<B: BackendT> {
     pub terms: Vec<B::Wire>,
 }
 
@@ -168,7 +168,7 @@ impl<
         F: FiniteField,
         C: AbstractChannel,
         SvoleF: SvoleT<P, V, F>,
-    > CommittedCrossTerms<P, DietMacAndCheese<P, V, F, C, SvoleF>>
+    > CommittedCrossTerms<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -191,7 +191,7 @@ where
 }
 
 impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
-    ComittedAcc<P, DietMacAndCheese<P, V, F, C, SvoleF>>
+    ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

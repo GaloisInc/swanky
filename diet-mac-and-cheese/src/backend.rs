@@ -254,7 +254,7 @@ where
 }
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>>
-    BackendT<P> for DietMacAndCheese<P, V, T, C, SVOLE>
+    BackendT for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
