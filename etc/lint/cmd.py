@@ -39,6 +39,7 @@ LINTS: List[Callable[[click.Context], LintResult]] = [
     existing_command_as_lint(
         "Run ./swanky vectoreyes generate --check", vectoreyes_generate, check=True
     ),
+    lint_rust.require_deny_missing_docs,
     lint_mypy,
     lint_flatbuffers.check_version_matches,
     lint_rust.check_cargo_lock,
@@ -58,7 +59,7 @@ def lint(ctx: click.Context) -> None:
         doc = lint.__doc__
         assert doc is not None, f"lint {lint} is missing docs!"
         lint_name = doc.strip().split("\n")[0].strip()
-        rich.get_console().rule(lint_name)
+        rich.get_console().rule(rich.markup.escape(lint_name))
         if lint(ctx) == LintResult.FAILURE:
             failures.append(lint_name)
     if len(failures) > 0:

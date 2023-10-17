@@ -165,6 +165,8 @@ All crates should (note: as of this writing, this isn't true):
 # Documentation
 Swanky APIs should be documented using [rustdoc](https://doc.rust-lang.org/rustdoc/index.html).
 
+Libraries in Swanky _must_ (this is enforced in CI) include a `#![deny(missing_docs)]` directive to require that all public APIs are documented.
+
 Documentation can be generated using [`cargo doc`](https://doc.rust-lang.org/cargo/commands/cargo-doc.html) so, for example `cargo doc --workspace --no-deps --open` will open Swanky documentation in your web browser.
 
 Swanky enables several Markdown extensions: [LaTeX math with KaTeX](https://katex.org/) and diagrams with [Mermaid](http://mermaid.js.org/).
