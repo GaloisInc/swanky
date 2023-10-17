@@ -1,4 +1,5 @@
 import itertools
+import re
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -176,6 +177,57 @@ def cargo_deny(ctx: click.Context) -> LintResult:
         )
         != 0
     ):
+        return LintResult.FAILURE
+    else:
+        return LintResult.SUCCESS
+
+
+# As of this writing, these libraries don't require documentation.
+LIBS_NOT_YET_DOCUMENTED = {
+    "bristol-fashion/src/lib.rs",
+    "crates/field/src/lib.rs",
+    "crates/field-binary/src/lib.rs",
+    "crates/field-f61p/src/lib.rs",
+    "crates/field-ff-primes/src/lib.rs",
+    "crates/field-fft/src/lib.rs",
+    "crates/field-test/src/lib.rs",
+    "crates/flatbuffer-build/src/lib.rs",
+    "crates/party/src/lib.rs",
+    "crates/serialization/src/lib.rs",
+    "diet-mac-and-cheese/src/lib.rs",
+    "diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
+    "diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
+    "fancy-garbling/base_conversion/src/lib.rs",
+    "inferno/src/lib.rs",
+    "keyed_arena/src/lib.rs",
+    "mac-n-cheese/event-log/src/lib.rs",
+    "mac-n-cheese/ir/src/lib.rs",
+    "mac-n-cheese/sieve-parser/src/lib.rs",
+    "mac-n-cheese/vole/src/lib.rs",
+    "mac-n-cheese/wire-map/src/lib.rs",
+    "vectoreyes/src/lib.rs",
+}
+
+
+def require_deny_missing_docs(ctx: click.Context) -> LintResult:
+    """
+    Require #![deny(missing_docs)] for all of our crates.
+    """
+    non_compliant = []
+    pat = re.compile(r"#!\[deny\(.*missing_docs.*\)\]", re.DOTALL)
+    for crate in crates_in_manifest():
+        lib_rs = crate / "src/lib.rs"
+        if not lib_rs.exists():
+            continue
+        if str(lib_rs.relative_to(ROOT)) in LIBS_NOT_YET_DOCUMENTED:
+            continue
+        if pat.search(lib_rs.read_text()) is None:
+            non_compliant.append(lib_rs.relative_to(ROOT))
+    non_compliant.sort()
+    if len(non_compliant) > 0:
+        print("The following files are missing a '#![deny(missing_docs)]' directive:")
+        for x in non_compliant:
+            print(f"- {x}")
         return LintResult.FAILURE
     else:
         return LintResult.SUCCESS
