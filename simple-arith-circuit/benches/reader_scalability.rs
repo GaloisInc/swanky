@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
 

@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use ocelot::oprf::{KmprtReceiver, KmprtSender};
 use rand::Rng;
 use scuttlebutt::{channel::track_unix_channel_pair, AesRng, Block, Block512};

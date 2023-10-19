@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use clap::Parser;
 use inferno::Proof;
 use rand::SeedableRng;

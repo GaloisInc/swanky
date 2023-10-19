@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 mod field;
 mod ring;
 pub use field::*;

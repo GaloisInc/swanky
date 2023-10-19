@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Serialization types for algebraic structures.
 
 use generic_array::typenum::Unsigned;

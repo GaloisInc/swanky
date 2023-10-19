@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 // Copyright (c) 2016 rust-threshold-secret-sharing developers
 //
 // Licensed under the Apache License, Version 2.0

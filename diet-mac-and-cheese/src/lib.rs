@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 /*!
 
 `diet_mac_and_cheese` provides a diet/light implementation of the Mac'n'Cheese protocol.

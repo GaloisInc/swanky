@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 #[macro_use]
 mod prime_field_using_ff;
 

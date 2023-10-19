@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 /*!
 Cli utilities.
 

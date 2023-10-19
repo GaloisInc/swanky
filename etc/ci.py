@@ -70,6 +70,19 @@ def test_rust(
         ):
             raise click.ClickException("Command failed: " + " ".join(cmd))
 
+    run(
+        [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+        ]
+        + features_args
+        + [
+            "--",
+            "-Dwarnings",
+        ]
+    )
     run(["cargo", "build", "--workspace", "--all-targets", "--verbose"] + features_args)
     if cache_test_output:
         # Doctests currently don't use the cargo runner :(

@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Private set intersection (PSZ) benchmarks using `criterion`.
 
 use criterion::{criterion_group, criterion_main, Criterion};

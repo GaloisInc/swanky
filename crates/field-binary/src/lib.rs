@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 mod f128b;
 mod f2;
 mod f64b;

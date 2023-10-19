@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use popsicle::psty::{Receiver, Sender};
 use scuttlebutt::{channel::track_unix_channel_pair, AesRng};
 use std::time::SystemTime;

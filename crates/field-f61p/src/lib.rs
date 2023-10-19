@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use crypto_bigint::Uint;
 use generic_array::GenericArray;
 use rand::Rng;

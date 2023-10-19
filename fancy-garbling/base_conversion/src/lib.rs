@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 #![deny(clippy::all)]
 
 pub fn lookup_digits_mod_at_position(x: u8, q: u16, pos: usize) -> &'static [u16] {

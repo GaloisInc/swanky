@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Support for types indexed by a _party_.
 //!
 //! The aim of this crate is code de-duplication in the context of multi-party

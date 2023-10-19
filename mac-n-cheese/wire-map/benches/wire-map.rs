@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use std::{hint::black_box, time::Instant};
 
 use mac_n_cheese_wire_map::WireMap;

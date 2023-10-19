@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use ocelot::svole::{Receiver, Sender};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
 use scuttlebutt::{
