@@ -396,14 +396,21 @@ impl<T: FiniteField> Receiver<T> {
     }
 
     /// Initialize the VOLE receiver.
+    ///
+    /// When provided as argument it uses a particular `delta`.
     pub fn init<C: AbstractChannel>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<T>,
     ) -> Result<Self, Error> {
         let pows: Powers<T> = Default::default();
-        let mut base_receiver = BaseReceiver::<T>::init(channel, pows.clone(), rng)?;
+        let mut base_receiver = if let Some(delta) = delta {
+            BaseReceiver::<T>::init_with_picked_delta(channel, pows.clone(), rng, delta)?
+        } else {
+            BaseReceiver::<T>::init(channel, pows.clone(), rng)?
+        };
         let base_voles_setup =
             base_receiver.receive(channel, compute_num_saved::<T>(lpn_setup), rng)?;
         let delta = base_receiver.delta();
@@ -527,8 +534,14 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole =
-            Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
+        let mut vole = Receiver::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+            None,
+        )
+        .unwrap();
         let mut vs: Vec<T> = Vec::new();
         vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
         let uws = handle.join().unwrap();
@@ -566,8 +579,14 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut vole =
-            Receiver::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
+        let mut vole = Receiver::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+            None,
+        )
+        .unwrap();
         let mut vs: Vec<T> = Vec::new();
         vole.receive::<_, V>(&mut channel, &mut rng, &mut vs)
             .unwrap();

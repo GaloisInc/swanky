@@ -2,13 +2,14 @@
 
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
+use crate::backend_extfield::DietMacAndCheeseExtField;
 use crate::circuit_ir::{
     CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore,
     WireCount, WireId, WireRange,
 };
 use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
-use crate::mac::Mac;
+use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
@@ -115,6 +116,36 @@ pub trait BackendConvT<P: Party>: PrimeBackendT {
 
     // Finalize the field switching conversions, by running edabits conversion checks
     fn finalize_conv(&mut self) -> Result<()>;
+}
+
+pub trait BackendLiftT: BackendT {
+    type LiftedBackend: BackendT<Wire = <Self::Wire as MacT>::LiftedMac>;
+    fn lift(&mut self) -> &mut Self::LiftedBackend;
+}
+
+impl<
+        P: Party,
+        T: PrimeFiniteField,
+        C: AbstractChannel,
+        SVOLE1: SvoleT<P, F2, F40b>,
+        SVOLE2: SvoleT<P, T, T>,
+    > BackendLiftT for DietMacAndCheeseConv<P, T, C, SVOLE1, SVOLE2>
+{
+    type LiftedBackend = Self;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
+    }
+}
+
+impl<P: Party, T: PrimeFiniteField, C: AbstractChannel, SVOLE: SvoleT<P, T, T>> BackendLiftT
+    for DietMacAndCheese<P, T, T, C, SVOLE>
+{
+    type LiftedBackend = Self;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
+    }
 }
 
 pub trait BackendDisjunctionT: BackendT {
@@ -753,7 +784,9 @@ impl<B: BackendT> EvaluatorSingle<B> {
     }
 }
 
-impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT> EvaluatorT<P> for EvaluatorSingle<B> {
+impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> EvaluatorT<P>
+    for EvaluatorSingle<B>
+{
     #[inline]
     fn evaluate_gate(
         &mut self,
@@ -872,9 +905,9 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT> EvaluatorT<P> for Evalu
             PluginExecution::PermutationCheck(plugin) => {
                 assert_eq!(outputs.len(), 0);
                 assert_eq!(inputs.len(), 2);
-                let xs: Vec<_> = copy_mem(&self.memory, inputs[0]).copied().collect();
-                let ys: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
-                plugin.execute(&xs, &ys, &mut self.backend)?
+                let xs = copy_mem(&self.memory, inputs[0]).copied();
+                let ys = copy_mem(&self.memory, inputs[1]).copied();
+                plugin.execute::<P, _>(xs, ys, &mut self.backend)?
             }
             PluginExecution::Disjunction(disj) => {
                 assert!(inputs.len() >= 1, "must provide condition");
@@ -1170,11 +1203,23 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         if field == std::any::TypeId::of::<F2>() {
             info!("loading field F2");
             assert_eq!(idx, self.eval.len());
+            let lpn_setup;
+            let lpn_extend;
+            if lpn_small {
+                lpn_setup = LPN_SETUP_SMALL;
+                lpn_extend = LPN_EXTEND_SMALL;
+            } else {
+                lpn_setup = LPN_SETUP_MEDIUM;
+                lpn_extend = LPN_EXTEND_MEDIUM;
+            }
+
             // Note for F2 we do not use the backend with Conv, simply dietMC
-            let dmc = DietMacAndCheese::<P, F2, F40b, _, SvoleF2>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
                 channel,
                 rng,
                 &self.fcom_f2,
+                lpn_setup,
+                lpn_extend,
                 self.no_batching,
             )?;
             back = Box::new(EvaluatorSingle::new(dmc, true));
@@ -1269,14 +1314,26 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         channel: &mut C,
         rng: AesRng,
         _idx: usize,
-        _lpn_small: bool,
+        lpn_small: bool,
     ) -> Result<()> {
         info!("loading field F2");
+        let lpn_setup;
+        let lpn_extend;
+        if lpn_small {
+            lpn_setup = LPN_SETUP_SMALL;
+            lpn_extend = LPN_EXTEND_SMALL;
+        } else {
+            lpn_setup = LPN_SETUP_MEDIUM;
+            lpn_extend = LPN_EXTEND_MEDIUM;
+        }
+
         let back: Box<dyn EvaluatorT<P>> = {
-            let dmc = DietMacAndCheese::<P, F2, F40b, _, SvoleF2>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b,F40b>>::init_with_fcom(
                 channel,
                 rng,
                 &self.fcom_f2,
+                lpn_setup,
+                lpn_extend,
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))

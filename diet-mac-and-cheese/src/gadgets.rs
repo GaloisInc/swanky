@@ -18,87 +18,31 @@
 //! specialization, we copy-and-paste.
 
 use crate::backend_trait::BackendT;
-use eyre::{ensure, Result};
-use generic_array::typenum::Unsigned;
-use log::warn;
-use swanky_field::{FiniteField, FiniteRing};
+use eyre::Result;
+use swanky_field::FiniteRing;
 
 mod less_than_eq;
 pub(crate) use less_than_eq::less_than_eq_with_public;
 
-/// A dot product gadget computing `xs · ys`, where `xs` contains MAC'd values
-/// and `ys` contains public values.
+mod permutation_check;
+pub(crate) use permutation_check::{permutation_check, permutation_check_binary};
+
+/// A dot product gadget computing `xs · [y, y^2, ..., y^n]`, where `xs`
+/// contains MAC'd values and `ys` contains public values.
 ///
 /// This gadget works over all fields.
-pub(crate) fn dotproduct_with_public<B: BackendT>(
+pub(crate) fn dotproduct_with_public_powers<B: BackendT>(
     backend: &mut B,
-    xs: &[B::Wire],
-    ys: &[B::FieldElement],
+    xs: &mut impl Iterator<Item = B::Wire>,
+    y: B::FieldElement,
+    n: usize,
 ) -> Result<B::Wire> {
     let mut result = backend.input_public(B::FieldElement::ZERO)?;
-    for (x, y) in xs.iter().zip(ys.iter()) {
-        let tmp = backend.mul_constant(x, *y)?;
+    let mut acc = y;
+    for x in xs.take(n) {
+        let tmp = backend.mul_constant(&x, acc)?;
         result = backend.add(&result, &tmp)?;
+        acc = acc * y;
     }
     Ok(result)
-}
-
-/// A permutation check gadget that asserts that `xs = 𝛑(ys)`, erroring out if
-/// not.
-///
-/// This gadget currently only works over fields larger than the statistical
-/// security parameter (which we have harded at 40 bits).
-pub(crate) fn permutation_check<B: BackendT>(
-    backend: &mut B,
-    xs: &[B::Wire],
-    ys: &[B::Wire],
-    ntuples: usize,
-    tuple_size: usize,
-) -> Result<()> {
-    // TODO: turn this warning into an error once F2 becomes supported with extension fields
-    if !(<B::FieldElement as FiniteField>::NumberOfBitsInBitDecomposition::USIZE >= 40) {
-        warn!("Insecure use of permutation check: Field size must be >= 40 bits");
-    }
-
-    ensure!(xs.len() == ys.len(), "Input lengths are not equal",);
-    ensure!(
-        xs.len() == ntuples * tuple_size,
-        "Provided input length not equal to expected input length",
-    );
-
-    let minus_one = -B::FieldElement::ONE;
-    let random = backend.random()?;
-
-    // TODO: Better would be to generate random values using `random` as a seed.
-    let mut acc = random;
-    let mut challenges = vec![B::FieldElement::ZERO; tuple_size];
-    for challenge in challenges.iter_mut() {
-        *challenge = acc;
-        acc = random * random;
-    }
-
-    let challenge = backend.random()?;
-
-    let mut x = backend.constant(B::FieldElement::ONE)?;
-    for i in 0..ntuples {
-        let result = dotproduct_with_public::<B>(
-            backend,
-            &xs[i * tuple_size..(i + 1) * tuple_size],
-            &challenges,
-        )?;
-        let tmp = backend.add_constant(&result, challenge * minus_one)?;
-        x = backend.mul(&x, &tmp)?;
-    }
-    let mut y = backend.constant(B::FieldElement::ONE)?;
-    for i in 0..ntuples {
-        let result = dotproduct_with_public::<B>(
-            backend,
-            &ys[i * tuple_size..(i + 1) * tuple_size],
-            &challenges,
-        )?;
-        let tmp = backend.add_constant(&result, challenge * minus_one)?;
-        y = backend.mul(&y, &tmp)?;
-    }
-    let z = backend.sub(&x, &y)?;
-    backend.assert_zero(&z)
 }

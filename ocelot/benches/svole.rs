@@ -34,8 +34,14 @@ fn svole_init<F: FiniteField>() -> (Arc<Mutex<Sender<F>>>, Arc<Mutex<Receiver<F>
     let reader = BufReader::new(receiver.try_clone().unwrap());
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
-    let vole_receiver =
-        Receiver::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap();
+    let vole_receiver = Receiver::init(
+        &mut channel,
+        &mut rng,
+        LPN_SETUP_MEDIUM,
+        LPN_EXTEND_MEDIUM,
+        None,
+    )
+    .unwrap();
     let vole_sender = handle.join().unwrap();
     let vole_sender = Arc::new(Mutex::new(vole_sender));
     let vole_receiver = Arc::new(Mutex::new(vole_receiver));
@@ -104,7 +110,14 @@ fn bench_svole_init<F: FiniteField>() {
     let writer = BufWriter::new(receiver);
     let mut channel = Channel::new(reader, writer);
     black_box(
-        Receiver::<F>::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap(),
+        Receiver::<F>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_MEDIUM,
+            LPN_EXTEND_MEDIUM,
+            None,
+        )
+        .unwrap(),
     );
     handle.join().unwrap();
 }

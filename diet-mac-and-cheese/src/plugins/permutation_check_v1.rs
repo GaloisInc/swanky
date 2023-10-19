@@ -22,18 +22,22 @@
 
 use super::{Plugin, PluginExecution};
 use crate::{
-    backend_trait::BackendT,
-    circuit_ir::{FunStore, TypeId, TypeStore, WireCount},
-    gadgets::permutation_check,
+    backend_multifield::BackendLiftT,
+    circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount},
+    gadgets::{permutation_check, permutation_check_binary},
+    mac::MacT,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
+use swanky_field_binary::F2;
+use swanky_party::Party;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]
 pub(crate) struct PermutationCheckV1 {
     /// The [`TypeId`] associated with this permutation check.
     type_id: TypeId,
+    field_type_id: std::any::TypeId,
     /// The number of tuples to check.
     ntuples: usize,
     /// The number of elements in each tuple.
@@ -44,9 +48,15 @@ impl PermutationCheckV1 {
     /// Create a new [`PermutationCheckV1`] instantiation for the field
     /// associated with the provided [`TypeId`] and the provided number of
     /// tuples and tuple size.
-    pub(crate) fn new(type_id: TypeId, ntuples: usize, tuple_size: usize) -> Self {
+    pub(crate) fn new(
+        type_id: TypeId,
+        field_type_id: std::any::TypeId,
+        ntuples: usize,
+        tuple_size: usize,
+    ) -> Self {
         Self {
             type_id,
+            field_type_id,
             ntuples,
             tuple_size,
         }
@@ -57,15 +67,30 @@ impl PermutationCheckV1 {
         self.type_id
     }
 
-    /// Run the permutation check on two lists provided by `xs` and `ys`,
-    /// utilizing the provided `backend`.
-    pub(crate) fn execute<B: BackendT>(
+    pub(crate) fn execute_binary<M: MacT, B: BackendLiftT<Wire = M>>(
         &self,
-        xs: &[B::Wire],
-        ys: &[B::Wire],
+        xs: impl Iterator<Item = B::Wire>,
+        ys: impl Iterator<Item = B::Wire>,
         backend: &mut B,
     ) -> Result<()> {
-        permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+        assert_eq!(self.field_type_id, std::any::TypeId::of::<F2>());
+        permutation_check_binary::<M, B>(backend.lift(), xs, ys, self.ntuples, self.tuple_size)
+    }
+
+    /// Run the permutation check on two lists provided by `xs` and `ys`,
+    /// utilizing the provided `backend`.
+    pub(crate) fn execute<P: Party, B: BackendLiftT>(
+        &self,
+        xs: impl Iterator<Item = B::Wire>,
+        ys: impl Iterator<Item = B::Wire>,
+        backend: &mut B,
+    ) -> Result<()> {
+        if std::any::TypeId::of::<B::FieldElement>() == std::any::TypeId::of::<F2>() {
+            self.execute_binary::<B::Wire, B>(xs, ys, backend)
+        } else {
+            assert_ne!(self.field_type_id, std::any::TypeId::of::<F2>());
+            permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+        }
     }
 }
 
@@ -77,7 +102,7 @@ impl Plugin for PermutationCheckV1 {
         params: &[PluginTypeArg],
         output_counts: &[(TypeId, WireCount)],
         input_counts: &[(TypeId, WireCount)],
-        _type_store: &TypeStore,
+        type_store: &TypeStore,
         _fun_store: &FunStore,
     ) -> eyre::Result<PluginExecution> {
         ensure!(
@@ -130,8 +155,16 @@ impl Plugin for PermutationCheckV1 {
         );
         let ntuples = nwires / tuple_size;
 
+        let field_type_id = match type_store.get(&type_id).unwrap() {
+            TypeSpecification::Field(f) => *f,
+            _ => {
+                bail!("Plugin does not support plugin types");
+            }
+        };
+
         Ok(PluginExecution::PermutationCheck(PermutationCheckV1::new(
             type_id,
+            field_type_id,
             ntuples as usize,
             tuple_size as usize,
         )))
