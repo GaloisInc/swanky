@@ -293,21 +293,15 @@ where
         lpn_extend: LpnParams,
         delta: T,
     ) -> Result<Self> {
-        let (svole, delta) = match P::WHICH {
-            WhichParty::Prover(_) => {
-                bail!("Should not init with delta for a prover");
-            }
-            WhichParty::Verifier(_) => {
-                let svole = SVOLE::init(channel, rng, lpn_setup, lpn_extend, Some(delta))?;
-                (svole, VerifierPrivateCopy::new(delta))
-            }
-        };
-
-        Ok(Self {
-            delta,
-            svole,
-            voles: PartyEither::default(),
-        })
+        if let WhichParty::Verifier(_) = P::WHICH {
+            Ok(Self {
+                delta: VerifierPrivateCopy::new(delta),
+                svole: SVOLE::init(channel, rng, lpn_setup, lpn_extend, Some(delta))?,
+                voles: PartyEither::default(),
+            })
+        } else {
+            bail!("Should not init with delta for a prover");
+        }
     }
 
     /// Duplicate the commitment scheme.
