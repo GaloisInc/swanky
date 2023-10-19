@@ -26,6 +26,17 @@ pub trait MacT: Clone + Copy + Debug + Default {
     fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac;
 }
 
+impl<T: FiniteField> MacT for T {
+    type Value = T;
+    type Tag = T;
+    type LiftedMac = Self;
+
+    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
+        debug_assert!(xs.len() == 1);
+        xs[0]
+    }
+}
+
 /// Party-generic MACs.
 ///
 /// The following holds for a global key known `Δ` known only to the verifier:
