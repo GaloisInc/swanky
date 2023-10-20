@@ -23,11 +23,13 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
       py.toml
       py.mypy
       py.types-toml
+      py.py-tree-sitter
     ]))
     sccache
     cacert
     niv
     nix
     nixpkgs-fmt
+    tree-sitter-grammars.tree-sitter-rust
   ];
 }
