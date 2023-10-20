@@ -1,5 +1,5 @@
 import itertools
-import re
+import os
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -11,6 +11,7 @@ import rich.panel
 import rich.syntax
 import rich.text
 import toml
+import tree_sitter  # type: ignore
 
 from etc import ROOT
 from etc.lint import LintResult
@@ -209,19 +210,47 @@ LIBS_NOT_YET_DOCUMENTED = {
 }
 
 
+_MISSING_DOCS_QUERY = """
+(source_file
+    (inner_attribute_item (attribute
+        (identifier) @deny
+        (#eq? @deny "deny")
+        arguments: (token_tree
+            (identifier) @lint_name
+            (#eq? @lint_name "missing_docs")
+        )
+    )))
+"""
+
+
+def _tree_sitter_rust_grammar() -> Path:
+    out = []
+    for entry in os.environ["buildInputs"].split():
+        if "tree-sitter-rust-grammar" in entry:
+            out.append(entry)
+    if len(out) != 1:
+        raise Exception(
+            f"Unexpected tree sitter rust grammar candidate list {repr(out)}"
+        )
+    return Path(out[0])
+
+
 def require_deny_missing_docs(ctx: click.Context) -> LintResult:
     """
     Require #![deny(missing_docs)] for all of our crates.
     """
+    lang = tree_sitter.Language(_tree_sitter_rust_grammar() / "parser", "rust")
+    p = tree_sitter.Parser()
+    p.set_language(lang)
+    q = lang.query(_MISSING_DOCS_QUERY)
     non_compliant = []
-    pat = re.compile(r"#!\[deny\(.*missing_docs.*\)\]", re.DOTALL)
     for crate in crates_in_manifest():
         lib_rs = crate / "src/lib.rs"
         if not lib_rs.exists():
             continue
         if str(lib_rs.relative_to(ROOT)) in LIBS_NOT_YET_DOCUMENTED:
             continue
-        if pat.search(lib_rs.read_text()) is None:
+        if len(q.captures(p.parse(lib_rs.read_bytes()).root_node)) == 0:
             non_compliant.append(lib_rs.relative_to(ROOT))
     non_compliant.sort()
     if len(non_compliant) > 0:
