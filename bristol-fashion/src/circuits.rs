@@ -22,7 +22,7 @@ define_cached_circuit!(ADD64, "adder64.txt");
 /// This circuit computes `a + b` where `a`, `b` and the result
 /// `a + b` are all 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn add64() -> Circuit {
     ADD64.with(Circuit::clone)
@@ -32,7 +32,7 @@ pub fn add64() -> Circuit {
 /// This circuit computes `a + b` where `a`, `b` and the result
 /// `a + b` are all 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn with_add64<F, R>(f: F) -> R
 where
@@ -47,7 +47,7 @@ define_cached_circuit!(SUB64, "sub64.txt");
 /// This circuit computes `a - b` where `a`, `b`, and the result
 /// `a - b` are all 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn sub64() -> Circuit {
     SUB64.with(Circuit::clone)
@@ -57,7 +57,7 @@ pub fn sub64() -> Circuit {
 /// This circuit computes `a - b` where `a`, `b`, and the result
 /// `a - b` are all 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn with_sub64<F, R>(f: F) -> R
 where
@@ -72,7 +72,7 @@ define_cached_circuit!(NEG64, "neg64.txt");
 /// This circuit computes `-a` where `a` and the result
 /// `-a` are both 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn neg64() -> Circuit {
     NEG64.with(Circuit::clone)
@@ -82,7 +82,7 @@ pub fn neg64() -> Circuit {
 /// This circuit computes `-a` where `a` and the result
 /// `-a` are both 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn with_neg64<F, R>(f: F) -> R
 where
@@ -97,7 +97,7 @@ define_cached_circuit!(MUL64, "mult64.txt");
 /// This circuit computes `a * b` where `a`, `b`, and the result
 /// `a * b` are all 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn mul64() -> Circuit {
     MUL64.with(Circuit::clone)
@@ -107,7 +107,7 @@ pub fn mul64() -> Circuit {
 /// This circuit computes `a * b` where `a`, `b`, and the result
 /// `a * b` are all 64-bit integers in little endian.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn with_mul64<F, R>(f: F) -> R
 where
@@ -128,7 +128,7 @@ define_cached_circuit!(WIDE_MUL64, "mult2_64.txt");
 /// output since the output wires of a Bristol Fashion circuit are
 /// contiguous.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn wide_mul64() -> Circuit {
     WIDE_MUL64.with(Circuit::clone)
@@ -144,7 +144,7 @@ pub fn wide_mul64() -> Circuit {
 /// output since the output wires of a Bristol Fashion circuit are
 /// contiguous.
 ///
-/// See: https://homes.esat.kuleuven.be/~nsmart/MPC/.
+/// See: <https://homes.esat.kuleuven.be/~nsmart/MPC/>.
 #[inline(never)]
 pub fn with_wide_mul64<F, R>(f: F) -> R
 where

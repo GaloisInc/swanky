@@ -15,9 +15,9 @@ pub trait BackendT {
 
     /// Return the value from a wire when it is a prover.
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement>;
-    /// Return [`Self::FieldElement::ONE`].
+    /// Return `Self::FieldElement::ONE`.
     fn one(&self) -> Result<Self::FieldElement>;
-    /// Return [`Self::FieldElement::ZERO`].
+    /// Return `Self::FieldElement::ZERO`.
     fn zero(&self) -> Result<Self::FieldElement>;
     /// Return a copy of `wire`.
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;

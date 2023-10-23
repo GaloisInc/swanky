@@ -20,7 +20,7 @@ enum Command {
     /// Generate a graphviz representation of the IR
     Dot {
         circuit: PathBuf,
-        /// Where should the output be written? Defaults to using <CIRCUIT>.dot
+        /// Where should the output be written? Defaults to using $circuit.dot
         #[clap(short, long)]
         output: Option<PathBuf>,
     },

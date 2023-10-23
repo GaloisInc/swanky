@@ -10,7 +10,7 @@
 //! Various number theoretic utility functions used in the library.
 //!
 //! Note: This library was adapted from
-//! https://github.com/snipsco/rust-threshold-secret-sharing
+//! <https://github.com/snipsco/rust-threshold-secret-sharing>
 
 use swanky_field::FiniteField;
 
