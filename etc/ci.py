@@ -176,13 +176,15 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
             finally:
                 conn.close()
             rich.print("sccache started!")
+    ctx.invoke(lint)
+    if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
+        raise click.ClickException("Pytest failed")
 
 
 @ci.command()
 @click.pass_context
 def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
-    ctx.invoke(lint)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
     test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
     test_rust(ctx, features=["serde"], force_haswell=True, cache_test_output=False)
@@ -192,5 +194,4 @@ def nightly(ctx: click.Context) -> None:
 @click.pass_context
 def quick(ctx: click.Context) -> None:
     """Run the quick (non-nightly) CI tests"""
-    ctx.invoke(lint)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)

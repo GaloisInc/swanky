@@ -1,9 +1,10 @@
 import itertools
 import os
 import subprocess
+import threading
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 import click
 import rich
@@ -234,14 +235,37 @@ def _tree_sitter_rust_grammar() -> Path:
     return Path(out[0])
 
 
+_MISSING_DOCS_QUERY_OBJ: Optional["tree_sitter.Query"] = None
+_MISSING_DOCS_PARSER: Optional["tree_sitter.Parser"] = None
+_MISSING_DOCS_QUERY_LOCK = threading.Lock()
+
+
+def _contains_deny_missing_docs(code: bytes) -> bool:
+    global _MISSING_DOCS_QUERY_LOCK
+    global _MISSING_DOCS_QUERY_OBJ
+    global _MISSING_DOCS_PARSER
+    with _MISSING_DOCS_QUERY_LOCK:
+        if _MISSING_DOCS_QUERY_OBJ is None:
+            lang = tree_sitter.Language(_tree_sitter_rust_grammar() / "parser", "rust")
+            _MISSING_DOCS_PARSER = tree_sitter.Parser()
+            _MISSING_DOCS_PARSER.set_language(lang)
+            _MISSING_DOCS_QUERY_OBJ = lang.query(_MISSING_DOCS_QUERY)
+        assert _MISSING_DOCS_PARSER is not None
+        return (
+            len(
+                _MISSING_DOCS_QUERY_OBJ.captures(
+                    _MISSING_DOCS_PARSER.parse(code).root_node
+                )
+            )
+            != 0
+        )
+
+
 def require_deny_missing_docs(ctx: click.Context) -> LintResult:
     """
     Require #![deny(missing_docs)] for all of our crates.
     """
-    lang = tree_sitter.Language(_tree_sitter_rust_grammar() / "parser", "rust")
-    p = tree_sitter.Parser()
-    p.set_language(lang)
-    q = lang.query(_MISSING_DOCS_QUERY)
+
     non_compliant = []
     for crate in crates_in_manifest():
         lib_rs = crate / "src/lib.rs"
@@ -249,7 +273,7 @@ def require_deny_missing_docs(ctx: click.Context) -> LintResult:
             continue
         if str(lib_rs.relative_to(ROOT)) in LIBS_NOT_YET_DOCUMENTED:
             continue
-        if len(q.captures(p.parse(lib_rs.read_bytes()).root_node)) == 0:
+        if not _contains_deny_missing_docs(lib_rs.read_bytes()):
             non_compliant.append(lib_rs.relative_to(ROOT))
     non_compliant.sort()
     if len(non_compliant) > 0:
