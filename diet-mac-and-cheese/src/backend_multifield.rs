@@ -100,19 +100,13 @@ fn conversion_param_b_valid() {
     assert!((CONVERSION_PARAM_B == 4) || (CONVERSION_PARAM_B == 5))
 }
 
-#[derive(Clone, Debug)]
-pub enum MacBit<P: Party> {
-    BitParty(Mac<P, F2, F40b>),
-    BitPublic(F2),
-}
-
 /// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
 /// functions to go to bits.
 pub trait BackendConvT<P: Party>: PrimeBackendT {
     // Convert a wire to bits in lower-endian
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBit<P>>>;
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>>;
     // convert bits in lower-endian to a wire
-    fn assert_conv_from_bits(&mut self, x: &[MacBit<P>]) -> Result<Self::Wire>;
+    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire>;
 
     // Finalize the field switching conversions, by running edabits conversion checks
     fn finalize_conv(&mut self) -> Result<()>;
@@ -181,17 +175,13 @@ where
 impl<P: Party, C: AbstractChannel, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
     for DietMacAndCheese<P, F2, F40b, C, SVOLE>
 {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBit<P>>> {
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         debug!("CONV_TO_BITS {:?}", w);
-        let mac = MacBit::BitParty(*w);
-        Ok(vec![mac])
+        Ok(vec![*w])
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[MacBit<P>]) -> Result<Self::Wire> {
-        match x[0] {
-            MacBit::BitParty(m) => Ok(m),
-            MacBit::BitPublic(m) => self.input_public(m),
-        }
+    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+        Ok(x[0])
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
@@ -522,7 +512,7 @@ impl<
         SvoleFE: SvoleT<P, FE, FE>,
     > BackendConvT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
 {
-    fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<MacBit<P>>> {
+    fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         debug!("CONV_TO_BITS {:?}", a);
         let mut v;
 
@@ -566,7 +556,7 @@ impl<
                 .as_slice(),
         )?;
 
-        let r = v.iter().map(|m| MacBit::BitParty(*m)).collect();
+        let r = v.clone();
 
         let bit_width = v.len();
         self.edabits_map
@@ -576,40 +566,26 @@ impl<
         Ok(r)
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[MacBit<P>]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
         let mut power_twos = ProverPrivateCopy::new(FE::ONE);
         let mut recomposed_value = ProverPrivateCopy::new(FE::ZERO);
 
         let mut bits = Vec::with_capacity(x.len());
 
-        for xx in x {
-            match xx {
-                MacBit::BitParty(m) => {
-                    if let WhichParty::Prover(ev) = P::WHICH {
-                        *recomposed_value.as_mut().into_inner(ev) +=
-                            (if m.value().into_inner(ev) == F2::ONE {
-                                FE::ONE
-                            } else {
-                                FE::ZERO
-                            }) * power_twos.into_inner(ev);
-                        power_twos
-                            .as_mut()
-                            .map(|power_twos| *power_twos += *power_twos);
-                    }
-
-                    bits.push(*m);
-                }
-                MacBit::BitPublic(b) => {
-                    // input the public bit as a private value and assert they are equal
-                    let m = self.dmc_f2.input_private(match P::WHICH {
-                        WhichParty::Prover(_) => Some(*b),
-                        WhichParty::Verifier(_) => None,
-                    })?;
-                    let hope_zero = self.dmc_f2.add_constant(&m, *b)?;
-                    self.dmc_f2.assert_zero(&hope_zero)?;
-                    bits.push(m);
-                }
+        for m in x {
+            if let WhichParty::Prover(ev) = P::WHICH {
+                *recomposed_value.as_mut().into_inner(ev) += (if m.value().into_inner(ev) == F2::ONE
+                {
+                    FE::ONE
+                } else {
+                    FE::ZERO
+                }) * power_twos.into_inner(ev);
+                power_twos
+                    .as_mut()
+                    .map(|power_twos| *power_twos += *power_twos);
             }
+
+            bits.push(*m);
         }
 
         if let WhichParty::Prover(ev) = P::WHICH {
@@ -736,9 +712,9 @@ trait EvaluatorT<P: Party> {
     ) -> Result<()>;
 
     /// Start the conversion for a [`ConvGate`].
-    fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<MacBit<P>>>;
+    fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>>;
     /// Finish the conversion for a [`ConvGate`].
-    fn conv_gate_set(&mut self, gate: &ConvGate, bits: &[MacBit<P>]) -> Result<()>;
+    fn conv_gate_set(&mut self, gate: &ConvGate, bits: &[Mac<P, F2, F40b>]) -> Result<()>;
 
     fn plugin_call_gate(
         &mut self,
@@ -956,7 +932,10 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
     // 6) x <- b0..b_n   with n < log2(X)
     // 7) y <- x         with Y > X
     // 8) x <- y         with Y > X
-    fn conv_gate_get(&mut self, (_, _, _, (start, end)): &ConvGate) -> Result<Vec<MacBit<P>>> {
+    fn conv_gate_get(
+        &mut self,
+        (_, _, _, (start, end)): &ConvGate,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
                 let mut v = Vec::with_capacity((end + 1 - start).try_into().unwrap());
@@ -985,7 +964,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
     fn conv_gate_set(
         &mut self,
         (_, (start, end), _, _): &ConvGate,
-        bits: &[MacBit<P>],
+        bits: &[Mac<P, F2, F40b>],
     ) -> Result<()> {
         if *start != *end {
             if self.is_boolean {
