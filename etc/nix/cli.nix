@@ -24,6 +24,7 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
       py.mypy
       py.types-toml
       py.py-tree-sitter
+      py.pytest
     ]))
     sccache
     cacert

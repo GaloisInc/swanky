@@ -177,6 +177,8 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
                 conn.close()
             rich.print("sccache started!")
     ctx.invoke(lint)
+    if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
+        raise click.ClickException("Pytest failed")
 
 
 @ci.command()
