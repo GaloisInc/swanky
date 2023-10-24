@@ -12,7 +12,7 @@
 //! But, now if we want to store the arena alongside references to values allocated into it,
 //! we have a problem
 //!
-//! ```compile_fail
+//! ```text
 //! struct OurFunStruct {
 //!     arena: bumpalo::Bump,
 //!     things: &'????? [usize], // what lifetime do we want?

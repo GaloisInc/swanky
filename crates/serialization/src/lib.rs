@@ -42,9 +42,9 @@ pub trait CanonicalSerialize: Copy + Serialize + DeserializeOwned {
 
 /// A way to serialize a sequence of elements.
 ///
-/// The [`Serializer::from_bytes`] and [`Serializer::to_bytes`] methods for
+/// The [`CanonicalSerialize::from_bytes`] and [`CanonicalSerialize::to_bytes`] methods for
 /// require that elements serialize and deserialize to the byte boundary.
-/// For algebraic structures like [`crate::field::F2`], where
+/// For algebraic structures like $`\texsf{GF}(2)`$ (the finite field of integers modulo 2), where
 /// each element can be represented in only one bit, using the `to_bytes` and `from_bytes`
 /// methods is 8x less efficient than just sending each bit of the elements.
 ///
@@ -72,7 +72,7 @@ pub trait SequenceDeserializer<E>: Sized {
     fn read<R: Read>(&mut self, src: &mut R) -> std::io::Result<E>;
 }
 
-/// An element serializer that uses the element's [`Serializer::to_bytes`] method.
+/// An element serializer that uses the element's [`CanonicalSerialize::to_bytes`] method.
 pub struct ByteElementSerializer<E: CanonicalSerialize>(PhantomData<E>);
 impl<E: CanonicalSerialize> SequenceSerializer<E> for ByteElementSerializer<E> {
     fn serialized_size(n: usize) -> usize {
@@ -91,7 +91,7 @@ impl<E: CanonicalSerialize> SequenceSerializer<E> for ByteElementSerializer<E> {
     }
 }
 
-/// An element deserializer that uses the element's [`Serializer::from_bytes`] method.
+/// An element deserializer that uses the element's [`CanonicalSerialize::from_bytes`] method.
 pub struct ByteElementDeserializer<E: CanonicalSerialize>(PhantomData<E>);
 impl<E: CanonicalSerialize> SequenceDeserializer<E> for ByteElementDeserializer<E> {
     fn new<R: Read>(_dst: &mut R) -> std::io::Result<Self> {

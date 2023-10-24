@@ -28,10 +28,10 @@ pub unsafe trait SmallBinaryField:
     /// Produce a field element of `Self` by zeroing the upper bits of `x`.
     fn from_lower_bits(x: u64) -> Self;
     /// Reduce the result of a single 128-bit carryless multiply of two `Self` values modulo
-    /// [`FiniteField::reduce_multiplication_over()`]
+    /// [`FiniteField::polynomial_modulus()`]
     fn reduce(x: U64x2) -> Self;
     /// Reduce the result of several 128-bit carryless multiply operations over
-    /// [`FiniteField::reduce_multiplication_over()`].
+    /// [`FiniteField::polynomial_modulus()`].
     #[inline(always)]
     fn reduce_vectored<const N: usize>(uppers: [U64x2; N], lowers: [U64x2; N]) -> [U64x2; N]
     where

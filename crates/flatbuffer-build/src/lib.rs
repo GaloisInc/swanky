@@ -6,7 +6,7 @@
 //! guarantee compatibility between a version of the compiler that's different from the version of
 //! the runtime library.
 //!
-//! See https://github.com/google/flatbuffers/wiki/Versioning for more details
+//! See <https://github.com/google/flatbuffers/wiki/Versioning> for more details
 
 use std::{
     io::{Read, Write},

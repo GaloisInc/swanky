@@ -1,5 +1,5 @@
 //! This module implements Ligero according to section 4.7 of
-//! https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
+//! <https://dl.acm.org/doi/pdf/10.1145/3133956.3134104>
 //!
 //! Running Ligero using a witness shared with another proof system ZKP2:
 //! 1. Create a circuit with a non-empty shared-witness range using the
@@ -523,7 +523,7 @@ proptest! {
 }
 
 /// The theoretical proof size according to Section 5.3 of
-/// https://dl.acm.org/doi/pdf/10.1145/3133956.3134104
+/// <https://dl.acm.org/doi/pdf/10.1145/3133956.3134104>
 pub fn expected_proof_size(
     sigma: usize,
     n: usize,

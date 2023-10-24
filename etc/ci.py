@@ -83,6 +83,10 @@ def test_rust(
             "-Dwarnings",
         ]
     )
+    run(
+        ["cargo", "doc", "--workspace", "--no-deps", "--verbose"] + features_args,
+        extra_env={"RUSTDOCFLAGS": "-D warnings"},
+    )
     run(["cargo", "build", "--workspace", "--all-targets", "--verbose"] + features_args)
     if cache_test_output:
         # Doctests currently don't use the cargo runner :(

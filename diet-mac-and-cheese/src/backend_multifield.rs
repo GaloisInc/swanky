@@ -765,7 +765,7 @@ trait EvaluatorT<P: Party> {
 
 /// A circuit evaluator for a single [`BackendT`].
 ///
-/// The evaluator uses [`BackendT`] to evaluate the circuit, and uses [`Memory`]
+/// The evaluator uses [`BackendT`] to evaluate the circuit, and uses `Memory`
 /// to manage memory for the evaluation.
 pub struct EvaluatorSingle<B: BackendT> {
     memory: Memory<<B as BackendT>::Wire>,
