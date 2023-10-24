@@ -1,7 +1,8 @@
 use crate::{
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, MacBit},
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
     backend_trait::BackendT,
     homcom::FCom,
+    mac::Mac,
     plugins::DisjunctionBody,
     svole_trait::SvoleT,
     DietMacAndCheese,
@@ -117,11 +118,11 @@ where
 impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
     BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<MacBit<P>>> {
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         self.dmc.assert_conv_to_bits(w)
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[MacBit<P>]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
         self.dmc.assert_conv_from_bits(x)
     }
 
