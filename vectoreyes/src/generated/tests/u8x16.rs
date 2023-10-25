@@ -68,3 +68,10 @@ fn const_matches_from() {
     const ARR: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     assert_eq!(crate::U8x16::from(ARR), crate::U8x16::from_array(ARR),);
 }
+#[test]
+fn size_matches_array() {
+    assert_eq!(
+        std::mem::size_of::<crate::U8x16>(),
+        std::mem::size_of::<[u8; 16]>(),
+    );
+}

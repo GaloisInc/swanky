@@ -206,7 +206,6 @@ LIBS_NOT_YET_DOCUMENTED = {
     "mac-n-cheese/sieve-parser/src/lib.rs",
     "mac-n-cheese/vole/src/lib.rs",
     "mac-n-cheese/wire-map/src/lib.rs",
-    "vectoreyes/src/lib.rs",
 }
 
 

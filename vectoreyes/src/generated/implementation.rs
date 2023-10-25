@@ -6740,6 +6740,7 @@ impl U64x2 {
   // DEALINGS IN THE SOFTWARE.
 select_impl! { scalar { #[derive(Clone)] enum Aes128KeySchedule { Variable(aes::Aes128), // TODO: if we care a lot about scalar performance, this could be quite slow.
 Fixed, } impl From<aes::Aes128> for Aes128KeySchedule { #[inline(always)] fn from(x: aes::Aes128) -> Self { Self::Variable(x) } } impl Deref for Aes128KeySchedule { type Target = aes::Aes128; #[inline(always)] fn deref(&self) -> &Self::Target { lazy_static::lazy_static! { static ref FIXED_AES_128: aes::Aes128 = { use aes::cipher::{KeyInit, generic_array::GenericArray}; aes::Aes128::new(&GenericArray::from([189, 36, 0, 193, 18, 65, 206, 51, 237, 61, 125, 199, 168, 86, 64, 37])) }; } match self { Self::Variable(aes) => aes, Self::Fixed => FIXED_AES_128.deref(), } } } type Aes128EncryptOnlyKeySchedule = Aes128KeySchedule; } avx2 { type Aes128EncryptOnlyKeySchedule = [U32x4; 11]; #[derive(Clone)] struct Aes128KeySchedule { encrypt_keys: [U32x4; 11], decrypt_keys: [U32x4; 11], } } }
+#[doc = "A key-scheduled Aes128 block cipher which can both encrypt and decrypt blocks."]
 #[derive(Clone)]
 pub struct Aes128 {
     key: Aes128KeySchedule,
@@ -6793,6 +6794,7 @@ impl From<Aes128> for Aes128EncryptOnly {
         select_impl_block! { scalar { Aes128EncryptOnly { key: aes.key, } } avx2 { Aes128EncryptOnly { key: aes.key.encrypt_keys, } } }
     }
 }
+#[doc = "A key-scheduled Aes128 block cipher which can only encrypt blocks."]
 #[derive(Clone)]
 pub struct Aes128EncryptOnly {
     key: Aes128EncryptOnlyKeySchedule,
@@ -6830,6 +6832,7 @@ impl crate::AesBlockCipher for Aes128EncryptOnly {
 }
 select_impl! { scalar { #[derive(Clone)] enum Aes256KeySchedule { Variable(aes::Aes256), // TODO: if we care a lot about scalar performance, this could be quite slow.
 Fixed, } impl From<aes::Aes256> for Aes256KeySchedule { #[inline(always)] fn from(x: aes::Aes256) -> Self { Self::Variable(x) } } impl Deref for Aes256KeySchedule { type Target = aes::Aes256; #[inline(always)] fn deref(&self) -> &Self::Target { lazy_static::lazy_static! { static ref FIXED_AES_256: aes::Aes256 = { use aes::cipher::{KeyInit, generic_array::GenericArray}; aes::Aes256::new(&GenericArray::from([156, 63, 253, 81, 157, 52, 243, 206, 213, 76, 200, 118, 144, 71, 141, 110, 23, 19, 106, 206, 52, 29, 51, 6, 102, 136, 149, 40, 59, 234, 162, 127])) }; } match self { Self::Variable(aes) => aes, Self::Fixed => FIXED_AES_256.deref(), } } } type Aes256EncryptOnlyKeySchedule = Aes256KeySchedule; } avx2 { type Aes256EncryptOnlyKeySchedule = [U32x4; 15]; #[derive(Clone)] struct Aes256KeySchedule { encrypt_keys: [U32x4; 15], decrypt_keys: [U32x4; 15], } } }
+#[doc = "A key-scheduled Aes256 block cipher which can both encrypt and decrypt blocks."]
 #[derive(Clone)]
 pub struct Aes256 {
     key: Aes256KeySchedule,
@@ -6884,6 +6887,7 @@ impl From<Aes256> for Aes256EncryptOnly {
         select_impl_block! { scalar { Aes256EncryptOnly { key: aes.key, } } avx2 { Aes256EncryptOnly { key: aes.key.encrypt_keys, } } }
     }
 }
+#[doc = "A key-scheduled Aes256 block cipher which can only encrypt blocks."]
 #[derive(Clone)]
 pub struct Aes256EncryptOnly {
     key: Aes256EncryptOnlyKeySchedule,

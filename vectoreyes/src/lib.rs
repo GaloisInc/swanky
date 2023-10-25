@@ -1,4 +1,5 @@
 #![allow(clippy::all)]
+#![deny(missing_docs)]
 //! VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.
 //!
 //! # Backends
@@ -50,23 +51,35 @@
 
 use std::ops::*;
 
+/// What CPU micro architecture is being targeted?
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MicroArchitecture {
+    /// <https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(client)>
     Skylake,
+    /// <https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(server)>
     SkylakeAvx512,
+    /// <https://en.wikichip.org/wiki/cascade_lake>
     CascadeLake,
+    /// <https://en.wikichip.org/wiki/amd_zen>
     AmdZenVer1,
+    /// <https://en.wikichip.org/wiki/amd/microarchitectures/zen_2>
     AmdZenVer2,
+    /// <https://en.wikichip.org/wiki/amd/microarchitectures/zen_3>
     AmdZenVer3,
+    /// A microarchitecture not on this list.
     Unknown,
 }
 
+/// What backend will be used when targeting the current CPU?
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VectorBackend {
+    /// The fallback scalar backend (doesn't use vector instructions)
     Scalar,
+    /// A vector backend targeting [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2)
     Avx2 {
+        /// The selected (or detected) microarchitecture to target.
         micro_architecture: MicroArchitecture,
     },
 }
@@ -122,6 +135,10 @@ scalar_impls!((i64, u64), (i32, u32), (i16, u16), (i8, u8));
 /// A vector equivalent to `[T; Self::Lanes]`.
 ///
 /// Note that each implemented method shows an equivalent scalar implementation.
+///
+/// # Representation
+/// This type should have the same size as `[T; Self::Lanes]`, though it may have increased
+/// alignment requirements.
 ///
 /// # Effects of Signedness on shift operations
 /// When `Scalar` is _signed_, this will shift in sign bits, as opposed to zeroes.
@@ -193,7 +210,9 @@ pub trait SimdBase:
         + From<Self>
         + Into<Self>;
 
+    /// A vector where every element is zero.
     const ZERO: Self;
+    /// Is `self == Self::ZERO`?
     fn is_zero(&self) -> bool;
 
     /// Create a new vector by setting element 0 to `value`, and the rest of the elements to `0`.
@@ -202,6 +221,7 @@ pub trait SimdBase:
     /// Create a new vector by setting every element to `value`.
     fn broadcast(value: Self::Scalar) -> Self;
 
+    /// A vector of `[Self::Scalar; 128 / (8 * std::mem::size_of::<Self::Scalar>())]`
     type BroadcastLoInput: SimdBase<Scalar = Self::Scalar>;
     /// Create a vector by setting every element to element 0 of `of`.
     fn broadcast_lo(of: Self::BroadcastLoInput) -> Self;
@@ -242,10 +262,17 @@ pub trait SimdBase:
     fn min(&self, other: Self) -> Self;
 }
 
+/// A vector supporting the gather operation.
 pub trait SimdBaseGatherable<IV: SimdBase>: SimdBase {
     /// Construct a vector by accessing values at `base + indices[i]`
+    ///
+    /// # Safety
+    /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`
     unsafe fn gather(base: *const Self::Scalar, indices: IV) -> Self;
     /// Construct a vector by accessing values at `base + indices[i]`, only if the mask is set.
+    ///
+    /// # Safety
+    /// This operation is safe if `std::ptr::read(base.add(indices[i]))` is safe for all `i`
     unsafe fn gather_masked(base: *const Self::Scalar, indices: IV, mask: Self, src: Self) -> Self;
 }
 
@@ -280,7 +307,9 @@ pub trait SimdBase8x: SimdBase {
 
 /// A vector supporting saturating arithmetic on each entry
 pub trait SimdSaturatingArithmetic: SimdBase {
+    /// Pairwise add vectors. On overflow, the entry's value goes to the maximum scalar value.
     fn saturating_add(&self, other: Self) -> Self;
+    /// Pairwise add vectors. On overflow, the entry's value goes to the minimum scalar value.
     fn saturating_sub(&self, other: Self) -> Self;
 }
 
@@ -354,6 +383,7 @@ pub trait ExtendingCast<T: SimdBase>: SimdBase {
 
 /// A utility trait you probably won't need to use. See [Simd].
 pub trait HasVector<const N: usize>: Scalar {
+    /// The vector of `[Self; N]`
     type Vector: SimdBase<Scalar = Self>;
 }
 
@@ -366,7 +396,12 @@ pub trait HasVector<const N: usize>: Scalar {
 /// ```
 pub type Simd<T, const N: usize> = <T as HasVector<N>>::Vector;
 
+/// An AES block cipher, suitable for encryption
+///
+/// This cipher can be used for encryption. Decryption operations are handled in the subtrait
+/// [`AesBlockCipherDecrypt`].
 pub trait AesBlockCipher: 'static + Clone + Sync + Send {
+    /// The type of the AES key.
     type Key: 'static + Clone + Sync + Send;
 
     /// If you don't need to use Aes for decryption, it's faster to only perform key scheduling
@@ -385,20 +420,25 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// If you need to AES with a particular key, be careful about endianness issues.
     fn new_with_key(key: Self::Key) -> Self;
 
+    /// AES-ECB encrypt `block`
     #[inline(always)]
     fn encrypt(&self, block: U8x16) -> U8x16 {
         self.encrypt_many([block])[0]
     }
+    /// AES-ECB encrypt `blocks`
     fn encrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
     where
         array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>;
 }
 
+/// An AES block cipher, suitable for encryption and decryption
 pub trait AesBlockCipherDecrypt: AesBlockCipher {
+    /// AES-ECB decrypt `block`
     #[inline(always)]
     fn decrypt(&self, block: U8x16) -> U8x16 {
         self.decrypt_many([block])[0]
     }
+    /// AES-ECB decrypt `blocks`
     fn decrypt_many<const N: usize>(&self, blocks: [U8x16; N]) -> [U8x16; N]
     where
         array_utils::ArrayUnrolledOps: array_utils::UnrollableArraySize<N>;
