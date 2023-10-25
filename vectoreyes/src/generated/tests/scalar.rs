@@ -12587,6 +12587,7 @@ impl Deref for Aes128KeySchedule {
     }
 }
 type Aes128EncryptOnlyKeySchedule = Aes128KeySchedule;
+#[doc = "A key-scheduled Aes128 block cipher which can both encrypt and decrypt blocks."]
 #[derive(Clone)]
 pub struct Aes128 {
     key: Aes128KeySchedule,
@@ -12651,6 +12652,7 @@ impl From<Aes128> for Aes128EncryptOnly {
         Aes128EncryptOnly { key: aes.key }
     }
 }
+#[doc = "A key-scheduled Aes128 block cipher which can only encrypt blocks."]
 #[derive(Clone)]
 pub struct Aes128EncryptOnly {
     key: Aes128EncryptOnlyKeySchedule,
@@ -12713,6 +12715,7 @@ impl Deref for Aes256KeySchedule {
     }
 }
 type Aes256EncryptOnlyKeySchedule = Aes256KeySchedule;
+#[doc = "A key-scheduled Aes256 block cipher which can both encrypt and decrypt blocks."]
 #[derive(Clone)]
 pub struct Aes256 {
     key: Aes256KeySchedule,
@@ -12777,6 +12780,7 @@ impl From<Aes256> for Aes256EncryptOnly {
         Aes256EncryptOnly { key: aes.key }
     }
 }
+#[doc = "A key-scheduled Aes256 block cipher which can only encrypt blocks."]
 #[derive(Clone)]
 pub struct Aes256EncryptOnly {
     key: Aes256EncryptOnlyKeySchedule,

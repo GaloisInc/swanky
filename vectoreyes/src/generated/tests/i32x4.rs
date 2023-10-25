@@ -72,3 +72,10 @@ fn const_matches_from() {
     const ARR: [i32; 4] = [0, 1, 2, 3];
     assert_eq!(crate::I32x4::from(ARR), crate::I32x4::from_array(ARR),);
 }
+#[test]
+fn size_matches_array() {
+    assert_eq!(
+        std::mem::size_of::<crate::I32x4>(),
+        std::mem::size_of::<[i32; 4]>(),
+    );
+}

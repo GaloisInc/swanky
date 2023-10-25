@@ -270,3 +270,11 @@ fn const_matches_from() {
         crate::{{ty}}::from_array(ARR),
     );
 }
+
+#[test]
+fn size_matches_array() {
+    assert_eq!(
+        std::mem::size_of::<crate::{{ty}}>(),
+        std::mem::size_of::<{{ty.array}}>(),
+    );
+}

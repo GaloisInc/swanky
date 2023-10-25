@@ -134,6 +134,7 @@
     {% endcall %}
 
     {% for encrypt_only in ["", "EncryptOnly"] %}
+        /// A key-scheduled Aes{{key_size}} block cipher which can {% if encrypt_only == "" %}both encrypt and decrypt{%else%}only encrypt{%endif%} blocks.
         #[derive(Clone)]
         pub struct Aes{{key_size}}{{encrypt_only}} {
             key: Aes{{key_size}}{{encrypt_only}}KeySchedule,
