@@ -18,7 +18,8 @@
 * `swanky-field-ff-primes`: Arithmetic fields of prime order larger than 64
 * `swanky-field-fft`: Utilities for performing FFTs on fields
 * `swanky-field-test`: Utilities for testing that finite field implementations are correct
-* `swanky-generic-array`: Utilities to make it easier to use generic arrays from the `generic-array` crate
+* `swanky-flatbuffer-build`: Utilities to build flatbuffers code.
+* `swanky-party`: Support for types indexed by a party.
 * `swanky-serialization`: Traits and utilities for compact serialization into a canonical byte representation
 
 # A note on security
