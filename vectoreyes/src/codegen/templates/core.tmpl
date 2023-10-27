@@ -367,6 +367,7 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
         }
     }
 
+    {% include "impl/serde.tmpl" %}
     {% include "impl/binops.tmpl" %}
     {% include "impl/const.tmpl" %}
     {% include "impl/conversions.tmpl" %}

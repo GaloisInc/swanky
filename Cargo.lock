@@ -2544,8 +2544,10 @@ dependencies = [
 name = "swanky-serialization"
 version = "0.5.0"
 dependencies = [
+ "bytemuck",
  "generic-array 1.0.0",
  "serde",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2905,6 +2907,8 @@ dependencies = [
  "lazy_static",
  "num-traits",
  "proptest",
+ "serde",
+ "serde_json",
  "subtle",
 ]
 
