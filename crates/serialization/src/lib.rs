@@ -10,6 +10,7 @@ use std::{
 };
 
 mod impls;
+pub use impls::{ValueTooBigForIsize, ValueTooBigForUsize};
 
 /// Types that implement this trait have a canonical serialization and a fixed
 /// serialization size.

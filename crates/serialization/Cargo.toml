@@ -10,4 +10,5 @@ version.workspace = true
 # serde, itself, is a small crate. We just don't want to require the derive feature.
 serde.workspace = true
 generic-array.workspace = true
-
+vectoreyes.workspace = true
+bytemuck.workspace = true
