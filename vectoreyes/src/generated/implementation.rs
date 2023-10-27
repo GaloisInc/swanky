@@ -70,6 +70,22 @@ impl subtle::ConditionallySelectable for I8x16 {
         Self::from(out)
     }
 }
+impl serde::Serialize for I8x16 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i8; 16]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I8x16 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i8; 16]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for I8x16 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -453,6 +469,22 @@ impl subtle::ConditionallySelectable for I8x32 {
             *out = <i8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for I8x32 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i8; 32]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I8x32 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i8; 32]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for I8x32 {
@@ -863,6 +895,22 @@ impl subtle::ConditionallySelectable for I16x8 {
         Self::from(out)
     }
 }
+impl serde::Serialize for I16x8 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i16; 8]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I16x8 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i16; 8]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for I16x8 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -1266,6 +1314,22 @@ impl subtle::ConditionallySelectable for I16x16 {
             *out = <i16 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for I16x16 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i16; 16]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I16x16 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i16; 16]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for I16x16 {
@@ -1686,6 +1750,22 @@ impl subtle::ConditionallySelectable for I32x4 {
         Self::from(out)
     }
 }
+impl serde::Serialize for I32x4 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i32; 4]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I32x4 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i32; 4]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for I32x4 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -2104,6 +2184,22 @@ impl subtle::ConditionallySelectable for I32x8 {
             *out = <i32 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for I32x8 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i32; 8]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I32x8 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i32; 8]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for I32x8 {
@@ -2540,6 +2636,22 @@ impl subtle::ConditionallySelectable for I64x2 {
         Self::from(out)
     }
 }
+impl serde::Serialize for I64x2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i64; 2]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I64x2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i64; 2]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for I64x2 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -2941,6 +3053,22 @@ impl subtle::ConditionallySelectable for I64x4 {
             *out = <i64 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for I64x4 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[i64; 4]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for I64x4 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[i64; 4]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for I64x4 {
@@ -3406,6 +3534,22 @@ impl subtle::ConditionallySelectable for U8x16 {
         Self::from(out)
     }
 }
+impl serde::Serialize for U8x16 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u8; 16]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U8x16 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u8; 16]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for U8x16 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -3790,6 +3934,22 @@ impl subtle::ConditionallySelectable for U8x32 {
             *out = <u8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for U8x32 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u8; 32]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U8x32 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u8; 32]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for U8x32 {
@@ -4201,6 +4361,22 @@ impl subtle::ConditionallySelectable for U16x8 {
         Self::from(out)
     }
 }
+impl serde::Serialize for U16x8 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u16; 8]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U16x8 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u16; 8]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for U16x8 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -4605,6 +4781,22 @@ impl subtle::ConditionallySelectable for U16x16 {
             *out = <u16 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for U16x16 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u16; 16]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U16x16 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u16; 16]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for U16x16 {
@@ -5026,6 +5218,22 @@ impl subtle::ConditionallySelectable for U32x4 {
         Self::from(out)
     }
 }
+impl serde::Serialize for U32x4 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u32; 4]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U32x4 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u32; 4]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for U32x4 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -5445,6 +5653,22 @@ impl subtle::ConditionallySelectable for U32x8 {
             *out = <u32 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for U32x8 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u32; 8]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U32x8 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u32; 8]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for U32x8 {
@@ -5882,6 +6106,22 @@ impl subtle::ConditionallySelectable for U64x2 {
         Self::from(out)
     }
 }
+impl serde::Serialize for U64x2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u64; 2]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U64x2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u64; 2]>::deserialize(deserializer).map(Self::from_array)
+    }
+}
 impl BitXorAssign for U64x2 {
     #[inline(always)]
     fn bitxor_assign(&mut self, rhs: Self) {
@@ -6284,6 +6524,22 @@ impl subtle::ConditionallySelectable for U64x4 {
             *out = <u64 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl serde::Serialize for U64x4 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        <[u64; 4]>::from(*self).serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for U64x4 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u64; 4]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl BitXorAssign for U64x4 {

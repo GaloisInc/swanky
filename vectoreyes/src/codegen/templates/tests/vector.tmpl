@@ -254,6 +254,24 @@ use crate::SimdSaturatingArithmetic;
     {% endfor %}
 {% endif %}
 
+// Check that the serialized json is the same for both implementations.
+{% call proptest_eq_scalar("serde_serialize", {'a': ty}) %}
+    serde_json::to_string(&a).unwrap()
+{% endcall %}
+
+proptest! {
+    #[test]
+    fn test_serialize_roundtrip(
+        x in {{ty.proptest_strategy}}
+    ) {
+        let x = crate::{{ty}}::from_array(x);
+        prop_assert_eq!(
+            serde_json::from_str::<crate::{{ty}}>(&serde_json::to_string(&x).unwrap()).unwrap(),
+            x
+        );
+    }
+}
+
 #[test]
 fn zero_is_zero() {
     assert!(crate::{{ty}}::ZERO.is_zero());

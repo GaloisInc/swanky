@@ -2905,6 +2905,8 @@ dependencies = [
  "lazy_static",
  "num-traits",
  "proptest",
+ "serde",
+ "serde_json",
  "subtle",
 ]
 
