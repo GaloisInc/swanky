@@ -1,5 +1,6 @@
 [package]
 name = "mac-n-cheese-event-log"
+description = "Utilities to define metrics for mac n'cheese"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

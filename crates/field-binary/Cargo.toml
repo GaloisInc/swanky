@@ -1,5 +1,6 @@
 [package]
 name = "swanky-field-binary"
+description = "Binary finite (extension) fields"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

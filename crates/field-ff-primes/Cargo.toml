@@ -1,5 +1,6 @@
 [package]
 name = "swanky-field-ff-primes"
+description = "Finite field implementations for large prime fields"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
