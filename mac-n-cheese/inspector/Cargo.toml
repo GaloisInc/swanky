@@ -1,5 +1,6 @@
 [package]
 name = "mac-n-cheese-inspector"
+description = "A tool to inspect mac n'cheese IR files"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

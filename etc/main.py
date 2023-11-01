@@ -45,6 +45,7 @@ from etc.fmt import fmt
 from etc.lint.cmd import lint
 from etc.list_features import list_features
 from etc.new_crate import new_crate
+from etc.readme import readme
 from etc.upgrades import upgrade_deps
 from vectoreyes.cmd import vectoreyes
 
@@ -53,5 +54,6 @@ main.add_command(fmt)
 main.add_command(lint)
 main.add_command(list_features)
 main.add_command(new_crate)
+main.add_command(readme)
 main.add_command(upgrade_deps)
 main.add_command(vectoreyes)

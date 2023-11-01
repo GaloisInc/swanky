@@ -1,5 +1,6 @@
 [package]
 name = "mac-n-cheese-vole"
+description = "An implementation of Vector Oblivious Linear Evaluation"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

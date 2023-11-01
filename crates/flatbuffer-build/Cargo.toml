@@ -1,5 +1,6 @@
 [package]
 name = "swanky-flatbuffer-build"
+description = "Tooling to automate compiling flatbuffer schemas"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

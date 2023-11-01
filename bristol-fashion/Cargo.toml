@@ -1,5 +1,6 @@
 [package]
 name = "bristol-fashion"
+description = "A parser for Bristol Fashion circuits."
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
