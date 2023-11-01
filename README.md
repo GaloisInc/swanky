@@ -3,11 +3,13 @@
 `swanky` provides a suite of rust libraries for doing secure computation.
 
 * `bristol-fashion`: A parser for Bristol Fashion circuits.
+* `diet-mac-and-cheese`: Implementation of the Mac'n'Cheese / QuickSilver zero knowledge proof system, with a focus on extensibility / features.
 * `fancy-garbling`: Boolean and arithmetic garbled circuits.
   * `twopac`: Two-party garbled-circuit-based secure computation.
 * `humidor`: Implementation of the Ligero zero knowledge proof system.
-* `keyed_arena`: Bump allocator which allows for random access to its allocations.
 * `inferno`: An implementation of the Limbo zero-knowledge proof system.
+* `keyed_arena`: Bump allocator which allows for random access to its allocations.
+* `mac-n-cheese`: Implementation of the Mac'n'Cheese / QuickSilver zero knowledge proof system, with a focus on raw speed.
 * `ocelot`: Oblivious transfer and oblivious PRFs.
 * `popsicle`: Private-set intersection.
 * `scuttlebutt`: Core primitives used by other `swanky` crates.
@@ -18,8 +20,11 @@
 * `swanky-field-ff-primes`: Arithmetic fields of prime order larger than 64
 * `swanky-field-fft`: Utilities for performing FFTs on fields
 * `swanky-field-test`: Utilities for testing that finite field implementations are correct
-* `swanky-generic-array`: Utilities to make it easier to use generic arrays from the `generic-array` crate
+* `swanky-flatbuffer-build`: Utilities to build flatbuffers code.
+* `swanky-party`: Support for types indexed by a party.
 * `swanky-serialization`: Traits and utilities for compact serialization into a canonical byte representation
+* `vectoreyes`: Vectorized implementations.
+* `zkv`: Zero knowledge proofs for verilog files using `inferno`.
 
 # A note on security
 
