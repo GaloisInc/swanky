@@ -26,7 +26,7 @@ use super::*;
 
 pub(super) mod internal {
     use super::*;
-    pub unsafe trait EitherStorageTrait<P, V> {
+    pub trait EitherStorageTrait<P, V> {
         // These functions will panic if called on the wrong variant.
         fn new_prover(p: P) -> Self;
         fn into_prover(self) -> P;
@@ -38,6 +38,10 @@ pub(super) mod internal {
         fn ref_verifier(&self) -> &V;
         fn mut_verifier(&mut self) -> &mut V;
     }
+
+    /// # Safety
+    /// If `Self == Prover`, `EitherStorage(Copy)<P, V>` must be `repr(transparent)` to `P`.
+    /// If `Self == Verifier`, `EitherStorage(Copy)<P, V> must be `repr(transparent)` to `V`.
     pub unsafe trait PartyEitherInternal {
         type EitherStorage<Prover, Verifier>: EitherStorageTrait<Prover, Verifier>;
         type EitherStorageCopy<Prover: Copy, Verifier: Copy>: EitherStorageTrait<Prover, Verifier>
@@ -46,7 +50,7 @@ pub(super) mod internal {
     #[derive(Clone, Copy)]
     #[repr(transparent)]
     pub struct EitherStorage<Pa: Party, T>(T, PhantomData<Pa>);
-    unsafe impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Prover, P> {
+    impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Prover, P> {
         #[inline]
         fn new_prover(p: P) -> Self {
             EitherStorage(p, PhantomData)
@@ -81,7 +85,7 @@ pub(super) mod internal {
             unreachable!()
         }
     }
-    unsafe impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Verifier, V> {
+    impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Verifier, V> {
         #[cold]
         fn new_prover(_p: P) -> Self {
             unreachable!()
@@ -215,16 +219,6 @@ macro_rules! define_prover_either {
                 match Pa::WHICH {
                     WhichParty::Prover(e) => $PartyEither::prover_new(e, P::default()),
                     WhichParty::Verifier(e) => $PartyEither::verifier_new(e, V::default()),
-                }
-            }
-        }
-        impl<Pa: Party, P: Clone $(+ $Copy)?, V: Clone $(+ $Copy)?> Clone for $PartyEither<Pa, P, V> {
-            fn clone(&self) -> Self {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) =>
-                        $PartyEither::prover_new(e, self.as_ref().prover_into(e).clone()),
-                    WhichParty::Verifier(e) =>
-                        $PartyEither::verifier_new(e, self.as_ref().verifier_into(e).clone()),
                 }
             }
         }
@@ -426,5 +420,17 @@ impl<Pa: Party, P: Read, V: Read> Read for PartyEither<Pa, P, V> {
             WhichParty::Prover(e) => self.as_mut().prover_into(e).read(buf),
             WhichParty::Verifier(e) => self.as_mut().verifier_into(e).read(buf),
         }
+    }
+}
+
+impl<Pa: Party, P: Clone, V: Clone> Clone for PartyEither<Pa, P, V> {
+    fn clone(&self) -> Self {
+        self.as_ref().map(Clone::clone, Clone::clone)
+    }
+}
+
+impl<Pa: Party, P: Copy, V: Copy> Clone for PartyEitherCopy<Pa, P, V> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
