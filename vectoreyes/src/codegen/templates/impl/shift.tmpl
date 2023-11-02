@@ -52,14 +52,12 @@
         {% call scalar() %}
             let mut out = self.as_array();
             for (x, amm) in out.iter_mut().zip(amount.as_array().iter().copied()) {
-                *x = if amm >= {{ty.ty.bits}} {% if ty.ty.signedness == Signedness.SIGNED %}|| amm < 0{% endif %} {
-                    {% if ty.ty.signedness == Signedness.SIGNED and dir == "right" -%}
-                    if *x < 0 { -1 } else { 0 }
-                    {%- else -%}
-                    0
-                    {% endif %}
-                } else {
+                *x = if (0..{{ty.ty.bits}}).contains(&amm) {
                     *x {{ op }} amm
+                } {% if ty.ty.signedness == Signedness.SIGNED and dir == "right" -%} else if *x < 0 {
+                    -1
+                } {% endif %} else {
+                    0
                 };
             }
             {{ty}}::from(out)

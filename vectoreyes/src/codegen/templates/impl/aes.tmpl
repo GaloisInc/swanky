@@ -93,6 +93,7 @@
 ] %}
     {% call(scalar, avx2) visit_backends() %}
         {% call scalar() %}
+            #[allow(clippy::large_enum_variant)]
             #[derive(Clone)]
             enum Aes{{key_size}}KeySchedule {
                 Variable(aes::Aes{{key_size}}),
@@ -263,12 +264,12 @@
                             t2 = U32x4({{avx2i('raw', '_mm_aeskeygenassist_si128')}}::<{{round}}>(t3.0));
                             t2 = t2.shuffle::<3, 3, 3, 3>();
                             t4 = U8x16::from(t1).shift_bytes_left::<0x4>().into();
-                            t1 = t1 ^ t4;
+                            t1 ^= t4;
                             t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
-                            t1 = t1 ^ t4;
+                            t1 ^= t4;
                             t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
-                            t1 = t1 ^ t4;
-                            t1 = t1 ^ t2;
+                            t1 ^= t4;
+                            t1 ^= t2;
 
                             enc_keys[{{pos}}] = t1;
                             {% if not encrypt_only %}
@@ -278,12 +279,12 @@
                             t4 = U32x4({{avx2i("raw", "_mm_aeskeygenassist_si128")}}::<0x00>(t1.0));
                             t2 = t4.shuffle::<2, 2, 2, 2>();
                             t4 = U8x16::from(t3).shift_bytes_left::<0x4>().into();
-                            t3 = t3 ^ t4;
+                            t3 ^= t4;
                             t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
-                            t3 = t3 ^ t4;
+                            t3 ^= t4;
                             t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
-                            t3 = t3 ^ t4;
-                            t3 = t3 ^ t2;
+                            t3 ^= t4;
+                            t3 ^= t2;
 
                             enc_keys[{{pos + 1}}] = t3;
                             {% if not encrypt_only %}
@@ -301,12 +302,12 @@
                         t2 = U32x4({{avx2i("raw", "_mm_aeskeygenassist_si128")}}::<0x40>(t3.0));
                         t2 = t2.shuffle::<3, 3, 3, 3>();
                         t4 = U8x16::from(t1).shift_bytes_left::<0x4>().into();
-                        t1 = t1 ^ t4;
+                        t1 ^= t4;
                         t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
-                        t1 = t1 ^ t4;
+                        t1 ^= t4;
                         t4 = U8x16::from(t4).shift_bytes_left::<0x4>().into();
-                        t1 = t1 ^ t4;
-                        t1 = t1 ^ t2;
+                        t1 ^= t4;
+                        t1 ^= t2;
 
                         enc_keys[14] = t1;
                         {% if not encrypt_only %}
