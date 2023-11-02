@@ -218,17 +218,6 @@ macro_rules! define_prover_either {
                 }
             }
         }
-        #[allow(clippy::incorrect_clone_impl_on_copy_type)]
-        impl<Pa: Party, P: Clone $(+ $Copy)?, V: Clone $(+ $Copy)?> Clone for $PartyEither<Pa, P, V> {
-            fn clone(&self) -> Self {
-                match Pa::WHICH {
-                    WhichParty::Prover(e) =>
-                        $PartyEither::prover_new(e, self.as_ref().prover_into(e).clone()),
-                    WhichParty::Verifier(e) =>
-                        $PartyEither::verifier_new(e, self.as_ref().verifier_into(e).clone()),
-                }
-            }
-        }
         unsafe impl<P $(: $Copy)?, V $(: $Copy)?> bytemuck::TransparentWrapper<P> for $PartyEither<Prover, P, V> {}
         unsafe impl<P $(: $Copy)?, V $(: $Copy)?> bytemuck::TransparentWrapper<V> for $PartyEither<Verifier, P, V> {}
         // TODO: I think we can do this without unsafe?
@@ -427,5 +416,17 @@ impl<Pa: Party, P: Read, V: Read> Read for PartyEither<Pa, P, V> {
             WhichParty::Prover(e) => self.as_mut().prover_into(e).read(buf),
             WhichParty::Verifier(e) => self.as_mut().verifier_into(e).read(buf),
         }
+    }
+}
+
+impl<Pa: Party, P: Clone, V: Clone> Clone for PartyEither<Pa, P, V> {
+    fn clone(&self) -> Self {
+        self.as_ref().map(Clone::clone, Clone::clone)
+    }
+}
+
+impl<Pa: Party, P: Copy, V: Copy> Clone for PartyEitherCopy<Pa, P, V> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
