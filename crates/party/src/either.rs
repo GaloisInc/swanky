@@ -26,7 +26,7 @@ use super::*;
 
 pub(super) mod internal {
     use super::*;
-    pub unsafe trait EitherStorageTrait<P, V> {
+    pub trait EitherStorageTrait<P, V> {
         // These functions will panic if called on the wrong variant.
         fn new_prover(p: P) -> Self;
         fn into_prover(self) -> P;
@@ -50,7 +50,7 @@ pub(super) mod internal {
     #[derive(Clone, Copy)]
     #[repr(transparent)]
     pub struct EitherStorage<Pa: Party, T>(T, PhantomData<Pa>);
-    unsafe impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Prover, P> {
+    impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Prover, P> {
         #[inline]
         fn new_prover(p: P) -> Self {
             EitherStorage(p, PhantomData)
@@ -85,7 +85,7 @@ pub(super) mod internal {
             unreachable!()
         }
     }
-    unsafe impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Verifier, V> {
+    impl<P, V> EitherStorageTrait<P, V> for EitherStorage<Verifier, V> {
         #[cold]
         fn new_prover(_p: P) -> Self {
             unreachable!()
