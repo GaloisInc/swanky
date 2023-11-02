@@ -47,6 +47,7 @@ struct UnknownProverSecret;
 
 macro_rules! make_prover_private_type {
     ($ProverPrivate:ident $PartyEither:ident $(: $Copy:ident)?) => {
+        /// A value known only to `Prover`s.
         #[derive(Clone $(, $Copy)?)]
         pub struct $ProverPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, T, UnknownProverSecret>);
         impl<P: Party, T $(: $Copy)?> $ProverPrivate<P, T> {
@@ -213,6 +214,7 @@ struct UnknownVerifierSecret;
 
 macro_rules! make_verifier_private_type {
     ($VerifierPrivate:ident $PartyEither:ident $(: $Copy:ident)?) => {
+        /// A value known only to `Verifier`s.
         #[derive(Clone $(, $Copy)?)]
         pub struct $VerifierPrivate<P: Party, T $(: $Copy)?>($PartyEither<P, UnknownVerifierSecret, T>);
         impl<P: Party, T $(: $Copy)?> $VerifierPrivate<P, T> {
