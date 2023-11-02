@@ -1,4 +1,5 @@
 #![allow(clippy::all)]
+#![deny(missing_docs)]
 //! Support for types indexed by a _party_.
 //!
 //! The aim of this crate is code de-duplication in the context of multi-party
@@ -184,7 +185,9 @@ pub use is_party::{IsParty, IS_PROVER, IS_VERIFIER};
 /// `P = Verifier` iff `P::WHICH == WhichParty::Verifier(IS_VERIFIER)`.
 #[derive(Clone, Copy)]
 pub enum WhichParty<P: Party> {
+    /// Value-level representation of the `Prover` type, with evidence.
     Prover(IsParty<P, Prover>),
+    /// Value-level representation of the `Verifier` type, with evidence.
     Verifier(IsParty<P, Verifier>),
 }
 

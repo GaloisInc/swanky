@@ -317,8 +317,8 @@ unsafe impl PartyEitherInternal for Verifier {
 }
 
 // TODO: fix these impls
-/// Convert a `PartyEither` over `Copy` values to a `PartyEitherCopy`.
 impl<Pa: Party, P: Copy, V: Copy> PartyEither<Pa, P, V> {
+    /// Convert a `PartyEither` over `Copy` values to a `PartyEitherCopy`.
     pub fn into_copy(self) -> PartyEitherCopy<Pa, P, V> {
         match Pa::WHICH {
             WhichParty::Prover(e) => PartyEitherCopy::prover_new(e, self.prover_into(e)),

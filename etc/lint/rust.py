@@ -194,7 +194,6 @@ LIBS_NOT_YET_DOCUMENTED = {
     "crates/field-fft/src/lib.rs",
     "crates/field-test/src/lib.rs",
     "crates/flatbuffer-build/src/lib.rs",
-    "crates/party/src/lib.rs",
     "crates/serialization/src/lib.rs",
     "diet-mac-and-cheese/src/lib.rs",
     "diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
