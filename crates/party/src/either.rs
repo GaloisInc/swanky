@@ -38,6 +38,10 @@ pub(super) mod internal {
         fn ref_verifier(&self) -> &V;
         fn mut_verifier(&mut self) -> &mut V;
     }
+
+    /// # Safety
+    /// If `Self == Prover`, `EitherStorage(Copy)<P, V>` must be `repr(transparent)` to `P`.
+    /// If `Self == Verifier`, `EitherStorage(Copy)<P, V> must be `repr(transparent)` to `V`.
     pub unsafe trait PartyEitherInternal {
         type EitherStorage<Prover, Verifier>: EitherStorageTrait<Prover, Verifier>;
         type EitherStorageCopy<Prover: Copy, Verifier: Copy>: EitherStorageTrait<Prover, Verifier>
