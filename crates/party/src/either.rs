@@ -218,6 +218,7 @@ macro_rules! define_prover_either {
                 }
             }
         }
+        #[allow(clippy::incorrect_clone_impl_on_copy_type)]
         impl<Pa: Party, P: Clone $(+ $Copy)?, V: Clone $(+ $Copy)?> Clone for $PartyEither<Pa, P, V> {
             fn clone(&self) -> Self {
                 match Pa::WHICH {
