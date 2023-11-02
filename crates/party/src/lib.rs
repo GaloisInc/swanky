@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 #![deny(missing_docs)]
 //! Support for types indexed by a _party_.
 //!
