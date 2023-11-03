@@ -238,7 +238,9 @@ impl AbstractChannel for swanky_channel::Channel<'_> {
     where
         Self: Sized,
     {
-        unimplemented!()
+        // AbstractChannel::clone() can't be implemented for Channel. Luckily, it's rarely used in
+        // swanky. (And further use should be discouraged.)
+        panic!("swanky_channel::Channel does not support clone")
     }
 }
 

@@ -41,7 +41,9 @@ impl std::fmt::Display for NetworkError {
 }
 impl std::error::Error for NetworkError {}
 
-/// How big should the read and write buffers be for a [`Channel`]?
+/// The sizes of the read and write buffers be for a [`Channel`]
+///
+/// The struct is only intended to be used as an argument to [`Channel::with_sizes`]
 pub struct BufferSizes {
     /// Size (in bytes) of the read buffer
     pub read: usize,
@@ -51,8 +53,23 @@ pub struct BufferSizes {
 impl Default for BufferSizes {
     fn default() -> Self {
         BufferSizes {
-            read: 1024 * 1024,
-            write: 1024 * 16,
+            // Upside of a larger value: Fewer system calls
+            // Downside of a larger value: More memory consumption
+            // The default Linux TCP receive window size (on systems I tested) is 128*1024
+            // We set this to 1024*256 to give us some wiggle room (due to the minimal) downside.
+            // This is also greater than the maximum TLS record size.
+            read: 1024 * 256,
+            // Upside of a larger value: Fewer system calls
+            // Downsides of a larger value:
+            //      (1) More memory consumption. Memory is typically not a bottleneck, so this is
+            //          usually a non-issue.
+            //      (2) Lower concurrency with the peer. Any time between when a party performs a
+            //          write() and when the write buffer gets flushed is time that the peer can't
+            //          spend computing on the written data.
+            // To that end, the default write value is set so as to fill a single TLS record:
+            //   MAX_TLS_RECORD_SIZE - (SIZE_OF_TLS_MAC + SIZE_OF_TLS_13_RECORD_TYPE)
+            // = 2^14 - (16+1)
+            write: (1 << 14) - (16 + 1),
         }
     }
 }
@@ -64,6 +81,11 @@ impl Default for BufferSizes {
 /// # Flushing
 /// `Channel` will automatically flush the write buffer before performing a read. As a result,
 /// users of the `Channel` API should almost never need to manually flush.
+///
+/// A manual flush should only be _required_ when interleaving `Channel` operations with
+/// non-`Channel` operations. For example, it would be advisble to `manual_flush()` before reading
+/// user input from standard in. `Channel` can't flush for you, because it doesn't know that you're
+/// about to read from standard in!
 ///
 /// # Error Handling
 /// On error, `Channel` is left in an unknown state. For example, if a `Channel` wraps a
@@ -239,7 +261,7 @@ impl Channel<'_> {
         }
         Ok(())
     }
-    /// Read exactly of `dst.len()` bytes from the peer into `dst`.
+    /// Read exactly `dst.len()` bytes from the peer into `dst`.
     ///
     /// # Example
     /// ```
