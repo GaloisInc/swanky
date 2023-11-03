@@ -522,7 +522,10 @@ where
         // TODO: Is there some cleanup to do here to keep to the memory peak under control???
         let frame = self.get_frame_mut();
 
-        if frame.callframe_is_vector && frame.callframe_vector.len() > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT) {
+        if frame.callframe_is_vector
+            && frame.callframe_vector.len()
+                > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT)
+        {
             frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
             frame.callframe_size = 0;
         }
