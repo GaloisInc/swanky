@@ -269,7 +269,7 @@ fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> WirePointer<X> {
 }
 
 #[inline]
-fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> () {
+fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) {
     for r in v.iter() {
         match r {
             CallframeElm {
@@ -282,7 +282,7 @@ fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> (
                         let addr = wire_ptr.0.offset((id - first) as isize);
                         *addr = x.clone();
                     }
-                    return ();
+                    return;
                 }
             }
         }
@@ -329,7 +329,7 @@ where
     }
 
     #[inline]
-    fn set(&mut self, id: WireId, x: &X) -> () {
+    fn set(&mut self, id: WireId, x: &X) {
         if id < self.outputs_cnt {
             set_callframe_if_ptr(&self.outputs, id, x)
         } else {
@@ -522,13 +522,9 @@ where
         // TODO: Is there some cleanup to do here to keep to the memory peak under control???
         let frame = self.get_frame_mut();
 
-        if frame.callframe_is_vector {
-            if frame.callframe_vector.len()
-                > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT)
-            {
-                frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
-                frame.callframe_size = 0;
-            }
+        if frame.callframe_is_vector && frame.callframe_vector.len() > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT) {
+            frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
+            frame.callframe_size = 0;
         }
 
         self.top -= 1;
@@ -659,18 +655,16 @@ where
                 frame.callframe_vector[idx] = wire_ptr.incr(i);
             }
             return;
+        } else if allow_allocation {
+            frame
+                .callframe
+                .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
+            return;
         } else {
-            if allow_allocation {
-                frame
-                    .callframe
-                    .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
-                return;
-            } else {
-                frame
-                    .callframe
-                    .allocate_inputs_ptr(start, start + count - 1, wire_ptr);
-                return;
-            }
+            frame
+                .callframe
+                .allocate_inputs_ptr(start, start + count - 1, wire_ptr);
+            return;
         }
     }
 
