@@ -128,8 +128,7 @@ where
             err.push(self.err[i].value().into_inner(ev));
         }
 
-        let acc = Accumulator { wit, err };
-        acc
+        Accumulator { wit, err }
     }
 }
 
@@ -213,8 +212,8 @@ impl<F: FiniteField> Accumulator<F> {
         let mut cs = self.wit.iter().chain(self.err.iter()).copied();
         let mut y = cs.next().unwrap();
         for c in cs {
-            y = y * x;
-            y = y + c;
+            y *= x;
+            y += c;
         }
         backend.input_public(y)
     }

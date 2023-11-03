@@ -1,4 +1,7 @@
-use std::ops::{Add, Mul, Sub};
+use std::{
+    cmp::Ordering,
+    ops::{Add, Mul, Sub},
+};
 
 use eyre::Result;
 use scuttlebutt::field::FiniteField;
@@ -27,16 +30,20 @@ fn merge<F: FiniteField, OP: Fn(F, F) -> F>(
     while i < lhs.0.len() && j < rhs.0.len() {
         let (idx_a, a) = lhs.0[i];
         let (idx_b, b) = rhs.0[j];
-        if idx_a == idx_b {
-            comb.push((idx_a, f(a, b)));
-            i += 1;
-            j += 1;
-        } else if idx_a < idx_b {
-            comb.push((idx_a, a));
-            i += 1;
-        } else {
-            comb.push((idx_b, b));
-            j += 1;
+        match idx_a.cmp(&idx_b) {
+            Ordering::Equal => {
+                comb.push((idx_a, f(a, b)));
+                i += 1;
+                j += 1;
+            }
+            Ordering::Less => {
+                comb.push((idx_a, a));
+                i += 1;
+            }
+            Ordering::Greater => {
+                comb.push((idx_b, b));
+                j += 1;
+            }
         }
     }
 
@@ -291,9 +298,9 @@ impl<F: FiniteField> R1CS<F> {
 
         // add output asserts
         // (if an output is unassigned it is set to 0)
-        for src in 0..(output as usize) {
+        for (src, cell) in cells.iter().enumerate().take(output as usize) {
             cs.push(Row {
-                l: cells[src].clone(),
+                l: cell.clone(),
                 r: LinComb(vec![(CONSTANT_IDX, F::ONE)]),
                 o: LinComb(vec![(src + 1, F::ONE)]),
             });

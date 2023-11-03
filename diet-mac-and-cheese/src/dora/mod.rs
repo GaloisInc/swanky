@@ -19,12 +19,12 @@ mod comm;
 mod perm;
 
 // Dora
-mod dora;
+mod protocol;
 
 type WireId = usize;
 
 pub use disjunction::Disjunction;
-pub use dora::Dora;
+pub use protocol::Dora;
 use swanky_field::PrimeFiniteField;
 
 use crate::circuit_ir::{GateM, TypeId};

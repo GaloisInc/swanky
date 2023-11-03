@@ -28,7 +28,6 @@ pub(super) struct CommittedWitness<'a, B: BackendT> {
 //
 // Ideally there would be a nicer way to do this.
 fn commit_vec<
-    'a,
     P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
@@ -61,7 +60,7 @@ where
             // combine
             Ok(tag
                 .into_iter()
-                .zip(pad.into_iter())
+                .zip(pad)
                 .map(|(t, v)| Mac::new(ProverPrivateCopy::new(v), t))
                 .collect::<Vec<_>>()
                 .into_iter())
@@ -172,7 +171,7 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn commit<'b>(
+    pub fn commit(
         channel: &mut impl AbstractChannel,
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
@@ -195,10 +194,10 @@ impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: S
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn commit<'a>(
+    pub fn commit(
         channel: &mut impl AbstractChannel,
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
-        disj: &'a Disjunction<V>,
+        disj: &Disjunction<V>,
         acc: &ProverPrivate<P, &Accumulator<V>>,
     ) -> Result<Self> {
         let wit = commit_vec(
