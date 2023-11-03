@@ -15,10 +15,10 @@ pub(crate) struct TextRelation {
 }
 
 impl TextRelation {
-    pub(crate) fn new(type_store: TypeStore) -> Self {
+    pub(crate) fn new(type_store: TypeStore, fun_store: FunStore) -> Self {
         Self {
             type_store,
-            fun_store: Default::default(),
+            fun_store,
             gates: Default::default(),
         }
     }
@@ -139,7 +139,7 @@ impl RelationVisitor for TextRelation {
     where
         for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
     {
-        let mut body_struct = TextRelation::default();
+        let mut body_struct = TextRelation::new(self.type_store.clone(), self.fun_store.clone());
         body(&mut body_struct)?;
 
         let mut output_counts = vec![];
