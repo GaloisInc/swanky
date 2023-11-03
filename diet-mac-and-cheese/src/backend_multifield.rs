@@ -205,7 +205,7 @@ impl<E> EdabitsMap<E> {
     }
 
     fn push_elem(&mut self, bit_width: usize, e: E) {
-        self.0.entry(bit_width).or_insert_with(std::vec::Vec::new);
+        self.0.entry(bit_width).or_default();
         self.0.get_mut(&bit_width).as_mut().unwrap().push(e);
     }
 
@@ -420,6 +420,9 @@ impl<
         Ok(())
     }
 
+    // The DietMacAndCheese type is highly generic, and we can't introduce a
+    // type alias in this context for readability.
+    #[allow(clippy::type_complexity)]
     fn disjunction(
         &mut self,
         inputs: &[Self::Wire],
@@ -869,7 +872,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
         inputs: &[WireRange],
         plugin: &PluginExecution,
     ) -> Result<()> {
-        fn copy_mem<'a, W>(mem: &'a Memory<W>, range: WireRange) -> impl Iterator<Item = &'a W>
+        fn copy_mem<W>(mem: &Memory<W>, range: WireRange) -> impl Iterator<Item = &W>
         where
             W: Copy + Clone + Debug + Default,
         {
@@ -886,7 +889,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 plugin.execute::<P, _>(xs, ys, &mut self.backend)?
             }
             PluginExecution::Disjunction(disj) => {
-                assert!(inputs.len() >= 1, "must provide condition");
+                assert!(!inputs.is_empty(), "must provide condition");
 
                 // retrieve input wires
                 let mut wires = Vec::with_capacity(disj.inputs() as usize + disj.cond() as usize);
@@ -944,7 +947,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                     debug!("CONV GET {:?}", in_wire);
                     let bits = self.backend.assert_conv_to_bits(in_wire)?;
                     assert_eq!(bits.len(), 1);
-                    v.push(bits[0].clone());
+                    v.push(bits[0]);
                 }
                 Ok(v.into_iter().rev().collect())
                 // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
@@ -971,7 +974,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 assert!((*end - *start + 1) as usize <= bits.len());
 
                 for (i, _) in (*start..(*end + 1)).enumerate() {
-                    let v = self.backend.assert_conv_from_bits(&[bits[i].clone()])?;
+                    let v = self.backend.assert_conv_from_bits(&[bits[i]])?;
                     debug!("CONV SET {:?}", v);
                     let out_wire = end - (i as WireId);
                     // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
@@ -1074,6 +1077,9 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     }
 
     /// New evaluator initializing the F2 Svole in a separate thread.
+    // The EvaluatorCirc type is highly generic, and we can't use a type alias
+    // in this context for readability.
+    #[allow(clippy::type_complexity)]
     pub fn new_multithreaded<C2: AbstractChannel + 'static + Send>(
         mut channel_vole: C2,
         rng: AesRng,
