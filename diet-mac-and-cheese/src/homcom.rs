@@ -582,10 +582,10 @@ where
             WhichParty::Verifier(ev) => {
                 let mut key_chi = T::ZERO;
                 let mut x_chi = T::ZERO;
-                for i in 0..batch.len() {
+                for (i, mac) in batch.iter().enumerate() {
                     let chi = T::random(&mut rng);
 
-                    key_chi += chi * batch[i].mac();
+                    key_chi += chi * mac.mac();
                     x_chi += out.as_ref().into_inner(ev)[i] * chi;
                 }
                 let m = channel.read_serializable::<T>()?;
