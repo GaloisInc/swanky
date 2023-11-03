@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 #![deny(missing_docs)]
 //! VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.
 //!
@@ -445,6 +444,24 @@ pub trait AesBlockCipherDecrypt: AesBlockCipher {
 }
 
 pub mod array_utils;
-#[allow(clippy::all)]
+// We want to allow `which_lane * 0 + 0` expressions.
+// These also allow for simpler generated code. For example, sometimes we have code which looks
+// like:
+//    let x: {{ty}};
+//    x as u8
+// When {{ty}} _is_ u8, this cast isn't neccessary. But it's simpler to always insert it in the
+// generated code.
+#[allow(
+    clippy::identity_op,
+    clippy::erasing_op,
+    clippy::unnecessary_cast,
+    clippy::useless_conversion
+)]
+// intel intrinsics have many arguments
+#[allow(clippy::too_many_arguments)]
+// our compressed code doesn't have newlines
+#[allow(clippy::suspicious_else_formatting)]
+// You can't put inline(always) without a closure
+#[allow(clippy::redundant_closure)]
 mod generated;
 pub use generated::implementation::*;
