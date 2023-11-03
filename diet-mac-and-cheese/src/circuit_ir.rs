@@ -460,6 +460,8 @@ impl FuncDecl {
     /// * `params` contains any associated parameters to the plugin operation.
     /// * `type_store` contains the [`TypeStore`] of the circuit.
     /// * `fun_store` contains the [`FunStore`] of the circuit.
+    // SIEVE IR plugins require all of these arguments to be instantiated
+    #[allow(clippy::too_many_arguments)]
     pub fn new_plugin(
         output_counts: Vec<(TypeId, WireCount)>,
         input_counts: Vec<(TypeId, WireCount)>,
