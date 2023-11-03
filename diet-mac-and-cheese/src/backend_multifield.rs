@@ -1559,7 +1559,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
         let rel = RelationReader::new(rel)?;
 
-        let mut buf_rel = TextRelation::new(self.type_store.clone());
+        let mut buf_rel = TextRelation::new(self.type_store.clone(), FunStore::default());
 
         rel.read(&mut buf_rel)?;
         self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
