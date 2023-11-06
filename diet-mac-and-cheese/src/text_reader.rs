@@ -26,60 +26,49 @@ impl TextRelation {
 
 impl FunctionBodyVisitor for TextRelation {
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::New(ty.try_into()?, first, last));
+        self.gates.push(GateM::New(ty, first, last));
         Ok(())
     }
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Delete(ty.try_into()?, first, last));
+        self.gates.push(GateM::Delete(ty, first, last));
         Ok(())
     }
     fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
-        self.gates
-            .push(GateM::Add(ty.try_into()?, dst, left, right));
+        self.gates.push(GateM::Add(ty, dst, left, right));
         Ok(())
     }
     fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
-        self.gates
-            .push(GateM::Mul(ty.try_into()?, dst, left, right));
+        self.gates.push(GateM::Mul(ty, dst, left, right));
         Ok(())
     }
     fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> eyre::Result<()> {
-        self.gates.push(GateM::AddConstant(
-            ty.try_into()?,
-            dst,
-            left,
-            Box::new(right),
-        ));
+        self.gates
+            .push(GateM::AddConstant(ty, dst, left, Box::new(right)));
         Ok(())
     }
     fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> eyre::Result<()> {
-        self.gates.push(GateM::MulConstant(
-            ty.try_into()?,
-            dst,
-            left,
-            Box::new(right),
-        ));
+        self.gates
+            .push(GateM::MulConstant(ty, dst, left, Box::new(right)));
         Ok(())
     }
     fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Copy(ty.try_into()?, dst, src));
+        self.gates.push(GateM::Copy(ty, dst, src));
         Ok(())
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, &src: &Number) -> eyre::Result<()> {
-        self.gates
-            .push(GateM::Constant(ty.try_into()?, dst, Box::new(src)));
+        self.gates.push(GateM::Constant(ty, dst, Box::new(src)));
         Ok(())
     }
     fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Instance(ty.try_into()?, dst));
+        self.gates.push(GateM::Instance(ty, dst));
         Ok(())
     }
     fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Witness(ty.try_into()?, dst));
+        self.gates.push(GateM::Witness(ty, dst));
         Ok(())
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::AssertZero(ty.try_into()?, src));
+        self.gates.push(GateM::AssertZero(ty, src));
         Ok(())
     }
     fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()> {
@@ -94,9 +83,9 @@ impl FunctionBodyVisitor for TextRelation {
         let in_last = src.range.end;
 
         self.gates.push(GateM::Conv(Box::new((
-            ty_out.try_into()?,
+            ty_out,
             (out_first, out_last),
-            ty_in.try_into()?,
+            ty_in,
             (in_first, in_last),
         ))));
         Ok(())
@@ -144,12 +133,12 @@ impl RelationVisitor for TextRelation {
 
         let mut output_counts = vec![];
         for o in outputs {
-            output_counts.push((o.ty.try_into()?, o.count));
+            output_counts.push((o.ty, o.count));
         }
 
         let mut input_counts = vec![];
         for inp in inputs {
-            input_counts.push((inp.ty.try_into()?, inp.count));
+            input_counts.push((inp.ty, inp.count));
         }
 
         let name_s: String = std::str::from_utf8(name)?.into();
@@ -176,12 +165,12 @@ impl RelationVisitor for TextRelation {
 
         let mut output_counts = vec![];
         for output in outputs {
-            output_counts.push((output.ty.try_into()?, output.count));
+            output_counts.push((output.ty, output.count));
         }
 
         let mut input_counts = vec![];
         for input in inputs {
-            input_counts.push((input.ty.try_into()?, input.count));
+            input_counts.push((input.ty, input.count));
         }
 
         let fun_body = FuncDecl::new_plugin(
