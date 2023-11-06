@@ -1,5 +1,4 @@
 #![allow(clippy::needless_range_loop)]
-#![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
 //! Field switching functionality based on protocol with Edabits.

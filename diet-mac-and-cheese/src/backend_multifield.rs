@@ -420,9 +420,6 @@ impl<
         Ok(())
     }
 
-    // The DietMacAndCheese type is highly generic, and we can't introduce a
-    // type alias in this context for readability.
-    #[allow(clippy::type_complexity)]
     fn disjunction(
         &mut self,
         inputs: &[Self::Wire],
@@ -1077,9 +1074,6 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     }
 
     /// New evaluator initializing the F2 Svole in a separate thread.
-    // The EvaluatorCirc type is highly generic, and we can't use a type alias
-    // in this context for readability.
-    #[allow(clippy::type_complexity)]
     pub fn new_multithreaded<C2: AbstractChannel + 'static + Send>(
         mut channel_vole: C2,
         rng: AesRng,
