@@ -253,16 +253,13 @@ struct CallframeElm<X> {
 #[inline]
 fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> WirePointer<X> {
     for r in v.iter() {
-        match r {
-            CallframeElm {
-                first,
-                last,
-                wire_ptr,
-            } => {
-                if *first <= id && id <= *last {
-                    return WirePointer(unsafe { wire_ptr.0.offset((id - first) as isize) });
-                }
-            }
+        let CallframeElm {
+            first,
+            last,
+            wire_ptr,
+        } = r;
+        if *first <= id && id <= *last {
+            return WirePointer(unsafe { wire_ptr.0.offset((id - first) as isize) });
         }
     }
     panic!("Not found")
@@ -271,20 +268,17 @@ fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> WirePointer<X> {
 #[inline]
 fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) {
     for r in v.iter() {
-        match r {
-            CallframeElm {
-                first,
-                last,
-                wire_ptr,
-            } => {
-                if *first <= id && id <= *last {
-                    unsafe {
-                        let addr = wire_ptr.0.offset((id - first) as isize);
-                        *addr = x.clone();
-                    }
-                    return;
-                }
+        let CallframeElm {
+            first,
+            last,
+            wire_ptr,
+        } = r;
+        if *first <= id && id <= *last {
+            unsafe {
+                let addr = wire_ptr.0.offset((id - first) as isize);
+                *addr = x.clone();
             }
+            return;
         }
     }
     panic!("Not found")
@@ -545,7 +539,7 @@ where
 
     #[inline]
     fn get_callframe_vector(wire_ptr: &WirePointer<X>) -> &X {
-        return unsafe { &*wire_ptr.0 };
+        unsafe { &*wire_ptr.0 }
     }
 
     #[inline]
@@ -657,17 +651,14 @@ where
                 let idx = (start + i) as usize;
                 frame.callframe_vector[idx] = wire_ptr.incr(i);
             }
-            return;
         } else if allow_allocation {
             frame
                 .callframe
                 .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
-            return;
         } else {
             frame
                 .callframe
                 .allocate_inputs_ptr(start, start + count - 1, wire_ptr);
-            return;
         }
     }
 
@@ -768,23 +759,22 @@ where
                 }
             } else {
                 // Unallocated single wire
-                let wire_ptr;
-                if allow_allocation {
+                let wire_ptr = if allow_allocation {
                     frame
                         .memframe_unallocated
-                        .insert(src_first, Box::new(X::default()));
-                    wire_ptr = WirePointer(
+                        .insert(src_first, Box::<X>::default());
+                    WirePointer(
                         ((&**frame.memframe_unallocated.get(&src_first).unwrap()) as *const X)
                             .cast_mut(),
-                    );
+                    )
                 } else {
                     // it is an input, and in that case we cant allocate, so it must be already assigned.
                     let ptr = frame.memframe_unallocated.get(&src_first);
                     if ptr.is_none() {
                         panic!("input passed but not previously assigned");
                     }
-                    wire_ptr = WirePointer(((&**ptr.unwrap()) as *const X).cast_mut());
-                }
+                    WirePointer(((&**ptr.unwrap()) as *const X).cast_mut())
+                };
 
                 let last_frame = self.get_frame_mut();
                 if callframe_is_vector {
