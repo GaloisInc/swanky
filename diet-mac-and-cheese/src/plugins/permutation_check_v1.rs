@@ -30,7 +30,6 @@ use crate::{
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::F2;
-use swanky_party::Party;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]
@@ -79,7 +78,7 @@ impl PermutationCheckV1 {
 
     /// Run the permutation check on two lists provided by `xs` and `ys`,
     /// utilizing the provided `backend`.
-    pub(crate) fn execute<P: Party, B: BackendLiftT>(
+    pub(crate) fn execute<B: BackendLiftT>(
         &self,
         xs: impl Iterator<Item = B::Wire>,
         ys: impl Iterator<Item = B::Wire>,
@@ -123,10 +122,10 @@ impl Plugin for PermutationCheckV1 {
             );
         };
         // TODO: Should we assume this param fits in a u64?
-        let tuple_size: u64 = tuple_size.as_words()[0].into();
+        let tuple_size: u64 = tuple_size.as_words()[0];
         ensure!(tuple_size != 0, "{}: Tuple size cannot be zero", Self::NAME);
         ensure!(
-            output_counts.len() == 0,
+            output_counts.is_empty(),
             "{}: Output count must be zero",
             Self::NAME
         );

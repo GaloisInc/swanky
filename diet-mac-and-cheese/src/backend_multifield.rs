@@ -886,7 +886,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 assert_eq!(inputs.len(), 2);
                 let xs = copy_mem(&self.memory, inputs[0]).copied();
                 let ys = copy_mem(&self.memory, inputs[1]).copied();
-                plugin.execute::<P, _>(xs, ys, &mut self.backend)?
+                plugin.execute::<_>(xs, ys, &mut self.backend)?
             }
             PluginExecution::Disjunction(disj) => {
                 assert!(!inputs.is_empty(), "must provide condition");
