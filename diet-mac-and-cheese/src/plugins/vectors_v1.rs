@@ -35,7 +35,7 @@ impl Plugin for VectorsV1 {
         match operation {
             "add" | "mul" => {
                 eyre::ensure!(
-                    params.len() == 0,
+                    params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -146,7 +146,7 @@ impl Plugin for VectorsV1 {
             }
             "add_scalar" | "mul_scalar" => {
                 eyre::ensure!(
-                    params.len() == 0,
+                    params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -206,7 +206,7 @@ impl Plugin for VectorsV1 {
             }
             "sum" | "product" => {
                 eyre::ensure!(
-                    params.len() == 0,
+                    params.is_empty(),
                     "{}; {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
@@ -237,7 +237,7 @@ impl Plugin for VectorsV1 {
                 let s = input_counts[0].1;
 
                 let mut gates = Vec::with_capacity(match s {
-                    0 | 1 | 2 => 1,
+                    0..=2 => 1,
                     _ => s as usize,
                 });
                 match s {
@@ -279,7 +279,7 @@ impl Plugin for VectorsV1 {
             }
             "dotproduct" => {
                 eyre::ensure!(
-                    params.len() == 0,
+                    params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
