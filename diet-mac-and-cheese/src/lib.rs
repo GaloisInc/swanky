@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 /*!
 
 `diet_mac_and_cheese` provides a diet/light implementation of the Mac'n'Cheese protocol.
@@ -31,7 +30,6 @@ pub mod fields;
 pub mod homcom;
 pub mod mac;
 mod memory;
-#[allow(clippy::all)]
 pub mod read_sieveir_phase2;
 mod sieveir_phase2;
 pub mod text_reader;
