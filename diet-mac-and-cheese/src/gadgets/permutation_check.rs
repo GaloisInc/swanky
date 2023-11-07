@@ -197,7 +197,7 @@ mod tests {
             )
             .unwrap();
             if is_good {
-                let _ = party.finalize().unwrap();
+                party.finalize().unwrap();
             } else {
                 let _ = party.finalize().unwrap_err();
             }
@@ -235,7 +235,7 @@ mod tests {
         )
         .unwrap();
         if is_good {
-            let _ = party.finalize().unwrap();
+            party.finalize().unwrap();
         } else {
             let _ = party.finalize().unwrap_err();
         }
@@ -303,10 +303,10 @@ mod tests {
             )
             .unwrap();
             if is_good {
-                let _ = party.finalize().unwrap();
-                let _ = party2.finalize().unwrap();
+                party.finalize().unwrap();
+                party2.finalize().unwrap();
             } else {
-                let _ = party.finalize().unwrap();
+                party.finalize().unwrap();
                 let _ = party2.finalize().unwrap_err();
             }
         });
@@ -355,10 +355,10 @@ mod tests {
         )
         .unwrap();
         if is_good {
-            let _ = party.finalize().unwrap();
-            let _ = party2.finalize().unwrap();
+            party.finalize().unwrap();
+            party2.finalize().unwrap();
         } else {
-            let _ = party.finalize().unwrap();
+            party.finalize().unwrap();
             let _ = party2.finalize().unwrap_err();
         }
 
