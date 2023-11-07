@@ -676,7 +676,6 @@ where
     // 4) in unallocated memframe
     // In addition, both the callframe and the memframe have a second mode, where the underlying structure
     // is a vector. For the callframe the vector holds addresses, for the memfarame it holds wires.
-    #[allow(clippy::needless_return)]
     pub(crate) fn allocate_slice(
         &mut self,
         src_first: WireId,
@@ -727,7 +726,6 @@ where
             //println!("3) present in pool");
             let wire_ptr = frame.memframe_pool.get_ptr_when_in_cache(src_first);
             self.place_ptr_in_callframe(start, count, allow_allocation, wire_ptr);
-            return;
         } else {
             //println!("4) unallocated");
             // if it is in unallocated then we need to allocate it
@@ -753,13 +751,11 @@ where
                         let idx = (start + i) as usize;
                         last_frame.callframe_vector[idx] = new_slice.incr(i);
                     }
-                    return;
                 } else {
                     let last_frame = self.get_frame_mut();
                     last_frame
                         .callframe
                         .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
-                    return;
                 }
             } else {
                 // Unallocated single wire
@@ -783,7 +779,6 @@ where
                 let last_frame = self.get_frame_mut();
                 if callframe_is_vector {
                     last_frame.callframe_vector[start as usize] = wire_ptr;
-                    return;
                 } else {
                     if allow_allocation {
                         last_frame
@@ -794,7 +789,6 @@ where
                             .callframe
                             .allocate_inputs_ptr(start, start, wire_ptr);
                     }
-                    return;
                 }
             }
         }
