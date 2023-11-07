@@ -367,10 +367,10 @@ impl<
                 )?,
             }
 
-            for (n, aux) in aux_batch.iter().enumerate().take(num) {
+            for (n, &aux) in aux_batch.iter().enumerate().take(num) {
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
-                        let &(and1, and2) = aux;
+                        let (and1, and2) = aux;
                         let and_res = and_res_batch.as_ref().into_inner(ev)[n];
                         let and_res_mac = and_res_mac_batch.as_ref().prover_into(ev)[n];
                         mult_check_state.accumulate(
@@ -388,7 +388,7 @@ impl<
                         ci_mac_batch.as_mut().into_inner(ev)[n] = c_mac;
                     }
                     WhichParty::Verifier(ev) => {
-                        let &(and1_mac, and2_mac) = aux;
+                        let (and1_mac, and2_mac) = aux;
                         let and_res_mac = and_res_mac_batch.as_ref().verifier_into(ev)[n];
                         mult_check_state.accumulate(
                             &(and1_mac, and2_mac, and_res_mac),
@@ -882,10 +882,10 @@ impl<
         };
         let mut e_rng = AesRng::from_seed(seed);
         let mut e = vec![Vec::with_capacity(n); s];
-        for ei in e.iter_mut().take(s) {
+        for ek in e.iter_mut().take(s) {
             for _ in 0..n {
                 let b = F2::random(&mut e_rng);
-                ei.push(b);
+                ek.push(b);
             }
         }
 
