@@ -22,6 +22,7 @@
 - **`popsicle`**: A library for private set intersection
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
+- **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
 - **`swanky-field-f61p`**: An implementation of `GF(2^61-1)`
