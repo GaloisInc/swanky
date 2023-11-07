@@ -2257,12 +2257,7 @@ pub(crate) mod tests {
 
         let one = one::<F61p>();
         let instances = vec![vec![], vec![], vec![], vec![]];
-        let witnesses = vec![
-            vec![one.clone(), one.clone(), one.clone(), one],
-            vec![],
-            vec![],
-            vec![],
-        ];
+        let witnesses = vec![vec![one, one, one, one], vec![], vec![], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
@@ -2309,12 +2304,7 @@ pub(crate) mod tests {
 
         let one = one::<F61p>();
         let instances = vec![vec![], vec![], vec![], vec![]];
-        let witnesses = vec![
-            vec![one.clone(), one.clone(), one.clone(), one],
-            vec![],
-            vec![],
-            vec![],
-        ];
+        let witnesses = vec![vec![one, one, one, one], vec![], vec![], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
@@ -2376,8 +2366,8 @@ pub(crate) mod tests {
             GateM::AssertZero(FF0, 9),
         ];
 
-        let instances = vec![vec![two.clone()]];
-        let witnesses = vec![vec![two.clone(), two.clone(), two]];
+        let instances = vec![vec![two]];
+        let witnesses = vec![vec![two, two, two]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
