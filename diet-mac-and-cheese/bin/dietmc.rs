@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 mod cli;
 
 use clap::Parser;
@@ -16,7 +15,6 @@ use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
-use pretty_env_logger;
 use scuttlebutt::field::{F40b, F2};
 use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::collections::VecDeque;
@@ -48,7 +46,7 @@ fn path_to_files(path: PathBuf) -> Result<Vec<PathBuf>> {
         let mut files: Vec<PathBuf> = vec![];
         for path in paths {
             files.push(
-                path.wrap_err_with(|| format!("error reading dir path"))?
+                path.wrap_err_with(|| "error reading dir path".to_string())?
                     .path(),
             );
         }
@@ -157,7 +155,7 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     let instance_paths = path_to_files(instance_path)?;
     for (i, instance_path) in instance_paths.iter().enumerate() {
         let mut instances = VecDeque::new();
-        let field = read_public_inputs(&instance_path, &mut instances);
+        let field = read_public_inputs(instance_path, &mut instances);
         let ninstances = instances.len();
         inputs.ingest_instances(i, instances);
         info!(
@@ -172,7 +170,7 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
         let witness_paths = path_to_files(witness.to_path_buf())?;
         for (i, witness_path) in witness_paths.iter().enumerate() {
             let mut witnesses = VecDeque::new();
-            let field = read_private_inputs(&witness_path, &mut witnesses);
+            let field = read_private_inputs(witness_path, &mut witnesses);
             let nwitnesses = witnesses.len();
             inputs.ingest_witnesses(i, witnesses);
             info!(
@@ -196,7 +194,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let mut conns = start_connection_verifier(&vec![args.connection_addr.clone()])?;
+            let mut conns = start_connection_verifier(&[args.connection_addr.clone()])?;
             let stream = conns.pop().unwrap();
 
             let reader = BufReader::new(stream.try_clone()?);
@@ -226,7 +224,7 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let mut conns = start_connection_prover(&vec![args.connection_addr.clone()])?;
+            let mut conns = start_connection_prover(&[args.connection_addr.clone()])?;
             let stream = conns.pop().unwrap();
 
             let reader = BufReader::new(stream.try_clone()?);
@@ -401,7 +399,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let mut conns = start_connection_verifier(&vec![args.connection_addr.clone()])?;
+            let mut conns = start_connection_verifier(&[args.connection_addr.clone()])?;
             let stream = conns.pop().unwrap();
 
             let reader = BufReader::new(stream.try_clone()?);
@@ -429,7 +427,7 @@ fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let mut conns = start_connection_prover(&vec![args.connection_addr.clone()])?;
+            let mut conns = start_connection_prover(&[args.connection_addr.clone()])?;
             let stream = conns.pop().unwrap();
 
             let reader = BufReader::new(stream.try_clone()?);
@@ -461,12 +459,12 @@ fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
     let mut addresses: Vec<String> = args
         .connection_addr
         .clone()
-        .split(",")
+        .split(',')
         .map(|x| x.into())
         .collect();
     // if there are not enough addresses then add some other ones
     if addresses.len() == 1 {
-        let split_addr: Vec<String> = addresses[0].clone().split(":").map(|x| x.into()).collect();
+        let split_addr: Vec<String> = addresses[0].clone().split(':').map(|x| x.into()).collect();
         let addr = split_addr[0].clone();
         let port: usize = split_addr[1]
             .clone()
@@ -474,7 +472,7 @@ fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
             .unwrap_or_else(|_| panic!("cant parse port"));
         for i in 1..config.threads() {
             let mut new_addr = addr.clone();
-            new_addr.push_str(":".into());
+            new_addr.push(':');
             let new_port = format!("{:?}", port + i);
             new_addr.push_str(&new_port);
             addresses.push(new_addr);
@@ -638,13 +636,11 @@ fn run(args: &Cli) -> Result<()> {
             assert!(config.threads() > 1);
             run_text_multihtreaded(args, &config)
         }
+    } else if config.threads() == 1 {
+        run_flatbuffers(args, &config)
     } else {
-        if config.threads() == 1 {
-            run_flatbuffers(args, &config)
-        } else {
-            assert!(config.threads() > 1);
-            run_flatbuffers_multihtreaded(args, &config)
-        }
+        assert!(config.threads() > 1);
+        run_flatbuffers_multihtreaded(args, &config)
     }
 }
 
