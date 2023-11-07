@@ -765,10 +765,10 @@ mod tests {
 
         let resprover = handle.join().unwrap();
 
-        for i in 0..count {
+        for (i, res) in resprover.iter().enumerate().take(count) {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
-                resprover[i].value().into_inner(IS_PROVER)
+                res.value().into_inner(IS_PROVER)
             );
         }
     }
@@ -834,10 +834,10 @@ mod tests {
 
         let batch_prover = handle.join().unwrap();
 
-        for i in 0..count {
+        for (i, res) in batch_prover.iter().enumerate().take(count) {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
-                batch_prover[i].value().into_inner(IS_PROVER)
+                res.value().into_inner(IS_PROVER)
             );
         }
     }
