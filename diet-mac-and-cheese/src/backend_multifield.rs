@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_arguments)]
-
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_extfield::DietMacAndCheeseExtField;
@@ -1138,6 +1136,8 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         Ok(())
     }
 
+    // All of these parameters are required to load a backend
+    #[allow(clippy::too_many_arguments)]
     fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField>(
         &mut self,
         channel: &mut C,
@@ -1322,6 +1322,8 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         Ok(())
     }
 
+    // All of these parameters are required to load a backend
+    #[allow(clippy::too_many_arguments)]
     fn load_backend_multithreaded_fe<
         FE: PrimeFiniteField + StatisticallySecureField,
         C2: AbstractChannel + 'static + Send,
