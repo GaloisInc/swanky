@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use diet_mac_and_cheese::edabits::Conv;
 use diet_mac_and_cheese::svole_trait::Svole;
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
