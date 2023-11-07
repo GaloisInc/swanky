@@ -83,7 +83,7 @@ impl Default for BufferSizes {
 /// users of the `Channel` API should almost never need to manually flush.
 ///
 /// A manual flush should only be _required_ when interleaving `Channel` operations with
-/// non-`Channel` operations. For example, it would be advisble to `manual_flush()` before reading
+/// non-`Channel` operations. For example, it would be advisable to `manual_flush()` before reading
 /// user input from standard in. `Channel` can't flush for you, because it doesn't know that you're
 /// about to read from standard in!
 ///
@@ -93,6 +93,9 @@ impl Default for BufferSizes {
 /// [`ETIMEDOUT`](https://man7.org/linux/man-pages/man7/tcp.7.html#ERRORS) error, due to the
 /// [Two Generals' Problem](https://en.wikipedia.org/wiki/Two_Generals%27_Problem), it's not
 /// possible to know whether or not the peer received the sent data.
+///
+/// As a result, on channel error, the only safe remediation strategy is to drop (and close) the
+/// inner `Read + Write` type.
 pub struct Channel<'a> {
     read_buffer: Vec<u8>,
     read_buffer_pos: usize,
