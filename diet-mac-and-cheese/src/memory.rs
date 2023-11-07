@@ -49,6 +49,10 @@ fn test_size_wire_ptr() {
 // TODO: because of the unsafe character of certain operations, it might be a good idea to
 // move this Pool to its own module and declare some functions of the API as `unsafe`.
 // Same idea for the Stack frame. Another possible solution would be to use Mac'n'Cheese Wire map
+
+// Allowed since the use of `Box` here can improve cache performance when many
+// allocations occur
+#[allow(clippy::box_collection)]
 #[derive(Debug)]
 pub(crate) struct Pool<X> {
     cache: RefCell<Cache<X>>, // We use a RefCell here, so that we can mutate the cache without having to declare the functions on `&mut self`. This is useful for implementing `get`
