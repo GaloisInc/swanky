@@ -35,7 +35,7 @@ fn run() {
             .unwrap();
         println!("Send time (random edabits): {:?}", start.elapsed());
         let start = Instant::now();
-        let _ = fconv_sender
+        fconv_sender
             .conv(&mut sender, &mut rng, num_bucket, num_cut, &edabits, None)
             .unwrap();
         println!("Send time (conv): {:?}", start.elapsed());
