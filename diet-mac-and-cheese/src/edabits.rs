@@ -1,6 +1,3 @@
-#![allow(clippy::needless_range_loop)]
-#![allow(clippy::too_many_arguments)]
-
 //! Field switching functionality based on protocol with Edabits.
 
 use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
@@ -233,7 +230,7 @@ impl<
             }
         }
 
-        for i in 0..n {
+        for (i, r) in r_batch.iter().enumerate().take(n) {
             let c = match P::WHICH {
                 WhichParty::Prover(ev) => {
                     c_batch.as_ref().prover_into(ev)[i].value().into_inner(ev)
@@ -244,9 +241,9 @@ impl<
             let c_m = f2_to_fe::<FE::PrimeField>(c);
 
             let choice = c.ct_eq(&F2::ONE);
-            let x = self.fcom_fe.neg(r_batch[i].value);
+            let x = self.fcom_fe.neg(r.value);
             let beq = self.fcom_fe.affine_add_cst(c_m, x);
-            let bneq = self.fcom_fe.affine_add_cst(c_m, r_batch[i].value);
+            let bneq = self.fcom_fe.affine_add_cst(c_m, r.value);
             let x_m = Mac::conditional_select(&bneq, &beq, choice);
 
             x_m_batch.push(x_m);
@@ -370,10 +367,10 @@ impl<
                 )?,
             }
 
-            for n in 0..num {
+            for (n, aux) in aux_batch.iter().enumerate().take(num) {
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
-                        let (and1, and2) = aux_batch[n];
+                        let &(and1, and2) = aux;
                         let and_res = and_res_batch.as_ref().into_inner(ev)[n];
                         let and_res_mac = and_res_mac_batch.as_ref().prover_into(ev)[n];
                         mult_check_state.accumulate(
@@ -391,7 +388,7 @@ impl<
                         ci_mac_batch.as_mut().into_inner(ev)[n] = c_mac;
                     }
                     WhichParty::Verifier(ev) => {
-                        let (and1_mac, and2_mac) = aux_batch[n];
+                        let &(and1_mac, and2_mac) = aux;
                         let and_res_mac = and_res_mac_batch.as_ref().verifier_into(ev)[n];
                         mult_check_state.accumulate(
                             &(and1_mac, and2_mac, and_res_mac),
@@ -620,7 +617,7 @@ impl<
                 PartyEither::verifier_new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
             }
         };
-        for i in 0..num {
+        for (i, &b) in b_batch.iter().enumerate().take(num) {
             let value = match P::WHICH {
                 WhichParty::Prover(ev) => Mac::new(
                     ProverPrivateCopy::new(b_m_batch.as_ref().into_inner(ev)[i]),
@@ -629,7 +626,7 @@ impl<
                 WhichParty::Verifier(ev) => b_m_mac_batch.as_ref().verifier_into(ev)[i],
             };
             dabit_vec.push(Dabit {
-                bit: b_batch[i],
+                bit: b,
                 value,
             })
         }
@@ -711,13 +708,13 @@ impl<
         let mut res = true;
 
         if let WhichParty::Prover(ev) = P::WHICH {
-            for i in 0..n {
+            for dabit in dabits.iter().take(n) {
                 // making sure the faulty dabits are not faulty
                 debug_assert!(
-                    ((dabits[i].bit.value().into_inner(ev) == F2::ZERO)
-                        & (dabits[i].value.value().into_inner(ev) == FE::PrimeField::ZERO))
-                        | ((dabits[i].bit.value().into_inner(ev) == F2::ONE)
-                            & (dabits[i].value.value().into_inner(ev) == FE::PrimeField::ONE))
+                    ((dabit.bit.value().into_inner(ev) == F2::ZERO)
+                        & (dabit.value.value().into_inner(ev) == FE::PrimeField::ZERO))
+                        | ((dabit.bit.value().into_inner(ev) == F2::ONE)
+                            & (dabit.value.value().into_inner(ev) == FE::PrimeField::ONE))
                 );
             }
         }
@@ -888,10 +885,10 @@ impl<
         };
         let mut e_rng = AesRng::from_seed(seed);
         let mut e = vec![Vec::with_capacity(n); s];
-        for k in 0..s {
+        for ei in e.iter_mut().take(s) {
             for _ in 0..n {
                 let b = F2::random(&mut e_rng);
-                e[k].push(b);
+                ei.push(b);
             }
         }
 
@@ -903,13 +900,13 @@ impl<
                 WhichParty::Prover(ev) => c1_mac.as_ref().prover_into(ev)[k],
                 WhichParty::Verifier(ev) => c1_mac.as_ref().verifier_into(ev)[k].mac(),
             };
-            for i in 0..n {
+            for (i, dabit) in dabits.iter().enumerate().take(n) {
                 // TODO: do not need to do it when e[i] is ZERO
-                let tmp = dabits[i].bit * e[k][i];
+                let tmp = dabit.bit * e[k][i];
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
                         ((e[k][i] == F2::ONE)
-                            & (tmp.value().into_inner(ev) == dabits[i].bit.value().into_inner(ev)))
+                            & (tmp.value().into_inner(ev) == dabit.bit.value().into_inner(ev)))
                             | (tmp.value().into_inner(ev) == F2::ZERO)
                     );
 
@@ -938,19 +935,19 @@ impl<
             WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(s)),
             WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(s)),
         };
-        for k in 0..s {
+        for ek in e.iter().take(s) {
             // NOTE: for performance maybe step 4 and 6 should be combined in one loop
             let mut r_prime = ProverPrivateCopy::new(FE::PrimeField::ZERO);
             let mut r_prime_mac = FE::ZERO;
-            for i in 0..n {
+            for (i, dabit) in dabits.iter().enumerate().take(n) {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b = f2_to_fe(e[k][i]);
-                let tmp = dabits[i].value * b;
+                let b = f2_to_fe(ek[i]);
+                let tmp = dabit.value * b;
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
                         ((b == FE::PrimeField::ONE)
                             & (tmp.value().into_inner(ev)
-                                == dabits[i].value.value().into_inner(ev)))
+                                == dabit.value.value().into_inner(ev)))
                             | (tmp.value().into_inner(ev) == FE::PrimeField::ZERO)
                     );
                     *r_prime.as_mut().into_inner(ev) += tmp.value().into_inner(ev);
@@ -1052,6 +1049,8 @@ impl<
         }
     }
 
+    // The conversion loop requires all of these parameters to function
+    #[allow(clippy::too_many_arguments)]
     fn conv_loop<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
