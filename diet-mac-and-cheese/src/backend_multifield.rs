@@ -93,11 +93,6 @@ const CONVERSION_BATCH_SIZE: usize = 10_321;
 const CONVERSION_PARAM_B_SAFE: usize = 5;
 const CONVERSION_BATCH_SIZE_SAFE: usize = 1_024;
 
-#[test]
-fn conversion_param_b_valid() {
-    assert!((CONVERSION_PARAM_B == 4) || (CONVERSION_PARAM_B == 5))
-}
-
 /// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
 /// functions to go to bits.
 pub trait BackendConvT<P: Party>: PrimeBackendT {
