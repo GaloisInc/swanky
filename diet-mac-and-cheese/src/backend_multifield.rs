@@ -1590,7 +1590,6 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
             out_ranges.len(),
             output_counts.len()
         );
-        #[allow(clippy::needless_range_loop)]
         for i in 0..output_counts.len() {
             let (field_idx, count) = output_counts[i];
             let (src_first, src_last) = out_ranges[i];
@@ -1605,7 +1604,6 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
             in_ranges.len(),
             input_counts.len()
         );
-        #[allow(clippy::needless_range_loop)]
         for i in 0..input_counts.len() {
             let (field_idx, count) = input_counts[i];
             let (src_first, src_last) = in_ranges[i];
