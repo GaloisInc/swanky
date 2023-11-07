@@ -76,8 +76,8 @@ impl ShimChannel {
 
 impl AbstractChannel for ShimChannel {
     fn read_bytes(&mut self, bytes: &mut [u8]) -> std::io::Result<()> {
-        for i in 0..bytes.len() {
-            bytes[i] = self.read_one_byte();
+        for byte in bytes.iter_mut() {
+            *byte = self.read_one_byte();
         }
         Ok(())
     }
