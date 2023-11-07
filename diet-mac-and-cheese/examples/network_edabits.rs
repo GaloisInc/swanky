@@ -283,12 +283,11 @@ fn main() -> std::io::Result<()> {
                 .help("Using multithreading on B-loop"),
         )
         .get_matches();
-    let whoami;
-    if !matches.contains_id("prover") {
-        whoami = VERIFIER;
+    let whoami = if !matches.contains_id("prover") {
+        VERIFIER
     } else {
-        whoami = PROVER;
-    }
+        PROVER
+    };
     let connection_addr = &matches.get_one::<String>("addr").unwrap();
     let num_bucket = matches
         .get_one::<String>("bucket")
