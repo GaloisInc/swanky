@@ -9,7 +9,6 @@ use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
-use pretty_env_logger;
 use rustls::{Certificate, ServerConfig, ServerConnection};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use scuttlebutt::{AesRng, TrackChannel};
@@ -62,7 +61,7 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let msg = websocket.read().unwrap();
     match msg {
         Message::Text(m) => {
-            if m == "init".to_string() {
+            if m == *"init" {
                 println!("INIT");
             }
         }
