@@ -601,14 +601,14 @@ mod tests {
         let instances = vec![vec![one::<F2>(), one::<F2>(), one::<F2>()]];
         let witnesses = vec![vec![zero::<F2>(), zero::<F2>(), one::<F2>(), one::<F2>()]];
 
-        if !test_circuit(
+        if test_circuit(
             fields.clone(),
             func_store,
             gates.clone(),
             instances.clone(),
             witnesses.clone(),
         )
-        .is_err()
+        .is_ok()
         {
             panic!("This circuit should fail because it's strict")
         };
@@ -696,7 +696,7 @@ mod tests {
             zero::<F2>(), // 1000
         ]];
 
-        if !test_circuit(fields.clone(), func_store, gates, instances, witnesses).is_err() {
+        if test_circuit(fields.clone(), func_store, gates, instances, witnesses).is_ok() {
             panic!("This circuit should fail because it's strict")
         };
     }
@@ -989,7 +989,7 @@ mod tests {
         ]];
         let witnesses = vec![vec![four::<F61p>()]];
 
-        if !test_circuit(fields, func_store, gates, instances, witnesses).is_err() {
+        if test_circuit(fields, func_store, gates, instances, witnesses).is_ok() {
             panic!("Test should fail");
         };
     }
