@@ -210,7 +210,7 @@ impl BufRelation {
         }
     }
 
-    pub fn next(&mut self) -> Option<()> {
+    pub fn read_next(&mut self) -> Option<()> {
         let msg = read_size_prefix_in_vec(&mut self.buffer_file, &mut self.buffer_bytes);
         match msg {
             Err(_) => {

@@ -1544,7 +1544,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
         loop {
-            let r = buf_rel.next();
+            let r = buf_rel.read_next();
             match r {
                 None => {
                     break;
