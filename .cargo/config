@@ -10,3 +10,6 @@ rustflags = [
 [build]
 # See this script for the rationale
 rustdoc = "./etc/rustdoc-wrapper.sh"
+
+[alias]
+swanky-clippy = "clippy --workspace --all-targets -- -Dwarnings -Aclippy::type_complexity"
