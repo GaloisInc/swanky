@@ -26,6 +26,12 @@ pub struct ShimChannel {
     write_buffer_len: usize,
 }
 
+impl Default for ShimChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Warning!! This buffer size should be smaller than the SharedBuffer in JS,
 // otherwise there is a risk that more data is written than can fit in the SharedBuffer.
 const BUFFER_SIZE: usize = 3_000_000;
