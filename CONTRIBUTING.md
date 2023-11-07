@@ -369,6 +369,6 @@ fn range(n: usize) -> impl Iterator<Item = usize> {
 
 # Clippy
 
-All of our Rust code _must_ pass cargo clippy. We currently use the default clippy lint configuration, but this is subject to change in the future. (Some projects deviate from the default configuration if some warnings are too noisy for their application, or not noisy enough.)
+All of our Rust code _must_ pass cargo clippy. We maintain a list of globally-allowed lints in `etc/ci.py`. (Some projects deviate from this configuration if some warnings are too noisy for their application, or not noisy enough.)
 
 If you find that a clippy lint that we have enabled is not a good match for your project, you can disable it in your code. The lint should be disabled for as small a scope as possible (e.g. disable the lint for a single function rather than a whole crate), and the reason for disabling the lint should be documented in a comment.
