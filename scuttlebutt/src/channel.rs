@@ -215,6 +215,35 @@ pub trait AbstractChannel {
     }
 }
 
+impl AbstractChannel for swanky_channel::Channel<'_> {
+    #[inline]
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        swanky_channel::Channel::read_bytes(self, bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    #[inline]
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        swanky_channel::Channel::write_bytes(self, bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    #[inline]
+    fn flush(&mut self) -> Result<()> {
+        self.force_flush()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    fn clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        // AbstractChannel::clone() can't be implemented for Channel. Luckily, it's rarely used in
+        // swanky. (And further use should be discouraged.)
+        panic!("swanky_channel::Channel does not support clone")
+    }
+}
+
 /// A standard read/write channel that implements `AbstractChannel`.
 pub struct Channel<R, W> {
     reader: Rc<RefCell<R>>,

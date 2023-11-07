@@ -1,0 +1,16 @@
+[package]
+name = "swanky-channel"
+description = "A channel abstraction to let users avoid manual flushing"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+swanky-serialization.workspace = true
+eyre.workspace = true
+generic-array.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
