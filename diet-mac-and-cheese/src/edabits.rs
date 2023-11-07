@@ -625,10 +625,7 @@ impl<
                 ),
                 WhichParty::Verifier(ev) => b_m_mac_batch.as_ref().verifier_into(ev)[i],
             };
-            dabit_vec.push(Dabit {
-                bit: b,
-                value,
-            })
+            dabit_vec.push(Dabit { bit: b, value })
         }
 
         Ok(dabit_vec)
@@ -946,8 +943,7 @@ impl<
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
                         ((b == FE::PrimeField::ONE)
-                            & (tmp.value().into_inner(ev)
-                                == dabit.value.value().into_inner(ev)))
+                            & (tmp.value().into_inner(ev) == dabit.value.value().into_inner(ev)))
                             | (tmp.value().into_inner(ev) == FE::PrimeField::ZERO)
                     );
                     *r_prime.as_mut().into_inner(ev) += tmp.value().into_inner(ev);
