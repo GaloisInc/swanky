@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use clap::{Arg, Command};
 use core::fmt::Debug;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
