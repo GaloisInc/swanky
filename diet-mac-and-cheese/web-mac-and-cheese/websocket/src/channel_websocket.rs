@@ -40,8 +40,7 @@ impl<Stream: Read + Write> WsChannel<Stream> {
             }
         }
 
-        let r = self.read_buffer[self.curr];
-        r
+        self.read_buffer[self.curr]
     }
 
     fn write_one_byte(&mut self, b: u8) -> Result<()> {
@@ -54,7 +53,7 @@ impl<Stream: Read + Write> WsChannel<Stream> {
     }
 
     fn internal_flush(&mut self) {
-        if self.write_buffer.len() > 0 {
+        if !self.write_buffer.is_empty() {
             let msg = Message::binary(&self.write_buffer[0..self.write_buffer_len]);
             self.websocket.write(msg).unwrap();
             self.websocket.flush().unwrap();
@@ -65,8 +64,8 @@ impl<Stream: Read + Write> WsChannel<Stream> {
 
 impl<Stream: Read + Write> AbstractChannel for WsChannel<Stream> {
     fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
-        for i in 0..bytes.len() {
-            bytes[i] = self.read_one_byte();
+        for byte in bytes.iter_mut() {
+            *byte = self.read_one_byte();
         }
         Ok(())
     }
