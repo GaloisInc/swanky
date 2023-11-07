@@ -779,16 +779,14 @@ where
                 let last_frame = self.get_frame_mut();
                 if callframe_is_vector {
                     last_frame.callframe_vector[start as usize] = wire_ptr;
+                } else if allow_allocation {
+                    last_frame
+                        .callframe
+                        .allocate_outputs_ptr(start, start, wire_ptr);
                 } else {
-                    if allow_allocation {
-                        last_frame
-                            .callframe
-                            .allocate_outputs_ptr(start, start, wire_ptr);
-                    } else {
-                        last_frame
-                            .callframe
-                            .allocate_inputs_ptr(start, start, wire_ptr);
-                    }
+                    last_frame
+                        .callframe
+                        .allocate_inputs_ptr(start, start, wire_ptr);
                 }
             }
         }
