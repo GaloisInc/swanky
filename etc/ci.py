@@ -92,7 +92,7 @@ def test_rust(
             "--",
             "-Dwarnings",
         ]
-        + ["-A " + lint for lint in ALLOWED_LINTS]
+        + ["-A clippy::" + lint for lint in ALLOWED_LINTS]
     )
     run(
         ["cargo", "doc", "--workspace", "--no-deps", "--verbose"] + features_args,
