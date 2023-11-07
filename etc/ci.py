@@ -26,6 +26,7 @@ Strings added here must exactly match the names of clippy lints (see
 https://rust-lang.github.io/rust-clippy/master/).
 """
 
+
 def test_rust(
     ctx: click.Context,
     features: List[str],
