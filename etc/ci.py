@@ -16,16 +16,6 @@ import rich.syntax
 from etc import NIX_CACHE_KEY, ROOT
 from etc.lint.cmd import lint
 
-ALLOWED_LINTS = [
-    "type_complexity",
-]
-"""
-Clippy lints that we allow across all swanky crates.
-
-Strings added here must exactly match the names of clippy lints (see
-https://rust-lang.github.io/rust-clippy/master/).
-"""
-
 
 def test_rust(
     ctx: click.Context,
@@ -80,20 +70,7 @@ def test_rust(
         ):
             raise click.ClickException("Command failed: " + " ".join(cmd))
 
-    run(
-        [
-            "cargo",
-            "clippy",
-            "--workspace",
-            "--all-targets",
-        ]
-        + features_args
-        + [
-            "--",
-            "-Dwarnings",
-        ]
-        + ["-Aclippy::" + lint for lint in ALLOWED_LINTS]
-    )
+    run(["cargo", "swanky-clippy"])
     run(
         ["cargo", "doc", "--workspace", "--no-deps", "--verbose"] + features_args,
         extra_env={"RUSTDOCFLAGS": "-D warnings"},
