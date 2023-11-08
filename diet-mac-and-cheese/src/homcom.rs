@@ -765,7 +765,7 @@ mod tests {
 
         let resprover = handle.join().unwrap();
 
-        for (i, res) in resprover.iter().enumerate().take(count) {
+        for (i, res) in resprover.iter().enumerate() {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
                 res.value().into_inner(IS_PROVER)
@@ -834,7 +834,7 @@ mod tests {
 
         let batch_prover = handle.join().unwrap();
 
-        for (i, res) in batch_prover.iter().enumerate().take(count) {
+        for (i, res) in batch_prover.iter().enumerate() {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
                 res.value().into_inner(IS_PROVER)
