@@ -29,10 +29,6 @@ pub trait AbstractChannel {
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()>;
     /// Flush the channel.
     fn flush(&mut self) -> Result<()>;
-    /// Clone the channel.
-    fn clone(&self) -> Self
-    where
-        Self: Sized;
     /// Read `nbytes` from the channel, and return it as a `Vec`.
     fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
         let mut data = vec![0; nbytes];
