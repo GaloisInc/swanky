@@ -230,7 +230,7 @@ impl<
             }
         }
 
-        for (i, r) in r_batch.iter().enumerate().take(n) {
+        for (i, r) in r_batch.iter().enumerate() {
             let c = match P::WHICH {
                 WhichParty::Prover(ev) => {
                     c_batch.as_ref().prover_into(ev)[i].value().into_inner(ev)
@@ -367,7 +367,7 @@ impl<
                 )?,
             }
 
-            for (n, &aux) in aux_batch.iter().enumerate().take(num) {
+            for (n, &aux) in aux_batch.iter().enumerate() {
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
                         let (and1, and2) = aux;
@@ -617,7 +617,7 @@ impl<
                 PartyEither::verifier_new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
             }
         };
-        for (i, &b) in b_batch.iter().enumerate().take(num) {
+        for (i, &b) in b_batch.iter().enumerate() {
             let value = match P::WHICH {
                 WhichParty::Prover(ev) => Mac::new(
                     ProverPrivateCopy::new(b_m_batch.as_ref().into_inner(ev)[i]),
@@ -705,7 +705,7 @@ impl<
         let mut res = true;
 
         if let WhichParty::Prover(ev) = P::WHICH {
-            for dabit in dabits.iter().take(n) {
+            for dabit in dabits.iter() {
                 // making sure the faulty dabits are not faulty
                 debug_assert!(
                     ((dabit.bit.value().into_inner(ev) == F2::ZERO)
@@ -882,7 +882,7 @@ impl<
         };
         let mut e_rng = AesRng::from_seed(seed);
         let mut e = vec![Vec::with_capacity(n); s];
-        for ek in e.iter_mut().take(s) {
+        for ek in e.iter_mut() {
             for _ in 0..n {
                 let b = F2::random(&mut e_rng);
                 ek.push(b);
@@ -897,12 +897,12 @@ impl<
                 WhichParty::Prover(ev) => c1_mac.as_ref().prover_into(ev)[k],
                 WhichParty::Verifier(ev) => c1_mac.as_ref().verifier_into(ev)[k].mac(),
             };
-            for (i, dabit) in dabits.iter().enumerate().take(n) {
+            for (dabit, &eki) in dabits.iter().zip(e[k].iter()) {
                 // TODO: do not need to do it when e[i] is ZERO
-                let tmp = dabit.bit * e[k][i];
+                let tmp = dabit.bit * eki;
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
-                        ((e[k][i] == F2::ONE)
+                        ((eki == F2::ONE)
                             & (tmp.value().into_inner(ev) == dabit.bit.value().into_inner(ev)))
                             | (tmp.value().into_inner(ev) == F2::ZERO)
                     );
@@ -932,13 +932,13 @@ impl<
             WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(s)),
             WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(s)),
         };
-        for ek in e.iter().take(s) {
+        for ek in e.iter() {
             // NOTE: for performance maybe step 4 and 6 should be combined in one loop
             let mut r_prime = ProverPrivateCopy::new(FE::PrimeField::ZERO);
             let mut r_prime_mac = FE::ZERO;
-            for (i, dabit) in dabits.iter().enumerate().take(n) {
+            for (dabit, &eki) in dabits.iter().zip(ek.iter()) {
                 // TODO: do not need to do it when e[i] is ZERO
-                let b = f2_to_fe(ek[i]);
+                let b = f2_to_fe(eki);
                 let tmp = dabit.value * b;
                 if let WhichParty::Prover(ev) = P::WHICH {
                     debug_assert!(
