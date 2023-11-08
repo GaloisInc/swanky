@@ -98,7 +98,7 @@ impl Plugin for IterV0 {
             );
         };
         // TODO: Should we assume this param fits in a u64?
-        let iter_count: u64 = iter_count.as_words()[0].into();
+        let iter_count: u64 = iter_count.as_words()[0];
 
         for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
             eyre::ensure!(

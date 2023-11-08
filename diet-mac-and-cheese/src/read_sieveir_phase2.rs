@@ -210,7 +210,7 @@ impl BufRelation {
         }
     }
 
-    pub fn next(&mut self) -> Option<()> {
+    pub fn read_next(&mut self) -> Option<()> {
         let msg = read_size_prefix_in_vec(&mut self.buffer_file, &mut self.buffer_bytes);
         match msg {
             Err(_) => {
@@ -405,19 +405,17 @@ pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<(
                     g::FunctionBody::PluginBody => {
                         let x = the_function.body_as_plugin_body().unwrap();
                         let plugin_name = x.name().unwrap().into();
-                        let operation = x.operation().unwrap_or_else(|| "missing_op").into();
+                        let operation = x.operation().unwrap_or("missing_op").into();
                         let params_flatc = x.params();
-                        let params = if params_flatc.is_none() {
-                            vec![]
-                        } else {
-                            let m = params_flatc.unwrap().len();
+                        let params = if let Some(params_flatc) = params_flatc {
+                            let m = params_flatc.len();
                             let mut params_v = vec![];
                             for j in 0..m {
-                                params_v.push(
-                                    PluginTypeArg::from_str(params_flatc.unwrap().get(j)).ok()?,
-                                );
+                                params_v.push(PluginTypeArg::from_str(params_flatc.get(j)).ok()?);
                             }
                             params_v
+                        } else {
+                            vec![]
                         };
                         let mut public_count = vec![];
                         for p in x.public_count().unwrap() {

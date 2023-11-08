@@ -49,6 +49,10 @@ fn test_size_wire_ptr() {
 // TODO: because of the unsafe character of certain operations, it might be a good idea to
 // move this Pool to its own module and declare some functions of the API as `unsafe`.
 // Same idea for the Stack frame. Another possible solution would be to use Mac'n'Cheese Wire map
+
+// Allowed since the use of `Box` here can improve cache performance when many
+// allocations occur
+#[allow(clippy::box_collection)]
 #[derive(Debug)]
 pub(crate) struct Pool<X> {
     cache: RefCell<Cache<X>>, // We use a RefCell here, so that we can mutate the cache without having to declare the functions on `&mut self`. This is useful for implementing `get`
@@ -253,38 +257,32 @@ struct CallframeElm<X> {
 #[inline]
 fn search_callframe<X>(v: &[CallframeElm<X>], id: WireId) -> WirePointer<X> {
     for r in v.iter() {
-        match r {
-            CallframeElm {
-                first,
-                last,
-                wire_ptr,
-            } => {
-                if *first <= id && id <= *last {
-                    return WirePointer(unsafe { wire_ptr.0.offset((id - first) as isize) });
-                }
-            }
+        let CallframeElm {
+            first,
+            last,
+            wire_ptr,
+        } = r;
+        if *first <= id && id <= *last {
+            return WirePointer(unsafe { wire_ptr.0.offset((id - first) as isize) });
         }
     }
     panic!("Not found")
 }
 
 #[inline]
-fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) -> () {
+fn set_callframe_if_ptr<X: Clone>(v: &[CallframeElm<X>], id: WireId, x: &X) {
     for r in v.iter() {
-        match r {
-            CallframeElm {
-                first,
-                last,
-                wire_ptr,
-            } => {
-                if *first <= id && id <= *last {
-                    unsafe {
-                        let addr = wire_ptr.0.offset((id - first) as isize);
-                        *addr = x.clone();
-                    }
-                    return ();
-                }
+        let CallframeElm {
+            first,
+            last,
+            wire_ptr,
+        } = r;
+        if *first <= id && id <= *last {
+            unsafe {
+                let addr = wire_ptr.0.offset((id - first) as isize);
+                *addr = x.clone();
             }
+            return;
         }
     }
     panic!("Not found")
@@ -329,7 +327,7 @@ where
     }
 
     #[inline]
-    fn set(&mut self, id: WireId, x: &X) -> () {
+    fn set(&mut self, id: WireId, x: &X) {
         if id < self.outputs_cnt {
             set_callframe_if_ptr(&self.outputs, id, x)
         } else {
@@ -522,13 +520,12 @@ where
         // TODO: Is there some cleanup to do here to keep to the memory peak under control???
         let frame = self.get_frame_mut();
 
-        if frame.callframe_is_vector {
-            if frame.callframe_vector.len()
+        if frame.callframe_is_vector
+            && frame.callframe_vector.len()
                 > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT)
-            {
-                frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
-                frame.callframe_size = 0;
-            }
+        {
+            frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
+            frame.callframe_size = 0;
         }
 
         self.top -= 1;
@@ -546,7 +543,7 @@ where
 
     #[inline]
     fn get_callframe_vector(wire_ptr: &WirePointer<X>) -> &X {
-        return unsafe { &*wire_ptr.0 };
+        unsafe { &*wire_ptr.0 }
     }
 
     #[inline]
@@ -658,19 +655,14 @@ where
                 let idx = (start + i) as usize;
                 frame.callframe_vector[idx] = wire_ptr.incr(i);
             }
-            return;
+        } else if allow_allocation {
+            frame
+                .callframe
+                .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
         } else {
-            if allow_allocation {
-                frame
-                    .callframe
-                    .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
-                return;
-            } else {
-                frame
-                    .callframe
-                    .allocate_inputs_ptr(start, start + count - 1, wire_ptr);
-                return;
-            }
+            frame
+                .callframe
+                .allocate_inputs_ptr(start, start + count - 1, wire_ptr);
         }
     }
 
@@ -684,7 +676,6 @@ where
     // 4) in unallocated memframe
     // In addition, both the callframe and the memframe have a second mode, where the underlying structure
     // is a vector. For the callframe the vector holds addresses, for the memfarame it holds wires.
-    #[allow(clippy::needless_return)]
     pub(crate) fn allocate_slice(
         &mut self,
         src_first: WireId,
@@ -735,7 +726,6 @@ where
             //println!("3) present in pool");
             let wire_ptr = frame.memframe_pool.get_ptr_when_in_cache(src_first);
             self.place_ptr_in_callframe(start, count, allow_allocation, wire_ptr);
-            return;
         } else {
             //println!("4) unallocated");
             // if it is in unallocated then we need to allocate it
@@ -761,49 +751,42 @@ where
                         let idx = (start + i) as usize;
                         last_frame.callframe_vector[idx] = new_slice.incr(i);
                     }
-                    return;
                 } else {
                     let last_frame = self.get_frame_mut();
                     last_frame
                         .callframe
                         .allocate_outputs_ptr(start, start + count - 1, wire_ptr);
-                    return;
                 }
             } else {
                 // Unallocated single wire
-                let wire_ptr;
-                if allow_allocation {
+                let wire_ptr = if allow_allocation {
                     frame
                         .memframe_unallocated
-                        .insert(src_first, Box::new(X::default()));
-                    wire_ptr = WirePointer(
+                        .insert(src_first, Box::<X>::default());
+                    WirePointer(
                         ((&**frame.memframe_unallocated.get(&src_first).unwrap()) as *const X)
                             .cast_mut(),
-                    );
+                    )
                 } else {
                     // it is an input, and in that case we cant allocate, so it must be already assigned.
                     let ptr = frame.memframe_unallocated.get(&src_first);
                     if ptr.is_none() {
                         panic!("input passed but not previously assigned");
                     }
-                    wire_ptr = WirePointer(((&**ptr.unwrap()) as *const X).cast_mut());
-                }
+                    WirePointer(((&**ptr.unwrap()) as *const X).cast_mut())
+                };
 
                 let last_frame = self.get_frame_mut();
                 if callframe_is_vector {
                     last_frame.callframe_vector[start as usize] = wire_ptr;
-                    return;
+                } else if allow_allocation {
+                    last_frame
+                        .callframe
+                        .allocate_outputs_ptr(start, start, wire_ptr);
                 } else {
-                    if allow_allocation {
-                        last_frame
-                            .callframe
-                            .allocate_outputs_ptr(start, start, wire_ptr);
-                    } else {
-                        last_frame
-                            .callframe
-                            .allocate_inputs_ptr(start, start, wire_ptr);
-                    }
-                    return;
+                    last_frame
+                        .callframe
+                        .allocate_inputs_ptr(start, start, wire_ptr);
                 }
             }
         }

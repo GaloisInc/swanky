@@ -42,7 +42,7 @@ pub(crate) fn dotproduct_with_public_powers<B: BackendT>(
     for x in xs.take(n) {
         let tmp = backend.mul_constant(&x, acc)?;
         result = backend.add(&result, &tmp)?;
-        acc = acc * y;
+        acc *= y;
     }
     Ok(result)
 }

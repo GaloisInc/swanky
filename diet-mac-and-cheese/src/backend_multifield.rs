@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_arguments)]
-
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_extfield::DietMacAndCheeseExtField;
@@ -94,11 +92,6 @@ const CONVERSION_PARAM_B: usize = 4;
 const CONVERSION_BATCH_SIZE: usize = 10_321;
 const CONVERSION_PARAM_B_SAFE: usize = 5;
 const CONVERSION_BATCH_SIZE_SAFE: usize = 1_024;
-
-#[test]
-fn conversion_param_b_valid() {
-    assert!((CONVERSION_PARAM_B == 4) || (CONVERSION_PARAM_B == 5))
-}
 
 /// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
 /// functions to go to bits.
@@ -205,7 +198,7 @@ impl<E> EdabitsMap<E> {
     }
 
     fn push_elem(&mut self, bit_width: usize, e: E) {
-        self.0.entry(bit_width).or_insert_with(std::vec::Vec::new);
+        self.0.entry(bit_width).or_default();
         self.0.get_mut(&bit_width).as_mut().unwrap().push(e);
     }
 
@@ -869,7 +862,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
         inputs: &[WireRange],
         plugin: &PluginExecution,
     ) -> Result<()> {
-        fn copy_mem<'a, W>(mem: &'a Memory<W>, range: WireRange) -> impl Iterator<Item = &'a W>
+        fn copy_mem<W>(mem: &Memory<W>, range: WireRange) -> impl Iterator<Item = &W>
         where
             W: Copy + Clone + Debug + Default,
         {
@@ -883,10 +876,10 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 assert_eq!(inputs.len(), 2);
                 let xs = copy_mem(&self.memory, inputs[0]).copied();
                 let ys = copy_mem(&self.memory, inputs[1]).copied();
-                plugin.execute::<P, _>(xs, ys, &mut self.backend)?
+                plugin.execute::<_>(xs, ys, &mut self.backend)?
             }
             PluginExecution::Disjunction(disj) => {
-                assert!(inputs.len() >= 1, "must provide condition");
+                assert!(!inputs.is_empty(), "must provide condition");
 
                 // retrieve input wires
                 let mut wires = Vec::with_capacity(disj.inputs() as usize + disj.cond() as usize);
@@ -944,7 +937,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                     debug!("CONV GET {:?}", in_wire);
                     let bits = self.backend.assert_conv_to_bits(in_wire)?;
                     assert_eq!(bits.len(), 1);
-                    v.push(bits[0].clone());
+                    v.push(bits[0]);
                 }
                 Ok(v.into_iter().rev().collect())
                 // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
@@ -971,7 +964,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 assert!((*end - *start + 1) as usize <= bits.len());
 
                 for (i, _) in (*start..(*end + 1)).enumerate() {
-                    let v = self.backend.assert_conv_from_bits(&[bits[i].clone()])?;
+                    let v = self.backend.assert_conv_from_bits(&[bits[i]])?;
                     debug!("CONV SET {:?}", v);
                     let out_wire = end - (i as WireId);
                     // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
@@ -1138,6 +1131,8 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         Ok(())
     }
 
+    // All of these parameters are required to load a backend
+    #[allow(clippy::too_many_arguments)]
     fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField>(
         &mut self,
         channel: &mut C,
@@ -1322,6 +1317,8 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         Ok(())
     }
 
+    // All of these parameters are required to load a backend
+    #[allow(clippy::too_many_arguments)]
     fn load_backend_multithreaded_fe<
         FE: PrimeFiniteField + StatisticallySecureField,
         C2: AbstractChannel + 'static + Send,
@@ -1542,7 +1539,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
         loop {
-            let r = buf_rel.next();
+            let r = buf_rel.read_next();
             match r {
                 None => {
                     break;
@@ -1588,7 +1585,6 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
             out_ranges.len(),
             output_counts.len()
         );
-        #[allow(clippy::needless_range_loop)]
         for i in 0..output_counts.len() {
             let (field_idx, count) = output_counts[i];
             let (src_first, src_last) = out_ranges[i];
@@ -1603,7 +1599,6 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
             in_ranges.len(),
             input_counts.len()
         );
-        #[allow(clippy::needless_range_loop)]
         for i in 0..input_counts.len() {
             let (field_idx, count) = input_counts[i];
             let (src_first, src_last) = in_ranges[i];
@@ -2262,12 +2257,7 @@ pub(crate) mod tests {
 
         let one = one::<F61p>();
         let instances = vec![vec![], vec![], vec![], vec![]];
-        let witnesses = vec![
-            vec![one.clone(), one.clone(), one.clone(), one],
-            vec![],
-            vec![],
-            vec![],
-        ];
+        let witnesses = vec![vec![one, one, one, one], vec![], vec![], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
@@ -2314,12 +2304,7 @@ pub(crate) mod tests {
 
         let one = one::<F61p>();
         let instances = vec![vec![], vec![], vec![], vec![]];
-        let witnesses = vec![
-            vec![one.clone(), one.clone(), one.clone(), one],
-            vec![],
-            vec![],
-            vec![],
-        ];
+        let witnesses = vec![vec![one, one, one, one], vec![], vec![], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
@@ -2381,8 +2366,8 @@ pub(crate) mod tests {
             GateM::AssertZero(FF0, 9),
         ];
 
-        let instances = vec![vec![two.clone()]];
-        let witnesses = vec![vec![two.clone(), two.clone(), two]];
+        let instances = vec![vec![two]];
+        let witnesses = vec![vec![two, two, two]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }

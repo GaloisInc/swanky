@@ -91,8 +91,8 @@ impl Plugin for DisjunctionV0 {
 
         // check that it is only for a single field
 
-        let mut ins = input_counts.into_iter().copied();
-        let out = output_counts.into_iter().copied();
+        let mut ins = input_counts.iter().copied();
+        let out = output_counts.iter().copied();
 
         let mut cnts_ins = vec![];
         let mut cnts_out = vec![];

@@ -582,10 +582,10 @@ where
             WhichParty::Verifier(ev) => {
                 let mut key_chi = T::ZERO;
                 let mut x_chi = T::ZERO;
-                for i in 0..batch.len() {
+                for (i, mac) in batch.iter().enumerate() {
                     let chi = T::random(&mut rng);
 
-                    key_chi += chi * batch[i].mac();
+                    key_chi += chi * mac.mac();
                     x_chi += out.as_ref().into_inner(ev)[i] * chi;
                 }
                 let m = channel.read_serializable::<T>()?;
@@ -765,10 +765,10 @@ mod tests {
 
         let resprover = handle.join().unwrap();
 
-        for i in 0..count {
+        for (i, res) in resprover.iter().enumerate() {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
-                resprover[i].value().into_inner(IS_PROVER)
+                res.value().into_inner(IS_PROVER)
             );
         }
     }
@@ -834,10 +834,10 @@ mod tests {
 
         let batch_prover = handle.join().unwrap();
 
-        for i in 0..count {
+        for (i, res) in batch_prover.iter().enumerate() {
             assert_eq!(
                 r.as_ref().into_inner(IS_VERIFIER)[i],
-                batch_prover[i].value().into_inner(IS_PROVER)
+                res.value().into_inner(IS_PROVER)
             );
         }
     }

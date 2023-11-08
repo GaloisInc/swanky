@@ -27,7 +27,7 @@ pub(super) fn permutation<B: BackendT>(
     rhs: &[B::Wire],
 ) -> Result<()> {
     debug_assert_eq!(lhs.len(), rhs.len());
-    if lhs.len() == 0 {
+    if lhs.is_empty() {
         return Ok(());
     }
     let mx = -x;

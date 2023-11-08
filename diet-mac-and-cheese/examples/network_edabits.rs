@@ -1,4 +1,3 @@
-#![allow(clippy::all)]
 use clap::{Arg, ArgAction, Command};
 use diet_mac_and_cheese::edabits::Conv;
 use diet_mac_and_cheese::svole_trait::Svole;
@@ -284,19 +283,27 @@ fn main() -> std::io::Result<()> {
                 .help("Using multithreading on B-loop"),
         )
         .get_matches();
-    let whoami;
-    if !matches.contains_id("prover") {
-        whoami = VERIFIER;
+    let whoami = if !matches.contains_id("prover") {
+        VERIFIER
     } else {
-        whoami = PROVER;
-    }
+        PROVER
+    };
     let connection_addr = &matches.get_one::<String>("addr").unwrap();
-    let num_bucket = usize::from_str_radix(matches.get_one::<String>("bucket").unwrap(), 10)
-        .unwrap_or(usize::from_str_radix(DEFAULT_NUM_BUCKET, 10).unwrap());
-    let nb_bits = usize::from_str_radix(matches.get_one::<String>("nb_bits").unwrap(), 10)
-        .unwrap_or(usize::from_str_radix(DEFAULT_NB_BITS, 10).unwrap());
-    let num_edabits = usize::from_str_radix(matches.get_one::<String>("num_edabits").unwrap(), 10)
-        .unwrap_or(usize::from_str_radix(DEFAULT_NUM_EDABITS, 10).unwrap());
+    let num_bucket = matches
+        .get_one::<String>("bucket")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap_or(DEFAULT_NUM_BUCKET.parse::<usize>().unwrap());
+    let nb_bits = matches
+        .get_one::<String>("nb_bits")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap_or(DEFAULT_NB_BITS.parse::<usize>().unwrap());
+    let num_edabits = matches
+        .get_one::<String>("num_edabits")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap_or(DEFAULT_NUM_EDABITS.parse::<usize>().unwrap());
 
     let multithreaded = matches.contains_id("multithreaded");
     let num_cut = num_bucket;

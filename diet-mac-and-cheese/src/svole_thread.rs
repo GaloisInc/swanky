@@ -16,7 +16,6 @@ const SLEEP_TIME: u64 = 1;
 const SLEEP_TIME_MAX: u64 = 100;
 
 // number of VOLE extension vectors cannot be smaller than 2.
-const VOLE_VEC_NUM_MIN: usize = 3;
 const VOLE_VEC_NUM: usize = 3;
 
 /// Multithreading Svole using some atomic data-structures.
@@ -33,7 +32,6 @@ pub struct SvoleAtomic<P: Party, V, T: Copy> {
 
 impl<P: Party, V, T: Copy + Default> SvoleAtomic<P, V, T> {
     pub fn create() -> Self {
-        assert!(VOLE_VEC_NUM_MIN <= VOLE_VEC_NUM_MIN);
         let mut v = vec![];
         for _ in 0..VOLE_VEC_NUM {
             v.push(Arc::new(Mutex::new(PartyEither::default())));

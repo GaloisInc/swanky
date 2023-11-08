@@ -79,60 +79,44 @@ mod tests {
     #[test]
     fn less_than_eq_with_public_works() {
         fn run<B: BackendT<FieldElement = F2>>(party: &mut B, zero: B::Wire, one: B::Wire) {
-            less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
+            less_than_eq_with_public(party, &[zero], &[F2::ZERO]).unwrap();
             party.finalize().unwrap();
-            less_than_eq_with_public(party, &vec![zero], &vec![F2::ONE]).unwrap();
+            less_than_eq_with_public(party, &[zero], &[F2::ONE]).unwrap();
             party.finalize().unwrap();
-            less_than_eq_with_public(party, &vec![one], &vec![F2::ONE]).unwrap();
+            less_than_eq_with_public(party, &[one], &[F2::ONE]).unwrap();
             party.finalize().unwrap();
-            less_than_eq_with_public(party, &vec![one], &vec![F2::ZERO]).unwrap();
+            less_than_eq_with_public(party, &[one], &[F2::ZERO]).unwrap();
             let _ = party.finalize().unwrap_err();
 
-            less_than_eq_with_public(party, &vec![zero], &vec![F2::ZERO]).unwrap();
+            less_than_eq_with_public(party, &[zero], &[F2::ZERO]).unwrap();
             party.finalize().unwrap();
 
-            less_than_eq_with_public(
-                party,
-                &vec![one, one, zero],
-                &vec![F2::ONE, F2::ONE, F2::ZERO],
-            )
-            .unwrap();
+            less_than_eq_with_public(party, &[one, one, zero], &[F2::ONE, F2::ONE, F2::ZERO])
+                .unwrap();
             party.finalize().unwrap();
 
-            less_than_eq_with_public(
-                party,
-                &vec![one, one, one],
-                &vec![F2::ONE, F2::ONE, F2::ZERO],
-            )
-            .unwrap();
+            less_than_eq_with_public(party, &[one, one, one], &[F2::ONE, F2::ONE, F2::ZERO])
+                .unwrap();
             let _ = party.finalize().unwrap_err();
 
-            less_than_eq_with_public(
-                party,
-                &vec![one, zero, zero],
-                &vec![F2::ONE, F2::ZERO, F2::ONE],
-            )
-            .unwrap();
+            less_than_eq_with_public(party, &[one, zero, zero], &[F2::ONE, F2::ZERO, F2::ONE])
+                .unwrap();
+            party.finalize().unwrap();
+
+            less_than_eq_with_public(party, &[one, one, one], &[F2::ONE, F2::ONE, F2::ONE])
+                .unwrap();
             party.finalize().unwrap();
 
             less_than_eq_with_public(
                 party,
-                &vec![one, one, one],
-                &vec![F2::ONE, F2::ONE, F2::ONE],
-            )
-            .unwrap();
-            party.finalize().unwrap();
-
-            less_than_eq_with_public(
-                party,
-                &vec![one, zero, one, one],
-                &vec![F2::ONE, F2::ZERO, F2::ZERO, F2::ONE],
+                &[one, zero, one, one],
+                &[F2::ONE, F2::ZERO, F2::ZERO, F2::ONE],
             )
             .unwrap();
             let _ = party.finalize().unwrap_err();
 
             // that's testing the little-endianness of the function
-            less_than_eq_with_public(party, &vec![one, one], &vec![F2::ZERO, F2::ONE]).unwrap();
+            less_than_eq_with_public(party, &[one, one], &[F2::ZERO, F2::ONE]).unwrap();
             let _ = party.finalize().unwrap_err();
         }
         let (sender, receiver) = UnixStream::pair().unwrap();

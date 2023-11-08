@@ -26,6 +26,12 @@ pub struct ShimChannel {
     write_buffer_len: usize,
 }
 
+impl Default for ShimChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Warning!! This buffer size should be smaller than the SharedBuffer in JS,
 // otherwise there is a risk that more data is written than can fit in the SharedBuffer.
 const BUFFER_SIZE: usize = 3_000_000;
@@ -70,8 +76,8 @@ impl ShimChannel {
 
 impl AbstractChannel for ShimChannel {
     fn read_bytes(&mut self, bytes: &mut [u8]) -> std::io::Result<()> {
-        for i in 0..bytes.len() {
-            bytes[i] = self.read_one_byte();
+        for byte in bytes.iter_mut() {
+            *byte = self.read_one_byte();
         }
         Ok(())
     }

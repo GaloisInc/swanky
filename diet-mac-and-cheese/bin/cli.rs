@@ -1,13 +1,8 @@
-#![allow(clippy::all)]
 /*!
 Cli utilities.
 
 */
 use clap::Parser;
-use ocelot::svole::{
-    LpnParams, LPN_EXTEND_LARGE, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_LARGE,
-    LPN_SETUP_MEDIUM, LPN_SETUP_SMALL,
-};
 use serde::Deserialize;
 use std::{fmt::Display, path::PathBuf};
 
@@ -16,18 +11,13 @@ const DEFAULT_NO_BATCHING: bool = false;
 const DEFAULT_THREADS: usize = 1;
 
 /// Lpn params as small, medium or large.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum LpnSize {
     Small,
+    #[default]
     Medium,
     Large,
-}
-
-impl Default for LpnSize {
-    fn default() -> Self {
-        LpnSize::Medium
-    }
 }
 
 impl Display for LpnSize {
@@ -36,22 +26,6 @@ impl Display for LpnSize {
             LpnSize::Small => write!(f, "small"),
             LpnSize::Medium => write!(f, "medium"),
             LpnSize::Large => write!(f, "large"),
-        }
-    }
-}
-
-/// Map an `LpnSize` to a pair of Lpn parameters for the init and extension phase.
-#[allow(dead_code)] // This is _not_ dead code, but the compiler thinks it is (it is used in `dietmc_zki.rs`)
-pub(crate) fn map_lpn_size(lpn_param: &LpnSize) -> (LpnParams, LpnParams) {
-    match lpn_param {
-        LpnSize::Small => {
-            return (LPN_SETUP_SMALL, LPN_EXTEND_SMALL);
-        }
-        LpnSize::Medium => {
-            return (LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM);
-        }
-        LpnSize::Large => {
-            return (LPN_SETUP_LARGE, LPN_EXTEND_LARGE);
         }
     }
 }

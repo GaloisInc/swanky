@@ -93,5 +93,5 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
         alert("error while zk evaluation");
         return false;
     }
-    return true;
+    true
 }

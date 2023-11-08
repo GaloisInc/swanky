@@ -47,13 +47,13 @@ impl GaloisPolyV0 {
         type_store: &TypeStore,
     ) -> Result<PluginExecution> {
         ensure!(
-            params.len() == 0,
+            params.is_empty(),
             "{}: Invalid number of params (must be zero): {}",
             Self::NAME,
             params.len()
         );
         ensure!(
-            output_counts.len() == 0,
+            output_counts.is_empty(),
             "{}: Output count must be zero",
             Self::NAME
         );
@@ -98,7 +98,7 @@ impl GaloisPolyV0 {
         let p1_start = input_counts[0].1;
         let q_start = input_counts[0].1 + 2;
 
-        let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, &type_store)?;
+        let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, type_store)?;
 
         let mut gates = vec![];
         let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
@@ -162,13 +162,13 @@ impl GaloisPolyV0 {
         type_store: &TypeStore,
     ) -> Result<PluginExecution> {
         ensure!(
-            params.len() == 0,
+            params.is_empty(),
             "{}: Invalid number of params (must be zero): {}",
             Self::NAME,
             params.len()
         );
         ensure!(
-            output_counts.len() == 0,
+            output_counts.is_empty(),
             "{}: Output count must be zero",
             Self::NAME
         );
@@ -206,7 +206,7 @@ impl GaloisPolyV0 {
         let c_wire = input_counts[0].1;
         let q_start = input_counts[0].1 + 1;
 
-        let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, &type_store)?;
+        let number_of_challenges = Self::number_of_challenges(q_degree, &type_id, type_store)?;
 
         let mut gates = vec![];
         let mut loop_first_wire = first_unused_wire_id(output_counts, input_counts);
@@ -280,7 +280,7 @@ impl GaloisPolyV0 {
         type_id: &TypeId,
         type_store: &TypeStore,
     ) -> Result<usize> {
-        let type_spec = type_store.get(&type_id)?;
+        let type_spec = type_store.get(type_id)?;
         let TypeSpecification::Field(field) = type_spec else {
             eyre::bail!("Invalid type specification for inputs; must be `Field`.");
         };
