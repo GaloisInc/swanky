@@ -210,6 +210,19 @@ pub trait AbstractChannel {
         Ok(())
     }
 }
+impl<'a, C: AbstractChannel> AbstractChannel for &'a mut C {
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        C::read_bytes(self, bytes)
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        C::write_bytes(self, bytes)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        C::flush(self)
+    }
+}
 
 impl AbstractChannel for swanky_channel::Channel<'_> {
     #[inline]
