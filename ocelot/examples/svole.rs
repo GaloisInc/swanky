@@ -68,10 +68,6 @@ impl<S: Read + Write> AbstractChannel for OurTrackChannel<S> {
     fn flush(&mut self) -> std::io::Result<()> {
         self.stream_w.flush()
     }
-
-    fn clone(&self) -> Self {
-        unimplemented!()
-    }
 }
 
 type VSender = Sender<F40b>;
