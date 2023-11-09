@@ -8,7 +8,7 @@ use crate::{
     WireLabel,
 };
 use itertools::Itertools;
-use scuttlebutt::{AbstractChannel, AesRng, Block, Channel};
+use scuttlebutt::{AesRng, Block, Channel};
 use std::{collections::HashMap, marker::PhantomData, rc::Rc};
 
 /// Static evaluator for a circuit, created by the `garble` function.

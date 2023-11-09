@@ -9,7 +9,6 @@ use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 /// Semi-honest evaluator.
 pub struct Evaluator<C, RNG, OT, Wire> {
     evaluator: Ev<C, Wire>,
-    channel: C,
     ot: OT,
     rng: RNG,
 }
@@ -26,23 +25,18 @@ impl<
     /// Make a new `Evaluator`.
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
         let ot = OT::init(&mut channel, &mut rng)?;
-        let evaluator = Ev::new(channel.clone());
-        Ok(Self {
-            evaluator,
-            channel,
-            ot,
-            rng,
-        })
+        let evaluator = Ev::new(channel);
+        Ok(Self { evaluator, ot, rng })
     }
 
     /// Get a reference to the internal channel.
     pub fn get_channel(&mut self) -> &mut C {
-        &mut self.channel
+        &mut self.evaluator.channel
     }
 
     fn run_ot(&mut self, inputs: &[bool]) -> Result<Vec<Block>, TwopacError> {
         self.ot
-            .receive(&mut self.channel, inputs, &mut self.rng)
+            .receive(&mut self.evaluator.channel, inputs, &mut self.rng)
             .map_err(TwopacError::from)
     }
 }

@@ -9,7 +9,6 @@ use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 /// Semi-honest garbler.
 pub struct Garbler<C, RNG, OT, Wire> {
     garbler: Gb<C, RNG, Wire>,
-    channel: C,
     ot: OT,
     rng: RNG,
 }
@@ -38,18 +37,13 @@ impl<
     pub fn new(mut channel: C, mut rng: RNG) -> Result<Self, TwopacError> {
         let ot = OT::init(&mut channel, &mut rng)?;
 
-        let garbler = Gb::new(channel.clone(), RNG::from_seed(rng.gen()));
-        Ok(Garbler {
-            garbler,
-            channel,
-            ot,
-            rng,
-        })
+        let garbler = Gb::new(channel, RNG::from_seed(rng.gen()));
+        Ok(Garbler { garbler, ot, rng })
     }
 
     /// Get a reference to the internal channel.
     pub fn get_channel(&mut self) -> &mut C {
-        &mut self.channel
+        &mut self.garbler.channel
     }
 
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
@@ -113,7 +107,8 @@ impl<
                 inputs.push(i);
             }
         }
-        self.ot.send(&mut self.channel, &inputs, &mut self.rng)?;
+        self.ot
+            .send(&mut self.garbler.channel, &inputs, &mut self.rng)?;
         Ok(wires)
     }
 }
