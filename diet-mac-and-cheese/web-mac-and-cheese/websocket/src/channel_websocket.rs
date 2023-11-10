@@ -82,8 +82,4 @@ impl<Stream: Read + Write> AbstractChannel for WsChannel<Stream> {
         self.internal_flush();
         Ok(())
     }
-    /// Clone the channel.
-    fn clone(&self) -> Self {
-        unimplemented!();
-    }
 }

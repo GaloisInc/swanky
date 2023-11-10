@@ -94,8 +94,4 @@ impl AbstractChannel for ShimChannel {
         self.internal_flush();
         Ok(())
     }
-    /// Clone the channel.
-    fn clone(&self) -> Self {
-        unimplemented!()
-    }
 }
