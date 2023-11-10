@@ -23,7 +23,7 @@ use swanky_party::{IsParty, Party, Verifier, WhichParty};
 pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     /// Initialize function.
     /// Initialize with delta when provided.
-    fn init<C: AbstractChannel>(
+    fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
@@ -34,7 +34,7 @@ pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
         Self: Sized;
 
     /// Extend function producing more correlations in the `out` vector.
-    fn extend<C: AbstractChannel>(
+    fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -83,7 +83,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> SvoleT<P, V, T> for Svole<P, 
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
-    fn init<C: AbstractChannel>(
+    fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
@@ -108,7 +108,7 @@ where
         })
     }
 
-    fn extend<C: AbstractChannel>(
+    fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,

@@ -108,8 +108,13 @@ impl<B: BackendT> ComittedAcc<B> {
     }
 }
 
-impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
-    ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
+impl<
+        P: Party,
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel + Clone,
+        SvoleF: SvoleT<P, V, F>,
+    > ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -177,7 +182,7 @@ impl<F: FiniteField> Accumulator<F> {
         true
     }
 
-    pub fn send<C: AbstractChannel>(&self, chan: &mut C) -> Result<()> {
+    pub fn send<C: AbstractChannel + Clone>(&self, chan: &mut C) -> Result<()> {
         for w in self.wit.iter() {
             chan.write_serializable(w)?;
         }
@@ -187,7 +192,7 @@ impl<F: FiniteField> Accumulator<F> {
         Ok(())
     }
 
-    pub fn recv<C: AbstractChannel>(chan: &mut C, r1cs: &R1CS<F>) -> Result<Self> {
+    pub fn recv<C: AbstractChannel + Clone>(chan: &mut C, r1cs: &R1CS<F>) -> Result<Self> {
         let mut wit = Vec::with_capacity(r1cs.dim());
         let mut err = Vec::with_capacity(r1cs.rows());
 

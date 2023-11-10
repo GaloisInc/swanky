@@ -17,7 +17,7 @@ use swanky_party::Party;
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
     T: FiniteField<PrimeField = F2>,
-    C: AbstractChannel,
+    C: AbstractChannel + Clone,
     SVOLE1: SvoleT<P, F2, T>,
     SVOLE2: SvoleT<P, T, T>,
 > where
@@ -30,7 +30,7 @@ pub(crate) struct DietMacAndCheeseExtField<
 impl<
         P: Party,
         T: FiniteField<PrimeField = F2>,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SVOLE1: SvoleT<P, F2, T>,
         SVOLE2: SvoleT<P, T, T>,
     > DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
@@ -54,7 +54,7 @@ where
 impl<
         P: Party,
         T: FiniteField<PrimeField = F2>,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SVOLE1: SvoleT<P, F2, T>,
         SVOLE2: SvoleT<P, T, T>,
     > BackendT for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
@@ -115,8 +115,12 @@ where
     }
 }
 
-impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
-    BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<
+        P: Party,
+        C: AbstractChannel + Clone,
+        SVOLE1: SvoleT<P, F2, F40b>,
+        SVOLE2: SvoleT<P, F40b, F40b>,
+    > BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
         self.dmc.assert_conv_to_bits(w)
@@ -131,8 +135,12 @@ impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P
     }
 }
 
-impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
-    BackendDisjunctionT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<
+        P: Party,
+        C: AbstractChannel + Clone,
+        SVOLE1: SvoleT<P, F2, F40b>,
+        SVOLE2: SvoleT<P, F40b, F40b>,
+    > BackendDisjunctionT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     fn disjunction(
         &mut self,
@@ -147,8 +155,12 @@ impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P
     }
 }
 
-impl<P: Party, C: AbstractChannel, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>>
-    BackendLiftT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<
+        P: Party,
+        C: AbstractChannel + Clone,
+        SVOLE1: SvoleT<P, F2, F40b>,
+        SVOLE2: SvoleT<P, F40b, F40b>,
+    > BackendLiftT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
 {
     type LiftedBackend = DietMacAndCheese<P, F40b, F40b, C, SVOLE2>;
 

@@ -113,7 +113,7 @@ pub trait BackendLiftT: BackendT {
 impl<
         P: Party,
         T: PrimeFiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SVOLE1: SvoleT<P, F2, F40b>,
         SVOLE2: SvoleT<P, T, T>,
     > BackendLiftT for DietMacAndCheeseConv<P, T, C, SVOLE1, SVOLE2>
@@ -125,7 +125,7 @@ impl<
     }
 }
 
-impl<P: Party, T: PrimeFiniteField, C: AbstractChannel, SVOLE: SvoleT<P, T, T>> BackendLiftT
+impl<P: Party, T: PrimeFiniteField, C: AbstractChannel + Clone, SVOLE: SvoleT<P, T, T>> BackendLiftT
     for DietMacAndCheese<P, T, T, C, SVOLE>
 {
     type LiftedBackend = Self;
@@ -147,7 +147,7 @@ pub trait BackendDisjunctionT: BackendT {
     ) -> Result<Vec<Self::Wire>>;
 }
 
-impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel, SVOLE: SvoleT<P, V, F40b>>
+impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
     BackendDisjunctionT for DietMacAndCheese<P, V, F40b, C, SVOLE>
 where
     <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
@@ -165,7 +165,7 @@ where
     }
 }
 
-impl<P: Party, C: AbstractChannel, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
+impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
     for DietMacAndCheese<P, F2, F40b, C, SVOLE>
 {
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
@@ -214,7 +214,7 @@ impl<E> EdabitsMap<E> {
 pub(crate) struct DietMacAndCheeseConv<
     P: Party,
     FE: FiniteField,
-    C: AbstractChannel,
+    C: AbstractChannel + Clone,
     SvoleF2: SvoleT<P, F2, F40b>,
     SvoleFE: SvoleT<P, FE, FE>,
 > {
@@ -229,7 +229,7 @@ pub(crate) struct DietMacAndCheeseConv<
 impl<
         P: Party,
         FE: PrimeFiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFE: SvoleT<P, FE, FE>,
     > DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
@@ -338,7 +338,7 @@ impl<
 impl<
         P: Party,
         FE: PrimeFiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFE: SvoleT<P, FE, FE>,
     > BackendT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
@@ -401,7 +401,7 @@ impl<
 impl<
         P: Party,
         FP: PrimeFiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFP: SvoleT<P, FP, FP>,
     > BackendDisjunctionT for DietMacAndCheeseConv<P, FP, C, SvoleF2, SvoleFP>
@@ -421,7 +421,7 @@ impl<
         fn execute_branch<
             P: Party,
             F: FiniteField<PrimeField = F>,
-            C: AbstractChannel,
+            C: AbstractChannel + Clone,
             SvoleF: SvoleT<P, F, F>,
         >(
             ev: IsParty<P, Prover>,
@@ -500,7 +500,7 @@ impl<
 impl<
         P: Party,
         FE: PrimeFiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFE: SvoleT<P, FE, FE>,
     > BackendConvT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
@@ -675,7 +675,7 @@ pub(super) struct DoraState<
     P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
-    C: AbstractChannel,
+    C: AbstractChannel + Clone,
     SvoleF: SvoleT<P, V, F>,
 > where
     F::PrimeField: IsSubFieldOf<V>,
@@ -1019,7 +1019,11 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
 // V) Evaluator for multiple fields
 
 /// Evaluator for Circuit IR (a.k.a. SIEVE IR0+)
-pub struct EvaluatorCirc<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b>> {
+pub struct EvaluatorCirc<
+    P: Party,
+    C: AbstractChannel + Clone + 'static,
+    SvoleF2: SvoleT<P, F2, F40b>,
+> {
     inputs: CircInputs,
     fcom_f2: FCom<P, F2, F40b, SvoleF2>,
     type_store: TypeStore,
@@ -1031,7 +1035,7 @@ pub struct EvaluatorCirc<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT
     phantom: PhantomData<C>,
 }
 
-impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'static>
+impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'static>
     EvaluatorCirc<P, C, SvoleF2>
 {
     pub fn new(
@@ -1067,7 +1071,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     }
 
     /// New evaluator initializing the F2 Svole in a separate thread.
-    pub fn new_multithreaded<C2: AbstractChannel + 'static + Send>(
+    pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send>(
         mut channel_vole: C2,
         rng: AesRng,
         inputs: CircInputs,
@@ -1321,7 +1325,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     #[allow(clippy::too_many_arguments)]
     fn load_backend_multithreaded_fe<
         FE: PrimeFiniteField + StatisticallySecureField,
-        C2: AbstractChannel + 'static + Send,
+        C2: AbstractChannel + Clone + 'static + Send,
     >(
         &mut self,
         channel: &mut C,
@@ -1373,7 +1377,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
         Ok(svole_thread)
     }
 
-    fn load_backend_multi_any<C2: AbstractChannel + 'static + Send>(
+    fn load_backend_multi_any<C2: AbstractChannel + Clone + 'static + Send>(
         &mut self,
         channel: &mut C,
         channel_vole: C2,
@@ -1466,7 +1470,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     }
 
     /// Load several backends with different fields by going over its internal type store.
-    pub fn load_backends_multithreaded<C2: AbstractChannel + 'static + Send>(
+    pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send>(
         &mut self,
         channel: &mut C,
         mut channels_svole: Vec<C2>,
@@ -1753,7 +1757,7 @@ impl<P: Party, C: AbstractChannel + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'sta
     }
 }
 
-impl<P: Party, C: AbstractChannel, SvoleF2: SvoleT<P, F2, F40b>> Drop
+impl<P: Party, C: AbstractChannel + Clone, SvoleF2: SvoleT<P, F2, F40b>> Drop
     for EvaluatorCirc<P, C, SvoleF2>
 {
     fn drop(&mut self) {
