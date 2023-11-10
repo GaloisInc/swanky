@@ -10,6 +10,17 @@ pub struct SyncChannel<R, W> {
     writer: Arc<Mutex<W>>,
 }
 
+/// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+impl<R, W> Clone for SyncChannel<R, W> {
+    /// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+    fn clone(&self) -> Self {
+        SyncChannel {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
+    }
+}
+
 impl<R: Read, W: Write> SyncChannel<R, W> {
     /// Make a new `Channel` from a `reader` and a `writer`.
     pub fn new(reader: R, writer: W) -> Self {
@@ -44,13 +55,5 @@ impl<R: Read, W: Write> AbstractChannel for SyncChannel<R, W> {
     #[inline(always)]
     fn flush(&mut self) -> Result<()> {
         self.writer.lock().unwrap().flush()
-    }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            reader: self.reader.clone(),
-            writer: self.writer.clone(),
-        }
     }
 }

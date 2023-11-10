@@ -250,6 +250,17 @@ pub struct Channel<R, W> {
     writer: Rc<RefCell<W>>,
 }
 
+/// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+impl<R, W> Clone for Channel<R, W> {
+    /// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+    fn clone(&self) -> Self {
+        Channel {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
+    }
+}
+
 impl<R: Read, W: Write> Channel<R, W> {
     /// Make a new `Channel` from a `reader` and a `writer`.
     pub fn new(reader: R, writer: W) -> Self {
@@ -285,14 +296,6 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     fn flush(&mut self) -> Result<()> {
         self.writer.borrow_mut().flush()
     }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            reader: self.reader.clone(),
-            writer: self.writer.clone(),
-        }
-    }
 }
 
 /// Standard Read/Write channel built from a symmetric stream.
@@ -323,12 +326,5 @@ impl<S: Read + Write> AbstractChannel for SymChannel<S> {
     #[inline(always)]
     fn flush(&mut self) -> Result<()> {
         self.stream.borrow_mut().flush()
-    }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            stream: self.stream.clone(),
-        }
     }
 }

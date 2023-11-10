@@ -7,6 +7,14 @@ use std::{
 /// A channel wrapping another channel for tracking the number of bits read/written.
 pub struct TrackChannel<C>(Arc<Mutex<InternalTrackChannel<C>>>);
 
+/// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+impl<C> Clone for TrackChannel<C> {
+    /// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 struct InternalTrackChannel<C> {
     channel: C,
     nbits_read: usize,
@@ -78,9 +86,5 @@ impl<C: AbstractChannel> AbstractChannel for TrackChannel<C> {
 
     fn flush(&mut self) -> Result<()> {
         self.0.lock().unwrap().channel.flush()
-    }
-
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
     }
 }
