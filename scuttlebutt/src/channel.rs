@@ -29,10 +29,6 @@ pub trait AbstractChannel {
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()>;
     /// Flush the channel.
     fn flush(&mut self) -> Result<()>;
-    /// Clone the channel.
-    fn clone(&self) -> Self
-    where
-        Self: Sized;
     /// Read `nbytes` from the channel, and return it as a `Vec`.
     fn read_vec(&mut self, nbytes: usize) -> Result<Vec<u8>> {
         let mut data = vec![0; nbytes];
@@ -214,6 +210,19 @@ pub trait AbstractChannel {
         Ok(())
     }
 }
+impl<'a, C: AbstractChannel> AbstractChannel for &'a mut C {
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
+        C::read_bytes(self, bytes)
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        C::write_bytes(self, bytes)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        C::flush(self)
+    }
+}
 
 impl AbstractChannel for swanky_channel::Channel<'_> {
     #[inline]
@@ -233,21 +242,23 @@ impl AbstractChannel for swanky_channel::Channel<'_> {
         self.force_flush()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
-
-    fn clone(&self) -> Self
-    where
-        Self: Sized,
-    {
-        // AbstractChannel::clone() can't be implemented for Channel. Luckily, it's rarely used in
-        // swanky. (And further use should be discouraged.)
-        panic!("swanky_channel::Channel does not support clone")
-    }
 }
 
 /// A standard read/write channel that implements `AbstractChannel`.
 pub struct Channel<R, W> {
     reader: Rc<RefCell<R>>,
     writer: Rc<RefCell<W>>,
+}
+
+/// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+impl<R, W> Clone for Channel<R, W> {
+    /// DO NOT USE THIS IMPL EXCEPT IN LEGACY CODE!
+    fn clone(&self) -> Self {
+        Channel {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+        }
+    }
 }
 
 impl<R: Read, W: Write> Channel<R, W> {
@@ -285,14 +296,6 @@ impl<R: Read, W: Write> AbstractChannel for Channel<R, W> {
     fn flush(&mut self) -> Result<()> {
         self.writer.borrow_mut().flush()
     }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            reader: self.reader.clone(),
-            writer: self.writer.clone(),
-        }
-    }
 }
 
 /// Standard Read/Write channel built from a symmetric stream.
@@ -323,12 +326,5 @@ impl<S: Read + Write> AbstractChannel for SymChannel<S> {
     #[inline(always)]
     fn flush(&mut self) -> Result<()> {
         self.stream.borrow_mut().flush()
-    }
-
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            stream: self.stream.clone(),
-        }
     }
 }

@@ -155,7 +155,7 @@ impl<
     > Conv<P, FE, SvoleF2, SvoleFE>
 {
     /// initialize
-    pub fn init<C: AbstractChannel>(
+    pub fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
@@ -178,7 +178,7 @@ impl<
         })
     }
 
-    fn convert_bit_2_field<C: AbstractChannel>(
+    fn convert_bit_2_field<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         r_batch: &[Dabit<P, FE>],
@@ -257,7 +257,7 @@ impl<
     // contrary to the one in the paper that applies it on a pair of
     // bits. This allows to the keep the rounds of communication equal
     // to m for any vector of additions.
-    fn bit_add_carry<C: AbstractChannel>(
+    fn bit_add_carry<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -429,7 +429,7 @@ impl<
     }
 
     /// input edabits
-    pub fn input_edabits<C: AbstractChannel>(
+    pub fn input_edabits<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -462,7 +462,7 @@ impl<
     }
 
     /// generate random edabits
-    pub fn random_edabits<C: AbstractChannel>(
+    pub fn random_edabits<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -518,7 +518,7 @@ impl<
     }
 
     /// generate random edabits
-    pub fn random_edabits_b2a<C: AbstractChannel>(
+    pub fn random_edabits_b2a<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -588,7 +588,7 @@ impl<
         Ok(edabits_vec)
     }
 
-    fn random_dabits<C: AbstractChannel>(
+    fn random_dabits<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -632,7 +632,7 @@ impl<
     }
 
     /// Generate random triples
-    pub fn random_triples<C: AbstractChannel>(
+    pub fn random_triples<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -688,7 +688,7 @@ impl<
         Ok(())
     }
 
-    fn fdabit<C: AbstractChannel>(
+    fn fdabit<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -1047,7 +1047,7 @@ impl<
 
     // The conversion loop requires all of these parameters to function
     #[allow(clippy::too_many_arguments)]
-    fn conv_loop<C: AbstractChannel>(
+    fn conv_loop<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -1130,7 +1130,7 @@ impl<
     }
 
     /// conversion checking
-    pub fn conv<C: AbstractChannel>(
+    pub fn conv<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,

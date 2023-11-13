@@ -58,7 +58,7 @@ impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomic<P, V, T> {
 }
 
 impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, V, T> {
-    fn init<C: AbstractChannel>(
+    fn init<C: AbstractChannel + Clone>(
         _channel: &mut C,
         _rng: &mut AesRng,
         _lpn_setup: LpnParams,
@@ -82,7 +82,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
         }
     }
 
-    fn extend<C: AbstractChannel>(
+    fn extend<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         _rng: &mut AesRng,
@@ -145,7 +145,7 @@ pub struct ThreadSvole<P: Party, V, T: FiniteField> {
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     /// Initialize the functionality.
-    pub fn init<C: AbstractChannel>(
+    pub fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
@@ -178,7 +178,11 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     }
 
     /// Run the functionality.
-    pub fn run<C: AbstractChannel>(&mut self, channel: &mut C, rng: &mut AesRng) -> Result<()>
+    pub fn run<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<()>
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {

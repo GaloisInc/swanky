@@ -23,7 +23,7 @@ pub struct Dora<
     P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
-    C: AbstractChannel,
+    C: AbstractChannel + Clone,
     SvoleF: SvoleT<P, V, F>,
 > where
     F::PrimeField: IsSubFieldOf<V>,
@@ -37,8 +37,13 @@ pub struct Dora<
     accs: ProverPrivate<P, Vec<Accumulator<V>>>, // current state of accumulator
 }
 
-impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
-    Dora<P, V, F, C, SvoleF>
+impl<
+        P: Party,
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel + Clone,
+        SvoleF: SvoleT<P, V, F>,
+    > Dora<P, V, F, C, SvoleF>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

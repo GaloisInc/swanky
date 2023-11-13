@@ -15,7 +15,7 @@ use subtle::ConditionallySelectable;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<C, RNG, Wire> {
-    channel: C,
+    pub(crate) channel: C,
     deltas: HashMap<u16, Wire>, // map from modulus to associated delta wire-label.
     current_output: usize,
     current_gate: usize,

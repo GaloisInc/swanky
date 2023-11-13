@@ -31,7 +31,7 @@ fn commit_vec<
     P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
-    C: AbstractChannel,
+    C: AbstractChannel + Clone,
     SvoleF: SvoleT<P, V, F>,
 >(
     backend: &mut FCom<P, V, F, SvoleF>,
@@ -77,7 +77,7 @@ impl<
         P: Party,
         V: IsSubFieldOf<F>,
         F: FiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SvoleF: SvoleT<P, V, F>,
     > CommittedWitness<'a, DietMacAndCheese<P, V, F, C, SvoleF>>
 where
@@ -87,7 +87,7 @@ where
         'b,
         I: Iterator<Item = <DietMacAndCheese<P, V, F, C, SvoleF> as BackendT>::Wire>,
     >(
-        channel: &mut impl AbstractChannel,
+        channel: &mut (impl AbstractChannel + Clone),
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
         input: I,
@@ -165,14 +165,14 @@ impl<
         P: Party,
         V: IsSubFieldOf<F>,
         F: FiniteField,
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         SvoleF: SvoleT<P, V, F>,
     > CommittedCrossTerms<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit(
-        channel: &mut impl AbstractChannel,
+        channel: &mut (impl AbstractChannel + Clone),
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &'a Disjunction<V>,
         cxt: ProverPrivate<P, &CrossTerms<V>>,
@@ -189,13 +189,18 @@ where
     }
 }
 
-impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, C: AbstractChannel, SvoleF: SvoleT<P, V, F>>
-    ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
+impl<
+        P: Party,
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel + Clone,
+        SvoleF: SvoleT<P, V, F>,
+    > ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit(
-        channel: &mut impl AbstractChannel,
+        channel: &mut (impl AbstractChannel + Clone),
         backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
         disj: &Disjunction<V>,
         acc: &ProverPrivate<P, &Accumulator<V>>,

@@ -17,7 +17,7 @@ use subtle::ConditionallySelectable;
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
 /// wires. Parallelizable.
 pub struct Evaluator<C, Wire> {
-    channel: C,
+    pub(crate) channel: C,
     current_gate: usize,
     current_output: usize,
     _phantom: PhantomData<Wire>,

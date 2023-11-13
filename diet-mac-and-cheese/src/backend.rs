@@ -126,7 +126,7 @@ pub struct DietMacAndCheese<
     P: Party,
     V: IsSubFieldOf<T>,
     T: FiniteField,
-    C: AbstractChannel,
+    C: AbstractChannel + Clone,
     SVOLE: SvoleT<P, V, T>,
 > where
     T::PrimeField: IsSubFieldOf<V>,
@@ -140,8 +140,13 @@ pub struct DietMacAndCheese<
     monitor: Monitor<T>,
 }
 
-impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>>
-    DietMacAndCheese<P, V, T, C, SVOLE>
+impl<
+        P: Party,
+        V: IsSubFieldOf<T>,
+        T: FiniteField,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, V, T>,
+    > DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -290,8 +295,13 @@ where
     }
 }
 
-impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>> Drop
-    for DietMacAndCheese<P, V, T, C, SVOLE>
+impl<
+        P: Party,
+        V: IsSubFieldOf<T>,
+        T: FiniteField,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, V, T>,
+    > Drop for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -302,8 +312,13 @@ where
     }
 }
 
-impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, C: AbstractChannel, SVOLE: SvoleT<P, V, T>>
-    BackendT for DietMacAndCheese<P, V, T, C, SVOLE>
+impl<
+        P: Party,
+        V: IsSubFieldOf<T>,
+        T: FiniteField,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, V, T>,
+    > BackendT for DietMacAndCheese<P, V, T, C, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {

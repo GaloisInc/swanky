@@ -3,19 +3,21 @@ use std::io::Result;
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 
 #[derive(Debug)]
-pub struct TxChannel<'a, C: AbstractChannel> {
+pub struct TxChannel<'a, C: AbstractChannel + Clone> {
     pub ch: C,
     pub tx: &'a mut blake3::Hasher,
 }
 
-impl<'a, C: AbstractChannel> AbstractChannel for TxChannel<'a, C> {
+impl<'a, C: AbstractChannel + Clone> Clone for TxChannel<'a, C> {
     fn clone(&self) -> Self
     where
         Self: Sized,
     {
         unimplemented!("Fiat-Shamir channel does not allow cloning")
     }
+}
 
+impl<'a, C: AbstractChannel + Clone> AbstractChannel for TxChannel<'a, C> {
     fn read_bytes(&mut self, buf: &mut [u8]) -> Result<()> {
         self.ch.read_bytes(buf)?;
         self.tx.update(buf);
@@ -32,7 +34,7 @@ impl<'a, C: AbstractChannel> AbstractChannel for TxChannel<'a, C> {
     }
 }
 
-impl<'a, C: AbstractChannel> TxChannel<'a, C> {
+impl<'a, C: AbstractChannel + Clone> TxChannel<'a, C> {
     pub fn new(ch: C, tx: &'a mut blake3::Hasher) -> Self {
         Self { ch, tx }
     }

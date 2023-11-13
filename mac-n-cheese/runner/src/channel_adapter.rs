@@ -15,11 +15,4 @@ impl<C: Read + Write> AbstractChannel for ChannelAdapter<C> {
     fn flush(&mut self) -> std::io::Result<()> {
         self.0.flush()
     }
-
-    fn clone(&self) -> Self
-    where
-        Self: Sized,
-    {
-        unimplemented!()
-    }
 }

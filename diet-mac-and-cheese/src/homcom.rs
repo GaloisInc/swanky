@@ -27,7 +27,10 @@ pub struct MultCheckState<P: Party, T: Copy> {
 
 impl<P: Party, T: FiniteField> MultCheckState<P, T> {
     /// Initialize the state.
-    pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel + Clone>(
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<Self> {
         let chi = match P::WHICH {
             WhichParty::Prover(_) => {
                 channel.flush()?;
@@ -87,7 +90,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         self.count += 1;
     }
 
-    pub(crate) fn finalize<C: AbstractChannel>(
+    pub(crate) fn finalize<C: AbstractChannel + Clone>(
         &mut self,
         mask: Mac<P, T, T>,
         channel: &mut C,
@@ -161,7 +164,10 @@ impl<P: Party, T: Copy> Drop for ZeroCheckState<P, T> {
 
 impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
     /// Initialize the state.
-    pub(crate) fn init<C: AbstractChannel>(channel: &mut C, rng: &mut AesRng) -> Result<Self> {
+    pub(crate) fn init<C: AbstractChannel + Clone>(
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<Self> {
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel.read_block()?,
             WhichParty::Verifier(_) => {
@@ -211,7 +217,10 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
         Ok(())
     }
 
-    pub(crate) fn finalize<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<usize> {
+    pub(crate) fn finalize<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<usize> {
         let b = match P::WHICH {
             WhichParty::Prover(ev) => {
                 channel.write_serializable(&self.key_chi)?;
@@ -250,7 +259,7 @@ where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
     /// Initialize the commitment scheme.
-    pub fn init<C: AbstractChannel>(
+    pub fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
@@ -286,7 +295,7 @@ where
         })
     }
 
-    pub fn init_with_delta<C: AbstractChannel>(
+    pub fn init_with_delta<C: AbstractChannel + Clone>(
         channel: &mut C,
         rng: &mut AesRng,
         lpn_setup: LpnParams,
@@ -320,7 +329,7 @@ where
     }
 
     /// Return a random [`Mac`].
-    pub fn random<C: AbstractChannel>(
+    pub fn random<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -355,7 +364,7 @@ where
     }
 
     /// Input a slice and return the associated MACs.
-    pub fn input_prover<C: AbstractChannel>(
+    pub fn input_prover<C: AbstractChannel + Clone>(
         &mut self,
         ev: IsParty<P, Prover>,
         channel: &mut C,
@@ -370,7 +379,7 @@ where
     }
 
     /// Input a number of commitment values and return the associated MACs.
-    pub fn input_verifier<C: AbstractChannel>(
+    pub fn input_verifier<C: AbstractChannel + Clone>(
         &mut self,
         ev: IsParty<P, Verifier>,
         channel: &mut C,
@@ -383,7 +392,7 @@ where
         Ok(out)
     }
 
-    pub fn input_prover_low_level<C: AbstractChannel>(
+    pub fn input_prover_low_level<C: AbstractChannel + Clone>(
         &mut self,
         ev: IsParty<P, Prover>,
         channel: &mut C,
@@ -399,7 +408,7 @@ where
         Ok(())
     }
 
-    pub fn input_verifier_low_level<C: AbstractChannel>(
+    pub fn input_verifier_low_level<C: AbstractChannel + Clone>(
         &mut self,
         ev: IsParty<P, Verifier>,
         channel: &mut C,
@@ -419,7 +428,7 @@ where
         Ok(())
     }
 
-    pub fn input1_prover<C: AbstractChannel>(
+    pub fn input1_prover<C: AbstractChannel + Clone>(
         &mut self,
         ev: IsParty<P, Prover>,
         channel: &mut C,
@@ -433,7 +442,7 @@ where
         Ok(r.mac())
     }
 
-    pub fn input1_verifier<C: AbstractChannel>(
+    pub fn input1_verifier<C: AbstractChannel + Clone>(
         &mut self,
         ev: IsParty<P, Verifier>,
         channel: &mut C,
@@ -489,7 +498,7 @@ where
     }
 
     /// Check that a batch of [`Mac`]s are zero.
-    pub fn check_zero<C: AbstractChannel>(
+    pub fn check_zero<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -538,7 +547,7 @@ where
     }
 
     /// Open a batch of [`Mac`]s. Only verifiers write to `out`.
-    pub fn open<C: AbstractChannel>(
+    pub fn open<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         batch: &[Mac<P, V, T>],
@@ -602,7 +611,7 @@ where
     }
 
     /// Quicksilver multiplication check.
-    pub fn quicksilver_check_multiply<C: AbstractChannel>(
+    pub fn quicksilver_check_multiply<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
@@ -681,7 +690,7 @@ where
     /// Finalize the multiplication check for a state.
     ///
     /// Return the number of triples checked.
-    pub fn quicksilver_finalize<C: AbstractChannel>(
+    pub fn quicksilver_finalize<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
