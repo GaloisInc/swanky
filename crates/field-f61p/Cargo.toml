@@ -7,6 +7,9 @@ license.workspace = true
 publish.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 rand.workspace = true
 swanky-serialization.workspace = true
