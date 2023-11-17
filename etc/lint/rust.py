@@ -105,7 +105,14 @@ def validate_crate_manifests(ctx: click.Context) -> LintResult:
     any_errors = False
     inherited_keys = set(root_cargo_toml()["workspace"]["package"].keys())
     for crate in crates_in_manifest():
+        crate_toml = (crate / "Cargo.toml").relative_to(ROOT)
         data = toml.loads((crate / "Cargo.toml").read_text())
+        if data.get("lints", dict()).get("workspace", False) != True:
+            any_errors = True
+            print(f"{crate_toml} is missing:")
+            rich.get_console().print(
+                rich.syntax.Syntax("[lints]\nworkspace = true", "toml")
+            )
         missing_workspace_keys = inherited_keys - set(
             k
             for k, v in data["package"].items()
@@ -113,7 +120,6 @@ def validate_crate_manifests(ctx: click.Context) -> LintResult:
         )
         if len(missing_workspace_keys) > 0:
             any_errors = True
-            crate_toml = (crate / "Cargo.toml").relative_to(ROOT)
             rich.print(
                 f"[bold][underline]{crate_toml}[/underline] missing workspace package keys[/bold]"
             )
