@@ -16,6 +16,9 @@ license.workspace = true
 publish.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 # my_dependency.workspace = true
 """.strip()
