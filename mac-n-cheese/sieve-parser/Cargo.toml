@@ -7,6 +7,9 @@ license.workspace = true
 publish.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 flatbuffers.workspace = true
 bumpalo = { workspace = true, features = ["collections"] }

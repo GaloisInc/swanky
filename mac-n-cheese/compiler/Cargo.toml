@@ -7,6 +7,9 @@ license.workspace = true
 publish.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 mac-n-cheese-ir.workspace = true
 mac-n-cheese-sieve-parser.workspace = true

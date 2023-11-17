@@ -213,7 +213,7 @@ macro_rules! field_mac_type {
             }
         }
         impl FieldMacType {
-            pub const ALL: &[FieldMacType] = &[$(FieldMacType::$name),*];
+            pub const ALL: &'static [FieldMacType] = &[$(FieldMacType::$name),*];
             pub fn visit<V: FieldTypeMacVisitor>(&self, v: V) -> V::Output {
                 match self {
                     $(

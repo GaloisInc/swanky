@@ -205,19 +205,19 @@ mod tests {
         let mut rng = StdRng::from_entropy();
 
         let pss: PackedSecretSharingGenerator<TestField> = PackedSecretSharingGenerator {
-            /// Maximum number of shares that can be known without exposing the secrets
-            /// (privacy threshold).
+            // Maximum number of shares that can be known without exposing the secrets
+            // (privacy threshold).
             threshold: 15,
-            /// Number of shares to split the secrets into.
+            // Number of shares to split the secrets into.
             share_count: 80,
-            /// Number of secrets to share together.
+            // Number of secrets to share together.
             secret_count: 48,
 
             // implementation configuration
-            /// `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
-            /// must be a power of 2.
+            // `m`-th principal root of unity in Zp, where `m = secret_count + threshold + 1`
+            // must be a power of 2.
             omega_secrets: <TestField as FieldForFFT<2>>::roots(6),
-            /// `n`-th principal root of unity in Zp, where `n = share_count + 1` must be a power of 3.
+            // `n`-th principal root of unity in Zp, where `n = share_count + 1` must be a power of 3.
             omega_shares: <TestField as FieldForFFT<3>>::roots(4),
         };
 
