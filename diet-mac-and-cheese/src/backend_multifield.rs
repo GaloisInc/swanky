@@ -1661,6 +1661,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
                     self.callframe_end(func);
                 }
+                PluginExecution::Ram(_) => todo!("Implement RAM evaluation"),
             },
         };
 

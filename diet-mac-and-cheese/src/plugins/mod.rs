@@ -43,6 +43,8 @@ pub(crate) enum PluginExecution {
     Disjunction(DisjunctionBody),
     /// The plugin implements a mux.
     Mux(MuxVersion),
+    /// The plugin implements RAM operations.
+    Ram(RamVersion),
 }
 
 impl PluginExecution {
@@ -52,7 +54,8 @@ impl PluginExecution {
             PluginExecution::Gates(gates) => Some(gates),
             PluginExecution::PermutationCheck(_)
             | PluginExecution::Disjunction(_)
-            | PluginExecution::Mux(_) => None,
+            | PluginExecution::Mux(_)
+            | PluginExecution::Ram(_) => None,
         }
     }
 
@@ -72,6 +75,11 @@ impl PluginExecution {
             }
             PluginExecution::Disjunction(body) => body.type_id_mapping(),
             PluginExecution::Mux(plugin) => {
+                let mut mapping = TypeIdMapping::default();
+                mapping.set(plugin.type_id());
+                mapping
+            }
+            PluginExecution::Ram(plugin) => {
                 let mut mapping = TypeIdMapping::default();
                 mapping.set(plugin.type_id());
                 mapping
@@ -141,7 +149,7 @@ pub(crate) trait Plugin {
 //
 
 mod dora;
-pub(crate) use dora::DisjunctionV0;
+pub(crate) use dora::{DisjunctionBody, DisjunctionV0};
 mod mux_v0;
 pub(crate) use mux_v0::{MuxV0, MuxV1, MuxVersion};
 mod permutation_check_v1;
@@ -152,5 +160,5 @@ mod iter_v0;
 pub(crate) use iter_v0::IterV0;
 mod vectors_v1;
 pub(crate) use vectors_v1::VectorsV1;
-
-pub use self::dora::DisjunctionBody;
+mod ram_v1;
+pub(crate) use ram_v1::{RamArithV1, RamBoolV1, RamVersion};
