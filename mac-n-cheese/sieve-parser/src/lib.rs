@@ -179,10 +179,10 @@ pub trait FunctionBodyVisitor {
     fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()>;
     fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()>;
     fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()>;
-    fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()>;
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()>;
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()>;
-    fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()>;
-    fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()>;
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()>;
     fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()>;
     fn call(&mut self, dst: &[WireRange], name: Identifier, args: &[WireRange])
@@ -283,8 +283,11 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
             Self::hex(right),
         )?)
     }
-    fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : $0x{src:x};")?)
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        write!(self.0, " <- 0x{ty:x} : ")?;
+        self.write_wire_ranges(src)?;
+        Ok(writeln!(self.0, ";")?)
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()> {
         Ok(writeln!(
@@ -293,11 +296,13 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
             Self::hex(src)
         )?)
     }
-    fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "$0x{dst:x} <- @public(0x{ty:x});")?)
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        Ok(writeln!(self.0, " <- @public(0x{ty:x});")?)
     }
-    fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "$0x{dst:x} <- @private(0x{ty:x});")?)
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        Ok(writeln!(self.0, " <- @private(0x{ty:x});")?)
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
         Ok(writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")?)
