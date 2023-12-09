@@ -115,9 +115,7 @@ impl std::fmt::Display for Header {
                     degree,
                     modulus,
                 } => writeln!(f, "@type ext_field {index} {degree} {modulus}")?,
-                Type::Ring {
-                    nbits,
-                } => writeln!(f, "@type ring {nbits};")?,
+                Type::Ring { nbits } => writeln!(f, "@type ring {nbits};")?,
                 Type::PluginType(PluginType {
                     name,
                     operation,
