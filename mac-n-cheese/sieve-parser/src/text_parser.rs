@@ -694,6 +694,14 @@ impl<T: Read + Seek> RelationReader<T> {
                                         self.ps.expect_byte(b',')?;
                                         wire_range_buf.push(self.read_wire_range()?);
                                     }
+                                    let num_input_wires =
+                                        wire_range_buf[1..].iter().map(|inp| inp.len()).sum();
+                                    eyre::ensure!(
+                                        out.len() == num_input_wires,
+                                        "Expected {} total input wires, got {}",
+                                        out.len(),
+                                        num_input_wires
+                                    );
                                     fbv.copy(ty, out, &wire_range_buf[1..])?;
                                 }
                                 ch => eyre::bail!("Unexpected {ch:?}. Expected < or $"),
