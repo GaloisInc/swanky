@@ -65,7 +65,7 @@ pub enum Type {
     ExtField {
         index: TypeId,
         degree: u64,
-        modulus: Number,
+        modulus: u64,
     },
     // Ignores private/public counts in this context, but they're needed
     // for plugin function bodies

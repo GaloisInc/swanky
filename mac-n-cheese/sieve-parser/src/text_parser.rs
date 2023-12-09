@@ -394,7 +394,7 @@ impl<T: Read + Seek> RelationReader<T> {
                                 b"ext_field" => {
                                     let index = self.ps.u8()?;
                                     let degree = self.ps.u64()?;
-                                    let modulus = self.ps.bignum()?;
+                                    let modulus = self.ps.u64()?;
                                     self.ps.semi()?;
                                     self.header.types.push(Type::ExtField {
                                         index,
