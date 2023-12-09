@@ -67,6 +67,9 @@ pub enum Type {
         degree: u64,
         modulus: u64,
     },
+    Ring {
+        nbits: u64,
+    },
     // Ignores private/public counts in this context, but they're needed
     // for plugin function bodies
     PluginType(PluginType),
@@ -112,6 +115,9 @@ impl std::fmt::Display for Header {
                     degree,
                     modulus,
                 } => writeln!(f, "@type ext_field {index} {degree} {modulus}")?,
+                Type::Ring {
+                    nbits,
+                } => writeln!(f, "@type ring {nbits};")?,
                 Type::PluginType(PluginType {
                     name,
                     operation,
