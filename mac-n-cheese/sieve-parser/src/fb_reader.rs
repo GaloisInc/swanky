@@ -343,6 +343,10 @@ impl super::RelationReader for RelationReader {
                     degree: ext_field.degree(),
                     modulus: ext_field.modulus(),
                 })
+            } else if let Some(ring) = ty.element_as_ring() {
+                header.types.push(Type::Ring {
+                    nbits: ring.nbits(),
+                })
             } else if let Some(plugin) = ty.element_as_plugin_type() {
                 let mut args_buf = Vec::new();
                 args_buf.extend(

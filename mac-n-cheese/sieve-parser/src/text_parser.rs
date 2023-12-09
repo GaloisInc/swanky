@@ -402,6 +402,11 @@ impl<T: Read + Seek> RelationReader<T> {
                                         modulus,
                                     })
                                 }
+                                b"ring" => {
+                                    let nbits = self.ps.u64()?;
+                                    self.ps.semi()?;
+                                    self.header.types.push(Type::Ring { nbits })
+                                }
                                 _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
                             }
                         }
