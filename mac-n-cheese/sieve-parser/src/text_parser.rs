@@ -689,7 +689,12 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b'>')?;
                                 }
                                 Some(b'$') => {
-                                    fbv.copy(ty, out, self.read_wire_id()?)?;
+                                    wire_range_buf.push(self.read_wire_range()?);
+                                    while self.ps.peek()? == Some(b',') {
+                                        self.ps.expect_byte(b',')?;
+                                        wire_range_buf.push(self.read_wire_range()?);
+                                    }
+                                    fbv.copy(ty, out, &wire_range_buf[1..])?;
                                 }
                                 ch => eyre::bail!("Unexpected {ch:?}. Expected < or $"),
                             }
