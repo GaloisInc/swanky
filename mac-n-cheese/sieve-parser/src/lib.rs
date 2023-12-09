@@ -186,6 +186,12 @@ pub enum ValueStreamKind {
     Private,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConversionSemantics {
+    NoModulus,
+    Modulus,
+}
+
 pub trait FunctionBodyVisitor {
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()>;
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()>;
@@ -198,7 +204,12 @@ pub trait FunctionBodyVisitor {
     fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
     fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()>;
-    fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()>;
+    fn convert(
+        &mut self,
+        dst: TypedWireRange,
+        src: TypedWireRange,
+        semantics: ConversionSemantics,
+    ) -> eyre::Result<()>;
     fn call(&mut self, dst: &[WireRange], name: Identifier, args: &[WireRange])
         -> eyre::Result<()>;
 }
@@ -321,7 +332,12 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
         Ok(writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")?)
     }
-    fn convert(&mut self, _dst: TypedWireRange, _src: TypedWireRange) -> eyre::Result<()> {
+    fn convert(
+        &mut self,
+        _dst: TypedWireRange,
+        _src: TypedWireRange,
+        _semantics: ConversionSemantics,
+    ) -> eyre::Result<()> {
         todo!()
     }
     fn call(

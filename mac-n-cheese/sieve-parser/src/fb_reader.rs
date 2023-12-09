@@ -12,8 +12,9 @@ mod sieve_ir_generated;
 use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
-    PluginTypeArg, RelationVisitor, Type, TypedCount, TypedWireRange, ValueStreamKind, WireRange,
+    ConversionDescription, ConversionSemantics, FunctionBodyVisitor, Header, Number, PluginBinding,
+    PluginType, PluginTypeArg, RelationVisitor, Type, TypedCount, TypedWireRange, ValueStreamKind,
+    WireRange,
 };
 
 fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
@@ -275,6 +276,11 @@ impl RelationReader {
                         start: x.in_first_id(),
                         end: x.in_last_id(),
                     },
+                },
+                if x.modulus() {
+                    ConversionSemantics::Modulus
+                } else {
+                    ConversionSemantics::NoModulus
                 },
             )?;
         } else if let Some(x) = gate.gate_as_gate_call() {

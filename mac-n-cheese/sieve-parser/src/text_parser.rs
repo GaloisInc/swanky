@@ -7,9 +7,9 @@ use crypto_bigint::{CheckedAdd, CheckedMul, Limb, Uint, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
-    PluginTypeArg, RelationVisitor, Type, TypeId, TypedCount, TypedWireRange, ValueStreamKind,
-    WireId, WireRange,
+    ConversionDescription, ConversionSemantics, FunctionBodyVisitor, Header, Number, PluginBinding,
+    PluginType, PluginTypeArg, RelationVisitor, Type, TypeId, TypedCount, TypedWireRange,
+    ValueStreamKind, WireId, WireRange,
 };
 
 #[cold]
@@ -730,6 +730,18 @@ impl<T: Read + Seek> RelationReader<T> {
                     let src_type_id = self.ps.u8()?;
                     self.ps.colon()?;
                     let src = self.read_wire_range()?;
+                    let semantics = if let Some(b',') = self.ps.peek()? {
+                        self.ps.expect_byte(b',')?;
+                        self.ps.at()?;
+                        self.ps.token(&mut buf)?;
+                        match buf.as_slice() {
+                            b"no_modulus" => ConversionSemantics::NoModulus,
+                            b"modulus" => ConversionSemantics::Modulus,
+                            _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
+                        }
+                    } else {
+                        ConversionSemantics::NoModulus
+                    };
                     self.ps.expect_byte(b')')?;
                     self.ps.semi()?;
                     fbv.convert(
@@ -741,6 +753,7 @@ impl<T: Read + Seek> RelationReader<T> {
                             ty: src_type_id,
                             range: src,
                         },
+                        semantics,
                     )?;
                 }
             }
