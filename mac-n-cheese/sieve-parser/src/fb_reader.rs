@@ -178,7 +178,21 @@ impl RelationReader {
         } else if let Some(x) = gate.gate_as_gate_assert_zero() {
             v.assert_zero(x.type_id().into(), x.in_id())?;
         } else if let Some(x) = gate.gate_as_gate_copy() {
-            v.copy(x.type_id().into(), x.out_id(), x.in_id())?;
+            let mut src = vec![];
+            for input in x.in_id().into_iter().flat_map(|x| x.iter()) {
+                src.push(WireRange {
+                    start: input.first_id(),
+                    end: input.last_id(),
+                })
+            }
+            v.copy(
+                x.type_id().into(),
+                WireRange {
+                    start: x.out_id().unwrap().first_id(),
+                    end: x.out_id().unwrap().last_id(),
+                },
+                &src,
+            )?;
         } else if let Some(x) = gate.gate_as_gate_add() {
             v.add(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
         } else if let Some(x) = gate.gate_as_gate_mul() {
@@ -198,9 +212,21 @@ impl RelationReader {
                 &bytes2number(x.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_public() {
-            v.public_input(x.type_id().into(), x.out_id())?;
+            v.public_input(
+                x.type_id().into(),
+                WireRange {
+                    start: x.out_id().unwrap().first_id(),
+                    end: x.out_id().unwrap().last_id(),
+                },
+            )?;
         } else if let Some(x) = gate.gate_as_gate_private() {
-            v.private_input(x.type_id().into(), x.out_id())?;
+            v.private_input(
+                x.type_id().into(),
+                WireRange {
+                    start: x.out_id().unwrap().first_id(),
+                    end: x.out_id().unwrap().last_id(),
+                },
+            )?;
         } else if let Some(x) = gate.gate_as_gate_new() {
             v.new(x.type_id().into(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_delete() {
