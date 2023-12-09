@@ -185,6 +185,23 @@ impl RelationReader {
                     end: input.last_id(),
                 })
             }
+            let num_input_wires = src.iter().map(|inp| inp.len()).sum();
+            let dst = WireRange {
+                start: x
+                    .out_id()
+                    .context("copy requires an output wire range")?
+                    .first_id(),
+                end: x
+                    .out_id()
+                    .context("copy requires an output wire range")?
+                    .last_id(),
+            };
+            eyre::ensure!(
+                dst.len() == num_input_wires,
+                "Expected {} total input wires, got {}",
+                dst.len(),
+                num_input_wires
+            );
             v.copy(
                 x.type_id().into(),
                 WireRange {
@@ -215,16 +232,28 @@ impl RelationReader {
             v.public_input(
                 x.type_id().into(),
                 WireRange {
-                    start: x.out_id().unwrap().first_id(),
-                    end: x.out_id().unwrap().last_id(),
+                    start: x
+                        .out_id()
+                        .context("public inputs need an output wire range")?
+                        .first_id(),
+                    end: x
+                        .out_id()
+                        .context("public inputs need an output wire range")?
+                        .last_id(),
                 },
             )?;
         } else if let Some(x) = gate.gate_as_gate_private() {
             v.private_input(
                 x.type_id().into(),
                 WireRange {
-                    start: x.out_id().unwrap().first_id(),
-                    end: x.out_id().unwrap().last_id(),
+                    start: x
+                        .out_id()
+                        .context("private inputs need an output wire range")?
+                        .first_id(),
+                    end: x
+                        .out_id()
+                        .context("private inputs need an output wire range")?
+                        .last_id(),
                 },
             )?;
         } else if let Some(x) = gate.gate_as_gate_new() {
