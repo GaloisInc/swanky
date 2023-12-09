@@ -158,6 +158,16 @@ impl WireRange {
             0
         }
     }
+    pub fn as_single_wire(&self) -> eyre::Result<WireId> {
+        eyre::ensure!(
+            self.len() == 1,
+            "Expected single wire, got a range {}..={}",
+            self.start,
+            self.end
+        );
+
+        Ok(self.start)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

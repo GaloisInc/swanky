@@ -501,19 +501,13 @@ impl<T: Read + Seek> RelationReader<T> {
         };
         Ok(WireRange { start, end })
     }
-    fn check_wire_range_buf_single_output(wire_range_buf: &[WireRange]) -> eyre::Result<WireId> {
+    fn check_wire_range_buf_single_output(wire_range_buf: &[WireRange]) -> eyre::Result<WireRange> {
         eyre::ensure!(
             wire_range_buf.len() == 1,
-            "Expected a single wire, got {}",
+            "Expected a single wire range, got {}",
             wire_range_buf.len()
         );
-        eyre::ensure!(
-            wire_range_buf[0].start == wire_range_buf[0].end,
-            "Expected single wire, got a range {}..={}",
-            wire_range_buf[0].start,
-            wire_range_buf[0].end
-        );
-        Ok(wire_range_buf[0].start)
+        Ok(wire_range_buf[0])
     }
     fn read_directives<FBV: FunctionBodyVisitor, F>(
         &mut self,
@@ -590,7 +584,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.add(ty, dst, left, right)?;
                                 }
                                 b"mul" => {
@@ -600,7 +595,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.mul(ty, dst, left, right)?;
                                 }
                                 b"addc" => {
@@ -612,7 +608,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.addc(ty, dst, left, &right)?;
                                 }
                                 b"mulc" => {
@@ -624,7 +621,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.mulc(ty, dst, left, &right)?;
                                 }
                                 b"public" => {
@@ -687,7 +685,7 @@ impl<T: Read + Seek> RelationReader<T> {
                             match self.ps.peek()? {
                                 Some(b'<') => {
                                     self.ps.expect_byte(b'<')?;
-                                    fbv.constant(ty, out, &self.ps.bignum()?)?;
+                                    fbv.constant(ty, out.as_single_wire()?, &self.ps.bignum()?)?;
                                     self.ps.expect_byte(b'>')?;
                                 }
                                 Some(b'$') => {
