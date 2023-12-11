@@ -179,14 +179,14 @@ impl RelationReader {
         } else if let Some(x) = gate.gate_as_gate_assert_zero() {
             v.assert_zero(x.type_id().into(), x.in_id())?;
         } else if let Some(x) = gate.gate_as_gate_copy() {
-            let mut src = vec![];
+            func_in_buf.clear();
             for input in x.in_id().into_iter().flat_map(|x| x.iter()) {
-                src.push(WireRange {
+                func_in_buf.push(WireRange {
                     start: input.first_id(),
                     end: input.last_id(),
                 })
             }
-            let num_input_wires = src.iter().map(|inp| inp.len()).sum();
+            let num_input_wires = func_in_buf.iter().map(|inp| inp.len()).sum();
             let dst = WireRange {
                 start: x
                     .out_id()
@@ -209,7 +209,7 @@ impl RelationReader {
                     start: x.out_id().unwrap().first_id(),
                     end: x.out_id().unwrap().last_id(),
                 },
-                &src,
+                &func_in_buf,
             )?;
         } else if let Some(x) = gate.gate_as_gate_add() {
             v.add(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
