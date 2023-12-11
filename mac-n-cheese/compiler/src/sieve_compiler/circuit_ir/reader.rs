@@ -6,9 +6,9 @@ use std::{
 use color_eyre::Help;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_sieve_parser::{
-    FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType, PluginTypeArg,
-    RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind, ValueStreamReader,
-    WireId, WireRange as ParserWireRange, ConversionSemantics,
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType,
+    PluginTypeArg, RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
+    ValueStreamReader, WireId, WireRange as ParserWireRange,
 };
 use rustc_hash::FxHashMap;
 
@@ -245,7 +245,12 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn copy(&mut self, _ty: TypeId, _dst: mac_n_cheese_sieve_parser::WireRange, _src: &[mac_n_cheese_sieve_parser::WireRange]) -> eyre::Result<()> {
+    fn copy(
+        &mut self,
+        _ty: TypeId,
+        _dst: mac_n_cheese_sieve_parser::WireRange,
+        _src: &[mac_n_cheese_sieve_parser::WireRange],
+    ) -> eyre::Result<()> {
         unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()> {
@@ -256,10 +261,18 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn public_input(&mut self, _ty: TypeId, _dst: mac_n_cheese_sieve_parser::WireRange) -> eyre::Result<()> {
+    fn public_input(
+        &mut self,
+        _ty: TypeId,
+        _dst: mac_n_cheese_sieve_parser::WireRange,
+    ) -> eyre::Result<()> {
         unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
-    fn private_input(&mut self, _ty: TypeId, _dst: mac_n_cheese_sieve_parser::WireRange) -> eyre::Result<()> {
+    fn private_input(
+        &mut self,
+        _ty: TypeId,
+        _dst: mac_n_cheese_sieve_parser::WireRange,
+    ) -> eyre::Result<()> {
         unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
@@ -269,7 +282,12 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn convert(&mut self, _dst: TypedWireRange, _src: TypedWireRange, _semantics: ConversionSemantics) -> eyre::Result<()> {
+    fn convert(
+        &mut self,
+        _dst: TypedWireRange,
+        _src: TypedWireRange,
+        _semantics: ConversionSemantics,
+    ) -> eyre::Result<()> {
         todo!()
     }
     fn call(
