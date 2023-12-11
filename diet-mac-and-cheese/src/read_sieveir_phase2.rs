@@ -247,7 +247,18 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate, fun_store: &FunStore) -> GateM {
         }
         gs::GateCopy => {
             let u = the_gate.gate_as_gate_copy().unwrap();
-            GateM::Copy(u.type_id(), u.out_id(), u.in_id())
+            let mut src = vec![];
+            for input in u.in_id().into_iter().flat_map(|x| x.iter()) {
+                src.push((input.first_id(), input.last_id()))
+            }
+            GateM::Copy(
+                u.type_id(),
+                (
+                    u.out_id().unwrap().first_id(),
+                    u.out_id().unwrap().last_id(),
+                ),
+                Box::new(src),
+            )
         }
         gs::GateAdd => {
             let u = the_gate.gate_as_gate_add().unwrap();
@@ -277,11 +288,23 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate, fun_store: &FunStore) -> GateM {
         }
         gs::GatePublic => {
             let u = the_gate.gate_as_gate_public().unwrap();
-            GateM::Instance(u.type_id(), u.out_id())
+            GateM::Instance(
+                u.type_id(),
+                (
+                    u.out_id().unwrap().first_id(),
+                    u.out_id().unwrap().last_id(),
+                ),
+            )
         }
         gs::GatePrivate => {
             let u = the_gate.gate_as_gate_private().unwrap();
-            GateM::Witness(u.type_id(), u.out_id())
+            GateM::Witness(
+                u.type_id(),
+                (
+                    u.out_id().unwrap().first_id(),
+                    u.out_id().unwrap().last_id(),
+                ),
+            )
         }
         gs::GateNew => {
             let u = the_gate.gate_as_gate_new().unwrap();
