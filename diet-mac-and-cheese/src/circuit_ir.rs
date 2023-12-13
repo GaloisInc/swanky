@@ -724,8 +724,24 @@ impl CircInputs {
         self.ins[type_id].pop_front()
     }
 
+    pub fn pop_instances(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
+        let mut instances = vec![];
+        for _ in 0..num {
+            instances.push(self.pop_instance(type_id)?)
+        }
+        Some(instances)
+    }
+
     pub fn pop_witness(&mut self, type_id: usize) -> Option<Number> {
         self.adjust_wit_type_idx(type_id);
         self.wit[type_id].pop_front()
+    }
+
+    pub fn pop_witnesses(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
+        let mut witnesses = vec![];
+        for _ in 0..num {
+            witnesses.push(self.pop_witness(type_id)?)
+        }
+        Some(witnesses)
     }
 }
