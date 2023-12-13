@@ -780,9 +780,17 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
             }
 
             Copy(_, out, inp) => {
-                let in_wire = self.memory.get(*inp);
-                let out_wire = self.backend.copy(in_wire)?;
-                self.memory.set(*out, &out_wire);
+                let mut curr_out = out.0;
+                for curr_inp_range in **inp {
+                    for curr_inp in curr_inp_range.0..=curr_inp_range.1 {
+                        let in_wire = self.memory.get(curr_inp);
+                        let out_wire = self.backend.copy(in_wire)?;
+                        self.memory.set(curr_out, &out_wire);
+                        curr_out += 1;
+                    }
+                }
+                // This condition should have been checked during parsing!
+                debug_assert_eq!(curr_out - 1, out.1);
             }
 
             Add(_, out, left, right) => {
