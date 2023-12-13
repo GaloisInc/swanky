@@ -417,17 +417,11 @@ mod tests {
 
         let mut gates = vec![GateM::New(0, 0, wire_count)];
         // Add witness gates for p0
-        for i in 0..p0_size {
-            gates.push(GateM::Witness(0, i))
-        }
+        gates.push(GateM::Witness(0, (0, p0_size - 1)));
         // Add witness gates for p1
-        for i in p0_size..p0_size + p1_size {
-            gates.push(GateM::Witness(0, i))
-        }
+        gates.push(GateM::Witness(0, (p0_size, p0_size + p1_size - 1)));
         // Add instance gates for q
-        for i in p0_size + p1_size..wire_count {
-            gates.push(GateM::Instance(0, i))
-        }
+        gates.push(GateM::Instance(0, (p0_size + p1_size, wire_count - 1)));
         gates.push(GateM::Call(Box::new((
             fun_id,
             vec![],
@@ -496,15 +490,11 @@ mod tests {
 
         let mut gates = vec![GateM::New(0, 0, wire_count)];
         // Add witness gates for p
-        for i in 0..p_size {
-            gates.push(GateM::Witness(0, i))
-        }
+        gates.push(GateM::Witness(0, (0, p_size - 1)));
         // Add witness gate for c
-        gates.push(GateM::Witness(0, p_size));
+        gates.push(GateM::Witness(0, (p_size, p_size)));
         // Add instance gates for q
-        for i in p_size + 1..wire_count {
-            gates.push(GateM::Instance(0, i))
-        }
+        gates.push(GateM::Instance(0, (p_size + 1, wire_count - 1)));
 
         gates.push(GateM::Call(Box::new((
             fun_id,
