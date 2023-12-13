@@ -1963,8 +1963,8 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, wr(0)),
+            GateM::Witness(FF0, wr(1)),
             GateM::Mul(FF0, 2, 0, 1),
             GateM::Conv(Box::new((FF1, wr(3), FF0, wr(2)))),
             GateM::AssertZero(FF1, 3),
@@ -1982,8 +1982,8 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF1, 0),
-            GateM::Witness(FF1, 1),
+            GateM::Witness(FF1, wr(0)),
+            GateM::Witness(FF1, wr(1)),
             GateM::Add(FF1, 2, 0, 1),
             GateM::Conv(Box::new((FF0, wr(3), FF1, wr(2)))),
             GateM::AddConstant(FF0, 4, 3, Box::from(minus_one::<F61p>())),
@@ -2002,13 +2002,11 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, (0, 1)),
             GateM::Mul(FF0, 2, 0, 1),
             GateM::Conv(Box::new((FF1, wr(3), FF0, wr(2)))),
             GateM::AssertZero(FF1, 3),
-            GateM::Witness(FF1, 4),
-            GateM::Witness(FF1, 5),
+            GateM::Witness(FF1, (4, 5)),
             GateM::Add(FF1, 6, 5, 4),
             GateM::Conv(Box::new((FF0, wr(7), FF1, wr(6)))),
             GateM::AddConstant(FF0, 8, 7, Box::from(minus_one::<F61p>())),
@@ -2030,8 +2028,7 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF1, 0),
-            GateM::Witness(FF1, 1),
+            GateM::Witness(FF1, (0, 1)),
             GateM::Conv(Box::new((FF0, wr(3), FF1, (0, 1)))),
             GateM::AddConstant(FF0, 4, 3, Box::from(minus_three::<F61p>())),
             GateM::AssertZero(FF0, 4),
@@ -2050,7 +2047,7 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, wr(0)),
             GateM::Conv(Box::new((FF1, (1, 5), FF0, wr(0)))),
             GateM::AssertZero(FF1, 1),
             GateM::AssertZero(FF1, 2),
@@ -2073,10 +2070,7 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Instance(FF1, 0),
-            GateM::Instance(FF1, 1),
-            GateM::Instance(FF1, 2),
-            GateM::Instance(FF1, 3),
+            GateM::Instance(FF1, (0, 3)),
             GateM::Conv(Box::new((FF0, wr(4), FF1, (0, 3)))),
             GateM::AddConstant(FF0, 5, 4, Box::from(minus_five::<F61p>())),
             GateM::AssertZero(FF0, 5),
@@ -2104,14 +2098,12 @@ pub(crate) mod tests {
 
         let mut gates = vec![
             GateM::New(FF0, 0, 0),
-            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, wr(0)),
             GateM::New(FF1, 1, 61),
             GateM::Conv(Box::new((FF1, (1, 61), FF0, wr(0)))),
             GateM::New(FF1, 62, 122),
         ];
-        for i in 0..59 {
-            gates.push(GateM::Copy(FF1, 62 + i, 1 + 2 + i));
-        }
+        gates.push(GateM::Copy(FF1, (62, 120), Box::new(vec![(3, 61)])));
         gates.push(GateM::Constant(FF1, 121, Box::new(zero::<F2>())));
         gates.push(GateM::Constant(FF1, 122, Box::new(one::<F2>())));
         gates.push(GateM::New(FF0, 123, 124));
@@ -2136,8 +2128,7 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, (0, 1)),
             GateM::Mul(FF0, 2, 0, 1),
             GateM::Conv(Box::new((FF1, wr(3), FF0, wr(2)))),
             GateM::AssertZero(FF1, 3),
@@ -2157,7 +2148,7 @@ pub(crate) mod tests {
         let gates = vec![
             //GateM::New(FF3, 4, 4),
             //GateM::New(FF2, 5, 7),
-            GateM::Witness(FF3, 4),
+            GateM::Witness(FF3, wr(4)),
             GateM::Conv(Box::new((FF2, wr(5), FF3, wr(4)))),
             GateM::Constant(FF2, 6, Box::from(minus_one::<F384q>())),
             GateM::Add(FF2, 7, 5, 6),
@@ -2177,9 +2168,9 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF2, 4),
+            GateM::Witness(FF2, wr(4)),
             GateM::Conv(Box::new((FF3, wr(5), FF2, wr(4)))),
-            GateM::Witness(FF1, 1),
+            GateM::Witness(FF1, wr(1)),
             GateM::Conv(Box::new((FF3, wr(2), FF1, wr(1)))),
             GateM::Constant(FF3, 6, Box::from(minus_one::<F2>())),
             GateM::Add(FF3, 7, 5, 6),
@@ -2205,8 +2196,7 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF1, 0),
-            GateM::Witness(FF1, 1),
+            GateM::Witness(FF1, (0, 1)),
             GateM::Mul(FF1, 2, 0, 1),
             GateM::Conv(Box::new((FF0, wr(3), FF1, wr(2)))),
             GateM::AssertZero(FF0, 3),
@@ -2229,9 +2219,9 @@ pub(crate) mod tests {
         let func_store = FunStore::default();
 
         let gates = vec![
-            GateM::Witness(FF0, 0),
+            GateM::Witness(FF0, wr(0)),
             GateM::Conv(Box::new((FF1, wr(1), FF0, wr(0)))),
-            GateM::Witness(FF1, 2),
+            GateM::Witness(FF1, wr(2)),
             GateM::Conv(Box::new((FF0, wr(3), FF1, wr(2)))),
             GateM::Constant(FF1, 4, Box::from(zero::<Secp256k1order>())),
             GateM::Add(FF1, 5, 1, 4),
@@ -2272,10 +2262,7 @@ pub(crate) mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
+            GateM::Witness(FF0, (0, 3)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(4, 4), (5, 5)],
@@ -2319,10 +2306,7 @@ pub(crate) mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
+            GateM::Witness(FF0, (0, 3)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(4, 4), (5, 5)],
@@ -2352,9 +2336,9 @@ pub(crate) mod tests {
         let mut func_store = FunStore::default();
 
         let gates_func = vec![
-            GateM::Copy(FF0, 0, 3),
+            GateM::Copy(FF0, wr(0), Box::new(vec![wr(3)])),
             GateM::Add(FF0, 1, 4, 6),
-            GateM::Copy(FF0, 2, 5),
+            GateM::Copy(FF0, wr(2), Box::new(vec![wr(5)])),
         ];
 
         let mut func = FuncDecl::new_function(
@@ -2385,10 +2369,7 @@ pub(crate) mod tests {
             // AssertZero(9)
             GateM::New(FF0, 0, 2),
             GateM::New(FF0, 3, 3),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Instance(FF0, 2),
-            GateM::Witness(FF0, 3),
+            GateM::Witness(FF0, (0, 3)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(4, 5), (6, 6)],
