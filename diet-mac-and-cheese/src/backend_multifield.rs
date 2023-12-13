@@ -700,8 +700,8 @@ trait EvaluatorT<P: Party> {
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
-        instance: Option<Number>,
-        witness: Option<Number>,
+        instances: Option<Vec<Number>>,
+        witnesses: Option<Vec<Number>>,
     ) -> Result<()>;
 
     /// Start the conversion for a [`ConvGate`].
@@ -760,8 +760,8 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
     fn evaluate_gate(
         &mut self,
         gate: &GateM,
-        instance: Option<Number>,
-        witness: Option<Number>,
+        instances: Option<Vec<Number>>,
+        witnesses: Option<Vec<Number>>,
     ) -> Result<()> {
         use GateM::*;
 
@@ -829,16 +829,24 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
             }
 
             Instance(_, out) => {
-                let v = self
-                    .backend
-                    .input_public(B::from_number(&instance.unwrap())?)?;
-                self.memory.set(*out, &v);
+                let mut curr_out = out.0;
+                for instance in instances.unwrap() {
+                    let v = self.backend.input_public(B::from_number(&instance)?)?;
+                    self.memory.set(curr_out, &v);
+                    curr_out += 1;
+                }
+                debug_assert_eq!(curr_out - 1, out.1);
             }
 
             Witness(_, out) => {
-                let w = witness.and_then(|v| B::from_number(&v).ok());
-                let v = self.backend.input_private(w)?;
-                self.memory.set(*out, &v);
+                let mut curr_out = out.0;
+                for witness in witnesses.iter().flatten() {
+                    let w = B::from_number(witness).ok();
+                    let v = self.backend.input_private(w)?;
+                    self.memory.set(curr_out, &v);
+                    curr_out += 1;
+                }
+                debug_assert_eq!(curr_out - 1, out.1);
             }
             New(_, first, last) => {
                 self.memory.allocation_new(*first, *last);
@@ -1687,13 +1695,21 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
                 debug!("CONV OUT");
             }
-            GateM::Instance(ty, _) => {
+            GateM::Instance(ty, out) => {
                 let i = *ty as usize;
-                self.eval[i].evaluate_gate(gate, self.inputs.pop_instance(i), None)?;
+                self.eval[i].evaluate_gate(
+                    gate,
+                    self.inputs.pop_instances(i, out.1 - out.0 + 1),
+                    None,
+                )?;
             }
-            GateM::Witness(ty, _) => {
+            GateM::Witness(ty, out) => {
                 let i = *ty as usize;
-                self.eval[i].evaluate_gate(gate, None, self.inputs.pop_witness(i))?;
+                self.eval[i].evaluate_gate(
+                    gate,
+                    None,
+                    self.inputs.pop_witnesses(i, out.1 - out.0 + 1),
+                )?;
             }
             GateM::Call(arg) => {
                 let (fun_id, out_ranges, in_ranges) = arg.as_ref();
@@ -1729,13 +1745,21 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
                 debug!("CONV OUT");
             }
-            GateM::Instance(ty, _out) => {
+            GateM::Instance(ty, out) => {
                 let i = *ty as usize;
-                self.eval[i].evaluate_gate(gate, inputs.pop_instance(i), None)?;
+                self.eval[i].evaluate_gate(
+                    gate,
+                    inputs.pop_instances(i, out.1 - out.0 + 1),
+                    None,
+                )?;
             }
-            GateM::Witness(ty, _out) => {
+            GateM::Witness(ty, out) => {
                 let i = *ty as usize;
-                self.eval[i].evaluate_gate(gate, None, inputs.pop_witness(i))?;
+                self.eval[i].evaluate_gate(
+                    gate,
+                    None,
+                    inputs.pop_witnesses(i, out.1 - out.0 + 1),
+                )?;
             }
             GateM::Call(arg) => {
                 let (fun_id, out_ranges, in_ranges) = arg.as_ref();
