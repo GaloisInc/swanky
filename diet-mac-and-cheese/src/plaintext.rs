@@ -9,9 +9,9 @@ use eyre::{bail, Result};
 use generic_array::GenericArray;
 use scuttlebutt::AesRng;
 use std::marker::PhantomData;
-use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf, PrimeFiniteField};
+use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F40b, F2};
-use swanky_party::Party;
+use swanky_party::{private::ProverPrivateCopy, Party, WhichParty};
 
 pub struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> {
     rng: AesRng,
@@ -169,12 +169,29 @@ impl<F: PrimeFiniteField> BackendDisjunctionT for DietMacAndCheesePlaintext<F, F
 }
 
 impl<P: Party> BackendConvT<P> for DietMacAndCheesePlaintext<F2, F40b> {
-    fn assert_conv_to_bits(&mut self, _w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
-        unimplemented!()
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
+        match P::WHICH {
+            WhichParty::Prover(_) => {
+                let bmac = Mac::new(ProverPrivateCopy::new(w.0), F40b::ZERO);
+                Ok(vec![bmac])
+            }
+            WhichParty::Verifier(_) => {
+                panic!(
+                    "calling plaintext evaluator conversion to bits on a Verifier party instead of Prover"
+                );
+            }
+        }
     }
 
-    fn assert_conv_from_bits(&mut self, _x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        unimplemented!()
+    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+        match P::WHICH {
+            WhichParty::Prover(ev) => Ok(WirePlaintext::new(x[0].value().into_inner(ev))),
+            WhichParty::Verifier(_) => {
+                panic!(
+                    "calling plaintext evaluator conversion from bits on a Verifier party instead of Prover"
+                );
+            }
+        }
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
@@ -183,12 +200,55 @@ impl<P: Party> BackendConvT<P> for DietMacAndCheesePlaintext<F2, F40b> {
 }
 
 impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintext<F, F> {
-    fn assert_conv_to_bits(&mut self, _w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
-        unimplemented!()
+    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
+        let mut v;
+        let bits = w.0.bit_decomposition();
+        match P::WHICH {
+            WhichParty::Prover(_) => {
+                v = Vec::with_capacity(bits.len());
+                for b in bits {
+                    let b2 = F2::from(b);
+                    let bmac = Mac::new(ProverPrivateCopy::new(b2), F40b::ZERO);
+                    v.push(bmac);
+                }
+            }
+            WhichParty::Verifier(_) => {
+                panic!(
+                    "calling plaintext evaluator conversion on a Verifier party instead of Prover"
+                );
+            }
+        }
+        Ok(v)
     }
 
-    fn assert_conv_from_bits(&mut self, _x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        unimplemented!()
+    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+        let mut power_twos = ProverPrivateCopy::new(F::ONE);
+        let mut recomposed_value = ProverPrivateCopy::new(F::ZERO);
+
+        let mut bits = Vec::with_capacity(x.len());
+
+        for m in x {
+            if let WhichParty::Prover(ev) = P::WHICH {
+                *recomposed_value.as_mut().into_inner(ev) += (if m.value().into_inner(ev) == F2::ONE
+                {
+                    F::ONE
+                } else {
+                    F::ZERO
+                }) * power_twos.into_inner(ev);
+                power_twos
+                    .as_mut()
+                    .map(|power_twos| *power_twos += *power_twos);
+            }
+
+            bits.push(*m);
+        }
+
+        let mac = self.input_private(match P::WHICH {
+            WhichParty::Prover(ev) => Some(recomposed_value.into_inner(ev)),
+            WhichParty::Verifier(_) => None,
+        })?;
+
+        Ok(mac)
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
