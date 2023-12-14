@@ -391,7 +391,11 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
 fn run_plaintext(args: &Cli) -> Result<()> {
     let start = Instant::now();
-    let (inputs, type_store) = build_inputs_flatbuffers(args)?;
+    let (inputs, type_store) = if args.text {
+        build_inputs_types_text(args)?
+    } else {
+        build_inputs_flatbuffers(args)?
+    };
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
     let relation_path = args.relation.clone();
@@ -409,7 +413,15 @@ fn run_plaintext(args: &Cli) -> Result<()> {
             evaluator.load_backends_plaintext()?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
-            evaluator.evaluate_relation(&relation_path)?;
+
+            if args.text {
+                let relation_file = File::open(relation_path)?;
+                let relation_reader = BufReader::new(relation_file);
+                evaluator.evaluate_relation_text(relation_reader)?;
+            } else {
+                evaluator.evaluate_relation(&relation_path)?;
+            }
+            evaluator.terminate()?;
             info!("time circ exec: {:?}", start.elapsed());
         }
     }
