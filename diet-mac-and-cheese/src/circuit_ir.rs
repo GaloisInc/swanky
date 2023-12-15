@@ -199,7 +199,7 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                         modulus,
                     )?)
                 }
-                mac_n_cheese_sieve_parser::Type::Ring { nbits } => {
+                mac_n_cheese_sieve_parser::Type::Ring { .. } => {
                     bail!("Rings not supported in Diet Mac'n'Cheese.")
                 }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
