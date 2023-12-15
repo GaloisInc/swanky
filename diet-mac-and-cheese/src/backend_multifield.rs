@@ -2365,7 +2365,9 @@ pub(crate) mod tests {
             // AssertZero(9)
             GateM::New(FF0, 0, 2),
             GateM::New(FF0, 3, 3),
-            GateM::Witness(FF0, (0, 3)),
+            GateM::Witness(FF0, (0, 1)),
+            GateM::Instance(FF0, wr(2)),
+            GateM::Witness(FF0, wr(3)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(4, 5), (6, 6)],
