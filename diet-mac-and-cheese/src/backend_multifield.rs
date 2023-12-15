@@ -836,12 +836,12 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
             }
 
             Witness(_, out) => {
-                let mut curr_out = out.0;
-                for witness in witnesses.iter().flatten() {
-                    let w = B::from_number(witness).ok();
+                for (i, curr_out) in (out.0..=out.1).into_iter().enumerate() {
+                    let w = witnesses
+                        .as_ref()
+                        .and_then(|wv| B::from_number(&wv[i]).ok());
                     let v = self.backend.input_private(w)?;
                     self.memory.set(curr_out, &v);
-                    curr_out += 1;
                 }
             }
             New(_, first, last) => {
