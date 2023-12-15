@@ -756,6 +756,9 @@ impl<B: BackendT> EvaluatorSingle<B> {
 impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> EvaluatorT<P>
     for EvaluatorSingle<B>
 {
+    // TODO: Revisit the type of instances / witnesses when we implement
+    // streaming for these values. They should probably be
+    // Option<&[Number]>!
     #[inline]
     fn evaluate_gate(
         &mut self,
