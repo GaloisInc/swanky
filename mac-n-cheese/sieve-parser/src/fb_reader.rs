@@ -12,8 +12,9 @@ mod sieve_ir_generated;
 use sieve_ir_generated::sieve_ir as fb;
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
-    PluginTypeArg, RelationVisitor, Type, TypedCount, TypedWireRange, ValueStreamKind, WireRange,
+    ConversionDescription, ConversionSemantics, FunctionBodyVisitor, Header, Number, PluginBinding,
+    PluginType, PluginTypeArg, RelationVisitor, Type, TypedCount, TypedWireRange, ValueStreamKind,
+    WireRange,
 };
 
 fn walk_inputs(paths: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
@@ -178,7 +179,38 @@ impl RelationReader {
         } else if let Some(x) = gate.gate_as_gate_assert_zero() {
             v.assert_zero(x.type_id().into(), x.in_id())?;
         } else if let Some(x) = gate.gate_as_gate_copy() {
-            v.copy(x.type_id().into(), x.out_id(), x.in_id())?;
+            func_in_buf.clear();
+            for input in x.in_id().into_iter().flat_map(|x| x.iter()) {
+                func_in_buf.push(WireRange {
+                    start: input.first_id(),
+                    end: input.last_id(),
+                })
+            }
+            let num_input_wires = func_in_buf.iter().map(|inp| inp.len()).sum();
+            let dst = WireRange {
+                start: x
+                    .out_id()
+                    .context("copy requires an output wire range")?
+                    .first_id(),
+                end: x
+                    .out_id()
+                    .context("copy requires an output wire range")?
+                    .last_id(),
+            };
+            eyre::ensure!(
+                dst.len() == num_input_wires,
+                "Expected {} total input wires, got {}",
+                dst.len(),
+                num_input_wires
+            );
+            v.copy(
+                x.type_id().into(),
+                WireRange {
+                    start: x.out_id().unwrap().first_id(),
+                    end: x.out_id().unwrap().last_id(),
+                },
+                &func_in_buf,
+            )?;
         } else if let Some(x) = gate.gate_as_gate_add() {
             v.add(x.type_id().into(), x.out_id(), x.left_id(), x.right_id())?;
         } else if let Some(x) = gate.gate_as_gate_mul() {
@@ -198,9 +230,33 @@ impl RelationReader {
                 &bytes2number(x.constant().map(|x| x.bytes()).unwrap_or_default())?,
             )?;
         } else if let Some(x) = gate.gate_as_gate_public() {
-            v.public_input(x.type_id().into(), x.out_id())?;
+            v.public_input(
+                x.type_id().into(),
+                WireRange {
+                    start: x
+                        .out_id()
+                        .context("public inputs need an output wire range")?
+                        .first_id(),
+                    end: x
+                        .out_id()
+                        .context("public inputs need an output wire range")?
+                        .last_id(),
+                },
+            )?;
         } else if let Some(x) = gate.gate_as_gate_private() {
-            v.private_input(x.type_id().into(), x.out_id())?;
+            v.private_input(
+                x.type_id().into(),
+                WireRange {
+                    start: x
+                        .out_id()
+                        .context("private inputs need an output wire range")?
+                        .first_id(),
+                    end: x
+                        .out_id()
+                        .context("private inputs need an output wire range")?
+                        .last_id(),
+                },
+            )?;
         } else if let Some(x) = gate.gate_as_gate_new() {
             v.new(x.type_id().into(), x.first_id(), x.last_id())?;
         } else if let Some(x) = gate.gate_as_gate_delete() {
@@ -220,6 +276,11 @@ impl RelationReader {
                         start: x.in_first_id(),
                         end: x.in_last_id(),
                     },
+                },
+                if x.modulus() {
+                    ConversionSemantics::Modulus
+                } else {
+                    ConversionSemantics::NoModulus
                 },
             )?;
         } else if let Some(x) = gate.gate_as_gate_call() {
@@ -281,6 +342,16 @@ impl super::RelationReader for RelationReader {
                             .context("field type needs modulus")?
                             .bytes(),
                     )?,
+                })
+            } else if let Some(ext_field) = ty.element_as_ext_field() {
+                header.types.push(Type::ExtField {
+                    index: ext_field.index(),
+                    degree: ext_field.degree(),
+                    modulus: ext_field.modulus(),
+                })
+            } else if let Some(ring) = ty.element_as_ring() {
+                header.types.push(Type::Ring {
+                    nbits: ring.nbits(),
                 })
             } else if let Some(plugin) = ty.element_as_plugin_type() {
                 let mut args_buf = Vec::new();

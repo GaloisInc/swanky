@@ -80,55 +80,7 @@ impl<F: PrimeFiniteField> Clause<F> {
         guard: &[F],     // guard value
         gates: &[GateM], // body
     ) -> Self {
-        // translates a WireId to DisjunctionGate WireId (offset by 1)
-        let tidx = |w: u64| -> usize { w as usize };
-
         // translate gates
-        let translate = |gate| match gate {
-            GateM::Add(typ2, dst, lhs, rhs) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                Some(DisjGate::Add(tidx(dst), tidx(lhs), tidx(rhs)))
-            }
-            GateM::Sub(typ2, dst, lhs, rhs) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                Some(DisjGate::Sub(tidx(dst), tidx(lhs), tidx(rhs)))
-            }
-            GateM::Mul(typ2, dst, lhs, rhs) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                Some(DisjGate::Mul(tidx(dst), tidx(lhs), tidx(rhs)))
-            }
-            GateM::Copy(typ2, dst, src) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                Some(DisjGate::Copy(tidx(dst), tidx(src)))
-            }
-            GateM::Witness(typ2, dst) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                Some(DisjGate::Witness(tidx(dst)))
-            }
-            GateM::Constant(typ2, dst, cnst) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                let val = F::try_from_int(*cnst).unwrap();
-                Some(DisjGate::Constant(tidx(dst), val))
-            }
-            GateM::AddConstant(typ2, dst, src, cnst) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                let val = F::try_from_int(*cnst).unwrap();
-                Some(DisjGate::AddConstant(tidx(dst), tidx(src), val))
-            }
-            GateM::MulConstant(typ2, dst, src, cnst) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                let val = F::try_from_int(*cnst).unwrap();
-                Some(DisjGate::MulConstant(tidx(dst), tidx(src), val))
-            }
-            GateM::AssertZero(typ2, src) => {
-                assert_eq!(typ2, typ, "different types in disjunction");
-                Some(DisjGate::AssertZero(tidx(src)))
-            }
-            GateM::New(_, _, _) => None,
-            GateM::Comment(_) => None,
-            _ => panic!("unsupported gate: {:?}", gate),
-        };
-
         let mut body = Vec::with_capacity(gates.len());
 
         // push gates to check guard
@@ -142,11 +94,73 @@ impl<F: PrimeFiniteField> Clause<F> {
 
         // translate body
         for gate in gates.iter().cloned() {
-            if let Some(gate) = translate(gate) {
-                body.push(gate)
-            }
+            translate_gate(&mut body, typ, gate);
         }
 
         Clause { gates: body }
+    }
+}
+
+fn tidx(w: u64) -> usize {
+    w as usize
+}
+
+// Translates `gate` to one or more `DisjGate`, pushing the result(s) to
+// `disj_gates`. Checks that all gates are for `typ`.
+fn translate_gate<F: PrimeFiniteField>(
+    disj_gates: &mut Vec<DisjGate<F>>,
+    typ: TypeId,
+    gate: GateM,
+) {
+    match gate {
+        GateM::Add(typ2, dst, lhs, rhs) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            disj_gates.push(DisjGate::Add(tidx(dst), tidx(lhs), tidx(rhs)))
+        }
+        GateM::Sub(typ2, dst, lhs, rhs) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            disj_gates.push(DisjGate::Sub(tidx(dst), tidx(lhs), tidx(rhs)))
+        }
+        GateM::Mul(typ2, dst, lhs, rhs) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            disj_gates.push(DisjGate::Mul(tidx(dst), tidx(lhs), tidx(rhs)))
+        }
+        GateM::Copy(typ2, dst, src) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            let mut curr_out = dst.0;
+            for curr_input_range in *src {
+                for curr_inp in curr_input_range.0..=curr_input_range.1 {
+                    disj_gates.push(DisjGate::Copy(tidx(curr_out), tidx(curr_inp)));
+                    curr_out += 1;
+                }
+            }
+        }
+        GateM::Witness(typ2, dst) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            for curr_dst in dst.0..=dst.1 {
+                disj_gates.push(DisjGate::Witness(tidx(curr_dst)))
+            }
+        }
+        GateM::Constant(typ2, dst, cnst) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            let val = F::try_from_int(*cnst).unwrap();
+            disj_gates.push(DisjGate::Constant(tidx(dst), val))
+        }
+        GateM::AddConstant(typ2, dst, src, cnst) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            let val = F::try_from_int(*cnst).unwrap();
+            disj_gates.push(DisjGate::AddConstant(tidx(dst), tidx(src), val))
+        }
+        GateM::MulConstant(typ2, dst, src, cnst) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            let val = F::try_from_int(*cnst).unwrap();
+            disj_gates.push(DisjGate::MulConstant(tidx(dst), tidx(src), val))
+        }
+        GateM::AssertZero(typ2, src) => {
+            assert_eq!(typ2, typ, "different types in disjunction");
+            disj_gates.push(DisjGate::AssertZero(tidx(src)))
+        }
+        GateM::New(_, _, _) | GateM::Comment(_) => {}
+        _ => panic!("unsupported gate: {:?}", gate),
     }
 }

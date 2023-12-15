@@ -3,8 +3,8 @@
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
 use log::info;
 use mac_n_cheese_sieve_parser::{
-    FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor, TypeId, TypedCount,
-    TypedWireRange, WireId, WireRange,
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
+    TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
 
 #[derive(Default)]
@@ -51,27 +51,40 @@ impl FunctionBodyVisitor for TextRelation {
             .push(GateM::MulConstant(ty, dst, left, Box::new(right)));
         Ok(())
     }
-    fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Copy(ty, dst, src));
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()> {
+        self.gates.push(GateM::Copy(
+            ty,
+            (dst.start, dst.end),
+            Box::new(src.iter().map(|wr| (wr.start, wr.end)).collect()),
+        ));
         Ok(())
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, &src: &Number) -> eyre::Result<()> {
         self.gates.push(GateM::Constant(ty, dst, Box::new(src)));
         Ok(())
     }
-    fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Instance(ty, dst));
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+        self.gates.push(GateM::Instance(ty, (dst.start, dst.end)));
         Ok(())
     }
-    fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        self.gates.push(GateM::Witness(ty, dst));
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+        self.gates.push(GateM::Witness(ty, (dst.start, dst.end)));
         Ok(())
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
         self.gates.push(GateM::AssertZero(ty, src));
         Ok(())
     }
-    fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()> {
+    fn convert(
+        &mut self,
+        dst: TypedWireRange,
+        src: TypedWireRange,
+        semantics: ConversionSemantics,
+    ) -> eyre::Result<()> {
+        if let ConversionSemantics::Modulus = semantics {
+            eyre::bail!("Diet Mac'n'Cheese only supports no-modulus conversion semantics")
+        }
+
         // read the output wires
         let ty_out = dst.ty;
         let out_first = dst.range.start;

@@ -246,7 +246,7 @@ impl Plugin for VectorsV1 {
                         "product" => GateM::Constant(t, 0, Box::new(Number::ONE)),
                         _ => unreachable!(),
                     }),
-                    1 => gates.push(GateM::Copy(t, 0, 1)),
+                    1 => gates.push(GateM::Copy(t, (0, 0), Box::new(vec![(1, 1)]))),
                     2 => gates.push(match operation {
                         "sum" => GateM::Add(t, 0, 1, 2),
                         "product" => GateM::Mul(t, 0, 1, 2),
@@ -271,7 +271,7 @@ impl Plugin for VectorsV1 {
                             res += 1;
                         }
 
-                        gates.push(GateM::Copy(t, 0, res));
+                        gates.push(GateM::Copy(t, (0, 0), Box::new(vec![(res, res)])));
                     }
                 };
 
@@ -355,7 +355,7 @@ impl Plugin for VectorsV1 {
                             res += 1;
                         }
 
-                        gates.push(GateM::Copy(t, 0, res));
+                        gates.push(GateM::Copy(t, (0, 0), Box::new(vec![(res, res)])));
                     }
                 };
 
@@ -401,13 +401,9 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 2),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
+            GateM::Witness(FF0, (0, 2)),
             GateM::New(FF0, 3, 5),
-            GateM::Instance(FF0, 3),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
+            GateM::Instance(FF0, (3, 5)),
             GateM::Call(Box::new((fun_id, vec![(6, 8)], vec![(0, 2), (3, 5)]))),
             GateM::AssertZero(FF0, 6),
             GateM::AssertZero(FF0, 7),
@@ -448,13 +444,9 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 2),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
+            GateM::Witness(FF0, (0, 2)),
             GateM::New(FF0, 3, 5),
-            GateM::Instance(FF0, 3),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
+            GateM::Instance(FF0, (3, 5)),
             GateM::Call(Box::new((fun_id, vec![(6, 8)], vec![(0, 2), (3, 5)]))),
             GateM::AssertZero(FF0, 6),
             GateM::AssertZero(FF0, 7),
@@ -491,9 +483,7 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 2),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
+            GateM::Instance(FF0, (0, 2)),
             GateM::Call(Box::new((fun_id, vec![(3, 5)], vec![(0, 2)]))),
             GateM::AssertZero(FF0, 3),
             GateM::AssertZero(FF0, 4),
@@ -534,9 +524,7 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 2),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
+            GateM::Instance(FF0, (0, 2)),
             GateM::Call(Box::new((fun_id, vec![(3, 5)], vec![(0, 2)]))),
             GateM::AssertZero(FF0, 3),
             GateM::AssertZero(FF0, 4),
@@ -573,10 +561,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 2),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
-            GateM::Witness(FF0, 3),
+            GateM::Instance(FF0, (0, 2)),
+            GateM::Witness(FF0, (3, 3)),
             GateM::Call(Box::new((fun_id, vec![(4, 6)], vec![(0, 2), (3, 3)]))),
             GateM::AssertZero(FF0, 4),
             GateM::AssertZero(FF0, 5),
@@ -617,10 +603,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 2),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
-            GateM::Witness(FF0, 3),
+            GateM::Instance(FF0, (0, 2)),
+            GateM::Witness(FF0, (3, 3)),
             GateM::Call(Box::new((fun_id, vec![(4, 6)], vec![(0, 2), (3, 3)]))),
             GateM::AssertZero(FF0, 4),
             GateM::AssertZero(FF0, 5),
@@ -699,10 +683,7 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 3),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
-            GateM::Instance(FF0, 3),
+            GateM::Instance(FF0, (0, 3)),
             GateM::Call(Box::new((sum_one_id, vec![(4, 4)], vec![(0, 0)]))),
             GateM::Call(Box::new((sum_two_id, vec![(5, 5)], vec![(1, 2)]))),
             GateM::Call(Box::new((sum_three_id, vec![(6, 6)], vec![(0, 2)]))),
@@ -790,10 +771,7 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 3),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
-            GateM::Instance(FF0, 3),
+            GateM::Instance(FF0, (0, 3)),
             GateM::Call(Box::new((mul_one_id, vec![(4, 4)], vec![(0, 0)]))),
             GateM::Call(Box::new((mul_two_id, vec![(5, 5)], vec![(0, 1)]))),
             GateM::Call(Box::new((mul_three_id, vec![(6, 6)], vec![(0, 2)]))),
@@ -881,15 +859,9 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 3),
-            GateM::Instance(FF0, 0),
-            GateM::Instance(FF0, 1),
-            GateM::Instance(FF0, 2),
-            GateM::Instance(FF0, 3),
+            GateM::Instance(FF0, (0, 3)),
             GateM::New(FF0, 4, 7),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
+            GateM::Instance(FF0, (4, 7)),
             GateM::Call(Box::new((dot_one_id, vec![(8, 8)], vec![(0, 0), (4, 4)]))),
             GateM::Call(Box::new((dot_two_id, vec![(9, 9)], vec![(0, 1), (4, 5)]))),
             GateM::Call(Box::new((

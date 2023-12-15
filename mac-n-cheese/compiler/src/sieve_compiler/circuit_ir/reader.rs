@@ -6,9 +6,9 @@ use std::{
 use color_eyre::Help;
 use eyre::{Context, ContextCompat};
 use mac_n_cheese_sieve_parser::{
-    FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType, PluginTypeArg,
-    RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind, ValueStreamReader,
-    WireId, WireRange as ParserWireRange,
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType,
+    PluginTypeArg, RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
+    ValueStreamReader, WireId, WireRange as ParserWireRange,
 };
 use rustc_hash::FxHashMap;
 
@@ -42,6 +42,9 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
             )),
             mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
                 eyre::bail!("Extension fields not supported!")
+            }
+            mac_n_cheese_sieve_parser::Type::Ring { .. } => {
+                eyre::bail!("Rings not supported!")
             }
             mac_n_cheese_sieve_parser::Type::PluginType(PluginType {
                 name,
@@ -242,12 +245,13 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()> {
-        push_field_insn!(ty, |<FE> self, dst: WireId, src: WireId| {
-            Ok(FieldInstruction::Copy { dst, src })
-        })?;
-        self.sink.update_size_hint(0)?;
-        Ok(())
+    fn copy(
+        &mut self,
+        _ty: TypeId,
+        _dst: mac_n_cheese_sieve_parser::WireRange,
+        _src: &[mac_n_cheese_sieve_parser::WireRange],
+    ) -> eyre::Result<()> {
+        unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()> {
         let src = *src;
@@ -257,23 +261,19 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        match self.lookup_type(ty)? {
-            Type::Field(field) => self.sink.needs_public_input(field, 1)?,
-            Type::Ram { .. } => eyre::bail!("No public inputs for RAM types"),
-        }
-        push_field_insn!(ty, |<FE> self, dst: WireId| {
-            Ok(FieldInstruction::GetPublicInput { dst })
-        })?;
-        self.sink.update_size_hint(1)?;
-        Ok(())
+    fn public_input(
+        &mut self,
+        _ty: TypeId,
+        _dst: mac_n_cheese_sieve_parser::WireRange,
+    ) -> eyre::Result<()> {
+        unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
-    fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        push_field_insn!(ty, |<FE> self, dst: WireId| {
-            Ok(FieldInstruction::GetWitness { dst })
-        })?;
-        self.sink.update_size_hint(1)?;
-        Ok(())
+    fn private_input(
+        &mut self,
+        _ty: TypeId,
+        _dst: mac_n_cheese_sieve_parser::WireRange,
+    ) -> eyre::Result<()> {
+        unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
         push_field_insn!(ty, |<FE> self, src: WireId| {
@@ -282,7 +282,12 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
         self.sink.update_size_hint(1)?;
         Ok(())
     }
-    fn convert(&mut self, _dst: TypedWireRange, _src: TypedWireRange) -> eyre::Result<()> {
+    fn convert(
+        &mut self,
+        _dst: TypedWireRange,
+        _src: TypedWireRange,
+        _semantics: ConversionSemantics,
+    ) -> eyre::Result<()> {
         todo!()
     }
     fn call(

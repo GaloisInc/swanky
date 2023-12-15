@@ -1,4 +1,4 @@
-// CACHE KEY 7046b74e70bbb13104595681784a919ecb149d21b2d06b06647bbeed60925992
+// CACHE KEY cc213ce9dcb0e3faa31da363e30f2c88f1b3a83b57d206efd3242763bce8fd98
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(clippy::all)]
 #![allow(unused_imports)]
@@ -211,12 +211,14 @@ pub struct DirectiveSetUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_TYPE_U: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_TYPE_U: u8 = 2;
+pub const ENUM_MAX_TYPE_U: u8 = 4;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_TYPE_U: [TypeU; 3] = [
+pub const ENUM_VALUES_TYPE_U: [TypeU; 5] = [
   TypeU::NONE,
   TypeU::Field,
+  TypeU::ExtField,
+  TypeU::Ring,
   TypeU::PluginType,
 ];
 
@@ -227,13 +229,17 @@ pub struct TypeU(pub u8);
 impl TypeU {
   pub const NONE: Self = Self(0);
   pub const Field: Self = Self(1);
-  pub const PluginType: Self = Self(2);
+  pub const ExtField: Self = Self(2);
+  pub const Ring: Self = Self(3);
+  pub const PluginType: Self = Self(4);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 2;
+  pub const ENUM_MAX: u8 = 4;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::Field,
+    Self::ExtField,
+    Self::Ring,
     Self::PluginType,
   ];
   /// Returns the variant's name or "" if unknown.
@@ -241,6 +247,8 @@ impl TypeU {
     match self {
       Self::NONE => Some("NONE"),
       Self::Field => Some("Field"),
+      Self::ExtField => Some("ExtField"),
+      Self::Ring => Some("Ring"),
       Self::PluginType => Some("PluginType"),
       _ => None,
     }
@@ -1621,6 +1629,36 @@ impl<'a> Type<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
+  pub fn element_as_ext_field(&self) -> Option<ExtField<'a>> {
+    if self.element_type() == TypeU::ExtField {
+      self.element().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { ExtField::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn element_as_ring(&self) -> Option<Ring<'a>> {
+    if self.element_type() == TypeU::Ring {
+      self.element().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { Ring::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
   pub fn element_as_plugin_type(&self) -> Option<PluginType<'a>> {
     if self.element_type() == TypeU::PluginType {
       self.element().map(|t| {
@@ -1646,6 +1684,8 @@ impl flatbuffers::Verifiable for Type<'_> {
      .visit_union::<TypeU, _>("element_type", Self::VT_ELEMENT_TYPE, "element", Self::VT_ELEMENT, false, |key, v, pos| {
         match key {
           TypeU::Field => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Field>>("TypeU::Field", pos),
+          TypeU::ExtField => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExtField>>("TypeU::ExtField", pos),
+          TypeU::Ring => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Ring>>("TypeU::Ring", pos),
           TypeU::PluginType => v.verify_union_variant::<flatbuffers::ForwardsUOffset<PluginType>>("TypeU::PluginType", pos),
           _ => Ok(()),
         }
@@ -1703,6 +1743,20 @@ impl core::fmt::Debug for Type<'_> {
       match self.element_type() {
         TypeU::Field => {
           if let Some(x) = self.element_as_field() {
+            ds.field("element", &x)
+          } else {
+            ds.field("element", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        TypeU::ExtField => {
+          if let Some(x) = self.element_as_ext_field() {
+            ds.field("element", &x)
+          } else {
+            ds.field("element", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        TypeU::Ring => {
+          if let Some(x) = self.element_as_ring() {
             ds.field("element", &x)
           } else {
             ds.field("element", &"InvalidFlatbuffer: Union discriminant does not match value.")
@@ -1817,6 +1871,234 @@ impl core::fmt::Debug for Field<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     let mut ds = f.debug_struct("Field");
       ds.field("modulo", &self.modulo());
+      ds.finish()
+  }
+}
+pub enum ExtFieldOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct ExtField<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ExtField<'a> {
+  type Inner = ExtField<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table::new(buf, loc) }
+  }
+}
+
+impl<'a> ExtField<'a> {
+  pub const VT_INDEX: flatbuffers::VOffsetT = 4;
+  pub const VT_DEGREE: flatbuffers::VOffsetT = 6;
+  pub const VT_MODULUS: flatbuffers::VOffsetT = 8;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    ExtField { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+    args: &'args ExtFieldArgs
+  ) -> flatbuffers::WIPOffset<ExtField<'bldr>> {
+    let mut builder = ExtFieldBuilder::new(_fbb);
+    builder.add_modulus(args.modulus);
+    builder.add_degree(args.degree);
+    builder.add_index(args.index);
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn index(&self) -> u8 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u8>(ExtField::VT_INDEX, Some(0)).unwrap()}
+  }
+  #[inline]
+  pub fn degree(&self) -> u64 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u64>(ExtField::VT_DEGREE, Some(0)).unwrap()}
+  }
+  #[inline]
+  pub fn modulus(&self) -> u64 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u64>(ExtField::VT_MODULUS, Some(0)).unwrap()}
+  }
+}
+
+impl flatbuffers::Verifiable for ExtField<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<u8>("index", Self::VT_INDEX, false)?
+     .visit_field::<u64>("degree", Self::VT_DEGREE, false)?
+     .visit_field::<u64>("modulus", Self::VT_MODULUS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct ExtFieldArgs {
+    pub index: u8,
+    pub degree: u64,
+    pub modulus: u64,
+}
+impl<'a> Default for ExtFieldArgs {
+  #[inline]
+  fn default() -> Self {
+    ExtFieldArgs {
+      index: 0,
+      degree: 0,
+      modulus: 0,
+    }
+  }
+}
+
+pub struct ExtFieldBuilder<'a: 'b, 'b> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> ExtFieldBuilder<'a, 'b> {
+  #[inline]
+  pub fn add_index(&mut self, index: u8) {
+    self.fbb_.push_slot::<u8>(ExtField::VT_INDEX, index, 0);
+  }
+  #[inline]
+  pub fn add_degree(&mut self, degree: u64) {
+    self.fbb_.push_slot::<u64>(ExtField::VT_DEGREE, degree, 0);
+  }
+  #[inline]
+  pub fn add_modulus(&mut self, modulus: u64) {
+    self.fbb_.push_slot::<u64>(ExtField::VT_MODULUS, modulus, 0);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ExtFieldBuilder<'a, 'b> {
+    let start = _fbb.start_table();
+    ExtFieldBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<ExtField<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for ExtField<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("ExtField");
+      ds.field("index", &self.index());
+      ds.field("degree", &self.degree());
+      ds.field("modulus", &self.modulus());
+      ds.finish()
+  }
+}
+pub enum RingOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct Ring<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Ring<'a> {
+  type Inner = Ring<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table::new(buf, loc) }
+  }
+}
+
+impl<'a> Ring<'a> {
+  pub const VT_NBITS: flatbuffers::VOffsetT = 4;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    Ring { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+    args: &'args RingArgs
+  ) -> flatbuffers::WIPOffset<Ring<'bldr>> {
+    let mut builder = RingBuilder::new(_fbb);
+    builder.add_nbits(args.nbits);
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn nbits(&self) -> u64 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u64>(Ring::VT_NBITS, Some(0)).unwrap()}
+  }
+}
+
+impl flatbuffers::Verifiable for Ring<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<u64>("nbits", Self::VT_NBITS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct RingArgs {
+    pub nbits: u64,
+}
+impl<'a> Default for RingArgs {
+  #[inline]
+  fn default() -> Self {
+    RingArgs {
+      nbits: 0,
+    }
+  }
+}
+
+pub struct RingBuilder<'a: 'b, 'b> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RingBuilder<'a, 'b> {
+  #[inline]
+  pub fn add_nbits(&mut self, nbits: u64) {
+    self.fbb_.push_slot::<u64>(Ring::VT_NBITS, nbits, 0);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> RingBuilder<'a, 'b> {
+    let start = _fbb.start_table();
+    RingBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<Ring<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for Ring<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("Ring");
+      ds.field("nbits", &self.nbits());
       ds.finish()
   }
 }
@@ -2223,11 +2505,11 @@ impl<'a> GateCopy<'a> {
   #[allow(unused_mut)]
   pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args GateCopyArgs
+    args: &'args GateCopyArgs<'args>
   ) -> flatbuffers::WIPOffset<GateCopy<'bldr>> {
     let mut builder = GateCopyBuilder::new(_fbb);
-    builder.add_in_id(args.in_id);
-    builder.add_out_id(args.out_id);
+    if let Some(x) = args.in_id { builder.add_in_id(x); }
+    if let Some(x) = args.out_id { builder.add_out_id(x); }
     builder.add_type_id(args.type_id);
     builder.finish()
   }
@@ -2241,18 +2523,18 @@ impl<'a> GateCopy<'a> {
     unsafe { self._tab.get::<u8>(GateCopy::VT_TYPE_ID, Some(0)).unwrap()}
   }
   #[inline]
-  pub fn out_id(&self) -> u64 {
+  pub fn out_id(&self) -> Option<&'a WireRange> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(GateCopy::VT_OUT_ID, Some(0)).unwrap()}
+    unsafe { self._tab.get::<WireRange>(GateCopy::VT_OUT_ID, None)}
   }
   #[inline]
-  pub fn in_id(&self) -> u64 {
+  pub fn in_id(&self) -> Option<flatbuffers::Vector<'a, WireRange>> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(GateCopy::VT_IN_ID, Some(0)).unwrap()}
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, WireRange>>>(GateCopy::VT_IN_ID, None)}
   }
 }
 
@@ -2264,24 +2546,24 @@ impl flatbuffers::Verifiable for GateCopy<'_> {
     use self::flatbuffers::Verifiable;
     v.visit_table(pos)?
      .visit_field::<u8>("type_id", Self::VT_TYPE_ID, false)?
-     .visit_field::<u64>("out_id", Self::VT_OUT_ID, false)?
-     .visit_field::<u64>("in_id", Self::VT_IN_ID, false)?
+     .visit_field::<WireRange>("out_id", Self::VT_OUT_ID, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, WireRange>>>("in_id", Self::VT_IN_ID, false)?
      .finish();
     Ok(())
   }
 }
-pub struct GateCopyArgs {
+pub struct GateCopyArgs<'a> {
     pub type_id: u8,
-    pub out_id: u64,
-    pub in_id: u64,
+    pub out_id: Option<&'a WireRange>,
+    pub in_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, WireRange>>>,
 }
-impl<'a> Default for GateCopyArgs {
+impl<'a> Default for GateCopyArgs<'a> {
   #[inline]
   fn default() -> Self {
     GateCopyArgs {
       type_id: 0,
-      out_id: 0,
-      in_id: 0,
+      out_id: None,
+      in_id: None,
     }
   }
 }
@@ -2296,12 +2578,12 @@ impl<'a: 'b, 'b> GateCopyBuilder<'a, 'b> {
     self.fbb_.push_slot::<u8>(GateCopy::VT_TYPE_ID, type_id, 0);
   }
   #[inline]
-  pub fn add_out_id(&mut self, out_id: u64) {
-    self.fbb_.push_slot::<u64>(GateCopy::VT_OUT_ID, out_id, 0);
+  pub fn add_out_id(&mut self, out_id: &WireRange) {
+    self.fbb_.push_slot_always::<&WireRange>(GateCopy::VT_OUT_ID, out_id);
   }
   #[inline]
-  pub fn add_in_id(&mut self, in_id: u64) {
-    self.fbb_.push_slot::<u64>(GateCopy::VT_IN_ID, in_id, 0);
+  pub fn add_in_id(&mut self, in_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , WireRange>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(GateCopy::VT_IN_ID, in_id);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> GateCopyBuilder<'a, 'b> {
@@ -2945,10 +3227,10 @@ impl<'a> GatePublic<'a> {
   #[allow(unused_mut)]
   pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args GatePublicArgs
+    args: &'args GatePublicArgs<'args>
   ) -> flatbuffers::WIPOffset<GatePublic<'bldr>> {
     let mut builder = GatePublicBuilder::new(_fbb);
-    builder.add_out_id(args.out_id);
+    if let Some(x) = args.out_id { builder.add_out_id(x); }
     builder.add_type_id(args.type_id);
     builder.finish()
   }
@@ -2962,11 +3244,11 @@ impl<'a> GatePublic<'a> {
     unsafe { self._tab.get::<u8>(GatePublic::VT_TYPE_ID, Some(0)).unwrap()}
   }
   #[inline]
-  pub fn out_id(&self) -> u64 {
+  pub fn out_id(&self) -> Option<&'a WireRange> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(GatePublic::VT_OUT_ID, Some(0)).unwrap()}
+    unsafe { self._tab.get::<WireRange>(GatePublic::VT_OUT_ID, None)}
   }
 }
 
@@ -2978,21 +3260,21 @@ impl flatbuffers::Verifiable for GatePublic<'_> {
     use self::flatbuffers::Verifiable;
     v.visit_table(pos)?
      .visit_field::<u8>("type_id", Self::VT_TYPE_ID, false)?
-     .visit_field::<u64>("out_id", Self::VT_OUT_ID, false)?
+     .visit_field::<WireRange>("out_id", Self::VT_OUT_ID, false)?
      .finish();
     Ok(())
   }
 }
-pub struct GatePublicArgs {
+pub struct GatePublicArgs<'a> {
     pub type_id: u8,
-    pub out_id: u64,
+    pub out_id: Option<&'a WireRange>,
 }
-impl<'a> Default for GatePublicArgs {
+impl<'a> Default for GatePublicArgs<'a> {
   #[inline]
   fn default() -> Self {
     GatePublicArgs {
       type_id: 0,
-      out_id: 0,
+      out_id: None,
     }
   }
 }
@@ -3007,8 +3289,8 @@ impl<'a: 'b, 'b> GatePublicBuilder<'a, 'b> {
     self.fbb_.push_slot::<u8>(GatePublic::VT_TYPE_ID, type_id, 0);
   }
   #[inline]
-  pub fn add_out_id(&mut self, out_id: u64) {
-    self.fbb_.push_slot::<u64>(GatePublic::VT_OUT_ID, out_id, 0);
+  pub fn add_out_id(&mut self, out_id: &WireRange) {
+    self.fbb_.push_slot_always::<&WireRange>(GatePublic::VT_OUT_ID, out_id);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> GatePublicBuilder<'a, 'b> {
@@ -3059,10 +3341,10 @@ impl<'a> GatePrivate<'a> {
   #[allow(unused_mut)]
   pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args GatePrivateArgs
+    args: &'args GatePrivateArgs<'args>
   ) -> flatbuffers::WIPOffset<GatePrivate<'bldr>> {
     let mut builder = GatePrivateBuilder::new(_fbb);
-    builder.add_out_id(args.out_id);
+    if let Some(x) = args.out_id { builder.add_out_id(x); }
     builder.add_type_id(args.type_id);
     builder.finish()
   }
@@ -3076,11 +3358,11 @@ impl<'a> GatePrivate<'a> {
     unsafe { self._tab.get::<u8>(GatePrivate::VT_TYPE_ID, Some(0)).unwrap()}
   }
   #[inline]
-  pub fn out_id(&self) -> u64 {
+  pub fn out_id(&self) -> Option<&'a WireRange> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<u64>(GatePrivate::VT_OUT_ID, Some(0)).unwrap()}
+    unsafe { self._tab.get::<WireRange>(GatePrivate::VT_OUT_ID, None)}
   }
 }
 
@@ -3092,21 +3374,21 @@ impl flatbuffers::Verifiable for GatePrivate<'_> {
     use self::flatbuffers::Verifiable;
     v.visit_table(pos)?
      .visit_field::<u8>("type_id", Self::VT_TYPE_ID, false)?
-     .visit_field::<u64>("out_id", Self::VT_OUT_ID, false)?
+     .visit_field::<WireRange>("out_id", Self::VT_OUT_ID, false)?
      .finish();
     Ok(())
   }
 }
-pub struct GatePrivateArgs {
+pub struct GatePrivateArgs<'a> {
     pub type_id: u8,
-    pub out_id: u64,
+    pub out_id: Option<&'a WireRange>,
 }
-impl<'a> Default for GatePrivateArgs {
+impl<'a> Default for GatePrivateArgs<'a> {
   #[inline]
   fn default() -> Self {
     GatePrivateArgs {
       type_id: 0,
-      out_id: 0,
+      out_id: None,
     }
   }
 }
@@ -3121,8 +3403,8 @@ impl<'a: 'b, 'b> GatePrivateBuilder<'a, 'b> {
     self.fbb_.push_slot::<u8>(GatePrivate::VT_TYPE_ID, type_id, 0);
   }
   #[inline]
-  pub fn add_out_id(&mut self, out_id: u64) {
-    self.fbb_.push_slot::<u64>(GatePrivate::VT_OUT_ID, out_id, 0);
+  pub fn add_out_id(&mut self, out_id: &WireRange) {
+    self.fbb_.push_slot_always::<&WireRange>(GatePrivate::VT_OUT_ID, out_id);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> GatePrivateBuilder<'a, 'b> {
@@ -3431,6 +3713,7 @@ impl<'a> GateConvert<'a> {
   pub const VT_IN_TYPE_ID: flatbuffers::VOffsetT = 10;
   pub const VT_IN_FIRST_ID: flatbuffers::VOffsetT = 12;
   pub const VT_IN_LAST_ID: flatbuffers::VOffsetT = 14;
+  pub const VT_MODULUS: flatbuffers::VOffsetT = 16;
 
   #[inline]
   pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -3446,6 +3729,7 @@ impl<'a> GateConvert<'a> {
     builder.add_in_first_id(args.in_first_id);
     builder.add_out_last_id(args.out_last_id);
     builder.add_out_first_id(args.out_first_id);
+    builder.add_modulus(args.modulus);
     builder.add_in_type_id(args.in_type_id);
     builder.add_out_type_id(args.out_type_id);
     builder.finish()
@@ -3494,6 +3778,13 @@ impl<'a> GateConvert<'a> {
     // which contains a valid value in this slot
     unsafe { self._tab.get::<u64>(GateConvert::VT_IN_LAST_ID, Some(0)).unwrap()}
   }
+  #[inline]
+  pub fn modulus(&self) -> bool {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<bool>(GateConvert::VT_MODULUS, Some(false)).unwrap()}
+  }
 }
 
 impl flatbuffers::Verifiable for GateConvert<'_> {
@@ -3509,6 +3800,7 @@ impl flatbuffers::Verifiable for GateConvert<'_> {
      .visit_field::<u8>("in_type_id", Self::VT_IN_TYPE_ID, false)?
      .visit_field::<u64>("in_first_id", Self::VT_IN_FIRST_ID, false)?
      .visit_field::<u64>("in_last_id", Self::VT_IN_LAST_ID, false)?
+     .visit_field::<bool>("modulus", Self::VT_MODULUS, false)?
      .finish();
     Ok(())
   }
@@ -3520,6 +3812,7 @@ pub struct GateConvertArgs {
     pub in_type_id: u8,
     pub in_first_id: u64,
     pub in_last_id: u64,
+    pub modulus: bool,
 }
 impl<'a> Default for GateConvertArgs {
   #[inline]
@@ -3531,6 +3824,7 @@ impl<'a> Default for GateConvertArgs {
       in_type_id: 0,
       in_first_id: 0,
       in_last_id: 0,
+      modulus: false,
     }
   }
 }
@@ -3565,6 +3859,10 @@ impl<'a: 'b, 'b> GateConvertBuilder<'a, 'b> {
     self.fbb_.push_slot::<u64>(GateConvert::VT_IN_LAST_ID, in_last_id, 0);
   }
   #[inline]
+  pub fn add_modulus(&mut self, modulus: bool) {
+    self.fbb_.push_slot::<bool>(GateConvert::VT_MODULUS, modulus, false);
+  }
+  #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> GateConvertBuilder<'a, 'b> {
     let start = _fbb.start_table();
     GateConvertBuilder {
@@ -3588,6 +3886,7 @@ impl core::fmt::Debug for GateConvert<'_> {
       ds.field("in_type_id", &self.in_type_id());
       ds.field("in_first_id", &self.in_first_id());
       ds.field("in_last_id", &self.in_last_id());
+      ds.field("modulus", &self.modulus());
       ds.finish()
   }
 }
