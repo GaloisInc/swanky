@@ -781,7 +781,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
 
             Copy(_, out, inp) => {
                 let mut curr_out = out.0;
-                for curr_inp_range in **inp {
+                for curr_inp_range in inp.iter() {
                     for curr_inp in curr_inp_range.0..=curr_inp_range.1 {
                         let in_wire = self.memory.get(curr_inp);
                         let out_wire = self.backend.copy(in_wire)?;
