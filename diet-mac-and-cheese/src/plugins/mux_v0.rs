@@ -458,18 +458,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 4, 14),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
-            GateM::Instance(FF0, 8),
-            GateM::Instance(FF0, 9),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
+            GateM::Witness(FF0, (0, 3)),
+            GateM::Instance(FF0, (4, 11)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(12, 12)],
@@ -524,14 +514,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 14),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
+            GateM::Witness(FF0, (0, 3)),
+            GateM::Instance(FF0, (4, 7)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(10, 10)],
@@ -578,13 +562,8 @@ mod tests {
 
         let mut gates = vec![
             GateM::New(FF0, 0, 14),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
+            GateM::Witness(FF0, (0, 3)),
+            GateM::Instance(FF0, (4, 6)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(10, 10)],
@@ -660,17 +639,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 14),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Witness(FF0, 2),
-            GateM::Witness(FF0, 3),
-            GateM::Witness(FF0, 4),
-            GateM::Witness(FF0, 5),
-            GateM::Witness(FF0, 6),
-            GateM::Witness(FF0, 7),
-            GateM::Instance(FF0, 8),
-            GateM::Instance(FF0, 9),
-            GateM::Instance(FF0, 10),
+            GateM::Witness(FF0, (0, 7)),
+            GateM::Instance(FF0, (8, 10)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(11, 11)],
@@ -725,17 +695,9 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 4, 11),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, (0, 1)),
             // NOTE: there is a gap with 2 unused wires here
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
-            GateM::Instance(FF0, 8),
-            GateM::Instance(FF0, 9),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
+            GateM::Instance(FF0, (4, 11)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(12, 14), (15, 15)],
@@ -799,20 +761,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 100),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
-            GateM::Instance(FF0, 12),
-            GateM::Instance(FF0, 13),
-            GateM::Instance(FF0, 14),
-            GateM::Instance(FF0, 15),
-            GateM::Instance(FF0, 16),
-            GateM::Instance(FF0, 17),
-            GateM::Instance(FF0, 18),
-            GateM::Instance(FF0, 19),
-            GateM::Instance(FF0, 20),
-            GateM::Instance(FF0, 21),
+            GateM::Witness(FF0, (0, 1)),
+            GateM::Instance(FF0, (10, 21)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(30, 32)],
@@ -878,17 +828,9 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 4, 11),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
+            GateM::Witness(FF0, (0, 1)),
             // NOTE: there is a gap with 2 unused wires here
-            GateM::Instance(FF0, 4),
-            GateM::Instance(FF0, 5),
-            GateM::Instance(FF0, 6),
-            GateM::Instance(FF0, 7),
-            GateM::Instance(FF0, 8),
-            GateM::Instance(FF0, 9),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
+            GateM::Instance(FF0, (4, 11)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(12, 14), (15, 15)],
@@ -952,19 +894,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 100),
-            GateM::Witness(FF0, 0),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
-            GateM::Instance(FF0, 12),
-            GateM::Instance(FF0, 13),
-            GateM::Instance(FF0, 14),
-            GateM::Instance(FF0, 15),
-            GateM::Instance(FF0, 16),
-            GateM::Instance(FF0, 17),
-            GateM::Instance(FF0, 18),
-            GateM::Instance(FF0, 19),
-            GateM::Instance(FF0, 20),
-            GateM::Instance(FF0, 21),
+            GateM::Witness(FF0, (0, 0)),
+            GateM::Instance(FF0, (10, 21)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(30, 32)],
@@ -1018,20 +949,8 @@ mod tests {
 
         let gates = vec![
             GateM::New(FF0, 0, 100),
-            GateM::Witness(FF0, 0),
-            GateM::Witness(FF0, 1),
-            GateM::Instance(FF0, 10),
-            GateM::Instance(FF0, 11),
-            GateM::Instance(FF0, 12),
-            GateM::Instance(FF0, 13),
-            GateM::Instance(FF0, 14),
-            GateM::Instance(FF0, 15),
-            GateM::Instance(FF0, 16),
-            GateM::Instance(FF0, 17),
-            GateM::Instance(FF0, 18),
-            GateM::Instance(FF0, 19),
-            GateM::Instance(FF0, 20),
-            GateM::Instance(FF0, 21),
+            GateM::Witness(FF0, (0, 1)),
+            GateM::Instance(FF0, (10, 21)),
             GateM::Call(Box::new((
                 fun_id,
                 vec![(30, 32)],

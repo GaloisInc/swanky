@@ -90,21 +90,21 @@ pub fn modulus_to_type_id(modulus: Number) -> Result<TypeId> {
     }
 }
 
-/// The polynomial modulus for [`F40b`], as a [`Number`].
-const F40B_POLYNOMIAL_MODULUS: Number = Number::from_u64(1099511627805);
-/// The polynomial modulus for [`F63b`], as a [`Number`].
-const F63B_POLYNOMIAL_MODULUS: Number = Number::from_u64(9223372036854775811);
+/// The polynomial modulus for [`F40b`], as a `u64`.
+const F40B_POLYNOMIAL_MODULUS: u64 = 1099511627805;
+/// The polynomial modulus for [`F63b`], as a `u64`.
+const F63B_POLYNOMIAL_MODULUS: u64 = 9223372036854775811;
 
 /// Map an extension field to its [`TypeId`].
 ///
 /// The extension field is specified as (1) the [`TypeId`] associated with its
 /// base field, (2) the degree of the extension field's polynomial modulus, and
-/// (3) the polynomial modulus, provided as a [`Number`] where the coefficients
+/// (3) the polynomial modulus, provided as a `u64` where the coefficients
 /// are the digits of the integer when interpreted in the base field.
 pub(crate) fn extension_field_to_type_id(
     base_field: TypeId,
     degree: u64,
-    modulus: Number,
+    modulus: u64,
 ) -> Result<TypeId> {
     ensure!(
         base_field == TypeId::of::<F2>(),

@@ -65,7 +65,10 @@ pub enum Type {
     ExtField {
         index: TypeId,
         degree: u64,
-        modulus: Number,
+        modulus: u64,
+    },
+    Ring {
+        nbits: u64,
     },
     // Ignores private/public counts in this context, but they're needed
     // for plugin function bodies
@@ -112,6 +115,7 @@ impl std::fmt::Display for Header {
                     degree,
                     modulus,
                 } => writeln!(f, "@type ext_field {index} {degree} {modulus}")?,
+                Type::Ring { nbits } => writeln!(f, "@type ring {nbits};")?,
                 Type::PluginType(PluginType {
                     name,
                     operation,
@@ -158,6 +162,16 @@ impl WireRange {
             0
         }
     }
+    pub fn as_single_wire(&self) -> eyre::Result<WireId> {
+        eyre::ensure!(
+            self.len() == 1,
+            "Expected single wire, got a range {}..={}",
+            self.start,
+            self.end
+        );
+
+        Ok(self.start)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -172,6 +186,12 @@ pub enum ValueStreamKind {
     Private,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConversionSemantics {
+    NoModulus,
+    Modulus,
+}
+
 pub trait FunctionBodyVisitor {
     fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()>;
     fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()>;
@@ -179,12 +199,17 @@ pub trait FunctionBodyVisitor {
     fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()>;
     fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()>;
     fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()>;
-    fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()>;
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()>;
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()>;
-    fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()>;
-    fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()>;
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()>;
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()>;
-    fn convert(&mut self, dst: TypedWireRange, src: TypedWireRange) -> eyre::Result<()>;
+    fn convert(
+        &mut self,
+        dst: TypedWireRange,
+        src: TypedWireRange,
+        semantics: ConversionSemantics,
+    ) -> eyre::Result<()>;
     fn call(&mut self, dst: &[WireRange], name: Identifier, args: &[WireRange])
         -> eyre::Result<()>;
 }
@@ -283,8 +308,11 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
             Self::hex(right),
         )?)
     }
-    fn copy(&mut self, ty: TypeId, dst: WireId, src: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "$0x{dst:x} <- 0x{ty:x} : $0x{src:x};")?)
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        write!(self.0, " <- 0x{ty:x} : ")?;
+        self.write_wire_ranges(src)?;
+        Ok(writeln!(self.0, ";")?)
     }
     fn constant(&mut self, ty: TypeId, dst: WireId, src: &Number) -> eyre::Result<()> {
         Ok(writeln!(
@@ -293,16 +321,23 @@ impl<T: Write> FunctionBodyVisitor for PrintingVisitor<T> {
             Self::hex(src)
         )?)
     }
-    fn public_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "$0x{dst:x} <- @public(0x{ty:x});")?)
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        Ok(writeln!(self.0, " <- @public(0x{ty:x});")?)
     }
-    fn private_input(&mut self, ty: TypeId, dst: WireId) -> eyre::Result<()> {
-        Ok(writeln!(self.0, "$0x{dst:x} <- @private(0x{ty:x});")?)
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+        self.write_wire_ranges(&[dst])?;
+        Ok(writeln!(self.0, " <- @private(0x{ty:x});")?)
     }
     fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
         Ok(writeln!(self.0, "@assert_zero(0x{ty:x} : $0x{src:x});")?)
     }
-    fn convert(&mut self, _dst: TypedWireRange, _src: TypedWireRange) -> eyre::Result<()> {
+    fn convert(
+        &mut self,
+        _dst: TypedWireRange,
+        _src: TypedWireRange,
+        _semantics: ConversionSemantics,
+    ) -> eyre::Result<()> {
         todo!()
     }
     fn call(

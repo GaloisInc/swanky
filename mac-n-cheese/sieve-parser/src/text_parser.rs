@@ -7,9 +7,9 @@ use crypto_bigint::{CheckedAdd, CheckedMul, Limb, Uint, U64};
 use eyre::{Context, ContextCompat};
 
 use crate::{
-    ConversionDescription, FunctionBodyVisitor, Header, Number, PluginBinding, PluginType,
-    PluginTypeArg, RelationVisitor, Type, TypeId, TypedCount, TypedWireRange, ValueStreamKind,
-    WireId, WireRange,
+    ConversionDescription, ConversionSemantics, FunctionBodyVisitor, Header, Number, PluginBinding,
+    PluginType, PluginTypeArg, RelationVisitor, Type, TypeId, TypedCount, TypedWireRange,
+    ValueStreamKind, WireId, WireRange,
 };
 
 #[cold]
@@ -394,13 +394,18 @@ impl<T: Read + Seek> RelationReader<T> {
                                 b"ext_field" => {
                                     let index = self.ps.u8()?;
                                     let degree = self.ps.u64()?;
-                                    let modulus = self.ps.bignum()?;
+                                    let modulus = self.ps.u64()?;
                                     self.ps.semi()?;
                                     self.header.types.push(Type::ExtField {
                                         index,
                                         degree,
                                         modulus,
                                     })
+                                }
+                                b"ring" => {
+                                    let nbits = self.ps.u64()?;
+                                    self.ps.semi()?;
+                                    self.header.types.push(Type::Ring { nbits })
                                 }
                                 _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
                             }
@@ -501,19 +506,13 @@ impl<T: Read + Seek> RelationReader<T> {
         };
         Ok(WireRange { start, end })
     }
-    fn check_wire_range_buf_single_output(wire_range_buf: &[WireRange]) -> eyre::Result<WireId> {
+    fn check_wire_range_buf_single_output(wire_range_buf: &[WireRange]) -> eyre::Result<WireRange> {
         eyre::ensure!(
             wire_range_buf.len() == 1,
-            "Expected a single wire, got {}",
+            "Expected a single wire range, got {}",
             wire_range_buf.len()
         );
-        eyre::ensure!(
-            wire_range_buf[0].start == wire_range_buf[0].end,
-            "Expected single wire, got a range {}..={}",
-            wire_range_buf[0].start,
-            wire_range_buf[0].end
-        );
-        Ok(wire_range_buf[0].start)
+        Ok(wire_range_buf[0])
     }
     fn read_directives<FBV: FunctionBodyVisitor, F>(
         &mut self,
@@ -590,7 +589,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.add(ty, dst, left, right)?;
                                 }
                                 b"mul" => {
@@ -600,7 +600,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.mul(ty, dst, left, right)?;
                                 }
                                 b"addc" => {
@@ -612,7 +613,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.addc(ty, dst, left, &right)?;
                                 }
                                 b"mulc" => {
@@ -624,7 +626,8 @@ impl<T: Read + Seek> RelationReader<T> {
                                     self.ps.expect_byte(b')')?;
                                     self.ps.semi()?;
                                     let dst =
-                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?;
+                                        Self::check_wire_range_buf_single_output(&wire_range_buf)?
+                                            .as_single_wire()?;
                                     fbv.mulc(ty, dst, left, &right)?;
                                 }
                                 b"public" => {
@@ -687,11 +690,24 @@ impl<T: Read + Seek> RelationReader<T> {
                             match self.ps.peek()? {
                                 Some(b'<') => {
                                     self.ps.expect_byte(b'<')?;
-                                    fbv.constant(ty, out, &self.ps.bignum()?)?;
+                                    fbv.constant(ty, out.as_single_wire()?, &self.ps.bignum()?)?;
                                     self.ps.expect_byte(b'>')?;
                                 }
                                 Some(b'$') => {
-                                    fbv.copy(ty, out, self.read_wire_id()?)?;
+                                    wire_range_buf.push(self.read_wire_range()?);
+                                    while self.ps.peek()? == Some(b',') {
+                                        self.ps.expect_byte(b',')?;
+                                        wire_range_buf.push(self.read_wire_range()?);
+                                    }
+                                    let num_input_wires =
+                                        wire_range_buf[1..].iter().map(|inp| inp.len()).sum();
+                                    eyre::ensure!(
+                                        out.len() == num_input_wires,
+                                        "Expected {} total input wires, got {}",
+                                        out.len(),
+                                        num_input_wires
+                                    );
+                                    fbv.copy(ty, out, &wire_range_buf[1..])?;
                                 }
                                 ch => eyre::bail!("Unexpected {ch:?}. Expected < or $"),
                             }
@@ -714,6 +730,18 @@ impl<T: Read + Seek> RelationReader<T> {
                     let src_type_id = self.ps.u8()?;
                     self.ps.colon()?;
                     let src = self.read_wire_range()?;
+                    let semantics = if let Some(b',') = self.ps.peek()? {
+                        self.ps.expect_byte(b',')?;
+                        self.ps.at()?;
+                        self.ps.token(&mut buf)?;
+                        match buf.as_slice() {
+                            b"no_modulus" => ConversionSemantics::NoModulus,
+                            b"modulus" => ConversionSemantics::Modulus,
+                            _ => eyre::bail!("unexpected token {:?}", ascii_str(&buf)),
+                        }
+                    } else {
+                        ConversionSemantics::NoModulus
+                    };
                     self.ps.expect_byte(b')')?;
                     self.ps.semi()?;
                     fbv.convert(
@@ -725,6 +753,7 @@ impl<T: Read + Seek> RelationReader<T> {
                             ty: src_type_id,
                             range: src,
                         },
+                        semantics,
                     )?;
                 }
             }

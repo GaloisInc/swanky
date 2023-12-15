@@ -62,6 +62,7 @@ table Directive {
 }
 
 // ==== Conversion ====
+// The 'count' field of these 'Count's must be > 0
 struct Conversion {
   output_count  :Count;
   input_count   :Count;
@@ -71,6 +72,7 @@ struct Conversion {
 union TypeU {
   Field,
   ExtField,
+  Ring,
   PluginType
 }
 
@@ -83,9 +85,13 @@ table Field {
 }
 
 table ExtField {
-  index   :Value;
-  degree  :Value;
-  modulus :Value;
+  index   :ubyte;
+  degree  :uint64;
+  modulus :uint64;
+}
+
+table Ring {
+  nbits   :uint64;
 }
 
 // 'name' and 'operation' must match STRING_REGEX
@@ -114,8 +120,8 @@ table GateAssertZero {
 
 table GateCopy {
   type_id  :ubyte;
-  out_id   :uint64;
-  in_id    :uint64;
+  out_id   :WireRange;
+  in_id    :[WireRange];
 }
 
 table GateAdd {
@@ -154,12 +160,12 @@ table GateMulConstant {
 
 table GatePublic {
   type_id  :ubyte;
-  out_id   :uint64;
+  out_id   :WireRange;
 }
 
 table GatePrivate {
   type_id  :ubyte;
-  out_id   :uint64;
+  out_id   :WireRange;
 }
 
 // To allocate in a contiguous space all wires between
@@ -183,6 +189,7 @@ table GateConvert {
   in_type_id    :ubyte;
   in_first_id   :uint64;
   in_last_id    :uint64;
+  modulus       :bool;
 }
 
 // ==== Function declaration ====
@@ -208,6 +215,7 @@ table PluginBody {
 
 // Declare a Function gate as a custom computation or from a plugin
 // The 'name' must match STRING_REGEX
+// The 'output_count' and 'input_count' must be > 0
 table Function {
   name          :string;
   output_count  :[Count];

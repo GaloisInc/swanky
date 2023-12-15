@@ -48,7 +48,7 @@ pub enum GateM {
     Constant(TypeId, WireId, Box<Number>),
     /// Assert that the element in [`WireId`] is zero.
     AssertZero(TypeId, WireId),
-    Copy(TypeId, WireId, WireId),
+    Copy(TypeId, WireRange, Box<Vec<WireRange>>),
     /// Adds the elements in the latter two [`WireId`]s together, storing the
     /// result in the first [`WireId`].
     Add(TypeId, WireId, WireId, WireId),
@@ -56,8 +56,8 @@ pub enum GateM {
     Mul(TypeId, WireId, WireId, WireId),
     AddConstant(TypeId, WireId, WireId, Box<Number>),
     MulConstant(TypeId, WireId, WireId, Box<Number>),
-    Instance(TypeId, WireId),
-    Witness(TypeId, WireId),
+    Instance(TypeId, WireRange),
+    Witness(TypeId, WireRange),
     /// Does field conversion.
     Conv(Box<ConvGate>),
     New(TypeId, WireId, WireId),
@@ -102,14 +102,14 @@ impl GateM {
         use GateM::*;
         match self {
             Constant(_, out, _)
-            | Copy(_, out, _)
+            | Copy(_, (_, out), _)
             | Add(_, out, _, _)
             | Sub(_, out, _, _)
             | Mul(_, out, _, _)
             | AddConstant(_, out, _, _)
             | MulConstant(_, out, _, _)
-            | Instance(_, out)
-            | Witness(_, out)
+            | Instance(_, (_, out))
+            | Witness(_, (_, out))
             | New(_, _, out)
             | Challenge(_, out) => Some(*out),
             AssertZero(_, _) | Delete(_, _, _) | Comment(_) => None,
@@ -198,6 +198,9 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                         degree,
                         modulus,
                     )?)
+                }
+                mac_n_cheese_sieve_parser::Type::Ring { .. } => {
+                    bail!("Rings not supported in Diet Mac'n'Cheese.")
                 }
                 mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
@@ -721,8 +724,24 @@ impl CircInputs {
         self.ins[type_id].pop_front()
     }
 
+    pub fn pop_instances(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
+        let mut instances = vec![];
+        for _ in 0..num {
+            instances.push(self.pop_instance(type_id)?)
+        }
+        Some(instances)
+    }
+
     pub fn pop_witness(&mut self, type_id: usize) -> Option<Number> {
         self.adjust_wit_type_idx(type_id);
         self.wit[type_id].pop_front()
+    }
+
+    pub fn pop_witnesses(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
+        let mut witnesses = vec![];
+        for _ in 0..num {
+            witnesses.push(self.pop_witness(type_id)?)
+        }
+        Some(witnesses)
     }
 }
