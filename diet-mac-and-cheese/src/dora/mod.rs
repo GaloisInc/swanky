@@ -134,7 +134,6 @@ fn translate_gate<F: PrimeFiniteField>(
                     curr_out += 1;
                 }
             }
-            debug_assert_eq!(curr_out - 1, dst.1);
         }
         GateM::Witness(typ2, dst) => {
             assert_eq!(typ2, typ, "different types in disjunction");

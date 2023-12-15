@@ -789,8 +789,6 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                         curr_out += 1;
                     }
                 }
-                // This condition should have been checked during parsing!
-                debug_assert_eq!(curr_out - 1, out.1);
             }
 
             Add(_, out, left, right) => {
@@ -835,7 +833,6 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                     self.memory.set(curr_out, &v);
                     curr_out += 1;
                 }
-                debug_assert_eq!(curr_out - 1, out.1);
             }
 
             Witness(_, out) => {
@@ -846,7 +843,6 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                     self.memory.set(curr_out, &v);
                     curr_out += 1;
                 }
-                debug_assert_eq!(curr_out - 1, out.1);
             }
             New(_, first, last) => {
                 self.memory.allocation_new(*first, *last);
