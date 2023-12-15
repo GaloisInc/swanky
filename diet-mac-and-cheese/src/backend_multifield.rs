@@ -839,7 +839,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
             }
 
             Witness(_, out) => {
-                for (i, curr_out) in (out.0..=out.1).into_iter().enumerate() {
+                for (i, curr_out) in (out.0..=out.1).enumerate() {
                     let w = witnesses
                         .as_ref()
                         .and_then(|wv| B::from_number(&wv[i]).ok());
