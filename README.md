@@ -20,6 +20,7 @@
 - **`mac-n-cheese-wire-map`**: An implementation of a sparse array
 - **`ocelot`**: A library for oblivious transfer protocols
 - **`popsicle`**: A library for private set intersection
+- **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
