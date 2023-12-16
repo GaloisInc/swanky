@@ -161,4 +161,4 @@ pub(crate) use iter_v0::IterV0;
 mod vectors_v1;
 pub(crate) use vectors_v1::VectorsV1;
 mod ram_v1;
-pub(crate) use ram_v1::{RamArithV1, RamBoolV1, RamVersion};
+pub(crate) use ram_v1::{RamArithV1, RamBoolV1, RamV1, RamVersion};

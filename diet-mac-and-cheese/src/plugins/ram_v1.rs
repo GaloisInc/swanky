@@ -20,7 +20,7 @@ pub(crate) enum RamOp {
 
 /// Description of a field-generic RAM operation execution.
 #[derive(Clone, Copy, Debug)]
-struct RamV1 {
+pub(crate) struct RamV1 {
     /// The address/value field.
     pub(crate) field_id: TypeId,
 
@@ -36,7 +36,7 @@ struct RamV1 {
 
 /// Description of a RAM operation execution, for arithmetic fields.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RamArithV1(RamV1);
+pub(crate) struct RamArithV1(pub RamV1);
 
 impl RamArithV1 {
     /// Create a new [`RamArithV1`] execution of `op` for a RAM over
@@ -53,7 +53,7 @@ impl RamArithV1 {
 
 /// Description of a RAM operation execution, for F2.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RamBoolV1(RamV1);
+pub(crate) struct RamBoolV1(pub RamV1);
 
 impl RamBoolV1 {
     /// Create a new [`RamBoolV1`] execution of `op` for a RAM over
