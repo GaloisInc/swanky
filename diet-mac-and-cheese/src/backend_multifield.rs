@@ -1676,7 +1676,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
                     self.callframe_end(func);
                 }
-                PluginExecution::Ram(_) => todo!("Implement RAM evaluation"),
+                PluginExecution::Ram(plugin) => {
+                    // No callframes: RAMs are all 'global', and RAM-typed
+                    // wires are to be thought of as (mutable) references.
+                    let type_id = plugin.type_id() as usize;
+                    self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
+                }
             },
         };
 
