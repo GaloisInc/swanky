@@ -9,7 +9,9 @@ use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
-use crate::plugins::{DisjunctionBody, PluginExecution};
+use crate::plugins::{
+    DisjunctionBody, PluginExecution, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
+};
 use crate::read_sieveir_phase2::BufRelation;
 use crate::svole_thread::{SvoleAtomic, ThreadSvole};
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
@@ -926,6 +928,24 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
             PluginExecution::Mux(plugin) => {
                 plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
             }
+            PluginExecution::Ram(plugin) => match plugin {
+                RamVersion::RamBool(RamBoolV1(RamV1 {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                }))
+                | RamVersion::RamArith(RamArithV1(RamV1 {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                })) => match op {
+                    RamOp::Init(size) => todo!("Implement RAM initialization."),
+                    RamOp::Read => todo!("Implement RAM reading."),
+                    RamOp::Write => todo!("Implement RAM writing."),
+                },
+            },
             _ => bail!("Plugin {plugin:?} is unsupported"),
         };
         Ok(())
