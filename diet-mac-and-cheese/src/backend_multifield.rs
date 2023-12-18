@@ -1034,9 +1034,10 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
 
 // V) Evaluator for multiple fields
 
-/// Evaluator for Circuit IR (a.k.a. SIEVE IR0+)
+/// Evaluator for Circuit IR (previously known as SIEVE IR0+)
 pub struct EvaluatorCirc<
     P: Party,
+    // See use of phantom for details on `C`
     C: AbstractChannel + Clone + 'static,
     SvoleF2: SvoleT<P, F2, F40b>,
 > {
@@ -1048,7 +1049,10 @@ pub struct EvaluatorCirc<
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
-    phantom: PhantomData<C>,
+    phantom: PhantomData<C>, // Storing the channel type here, is almost a convenience to prevent adding the type paramter to
+                             // a handful of functions in the `impl`, maybe a TODO to eliminate that and bring the type down to the
+                             // functions. One benefit of the refactoring is to not have to pass a dummy channel for the plaintext
+                             // evaluator
 }
 
 impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'static>
@@ -1337,9 +1341,8 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         idx: usize,
     ) -> Result<()> {
         assert!(idx == self.eval.len());
-        let back: Box<dyn EvaluatorT<P>>;
         let dmc = DietMacAndCheesePlaintext::<FE, FE>::new()?;
-        back = Box::new(EvaluatorSingle::new(dmc, false));
+        let back = Box::new(EvaluatorSingle::new(dmc, false));
         self.eval.push(back);
         Ok(())
     }
@@ -1351,8 +1354,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field F2");
             assert_eq!(idx, self.eval.len());
 
-            // Note for F2 we do not use the backend with Conv, simply dietMC
-            let dmc = DietMacAndCheesePlaintext::<F2, F40b>::new()?;
+            // For F2, it needs also an extension field backend for the permutation_check
+            let mut dmc = DietMacAndCheesePlaintext::<F2, F40b>::new()?;
+            let ext_backend = DietMacAndCheesePlaintext::<F40b, F40b>::new()?;
+            dmc.set_extfield_backend(ext_backend);
             back = Box::new(EvaluatorSingle::new(dmc, true));
             self.f2_idx = self.eval.len();
             self.eval.push(back);

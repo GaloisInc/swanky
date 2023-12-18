@@ -407,7 +407,7 @@ fn run_plaintext(args: &Cli) -> Result<()> {
 
             let mut evaluator = EvaluatorCirc::<
                 Prover,
-                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary typpe
+                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
                 Svole<_, F2, F40b>,
             >::new_plaintext(inputs, type_store)?;
             evaluator.load_backends_plaintext()?;

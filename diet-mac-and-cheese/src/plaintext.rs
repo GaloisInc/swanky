@@ -2,7 +2,7 @@ use crate::{
     backend::Monitor,
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
     backend_trait::BackendT,
-    mac::{Mac, MacT},
+    mac::{make_x_i, Mac, MacT},
     plugins::DisjunctionBody,
 };
 use eyre::{bail, Result};
@@ -13,8 +13,13 @@ use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFin
 use swanky_field_binary::{F40b, F2};
 use swanky_party::{private::ProverPrivateCopy, Party, WhichParty};
 
-pub struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> {
+/// Plaintext backend.
+pub(crate) struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> {
+    // The random generator is necessary for the random gate
     rng: AesRng,
+    // This optional backend is for the extension field necessary for lifting F2 values.
+    extfield_backend: Option<Box<DietMacAndCheesePlaintext<F40b, F40b>>>,
+    // Monitor gates
     monitor: Monitor<V>,
     phantom: PhantomData<T>,
 }
@@ -23,9 +28,14 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> DietMacAndCheesePlaintext<V, T> {
     pub fn new() -> Result<Self> {
         Ok(Self {
             rng: Default::default(),
+            extfield_backend: None,
             monitor: Monitor::default(),
             phantom: Default::default(),
         })
+    }
+
+    pub fn set_extfield_backend(&mut self, b: DietMacAndCheesePlaintext<F40b, F40b>) {
+        self.extfield_backend = Some(Box::new(b));
     }
 }
 
@@ -36,8 +46,13 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> MacT for WirePlaintext<V, T> {
     type Value = V;
     type Tag = T;
     type LiftedMac = WirePlaintext<T, T>;
-    fn lift(_xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
-        unimplemented!()
+    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
+        let mut value = T::ZERO;
+        for (i, x) in xs.iter().enumerate() {
+            let x_i: T = make_x_i::<V, T>(i);
+            value += x.0 * x_i;
+        }
+        WirePlaintext(value, PhantomData)
     }
 }
 
@@ -128,15 +143,23 @@ where
     }
 }
 
-impl<V: IsSubFieldOf<T>, T: FiniteField> BackendLiftT for DietMacAndCheesePlaintext<V, T>
-where
-    T::PrimeField: IsSubFieldOf<T>,
-    <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
-{
-    type LiftedBackend = DietMacAndCheesePlaintext<T, T>;
+impl BackendLiftT for DietMacAndCheesePlaintext<F2, F40b> {
+    type LiftedBackend = DietMacAndCheesePlaintext<F40b, F40b>;
 
     fn lift(&mut self) -> &mut Self::LiftedBackend {
-        unimplemented!()
+        if self.extfield_backend.is_some() {
+            return self.extfield_backend.as_mut().unwrap();
+        } else {
+            unimplemented!()
+        }
+    }
+}
+
+impl<F: PrimeFiniteField> BackendLiftT for DietMacAndCheesePlaintext<F, F> {
+    type LiftedBackend = DietMacAndCheesePlaintext<F, F>;
+
+    fn lift(&mut self) -> &mut Self::LiftedBackend {
+        self
     }
 }
 
@@ -146,7 +169,7 @@ impl BackendDisjunctionT for DietMacAndCheesePlaintext<F2, F40b> {
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("disjunction plugin is not sound for GF(2)")
+        unimplemented!("plaintext backend doe not support the disjunction plugin")
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
@@ -160,7 +183,7 @@ impl<F: PrimeFiniteField> BackendDisjunctionT for DietMacAndCheesePlaintext<F, F
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("disjunction plugin is not sound for GF(2)")
+        unimplemented!("plaintext backend doe not support the disjunction plugin")
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
