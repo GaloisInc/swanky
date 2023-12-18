@@ -941,9 +941,32 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                     op,
                     ..
                 })) => match op {
-                    RamOp::Init(size) => todo!("Implement RAM initialization."),
-                    RamOp::Read => todo!("Implement RAM reading."),
-                    RamOp::Write => todo!("Implement RAM writing."),
+                    RamOp::Init(size) => {
+                        debug_assert_eq!(inputs.len(), 1);
+                        debug_assert_eq!((inputs[0].1 - inputs[0].0 + 1) as usize, *value_count);
+                        debug_assert_eq!(outputs.len(), 1);
+                        debug_assert_eq!(outputs[0].1 - outputs[0].0 + 1, 1);
+
+                        todo!("Initialize a RAM state object associated with the out wire/addr count/value count.")
+                    }
+                    RamOp::Read => {
+                        debug_assert_eq!(inputs.len(), 2);
+                        debug_assert_eq!(inputs[0].0, inputs[0].1);
+                        debug_assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
+                        debug_assert_eq!(outputs.len(), 1);
+                        debug_assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
+
+                        todo!("Fetch RAM state object & perform a read on it.")
+                    }
+                    RamOp::Write => {
+                        debug_assert_eq!(inputs.len(), 3);
+                        debug_assert_eq!(inputs[0].0, inputs[0].1);
+                        debug_assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
+                        debug_assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
+                        debug_assert_eq!(outputs.len(), 0);
+
+                        todo!("Fetch RAM state object & perform a write on it.")
+                    }
                 },
             },
             _ => bail!("Plugin {plugin:?} is unsupported"),
