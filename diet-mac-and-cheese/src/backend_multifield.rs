@@ -1910,8 +1910,10 @@ pub(crate) mod tests {
     use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
+    use scuttlebutt::SyncChannel;
     use scuttlebutt::{field::F61p, AesRng, Channel};
     use std::env;
+    use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
         io::{BufReader, BufWriter},
@@ -2045,6 +2047,35 @@ pub(crate) mod tests {
         handle.join().unwrap()
     }
 
+    pub(crate) fn test_circuit_plaintext(
+        fields: Vec<Number>,
+        func_store: FunStore,
+        gates: Vec<GateM>,
+        instances: Vec<Vec<Number>>,
+        witnesses: Vec<Vec<Number>>,
+    ) -> eyre::Result<()> {
+        let type_store = TypeStore::try_from(fields.clone())?;
+
+        let mut inputs = CircInputs::default();
+
+        for (id, instances) in instances.into_iter().enumerate() {
+            inputs.ingest_instances(id, VecDeque::from(instances));
+        }
+
+        for (id, witnesses) in witnesses.into_iter().enumerate() {
+            inputs.ingest_witnesses(id, VecDeque::from(witnesses));
+        }
+
+        let mut eval = EvaluatorCirc::<
+            Prover,
+            SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
+            Svole<_, _, _>,
+        >::new_plaintext(inputs, type_store)?;
+        eval.load_backends_plaintext()?;
+        eval.evaluate_gates(&gates, &func_store)?;
+        eyre::Result::Ok(())
+    }
+
     fn test_conv_00() {
         // Test simple conversion from F61p to F2
         let fields = vec![F61P_MODULUS, F2_MODULUS];
@@ -2150,6 +2181,31 @@ pub(crate) mod tests {
         let witnesses = vec![vec![three::<F61p>()], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    // Same as `test_conv_field_to_binary` but with plaintext evaluator
+    fn test_conv_field_to_binary_plaintext() {
+        // Test conversion from F61p to a vec of F2
+        // 3 bit decomposition is 11000 on 5 bits, 00011
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
+        let func_store = FunStore::default();
+
+        let gates = vec![
+            GateM::Witness(FF0, wr(0)),
+            GateM::Conv(Box::new((FF1, (1, 5), FF0, wr(0)))),
+            GateM::AssertZero(FF1, 1),
+            GateM::AssertZero(FF1, 2),
+            GateM::AssertZero(FF1, 3),
+            GateM::AddConstant(FF1, 6, 4, Box::from(one::<F2>())),
+            GateM::AddConstant(FF1, 7, 5, Box::from(one::<F2>())),
+            GateM::AssertZero(FF1, 6),
+            GateM::AssertZero(FF1, 7),
+        ];
+
+        let instances = vec![vec![], vec![]];
+        let witnesses = vec![vec![three::<F61p>()], vec![]];
+
+        test_circuit_plaintext(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_publics() {
@@ -2373,6 +2429,50 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    fn test4_simple_fun_plaintext() {
+        // tests the simplest function
+
+        let fields = vec![F61P_MODULUS];
+        let mut func_store = FunStore::default();
+
+        let gates_func = vec![GateM::Add(FF0, 0, 2, 4), GateM::Add(FF0, 1, 3, 5)];
+
+        let mut func = FuncDecl::new_function(
+            gates_func,
+            vec![(FF0, 1), (FF0, 1)],
+            vec![(FF0, 2), (FF0, 2)],
+        );
+
+        // The following instruction disable the vector optimization
+        func.compiled_info.body_max = None;
+
+        let fun_id = func_store.insert("myadd".into(), func).unwrap();
+
+        let gates = vec![
+            GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
+            GateM::Witness(FF0, (0, 3)),
+            GateM::Call(Box::new((
+                fun_id,
+                vec![(4, 4), (5, 5)],
+                vec![(0, 1), (2, 3)],
+            ))),
+            GateM::Add(FF0, 6, 4, 5),
+            GateM::AddConstant(
+                FF0,
+                7,
+                6,
+                Box::from((-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int()),
+            ),
+            GateM::AssertZero(FF0, 7),
+        ];
+
+        let one = one::<F61p>();
+        let instances = vec![vec![], vec![], vec![], vec![]];
+        let witnesses = vec![vec![one, one, one, one], vec![], vec![], vec![]];
+
+        test_circuit_plaintext(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
     fn test5_simple_fun_with_vec() {
         // tests the simplest function with vec
 
@@ -2486,6 +2586,7 @@ pub(crate) mod tests {
         test_conv_02_twoway();
         test_conv_binary_to_field();
         test_conv_field_to_binary();
+        test_conv_field_to_binary_plaintext();
         test_conv_publics();
         test_conv_shift();
     }
@@ -2498,6 +2599,7 @@ pub(crate) mod tests {
     #[test]
     fn test_func() {
         test4_simple_fun();
+        test4_simple_fun_plaintext();
         test5_simple_fun_with_vec();
         test6_fun_slice_and_unallocated()
     }

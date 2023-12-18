@@ -174,23 +174,19 @@ impl Plugin for PermutationCheckV1 {
 mod tests {
     use super::PermutationCheckV1;
     use crate::{
-        backend_multifield::tests::test_circuit,
+        backend_multifield::tests::{test_circuit, test_circuit_plaintext},
         circuit_ir::{FunStore, FuncDecl, GateM, TypeStore},
-        fields::F61P_MODULUS,
+        fields::{F2_MODULUS, F61P_MODULUS},
         plugins::Plugin,
     };
     use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use rand::seq::SliceRandom;
     use scuttlebutt::AesRng;
     use swanky_field::PrimeFiniteField;
+    use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
 
-    fn test_permutation<F: PrimeFiniteField>(
-        ntuples: u64,
-        tuple_size: u64,
-        modulus: Number,
-        is_good: bool,
-    ) {
+    fn create_gates(ntuples: u64, tuple_size: u64, modulus: Number) -> (FunStore, Vec<GateM>) {
         let total = ntuples * tuple_size;
         let fields = vec![modulus];
         let mut fun_store = FunStore::default();
@@ -219,6 +215,18 @@ mod tests {
             vec![(0, total - 1), (total, 2 * total - 1)],
         ))));
 
+        (fun_store, gates)
+    }
+
+    fn test_permutation<F: PrimeFiniteField>(
+        ntuples: u64,
+        tuple_size: u64,
+        modulus: Number,
+        is_good: bool,
+    ) {
+        let fields = vec![modulus];
+        let (fun_store, gates) = create_gates(ntuples, tuple_size, modulus);
+
         let mut rng = AesRng::new();
         let mut v: Vec<Vec<Number>> = (0..ntuples)
             .map(|_| {
@@ -236,6 +244,44 @@ mod tests {
         }
 
         let result = test_circuit(fields, fun_store, gates, vec![instances], vec![witnesses]);
+        if is_good {
+            assert!(result.is_ok());
+        } else {
+            assert!(result.is_err());
+        }
+    }
+
+    // This is similar to `test_permutation` but using the plaintext evaluator and specialized for F2
+    fn test_permutation_binary_plaintext<F: PrimeFiniteField>(
+        ntuples: u64,
+        tuple_size: u64,
+        modulus: Number,
+        is_good: bool,
+    ) {
+        let fields = vec![modulus];
+        let (fun_store, gates) = create_gates(ntuples, tuple_size, modulus);
+
+        let mut rng = AesRng::new();
+        let mut v: Vec<Vec<F>> = (0..ntuples)
+            .map(|_| (0..tuple_size).map(|_| F::random(&mut rng)).collect())
+            .collect();
+
+        let witnesses: Vec<Number> = v
+            .clone()
+            .into_iter()
+            .flatten()
+            .map(|x| x.into_int())
+            .collect();
+        v.shuffle(&mut rng);
+        let mut copy_v: Vec<F> = v.into_iter().flatten().collect();
+        if !is_good {
+            copy_v[0] = F::ONE - copy_v[0]; // take the negative value instead of random, so that it works for binary
+        }
+
+        let instances: Vec<Number> = copy_v.into_iter().map(|x| x.into_int()).collect();
+
+        let result =
+            test_circuit_plaintext(fields, fun_store, gates, vec![instances], vec![witnesses]);
         if is_good {
             assert!(result.is_ok());
         } else {
@@ -271,5 +317,17 @@ mod tests {
     #[test]
     fn bad_permutation_of_ten_tuples_of_length_five_fails() {
         test_permutation::<F61p>(10, 5, F61P_MODULUS, false);
+    }
+
+    #[test]
+    fn permutation_of_ten_elements_plaintext_works() {
+        test_permutation_binary_plaintext::<F2>(10, 1, F2_MODULUS, true);
+        test_permutation_binary_plaintext::<F61p>(10, 1, F61P_MODULUS, true);
+    }
+
+    #[test]
+    fn permutation_of_ten_elements_plaintext_fails() {
+        test_permutation_binary_plaintext::<F2>(10, 1, F2_MODULUS, false);
+        test_permutation_binary_plaintext::<F61p>(10, 1, F61P_MODULUS, false);
     }
 }
