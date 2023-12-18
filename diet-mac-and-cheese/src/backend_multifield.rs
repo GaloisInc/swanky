@@ -126,16 +126,6 @@ impl<
     }
 }
 
-impl<P: Party, T: PrimeFiniteField, C: AbstractChannel + Clone, SVOLE: SvoleT<P, T, T>> BackendLiftT
-    for DietMacAndCheese<P, T, T, C, SVOLE>
-{
-    type LiftedBackend = Self;
-
-    fn lift(&mut self) -> &mut Self::LiftedBackend {
-        self
-    }
-}
-
 pub trait BackendDisjunctionT: BackendT {
     // finalize the disjunctions, by running the final Dora checks
     fn finalize_disj(&mut self) -> Result<()>;
