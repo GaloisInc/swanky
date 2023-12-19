@@ -1039,7 +1039,6 @@ pub struct EvaluatorCirc<
     fcom_f2: Option<FCom<P, F2, F40b, SvoleF2>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
-    f2_idx: usize,
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
@@ -1075,7 +1074,6 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             fcom_f2: Some(fcom_f2),
             type_store,
             eval: Vec::new(),
-            f2_idx: 42,
             rng,
             multithreaded_voles: vec![],
             no_batching,
@@ -1089,7 +1087,6 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             fcom_f2: None,
             type_store,
             eval: Vec::new(),
-            f2_idx: 42,
             rng: AesRng::new(),
             multithreaded_voles: vec![],
             no_batching: false, // unused
@@ -1136,7 +1133,6 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 fcom_f2: Some(fcom_f2),
                 type_store,
                 eval: Vec::new(),
-                f2_idx: 42,
                 rng,
                 multithreaded_voles: vec![Box::new(svole_atomic3)],
                 no_batching,
@@ -1228,7 +1224,6 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 self.no_batching,
             )?;
             back = Box::new(EvaluatorSingle::new(dmc, true));
-            self.f2_idx = self.eval.len();
             self.eval.push(back);
             Ok(())
         } else if field == std::any::TypeId::of::<F61p>() {
@@ -1352,7 +1347,6 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             let ext_backend = DietMacAndCheesePlaintext::<F40b, F40b>::new()?;
             dmc.set_extfield_backend(ext_backend);
             back = Box::new(EvaluatorSingle::new(dmc, true));
-            self.f2_idx = self.eval.len();
             self.eval.push(back);
             Ok(())
         } else if field == std::any::TypeId::of::<F61p>() {
@@ -1413,7 +1407,6 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
         };
-        self.f2_idx = self.eval.len();
         self.eval.push(back);
         Ok(())
     }
