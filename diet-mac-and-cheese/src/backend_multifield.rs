@@ -1008,7 +1008,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                     op,
                     ..
                 })) => match op {
-                    RamOp::Init(size) => {
+                    RamOp::Init(_size) => {
                         debug_assert_eq!(inputs.len(), 1);
                         debug_assert_eq!((inputs[0].1 - inputs[0].0 + 1) as usize, *value_count);
                         debug_assert_eq!(outputs.len(), 1);
