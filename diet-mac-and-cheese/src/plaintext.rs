@@ -169,7 +169,7 @@ impl BackendDisjunctionT for DietMacAndCheesePlaintext<F2, F40b> {
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("plaintext backend doe not support the disjunction plugin")
+        unimplemented!("The plaintext backend does not support the disjunction plugin")
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
@@ -183,7 +183,7 @@ impl<F: PrimeFiniteField> BackendDisjunctionT for DietMacAndCheesePlaintext<F, F
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("plaintext backend doe not support the disjunction plugin")
+        unimplemented!("The plaintext backend does not support the disjunction plugin")
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
@@ -231,13 +231,14 @@ impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintex
                 v = Vec::with_capacity(bits.len());
                 for b in bits {
                     let b2 = F2::from(b);
-                    let bmac = Mac::new(ProverPrivateCopy::new(b2), F40b::ZERO);
+                    let dummy_tag = F40b::ZERO;
+                    let bmac = Mac::new(ProverPrivateCopy::new(b2), dummy_tag);
                     v.push(bmac);
                 }
             }
             WhichParty::Verifier(_) => {
                 panic!(
-                    "calling plaintext evaluator conversion on a Verifier party instead of Prover"
+                    "calling plaintext evaluator conversion to bits on a Verifier party instead of Prover"
                 );
             }
         }
@@ -245,31 +246,25 @@ impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintex
     }
 
     fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        let mut power_twos = ProverPrivateCopy::new(F::ONE);
-        let mut recomposed_value = ProverPrivateCopy::new(F::ZERO);
+        let mut power_twos = F::ONE;
+        let mut recomposed_value = F::ZERO;
 
-        let mut bits = Vec::with_capacity(x.len());
-
-        for m in x {
-            if let WhichParty::Prover(ev) = P::WHICH {
-                *recomposed_value.as_mut().into_inner(ev) += (if m.value().into_inner(ev) == F2::ONE
-                {
+        if let WhichParty::Prover(ev) = P::WHICH {
+            for m in x {
+                recomposed_value += (if m.value().into_inner(ev) == F2::ONE {
                     F::ONE
                 } else {
                     F::ZERO
-                }) * power_twos.into_inner(ev);
-                power_twos
-                    .as_mut()
-                    .map(|power_twos| *power_twos += *power_twos);
+                }) * power_twos;
+                power_twos += power_twos;
             }
-
-            bits.push(*m);
+        } else {
+            panic!(
+                "calling plaintext evaluator conversion from bits on a Verifier party instead of Prover"
+            );
         }
 
-        let mac = self.input_private(match P::WHICH {
-            WhichParty::Prover(ev) => Some(recomposed_value.into_inner(ev)),
-            WhichParty::Verifier(_) => None,
-        })?;
+        let mac = self.input_private(Some(recomposed_value))?; // `Some` because the plaintext is the prover.
 
         Ok(mac)
     }
