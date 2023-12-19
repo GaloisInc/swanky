@@ -1,3 +1,5 @@
+//! Plaintext backend.
+
 use crate::{
     backend::Monitor,
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
@@ -13,19 +15,33 @@ use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFin
 use swanky_field_binary::{F40b, F2};
 use swanky_party::{private::ProverPrivateCopy, Party, WhichParty};
 
-/// Plaintext backend.
+// This file provides an implementation of the Plaintext backend.
+// `DietMacAndCheePlaintext<V,T>` is the main struct for this backend.
+// It may be instantiated for any supported field <V> with its associated tag field <T>.
+// Note that for the plaintext evaluator the tag field is usually ignored but a necessity to satisfy the
+// current architecture focusing on the ZK backend based on VOLE.
+// The struct `DietMacAndCheePlaintext<V,T>` implements the following traits (necessary for toplevel multifield evaluator `EvaluatorCirc`):
+//   * `BackendT` for the basic gates functions add/mul/check_zero etc.
+//   * `BackendConvT` for converting functions from the field to binary
+//   * `BackendLiftT` for lifting values to the tag field
+//   * `BackendDisjT`, not supported
+//
+// Another key structure is `WirePlaintext<V, T>` that holds a `V` value and phatom second value for `T`.
+
 pub(crate) struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> {
     // The random generator is necessary for the random gate
     rng: AesRng,
-    // This optional backend is for the extension field necessary for lifting F2 values.
+    // This optional backend is for the extension field associated to the binary field.
+    // It is necessary for lifting `F2` values to its tag extension field `F40b`.
     extfield_backend: Option<Box<DietMacAndCheesePlaintext<F40b, F40b>>>,
     // Monitor gates
     monitor: Monitor<V>,
+    // The Tag field is not used
     phantom: PhantomData<T>,
 }
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> DietMacAndCheesePlaintext<V, T> {
-    pub fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         Ok(Self {
             rng: Default::default(),
             extfield_backend: None,
@@ -34,13 +50,14 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> DietMacAndCheesePlaintext<V, T> {
         })
     }
 
-    pub fn set_extfield_backend(&mut self, b: DietMacAndCheesePlaintext<F40b, F40b>) {
+    /// For the `F2` boolean backend this function stores the extension field backend.
+    pub(crate) fn set_extfield_backend(&mut self, b: DietMacAndCheesePlaintext<F40b, F40b>) {
         self.extfield_backend = Some(Box::new(b));
     }
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-pub struct WirePlaintext<V: IsSubFieldOf<T>, T: FiniteField>(V, PhantomData<T>);
+pub(crate) struct WirePlaintext<V: IsSubFieldOf<T>, T: FiniteField>(V, PhantomData<T>);
 
 impl<V: IsSubFieldOf<T>, T: FiniteField> MacT for WirePlaintext<V, T> {
     type Value = V;

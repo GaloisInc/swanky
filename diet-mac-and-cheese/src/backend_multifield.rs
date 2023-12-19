@@ -1032,6 +1032,10 @@ pub struct EvaluatorCirc<
     SvoleF2: SvoleT<P, F2, F40b>,
 > {
     inputs: CircInputs,
+    // Fcom F2 functionality shared between the F2 backend and for field switching.
+    // This is an optional to allow using none in the plaintext mode.
+    // NOTE: If not in plaintext mode, in the current implementation it is always used,
+    // which could be a TODO to only use it if an F2 backend is necessary or if any field switching is used.
     fcom_f2: Option<FCom<P, F2, F40b, SvoleF2>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
@@ -1040,9 +1044,8 @@ pub struct EvaluatorCirc<
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
     phantom: PhantomData<C>, // Storing the channel type here, is almost a convenience to prevent adding the type paramter to
-                             // a handful of functions in the `impl`, maybe a TODO to eliminate that and bring the type down to the
-                             // functions. One benefit of the refactoring is to not have to pass a dummy channel for the plaintext
-                             // evaluator
+                             // a handful of functions in the `impl`, maybe a TODO to eliminate the phatom and bring the type down to the
+                             // functions. One benefit would be to not have to pass a dummy channel for the plaintext mode
 }
 
 impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'static>
@@ -1089,7 +1092,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             f2_idx: 42,
             rng: AesRng::new(),
             multithreaded_voles: vec![],
-            no_batching: false,
+            no_batching: false, // unused
             phantom: PhantomData,
         })
     }
@@ -1215,7 +1218,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 lpn_extend = LPN_EXTEND_MEDIUM;
             }
 
-            // Note for F2 we do not use the backend with Conv, simply dietMC
+            // Note for F2 we do not use the backend with Conv but the one that can lift values to its extension field
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
                 channel,
                 rng,
@@ -1344,7 +1347,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field F2");
             assert_eq!(idx, self.eval.len());
 
-            // For F2, it needs also an extension field backend for the permutation_check
+            // For F2, it requires the extension field backend for the permutation_check
             let mut dmc = DietMacAndCheesePlaintext::<F2, F40b>::new()?;
             let ext_backend = DietMacAndCheesePlaintext::<F40b, F40b>::new()?;
             dmc.set_extfield_backend(ext_backend);

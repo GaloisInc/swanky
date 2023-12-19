@@ -669,6 +669,7 @@ fn run(args: &Cli) -> Result<()> {
     info!("threads:    {:?}", config.threads());
 
     if args.plaintext {
+        // when running in plaintext mode, the `config` is ignored
         return run_plaintext(args);
     }
 
