@@ -734,6 +734,73 @@ trait EvaluatorT<P: Party> {
     fn finalize(&mut self) -> Result<()>;
 }
 
+/// An [`EvaluatorT`] for types that don't actually need to implement evaluation.
+///
+/// In particular, this can be used for plugin-defined types, such as RAM, that
+/// are actually evaluated in the context of the address/value field. This is
+/// necessary due to the dynamic dispatch approach of Diet Mac'n'Cheese, which
+/// requires that all types used in a circuit provide a backend for evaluation,
+/// even if that backend will never be invoked.
+///
+/// Note that all `EvaluatorT` methods for this type `panic!` to reflect the
+/// above-described use-case.
+struct EvaluatorDummy;
+
+impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
+    fn evaluate_gate(
+        &mut self,
+        _gate: &GateM,
+        _instances: Option<Vec<Number>>,
+        _witnesses: Option<Vec<Number>>,
+    ) -> Result<()> {
+        unimplemented!("EvaluatorDummy cannot evaluate gates.")
+    }
+
+    fn conv_gate_get(&mut self, _gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>> {
+        unimplemented!("EvaluatorDummy cannot convert between field types.")
+    }
+
+    fn conv_gate_set(&mut self, _gate: &ConvGate, _bits: &[Mac<P, F2, F40b>]) -> Result<()> {
+        unimplemented!("EvaluatorDummy cannot convert between field types.")
+    }
+
+    fn plugin_call_gate(
+        &mut self,
+        _outputs: &[WireRange],
+        _inputs: &[WireRange],
+        _plugin: &PluginExecution,
+    ) -> Result<()> {
+        unimplemented!("EvaluatorDummy cannot evaluate plugin calls.")
+    }
+
+    fn push_frame(&mut self, _compiled_info: &CompiledInfo) {
+        unimplemented!("EvaluatorDummy cannot push stack frames.")
+    }
+
+    fn pop_frame(&mut self) {
+        unimplemented!("EvaluatorDummy cannot pop stack frames.")
+    }
+
+    fn allocate_new(&mut self, _first_id: WireId, _last_id: WireId) {
+        unimplemented!("EvaluatorDummy cannot allocate wire memory.")
+    }
+
+    fn allocate_slice(
+        &mut self,
+        _src_first: WireId,
+        _src_last: WireId,
+        _start: WireId,
+        _count: WireId,
+        _allow_allocation: bool,
+    ) {
+        unimplemented!("EvaluatorDummy cannot allocate wire memory.")
+    }
+
+    fn finalize(&mut self) -> Result<()> {
+        unimplemented!("EvaluatorDummy cannot be finalized.")
+    }
+}
+
 /// A circuit evaluator for a single [`BackendT`].
 ///
 /// The evaluator uses [`BackendT`] to evaluate the circuit, and uses `Memory`
