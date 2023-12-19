@@ -129,19 +129,11 @@ pub(crate) struct Cli {
     incrementing the port number to match the number of threads.")]
     pub connection_addr: String,
 
-    /// Text format for instance/witness/relation
+    /// Activate text format for instance/witness/relation (otherwise default is flatbuffer)
     #[arg(long)]
     pub text: bool,
 
-    /// instance path
-    #[clap(long)]
-    pub instance: PathBuf,
-
-    /// relation path
-    #[clap(long)]
-    pub relation: PathBuf,
-
-    /// plaintext evaluator
+    /// Activate plaintext evaluation mode
     #[clap(default_value_t = false, short, long)]
     pub plaintext: bool,
 
@@ -155,6 +147,14 @@ pub(crate) struct Cli {
     - threads = ${}
     ", LpnSize::default(), DEFAULT_NO_BATCHING, DEFAULT_THREADS))]
     pub config: Option<PathBuf>,
+
+    /// instance path
+    #[clap(long)]
+    pub instance: PathBuf,
+
+    /// relation path
+    #[clap(long)]
+    pub relation: PathBuf,
 
     /// witness path
     #[clap(long)]
