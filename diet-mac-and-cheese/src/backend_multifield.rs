@@ -2149,6 +2149,25 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    // Same as `test_conv_binary_to_field()` but with plaintext backend
+    fn test_conv_binary_to_field_plaintext() {
+        // Test conversion from 2 bits to F61p
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
+        let func_store = FunStore::default();
+
+        let gates = vec![
+            GateM::Witness(FF1, (0, 1)),
+            GateM::Conv(Box::new((FF0, wr(3), FF1, (0, 1)))),
+            GateM::AddConstant(FF0, 4, 3, Box::from(minus_three::<F61p>())),
+            GateM::AssertZero(FF0, 4),
+        ];
+
+        let instances = vec![vec![], vec![]];
+        let witnesses = vec![vec![], vec![one::<F2>(), one::<F2>()]];
+
+        test_circuit_plaintext(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
     fn test_conv_field_to_binary() {
         // Test conversion from F61p to a vec of F2
         // 3 bit decomposition is 11000 on 5 bits, 00011
@@ -2576,9 +2595,14 @@ pub(crate) mod tests {
         test_conv_02_twoway();
         test_conv_binary_to_field();
         test_conv_field_to_binary();
-        test_conv_field_to_binary_plaintext();
         test_conv_publics();
         test_conv_shift();
+    }
+
+    #[test]
+    fn test_multifield_conv_plaintext() {
+        test_conv_binary_to_field_plaintext();
+        test_conv_field_to_binary_plaintext();
     }
 
     #[test]
