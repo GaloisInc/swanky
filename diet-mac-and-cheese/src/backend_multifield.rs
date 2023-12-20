@@ -9,6 +9,7 @@ use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
+use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
 use crate::svole_thread::{SvoleAtomic, ThreadSvole};
@@ -117,16 +118,6 @@ impl<
         SVOLE1: SvoleT<P, F2, F40b>,
         SVOLE2: SvoleT<P, T, T>,
     > BackendLiftT for DietMacAndCheeseConv<P, T, C, SVOLE1, SVOLE2>
-{
-    type LiftedBackend = Self;
-
-    fn lift(&mut self) -> &mut Self::LiftedBackend {
-        self
-    }
-}
-
-impl<P: Party, T: PrimeFiniteField, C: AbstractChannel + Clone, SVOLE: SvoleT<P, T, T>> BackendLiftT
-    for DietMacAndCheese<P, T, T, C, SVOLE>
 {
     type LiftedBackend = Self;
 
@@ -1033,21 +1024,27 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
 
 // V) Evaluator for multiple fields
 
-/// Evaluator for Circuit IR (a.k.a. SIEVE IR0+)
+/// Evaluator for Circuit IR (previously known as SIEVE IR0+)
 pub struct EvaluatorCirc<
     P: Party,
+    // See use of phantom for details on `C`
     C: AbstractChannel + Clone + 'static,
     SvoleF2: SvoleT<P, F2, F40b>,
 > {
     inputs: CircInputs,
-    fcom_f2: FCom<P, F2, F40b, SvoleF2>,
+    // Fcom F2 functionality shared between the F2 backend and for field switching.
+    // This is an optional to allow using none in the plaintext mode.
+    // NOTE: If not in plaintext mode, in the current implementation it is always used,
+    // which could be a TODO to only use it if an F2 backend is necessary or if any field switching is used.
+    fcom_f2: Option<FCom<P, F2, F40b, SvoleF2>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
-    f2_idx: usize,
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
     no_batching: bool,
-    phantom: PhantomData<C>,
+    phantom: PhantomData<C>, // Storing the channel type here, is almost a convenience to prevent adding the type paramter to
+                             // a handful of functions in the `impl`, maybe a TODO to eliminate the phatom and bring the type down to the
+                             // functions. One benefit would be to not have to pass a dummy channel for the plaintext mode
 }
 
 impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'static>
@@ -1074,13 +1071,25 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
 
         Ok(EvaluatorCirc {
             inputs,
-            fcom_f2,
+            fcom_f2: Some(fcom_f2),
             type_store,
             eval: Vec::new(),
-            f2_idx: 42,
             rng,
             multithreaded_voles: vec![],
             no_batching,
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn new_plaintext(inputs: CircInputs, type_store: TypeStore) -> Result<Self> {
+        Ok(EvaluatorCirc {
+            inputs,
+            fcom_f2: None,
+            type_store,
+            eval: Vec::new(),
+            rng: AesRng::new(),
+            multithreaded_voles: vec![],
+            no_batching: false, // unused
             phantom: PhantomData,
         })
     }
@@ -1121,10 +1130,9 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         Ok((
             EvaluatorCirc {
                 inputs,
-                fcom_f2,
+                fcom_f2: Some(fcom_f2),
                 type_store,
                 eval: Vec::new(),
-                f2_idx: 42,
                 rng,
                 multithreaded_voles: vec![Box::new(svole_atomic3)],
                 no_batching,
@@ -1173,7 +1181,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         let dmc = DietMacAndCheeseConv::<P, FE, _, _, Svole<_, FE, FE>>::init(
             channel,
             rng,
-            &self.fcom_f2,
+            self.fcom_f2.as_ref().unwrap(),
             lpn_setup,
             lpn_extend,
             self.no_batching,
@@ -1206,17 +1214,16 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 lpn_extend = LPN_EXTEND_MEDIUM;
             }
 
-            // Note for F2 we do not use the backend with Conv, simply dietMC
+            // Note for F2 we do not use the backend with Conv but the one that can lift values to its extension field
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
                 channel,
                 rng,
-                &self.fcom_f2,
+                self.fcom_f2.as_ref().unwrap(),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,
             )?;
             back = Box::new(EvaluatorSingle::new(dmc, true));
-            self.f2_idx = self.eval.len();
             self.eval.push(back);
             Ok(())
         } else if field == std::any::TypeId::of::<F61p>() {
@@ -1302,6 +1309,75 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         }
     }
 
+    pub fn load_backends_plaintext(&mut self) -> Result<()> {
+        let type_store = self.type_store.clone();
+        for (idx, spec) in type_store.iter() {
+            match spec {
+                TypeSpecification::Field(field) => {
+                    self.load_backend_plaintext(*field, *idx as usize)?;
+                }
+                _ => {
+                    bail!("Type not supported yet: {:?}", spec);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn load_backend_fe_plaintext<FE: PrimeFiniteField + StatisticallySecureField>(
+        &mut self,
+        idx: usize,
+    ) -> Result<()> {
+        assert!(idx == self.eval.len());
+        let dmc = DietMacAndCheesePlaintext::<FE, FE>::new()?;
+        let back = Box::new(EvaluatorSingle::new(dmc, false));
+        self.eval.push(back);
+        Ok(())
+    }
+
+    pub fn load_backend_plaintext(&mut self, field: std::any::TypeId, idx: usize) -> Result<()> {
+        // Loading the backends in order
+        let back: Box<dyn EvaluatorT<P>>;
+        if field == std::any::TypeId::of::<F2>() {
+            info!("loading field F2");
+            assert_eq!(idx, self.eval.len());
+
+            // For F2, it requires the extension field backend for the permutation_check
+            let mut dmc = DietMacAndCheesePlaintext::<F2, F40b>::new()?;
+            let ext_backend = DietMacAndCheesePlaintext::<F40b, F40b>::new()?;
+            dmc.set_extfield_backend(ext_backend);
+            back = Box::new(EvaluatorSingle::new(dmc, true));
+            self.eval.push(back);
+            Ok(())
+        } else if field == std::any::TypeId::of::<F61p>() {
+            info!("loading field F61p");
+            self.load_backend_fe_plaintext::<F61p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F128p>() {
+            info!("loading field F128p");
+            self.load_backend_fe_plaintext::<F128p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<Secp256k1>() {
+            info!("loading field Secp256k1");
+            self.load_backend_fe_plaintext::<Secp256k1>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<Secp256k1order>() {
+            info!("loading field Secp256k1order");
+            self.load_backend_fe_plaintext::<Secp256k1order>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F384p>() {
+            info!("loading field F384p");
+            self.load_backend_fe_plaintext::<F384p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F384q>() {
+            info!("loading field F384q");
+            self.load_backend_fe_plaintext::<F384q>(idx)?;
+            Ok(())
+        } else {
+            bail!("Unknown or unsupported field {:?}", field);
+        }
+    }
+
     fn load_backend_multithreaded_f2(
         &mut self,
         channel: &mut C,
@@ -1324,14 +1400,13 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b,F40b>>::init_with_fcom(
                 channel,
                 rng,
-                &self.fcom_f2,
+                self.fcom_f2.as_ref().unwrap(),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
         };
-        self.f2_idx = self.eval.len();
         self.eval.push(back);
         Ok(())
     }
@@ -1382,7 +1457,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomic<P, FE, FE>>::init_with_svole(
                 channel,
                 rng,
-                &self.fcom_f2,
+                self.fcom_f2.as_ref().unwrap(),
                 svole_atomic2,
                 self.no_batching,
             )?;
@@ -1821,8 +1896,10 @@ pub(crate) mod tests {
     use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
+    use scuttlebutt::SyncChannel;
     use scuttlebutt::{field::F61p, AesRng, Channel};
     use std::env;
+    use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
         io::{BufReader, BufWriter},
@@ -1956,6 +2033,35 @@ pub(crate) mod tests {
         handle.join().unwrap()
     }
 
+    pub(crate) fn test_circuit_plaintext(
+        fields: Vec<Number>,
+        func_store: FunStore,
+        gates: Vec<GateM>,
+        instances: Vec<Vec<Number>>,
+        witnesses: Vec<Vec<Number>>,
+    ) -> eyre::Result<()> {
+        let type_store = TypeStore::try_from(fields.clone())?;
+
+        let mut inputs = CircInputs::default();
+
+        for (id, instances) in instances.into_iter().enumerate() {
+            inputs.ingest_instances(id, VecDeque::from(instances));
+        }
+
+        for (id, witnesses) in witnesses.into_iter().enumerate() {
+            inputs.ingest_witnesses(id, VecDeque::from(witnesses));
+        }
+
+        let mut eval = EvaluatorCirc::<
+            Prover,
+            SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
+            Svole<_, _, _>,
+        >::new_plaintext(inputs, type_store)?;
+        eval.load_backends_plaintext()?;
+        eval.evaluate_gates(&gates, &func_store)?;
+        eyre::Result::Ok(())
+    }
+
     fn test_conv_00() {
         // Test simple conversion from F61p to F2
         let fields = vec![F61P_MODULUS, F2_MODULUS];
@@ -2039,6 +2145,25 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    // Same as `test_conv_binary_to_field()` but with plaintext backend
+    fn test_conv_binary_to_field_plaintext() {
+        // Test conversion from 2 bits to F61p
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
+        let func_store = FunStore::default();
+
+        let gates = vec![
+            GateM::Witness(FF1, (0, 1)),
+            GateM::Conv(Box::new((FF0, wr(3), FF1, (0, 1)))),
+            GateM::AddConstant(FF0, 4, 3, Box::from(minus_three::<F61p>())),
+            GateM::AssertZero(FF0, 4),
+        ];
+
+        let instances = vec![vec![], vec![]];
+        let witnesses = vec![vec![], vec![one::<F2>(), one::<F2>()]];
+
+        test_circuit_plaintext(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
     fn test_conv_field_to_binary() {
         // Test conversion from F61p to a vec of F2
         // 3 bit decomposition is 11000 on 5 bits, 00011
@@ -2061,6 +2186,31 @@ pub(crate) mod tests {
         let witnesses = vec![vec![three::<F61p>()], vec![]];
 
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
+    // Same as `test_conv_field_to_binary` but with plaintext evaluator
+    fn test_conv_field_to_binary_plaintext() {
+        // Test conversion from F61p to a vec of F2
+        // 3 bit decomposition is 11000 on 5 bits, 00011
+        let fields = vec![F61P_MODULUS, F2_MODULUS];
+        let func_store = FunStore::default();
+
+        let gates = vec![
+            GateM::Witness(FF0, wr(0)),
+            GateM::Conv(Box::new((FF1, (1, 5), FF0, wr(0)))),
+            GateM::AssertZero(FF1, 1),
+            GateM::AssertZero(FF1, 2),
+            GateM::AssertZero(FF1, 3),
+            GateM::AddConstant(FF1, 6, 4, Box::from(one::<F2>())),
+            GateM::AddConstant(FF1, 7, 5, Box::from(one::<F2>())),
+            GateM::AssertZero(FF1, 6),
+            GateM::AssertZero(FF1, 7),
+        ];
+
+        let instances = vec![vec![], vec![]];
+        let witnesses = vec![vec![three::<F61p>()], vec![]];
+
+        test_circuit_plaintext(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
     fn test_conv_publics() {
@@ -2284,6 +2434,50 @@ pub(crate) mod tests {
         test_circuit(fields, func_store, gates, instances, witnesses).unwrap();
     }
 
+    fn test4_simple_fun_plaintext() {
+        // tests the simplest function
+
+        let fields = vec![F61P_MODULUS];
+        let mut func_store = FunStore::default();
+
+        let gates_func = vec![GateM::Add(FF0, 0, 2, 4), GateM::Add(FF0, 1, 3, 5)];
+
+        let mut func = FuncDecl::new_function(
+            gates_func,
+            vec![(FF0, 1), (FF0, 1)],
+            vec![(FF0, 2), (FF0, 2)],
+        );
+
+        // The following instruction disable the vector optimization
+        func.compiled_info.body_max = None;
+
+        let fun_id = func_store.insert("myadd".into(), func).unwrap();
+
+        let gates = vec![
+            GateM::New(FF0, 0, 7), // TODO: Test when not all the New is done
+            GateM::Witness(FF0, (0, 3)),
+            GateM::Call(Box::new((
+                fun_id,
+                vec![(4, 4), (5, 5)],
+                vec![(0, 1), (2, 3)],
+            ))),
+            GateM::Add(FF0, 6, 4, 5),
+            GateM::AddConstant(
+                FF0,
+                7,
+                6,
+                Box::from((-(F61p::ONE + F61p::ONE + F61p::ONE + F61p::ONE)).into_int()),
+            ),
+            GateM::AssertZero(FF0, 7),
+        ];
+
+        let one = one::<F61p>();
+        let instances = vec![vec![], vec![], vec![], vec![]];
+        let witnesses = vec![vec![one, one, one, one], vec![], vec![], vec![]];
+
+        test_circuit_plaintext(fields, func_store, gates, instances, witnesses).unwrap();
+    }
+
     fn test5_simple_fun_with_vec() {
         // tests the simplest function with vec
 
@@ -2402,6 +2596,12 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn test_multifield_conv_plaintext() {
+        test_conv_binary_to_field_plaintext();
+        test_conv_field_to_binary_plaintext();
+    }
+
+    #[test]
     fn test_multifield_ff_secp256() {
         test_conv_ff_5();
     }
@@ -2409,6 +2609,7 @@ pub(crate) mod tests {
     #[test]
     fn test_func() {
         test4_simple_fun();
+        test4_simple_fun_plaintext();
         test5_simple_fun_with_vec();
         test6_fun_slice_and_unallocated()
     }

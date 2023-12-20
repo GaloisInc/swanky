@@ -7,7 +7,7 @@ use subtle::{Choice, ConditionallySelectable};
 use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover};
 
-fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
+pub(crate) fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
     v[i] = V::ONE;
     T::from_subfield(&v)

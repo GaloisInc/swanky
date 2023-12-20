@@ -15,8 +15,8 @@ supported, and `〜` denotes partially supported.
 | ------------------- | :--------: | --------------- |
 | extended-arithmetic |    `✘`     |                 |
 | iter                |    `✔`     |                 |
-| permutation-check   |    `〜`    | Arithmetic only |
-| mux                 |    `〜`    | Boolean only    |
+| permutation-check   |    `✔`     |                 |
+| mux                 |    `✔`     |                 |
 | ram                 |    `✘`     |                 |
 | vectors             |    `✔`     |                 |
 
@@ -116,6 +116,14 @@ about which part of the circuit is failing. This is done by setting the paramete
 
 Note that it has a significant impact on performance by introducing a round of communication per `check_zero` gate.
 
+
+## Plaintext evaluation
+
+`dietmc` provides a mode for plaintext evaluation using the flag `--plaintext`:
+```bash
+cargo run --bin dietmc --release -- --instance <PATH>/*.sieve --relation <PATH>/*.sieve \
+  --witness <PATH>/*.sieve --plaintext
+```
 
 ## Compile flatbuffer sieveir
 
