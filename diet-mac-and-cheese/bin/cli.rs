@@ -129,11 +129,11 @@ pub(crate) struct Cli {
     incrementing the port number to match the number of threads.")]
     pub connection_addr: String,
 
-    /// Activate text format for instance/witness/relation (otherwise default is flatbuffer)
+    /// Read circuit files in text format, rather than flatbuffers.
     #[arg(long)]
     pub text: bool,
 
-    /// Activate plaintext evaluation mode
+    /// Evaluate circuits in the clear, instead of in ZK.
     #[clap(default_value_t = false, short, long)]
     pub plaintext: bool,
 
