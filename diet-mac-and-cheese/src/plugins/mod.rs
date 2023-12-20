@@ -4,12 +4,9 @@ use mac_n_cheese_sieve_parser::PluginTypeArg;
 
 #[derive(Clone, Debug)]
 pub struct PluginType {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    operation: String,
-    #[allow(dead_code)]
-    params: Vec<PluginTypeArg>,
+    pub name: String,
+    pub operation: String,
+    pub params: Vec<PluginTypeArg>,
 }
 
 impl PluginType {

@@ -11,7 +11,7 @@ use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
-    DisjunctionBody, PluginExecution, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
+    DisjunctionBody, PluginExecution, PluginType, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
 };
 use crate::read_sieveir_phase2::BufRelation;
 use crate::svole_thread::{SvoleAtomic, ThreadSvole};
@@ -28,7 +28,7 @@ use eyre::{bail, ensure, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use mac_n_cheese_sieve_parser::Number;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
@@ -1260,12 +1260,86 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 TypeSpecification::Field(field) => {
                     self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
                 }
-                _ => {
-                    bail!("Type not supported yet: {:?}", spec);
-                }
+                TypeSpecification::Plugin(PluginType {
+                    name,
+                    operation,
+                    params,
+                }) => self.load_backend_plugin(&type_store, name, operation, params)?,
             }
         }
         Ok(())
+    }
+
+    fn load_backend_plugin(
+        &mut self,
+        type_store: &TypeStore,
+        name: &str,
+        operation: &str,
+        params: &[PluginTypeArg],
+    ) -> Result<()> {
+        match name {
+            "ram_bool_v1" => match operation {
+                "ram" => {
+                    ensure!(
+                        params.len() == 3,
+                        "Boolean RAM types must specify three parameters, but {} were given",
+                        params.len()
+                    );
+
+                    // Validate type index refers to F2
+                    let PluginTypeArg::Number(field_id) = params[0] else {
+                        bail!("The Boolean RAM type expects a number as its first parameter, but a string was found")
+                    };
+                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
+                    else {
+                        bail!("The first Boolean RAM type parameter must refer to a field")
+                    };
+                    ensure!(
+                        field_rust_id == std::any::TypeId::of::<F2>(),
+                        "Boolean RAMs only support Boolean addresses/values"
+                    );
+
+                    // Just check that the other parameters are numeric
+                    if let PluginTypeArg::String(_) = params[1] {
+                        bail!("The Boolean RAM type expects a number as its second parameter, but a string was found")
+                    }
+
+                    if let PluginTypeArg::String(_) = params[2] {
+                        bail!("The Boolean RAM type expects a number as its third parameter, but a string was found")
+                    }
+
+                    self.eval.push(Box::new(EvaluatorDummy));
+
+                    Ok(())
+                }
+                _ => bail!("{} is not a type defined by {}", operation, name),
+            },
+            "ram_arith_v1" => match operation {
+                "ram" => {
+                    ensure!(
+                        params.len() == 1,
+                        "Arithmetic RAM types must specify one parameter, but {} were given",
+                        params.len()
+                    );
+
+                    // Validate type index refers to a field
+                    let PluginTypeArg::Number(field_id) = params[0] else {
+                        bail!("The arithmetic RAM type expects a number as its first parameter, but a string was found")
+                    };
+                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
+                        bail!("The first arithmetic RAM type parameter must refer to a field")
+                    }
+
+                    self.eval.push(Box::new(EvaluatorDummy));
+
+                    Ok(())
+                }
+                _ => bail!("{} is not a type defined by {}", operation, name),
+            },
+            _ => bail!("Plugin type not supported yet: {}:{}", name, operation),
+        }
     }
 
     // All of these parameters are required to load a backend
@@ -1698,9 +1772,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                         bail!("no more channel available to load a backend");
                     }
                 }
-                _ => {
-                    todo!("Type not supported yet: {:?}", spec);
-                }
+                TypeSpecification::Plugin(PluginType {
+                    name,
+                    operation,
+                    params,
+                }) => self.load_backend_plugin(&type_store, name, operation, params)?,
             }
         }
         Ok(handles)
