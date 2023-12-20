@@ -129,17 +129,13 @@ pub(crate) struct Cli {
     incrementing the port number to match the number of threads.")]
     pub connection_addr: String,
 
-    /// Text format for instance/witness/relation
+    /// Read circuit files in text format, rather than flatbuffers.
     #[arg(long)]
     pub text: bool,
 
-    /// instance path
-    #[clap(long)]
-    pub instance: PathBuf,
-
-    /// relation path
-    #[clap(long)]
-    pub relation: PathBuf,
+    /// Evaluate circuits in the clear, instead of in ZK.
+    #[clap(default_value_t = false, short, long)]
+    pub plaintext: bool,
 
     /// Config file for internal options.
     #[clap(long, help = format!("\
@@ -151,6 +147,14 @@ pub(crate) struct Cli {
     - threads = ${}
     ", LpnSize::default(), DEFAULT_NO_BATCHING, DEFAULT_THREADS))]
     pub config: Option<PathBuf>,
+
+    /// instance path
+    #[clap(long)]
+    pub instance: PathBuf,
+
+    /// relation path
+    #[clap(long)]
+    pub relation: PathBuf,
 
     /// witness path
     #[clap(long)]

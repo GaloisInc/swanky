@@ -389,6 +389,47 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     Ok(())
 }
 
+fn run_plaintext(args: &Cli) -> Result<()> {
+    let start = Instant::now();
+    let (inputs, type_store) = if args.text {
+        build_inputs_types_text(args)?
+    } else {
+        build_inputs_flatbuffers(args)?
+    };
+    info!("time reading ins/wit/rel: {:?}", start.elapsed());
+
+    let relation_path = args.relation.clone();
+    match args.witness {
+        None => {
+            eyre::bail!("Plaintext evaluation requires a witness to be provided.");
+        }
+        Some(_) => {
+            // Prover mode
+            let start = Instant::now();
+
+            let mut evaluator = EvaluatorCirc::<
+                Prover,
+                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
+                Svole<_, F2, F40b>,
+            >::new_plaintext(inputs, type_store)?;
+            evaluator.load_backends_plaintext()?;
+            info!("init time: {:?}", start.elapsed());
+            let start = Instant::now();
+
+            if args.text {
+                let relation_file = File::open(relation_path)?;
+                let relation_reader = BufReader::new(relation_file);
+                evaluator.evaluate_relation_text(relation_reader)?;
+            } else {
+                evaluator.evaluate_relation(&relation_path)?;
+            }
+            evaluator.terminate()?;
+            info!("time circ exec: {:?}", start.elapsed());
+        }
+    }
+    Ok(())
+}
+
 // Run with relation in flatbuffers format
 fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
     let start = Instant::now();
@@ -628,6 +669,11 @@ fn run(args: &Cli) -> Result<()> {
     info!("instance:   {:?}", args.instance);
     info!("text fmt:   {:?}", args.text);
     info!("threads:    {:?}", config.threads());
+
+    if args.plaintext {
+        // when running in plaintext mode, the `config` is ignored
+        return run_plaintext(args);
+    }
 
     if args.text {
         if config.threads() == 1 {
