@@ -2,7 +2,10 @@ use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use std::io::{Read, Seek};
 
-use crate::parameters::FIELD_SIZE;
+use crate::{
+    parameters::{self, FIELD_SIZE},
+    witness_counter::ExtendedWitnessCounter,
+};
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
@@ -12,7 +15,22 @@ impl Proof {
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
     pub fn prove<T: Read + Seek>(circuit: &mut T) -> Result<Self> {
         let reader = RelationReader::new(circuit)?;
-        Self::validate_circuit_header(reader)?;
+        Self::validate_circuit_header(&reader)?;
+
+        // Check the circuit for the number of extended-witness-contributing gates
+        let mut extended_witness_counter = ExtendedWitnessCounter::default();
+        reader.read(&mut extended_witness_counter)?;
+        println!(
+            "The extended witness size is {}",
+            extended_witness_counter.count()
+        );
+
+        // Get the number of VOLEs by adding extended witness count to r * tau
+        println!(
+            "The total number of required VOLEs is {}",
+            extended_witness_counter.count()
+                + parameters::VOLE_SIZE_PARAM * parameters::REPETITION_PARAM
+        );
 
         todo!()
     }
@@ -26,7 +44,7 @@ impl Proof {
     /// - Must not allow any plugins
     /// - Must not allow any conversions
     /// - Must not allow any types other than $`\mathbb F_2`$
-    fn validate_circuit_header<T: Read + Seek>(circuit_reader: RelationReader<T>) -> Result<()> {
+    fn validate_circuit_header<T: Read + Seek>(circuit_reader: &RelationReader<T>) -> Result<()> {
         let header = circuit_reader.header();
         if !header.plugins.is_empty() {
             bail!("Invalid circuit: VOLE-in-the-head does not support any plugins")
@@ -49,6 +67,8 @@ impl Proof {
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+
+    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 
     use crate::Proof;
 
@@ -98,8 +118,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not yet implemented")]
-    fn tiny_header_works() {
+    fn tiny_header_works() -> eyre::Result<()> {
         let tiny_header = "version 2.0.0;
             circuit;
             @type field 2;
@@ -107,9 +126,8 @@ mod tests {
             @end ";
         let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
 
-        // The failure mode here will need to change once we actually do something in `prove`.
-        // The panic we expect indicates that we got past the circuit validation method.
-        let result = Proof::prove(tiny_header_cursor);
-        assert!(result.is_ok());
+        let reader = RelationReader::new(tiny_header_cursor)?;
+        assert!(Proof::validate_circuit_header(&reader).is_ok());
+        Ok(())
     }
 }
