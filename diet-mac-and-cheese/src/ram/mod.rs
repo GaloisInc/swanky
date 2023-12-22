@@ -1,5 +1,8 @@
 mod perm;
+mod protocol;
 mod tx;
+
+use protocol::DoraRam;
 
 pub trait MemorySpace<V> {
     type Addr: AsRef<[V]>;
