@@ -26,6 +26,8 @@ pub mod plaintext;
 #[allow(dead_code)] // because, well, it's not used yet.
 mod dora;
 
+mod ram;
+
 pub mod edabits;
 pub mod fields;
 pub mod homcom;
