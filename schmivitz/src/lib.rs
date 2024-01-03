@@ -18,3 +18,6 @@
 
 #[allow(unused)]
 pub mod parameters;
+mod proof;
+
+pub use proof::Proof;

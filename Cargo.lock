@@ -2176,6 +2176,11 @@ dependencies = [
 [[package]]
 name = "schmivitz"
 version = "0.5.0"
+dependencies = [
+ "eyre",
+ "mac-n-cheese-sieve-parser",
+ "swanky-field-binary",
+]
 
 [[package]]
 name = "scopeguard"
