@@ -241,9 +241,10 @@ where
         self.cache.borrow_mut().invalidate();
     }
 
-    fn remove(&mut self, id: WireId) -> usize {
+    // remove a slice in the pool whose first wire is `id`. When `id` is present it returns how many wires were in the slice.
+    fn remove(&mut self, id: WireId) -> Option<usize> {
         self.cache.borrow_mut().invalidate();
-        self.pool.remove(&id).unwrap().len()
+        self.pool.remove(&id).map(|v| v.len())
     }
 }
 
@@ -805,7 +806,19 @@ where
             let mut remaining = last - first + 1;
             let mut curr = first;
             loop {
-                let how_many: WireId = frame.memframe_pool.remove(curr).try_into().unwrap();
+                // first we attempt to remove in the pool and if it is not present there then
+                // we attempt removing it in the unallocated wires.
+                let attempt_remove_in_pool_first = frame.memframe_pool.remove(curr);
+                let how_many = if let Some(n) = attempt_remove_in_pool_first {
+                    n.try_into().unwrap()
+                } else {
+                    let t = frame.memframe_unallocated.remove(&curr);
+                    if t.is_some() {
+                        1
+                    } else {
+                        panic!("cannot find wire to delete in either pool of allocated or unallocated wires");
+                    }
+                };
                 debug_assert!(how_many <= remaining);
                 remaining -= how_many;
                 curr += how_many;
