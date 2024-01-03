@@ -933,6 +933,27 @@ mod tests {
         mem.allocation_delete(11, 23);
     }
 
+    fn test_memory2() {
+        // testing delete of two implicitly allocated wires succeeds.
+        let mut mem = Memory::<char>::new();
+
+        mem.set(1, &'a');
+        mem.set(2, &'b');
+
+        mem.allocation_delete(1, 2);
+    }
+
+    fn test_memory3() {
+        // testing delete of explicit allocation and one implicit.
+        let mut mem = Memory::<char>::new();
+
+        mem.allocation_new(100, 120);
+        mem.set(121, &'b');
+        mem.allocation_new(122, 140);
+
+        mem.allocation_delete(100, 140);
+    }
+
     #[test]
     fn test_cache() {
         test_cache1();
@@ -942,5 +963,7 @@ mod tests {
     #[test]
     fn test_memory() {
         test_memory1();
+        test_memory2();
+        test_memory3();
     }
 }
