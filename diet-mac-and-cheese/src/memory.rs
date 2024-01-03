@@ -919,6 +919,7 @@ mod tests {
         assert!(!pool.present(0));
     }
 
+    #[test]
     fn test_memory_delete_spans_multiple_range() {
         // testing new and delete of spanning wire ranges.
         let mut mem = Memory::<char>::new();
@@ -933,6 +934,7 @@ mod tests {
         mem.allocation_delete(11, 23);
     }
 
+    #[test]
     fn test_memory_delete_implicit_allocation() {
         // testing delete of two implicitly allocated wires succeeds.
         let mut mem = Memory::<char>::new();
@@ -943,6 +945,7 @@ mod tests {
         mem.allocation_delete(1, 2);
     }
 
+    #[test]
     fn test_memory_delete_explicit_and_implicit() {
         // testing delete of explicit allocation and one implicit.
         let mut mem = Memory::<char>::new();
@@ -958,12 +961,5 @@ mod tests {
     fn test_cache() {
         test_cache1();
         test_cache2();
-    }
-
-    #[test]
-    fn test_memory() {
-        test_memory_delete_spans_multiple_range();
-        test_memory_delete_implicit_allocation();
-        test_memory_delete_explicit_and_implicit();
     }
 }
