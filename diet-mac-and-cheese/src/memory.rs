@@ -817,7 +817,10 @@ where
                         1
                     }
                 };
-                debug_assert!(how_many <= remaining);
+                assert!(
+                    how_many <= remaining,
+                    "attempt to delete more wires than requested, "
+                );
                 remaining -= how_many;
                 curr += how_many;
                 if remaining == 0 {
