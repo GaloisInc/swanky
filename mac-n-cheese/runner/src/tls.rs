@@ -71,10 +71,11 @@ pub fn initiate_tls<P: Party>(
             File::open(root_cas)
                 .with_context(|| format!("Unable to open root CA file {:?}", root_cas))?,
         );
-        tls_root_store.add_parsable_certificates(
-            &rustls_pemfile::certs(&mut f)
-                .with_context(|| format!("Unable to read root CAs from file {:?}", root_cas))?,
-        );
+        for cert in rustls_pemfile::certs(&mut f) {
+            let cert =
+                cert.with_context(|| format!("Unable to read root CAs from file {:?}", root_cas))?;
+            tls_root_store.add(cert).context("Adding root CA")?;
+        }
         tls_root_store
     };
     let (tls_certs, tls_private_key) = {
@@ -83,18 +84,16 @@ pub fn initiate_tls<P: Party>(
                 .with_context(|| format!("Unable to open TLS cert file {:?}", tls_cert))?,
         );
         let mut tls_certs: Vec<_> = Default::default();
-        let mut key = None;
-        for x in rustls_pemfile::read_all(&mut f)
-            .with_context(|| format!("Unable to read TLS cert file {:?}", tls_cert))?
-            .into_iter()
-        {
+        let mut key: Option<rustls::pki_types::PrivateKeyDer> = None;
+        for x in rustls_pemfile::read_all(&mut f) {
+            let x = x.with_context(|| format!("Unable to read TLS cert file {:?}", tls_cert))?;
             match x {
-                rustls_pemfile::Item::X509Certificate(c) => tls_certs.push(rustls::Certificate(c)),
-                rustls_pemfile::Item::RSAKey(k) => {
-                    key = Some(k);
+                rustls_pemfile::Item::X509Certificate(c) => tls_certs.push(c),
+                rustls_pemfile::Item::Pkcs1Key(k) => {
+                    key = Some(k.into());
                 }
-                rustls_pemfile::Item::PKCS8Key(k) => {
-                    key = Some(k);
+                rustls_pemfile::Item::Pkcs8Key(k) => {
+                    key = Some(k.into());
                 }
                 _ => {
                     // Ignore unknown entries.
@@ -102,23 +101,22 @@ pub fn initiate_tls<P: Party>(
             }
         }
         if let Some(key) = key {
-            (tls_certs, rustls::PrivateKey(key))
+            (tls_certs, key)
         } else {
             eyre::bail!("No private key found in {:?}", tls_cert);
         }
     };
     Ok(match P::WHICH {
         WhichParty::Prover(e) => {
-            let tls_config = rustls::ServerConfig::builder()
-                .with_cipher_suites(&[rustls::cipher_suite::TLS13_AES_128_GCM_SHA256])
-                .with_safe_default_kx_groups()
-                .with_protocol_versions(&[&rustls::version::TLS13])
-                .expect("building rustls server config")
-                .with_client_cert_verifier(Arc::new(
-                    rustls::server::AllowAnyAuthenticatedClient::new(tls_root_store),
-                ))
-                .with_single_cert(tls_certs, tls_private_key)
-                .context("building rustls client config")?;
+            let tls_config =
+                rustls::ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+                    .with_client_cert_verifier(
+                        rustls::server::WebPkiClientVerifier::builder(Arc::new(tls_root_store))
+                            .build()
+                            .context("Building client cert validator")?,
+                    )
+                    .with_single_cert(tls_certs, tls_private_key)
+                    .context("building rustls client config")?;
             let listener = TcpListener::bind(address)
                 .with_context(|| format!("Tcp binding to {:?}", address))?;
             eprintln!("Waiting for connection on {address:?}");
@@ -188,14 +186,11 @@ pub fn initiate_tls<P: Party>(
             )
         }
         WhichParty::Verifier(e) => {
-            let tls_config = rustls::ClientConfig::builder()
-                .with_cipher_suites(&[rustls::cipher_suite::TLS13_AES_128_GCM_SHA256])
-                .with_safe_default_kx_groups()
-                .with_protocol_versions(&[&rustls::version::TLS13])
-                .expect("building rustls ClientConfig")
-                .with_root_certificates(tls_root_store)
-                .with_client_auth_cert(tls_certs, tls_private_key)
-                .context("building rustls client config")?;
+            let tls_config =
+                rustls::ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+                    .with_root_certificates(tls_root_store)
+                    .with_client_auth_cert(tls_certs, tls_private_key)
+                    .context("building rustls client config")?;
             let tls_root_conn = rustls::ClientConnection::new(
                 Arc::new(tls_config),
                 PURPORTED_TLS_HOST_NAME.try_into().unwrap(),
