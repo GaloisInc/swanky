@@ -806,17 +806,15 @@ where
             let mut remaining = last - first + 1;
             let mut curr = first;
             loop {
-                // first we attempt to remove in the pool and if it is not present there then
-                // we attempt removing it in the unallocated wires.
-                let attempt_remove_in_pool_first = frame.memframe_pool.remove(curr);
-                let how_many = if let Some(n) = attempt_remove_in_pool_first {
-                    n.try_into().unwrap()
-                } else {
-                    let t = frame.memframe_unallocated.remove(&curr);
-                    if t.is_some() {
+                // First we attempt to remove in the pool...
+                let how_many = match frame.memframe_pool.remove(curr) {
+                    Some(num_removed) => num_removed.try_into().unwrap(),
+                    None => {
+                        // ...if it is not present there then we attempt removing it in the unallocated wires.
+                        frame.memframe_unallocated.remove(&curr)
+                             .expect("cannot find wire to delete in either pool of allocated or unallocated wires");
+                        // Anything removed from this pool accounts for exactly one wire
                         1
-                    } else {
-                        panic!("cannot find wire to delete in either pool of allocated or unallocated wires");
                     }
                 };
                 debug_assert!(how_many <= remaining);
