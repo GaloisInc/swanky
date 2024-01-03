@@ -16,7 +16,11 @@ version.workspace = true
 eyre.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 merlin.workspace = true
+swanky-field.workspace = true
 swanky-field-binary.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
 
 [lints]
 workspace = true

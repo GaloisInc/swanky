@@ -1,10 +1,13 @@
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
-use std::io::{Read, Seek};
+use std::{
+    io::{Read, Seek},
+    path::Path,
+};
 
 use crate::{
     parameters::{self, FIELD_SIZE},
-    witness_counter::ExtendedWitnessCounter,
+    witness_counter::VoleCircuitPreparer,
 };
 
 /// Zero-knowledge proof of knowledge of a circuit.
@@ -13,12 +16,12 @@ pub struct Proof {}
 
 impl Proof {
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove<T: Read + Seek>(circuit: &mut T) -> Result<Self> {
+    pub fn prove<T: Read + Seek>(circuit: &mut T, private_input: &Path) -> Result<Self> {
         let reader = RelationReader::new(circuit)?;
         Self::validate_circuit_header(&reader)?;
 
         // Check the circuit for the number of extended-witness-contributing gates
-        let mut extended_witness_counter = ExtendedWitnessCounter::default();
+        let mut extended_witness_counter = VoleCircuitPreparer::new_from_path(private_input)?;
         reader.read(&mut extended_witness_counter)?;
         println!(
             "The extended witness size is {}",
@@ -29,7 +32,7 @@ impl Proof {
         println!(
             "The total number of required VOLEs is {}",
             extended_witness_counter.count()
-                + parameters::VOLE_SIZE_PARAM * parameters::REPETITION_PARAM
+                + (parameters::VOLE_SIZE_PARAM * parameters::REPETITION_PARAM) as u64
         );
 
         todo!()
@@ -81,7 +84,8 @@ mod tests {
             @begin
             @end ";
         let plugin_cursor = &mut Cursor::new(plugin.as_bytes());
-        assert!(Proof::prove(plugin_cursor).is_err());
+        let reader = RelationReader::new(plugin_cursor).unwrap();
+        assert!(Proof::validate_circuit_header(&reader).is_err());
     }
 
     #[test]
@@ -94,7 +98,8 @@ mod tests {
             @begin
             @end ";
         let conversion_cursor = &mut Cursor::new(trivial_conversion.as_bytes());
-        assert!(Proof::prove(conversion_cursor).is_err());
+        let reader = RelationReader::new(conversion_cursor).unwrap();
+        assert!(Proof::validate_circuit_header(&reader).is_err());
     }
 
     #[test]
@@ -105,7 +110,8 @@ mod tests {
             @begin
             @end ";
         let big_field_cursor = &mut Cursor::new(big_field.as_bytes());
-        assert!(Proof::prove(big_field_cursor).is_err());
+        let reader = RelationReader::new(big_field_cursor).unwrap();
+        assert!(Proof::validate_circuit_header(&reader).is_err());
 
         let extra_field = "version 2.0.0;
             circuit;
@@ -114,7 +120,8 @@ mod tests {
             @begin
             @end ";
         let extra_field_cursor = &mut Cursor::new(extra_field.as_bytes());
-        assert!(Proof::prove(extra_field_cursor).is_err());
+        let reader = RelationReader::new(extra_field_cursor).unwrap();
+        assert!(Proof::validate_circuit_header(&reader).is_err());
     }
 
     #[test]
@@ -125,7 +132,6 @@ mod tests {
             @begin
             @end ";
         let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
-
         let reader = RelationReader::new(tiny_header_cursor)?;
         assert!(Proof::validate_circuit_header(&reader).is_ok());
         Ok(())
