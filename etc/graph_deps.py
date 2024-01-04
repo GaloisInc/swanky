@@ -5,7 +5,7 @@ import click
 from etc import ROOT
 
 
-def cargo_depgraph():
+def cargo_depgraph() -> str:
     return subprocess.check_output(
         [
             "cargo",
