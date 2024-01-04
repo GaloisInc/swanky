@@ -48,6 +48,7 @@ from etc.new_crate import new_crate
 from etc.readme import readme
 from etc.upgrades import upgrade_deps
 from vectoreyes.cmd import vectoreyes
+from etc.graph_deps import graph_deps
 
 main.add_command(ci)
 main.add_command(fmt)
@@ -57,3 +58,4 @@ main.add_command(new_crate)
 main.add_command(readme)
 main.add_command(upgrade_deps)
 main.add_command(vectoreyes)
+main.add_command(graph_deps)
