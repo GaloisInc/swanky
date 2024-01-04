@@ -241,9 +241,10 @@ where
         self.cache.borrow_mut().invalidate();
     }
 
-    fn remove(&mut self, id: WireId) -> usize {
+    // remove a slice in the pool whose first wire is `id`. When `id` is present it returns how many wires were in the slice.
+    fn remove(&mut self, id: WireId) -> Option<usize> {
         self.cache.borrow_mut().invalidate();
-        self.pool.remove(&id).unwrap().len()
+        self.pool.remove(&id).map(|v| v.len())
     }
 }
 
@@ -805,8 +806,21 @@ where
             let mut remaining = last - first + 1;
             let mut curr = first;
             loop {
-                let how_many: WireId = frame.memframe_pool.remove(curr).try_into().unwrap();
-                debug_assert!(how_many <= remaining);
+                // First we attempt to remove in the pool...
+                let how_many = match frame.memframe_pool.remove(curr) {
+                    Some(num_removed) => num_removed.try_into().unwrap(),
+                    None => {
+                        // ...if it is not present there then we attempt removing it in the unallocated wires.
+                        frame.memframe_unallocated.remove(&curr)
+                             .expect("cannot find wire to delete in either pool of allocated or unallocated wires");
+                        // Anything removed from this pool accounts for exactly one wire
+                        1
+                    }
+                };
+                assert!(
+                    how_many <= remaining,
+                    "attempt to delete more wires than requested, "
+                );
                 remaining -= how_many;
                 curr += how_many;
                 if remaining == 0 {
@@ -905,7 +919,8 @@ mod tests {
         assert!(!pool.present(0));
     }
 
-    fn test_memory1() {
+    #[test]
+    fn test_memory_delete_spans_multiple_range() {
         // testing new and delete of spanning wire ranges.
         let mut mem = Memory::<char>::new();
 
@@ -920,13 +935,31 @@ mod tests {
     }
 
     #[test]
-    fn test_cache() {
-        test_cache1();
-        test_cache2();
+    fn test_memory_delete_implicit_allocation() {
+        // testing delete of two implicitly allocated wires succeeds.
+        let mut mem = Memory::<char>::new();
+
+        mem.set(1, &'a');
+        mem.set(2, &'b');
+
+        mem.allocation_delete(1, 2);
     }
 
     #[test]
-    fn test_memory() {
-        test_memory1();
+    fn test_memory_delete_explicit_and_implicit() {
+        // testing delete of explicit allocation and one implicit.
+        let mut mem = Memory::<char>::new();
+
+        mem.allocation_new(100, 120);
+        mem.set(121, &'b');
+        mem.allocation_new(122, 140);
+
+        mem.allocation_delete(100, 140);
+    }
+
+    #[test]
+    fn test_cache() {
+        test_cache1();
+        test_cache2();
     }
 }
