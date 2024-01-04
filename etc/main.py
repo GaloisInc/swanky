@@ -42,13 +42,13 @@ def main(
 
 from etc.ci import ci
 from etc.fmt import fmt
+from etc.graph_deps import graph_deps
 from etc.lint.cmd import lint
 from etc.list_features import list_features
 from etc.new_crate import new_crate
 from etc.readme import readme
 from etc.upgrades import upgrade_deps
 from vectoreyes.cmd import vectoreyes
-from etc.graph_deps import graph_deps
 
 main.add_command(ci)
 main.add_command(fmt)
