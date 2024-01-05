@@ -9,7 +9,7 @@ use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use mac_n_cheese_sieve_parser::ValueStreamKind;
 use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
-use rustls::{Certificate, ServerConfig, ServerConnection};
+use rustls::{ServerConfig, ServerConnection};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use scuttlebutt::{AesRng, TrackChannel};
 use std::collections::VecDeque;
@@ -171,18 +171,16 @@ fn main() {
         let cert_reader = &mut BufReader::new(pem_file);
         let key_reader = &mut BufReader::new(key_file);
         let cert_chain = certs(cert_reader)
-            .expect("Failed to load certificate chain")
-            .into_iter()
-            .map(Certificate)
+            .map(|c| c.expect("Failed to load certificate chain"))
             .collect();
-        let mut keys = pkcs8_private_keys(key_reader).expect("Failed to load private key");
-        let key_der = keys.remove(0);
-        let key = rustls::PrivateKey(key_der);
+        let key = pkcs8_private_keys(key_reader)
+            .next()
+            .expect("Missing private key")
+            .expect("Failed to load private key");
 
         let config = ServerConfig::builder()
-            .with_safe_defaults()
             .with_no_client_auth()
-            .with_single_cert(cert_chain, key)
+            .with_single_cert(cert_chain, rustls::pki_types::PrivateKeyDer::from(key))
             .expect("bad certificate/key");
 
         let arc_config = Arc::new(config);
