@@ -274,23 +274,6 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let rng = AesRng::new();
 
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
-
-            let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn() == LpnSize::Small,
-                )?;
-            handles.push(handle_f2);
-
             let mut channels_svole = vec![];
             for _ in 1..conns.len() {
                 let conn = conns.pop().unwrap();
@@ -298,6 +281,22 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 let writer = BufWriter::new(conn);
                 channels_svole.push(SyncChannel::new(reader, writer));
             }
+
+            let channels_f2_svole =
+                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+
+            let mut handles = vec![];
+            let (mut evaluator, handles_f2) =
+                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
+                    channels_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
+                )?;
+            handles.extend(handles_f2);
+
             //eyre::ensure!(conns.len() == 1);
             let conn_main = conns.pop().unwrap();
             let reader = BufReader::new(conn_main.try_clone()?);
@@ -308,6 +307,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 &mut channel,
                 channels_svole,
                 config.lpn() == LpnSize::Small,
+                config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -334,23 +334,6 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let rng = AesRng::new();
 
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
-
-            let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn() == LpnSize::Small,
-                )?;
-            handles.push(handle_f2);
-
             let mut channels_svole = vec![];
             for _ in 1..conns.len() {
                 let conn = conns.pop().unwrap();
@@ -358,6 +341,22 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 let writer = BufWriter::new(conn);
                 channels_svole.push(SyncChannel::new(reader, writer));
             }
+
+            let channels_f2_svole =
+                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+
+            let mut handles = vec![];
+            let (mut evaluator, handles_f2) =
+                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
+                    channels_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
+                )?;
+            handles.extend(handles_f2);
+
             //eyre::ensure!(conns.len() == 1);
             let conn_main = conns.pop().unwrap();
             let reader = BufReader::new(conn_main.try_clone()?);
@@ -368,6 +367,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 &mut channel,
                 channels_svole,
                 config.lpn() == LpnSize::Small,
+                config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -539,25 +539,6 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let init_time = Instant::now();
             let total_time = Instant::now();
 
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
-
-            let rng = AesRng::new();
-
-            let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn() == LpnSize::Small,
-                )?;
-            handles.push(handle_f2);
-
             let mut channels_svole = vec![];
             for _ in 1..conns.len() {
                 let conn = conns.pop().unwrap();
@@ -565,6 +546,24 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 let writer = BufWriter::new(conn);
                 channels_svole.push(SyncChannel::new(reader, writer));
             }
+
+            let channels_f2_svole =
+                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+
+            let rng = AesRng::new();
+
+            let mut handles = vec![];
+            let (mut evaluator, handles_f2) =
+                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
+                    channels_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
+                )?;
+            handles.extend(handles_f2);
+
             //eyre::ensure!(conns.len() == 1);
             let conn_main = conns.pop().unwrap();
             let reader = BufReader::new(conn_main.try_clone()?);
@@ -575,6 +574,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 &mut channel,
                 channels_svole,
                 config.lpn() == LpnSize::Small,
+                config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
@@ -597,24 +597,6 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let init_time = Instant::now();
             let total_time = Instant::now();
 
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
-
-            let rng = AesRng::new();
-            let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn() == LpnSize::Small,
-                )?;
-            handles.push(handle_f2);
-
             let mut channels_svole = vec![];
             for _ in 1..conns.len() {
                 let conn = conns.pop().unwrap();
@@ -622,6 +604,23 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 let writer = BufWriter::new(conn);
                 channels_svole.push(SyncChannel::new(reader, writer));
             }
+
+            let channels_f2_svole =
+                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+
+            let rng = AesRng::new();
+            let mut handles = vec![];
+            let (mut evaluator, handles_f2) =
+                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
+                    channels_f2_svole,
+                    rng,
+                    inputs,
+                    type_store,
+                    config.no_batching(),
+                    config.lpn() == LpnSize::Small,
+                )?;
+            handles.extend(handles_f2);
+
             //eyre::ensure!(conns.len() == 1);
             let conn_main = conns.pop().unwrap();
             let reader = BufReader::new(conn_main.try_clone()?);
@@ -632,6 +631,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                 &mut channel,
                 channels_svole,
                 config.lpn() == LpnSize::Small,
+                config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
 

@@ -1,45 +1,39 @@
 //! Multithreading Svole.
 
 use crate::svole_trait::{field_name, SvoleStopSignal, SvoleT};
-use eyre::Result;
+use eyre::{ensure, Result};
 use log::{debug, info, warn};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
+use std::cell::RefCell;
 use std::fmt::Debug;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use swanky_party::either::PartyEither;
-use swanky_party::{Party, Verifier, WhichParty};
+use swanky_party::{IsParty, Party, Verifier, WhichParty};
 
 const SLEEP_TIME: u64 = 1;
+const SLEEP_TIME_DELTA: u64 = 20;
 const SLEEP_TIME_MAX: u64 = 100;
-
-// number of VOLE extension vectors cannot be smaller than 2.
-const VOLE_VEC_NUM: usize = 3;
 
 /// Multithreading Svole using some atomic data-structures.
 ///
 /// An Svole functionality can use this structure to store the generated correlations.
 /// The stored correlations can be read by a consumer in a synchronized way.
 pub struct SvoleAtomic<P: Party, V, T: Copy> {
-    voles: Vec<Arc<Mutex<PartyEither<P, Vec<(V, T)>, Vec<T>>>>>,
-    last_done: Arc<Mutex<usize>>,
-    next_todo: Arc<Mutex<usize>>,
+    voles: Arc<Mutex<PartyEither<P, Vec<(V, T)>, Vec<T>>>>,
+    full: Arc<Mutex<bool>>,
     stop_signal: Arc<Mutex<bool>>,
     delta: Arc<Mutex<Option<T>>>,
 }
 
 impl<P: Party, V, T: Copy + Default> SvoleAtomic<P, V, T> {
     pub fn create() -> Self {
-        let mut v = vec![];
-        for _ in 0..VOLE_VEC_NUM {
-            v.push(Arc::new(Mutex::new(PartyEither::default())));
-        }
         Self {
-            voles: v,
-            last_done: Arc::new(Mutex::new(VOLE_VEC_NUM - 1)),
-            next_todo: Arc::new(Mutex::new(0)),
+            voles: Arc::new(Mutex::new(PartyEither::default())),
+            full: Arc::new(Mutex::new(false)),
             stop_signal: Arc::new(Mutex::new(false)),
             delta: Arc::new(Mutex::new(None)),
         }
@@ -69,14 +63,9 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
     }
 
     fn duplicate(&self) -> Self {
-        let mut v = vec![];
-        for i in 0..VOLE_VEC_NUM {
-            v.push(self.voles[i].clone());
-        }
         Self {
-            voles: v,
-            last_done: self.last_done.clone(),
-            next_todo: self.next_todo.clone(),
+            voles: self.voles.clone(),
+            full: self.full.clone(),
             stop_signal: self.stop_signal.clone(),
             delta: self.delta.clone(),
         }
@@ -90,22 +79,18 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
     ) -> Result<()> {
         let mut sleep_time = SLEEP_TIME;
         loop {
-            let last_done = *self.last_done.lock().unwrap();
-            let next_todo = *self.next_todo.lock().unwrap();
+            let full = *self.full.lock().unwrap();
 
-            let candidate = (last_done + 1) % VOLE_VEC_NUM;
-            if candidate != next_todo {
+            if full {
                 let _start = Instant::now();
-                out.as_mut()
-                    .zip(self.voles[candidate].lock().unwrap().as_mut())
-                    .map(
-                        |(out, candidate)| out.append(candidate),
-                        |(out, candidate)| out.append(candidate),
-                    );
+                out.as_mut().zip(self.voles.lock().unwrap().as_mut()).map(
+                    |(out, candidate)| out.append(candidate),
+                    |(out, candidate)| out.append(candidate),
+                );
                 debug!("COPY<time:{:?} >", _start.elapsed());
                 // No need to clear because append() already takes care of it, otherwise
                 // self.voles[candidate].lock().unwrap().clear();
-                *self.last_done.lock().unwrap() = candidate;
+                *self.full.lock().unwrap() = false;
                 break;
             } else {
                 // WARNING!!!! This flush is very important to avoid deadlock!!!!!
@@ -125,15 +110,79 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
         Ok(())
     }
 
-    fn delta(&self, _ev: swanky_party::IsParty<P, Verifier>) -> T {
+    fn delta(&self, _ev: IsParty<P, Verifier>) -> T {
         while (*self.delta.lock().unwrap()).is_none() {
             warn!(
                 "Waiting for DELTA: {:?}",
                 std::any::type_name::<T>().split("::").last().unwrap()
             );
-            std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME));
+            std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME_DELTA));
         }
         (*self.delta.lock().unwrap()).unwrap()
+    }
+}
+
+pub struct SvoleAtomicRoundRobin<P: Party, V, T: Copy> {
+    svoles: Vec<SvoleAtomic<P, V, T>>,
+    current: Rc<RefCell<usize>>,
+    num_voles: Rc<RefCell<usize>>,
+}
+
+impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomicRoundRobin<P, V, T> {
+    fn send_stop_signal(&mut self) -> Result<()> {
+        unreachable!()
+    }
+}
+
+impl<P: Party, V, T: Copy> SvoleAtomicRoundRobin<P, V, T> {
+    pub fn new(svoles: Vec<SvoleAtomic<P, V, T>>) -> Result<Self> {
+        ensure!(svoles.len() > 0, "Round-robin needs some svoles");
+        let num_voles = svoles.len();
+        Ok(Self {
+            svoles,
+            current: Rc::new(RefCell::new(0)),
+            num_voles: Rc::new(RefCell::new(num_voles)),
+        })
+    }
+}
+
+impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoundRobin<P, V, T> {
+    fn init<C: AbstractChannel + Clone>(
+        _channel: &mut C,
+        _rng: &mut AesRng,
+        _lpn_setup: LpnParams,
+        _lpn_extend: LpnParams,
+        _delta: Option<T>,
+    ) -> Result<Self> {
+        unreachable!("Should not be initialized")
+    }
+
+    fn duplicate(&self) -> Self {
+        // We need the duplicate here because, for the conversion gates, we are currently
+        // duplicating the DietMacAndCheese functionality.
+        let svoles = self.svoles.iter().map(|c| c.duplicate()).collect();
+        Self {
+            svoles,
+            current: self.current.clone(),
+            num_voles: self.num_voles.clone(),
+        }
+    }
+
+    fn extend<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+        out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
+    ) -> Result<()> {
+        self.svoles[*self.current.borrow()].extend(channel, rng, out)?;
+        let mut curr = self.current.borrow_mut();
+        *curr = (*curr + 1) % *self.num_voles.borrow();
+        Ok(())
+    }
+
+    fn delta(&self, ev: IsParty<P, Verifier>) -> T {
+        // It is the same delta for all the svoles in the round-robin
+        self.svoles[*self.current.borrow()].delta(ev)
     }
 }
 
@@ -151,6 +200,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         mut svole_atomic: SvoleAtomic<P, V, T>,
+        delta: Option<T>,
     ) -> Result<Self> {
         let vole_comm = match P::WHICH {
             WhichParty::Prover(ev) => {
@@ -158,7 +208,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
             }
             WhichParty::Verifier(ev) => PartyEither::verifier_new(
                 ev,
-                Receiver::init(channel, rng, lpn_setup, lpn_extend, None)?,
+                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)?,
             ),
         };
 
@@ -188,25 +238,25 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     {
         let mut sleep_time = SLEEP_TIME;
         loop {
-            let last_done = *self.svole_atomic.last_done.lock().unwrap();
-            let next_todo = *self.svole_atomic.next_todo.lock().unwrap();
+            let full = *self.svole_atomic.full.lock().unwrap();
 
             // We stop when all the svole vectors are full to avoid concurrency issues.
             // In particular if one side decides to fill up an svole while the other has received a
             // stop signal
-            if *self.svole_atomic.stop_signal.lock().unwrap() && next_todo == last_done {
+            if *self.svole_atomic.stop_signal.lock().unwrap() && full {
                 info!("Stop running svole functionality for {}", field_name::<T>());
                 break;
             }
 
-            if next_todo != last_done {
+            if !full {
                 match P::WHICH {
                     WhichParty::Prover(ev) => {
                         debug!("multithread prover extend");
                         self.vole_comm.as_mut().prover_into(ev).send(
                             channel,
                             rng,
-                            self.svole_atomic.voles[next_todo]
+                            self.svole_atomic
+                                .voles
                                 .lock()
                                 .unwrap()
                                 .as_mut()
@@ -221,7 +271,8 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                         self.vole_comm.as_mut().verifier_into(ev).receive::<_, V>(
                             channel,
                             rng,
-                            self.svole_atomic.voles[next_todo]
+                            self.svole_atomic
+                                .voles
                                 .lock()
                                 .unwrap()
                                 .as_mut()
@@ -236,7 +287,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                     }
                 }
 
-                *self.svole_atomic.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
+                *self.svole_atomic.full.lock().unwrap() = true;
                 sleep_time = SLEEP_TIME; // reset sleep time
             } else {
                 debug!(
