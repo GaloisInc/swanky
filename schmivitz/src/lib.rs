@@ -19,5 +19,6 @@
 #[allow(unused)]
 pub mod parameters;
 mod proof;
+mod witness_counter;
 
 pub use proof::Proof;
