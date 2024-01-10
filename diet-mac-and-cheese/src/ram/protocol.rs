@@ -8,7 +8,7 @@ use swanky_party::{private::ProverPrivate, Party};
 
 use crate::{mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
 
-use super::{tx::TxChannel, MemorySpace};
+use super::{tx::TxChannel, MemorySpace, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
 
 pub struct DoraRam<
     P: Party,
@@ -44,8 +44,8 @@ where
             space,
             ch: TxChannel::new(dmc.channel.clone(), Default::default()),
             memory: Default::default(),
-            rds: vec![],
-            wrs: vec![],
+            rds: Vec::with_capacity(PRE_ALLOC_MEM + PRE_ALLOC_STEPS),
+            wrs: Vec::with_capacity(PRE_ALLOC_MEM + PRE_ALLOC_STEPS),
             _ph: PhantomData,
         }
     }
