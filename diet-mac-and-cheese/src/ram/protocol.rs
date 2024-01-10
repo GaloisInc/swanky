@@ -20,6 +20,7 @@ pub struct DoraRam<
 > where
     F::PrimeField: IsSubFieldOf<V>,
 {
+    challenge_size: usize,
     space: M,
     ch: TxChannel<C>,
     memory: ProverPrivate<P, FxHashMap<Vec<V>, Vec<V>>>,
@@ -39,8 +40,13 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn new(dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>, space: M) -> Self {
+    pub fn new(
+        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        challenge_size: usize,
+        space: M,
+    ) -> Self {
         Self {
+            challenge_size,
             space,
             ch: TxChannel::new(dmc.channel.clone(), Default::default()),
             memory: Default::default(),
