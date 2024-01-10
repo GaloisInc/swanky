@@ -3,7 +3,7 @@ use std::io::Result;
 use scuttlebutt::AbstractChannel;
 use swanky_field::FiniteField;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TxChannel<C: AbstractChannel> {
     pub ch: C,
     pub tx: blake3::Hasher,
