@@ -1,4 +1,4 @@
-use std::{iter, marker::PhantomData};
+use std::{collections::hash_map::Entry, iter, marker::PhantomData};
 
 use rustc_hash::FxHashMap;
 
@@ -9,7 +9,7 @@ use swanky_party::{
     Party, WhichParty,
 };
 
-use crate::{mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
+use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
 
 use super::{tx::TxChannel, MemorySpace, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
 
@@ -132,5 +132,65 @@ where
                 .try_into()
                 .unwrap(),
         )
+    }
+
+    pub fn insert(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        addr: &[Mac<P, V, F>],
+        value: &[Mac<P, V, F>],
+    ) -> eyre::Result<()> {
+        debug_assert_eq!(addr.len(), self.space.addr_size());
+        debug_assert_eq!(value.len(), self.space.value_size());
+
+        let mut flat = vec![
+            Default::default();
+            self.space.addr_size() + self.space.value_size() + self.challenge_size
+        ];
+
+        match P::WHICH {
+            WhichParty::Prover(ev) => {
+                let val_addr: Vec<_> = addr.iter().map(|e| e.value().into_inner(ev)).collect();
+                match self.memory.as_mut().into_inner(ev).entry(val_addr) {
+                    Entry::Occupied(_) => {
+                        unreachable!("double entry, must remove entry first: this is a logic error")
+                    }
+                    Entry::Vacant(entry) => {
+                        for (i, elem) in iter::empty()
+                            .chain(addr.iter().copied())
+                            .chain(value.iter().copied())
+                            .chain(commit_pub(&self.ch.challenge(self.challenge_size)))
+                            .enumerate()
+                        {
+                            flat[i] = elem;
+                        }
+
+                        entry.insert(
+                            flat[self.space.addr_size()..]
+                                .iter()
+                                .map(|m| m.value().into_inner(ev))
+                                .collect(),
+                        );
+                    }
+                }
+            }
+            WhichParty::Verifier(_) => {
+                for (i, elem) in iter::empty()
+                    .chain(addr.iter().copied())
+                    .chain(value.iter().copied())
+                    .chain(
+                        self.ch
+                            .challenge(self.challenge_size)
+                            .iter()
+                            .map(|&x| dmc.input_public(x).unwrap()),
+                    )
+                    .enumerate()
+                {
+                    flat[i] = elem;
+                }
+            }
+        }
+
+        Ok(self.wrs.push(flat))
     }
 }
