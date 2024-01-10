@@ -32,6 +32,17 @@ pub struct DoraRam<
     _ph: PhantomData<SVOLE>,
 }
 
+#[inline(always)]
+fn commit_pub<P: Party, V: IsSubFieldOf<T>, T: FiniteField>(values: &[V]) -> Vec<Mac<P, V, T>>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+    values
+        .iter()
+        .map(|&x| Mac::new(ProverPrivateCopy::new(x), T::ZERO))
+        .collect()
+}
+
 impl<
         P: Party,
         V: IsSubFieldOf<F>,
