@@ -9,7 +9,13 @@ use swanky_party::{
     Party, WhichParty,
 };
 
-use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
+use crate::{
+    backend_trait::BackendT,
+    mac::Mac,
+    ram::{collapse_vec, perm::permutation},
+    svole_trait::SvoleT,
+    DietMacAndCheese,
+};
 
 use super::{tx::TxChannel, MemorySpace, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
 
@@ -192,5 +198,78 @@ where
         }
 
         Ok(self.wrs.push(flat))
+    }
+
+    pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
+        log::info!("finalizing ram: {} operations", self.wrs.len(),);
+
+        let mut pre = match P::WHICH {
+            WhichParty::Prover(_) => commit_pub::<P, _, _>(&vec![
+                V::default();
+                self.space.addr_size()
+                    + self.space.value_size()
+                    + self.challenge_size
+            ]),
+            WhichParty::Verifier(_) => {
+                vec![
+                    V::default();
+                    self.space.addr_size() + self.space.value_size() + self.challenge_size
+                ]
+                .into_iter()
+                .map(|x| dmc.input_public(x).unwrap())
+                .collect()
+            }
+        };
+
+        for addr in self.space.enumerate() {
+            let addr = match P::WHICH {
+                WhichParty::Prover(_) => commit_pub(&addr.as_ref()),
+                WhichParty::Verifier(_) => addr
+                    .as_ref()
+                    .iter()
+                    .map(|&x| dmc.input_public(x).unwrap())
+                    .collect(),
+            };
+            pre[..self.space.addr_size()].copy_from_slice(&addr);
+            self.wrs.push(pre.clone());
+            self.remove(dmc, &addr)?;
+        }
+
+        assert_eq!(self.rds.len(), self.wrs.len());
+
+        let (chal_cmbn, chal_perm1) = match P::WHICH {
+            WhichParty::Prover(_) => {
+                dmc.channel.flush()?;
+                (
+                    dmc.channel.read_serializable::<V>()?,
+                    dmc.channel.read_serializable::<V>()?,
+                )
+            }
+            WhichParty::Verifier(_) => {
+                let chals @ (chal_cmbn, chal_perm1) =
+                    (V::random(&mut dmc.rng), V::random(&mut dmc.rng));
+
+                dmc.channel.write_serializable(&chal_cmbn)?;
+                dmc.channel.write_serializable(&chal_perm1)?;
+                dmc.channel.flush()?;
+
+                chals
+            }
+        };
+
+        log::debug!("collapse wrs");
+        let wrs = collapse_vec(dmc, &self.wrs, chal_cmbn)?;
+
+        log::debug!("collapse rds");
+        let rds = collapse_vec(dmc, &self.rds, chal_cmbn)?;
+
+        self.wrs.clear();
+        self.wrs.shrink_to_fit();
+
+        self.rds.clear();
+        self.wrs.shrink_to_fit();
+
+        log::debug!("permutation check");
+        permutation(dmc, chal_perm1, &wrs, &rds)
     }
 }

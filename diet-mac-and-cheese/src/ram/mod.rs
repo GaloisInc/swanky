@@ -24,7 +24,7 @@ fn combine<'a, B: BackendT>(
 
 pub(super) fn collapse_vec<B: BackendT>(
     backend: &mut B,
-    elems: &[&[B:: Wire]],
+    elems: &[Vec<B::Wire>],
     x: B::FieldElement,
 ) -> eyre::Result<Vec<B::Wire>> {
     let mut out = Vec::with_capacity(elems.len());
