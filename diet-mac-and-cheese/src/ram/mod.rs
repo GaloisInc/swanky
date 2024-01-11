@@ -5,9 +5,11 @@ mod tx;
 use std::marker::PhantomData;
 
 use protocol::DoraRam;
-use swanky_field::{FiniteField, PrimeFiniteField};
+use scuttlebutt::AbstractChannel;
+use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_party::Party;
 
-use crate::backend_trait::BackendT;
+use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
 
 const PRE_ALLOC_MEM: usize = 1 << 20;
 const PRE_ALLOC_STEPS: usize = (1 << 23) + PRE_ALLOC_MEM;
@@ -104,6 +106,95 @@ impl<F: FiniteField> MemorySpace<F> for Arithmetic<F> {
         ArithmeticIter {
             current: [F::ZERO],
             rem: self.size,
+        }
+    }
+}
+
+pub struct ArithmeticRam<
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, V, F>,
+> where
+    F::PrimeField: IsSubFieldOf<V>,
+{
+    size: usize,
+    ram: Option<DoraRam<P, V, F, C, Arithmetic<V>, SVOLE>>,
+}
+
+impl<
+        P: Party,
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, V, F>,
+    > Default for ArithmeticRam<P, V, F, C, SVOLE>
+where
+    F::PrimeField: IsSubFieldOf<V>,
+{
+    fn default() -> Self {
+        Self { size: 0, ram: None }
+    }
+}
+
+impl<
+        P: Party,
+        V: IsSubFieldOf<F>,
+        F: FiniteField,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, V, F>,
+    > ArithmeticRam<P, V, F, C, SVOLE>
+where
+    F::PrimeField: IsSubFieldOf<V>,
+{
+    pub fn new(size: usize) -> Self {
+        Self { size, ram: None }
+    }
+
+    pub fn read(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        addr: &Mac<P, V, F>,
+    ) -> eyre::Result<Mac<P, V, F>> {
+        match self.ram.as_mut() {
+            Some(ram) => {
+                let value = ram.remove(dmc, &[*addr])?;
+                ram.insert(dmc, &[*addr], &value)?;
+                Ok(value[0])
+            }
+            None => {
+                let ram = DoraRam::new(dmc, 2, Arithmetic::new(self.size));
+                self.ram = Some(ram);
+                self.read(dmc, addr)
+            }
+        }
+    }
+
+    pub fn write(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        addr: &Mac<P, V, F>,
+        value: &Mac<P, V, F>,
+    ) -> eyre::Result<()> {
+        match self.ram.as_mut() {
+            Some(ram) => {
+                ram.remove(dmc, &[*addr])?;
+                ram.insert(dmc, &[*addr], &[*value])?;
+                Ok(())
+            }
+            None => {
+                let ram = DoraRam::new(dmc, 2, Arithmetic::new(self.size));
+                self.ram = Some(ram);
+                self.write(dmc, addr, value)
+            }
+        }
+    }
+
+    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
+        match self.ram.take() {
+            Some(ram) => ram.finalize(dmc),
+            None => Ok(()),
         }
     }
 }
