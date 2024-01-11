@@ -1,3 +1,6 @@
+// TODO: Turn this off!
+#![allow(dead_code)]
+
 mod perm;
 mod protocol;
 mod tests;
