@@ -197,7 +197,8 @@ where
             }
         }
 
-        Ok(self.wrs.push(flat))
+        self.wrs.push(flat);
+        Ok(())
     }
 
     pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
@@ -223,7 +224,7 @@ where
 
         for addr in self.space.enumerate() {
             let addr = match P::WHICH {
-                WhichParty::Prover(_) => commit_pub(&addr.as_ref()),
+                WhichParty::Prover(_) => commit_pub(addr.as_ref()),
                 WhichParty::Verifier(_) => addr
                     .as_ref()
                     .iter()
