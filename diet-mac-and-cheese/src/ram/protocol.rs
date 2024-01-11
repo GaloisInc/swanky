@@ -267,7 +267,7 @@ where
         self.wrs.shrink_to_fit();
 
         self.rds.clear();
-        self.wrs.shrink_to_fit();
+        self.rds.shrink_to_fit();
 
         log::debug!("permutation check");
         permutation(dmc, chal_perm1, &wrs, &rds)
