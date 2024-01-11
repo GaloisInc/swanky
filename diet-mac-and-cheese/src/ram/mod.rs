@@ -1,5 +1,6 @@
 mod perm;
 mod protocol;
+mod tests;
 mod tx;
 
 use std::marker::PhantomData;
