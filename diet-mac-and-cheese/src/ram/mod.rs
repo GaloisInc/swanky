@@ -2,7 +2,10 @@ mod perm;
 mod protocol;
 mod tx;
 
+use std::marker::PhantomData;
+
 use protocol::DoraRam;
+use swanky_field::{FiniteField, PrimeFiniteField};
 
 use crate::backend_trait::BackendT;
 
@@ -45,4 +48,62 @@ pub trait MemorySpace<V> {
     fn size(&self) -> usize;
 
     fn enumerate(&self) -> Self::Enum;
+}
+
+struct Arithmetic<F: FiniteField> {
+    size: usize,
+    _ph: PhantomData<F>,
+}
+
+impl<F: FiniteField> Arithmetic<F> {
+    fn new(size: usize) -> Self {
+        Self {
+            size,
+            _ph: PhantomData,
+        }
+    }
+}
+
+struct ArithmeticIter<F: FiniteField> {
+    current: [F; 1],
+    rem: usize,
+}
+
+impl<F: FiniteField> Iterator for ArithmeticIter<F> {
+    type Item = [F; 1];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rem > 0 {
+            let old = self.current;
+            self.current[0] += F::ONE;
+            self.rem -= 1;
+            Some(old)
+        } else {
+            None
+        }
+    }
+}
+
+impl<F: FiniteField> MemorySpace<F> for Arithmetic<F> {
+    type Addr = [F; 1];
+    type Enum = ArithmeticIter<F>;
+
+    fn addr_size(&self) -> usize {
+        1
+    }
+
+    fn value_size(&self) -> usize {
+        1
+    }
+
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    fn enumerate(&self) -> Self::Enum {
+        ArithmeticIter {
+            current: [F::ZERO],
+            rem: self.size,
+        }
+    }
 }
