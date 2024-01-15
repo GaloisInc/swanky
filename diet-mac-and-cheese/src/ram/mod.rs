@@ -124,7 +124,7 @@ pub struct ArithmeticRam<
     F::PrimeField: IsSubFieldOf<V>,
 {
     size: usize,
-    ram: Option<DoraRam<P, V, F, C, Arithmetic<V>, SVOLE>>,
+    dora: Option<DoraRam<P, V, F, C, Arithmetic<V>, SVOLE>>,
 }
 
 impl<
@@ -138,7 +138,10 @@ where
     F::PrimeField: IsSubFieldOf<V>,
 {
     fn default() -> Self {
-        Self { size: 0, ram: None }
+        Self {
+            size: 0,
+            dora: None,
+        }
     }
 }
 
@@ -153,7 +156,7 @@ where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn new(size: usize) -> Self {
-        Self { size, ram: None }
+        Self { size, dora: None }
     }
 
     pub fn read(
@@ -161,7 +164,7 @@ where
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &Mac<P, V, F>,
     ) -> eyre::Result<Mac<P, V, F>> {
-        match self.ram.as_mut() {
+        match self.dora.as_mut() {
             Some(ram) => {
                 let value = ram.remove(dmc, &[*addr])?;
                 ram.insert(dmc, &[*addr], &value)?;
@@ -169,7 +172,7 @@ where
             }
             None => {
                 let ram = DoraRam::new(dmc, 2, Arithmetic::new(self.size));
-                self.ram = Some(ram);
+                self.dora = Some(ram);
                 self.read(dmc, addr)
             }
         }
@@ -181,7 +184,7 @@ where
         addr: &Mac<P, V, F>,
         value: &Mac<P, V, F>,
     ) -> eyre::Result<()> {
-        match self.ram.as_mut() {
+        match self.dora.as_mut() {
             Some(ram) => {
                 ram.remove(dmc, &[*addr])?;
                 ram.insert(dmc, &[*addr], &[*value])?;
@@ -189,14 +192,14 @@ where
             }
             None => {
                 let ram = DoraRam::new(dmc, 2, Arithmetic::new(self.size));
-                self.ram = Some(ram);
+                self.dora = Some(ram);
                 self.write(dmc, addr, value)
             }
         }
     }
 
     pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
-        match self.ram.take() {
+        match self.dora.take() {
             Some(ram) => ram.finalize(dmc),
             None => Ok(()),
         }
