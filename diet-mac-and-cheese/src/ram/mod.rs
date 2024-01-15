@@ -133,24 +133,6 @@ impl<
         F: FiniteField,
         C: AbstractChannel + Clone,
         SVOLE: SvoleT<P, V, F>,
-    > Default for ArithmeticRam<P, V, F, C, SVOLE>
-where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    fn default() -> Self {
-        Self {
-            size: 0,
-            dora: None,
-        }
-    }
-}
-
-impl<
-        P: Party,
-        V: IsSubFieldOf<F>,
-        F: FiniteField,
-        C: AbstractChannel + Clone,
-        SVOLE: SvoleT<P, V, F>,
     > ArithmeticRam<P, V, F, C, SVOLE>
 where
     F::PrimeField: IsSubFieldOf<V>,
