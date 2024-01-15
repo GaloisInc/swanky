@@ -99,7 +99,7 @@ where
                         vec![V::default(); self.space.value_size() + self.challenge_size]
                     });
 
-                for (i, elem) in iter::empty()
+                for elem in iter::empty()
                     .chain(addr.iter().copied())
                     .chain(old.into_iter().map(|x| {
                         let m = dmc
@@ -108,26 +108,22 @@ where
                             .unwrap();
                         Mac::new(ProverPrivateCopy::new(x), m)
                     }))
-                    .enumerate()
                 {
-                    flat[i] = elem;
+                    flat.push(elem);
                 }
             }
             WhichParty::Verifier(ev) => {
-                for (i, elem) in iter::empty()
-                    .chain(
-                        dmc.fcom
-                            .input_verifier(
-                                ev,
-                                &mut self.ch,
-                                &mut dmc.rng,
-                                self.space.value_size() + self.challenge_size,
-                            )
-                            .unwrap(),
-                    )
-                    .enumerate()
-                {
-                    flat[i] = elem;
+                for elem in iter::empty().chain(
+                    dmc.fcom
+                        .input_verifier(
+                            ev,
+                            &mut self.ch,
+                            &mut dmc.rng,
+                            self.space.value_size() + self.challenge_size,
+                        )
+                        .unwrap(),
+                ) {
+                    flat.push(elem);
                 }
             }
         }
