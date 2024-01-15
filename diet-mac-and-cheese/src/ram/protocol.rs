@@ -158,13 +158,12 @@ where
                         unreachable!("double entry, must remove entry first: this is a logic error")
                     }
                     Entry::Vacant(entry) => {
-                        for (i, elem) in iter::empty()
+                        for elem in iter::empty()
                             .chain(addr.iter().copied())
                             .chain(value.iter().copied())
                             .chain(commit_pub(&self.ch.challenge(self.challenge_size)))
-                            .enumerate()
                         {
-                            flat[i] = elem;
+                            flat.push(elem);
                         }
 
                         entry.insert(
@@ -177,7 +176,7 @@ where
                 }
             }
             WhichParty::Verifier(_) => {
-                for (i, elem) in iter::empty()
+                for elem in iter::empty()
                     .chain(addr.iter().copied())
                     .chain(value.iter().copied())
                     .chain(
@@ -186,9 +185,8 @@ where
                             .iter()
                             .map(|&x| dmc.input_public(x).unwrap()),
                     )
-                    .enumerate()
                 {
-                    flat[i] = elem;
+                    flat.push(elem);
                 }
             }
         }

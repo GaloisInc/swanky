@@ -37,14 +37,14 @@ impl<C: AbstractChannel> TxChannel<C> {
         while i < n {
             let hsh = self.tx.finalize();
             let a = hsh.as_bytes()[..16].try_into().unwrap();
-            out[i] = F::from_uniform_bytes(a);
+            out.push(F::from_uniform_bytes(a));
             if i == n - 1 {
                 break;
             }
             i += 1;
 
             let b = hsh.as_bytes()[16..].try_into().unwrap();
-            out[i] = F::from_uniform_bytes(b);
+            out.push(F::from_uniform_bytes(b));
             i += 1;
         }
         out
