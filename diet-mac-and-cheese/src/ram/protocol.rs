@@ -95,9 +95,10 @@ where
                     .as_mut()
                     .into_inner(ev)
                     .remove(&val_addr)
-                    .unwrap_or_else(|| {
-                        vec![V::default(); self.space.value_size() + self.challenge_size]
-                    });
+                    .unwrap_or(vec![
+                        V::default();
+                        self.space.value_size() + self.challenge_size
+                    ]);
 
                 for elem in iter::empty()
                     .chain(addr.iter().copied())
