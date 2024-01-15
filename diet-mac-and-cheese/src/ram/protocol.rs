@@ -114,7 +114,7 @@ where
                 }
             }
             WhichParty::Verifier(ev) => {
-                for elem in iter::empty().chain(
+                for elem in iter::empty().chain(addr.iter().copied()).chain(
                     dmc.fcom
                         .input_verifier(
                             ev,
