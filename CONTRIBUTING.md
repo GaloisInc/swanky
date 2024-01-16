@@ -410,7 +410,7 @@ fn range_use_example() {
         buf.clear();
         range(i, &mut buf);
         for j in buf.iter() {
-        	println!("{j}");
+            println!("{j}");
         }
     }
 }
@@ -421,7 +421,7 @@ Alternatively, `range` could return an `Iterator`, which doesn't require that it
 ```rust
 // impl Iterator doesn't allocate anything.
 fn range(n: usize) -> impl Iterator<Item = usize> {
-	0..n
+    0..n
 }
 ```
 
