@@ -107,8 +107,6 @@ If you ask a reviewer to review too much code it can be overwhelming. Instead, b
 
 Ask questions of the code author in comments! If you have a question about the code, it can help indicate that code should be restructured or differently documented. At worst, it'll help your understanding!
 
-See the [Galois-internal Code Review page for more details](https://confluence.galois.com/display/EN/Code+Reviews).
-
 ### AI Tools
 
 Due to copyright concerns, we cannot accept _any_ contributions that were written, even in part, with AI tools (such as Github's Copilot). This extends to _any_ contribution to the repository, including source code, commit messages, documentation, etc.
