@@ -133,7 +133,7 @@ Swanky should not depend on any dynamic libraries at runtime (all dependencies s
 
 The Swanky build should not _require_ any tools other than the Rust compiler toolchain, `cargo`, and a C compiler/system linker.
 
-In some cases, we may depend on external tools for [code generation](#code-generation). If this is the case, the external tool should not be required for a default build of Swanky. For example, you should only need to have the flatbuffer code generator tool installed if you make changes to Swanky's flatbuffer files.
+In some cases, we may depend on external tools for code generation. If this is the case, the external tool should not be required for a default build of Swanky. For example, you should only need to have the flatbuffer code generator tool installed if you make changes to Swanky's flatbuffer files.
 
 The goal of this requirement is to make sure that it is easy for new users to get started with Swanky. It's much easier to say "all you need is Rust," than it is to start requiring additional tools on top.
 
