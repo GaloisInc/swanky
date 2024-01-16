@@ -2194,6 +2194,8 @@ dependencies = [
  "eyre",
  "mac-n-cheese-sieve-parser",
  "merlin",
+ "rand",
+ "swanky-field",
  "swanky-field-binary",
 ]
 
