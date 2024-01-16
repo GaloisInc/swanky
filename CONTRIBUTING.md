@@ -58,6 +58,7 @@ All MRs need to pass CI's checks. CI will, in addition to running Rust tests, al
 #### Git Branching Style
 
 We follow the [Github Flow](https://docs.github.com/en/get-started/quickstart/github-flow) git branching workflow. `dev` is the main branch of the Swanky repo. In this workflow, you:
+
 1. Branch off the target branch (typically `dev`)
 2. Commit and push your changes to the branch
 3. Open a [Merge Request](#merge-requests) from your branch to the target branch.
@@ -82,6 +83,7 @@ Each component[^what-is-a-component] of Swanky is owned by a team of at least _t
 [^what-is-a-component]: A component of Swanky ought to be one crate. However, there are some crates, like ocelot, which contain many different protocols and components. Until they get broken up into several different crates, different modules in ocelot might have distinct code owners.
 
 The code owners are responsible for shepherding the components that they own, including:
+
 * **Reviewing code which modifies their components.** Gitlab will automatically ask code owners to review any merge request which modifies code that they own.
 * **Managing the health of the component.** This includes triaging issues which may impact the component.
 * **Fielding questions about the component.** The code owners should be the resident experts on the components they own.
@@ -146,9 +148,10 @@ We prefer to have many smaller crates rather than a few big crates. This strateg
 For example, rather than having a single crate for all things oblivious transfer, we'd prefer to have a `swanky-ot-traits` crate for the core Oblivious Transfer traits, and then a `swanky-ot-*` crate for each OT protocol implementation.
 
 The script `./swanky new-crate` makes it easy to create a new crate and register it the workspace's `Cargo.toml` file.
- 
- Use it like:
- ```
+
+Use it like:
+
+```terminal
 # Create a crate named swanky-ot-kos
 $ ./swanky new-crate swanky-ot-kos
 ```
@@ -164,10 +167,12 @@ We should _avoid_ defining Cargo features whenever possible! Features are extrem
 ##### Optionally Compile a Module
 
 For code that would look like:
+
 ```rust
 #[cfg(feature = "cool_module")]
 pub mod cool_module;
 ```
+
 Rather than defining a Cargo feature, it's preferable to create a [new crate](#one-feature-per-crate) with the optional functionality, instead.
 
 ##### Optionally Implement a Trait
@@ -175,10 +180,12 @@ Rather than defining a Cargo feature, it's preferable to create a [new crate](#o
 For example, maybe you want to implement the [`num::Zero`](https://docs.rs/num/latest/num/trait.Zero.html) trait on a type you define, but you don't want to pull in the `num` dependency in all cases.
 
 _With_ features (i.e. the **EVIL** way), the code would look like:
+
 ```rust
 #[cfg(feature = "num")]
 impl num::Zero for MyFunIntegerType { /* ... */ }
 ```
+
 The better way is to unconditionally depend (i.e. without a Cargo feature) on the [`num_traits`](https://docs.rs/num-traits/latest/num_traits/identities/trait.Zero.html) crate. This crate is small since it _only_ contains the core traits of the `num` ecosystem, and so depending on it won't bloat compile times, while at the same time avoiding the definition of a new crate feature.
 
 This technique isn't specific to the `num` ecosystem, either. Many Rust libraries provide an explicit `_traits`-style crate.
@@ -186,6 +193,7 @@ This technique isn't specific to the `num` ecosystem, either. Many Rust librarie
 ### Crate Layout
 
 All crates should (note: as of this writing, this isn't true):
+
 * live in the `crates/` directory. If the crate lives in a subdirectory of the `crates/` directory, the directory structure must match the name of the crate (to make it easy to find the crate). For example `swanky-ot-kos` might live in `crates/ot-kos` or `crates/ot/kos`, but it shouldn't live in `crates/kos`.
 * be named starting with the `swanky-` prefix. This makes it easy to determine which crates come from Swanky, and which crates are external dependencies.
 
@@ -248,6 +256,7 @@ This functionality lets us set a common set of metadata (such as version, licens
 Similarly, we also use workspace inheritance to specify a single version of our dependencies in the root `Cargo.toml` file.
 
 To use Cargo workspace inheritance, add to your `Cargo.toml` file:
+
 ```toml
 [package]
 authors.workspace = true
@@ -258,6 +267,7 @@ version.workspace = true
 ```
 
 Use dependencies like:
+
 ```toml
 num = { workspace = true, default-features = true }
 vector2d.workspace = true
@@ -384,6 +394,7 @@ fn range(n: usize) -> Vec<usize> {
 This function _requires_ a new allocation each time it's invoked. It could be rewritten in any of the following ways to eliminate the memory allocation.
 
 If the caller provides the destination buffer, its allocation can be re-used across calls.
+
 ```rust
 fn range(n: usize, dst: &mut Vec<usize>) {
     dst.reserve(n);
