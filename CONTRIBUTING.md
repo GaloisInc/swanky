@@ -1,5 +1,3 @@
-# Swanky Contributing
-
 This document is still a work in progress. More information will be added later.
 
 :wave: Hello newcomer to Swanky! This document contains a lot of _stuff_ about our development process. Here are the most important sections for introducing you to Swanky:
