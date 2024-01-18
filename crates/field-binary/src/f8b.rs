@@ -164,13 +164,17 @@ impl IsSubFieldOf<F8b> for F2 {
 // F128b superfield
 impl From<F8b> for F128b {
     fn from(value: F8b) -> Self {
-        Self(value.0.into())
+        // TODO: performance optimize this
+        let mut arr: GenericArray<F8b, generic_array::typenum::U16> = Default::default();
+        arr[0] = value;
+        Self::from_subfield(&arr)
     }
 }
 impl Mul<F128b> for F8b {
     type Output = F128b;
 
     fn mul(self, x: F128b) -> Self::Output {
+        // TODO: performance optimize this
         F128b::from(self) * x
     }
 }
