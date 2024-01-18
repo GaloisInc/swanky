@@ -7,15 +7,7 @@
 
 use eyre::Result;
 use merlin::Transcript;
-use swanky_field_binary::F2;
-
-/// This should be $`GF(2^{r\tau}) = GF(2^{120})`$.
-#[allow(unused)]
-struct F120b;
-
-/// This should be $`GF(2^r) = GF(2^10)`$.
-#[allow(unused)]
-struct F10b;
+use swanky_field_binary::{F128b, F2};
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
@@ -78,28 +70,28 @@ where
     /// [`RandomVole::commitment_mask()`].
     fn witness_mask(&self) -> &[F2];
 
-    /// Gets the `i`th component of the random value (`u` in the paper), embedded into [`F120b`]
+    /// Gets the `i`th component of the random value (`u` in the paper), embedded into [`F128b`]
     /// from [`F2`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     ///
-    /// The index `i` must be in the range $`[1, r\tau] = [1, 120]`$, where
+    /// The index `i` must be in the range $`[1, r\tau] = [1, 128]`$, where
     /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM) and
     /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVole::witness_mask()`].
-    fn commitment_mask(&self, i: u8) -> Result<F120b>;
+    fn commitment_mask(&self, i: u8) -> Result<F128b>;
 
-    /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F120b`] from
-    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F10b`].
+    /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
+    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`](swanky_field_binary::F8b).
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
     ///
     /// The index `i` must be in the range $`[1, \ell + r\tau]`$, where $`\ell + r\tau`$ is the
     /// value returned by [`RandomVole::count()`].
-    fn vole_mask(&self, i: u64) -> Result<F120b>;
+    fn vole_mask(&self, i: u64) -> Result<F128b>;
 
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
