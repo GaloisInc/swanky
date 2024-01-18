@@ -134,12 +134,7 @@ impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomicRoundRobin<P, V, T> {
     }
 }
 
-impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField + Copy + Default + Debug>
-    SvoleAtomicRoundRobin<P, V, T>
-where
-    // This constraint is necessary in order to use `wykw::sole::Sender::send`
-    <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
-{
+impl<P: Party, V, T: Copy> SvoleAtomicRoundRobin<P, V, T> {
     fn new(svoles: Vec<SvoleAtomic<P, V, T>>) -> Result<Self> {
         ensure!(!svoles.is_empty(), "Round-robin needs some svoles");
         let num_voles = svoles.len();
@@ -149,8 +144,15 @@ where
             num_voles: Rc::new(RefCell::new(num_voles)),
         })
     }
+}
 
-    // Create a
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField + Copy + Default + Debug>
+    SvoleAtomicRoundRobin<P, V, T>
+where
+    // This constraint is necessary in order to use `wykw::sole::Sender::send`
+    <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
+{
+    // Create a `SvoleAtomicRounRobin`
     pub(crate) fn create_and_spawn_svole_threads<C2: AbstractChannel + Clone + 'static + Send>(
         channels_vole: Vec<C2>,
         lpn_setup: LpnParams,
@@ -363,8 +365,8 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
 
 #[cfg(test)]
 mod test {
-    use super::SvoleAtomic;
-    use super::{SLEEP_TIME, VOLE_VEC_NUM};
+    use super::SLEEP_TIME;
+    use super::{SvoleAtomic, SvoleAtomicRoundRobin};
     use crate::svole_trait::SvoleT;
     use rand::Rng;
     use scuttlebutt::{AesRng, Channel};
@@ -375,18 +377,16 @@ mod test {
     use swanky_party::either::PartyEither;
     use swanky_party::{Verifier, IS_VERIFIER};
 
-    fn produce(s: &SvoleAtomic<Verifier, u32, u32>) {
+    fn produce(s: &SvoleAtomic<Verifier, u32, u32>, v: u32) {
         loop {
             if *s.stop_signal.lock().unwrap() {
                 break;
             }
-            let last_done = *s.last_done.lock().unwrap();
-            let next_todo = *s.next_todo.lock().unwrap();
+            let full = *s.full.lock().unwrap();
 
-            if next_todo != last_done {
-                *s.voles[next_todo].lock().unwrap() =
-                    PartyEither::verifier_new(IS_VERIFIER, vec![42, 43]);
-                *s.next_todo.lock().unwrap() = (next_todo + 1) % VOLE_VEC_NUM;
+            if !full {
+                *s.voles.lock().unwrap() = PartyEither::verifier_new(IS_VERIFIER, vec![v, v + 1]);
+                *s.full.lock().unwrap() = true;
                 break;
             } else {
                 std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME + SLEEP_TIME));
@@ -399,33 +399,56 @@ mod test {
         // generate some random sequence of produce and consume, and test if it reaches the end without
         // a deadlock
         let t1 = SvoleAtomic::<Verifier, u32, u32>::create();
-        let mut t2 = t1.duplicate();
+        let t1_copy = t1.duplicate();
 
-        let how_many = 200;
-        let handle = std::thread::spawn(move || {
+        let t2 = SvoleAtomic::<Verifier, u32, u32>::create();
+        let t2_copy = t2.duplicate();
+
+        let how_many = 100;
+        const CONST_42: u32 = 42;
+        const SHIFT: u32 = 100;
+        let handle1 = std::thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let random_millis = rng.gen_range(0..=SLEEP_TIME);
             for _ in 0..how_many {
-                produce(&t1);
+                let random_millis = rng.gen_range(0..=SLEEP_TIME);
+                produce(&t1, CONST_42);
                 std::thread::sleep(std::time::Duration::from_millis(random_millis));
-                println!("CONS");
             }
         });
+
+        let handle2 = std::thread::spawn(move || {
+            let mut rng = rand::thread_rng();
+            for _ in 0..how_many {
+                let random_millis = rng.gen_range(0..=SLEEP_TIME);
+                produce(&t2, CONST_42 + SHIFT);
+                std::thread::sleep(std::time::Duration::from_millis(random_millis));
+            }
+        });
+
+        let mut round_robin = SvoleAtomicRoundRobin::new(vec![t1_copy, t2_copy]).unwrap();
 
         let mut rng = AesRng::new();
         let (sender, _receiver) = UnixStream::pair().unwrap();
         let reader = BufReader::new(sender.try_clone().unwrap());
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
-        let mut out = PartyEither::verifier_new(IS_VERIFIER, vec![]);
-        for _ in 0..how_many {
-            let mut other_rng = rand::thread_rng();
+        let mut v: Vec<u32> = vec![];
+        let mut out = PartyEither::verifier_new(IS_VERIFIER, &mut v);
+        let mut i = 0;
+        let mut other_rng = rand::thread_rng();
+        for _ in 0..2 * how_many {
             let random_millis = other_rng.gen_range(0..=SLEEP_TIME);
-            t2.extend(&mut channel, &mut rng, &mut out.as_mut())
+            round_robin
+                .extend::<_>(&mut channel, &mut rng, &mut out)
                 .unwrap();
+            assert_eq!(out.as_ref().verifier_into(IS_VERIFIER)[0], i + CONST_42);
+            assert_eq!(out.as_ref().verifier_into(IS_VERIFIER)[1], i + CONST_42 + 1);
+            i = (i + SHIFT) % (2 * SHIFT);
+            out.as_mut().verifier_into(IS_VERIFIER).clear();
+
             std::thread::sleep(std::time::Duration::from_millis(random_millis));
-            println!("CONS2");
         }
-        handle.join().unwrap();
+        handle1.join().unwrap();
+        handle2.join().unwrap();
     }
 }

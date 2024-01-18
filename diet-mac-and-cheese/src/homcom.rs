@@ -1026,6 +1026,7 @@ mod tests {
                     LPN_SETUP_SMALL,
                     LPN_EXTEND_SMALL,
                     svole_atomic2,
+                    None,
                 )
                 .unwrap();
                 svole_prover.run(&mut channel_vole, &mut rng).unwrap();
@@ -1069,6 +1070,7 @@ mod tests {
                 LPN_SETUP_SMALL,
                 LPN_EXTEND_SMALL,
                 svole_atomic2,
+                None,
             )
             .unwrap();
             svole_receiver.run(&mut channel_vole, &mut rng).unwrap();
