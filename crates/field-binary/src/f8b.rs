@@ -342,19 +342,16 @@ mod tests {
         #[test]
         fn decompose_then_form_works(original in any_f128b()) {
             let composed: F128b = F8b::form_superfield(&F8b::decompose_superfield(&original));
-            assert_eq!(original, composed);
-
+            prop_assert_eq!(original, composed);
         }
     }
     proptest! {
         #[test]
         fn form_then_decompose_works(a in uniform16(any_f8b())) {
             let a_as_ga = a.into();
-                let lifted: F128b = F8b::form_superfield(&a_as_ga);
-                let composed = F8b::decompose_superfield(&lifted);
-
-                assert_eq!(a_as_ga, composed);
-
+            let lifted: F128b = F8b::form_superfield(&a_as_ga);
+            let composed = F8b::decompose_superfield(&lifted);
+            prop_assert_eq!(a_as_ga, composed);
         }
     }
     proptest! {
@@ -369,7 +366,7 @@ mod tests {
             let b_decomp = F8b::decompose_superfield(&b);
             let actual = multiply_f8b_16_elements(a_decomp, b_decomp);
 
-            assert_eq!(expected, actual);
+            prop_assert_eq!(expected, actual);
     }
 
     }
@@ -389,7 +386,7 @@ mod tests {
             let b_super: F128b = F8b::form_superfield(&b);
             let actual = a_super * b_super;
 
-            assert_eq!(expected, actual);
+            prop_assert_eq!(expected, actual);
         }
     }
 }
