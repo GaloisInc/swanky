@@ -12,7 +12,7 @@ use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
-use crate::svole_thread::{SvoleAtomic, SvoleAtomicRoundRobin, ThreadSvole};
+use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
 use crate::text_reader::TextRelation;
 use crate::DietMacAndCheese;
@@ -1128,51 +1128,24 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         lpn_small: bool,
     ) -> Result<(
         EvaluatorCirc<P, C, SvoleAtomicRoundRobin<P, F2, F40b>>,
-        Vec<std::thread::JoinHandle<()>>,
+        Vec<std::thread::JoinHandle<Result<()>>>,
     )> {
         let (lpn_setup, lpn_extend) = if lpn_small {
             (LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
         } else {
             (LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM)
         };
-        let mut threads = vec![];
-        let mut svoles_atomics: Vec<SvoleAtomic<P, F2, F40b>> = vec![];
-
+        let (svole_round_robin, svoles_atomics, threads) =
+            SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads(
+                channels_vole,
+                lpn_setup,
+                lpn_extend,
+            )?;
         let mut multithreaded_voles: Vec<Box<dyn SvoleStopSignal>> = vec![];
-
-        for (i, mut channel_vole) in channels_vole.into_iter().enumerate() {
-            let svole_atomic = SvoleAtomic::<P, F2, F40b>::create();
-            let svole_atomic2 = svole_atomic.duplicate();
-            let svole_atomic3 = svole_atomic.duplicate();
-
-            let delta = if i != 0 {
-                // We get the delta from the first vole.
-                match P::WHICH {
-                    WhichParty::Verifier(ev) => Some(svoles_atomics[0].delta(ev)),
-                    WhichParty::Prover(_) => None,
-                }
-            } else {
-                None
-            };
-
-            let svole_thread = std::thread::spawn(move || {
-                let mut rng2 = AesRng::new();
-                let mut svole_sender = ThreadSvole::init(
-                    &mut channel_vole,
-                    &mut rng2,
-                    lpn_setup,
-                    lpn_extend,
-                    svole_atomic,
-                    delta,
-                )
-                .unwrap();
-                svole_sender.run(&mut channel_vole, &mut rng2).unwrap();
-            });
-            threads.push(svole_thread);
-            svoles_atomics.push(svole_atomic2);
-            multithreaded_voles.push(Box::new(svole_atomic3));
+        for s in svoles_atomics {
+            multithreaded_voles.push(Box::new(s))
         }
-        let svole_round_robin = SvoleAtomicRoundRobin::<P, F2, F40b>::new(svoles_atomics)?;
+
         let fcom_f2 = FCom::init_with_vole(svole_round_robin)?;
         Ok((
             EvaluatorCirc {
@@ -1474,7 +1447,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         extend_small: LpnParams,
         setup_normal: LpnParams,
         extend_normal: LpnParams,
-    ) -> Result<Vec<std::thread::JoinHandle<()>>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
         let (lpn_setup, lpn_extend) = if lpn_small {
@@ -1482,44 +1455,15 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else {
             (setup_normal, extend_normal)
         };
-        let mut threads = vec![];
-        let mut svoles_atomics: Vec<SvoleAtomic<P, FE, FE>> = vec![];
-
-        for (i, mut channel_vole) in channels_vole.into_iter().enumerate() {
-            let svole_atomic = SvoleAtomic::<P, FE, FE>::create();
-            let svole_atomic2 = svole_atomic.duplicate();
-            let svole_atomic3 = svole_atomic.duplicate();
-
-            let delta = if i != 0 {
-                // We get the delta from the first vole.
-                match P::WHICH {
-                    WhichParty::Verifier(ev) => Some(svoles_atomics[0].delta(ev)),
-                    WhichParty::Prover(_) => None,
-                }
-            } else {
-                None
-            };
-
-            let svole_thread = std::thread::spawn(move || {
-                let mut rng2 = AesRng::new();
-                let mut svole = ThreadSvole::<P, FE, FE>::init(
-                    &mut channel_vole,
-                    &mut rng2,
-                    lpn_setup,
-                    lpn_extend,
-                    svole_atomic,
-                    delta,
-                )
-                .unwrap();
-                svole.run(&mut channel_vole, &mut rng2).unwrap();
-            });
-            threads.push(svole_thread);
-            svoles_atomics.push(svole_atomic2);
-            self.multithreaded_voles.push(Box::new(svole_atomic3))
+        let (svole_round_robin, svoles_atomics, threads) =
+            SvoleAtomicRoundRobin::<P, FE, FE>::create_and_spawn_svole_threads(
+                channels_vole,
+                lpn_setup,
+                lpn_extend,
+            )?;
+        for s in svoles_atomics {
+            self.multithreaded_voles.push(Box::new(s))
         }
-
-        let svole_round_robin = SvoleAtomicRoundRobin::<P, FE, FE>::new(svoles_atomics)?;
-
         debug!("Starting DietMacAndCheese...");
         let dmc =
             DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomicRoundRobin<P, FE, FE>>::init_with_svole(
@@ -1542,7 +1486,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         field: std::any::TypeId,
         idx: usize,
         lpn_small: bool,
-    ) -> Result<Vec<std::thread::JoinHandle<()>>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F161p");
             self.load_backend_multithreaded_fe::<F61p, C2>(
@@ -1633,7 +1577,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         mut channels_vole: Vec<C2>,
         lpn_small: bool,
         threads_per_field: usize,
-    ) -> Result<Vec<std::thread::JoinHandle<()>>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         let type_store = self.type_store.clone();
         let mut handles = vec![];
         for (idx, spec) in type_store.iter() {

@@ -134,15 +134,72 @@ impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomicRoundRobin<P, V, T> {
     }
 }
 
-impl<P: Party, V, T: Copy> SvoleAtomicRoundRobin<P, V, T> {
-    pub fn new(svoles: Vec<SvoleAtomic<P, V, T>>) -> Result<Self> {
-        ensure!(svoles.len() > 0, "Round-robin needs some svoles");
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField + Copy + Default + Debug>
+    SvoleAtomicRoundRobin<P, V, T>
+where
+    // This constraint is necessary in order to use `wykw::sole::Sender::send`
+    <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
+{
+    fn new(svoles: Vec<SvoleAtomic<P, V, T>>) -> Result<Self> {
+        ensure!(!svoles.is_empty(), "Round-robin needs some svoles");
         let num_voles = svoles.len();
         Ok(Self {
             svoles,
             current: Rc::new(RefCell::new(0)),
             num_voles: Rc::new(RefCell::new(num_voles)),
         })
+    }
+
+    // Create a
+    pub(crate) fn create_and_spawn_svole_threads<C2: AbstractChannel + Clone + 'static + Send>(
+        channels_vole: Vec<C2>,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+    ) -> Result<(
+        Self,
+        Vec<SvoleAtomic<P, V, T>>,
+        Vec<std::thread::JoinHandle<Result<()>>>,
+    )> {
+        let mut threads = vec![];
+        let mut svoles_atomics: Vec<SvoleAtomic<P, V, T>> = vec![];
+        let mut svoles_atomics_to_stop: Vec<SvoleAtomic<P, V, T>> = vec![];
+
+        for (i, mut channel_vole) in channels_vole.into_iter().enumerate() {
+            let svole_atomic = SvoleAtomic::<P, V, T>::create();
+            let svole_atomic2 = svole_atomic.duplicate();
+            let svole_atomic3 = svole_atomic.duplicate();
+
+            let delta = if i != 0 {
+                // We get the delta from the first vole.
+                match P::WHICH {
+                    WhichParty::Verifier(ev) => Some(svoles_atomics[0].delta(ev)),
+                    WhichParty::Prover(_) => None,
+                }
+            } else {
+                None
+            };
+
+            let svole_thread = std::thread::spawn(move || {
+                let mut rng2 = AesRng::new();
+                let mut svole = ThreadSvole::<P, V, T>::init(
+                    &mut channel_vole,
+                    &mut rng2,
+                    lpn_setup,
+                    lpn_extend,
+                    svole_atomic,
+                    delta,
+                )?;
+                svole.run(&mut channel_vole, &mut rng2)?;
+                Ok(())
+            });
+            threads.push(svole_thread);
+            svoles_atomics.push(svole_atomic2);
+            svoles_atomics_to_stop.push(svole_atomic3)
+        }
+
+        let svole_round_robin = SvoleAtomicRoundRobin::<P, V, T>::new(svoles_atomics)?;
+
+        Ok((svole_round_robin, svoles_atomics_to_stop, threads))
     }
 }
 
@@ -234,6 +291,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
         rng: &mut AesRng,
     ) -> Result<()>
     where
+        // This constraint is necessary in order to use `wykw::sole::Sender::send`
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
         let mut sleep_time = SLEEP_TIME;

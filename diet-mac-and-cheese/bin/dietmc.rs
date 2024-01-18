@@ -318,7 +318,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             evaluator.evaluate_relation_text(relation_reader)?;
             evaluator.terminate()?;
             for handle in handles {
-                handle.join().unwrap();
+                handle.join().expect("thread failed to join")?;
             }
             info!("circ exec time: {:?}", start.elapsed());
 
@@ -378,7 +378,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             evaluator.evaluate_relation_text(relation_reader)?;
             evaluator.terminate()?;
             for handle in handles {
-                handle.join().unwrap();
+                handle.join().expect("thread failed to join")?;
             }
             info!("circ exec time: {:?}", start.elapsed());
 
@@ -583,7 +583,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             evaluator.evaluate_relation(&relation_path).unwrap();
             evaluator.terminate()?;
             for handle in handles {
-                handle.join().unwrap();
+                handle.join().expect("thread failed to join")?;
             }
             info!("circ exec time: {:?}", start.elapsed());
 
@@ -640,7 +640,7 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             evaluator.evaluate_relation(&relation_path)?;
             evaluator.terminate()?;
             for handle in handles {
-                handle.join().unwrap();
+                handle.join().expect("thread failed to join")?;
             }
             info!("circ exec time: {:?}", start.elapsed());
 
