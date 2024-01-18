@@ -9,6 +9,7 @@ use super::{r1cs::R1CS, Clause};
 
 #[derive(Debug, Clone)]
 pub struct Disjunction<F: FiniteField> {
+    max_wit: usize,        // maximum witness gates in any clause
     dim_wit: usize,        // dimension of witness vector
     dim_err: usize,        // dimension of error vector
     inputs: usize,         // number of inputs to disjunction
@@ -44,22 +45,30 @@ impl<F: FiniteField> Disjunction<F> {
         // convert every clause to R1CS
         let mut dim_wit = 0;
         let mut dim_err = 0;
+        let mut max_wit = 0;
         let mut r1cs_rels = vec![];
         for opt in clauses {
             let rel = R1CS::new(inputs, outputs, &opt.gates);
             dim_wit = cmp::max(dim_wit, rel.dim_wit());
             dim_err = cmp::max(dim_err, rel.rows());
+            max_wit = cmp::max(max_wit, rel.num_wit());
             r1cs_rels.push(rel);
         }
 
-        // "compile" gates to R1CS relations
+        // collect multiple R1CS relations into a single disjunction
+        r1cs_rels.shrink_to_fit();
         Self {
             dim_err,
             dim_wit,
+            max_wit,
             inputs: inputs as usize,
             outputs: outputs as usize,
             clauses: r1cs_rels,
         }
+    }
+
+    pub fn num_wit(&self) -> usize {
+        self.max_wit
     }
 
     pub(super) fn clauses(&self) -> &[R1CS<F>] {

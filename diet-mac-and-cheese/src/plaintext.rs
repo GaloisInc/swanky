@@ -4,6 +4,7 @@ use crate::{
     backend::Monitor,
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
     backend_trait::BackendT,
+    circuit_ir::FieldInputs,
     mac::{make_x_i, Mac, MacT},
     plugins::DisjunctionBody,
 };
@@ -183,6 +184,7 @@ impl<F: PrimeFiniteField> BackendLiftT for DietMacAndCheesePlaintext<F, F> {
 impl BackendDisjunctionT for DietMacAndCheesePlaintext<F2, F40b> {
     fn disjunction(
         &mut self,
+        _inswit: &mut FieldInputs,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
@@ -197,6 +199,7 @@ impl BackendDisjunctionT for DietMacAndCheesePlaintext<F2, F40b> {
 impl<F: PrimeFiniteField> BackendDisjunctionT for DietMacAndCheesePlaintext<F, F> {
     fn disjunction(
         &mut self,
+        _inswit: &mut FieldInputs,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {

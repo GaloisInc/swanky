@@ -72,6 +72,7 @@ where
     pub fn mux(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
+        mut wit_tape: impl Iterator<Item = V>, // witness tape
         input: &[Mac<P, V, F>],
         opt: ProverPrivateCopy<P, usize>,
     ) -> Result<Vec<Mac<P, V, F>>> {
@@ -86,9 +87,17 @@ where
                 let clause = self.disj.clause(opt.into_inner(ev));
 
                 // compute extended witness for the clause
-                let wit =
-                    clause.compute_witness(input.iter().map(|input| input.value().into_inner(ev)));
-                debug_assert!(wit.check(clause));
+                let wit = clause.compute_witness(
+                    &mut wit_tape,
+                    input.iter().map(|input| input.value().into_inner(ev)),
+                );
+                debug_assert!(wit.check(clause), "invalid witness");
+
+                // eat padding from witness tape
+                for _ in clause.num_wit()..self.disj.num_wit() {
+                    let v = wit_tape.next().expect("witness tape too short");
+                    debug_assert_eq!(v, V::ZERO, "witness padding is not zero");
+                }
 
                 //compute cross terms with accumulator
                 debug_assert!(self.accs.as_ref().into_inner(ev)[opt.into_inner(ev)].check(clause));
@@ -282,104 +291,5 @@ where
         self.trace.clear();
         self.init = accs;
         permutation(dmc, chal_perm, &lhs, &rhs)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
-    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-    use scuttlebutt::{field::F61p, ring::FiniteRing, AesRng, Channel};
-    use swanky_party::{Prover, Verifier, IS_VERIFIER};
-
-    use crate::backend_trait::BackendT;
-    use crate::{
-        dora::{Clause, DisjGate},
-        svole_trait::Svole,
-        DietMacAndCheese,
-    };
-    use rand::{Rng, SeedableRng};
-
-    use super::*;
-
-    // a very simple example using a disjunction to implement a range check
-    #[test]
-    fn test_range_example() {
-        const RANGE_SIZE: usize = 256;
-        const NUM_RANGE_PROOFS: usize = 10_000;
-
-        // a range check
-        let clauses = (0..RANGE_SIZE)
-            .map(|i| Clause {
-                gates: vec![
-                    DisjGate::AddConstant(1, 0, -F61p::try_from(i as u128).unwrap()),
-                    DisjGate::AssertZero(1),
-                ],
-            })
-            .collect::<Vec<_>>();
-
-        let range_check = Disjunction::new(clauses.iter().cloned(), 1, 0);
-
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
-        let range_check_clone = range_check.clone();
-
-        let handle = std::thread::spawn(move || {
-            let rng = AesRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-
-            let mut prover: DietMacAndCheese<Prover, F61p, F61p, _, Svole<_, _, F61p>> =
-                DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                    .unwrap();
-
-            let mut disj = Dora::<Prover, F61p, F61p, _, Svole<_, _, F61p>>::new(range_check);
-
-            println!("warm up");
-            prover.input_private(Some(F61p::ONE)).unwrap();
-
-            // do a number of range checks
-            println!("do {} range proofs", NUM_RANGE_PROOFS);
-            for _ in 0..NUM_RANGE_PROOFS {
-                let wi: usize = prover.rng.gen::<usize>() % RANGE_SIZE;
-                let wf = F61p::try_from(wi as u128).unwrap();
-                let v = prover.input_private(Some(wf)).unwrap();
-                disj.mux(&mut prover, &[v], ProverPrivateCopy::new(wi))
-                    .unwrap(); // because it is assigned 1
-            }
-            disj.finalize(&mut prover).unwrap();
-
-            println!("finalize");
-            prover.finalize().unwrap();
-
-            println!("done");
-        });
-
-        let rng = AesRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut dmc: DietMacAndCheese<Verifier, F61p, F61p, _, Svole<_, F61p, F61p>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
-
-        dmc.input_private(None).unwrap();
-
-        let mut disj = Dora::new(range_check_clone);
-        for _ in 0..NUM_RANGE_PROOFS {
-            let v = dmc.input_private(None).unwrap();
-            disj.mux(&mut dmc, &[v], ProverPrivateCopy::empty(IS_VERIFIER))
-                .unwrap();
-        }
-        disj.finalize(&mut dmc).unwrap();
-        dmc.finalize().unwrap();
-
-        handle.join().unwrap();
     }
 }

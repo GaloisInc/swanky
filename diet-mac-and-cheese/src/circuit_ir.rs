@@ -11,7 +11,9 @@ use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
+    marker::PhantomData,
 };
+use swanky_field::PrimeFiniteField;
 
 /// The wire index.
 pub type WireId = u64;
@@ -657,91 +659,146 @@ impl FunStore {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Tape(VecDeque<Number>);
+
+impl Tape {
+    pub fn iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+        TapeF(self, PhantomData)
+    }
+
+    pub fn pop_field<F: PrimeFiniteField>(&mut self) -> Option<F> {
+        let val = self.0.pop_front()?;
+        F::try_from_int(val).into()
+    }
+
+    pub fn ingest(&mut self, n: Number) {
+        self.0.push_back(n);
+    }
+
+    pub fn ingest_many(&mut self, ns: VecDeque<Number>) {
+        self.0.extend(ns);
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn pop(&mut self) -> Option<Number> {
+        self.0.pop_front()
+    }
+
+    pub fn pop_many(&mut self, num: u64) -> Option<Vec<Number>> {
+        let mut numbers = vec![];
+        for _ in 0..num {
+            numbers.push(self.pop()?);
+        }
+        Some(numbers)
+    }
+}
+
+/// Allows strongly typed iteration
+/// over the tape with minimal overhead
+#[repr(transparent)]
+pub struct TapeF<'a, F: PrimeFiniteField>(&'a mut Tape, PhantomData<F>);
+
+impl<'a, F: PrimeFiniteField> Iterator for TapeF<'a, F> {
+    type Item = F;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_field::<F>()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FieldInputs {
+    ins: Tape,
+    wit: Tape,
+}
+
+impl FieldInputs {
+    /// Access the witness tape for this field.
+    pub fn wit(&mut self) -> &mut Tape {
+        &mut self.wit
+    }
+
+    /// Access the instance tape for this field.
+    pub fn ins(&mut self) -> &mut Tape {
+        &mut self.ins
+    }
+}
+
 // TODO: add type synonym for Vec<u8> serialized field values,
 //       maybe use Box<[u8]> like in other places.
 #[derive(Debug, Default)]
 pub struct CircInputs {
-    ins: Vec<VecDeque<Number>>,
-    wit: Vec<VecDeque<Number>>,
+    field: Vec<FieldInputs>,
 }
 
+// TODO: reconsider the interface for this: we could use .get()
 impl CircInputs {
     #[inline]
-    fn adjust_ins_type_idx(&mut self, type_id: usize) {
-        let n = self.ins.len();
-        if n <= type_id {
-            for _i in n..(type_id + 1) {
-                self.ins.push(Default::default());
-            }
-        }
+    pub fn get(&mut self, type_id: usize) -> &mut FieldInputs {
+        self.adjust_type_idx(type_id);
+        &mut self.field[type_id]
     }
+
     #[inline]
-    fn adjust_wit_type_idx(&mut self, type_id: usize) {
-        let n = self.wit.len();
-        if n <= type_id {
-            for _i in n..(type_id + 1) {
-                self.wit.push(Default::default());
-            }
+    fn adjust_type_idx(&mut self, type_id: usize) {
+        if self.field.len() <= type_id {
+            self.field.resize_with(type_id + 1, Default::default);
         }
     }
 
     // Return the number of instances associated with a given `type_id`
     pub fn num_instances(&self, type_id: usize) -> usize {
-        self.ins[type_id].len()
+        match self.field.get(type_id) {
+            Some(field) => field.ins.len(),
+            None => 0,
+        }
     }
 
     // Return the number of witnesses associated with a given `type_id`
     pub fn num_witnesses(&self, type_id: usize) -> usize {
-        self.wit[type_id].len()
+        match self.field.get(type_id) {
+            Some(field) => field.wit.len(),
+            None => 0,
+        }
     }
 
     /// Ingest instance.
     pub fn ingest_instance(&mut self, type_id: usize, instance: Number) {
-        self.adjust_ins_type_idx(type_id);
-        self.ins[type_id].push_back(instance);
+        self.get(type_id).ins().ingest(instance);
     }
 
     /// Ingest witness.
     pub fn ingest_witness(&mut self, type_id: usize, witness: Number) {
-        self.adjust_wit_type_idx(type_id);
-        self.wit[type_id].push_back(witness);
+        self.get(type_id).wit().ingest(witness);
     }
 
     /// Ingest instances.
     pub fn ingest_instances(&mut self, type_id: usize, instances: VecDeque<Number>) {
-        self.adjust_ins_type_idx(type_id);
-        self.ins[type_id] = instances;
+        self.get(type_id).ins().ingest_many(instances);
     }
 
     /// Ingest witnesses.
     pub fn ingest_witnesses(&mut self, type_id: usize, witnesses: VecDeque<Number>) {
-        self.adjust_wit_type_idx(type_id);
-        self.wit[type_id] = witnesses;
+        self.get(type_id).wit().ingest_many(witnesses);
     }
 
     pub fn pop_instance(&mut self, type_id: usize) -> Option<Number> {
-        self.adjust_ins_type_idx(type_id);
-        self.ins[type_id].pop_front()
+        self.get(type_id).ins().pop()
     }
 
     pub fn pop_instances(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
-        let mut instances = vec![];
-        for _ in 0..num {
-            instances.push(self.pop_instance(type_id)?)
-        }
-        Some(instances)
+        self.get(type_id).ins().pop_many(num)
     }
 
     pub fn pop_witness(&mut self, type_id: usize) -> Option<Number> {
-        self.adjust_wit_type_idx(type_id);
-        self.wit[type_id].pop_front()
+        self.get(type_id).wit().pop()
     }
 
     pub fn pop_witnesses(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
-        let mut witnesses = vec![];
-        for _ in 0..num {
-            witnesses.push(self.pop_witness(type_id)?)
-        }
-        Some(witnesses)
+        self.get(type_id).wit().pop_many(num)
     }
 }
