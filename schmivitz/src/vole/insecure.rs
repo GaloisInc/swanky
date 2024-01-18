@@ -90,6 +90,10 @@ impl RandomVole for InsecureVole {
         self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM
     }
 
+    fn extended_witness_length(&self) -> usize {
+        self.extended_witness_length
+    }
+
     fn witness_mask(&self) -> &[F2] {
         &self.values[0..self.extended_witness_length]
     }

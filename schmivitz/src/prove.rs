@@ -7,8 +7,11 @@ use std::{
 
 use crate::{
     parameters::{self, FIELD_SIZE},
-    witness_counter::VoleCircuitPreparer,
+    prove::witness_counter::VoleCircuitPreparer,
 };
+
+pub(crate) mod circuit_traverser;
+pub(crate) mod witness_counter;
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
@@ -73,7 +76,7 @@ mod tests {
 
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 
-    use crate::Proof;
+    use super::Proof;
 
     #[test]
     fn header_cannot_include_plugins() {
