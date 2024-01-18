@@ -264,6 +264,47 @@ mod tests {
         }
     }
 
+    // TODO: I don't know how to implement this function, but it's needed to support the remaining
+    // tests
+    fn multiply_f8b_16_elements(
+        _a: GenericArray<F8b, U16>,
+        _b: GenericArray<F8b, U16>,
+    ) -> GenericArray<F8b, U16> {
+        // We need to treat these inputs as elements of a polynomial quotient group whose modulus
+        // is a function of those of [`F8b`] and [`F128b`].
+
+        // When I print out the modulus in sage, I get:
+        // X8^16 + (G8^3 + 1)*X8^15 + (G8^6 + G8^2 + G8 + 1)*X8^14 + (G8^7 + G8^6 + G8^4 + G8)*X8^13
+        // + (G8^4 + G8^3 + G8^2 + G8)*X8^12 + (G8^7 + G8^5 + G8^4 + G8^2 + 1)*X8^11
+        // + (G8^3 + G8)*X8^10 + (G8^7 + G8^6 + G8^3 + G8^2 + G8)*X8^9
+        // + (G8^5 + G8^4 + G8^2 + 1)*X8^8 + (G8^6 + G8^4 + G8^2 + G8)*X8^7
+        // + (G8^5 + G8^3 + 1)*X8^6 + (G8^4 + G8)*X8^5
+        // + (G8^7 + G8^6 + G8^5 + G8^2 + G8 + 1)*X8^4 + (G8^7 + G8^4 + G8^2)*X8^3
+        // + (G8^7 + G8^5 + G8^4 + G8^3 + G8^2 + G8)*X8^2
+        // + (G8^7 + G8^6 + G8^4 + G8^3 + G8)*X8 + G8^7 + G8^6 + G8^5 + G8^3 + G8^2 + G8
+        //
+        // I have no idea how to reduce by this in Rust.
+        todo!()
+    }
+
+    #[test]
+    #[should_panic(expected = "not yet implemented")]
+    fn muliply_f8b_16_elements_works_for_known_value() {
+        // Tests multiplication against ground truth from sagemath:
+        let expected_product = [
+            36, 38, 68, 89, 231, 202, 205, 137, 64, 204, 182, 95, 83, 254, 119, 14,
+        ];
+        let a = [0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+            .into_iter()
+            .map(|n| F8b::from(n))
+            .collect::<GenericArray<F8b, U16>>();
+
+        let a_squared = multiply_f8b_16_elements(a, a);
+        for (e, a) in zip(expected_product, a_squared) {
+            assert_eq!(e, a.0)
+        }
+    }
+
     swanky_field_test::test_field!(test_field, F8b);
 
     fn any_f8b() -> impl Strategy<Value = F8b> {
@@ -290,6 +331,41 @@ mod tests {
 
                 assert_eq!(a_as_ga, composed);
 
+        }
+    }
+    proptest! {
+        #[test]
+        #[should_panic(expected = "not yet implemented")]
+        fn decompose_homomorphism_works(a in any_f128b(), b in any_f128b()) {
+            // decompose(a * b)
+            let expected = F8b::decompose_superfield(&(a * b));
+
+            // decompose(a) * decompose(b)
+            let a_decomp = F8b::decompose_superfield(&a);
+            let b_decomp = F8b::decompose_superfield(&b);
+            let actual = multiply_f8b_16_elements(a_decomp, b_decomp);
+
+            assert_eq!(expected, actual);
+    }
+
+    }
+
+    proptest! {
+        #[test]
+        #[should_panic(expected = "not yet implemented")]
+        fn superfield_homomorphism_works(a in uniform16(any_f8b()), b in uniform16(any_f8b())) {
+            let a: GenericArray<F8b, U16> = a.into();
+            let b: GenericArray<F8b, U16> = b.into();
+
+            // superfield(a * b)
+            let expected: F128b = F8b::form_superfield(&multiply_f8b_16_elements(a, b));
+
+            // superfield(a) * superfield(b)
+            let a_super: F128b = F8b::form_superfield(&a);
+            let b_super: F128b = F8b::form_superfield(&b);
+            let actual = a_super * b_super;
+
+            assert_eq!(expected, actual);
         }
     }
 }
