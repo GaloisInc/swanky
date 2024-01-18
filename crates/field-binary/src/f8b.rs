@@ -312,7 +312,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not yet implemented")]
     fn muliply_f8b_16_elements_works_for_known_value() {
         // Tests multiplication against ground truth from sagemath:
         let expected_product = [
@@ -356,7 +355,6 @@ mod tests {
     }
     proptest! {
         #[test]
-        #[should_panic(expected = "not yet implemented")]
         fn decompose_homomorphism_works(a in any_f128b(), b in any_f128b()) {
             // decompose(a * b)
             let expected = F8b::decompose_superfield(&(a * b));
@@ -373,7 +371,6 @@ mod tests {
 
     proptest! {
         #[test]
-        #[should_panic(expected = "not yet implemented")]
         fn superfield_homomorphism_works(a in uniform16(any_f8b()), b in uniform16(any_f8b())) {
             let a: GenericArray<F8b, U16> = a.into();
             let b: GenericArray<F8b, U16> = b.into();
