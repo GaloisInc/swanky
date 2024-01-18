@@ -225,12 +225,12 @@ impl IsSubFieldOf<F128b> for F8b {
 mod tests {
     use std::iter::zip;
 
+    use super::*;
     use generic_array::{typenum::U16, GenericArray};
-    use proptest::{array::uniform16, proptest, strategy::Strategy};
-    use swanky_field::IsSubFieldOf;
+    use proptest::{array::uniform16, prelude::*};
+    use swanky_field::{polynomial::Polynomial, IsSubFieldOf};
     use swanky_field_test::arbitrary_ring;
-
-    use crate::{F128b, F8b};
+    use vectoreyes::array_utils::ArrayUnrolledExt;
 
     #[test]
     fn superfield_formation_works_for_known_value() {
@@ -264,27 +264,51 @@ mod tests {
         }
     }
 
-    // TODO: I don't know how to implement this function, but it's needed to support the remaining
-    // tests
     fn multiply_f8b_16_elements(
-        _a: GenericArray<F8b, U16>,
-        _b: GenericArray<F8b, U16>,
+        a: GenericArray<F8b, U16>,
+        b: GenericArray<F8b, U16>,
     ) -> GenericArray<F8b, U16> {
-        // We need to treat these inputs as elements of a polynomial quotient group whose modulus
-        // is a function of those of [`F8b`] and [`F128b`].
-
-        // When I print out the modulus in sage, I get:
-        // X8^16 + (G8^3 + 1)*X8^15 + (G8^6 + G8^2 + G8 + 1)*X8^14 + (G8^7 + G8^6 + G8^4 + G8)*X8^13
-        // + (G8^4 + G8^3 + G8^2 + G8)*X8^12 + (G8^7 + G8^5 + G8^4 + G8^2 + 1)*X8^11
-        // + (G8^3 + G8)*X8^10 + (G8^7 + G8^6 + G8^3 + G8^2 + G8)*X8^9
-        // + (G8^5 + G8^4 + G8^2 + 1)*X8^8 + (G8^6 + G8^4 + G8^2 + G8)*X8^7
-        // + (G8^5 + G8^3 + 1)*X8^6 + (G8^4 + G8)*X8^5
-        // + (G8^7 + G8^6 + G8^5 + G8^2 + G8 + 1)*X8^4 + (G8^7 + G8^4 + G8^2)*X8^3
-        // + (G8^7 + G8^5 + G8^4 + G8^3 + G8^2 + G8)*X8^2
-        // + (G8^7 + G8^6 + G8^4 + G8^3 + G8)*X8 + G8^7 + G8^6 + G8^5 + G8^3 + G8^2 + G8
-        //
-        // I have no idea how to reduce by this in Rust.
-        todo!()
+        let [a, b] = [a, b].array_map(|coeffs| Polynomial {
+            constant: coeffs[0],
+            coefficients: coeffs[1..].to_vec(),
+        });
+        let mut wide_product = a;
+        wide_product *= &b;
+        // X8^16 + (G8^3 + 1)*X8^15 + (G8^6 + G8^2 + G8 + 1)*X8^14 + (G8^7 + G8^6 + G8^4 + G8)*X8^13 + (G8^4 + G8^3 + G8^2 + G8)*X8^12 + (G8^7 + G8^5 + G8^4 + G8^2 + 1)*X8^11 + (G8^3 + G8)*X8^10 + (G8^7 + G8^6 + G8^3 + G8^2 + G8)*X8^9 + (G8^5 + G8^4 + G8^2 + 1)*X8^8 + (G8^6 + G8^4 + G8^2 + G8)*X8^7 + (G8^5 + G8^3 + 1)*X8^6 + (G8^4 + G8)*X8^5 + (G8^7 + G8^6 + G8^5 + G8^2 + G8 + 1)*X8^4 + (G8^7 + G8^4 + G8^2)*X8^3 + (G8^7 + G8^5 + G8^4 + G8^3 + G8^2 + G8)*X8^2 + (G8^7 + G8^6 + G8^4 + G8^3 + G8)*X8 + G8^7 + G8^6 + G8^5 + G8^3 + G8^2 + G8
+        let p16_over_8 = Polynomial {
+            constant: F8b(238),
+            coefficients: vec![
+                F8b(218),
+                F8b(190),
+                F8b(148),
+                F8b(231),
+                F8b(18),
+                F8b(41),
+                F8b(86),
+                F8b(53),
+                F8b(206),
+                F8b(10),
+                F8b(181),
+                F8b(30),
+                F8b(210),
+                F8b(71),
+                F8b(9),
+                F8b(1),
+            ],
+        };
+        let mut reduced_product = wide_product.divmod(&p16_over_8).1;
+        while let Some(x) = reduced_product.coefficients.last() {
+            if *x == F8b::ZERO {
+                reduced_product.coefficients.pop();
+            } else {
+                break;
+            }
+        }
+        let mut out: GenericArray<F8b, U16> = Default::default();
+        out[0] = reduced_product.constant;
+        out[1..1 + reduced_product.coefficients.len()]
+            .copy_from_slice(&reduced_product.coefficients);
+        out
     }
 
     #[test]
