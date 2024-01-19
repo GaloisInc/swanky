@@ -52,11 +52,9 @@ fn test_range_example() {
 
         let mut disj = Dora::<Prover, F61p, F61p, _, Svole<_, _, F61p>>::new(range_check);
 
-        println!("warm up");
         prover.input_private(Some(F61p::ONE)).unwrap();
 
         // do a number of range checks
-        println!("do {} range proofs", NUM_RANGE_PROOFS);
         for _ in 0..NUM_RANGE_PROOFS {
             let wi: usize = prover.rng.gen::<usize>() % RANGE_SIZE;
             let wf = F61p::try_from(wi as u128).unwrap();
@@ -66,10 +64,7 @@ fn test_range_example() {
         }
         disj.finalize(&mut prover).unwrap();
 
-        println!("finalize");
         prover.finalize().unwrap();
-
-        println!("done");
     });
 
     let rng = AesRng::from_seed(Default::default());

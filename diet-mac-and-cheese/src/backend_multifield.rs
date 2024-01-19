@@ -1752,7 +1752,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     let type_id = plugin.type_id() as usize;
                     // The permutation plugin does not need to execute `callframe_start` or `callframe_end`
                     self.eval[type_id].plugin_call_gate(
-                        &mut self.inputs.get(type_id),
+                        self.inputs.get(type_id),
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -1763,7 +1763,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // disjunction does not use a callframe:
                     // since the inputs/outputs must be flattened to an R1CS witness.
                     self.eval[type_id].plugin_call_gate(
-                        &mut self.inputs.get(type_id),
+                        self.inputs.get(type_id),
                         out_ranges,
                         in_ranges,
                         body.execution(),

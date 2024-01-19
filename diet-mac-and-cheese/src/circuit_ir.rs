@@ -684,12 +684,16 @@ impl Tape {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn pop(&mut self) -> Option<Number> {
         self.0.pop_front()
     }
 
     pub fn pop_many(&mut self, num: u64) -> Option<Vec<Number>> {
-        let mut numbers = vec![];
+        let mut numbers = Vec::with_capacity(num as usize);
         for _ in 0..num {
             numbers.push(self.pop()?);
         }
