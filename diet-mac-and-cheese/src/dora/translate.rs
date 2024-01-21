@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use mac_n_cheese_sieve_parser::TypeId;
 use swanky_field::PrimeFiniteField;
 
@@ -9,41 +7,75 @@ use super::DisjGate;
 
 #[derive(Default)]
 struct WireFrame {
-    map: HashMap<mac_n_cheese_sieve_parser::WireId, super::WireId>,
-    max: usize, // max cell number assigned in this scope
-    off: usize, // offset for cell numbers in this scope
+    // next available cell number
+    next: usize,
+    // maps SIEVE wire ids (index) to cell numbers
+    alias: Vec<Option<super::WireId>>,
 }
 
 impl WireFrame {
+    fn new(inputs: usize, outputs: usize) -> Self {
+        WireFrame {
+            next: inputs + outputs,
+            alias: (0..inputs + outputs).map(Some).collect(),
+        }
+    }
+
     // translates a SIEVE wire id to a cell number
     fn translate(&mut self, org: mac_n_cheese_sieve_parser::WireId) -> super::WireId {
-        match self.map.get(&org) {
-            Some(r) => *r,
-            None => {
-                let idx = self.off + org as usize;
-                self.max = std::cmp::max(self.max, idx);
-                idx
+        let idx = org as usize;
+        if self.alias.len() <= idx {
+            self.alias.resize(idx + 1, None);
+        }
+
+        match &mut self.alias[idx] {
+            Some(cell) => *cell,
+            tx => {
+                let cell = self.next;
+                self.next = cell + 1;
+                *tx = Some(cell);
+                cell
             }
         }
     }
 
     // descend into a child scope (used with function calls)
     fn descend(&self, map: Vec<(mac_n_cheese_sieve_parser::WireId, super::WireId)>) -> Self {
+        // create initial alias map
+        let size = map
+            .iter()
+            .map(|(org, _)| (*org + 1) as usize)
+            .max()
+            .unwrap_or(0);
+
+        let mut alias = vec![None; size];
+        for (org, dst) in map {
+            alias[org as usize] = Some(dst);
+        }
+
         WireFrame {
-            max: self.max,
-            off: self.max + 1, // avoids reassigning cells from parent
-            map: map.into_iter().collect(),
+            next: self.next,
+            alias,
         }
     }
 }
 
+/// Translates a SIEVE-IR gate to a list of `DisjGate`
 pub(crate) fn translate<F: PrimeFiniteField>(
+    inputs: usize,
+    outputs: usize,
     disj_gates: &mut Vec<DisjGate<F>>,
     fun_store: &FunStore,
     typ: TypeId,
     gates: impl Iterator<Item = GateM>,
 ) {
-    translate_gates(disj_gates, fun_store, typ, gates, &mut WireFrame::default());
+    translate_gates(
+        disj_gates,
+        fun_store,
+        typ,
+        gates,
+        &mut WireFrame::new(inputs, outputs),
+    );
 }
 
 fn translate_gates<F: PrimeFiniteField>(
@@ -51,10 +83,10 @@ fn translate_gates<F: PrimeFiniteField>(
     fun_store: &FunStore,
     typ: TypeId,
     gates: impl Iterator<Item = GateM>,
-    alloc: &mut WireFrame,
+    frame: &mut WireFrame,
 ) {
     for gate in gates {
-        translate_gate(disj_gates, fun_store, typ, gate, alloc);
+        translate_gate(disj_gates, fun_store, typ, gate, frame);
     }
 }
 
@@ -65,63 +97,66 @@ fn translate_gate<F: PrimeFiniteField>(
     fun_store: &FunStore,
     typ: TypeId,
     gate: GateM,
-    alloc: &mut WireFrame,
+    frame: &mut WireFrame,
 ) {
     match gate {
         GateM::Add(typ2, dst, lhs, rhs) => {
             assert_eq!(typ2, typ, "different types in disjunction");
             disj_gates.push(DisjGate::Add(
-                alloc.translate(dst),
-                alloc.translate(lhs),
-                alloc.translate(rhs),
+                frame.translate(dst),
+                frame.translate(lhs),
+                frame.translate(rhs),
             ))
         }
         GateM::Sub(typ2, dst, lhs, rhs) => {
             assert_eq!(typ2, typ, "different types in disjunction");
             disj_gates.push(DisjGate::Sub(
-                alloc.translate(dst),
-                alloc.translate(lhs),
-                alloc.translate(rhs),
+                frame.translate(dst),
+                frame.translate(lhs),
+                frame.translate(rhs),
             ))
         }
         GateM::Mul(typ2, dst, lhs, rhs) => {
             assert_eq!(typ2, typ, "different types in disjunction");
             disj_gates.push(DisjGate::Mul(
-                alloc.translate(dst),
-                alloc.translate(lhs),
-                alloc.translate(rhs),
+                frame.translate(dst),
+                frame.translate(lhs),
+                frame.translate(rhs),
             ))
         }
         GateM::Copy(typ2, dst, src) => {
             assert_eq!(typ2, typ, "different types in disjunction");
-            let mut curr_out = dst.0;
-            for curr_input_range in *src {
-                for curr_inp in curr_input_range.0..=curr_input_range.1 {
-                    disj_gates.push(DisjGate::Copy(
-                        alloc.translate(curr_out),
-                        alloc.translate(curr_inp),
-                    ));
-                    curr_out += 1;
-                }
+
+            // flatten ranges
+            let dsts = dst.0..=dst.1;
+            let srcs = src.iter().cloned().flat_map(|(s, e)| s..=e);
+
+            // translate each copy
+            for (w_dst, w_src) in dsts.zip(srcs) {
+                // explicit copy
+                disj_gates.push(DisjGate::Copy(
+                    frame.translate(w_dst),
+                    frame.translate(w_src),
+                ));
             }
         }
         GateM::Witness(typ2, dst) => {
             assert_eq!(typ2, typ, "different types in disjunction");
             for curr_dst in dst.0..=dst.1 {
-                disj_gates.push(DisjGate::Witness(alloc.translate(curr_dst)))
+                disj_gates.push(DisjGate::Witness(frame.translate(curr_dst)))
             }
         }
         GateM::Constant(typ2, dst, cnst) => {
             assert_eq!(typ2, typ, "different types in disjunction");
             let val = F::try_from_int(*cnst).unwrap();
-            disj_gates.push(DisjGate::Constant(alloc.translate(dst), val))
+            disj_gates.push(DisjGate::Constant(frame.translate(dst), val))
         }
         GateM::AddConstant(typ2, dst, src, cnst) => {
             assert_eq!(typ2, typ, "different types in disjunction");
             let val = F::try_from_int(*cnst).unwrap();
             disj_gates.push(DisjGate::AddConstant(
-                alloc.translate(dst),
-                alloc.translate(src),
+                frame.translate(dst),
+                frame.translate(src),
                 val,
             ))
         }
@@ -129,14 +164,14 @@ fn translate_gate<F: PrimeFiniteField>(
             assert_eq!(typ2, typ, "different types in disjunction");
             let val = F::try_from_int(*cnst).unwrap();
             disj_gates.push(DisjGate::MulConstant(
-                alloc.translate(dst),
-                alloc.translate(src),
+                frame.translate(dst),
+                frame.translate(src),
                 val,
             ))
         }
         GateM::AssertZero(typ2, src) => {
             assert_eq!(typ2, typ, "different types in disjunction");
-            disj_gates.push(DisjGate::AssertZero(alloc.translate(src)))
+            disj_gates.push(DisjGate::AssertZero(frame.translate(src)))
         }
         GateM::Call(call_gate) => {
             // recall:
@@ -149,28 +184,61 @@ fn translate_gate<F: PrimeFiniteField>(
             // lookup function body
             let func = fun_store.get_func(fun_id).unwrap();
 
-            // Map inputs/outputs to cells into the child scope
-            // avoids needing to copy arguments and return values
-            // to/from the parent scope
+            // check that the function has the correct type
+            for typ2 in func.compiled_info.type_ids.iter() {
+                assert_eq!(*typ2, typ, "different types in disjunction");
+            }
+
+            // Check that no output wires are used as input wires.
+            // This way, the input cells does not change during the function call.
             //
-            // Note: this relies on wires being single assignment in SIEVE-IR
-            let mut w = 0;
+            // This is enforced by the SIEVE-IR spec, because of single assignment:
+            // otherwise it would require reassigning the input wires.
+            // So this is a sanity check.
+            #[cfg(debug_assertions)]
+            {
+                use std::collections::HashSet;
+
+                let src_set: HashSet<u64> =
+                    src_wires.iter().cloned().flat_map(|(s, e)| s..=e).collect();
+
+                assert!(
+                    !dst_wires
+                        .iter()
+                        .cloned()
+                        .flat_map(|(s, e)| s..=e)
+                        .any(|x| src_set.contains(&x)),
+                    "output wires used as input wires"
+                )
+            }
+
+            // Alias parent inputs/outputs cells into the child scope.
+            //
+            // Note:
+            //
+            // - the function call cannot assign to inputs
+            // - the set of outputs is disjoint from the set of inputs
+            //
+            // Both follows from single assignment in SIEVE-IR.
+            // Therefore we can safely alias the input/output
+            // cells of the parent into the child scope.
+            let mut wire = 0;
             let mut alias = Vec::with_capacity(func.compiled_info.outputs_cnt as usize);
             for (start, end) in dst_wires.iter() {
                 for dst in *start..=*end {
-                    alias.push((w, alloc.translate(dst)));
-                    w += 1;
+                    alias.push((wire, frame.translate(dst)));
+                    wire += 1;
                 }
             }
             for (start, end) in src_wires.iter() {
                 for src in *start..=*end {
-                    alias.push((w, alloc.translate(src)));
-                    w += 1;
+                    alias.push((wire, frame.translate(src)));
+                    wire += 1;
                 }
             }
 
             // check that the number of arguments is correct
-            debug_assert_eq!(w, func.compiled_info.inputs_cnt);
+            debug_assert_eq!(wire, func.compiled_info.inputs_cnt);
             debug_assert_eq!(alias.len(), func.compiled_info.inputs_cnt as usize);
 
             // translate function body
@@ -181,11 +249,15 @@ fn translate_gate<F: PrimeFiniteField>(
                         fun_store,
                         typ,
                         body.gates().iter().cloned(),
-                        &mut alloc.descend(alias),
+                        &mut frame.descend(alias),
                     );
                 }
-                _ => panic!("unsupported function body"),
+                _ => panic!("unsupported function body in disjunction (not gates)"),
             }
+
+            // leaving the child scope
+            // automatically garbage collects the
+            // cells allocated in the child scope as "next" is reset.
         }
 
         GateM::New(_, _, _) | GateM::Comment(_) => {}

@@ -42,7 +42,8 @@ circuit;
         $18 <- @call(inner_prod_4, $5 ... $8, $13 ... $16);
 
         // sum
-        $0 <- @add($17, $18);
+        $19 <- @add($17, $18);
+        $0 <- $19;
     @end
 
     // test inner product
@@ -82,13 +83,15 @@ circuit;
         $24 <- @addc($8, <8>);
 
         // inner product
-        $0 <- @call(inner_prod_8, $17 ... $24, $9 ... $16);
+        $25 <- @call(inner_prod_8, $17 ... $24, $9 ... $16);
+        $0 <- $25;
     @end
 
     @function(clause_f1, @out: 0:1, @in: 0:8, 0:8)
         $17 <- @call(inner_prod_8, $1 ... $8, $1 ... $8);
         $18 <- @addc($17, <1000>);
-        $0 <- @mul($18, $18);
+        $19 <- @mul($18, $18);
+        $0 <- $19;
     @end
 
     @function(branch_example, @out: 0:1, @in: 0:1, 0:8, 0:8)

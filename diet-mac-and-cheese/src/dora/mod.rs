@@ -103,7 +103,15 @@ impl<F: PrimeFiniteField> Clause<F> {
         }
 
         // translate body
-        translate(&mut body, fun_store, typ, gates.iter().cloned());
+        translate(
+            inputs,
+            outputs,
+            &mut body,
+            fun_store,
+            typ,
+            gates.iter().cloned(),
+        );
+
         body.shrink_to_fit();
         Clause { gates: body }
     }
