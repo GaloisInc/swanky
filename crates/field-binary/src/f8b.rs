@@ -41,7 +41,8 @@ impl<'a> MulAssign<&'a F8b> for F8b {
         let wide_product = a.carryless_mul::<false, false>(b);
         let wide_product: u128 = bytemuck::cast(wide_product);
 
-        // Reduce!
+        // Reduce! This reduction code was generated using SageMath as a function of the
+        // polynomial modulus selected for the field.
         let reduced_product = (wide_product >> 0) & 0b0000000011111111
             ^ (wide_product >> 4) & 0b000011110000
             ^ (wide_product >> 5) & 0b00011111000
@@ -276,12 +277,18 @@ mod tests {
         a: GenericArray<F8b, U16>,
         b: GenericArray<F8b, U16>,
     ) -> GenericArray<F8b, U16> {
+        // Represent the f8b_16 elements as coefficients for a polynomial
         let [a, b] = [a, b].array_map(|coeffs| Polynomial {
             constant: coeffs[0],
             coefficients: coeffs[1..].to_vec(),
         });
+
+        // Multiply the two polynomials...
         let mut wide_product = a;
         wide_product *= &b;
+
+        // ...then reduce by their modulus. This modulus is a function of the polynomials for the
+        // F8b and F128b fields, computed using SageMath.
         // X8^16 + (G8^3 + 1)*X8^15 + (G8^6 + G8^2 + G8 + 1)*X8^14 + (G8^7 + G8^6 + G8^4 + G8)*X8^13 + (G8^4 + G8^3 + G8^2 + G8)*X8^12 + (G8^7 + G8^5 + G8^4 + G8^2 + 1)*X8^11 + (G8^3 + G8)*X8^10 + (G8^7 + G8^6 + G8^3 + G8^2 + G8)*X8^9 + (G8^5 + G8^4 + G8^2 + 1)*X8^8 + (G8^6 + G8^4 + G8^2 + G8)*X8^7 + (G8^5 + G8^3 + 1)*X8^6 + (G8^4 + G8)*X8^5 + (G8^7 + G8^6 + G8^5 + G8^2 + G8 + 1)*X8^4 + (G8^7 + G8^4 + G8^2)*X8^3 + (G8^7 + G8^5 + G8^4 + G8^3 + G8^2 + G8)*X8^2 + (G8^7 + G8^6 + G8^4 + G8^3 + G8)*X8 + G8^7 + G8^6 + G8^5 + G8^3 + G8^2 + G8
         let p16_over_8 = Polynomial {
             constant: F8b(238),
@@ -305,6 +312,8 @@ mod tests {
             ],
         };
         let mut reduced_product = wide_product.divmod(&p16_over_8).1;
+
+        // Drop any leading zero coefficients and encode back into an array
         while let Some(x) = reduced_product.coefficients.last() {
             if *x == F8b::ZERO {
                 reduced_product.coefficients.pop();
@@ -396,9 +405,12 @@ mod tests {
     }
 }
 
-/// Conversion matrix used to transform elements in $`\textsf{GF}(2^8)^{16}`$ to $`\textsf{GF}(2^{128})`$.
+/// Conversion matrix used to transform elements in $`\textsf{GF}(2^8)^{16}`$ to
+/// $`\textsf{GF}(2^{128})`$.
 ///
-/// This is tailored to produce a sensible isomorphism with our chosen polynomials for multiplication.
+/// This is tailored to produce a sensible isomorphism with our chosen polynomials so that
+/// multiplication is homomorphic across the two fields. It was computed using SageMath as a
+/// function of the polynomials for `F8b` and `F128b`.
 const F8_16_TO_F128: [u128; 128] = [
     0x827ccc967c10d06c2ade106a4a182a1d,
     0xfeb05aea6cc0bc46f4ce7a205232372a,
@@ -530,9 +542,13 @@ const F8_16_TO_F128: [u128; 128] = [
     0xec827ccc967c10d06c2ade106a4a182a,
 ];
 
-/// Conversion matrix used to transform elements in $`\textsf{GF}(2^{128})`$ to $`\textsf{GF}(2^8)^{16}`$.
+/// Conversion matrix used to transform elements in $`\textsf{GF}(2^{128})`$ to
+/// $`\textsf{GF}(2^8)^{16}`$.
 ///
-/// This is tailored to produce a sensible isomorphism with our chosen polynomials for multiplication.
+/// This is tailored to produce a sensible isomorphism with our chosen polynomials so that
+/// multiplication is homomorphic across the two fields. It was computed using SageMath as a
+/// function of the polynomials for `F8b` and `F128b`; in fact, it's the inverse of the
+/// [`F8_16_to_F128`] matrix.
 const F128_TO_F8_16: [u128; 128] = [
     0x7b6cf0a9ddfcc4cf65c76c2f8a2a0001,
     0xf758a5acc4d2d4c92789fe43a82f0000,
