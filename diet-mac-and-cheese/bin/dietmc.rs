@@ -91,6 +91,31 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
     Ok(tcp_streams)
 }
 
+// split the connections into
+// * one channel for the committing the witnesses and extended witnesses during circuit evaluation
+// * a vec of channels for F2
+// * a vec of channels for the other fields
+fn split_connections_for_multithreading(
+    config: &Config,
+    conns: &mut Vec<TcpStream>,
+) -> Result<(
+    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
+    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
+)> {
+    let mut channels = vec![];
+    for _ in 0..conns.len() {
+        let conn = conns.pop().unwrap();
+        let reader = BufReader::new(conn.try_clone()?);
+        let writer = BufWriter::new(conn);
+        channels.push(SyncChannel::new(reader, writer));
+    }
+    let channel = channels.remove(0);
+    let channels_f2_svole = channels.split_off(channels.len() - config.threads_per_field());
+    let channels_svole = channels;
+    Ok((channel, channels_f2_svole, channels_svole))
+}
+
 fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     info!("relation: {:?}", args.relation);
 
@@ -274,16 +299,8 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let rng = AesRng::new();
 
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-
-            let channels_f2_svole =
-                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+            let (mut channel, channels_f2_svole, channels_svole) =
+                split_connections_for_multithreading(config, &mut conns)?;
 
             let mut handles = vec![];
             let (mut evaluator, handles_f2) =
@@ -296,12 +313,6 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     config.lpn() == LpnSize::Small,
                 )?;
             handles.extend(handles_f2);
-
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
@@ -334,16 +345,8 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
 
             let rng = AesRng::new();
 
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-
-            let channels_f2_svole =
-                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+            let (mut channel, channels_f2_svole, channels_svole) =
+                split_connections_for_multithreading(config, &mut conns)?;
 
             let mut handles = vec![];
             let (mut evaluator, handles_f2) =
@@ -356,12 +359,6 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     config.lpn() == LpnSize::Small,
                 )?;
             handles.extend(handles_f2);
-
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
@@ -539,16 +536,8 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let init_time = Instant::now();
             let total_time = Instant::now();
 
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-
-            let channels_f2_svole =
-                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+            let (mut channel, channels_f2_svole, channels_svole) =
+                split_connections_for_multithreading(config, &mut conns)?;
 
             let rng = AesRng::new();
 
@@ -563,12 +552,6 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     config.lpn() == LpnSize::Small,
                 )?;
             handles.extend(handles_f2);
-
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
@@ -597,16 +580,8 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let init_time = Instant::now();
             let total_time = Instant::now();
 
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-
-            let channels_f2_svole =
-                channels_svole.split_off(channels_svole.len() - config.threads_per_field());
+            let (mut channel, channels_f2_svole, channels_svole) =
+                split_connections_for_multithreading(config, &mut conns)?;
 
             let rng = AesRng::new();
             let mut handles = vec![];
@@ -620,12 +595,6 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
                     config.lpn() == LpnSize::Small,
                 )?;
             handles.extend(handles_f2);
-
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
