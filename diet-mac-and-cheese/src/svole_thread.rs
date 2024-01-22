@@ -15,8 +15,17 @@ use swanky_party::either::PartyEither;
 use swanky_party::{IsParty, Party, Verifier, WhichParty};
 
 const SLEEP_TIME: u64 = 1;
-const SLEEP_TIME_DELTA: u64 = 20;
 const SLEEP_TIME_MAX: u64 = 100;
+const SLEEP_TIME_DELTA: u64 = 20;
+
+/// The Multithreading model is to move the production of svoles to individual threads.
+/// And for a given field, many threads producing svoles are bundled and consumed in a structure
+/// using a round-robin.
+/// * `SvoleAtomic` is the atomic structure allowing to produce or consume the voles.
+/// * `ThreadVole` is the structure that is spawn in a thread containing the `Sender/Receiver`
+///    svole functionality together with a `SvoleAtomic` used at a producer.
+/// * `SvoleAtomicRoundRobin` is the structure used by the consumer of svoles which draws the
+///    svoles by the threads in a round-robin fashion.
 
 /// Multithreading Svole using some atomic data-structures.
 ///
@@ -111,6 +120,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
     }
 
     fn delta(&self, _ev: IsParty<P, Verifier>) -> T {
+        // Need to wait for delta to be available
         while (*self.delta.lock().unwrap()).is_none() {
             warn!(
                 "Waiting for DELTA: {:?}",
@@ -119,6 +129,124 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
             std::thread::sleep(std::time::Duration::from_millis(SLEEP_TIME_DELTA));
         }
         (*self.delta.lock().unwrap()).unwrap()
+    }
+}
+
+/// Svole intended to be run in a separate thread.
+pub struct ThreadSvole<P: Party, V, T: FiniteField> {
+    vole_comm: PartyEither<P, Sender<T>, Receiver<T>>,
+    svole_atomic: SvoleAtomic<P, V, T>,
+}
+
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
+    /// Initialize the functionality.
+    pub fn init<C: AbstractChannel + Clone>(
+        channel: &mut C,
+        rng: &mut AesRng,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
+        mut svole_atomic: SvoleAtomic<P, V, T>,
+        delta: Option<T>,
+    ) -> Result<Self> {
+        let vole_comm = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                PartyEither::prover_new(ev, Sender::init(channel, rng, lpn_setup, lpn_extend)?)
+            }
+            WhichParty::Verifier(ev) => PartyEither::verifier_new(
+                ev,
+                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)?,
+            ),
+        };
+
+        match P::WHICH {
+            WhichParty::Prover(_) => debug!("INIT MultithreadedSender"),
+            WhichParty::Verifier(ev) => {
+                svole_atomic.set_delta(vole_comm.as_ref().verifier_into(ev).delta());
+                debug!("DELTA is {:?}", svole_atomic.delta(ev));
+                debug!("INIT MultithreadedReceiver");
+            }
+        }
+
+        Ok(Self {
+            vole_comm,
+            svole_atomic,
+        })
+    }
+
+    /// Run the functionality.
+    pub fn run<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<()>
+    where
+        // This constraint is necessary in order to use `wykw::sole::Sender::send`
+        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
+    {
+        let mut sleep_time = SLEEP_TIME;
+        loop {
+            let full = *self.svole_atomic.full.lock().unwrap();
+
+            // We stop when all the svole vectors are full to avoid concurrency issues.
+            // In particular if one side decides to fill up an svole while the other has received a
+            // stop signal
+            if *self.svole_atomic.stop_signal.lock().unwrap() && full {
+                info!("Stop running svole functionality for {}", field_name::<T>());
+                break;
+            }
+
+            if !full {
+                match P::WHICH {
+                    WhichParty::Prover(ev) => {
+                        debug!("multithread prover extend");
+                        self.vole_comm.as_mut().prover_into(ev).send(
+                            channel,
+                            rng,
+                            self.svole_atomic
+                                .voles
+                                .lock()
+                                .unwrap()
+                                .as_mut()
+                                .prover_into(ev),
+                        )?;
+                        debug!("DONE multithread prover extend");
+                    }
+                    WhichParty::Verifier(ev) => {
+                        debug!("multithread verifier extend");
+                        debug!("RUN DELTA is {:?}", self.svole_atomic.delta(ev));
+                        let start = Instant::now();
+                        self.vole_comm.as_mut().verifier_into(ev).receive::<_, V>(
+                            channel,
+                            rng,
+                            self.svole_atomic
+                                .voles
+                                .lock()
+                                .unwrap()
+                                .as_mut()
+                                .verifier_into(ev),
+                        )?;
+                        info!(
+                            "SVOLE<{} {:?}>",
+                            std::any::type_name::<T>().split("::").last().unwrap(),
+                            start.elapsed(),
+                        );
+                        debug!("DONE multithread verifier extend");
+                    }
+                }
+
+                *self.svole_atomic.full.lock().unwrap() = true;
+                sleep_time = SLEEP_TIME; // reset sleep time
+            } else {
+                debug!(
+                    "SLEEP! multithreaded svole: {:?}",
+                    std::any::type_name::<T>()
+                );
+                // exponential backoff sleep
+                std::thread::sleep(std::time::Duration::from_millis(sleep_time));
+                sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -240,126 +368,9 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoun
     }
 
     fn delta(&self, ev: IsParty<P, Verifier>) -> T {
-        // It is the same delta for all the svoles in the round-robin
+        // It is the same delta for all the svoles in the round-robin,
+        // so we can pick the current one.
         self.svoles[*self.current.borrow()].delta(ev)
-    }
-}
-
-/// Svole intended to be run in a separate thread.
-pub struct ThreadSvole<P: Party, V, T: FiniteField> {
-    vole_comm: PartyEither<P, Sender<T>, Receiver<T>>,
-    svole_atomic: SvoleAtomic<P, V, T>,
-}
-
-impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
-    /// Initialize the functionality.
-    pub fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
-        rng: &mut AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-        mut svole_atomic: SvoleAtomic<P, V, T>,
-        delta: Option<T>,
-    ) -> Result<Self> {
-        let vole_comm = match P::WHICH {
-            WhichParty::Prover(ev) => {
-                PartyEither::prover_new(ev, Sender::init(channel, rng, lpn_setup, lpn_extend)?)
-            }
-            WhichParty::Verifier(ev) => PartyEither::verifier_new(
-                ev,
-                Receiver::init(channel, rng, lpn_setup, lpn_extend, delta)?,
-            ),
-        };
-
-        match P::WHICH {
-            WhichParty::Prover(_) => debug!("INIT MultithreadedSender"),
-            WhichParty::Verifier(ev) => {
-                svole_atomic.set_delta(vole_comm.as_ref().verifier_into(ev).delta());
-                debug!("DELTA is {:?}", svole_atomic.delta(ev));
-                debug!("INIT MultithreadedReceiver");
-            }
-        }
-
-        Ok(Self {
-            vole_comm,
-            svole_atomic,
-        })
-    }
-
-    /// Run the functionality.
-    pub fn run<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<()>
-    where
-        // This constraint is necessary in order to use `wykw::sole::Sender::send`
-        <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
-    {
-        let mut sleep_time = SLEEP_TIME;
-        loop {
-            let full = *self.svole_atomic.full.lock().unwrap();
-
-            // We stop when all the svole vectors are full to avoid concurrency issues.
-            // In particular if one side decides to fill up an svole while the other has received a
-            // stop signal
-            if *self.svole_atomic.stop_signal.lock().unwrap() && full {
-                info!("Stop running svole functionality for {}", field_name::<T>());
-                break;
-            }
-
-            if !full {
-                match P::WHICH {
-                    WhichParty::Prover(ev) => {
-                        debug!("multithread prover extend");
-                        self.vole_comm.as_mut().prover_into(ev).send(
-                            channel,
-                            rng,
-                            self.svole_atomic
-                                .voles
-                                .lock()
-                                .unwrap()
-                                .as_mut()
-                                .prover_into(ev),
-                        )?;
-                        debug!("DONE multithread prover extend");
-                    }
-                    WhichParty::Verifier(ev) => {
-                        debug!("multithread verifier extend");
-                        debug!("RUN DELTA is {:?}", self.svole_atomic.delta(ev));
-                        let start = Instant::now();
-                        self.vole_comm.as_mut().verifier_into(ev).receive::<_, V>(
-                            channel,
-                            rng,
-                            self.svole_atomic
-                                .voles
-                                .lock()
-                                .unwrap()
-                                .as_mut()
-                                .verifier_into(ev),
-                        )?;
-                        info!(
-                            "SVOLE<{} {:?}>",
-                            std::any::type_name::<T>().split("::").last().unwrap(),
-                            start.elapsed(),
-                        );
-                        debug!("DONE multithread verifier extend");
-                    }
-                }
-
-                *self.svole_atomic.full.lock().unwrap() = true;
-                sleep_time = SLEEP_TIME; // reset sleep time
-            } else {
-                debug!(
-                    "SLEEP! multithreaded svole: {:?}",
-                    std::any::type_name::<T>()
-                );
-                // exponential backoff sleep
-                std::thread::sleep(std::time::Duration::from_millis(sleep_time));
-                sleep_time = std::cmp::min(sleep_time + 1 + (sleep_time / 2), SLEEP_TIME_MAX);
-            }
-        }
-        Ok(())
     }
 }
 
