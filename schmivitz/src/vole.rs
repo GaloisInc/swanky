@@ -5,8 +5,11 @@
 //! - Secure version as described in FAEST spec and paper
 //!
 
+mod insecure;
+
 use eyre::Result;
 use merlin::Transcript;
+use rand::{CryptoRng, RngCore};
 use swanky_field_binary::{F128b, F2};
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
@@ -51,7 +54,11 @@ where
     /// any external context provided at the application level.
     /// Internally, it must incorporate any additional public parameters defined by this
     /// instantiation of `RandomVole`.
-    fn create(extended_witness_length: u64, transcript: &mut Transcript) -> Self;
+    fn create(
+        extended_witness_length: usize,
+        transcript: &mut Transcript,
+        rng: &mut (impl CryptoRng + RngCore),
+    ) -> Self;
 
     /// Get the total number of VOLE correlations supported by this random VOLE instance.
     ///
@@ -59,7 +66,7 @@ where
     /// passed to [`RandomVole::create()`];
     /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM); and
     /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
-    fn count(&self) -> u64;
+    fn count(&self) -> usize;
 
     /// Get the mask for the witness; this is $`\bf u_{[1..\ell]}`$ in the paper, where
     /// $`\ell`$ is the `extended_witness_length` passed to [`RandomVole::create()`].
@@ -91,7 +98,7 @@ where
     ///
     /// The index `i` must be in the range $`[1, \ell + r\tau]`$, where $`\ell + r\tau`$ is the
     /// value returned by [`RandomVole::count()`].
-    fn vole_mask(&self, i: u64) -> Result<F128b>;
+    fn vole_mask(&self, i: usize) -> Result<F128b>;
 
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
