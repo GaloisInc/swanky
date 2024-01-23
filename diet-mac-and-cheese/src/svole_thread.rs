@@ -341,7 +341,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoun
         _lpn_extend: LpnParams,
         _delta: Option<T>,
     ) -> Result<Self> {
-        unreachable!("Should not be initialized")
+        panic!("Should not be initialized via init from SvoleT")
     }
 
     fn duplicate(&self) -> Self {
