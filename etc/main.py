@@ -42,6 +42,7 @@ def main(
 
 from etc.ci import ci
 from etc.fmt import fmt
+from etc.graph_deps import graph_deps
 from etc.lint.cmd import lint
 from etc.list_features import list_features
 from etc.new_crate import new_crate
@@ -57,3 +58,4 @@ main.add_command(new_crate)
 main.add_command(readme)
 main.add_command(upgrade_deps)
 main.add_command(vectoreyes)
+main.add_command(graph_deps)

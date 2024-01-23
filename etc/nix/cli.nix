@@ -10,6 +10,7 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
     cargo-nextest
     cargo-deny
     cargo-edit
+    cargo-depgraph
     llvmPackages_16.bintools
     git
     (python311.withPackages (py: [

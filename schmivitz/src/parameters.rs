@@ -19,7 +19,7 @@ pub const SECURITY_PARAM: usize = 128;
 /// Note that the ZK protocol for degree-2 polynomials from small-sized sVOLE defined in
 /// Section 6.2 actually allows the input polynomials to be defined over an extension field
 /// $`\mathbb F_{p^k}`$, for some $`k`$. For ease of implementation, we restrict the input
-/// polynomials to be over $\mathbb F_p$.
+/// polynomials to be over $`\mathbb F_p`$.
 pub const FIELD_SIZE: usize = 2;
 
 /// The field size ($`r`$ in the paper) for the generated VOLEs, relative to [`FIELD_SIZE`].
@@ -29,7 +29,7 @@ pub const FIELD_SIZE: usize = 2;
 ///
 /// This parameter needs to define a "small- to medium-sized" extension; other implementations
 /// vary this from 7 to 11 (see [Baum et al., Section 7.2](https://eprint.iacr.org/2023/996.pdf))
-pub const VOLE_SIZE_PARAM: usize = 10;
+pub const VOLE_SIZE_PARAM: usize = 8;
 
 /// The repetition parameter ($`\tau`$ in the paper).
 ///
@@ -40,4 +40,4 @@ pub const VOLE_SIZE_PARAM: usize = 10;
 /// This maintains the property that $`\lambda \approx r\tau`$, for the
 /// [security parameter $`\lambda`$](SECURITY_PARAM) and the
 /// [VOLE size parameter $`r`$](VOLE_SIZE_PARAM).
-pub const REPETITION_PARAM: usize = 12;
+pub const REPETITION_PARAM: usize = 16;

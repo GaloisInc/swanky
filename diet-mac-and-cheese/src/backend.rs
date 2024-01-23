@@ -105,7 +105,7 @@ impl<T: FiniteField> Monitor<T> {
         info!("Monitor for field: {}", field_name::<T>());
         if self.monitor_mul != self.monitor_zk_mult_check {
             warn!(
-                "diff numb of mult gates {} and mult_check {}",
+                "diff numb of mult gates {} and zk_mult_check {}",
                 self.monitor_mul, self.monitor_zk_mult_check
             );
         }
