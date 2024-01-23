@@ -21,6 +21,9 @@ mod perm;
 // Dora
 mod protocol;
 
+#[cfg(test)]
+mod tests;
+
 type WireId = usize;
 
 pub use disjunction::Disjunction;
@@ -105,7 +108,7 @@ fn tidx(w: u64) -> usize {
     w as usize
 }
 
-// Translates `gate` to one or more `DisjGate`, pushing the result(s) to
+// Translates `gate` to one or more low-level `DisjGate`, pushing the result(s) to
 // `disj_gates`. Checks that all gates are for `typ`.
 fn translate_gate<F: PrimeFiniteField>(
     disj_gates: &mut Vec<DisjGate<F>>,
@@ -136,6 +139,8 @@ fn translate_gate<F: PrimeFiniteField>(
             }
         }
         GateM::Witness(typ2, dst) => {
+            // split high dimensional witness gate
+            // into multiple 1-dimensional gates
             assert_eq!(typ2, typ, "different types in disjunction");
             for curr_dst in dst.0..=dst.1 {
                 disj_gates.push(DisjGate::Witness(tidx(curr_dst)))

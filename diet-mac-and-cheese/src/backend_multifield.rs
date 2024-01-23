@@ -2,8 +2,8 @@
 
 use crate::backend_extfield::DietMacAndCheeseExtField;
 use crate::circuit_ir::{
-    CircInputs, CompiledInfo, FunId, FunStore, FuncDecl, GateM, TypeSpecification, TypeStore,
-    WireCount, WireId, WireRange,
+    CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification,
+    TypeStore, WireCount, WireId, WireRange,
 };
 use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
@@ -36,6 +36,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::io::{Read, Seek};
+use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use swanky_field::{
@@ -133,6 +134,7 @@ pub trait BackendDisjunctionT: BackendT {
     // execute a disjunction on the given inputs
     fn disjunction(
         &mut self,
+        inswit: &mut FieldInputs,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>>;
@@ -145,6 +147,7 @@ where
 {
     fn disjunction(
         &mut self,
+        _inswit: &mut FieldInputs,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
@@ -388,7 +391,7 @@ impl<
 }
 
 // Note: The restriction to a prime field is not caused by Dora
-// This should be expanded in the future to allow disjunctinos over extension fields.
+// This should be expanded in the future to allow disjunctions over extension fields.
 impl<
         P: Party,
         FP: PrimeFiniteField,
@@ -406,17 +409,20 @@ impl<
 
     fn disjunction(
         &mut self,
+        inswit: &mut FieldInputs,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
         fn execute_branch<
+            I: Iterator<Item = F>,
             P: Party,
-            F: FiniteField<PrimeField = F>,
+            F: FiniteField,
             C: AbstractChannel + Clone,
             SvoleF: SvoleT<P, F, F>,
         >(
             ev: IsParty<P, Prover>,
             dmc: &mut DietMacAndCheese<P, F, F, C, SvoleF>,
+            wit_tape: I,
             inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire],
             cond: usize,
             st: &mut DoraState<P, F, F, C, SvoleF>,
@@ -435,7 +441,8 @@ impl<
                 .get(&guard_val)
                 .expect("no clause guard is satisfied");
 
-            st.dora.mux(dmc, inputs, ProverPrivateCopy::new(opt))
+            st.dora
+                .mux(dmc, wit_tape, inputs, ProverPrivateCopy::new(opt))
         }
 
         match self.dora_states.entry(disj.id()) {
@@ -443,16 +450,17 @@ impl<
                 WhichParty::Prover(ev) => execute_branch(
                     ev,
                     &mut self.dmc,
+                    inswit.wit().iter::<FP::PrimeField>(),
                     inputs,
                     disj.cond() as usize,
                     entry.get_mut(),
                 ),
-                WhichParty::Verifier(ev) => {
-                    entry
-                        .get_mut()
-                        .dora
-                        .mux(&mut self.dmc, inputs, ProverPrivateCopy::empty(ev))
-                }
+                WhichParty::Verifier(ev) => entry.get_mut().dora.mux(
+                    &mut self.dmc,
+                    iter::empty(),
+                    inputs,
+                    ProverPrivateCopy::empty(ev),
+                ),
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
@@ -475,13 +483,20 @@ impl<
 
                 // compute opt
                 match P::WHICH {
-                    WhichParty::Prover(ev) => {
-                        execute_branch(ev, &mut self.dmc, inputs, disj.cond() as usize, dora)
-                    }
-                    WhichParty::Verifier(ev) => {
-                        dora.dora
-                            .mux(&mut self.dmc, inputs, ProverPrivateCopy::empty(ev))
-                    }
+                    WhichParty::Prover(ev) => execute_branch(
+                        ev,
+                        &mut self.dmc,
+                        inswit.wit().iter::<FP::PrimeField>(),
+                        inputs,
+                        disj.cond() as usize,
+                        dora,
+                    ),
+                    WhichParty::Verifier(ev) => dora.dora.mux(
+                        &mut self.dmc,
+                        iter::empty(),
+                        inputs,
+                        ProverPrivateCopy::empty(ev),
+                    ),
                 }
             }
         }
@@ -702,6 +717,7 @@ trait EvaluatorT<P: Party> {
 
     fn plugin_call_gate(
         &mut self,
+        inswit: &mut FieldInputs,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
@@ -864,6 +880,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
 
     fn plugin_call_gate(
         &mut self,
+        inswit: &mut FieldInputs,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
@@ -902,7 +919,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 debug_assert_eq!(wires.len() as WireCount, disj.inputs() + disj.cond());
 
                 // invoke disjunction implement on the backend
-                let wires = self.backend.disjunction(&wires[..], disj)?;
+                let wires = self.backend.disjunction(inswit, &wires[..], disj)?;
                 debug_assert_eq!(wires.len() as u64, disj.outputs());
 
                 // write back output wires
@@ -1734,12 +1751,19 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 PluginExecution::PermutationCheck(plugin) => {
                     let type_id = plugin.type_id() as usize;
                     // The permutation plugin does not need to execute `callframe_start` or `callframe_end`
-                    self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
+                    self.eval[type_id].plugin_call_gate(
+                        self.inputs.get(type_id),
+                        out_ranges,
+                        in_ranges,
+                        body.execution(),
+                    )?;
                 }
                 PluginExecution::Disjunction(plugin) => {
+                    let type_id = plugin.field() as usize;
                     // disjunction does not use a callframe:
                     // since the inputs/outputs must be flattened to an R1CS witness.
-                    self.eval[plugin.field() as usize].plugin_call_gate(
+                    self.eval[type_id].plugin_call_gate(
+                        self.inputs.get(type_id),
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -1748,7 +1772,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 PluginExecution::Mux(plugin) => {
                     let type_id = plugin.type_id() as usize;
                     self.callframe_start(func, out_ranges, in_ranges)?;
-                    self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
+                    self.eval[type_id].plugin_call_gate(
+                        self.inputs.get(type_id),
+                        out_ranges,
+                        in_ranges,
+                        body.execution(),
+                    )?;
                     self.callframe_end(func);
                 }
             },
