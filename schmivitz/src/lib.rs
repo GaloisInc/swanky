@@ -16,6 +16,7 @@
 
 #![deny(missing_docs)]
 
+mod all_but_one_vc;
 #[allow(unused)]
 pub mod parameters;
 mod prove;

@@ -2,7 +2,14 @@
 name = "schmivitz"
 description = "A library for zero-knowledge protocols using VOLE-in-the-head"
 categories = ["cryptography"]
-keywords = ["cryptography", "zero-knowledge", "VOLE", "VOLE-in-the-head", "NIZK", "non-interactive"]
+keywords = [
+    "cryptography",
+    "zero-knowledge",
+    "VOLE",
+    "VOLE-in-the-head",
+    "NIZK",
+    "non-interactive",
+]
 autoexamples = true
 authors.workspace = true
 license.workspace = true
@@ -13,12 +20,15 @@ version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+blake3.workspace = true
 eyre.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 merlin.workspace = true
+proptest.workspace = true
 rand.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
+vectoreyes.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
