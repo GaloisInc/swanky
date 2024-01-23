@@ -1587,18 +1587,19 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     if *field == std::any::TypeId::of::<F2>() {
                         self.load_backend_multithreaded_f2(channel, rng, *idx as usize, lpn_small)?;
                     } else {
-                        let mut channels_voles = vec![];
-                        for _ in 0..threads_per_field {
-                            if let Some(channel_vole) = channels_vole.pop() {
-                                channels_voles.push(channel_vole);
-                            } else {
-                                bail!("no more channel available to load a backend");
-                            }
+                        if channels_vole.len() < threads_per_field {
+                            bail!(
+                                "not enough channels available: {} channels available instead of {}",
+                                channels_vole.len(),
+                                threads_per_field
+                            );
                         }
+                        let channels_for_field =
+                            channels_vole.split_off(channels_vole.len() - threads_per_field + 1);
 
                         let more_handles = self.load_backend_multi_any(
                             channel,
-                            channels_voles,
+                            channels_for_field,
                             rng,
                             *field,
                             *idx as usize,
