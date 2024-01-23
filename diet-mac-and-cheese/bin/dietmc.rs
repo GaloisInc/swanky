@@ -97,19 +97,21 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
 // * a vec of channels for the other fields
 fn split_connections_for_multithreading(
     config: &Config,
-    conns: &mut Vec<TcpStream>,
+    conns: Vec<TcpStream>,
 ) -> Result<(
     SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
     Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
     Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
 )> {
-    let mut channels = vec![];
-    for _ in 0..conns.len() {
-        let conn = conns.pop().unwrap();
-        let reader = BufReader::new(conn.try_clone()?);
-        let writer = BufWriter::new(conn);
-        channels.push(SyncChannel::new(reader, writer));
-    }
+    let mut channels = conns
+        .into_iter()
+        .map(|conn| {
+            let reader = BufReader::new(conn.try_clone()?);
+            let writer = BufWriter::new(conn);
+            Ok(SyncChannel::new(reader, writer))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     let channel = channels.remove(0);
     let channels_f2_svole = channels.split_off(channels.len() - config.threads_per_field());
     let channels_svole = channels;
@@ -292,7 +294,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let mut conns = start_connection_verifier(&addresses)?;
+            let conns = start_connection_verifier(&addresses)?;
 
             let init_time = Instant::now();
             let total_time = Instant::now();
@@ -300,7 +302,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
 
             let (mut channel, channels_f2_svole, channels_svole) =
-                split_connections_for_multithreading(config, &mut conns)?;
+                split_connections_for_multithreading(config, conns)?;
 
             let mut handles = vec![];
             let (mut evaluator, handles_f2) =
@@ -338,7 +340,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let mut conns = start_connection_prover(&addresses)?;
+            let conns = start_connection_prover(&addresses)?;
 
             let init_time = Instant::now();
             let total_time = Instant::now();
@@ -346,7 +348,7 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
             let rng = AesRng::new();
 
             let (mut channel, channels_f2_svole, channels_svole) =
-                split_connections_for_multithreading(config, &mut conns)?;
+                split_connections_for_multithreading(config, conns)?;
 
             let mut handles = vec![];
             let (mut evaluator, handles_f2) =
@@ -531,13 +533,13 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let mut conns = start_connection_verifier(&addresses)?;
+            let conns = start_connection_verifier(&addresses)?;
 
             let init_time = Instant::now();
             let total_time = Instant::now();
 
             let (mut channel, channels_f2_svole, channels_svole) =
-                split_connections_for_multithreading(config, &mut conns)?;
+                split_connections_for_multithreading(config, conns)?;
 
             let rng = AesRng::new();
 
@@ -575,13 +577,13 @@ fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let mut conns = start_connection_prover(&addresses)?;
+            let conns = start_connection_prover(&addresses)?;
 
             let init_time = Instant::now();
             let total_time = Instant::now();
 
             let (mut channel, channels_f2_svole, channels_svole) =
-                split_connections_for_multithreading(config, &mut conns)?;
+                split_connections_for_multithreading(config, conns)?;
 
             let rng = AesRng::new();
             let mut handles = vec![];
