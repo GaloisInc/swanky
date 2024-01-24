@@ -43,16 +43,23 @@ pub(super) fn collapse_vec<B: BackendT>(
     Ok(out)
 }
 
+/// Types representing an enumerable memory/RAM space.
 pub trait MemorySpace<V> {
+    /// The type of RAM addresses.
     type Addr: AsRef<[V]>;
+    /// An iterator over [`Self::Addr`].
     type Enum: Iterator<Item = Self::Addr>;
 
+    /// The size (in number of `V`) of addresses.
     fn addr_size(&self) -> usize;
 
+    /// The size (in number of `V`) of values.
     fn value_size(&self) -> usize;
 
+    /// The total capacity of the RAM.
     fn size(&self) -> usize;
 
+    /// Return an iterator over all addresses.
     fn enumerate(&self) -> Self::Enum;
 }
 
@@ -114,6 +121,13 @@ impl<F: FiniteField> MemorySpace<F> for Arithmetic<F> {
     }
 }
 
+/// A RAM with addresses/values represented by a single arithmetic field
+/// element.
+///
+/// This is a high-level wrapper around [`DoraRam`] for the case described
+/// above. Use of this structure over `DoraRam` is preferred, as it provides
+/// the more familiar read/write interface and properly executes the protocol
+/// steps for these operations.
 pub struct ArithmeticRam<
     P: Party,
     V: IsSubFieldOf<F>,
