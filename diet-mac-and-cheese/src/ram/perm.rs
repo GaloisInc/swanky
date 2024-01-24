@@ -18,6 +18,9 @@ fn eval_zero_poly<B: BackendT>(
     Ok(rs)
 }
 
+/// Assert that `lhs` is a permutation of `rhs`.
+///
+/// `lhs` and `rhs` are assumed to be of equal length!
 pub(super) fn permutation<B: BackendT>(
     backend: &mut B,
     x: B::FieldElement,
