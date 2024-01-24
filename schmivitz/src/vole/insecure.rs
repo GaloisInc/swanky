@@ -7,7 +7,7 @@
 use std::iter::{repeat_with, zip};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
-use eyre::{bail, eyre, Result};
+use eyre::{bail, Result};
 use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
@@ -20,11 +20,11 @@ struct InsecureVole {
 
     /// Random values $`\bf u`$ that were committed to.
     ///
-    /// Guarantee: This is length `extended_witness_length`.
+    /// Guarantee: This has length `extended_witness_length` + r\tau `$, where $`r`$ is the
+    /// [`VOLE_SIZE_PARAM`] and $`\tau`$ is the [`REPETITION_PARAM`].
     values: Vec<F2>,
 
     /// Verifier's chosen random key $`\bf \Delta`$.
-    #[allow(unused)]
     verifier_key: [F8b; REPETITION_PARAM],
 
     /// Masks for the random values $`\bf V`$.
@@ -52,10 +52,12 @@ impl RandomVole for InsecureVole {
             .as_bytes(),
         );
 
+        let total_vole_count = extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
+
         // Choose random values for everything.
         // NB: This will fail on a 32-bit target if the witness length is > 2^32
         let values = repeat_with(|| F2::random(rng))
-            .take(extended_witness_length)
+            .take(total_vole_count)
             .collect();
 
         // This unwrap is safe because we hardcoded the length
@@ -73,7 +75,7 @@ impl RandomVole for InsecureVole {
                 .try_into()
                 .unwrap()
         })
-        .take(extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM)
+        .take(total_vole_count)
         .collect();
 
         Self {
@@ -111,13 +113,8 @@ impl RandomVole for InsecureVole {
                 i
             );
         }
-        // Adjust for one-indexing; bail if messed up the mask length.
-        let unlifted: &[F8b; REPETITION_PARAM] =
-            self.masks[i - 1].as_slice().try_into().map_err(|_| {
-                eyre!("Internal error: expected mask entry to be exactly length 16, but it wasn't")
-            })?;
-
-        Ok(F8b::form_superfield(unlifted.into()))
+        // Adjust for one-indexing
+        Ok(F8b::form_superfield(&self.masks[i - 1].into()))
     }
 
     fn decommit(self, _transcript: &mut merlin::Transcript) -> Self::Decommitment {
@@ -132,18 +129,17 @@ impl RandomVole for InsecureVole {
             .map(|ui| self.verifier_key.map(|delta| *ui * delta))
             .collect::<Vec<_>>();
 
-        assert_eq!(u_delta.len(), self.extended_witness_length);
-
         // Add V + uΔ^T
+        // The unwrap is safe because both internal types are known to be length 16
         let verifier_commitments = zip(self.masks, u_delta)
-            .map(|(v, ud)| {
-                zip(v, ud)
+            .map(|(vs, uds)| {
+                zip(vs, uds)
                     .map(|(v, ud)| v + ud)
                     .collect::<Vec<_>>()
                     .try_into()
                     .unwrap()
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         Self::Decommitment {
             extended_witness_length: self.extended_witness_length,
@@ -199,5 +195,35 @@ impl InsecureCommitments {
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use merlin::Transcript;
+    use rand::thread_rng;
+
+    use crate::{
+        parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
+        vole::{insecure::InsecureVole, RandomVole},
+    };
+
+    #[test]
+    fn everything_is_the_expected_size() {
+        let rng = &mut thread_rng();
+        let transcript = &mut Transcript::new(b"testing");
+
+        let witness = 100;
+        let voles = InsecureVole::create(witness, transcript, rng);
+
+        assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
+        assert_eq!(voles.witness_mask().len(), witness);
+
+        let decom = voles.decommit(transcript);
+
+        assert_eq!(decom.extended_witness_length(), witness);
+        assert_eq!(decom.witness_voles().len(), witness);
+        // This will panic if there's a length problem:
+        decom.mask_voles();
     }
 }
