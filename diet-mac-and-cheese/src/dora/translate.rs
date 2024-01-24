@@ -1,7 +1,6 @@
-use mac_n_cheese_sieve_parser::TypeId;
 use swanky_field::PrimeFiniteField;
 
-use crate::circuit_ir::{FunStore, FunctionBody, GateM};
+use crate::circuit_ir::{self, FunStore, FunctionBody, GateM, TypeId};
 
 use super::DisjGate;
 
@@ -22,7 +21,7 @@ impl WireFrame {
     }
 
     // translates a SIEVE wire id to a cell number
-    fn translate(&mut self, org: mac_n_cheese_sieve_parser::WireId) -> super::WireId {
+    fn translate(&mut self, org: circuit_ir::WireId) -> super::WireId {
         let idx = org as usize;
         if self.alias.len() <= idx {
             self.alias.resize(idx + 1, None);
@@ -40,7 +39,7 @@ impl WireFrame {
     }
 
     // descend into a child scope (used with function calls)
-    fn descend(&self, map: Vec<(mac_n_cheese_sieve_parser::WireId, super::WireId)>) -> Self {
+    fn descend(&self, map: Vec<(circuit_ir::WireId, super::WireId)>) -> Self {
         // create initial alias map
         let size = map
             .iter()
