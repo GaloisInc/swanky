@@ -1141,10 +1141,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 lpn_setup,
                 lpn_extend,
             )?;
-        let mut multithreaded_voles: Vec<Box<dyn SvoleStopSignal>> = vec![];
-        for s in svoles_atomics {
-            multithreaded_voles.push(Box::new(s))
-        }
+        let multithreaded_voles: Vec<Box<dyn SvoleStopSignal>> = svoles_atomics
+            .into_iter()
+            .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
+            .collect();
 
         let fcom_f2 = FCom::init_with_vole(svole_round_robin)?;
         Ok((
@@ -1461,9 +1461,13 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 lpn_setup,
                 lpn_extend,
             )?;
-        for s in svoles_atomics {
-            self.multithreaded_voles.push(Box::new(s))
-        }
+        self.multithreaded_voles.extend(
+            svoles_atomics
+                .into_iter()
+                .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
+                .collect::<Vec<_>>(),
+        );
+
         debug!("Starting DietMacAndCheese...");
         let dmc =
             DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomicRoundRobin<P, FE, FE>>::init_with_svole(
