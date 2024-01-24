@@ -181,7 +181,7 @@ where
                 let val_addr: Vec<_> = addr.iter().map(|e| e.value().into_inner(ev)).collect();
                 match self.memory.as_mut().into_inner(ev).entry(val_addr) {
                     Entry::Occupied(_) => {
-                        unreachable!("double entry, must remove entry first: this is a logic error")
+                        unreachable!("Must remove entry first: this is a logic error!")
                     }
                     Entry::Vacant(entry) => {
                         for elem in iter::empty()
@@ -225,22 +225,13 @@ where
     pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
         log::info!("finalizing ram: {} operations", self.wrs.len(),);
 
+        let flattened_size = self.space.addr_size() + self.space.value_size() + self.challenge_size;
         let mut pre = match P::WHICH {
-            WhichParty::Prover(_) => commit_pub::<P, _, _>(&vec![
-                V::default();
-                self.space.addr_size()
-                    + self.space.value_size()
-                    + self.challenge_size
-            ]),
-            WhichParty::Verifier(_) => {
-                vec![
-                    V::default();
-                    self.space.addr_size() + self.space.value_size() + self.challenge_size
-                ]
+            WhichParty::Prover(_) => commit_pub::<P, _, _>(&vec![V::default(); flattened_size]),
+            WhichParty::Verifier(_) => vec![V::default(); flattened_size]
                 .into_iter()
                 .map(|x| dmc.input_public(x).unwrap())
-                .collect()
-            }
+                .collect(),
         };
 
         for addr in self.space.enumerate() {
