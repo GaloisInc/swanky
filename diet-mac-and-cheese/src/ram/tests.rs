@@ -13,8 +13,10 @@ fn test_ram() {
 
     use crate::{backend_trait::BackendT, svole_trait::Svole, DietMacAndCheese};
 
-    use super::{protocol::DoraRam, Arithmetic, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
+    use super::{protocol::DoraRam, Arithmetic};
 
+    const RAM_SIZE: usize = 100;
+    const RAM_STEPS: usize = 100;
     const REPEATS: usize = 5;
     let (sender, receiver) = UnixStream::pair().unwrap();
 
@@ -38,14 +40,11 @@ fn test_ram() {
             let mut ram = DoraRam::<Prover, F61p, F61p, _, _, _>::new(
                 &mut prover,
                 2,
-                Arithmetic::new(PRE_ALLOC_MEM),
+                Arithmetic::new(RAM_SIZE),
             );
 
-            for i in 0..(PRE_ALLOC_STEPS - PRE_ALLOC_MEM) {
-                if i & 0xffff == 0 {
-                    println!("{:x} {:x} {:x}", i, 1 << 20, 1 << 23);
-                }
-                let addr = rand::random::<u32>() % (PRE_ALLOC_MEM as u32);
+            for _ in 0..RAM_STEPS {
+                let addr = rand::random::<u32>() % (RAM_SIZE as u32);
                 let addr = F61p::try_from(addr as u128).unwrap();
                 let addr = prover.input_private(Some(addr)).unwrap();
 
@@ -57,8 +56,6 @@ fn test_ram() {
         }
 
         prover.finalize().unwrap();
-
-        println!("done");
     });
 
     {
@@ -81,9 +78,9 @@ fn test_ram() {
             let mut ram = DoraRam::<Verifier, F61p, F61p, _, _, _>::new(
                 &mut verifier,
                 2,
-                Arithmetic::new(PRE_ALLOC_MEM),
+                Arithmetic::new(RAM_SIZE),
             );
-            for _ in 0..(PRE_ALLOC_STEPS - PRE_ALLOC_MEM) {
+            for _ in 0..RAM_STEPS {
                 let addr = verifier.input_private(None).unwrap();
                 let value = ram.remove(&mut verifier, &[addr]).unwrap();
                 ram.insert(&mut verifier, &[addr], &value).unwrap();
