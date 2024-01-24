@@ -146,10 +146,9 @@ where
         debug_assert_eq!(addr.len(), self.space.addr_size());
         debug_assert_eq!(value.len(), self.space.value_size());
 
-        let mut flat = vec![
-            Default::default();
-            self.space.addr_size() + self.space.value_size() + self.challenge_size
-        ];
+        let mut flat = Vec::with_capacity(
+            self.space.addr_size() + self.space.value_size() + self.challenge_size,
+        );
 
         match P::WHICH {
             WhichParty::Prover(ev) => {
