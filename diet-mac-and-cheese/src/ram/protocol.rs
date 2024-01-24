@@ -101,14 +101,17 @@ where
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &[Mac<P, V, F>],
     ) -> eyre::Result<Vec<Mac<P, V, F>>> {
-        let mut flat: Vec<Mac<P, V, F>> = Vec::with_capacity(
-            self.space.addr_size() + self.space.value_size() + self.challenge_size,
         eyre::ensure!(
             addr.len() == self.space.addr_size(),
             "Address should be {} elements, but got {}.",
             self.space.addr_size(),
             addr.len()
         );
+
+        let stored_size = self.space.value_size() + self.challenge_size;
+        let flattened_size = self.space.addr_size() + stored_size;
+
+        let mut flat: Vec<Mac<P, V, F>> = Vec::with_capacity(flattened_size);
 
         match P::WHICH {
             WhichParty::Prover(ev) => {
@@ -118,10 +121,7 @@ where
                     .as_mut()
                     .into_inner(ev)
                     .remove(&val_addr)
-                    .unwrap_or(vec![
-                        V::default();
-                        self.space.value_size() + self.challenge_size
-                    ]);
+                    .unwrap_or(vec![V::default(); stored_size]);
 
                 for elem in iter::empty()
                     .chain(addr.iter().copied())
@@ -139,12 +139,7 @@ where
             WhichParty::Verifier(ev) => {
                 for elem in iter::empty().chain(addr.iter().copied()).chain(
                     dmc.fcom
-                        .input_verifier(
-                            ev,
-                            &mut self.ch,
-                            &mut dmc.rng,
-                            self.space.value_size() + self.challenge_size,
-                        )
+                        .input_verifier(ev, &mut self.ch, &mut dmc.rng, stored_size)
                         .unwrap(),
                 ) {
                     flat.push(elem);
