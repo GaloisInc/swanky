@@ -19,6 +19,18 @@ use crate::{
 
 use super::{tx::TxChannel, MemorySpace, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
 
+/// The Dora RAM protocol state.
+///
+/// Values of this type represent RAMs in the Dora protocol. Rather than the
+/// usual read/write interface to memory, `DoraRam` exposes the operations
+/// required by the protocol: `remove`, `insert`, and a `finalize` method to
+//  execute the final stages of the protocol (after all operations on the RAM
+/// are complete.)
+///
+/// This is a low-level representation of RAM, generalized over the party,
+/// address/value type, and representation of 'actual' RAM cells. See the
+/// module-level documentation for structures providing convenient
+/// instantiations exposing the more familiar read/write interface.
 pub struct DoraRam<
     P: Party,
     V: IsSubFieldOf<F>,
@@ -60,6 +72,12 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
+    /// Create a new `DoraRam` using the Diet Mac'n'Cheese protocol, the size
+    /// of challenges, and the 'actual' memory space.
+    ///
+    /// Note: We currently pre-allocate very large `Vec`s for the bags of reads
+    /// and writes. Given that the cost of re-allocation would be amortized
+    /// away for large numbers of operations, this might change in the future.
     pub fn new(
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         challenge_size: usize,
@@ -76,6 +94,8 @@ where
         }
     }
 
+    /// Read, remove, and return the value at `addr` in the underlying memory
+    /// space, adding this read to the bag `rds`.
     pub fn remove(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
@@ -133,6 +153,8 @@ where
         Ok(flat[self.space.addr_size()..self.space.addr_size() + self.space.value_size()].into())
     }
 
+    /// Write `value` to `addr` in the underlying memory space, adding this
+    /// write to the bag `wrs`.
     pub fn insert(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
@@ -191,6 +213,7 @@ where
         Ok(())
     }
 
+    /// Finalize the RAM protocol (check that `rds` is a permutation of `wrs`).
     pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
         log::info!("finalizing ram: {} operations", self.wrs.len(),);
 
