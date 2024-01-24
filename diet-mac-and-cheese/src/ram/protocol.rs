@@ -101,10 +101,13 @@ where
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &[Mac<P, V, F>],
     ) -> eyre::Result<Vec<Mac<P, V, F>>> {
-        debug_assert_eq!(addr.len(), self.space.addr_size());
-
         let mut flat: Vec<Mac<P, V, F>> = Vec::with_capacity(
             self.space.addr_size() + self.space.value_size() + self.challenge_size,
+        eyre::ensure!(
+            addr.len() == self.space.addr_size(),
+            "Address should be {} elements, but got {}.",
+            self.space.addr_size(),
+            addr.len()
         );
 
         match P::WHICH {
@@ -161,8 +164,18 @@ where
         addr: &[Mac<P, V, F>],
         value: &[Mac<P, V, F>],
     ) -> eyre::Result<()> {
-        debug_assert_eq!(addr.len(), self.space.addr_size());
-        debug_assert_eq!(value.len(), self.space.value_size());
+        eyre::ensure!(
+            addr.len() == self.space.addr_size(),
+            "Address should be {} elements, but got {}.",
+            self.space.addr_size(),
+            addr.len()
+        );
+        eyre::ensure!(
+            value.len() == self.space.value_size(),
+            "Value should be {} elements, but got {}.",
+            self.space.value_size(),
+            value.len()
+        );
 
         let mut flat = Vec::with_capacity(
             self.space.addr_size() + self.space.value_size() + self.challenge_size,
