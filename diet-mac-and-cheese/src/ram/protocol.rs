@@ -231,7 +231,7 @@ where
             self.remove(dmc, &addr)?;
         }
 
-        assert_eq!(self.rds.len(), self.wrs.len());
+        debug_assert_eq!(self.rds.len(), self.wrs.len());
 
         let (chal_cmbn, chal_perm1) = match P::WHICH {
             WhichParty::Prover(_) => {
