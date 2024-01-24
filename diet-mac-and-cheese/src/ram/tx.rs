@@ -3,9 +3,13 @@ use std::io::Result;
 use scuttlebutt::AbstractChannel;
 use swanky_field::FiniteField;
 
+/// A Fiat-Shamir channel-wrapper.
 #[derive(Clone, Debug)]
 pub struct TxChannel<C: AbstractChannel> {
+    /// The underlying [`AbstractChannel`].
     pub ch: C,
+    /// The Blake3 hasher used to compute digests from bytes read from and
+    /// written to `ch`.
     pub tx: blake3::Hasher,
 }
 
@@ -27,10 +31,12 @@ impl<C: AbstractChannel> AbstractChannel for TxChannel<C> {
 }
 
 impl<C: AbstractChannel> TxChannel<C> {
+    /// Create a new Fiat-Shamir channel from a channel and Blake3 hasher.
     pub fn new(ch: C, tx: blake3::Hasher) -> Self {
         Self { ch, tx }
     }
 
+    /// Compute a challenge of length `n` from the channel's digest.
     pub fn challenge<F: FiniteField>(&mut self, n: usize) -> Vec<F> {
         let mut out = Vec::with_capacity(n);
         let mut i = 0;
