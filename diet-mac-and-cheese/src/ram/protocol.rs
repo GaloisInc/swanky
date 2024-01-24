@@ -130,11 +130,7 @@ where
         }
 
         self.rds.push(flat.clone());
-        Ok(
-            flat[self.space.addr_size()..self.space.addr_size() + self.space.value_size()]
-                .try_into()
-                .unwrap(),
-        )
+        Ok(flat[self.space.addr_size()..self.space.addr_size() + self.space.value_size()].into())
     }
 
     pub fn insert(
