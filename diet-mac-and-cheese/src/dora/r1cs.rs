@@ -154,6 +154,7 @@ impl<F: FiniteField> Row<F> {
 #[derive(Debug, Clone)]
 pub(super) struct R1CS<F: FiniteField> {
     pub dim: usize,
+    pub wit: usize,
     pub cells: usize,
     pub input: usize,
     pub output: usize,
@@ -197,6 +198,10 @@ pub(super) struct CrossTerms<F: FiniteField> {
 }
 
 impl<F: FiniteField> R1CS<F> {
+    pub(crate) fn num_wit(&self) -> usize {
+        self.wit
+    }
+
     pub(crate) fn rows(&self) -> usize {
         self.rows.len()
     }
@@ -214,10 +219,12 @@ impl<F: FiniteField> R1CS<F> {
 
     // converts a circuit into a R1CS relation
     pub(crate) fn new(input: WireCount, output: WireCount, gates: &[DisjGate<F>]) -> Self {
+        // must take at least one input (the guard)
         assert!(input > 0, "no inputs");
 
-        // compute the number of cells required for witness generation
-        let max_cell = gates
+        // compute the number of cells required for witness generation:
+        // look at every gate and take the maximum destination cell index
+        let max_dst = gates
             .iter()
             .copied()
             .map(|gate| match gate {
@@ -235,7 +242,8 @@ impl<F: FiniteField> R1CS<F> {
             .max()
             .unwrap_or(0);
 
-        let num_cells = std::cmp::max(max_cell + 1, (input + output) as usize);
+        // now many total cells are required for the circuit?
+        let num_cells = std::cmp::max(max_dst + 1, (input + output) as usize);
 
         // allocate cells for symbolic evaluation of circuit
         let mut cells = Vec::with_capacity(num_cells);
@@ -243,25 +251,36 @@ impl<F: FiniteField> R1CS<F> {
         cells.extend((0..input).map(|i| LinComb(vec![((1 + i + output) as usize, F::ONE)])));
         cells.resize(num_cells, LinComb::default());
 
-        // compute constraints
-        let mut cs = Vec::with_capacity(max_cell);
-        let mut dim = (1 + input + output) as usize;
+        // rows (constraints) of the R1CS relation
+        let mut rows = vec![];
+
+        // next free extended witness index
+        // note: no relation to the cells,
+        // which hold linear combinations of witness values
+        let mut nxt = (1 + input + output) as usize;
+
+        // count number of witness values
+        // (which will be consumed from the witness tape)
+        let mut wit = 0;
+
+        // translate intermediate gates to R1CS gate-by-gate
         for gate in gates.iter().copied() {
             match gate {
                 DisjGate::Mul(dst, l, r) => {
                     let l = cells[l].clone();
                     let r = cells[r].clone();
-                    let o = LinComb(vec![(dim, F::ONE)]);
+                    let o = LinComb(vec![(nxt, F::ONE)]);
                     cells[dst] = o.clone();
-                    cs.push(Row { l, r, o });
-                    dim += 1;
+                    rows.push(Row { l, r, o });
+                    nxt += 1;
                 }
                 DisjGate::Copy(dst, src) => {
                     cells[dst] = cells[src].clone();
                 }
                 DisjGate::Witness(dst) => {
-                    cells[dst] = LinComb(vec![(dim, F::ONE)]);
-                    dim += 1;
+                    cells[dst] = LinComb(vec![(nxt, F::ONE)]);
+                    nxt += 1; // alloc a cell for the witness value
+                    wit += 1; // consume a witness from the tape
                 }
                 DisjGate::Constant(dst, val) => {
                     cells[dst] = LinComb(vec![(CONSTANT_IDX, val)]);
@@ -279,15 +298,14 @@ impl<F: FiniteField> R1CS<F> {
                     cells[dst] = cells[l].clone() * c;
                 }
                 DisjGate::AssertZero(src) => {
-                    cs.push(Row {
+                    rows.push(Row {
                         l: cells[src].clone(),
                         r: LinComb(vec![(CONSTANT_IDX, F::ONE)]),
                         o: LinComb(vec![]),
                     });
                 }
-                // used to easily implement the guards for clauses
                 DisjGate::AssertConstant(src, val) => {
-                    cs.push(Row {
+                    rows.push(Row {
                         l: cells[src].clone(),
                         r: LinComb(vec![(CONSTANT_IDX, F::ONE)]),
                         o: LinComb(vec![(CONSTANT_IDX, val)]),
@@ -299,39 +317,46 @@ impl<F: FiniteField> R1CS<F> {
         // add output asserts
         // (if an output is unassigned it is set to 0)
         for (src, cell) in cells.iter().enumerate().take(output as usize) {
-            cs.push(Row {
+            rows.push(Row {
                 l: cell.clone(),
                 r: LinComb(vec![(CONSTANT_IDX, F::ONE)]),
                 o: LinComb(vec![(src + 1, F::ONE)]),
             });
         }
 
-        cs.shrink_to_fit();
+        rows.shrink_to_fit();
 
         Self {
-            dim,
+            dim: nxt,
+            wit,
             input: input as usize,
             output: output as usize,
-            cells: num_cells,
+            cells: cells.len(),
             gates: gates.to_vec(),
-            rows: cs,
+            rows,
         }
     }
 
-    pub fn compute_witness<I: Iterator<Item = F>>(&self, input: I) -> ExtendedWitness<F> {
-        // copy input to cells (for evaluation)
+    pub fn compute_witness<I: Iterator<Item = F>, WI: Iterator<Item = F>>(
+        &self,
+        wit_tape: &mut WI, // witness tape
+        input: I,          // inputs to the disjunction (previous wires)
+    ) -> ExtendedWitness<F> {
+        // copy input to cells
+        // (a "sketch pad" for evaluation)
         // [1 || output || input]
         let mut cells = Vec::with_capacity(self.cells);
         cells.extend((0..self.output).map(|_| F::ZERO));
         cells.extend(input);
         debug_assert_eq!(cells.len(), self.input + self.output);
 
-        // alloc space for [ output || input ]
+        // alloc space in extended wit for [ 1 || output || input ]
         let mut wit = Vec::with_capacity(self.dim);
         wit.push(F::ONE);
         wit.extend_from_slice(&cells[..]);
 
-        // allocate temp cells for evaluation
+        // allocate temp cells for evaluation:
+        // the cells hold linear combinations of witness values
         cells.resize(self.cells, F::ZERO);
         debug_assert_eq!(cells.len(), self.cells);
 
@@ -339,8 +364,14 @@ impl<F: FiniteField> R1CS<F> {
         for gate in self.gates.iter().copied() {
             match gate {
                 DisjGate::Mul(dst, lhs, rhs) => {
+                    // compute the result
                     let res = cells[lhs] * cells[rhs];
+
+                    // add the result to the extended witness
                     wit.push(res);
+
+                    // and assign to the cell
+                    // (for subsequent gates evaluation)
                     cells[dst] = res;
                 }
                 DisjGate::Copy(dst, src) => {
@@ -352,8 +383,8 @@ impl<F: FiniteField> R1CS<F> {
                 DisjGate::Add(dst, lhs, rhs) => {
                     cells[dst] = cells[lhs] + cells[rhs];
                 }
-                DisjGate::Sub(dst, l, r) => {
-                    cells[dst] = cells[l] - cells[r];
+                DisjGate::Sub(dst, lhs, rhs) => {
+                    cells[dst] = cells[lhs] - cells[rhs];
                 }
                 DisjGate::AddConstant(dst, src, c) => {
                     cells[dst] = cells[src] + c;
@@ -362,23 +393,23 @@ impl<F: FiniteField> R1CS<F> {
                     cells[dst] = cells[src] * c;
                 }
                 DisjGate::AssertConstant(src, val) => {
-                    assert_eq!(
-                        cells[src], val,
-                        "assert equal in disjunction not satisified"
-                    );
+                    // note: this is just a sanity check: the circuit also checks this.
+                    assert_eq!(cells[src], val, "assert equal in disjunction not satisfied");
                 }
                 DisjGate::AssertZero(src) => {
+                    // note: this is just a sanity check: the circuit also checks this.
                     assert_eq!(cells[src], F::ZERO, "assert zero in disjunction failed");
                 }
-                DisjGate::Witness(_dst) => {
-                    // this should just assign a cell freely
-                    // but we need to pass in the witness tape somehow.
-                    unimplemented!("not implemented (yet)")
+                DisjGate::Witness(dst) => {
+                    // assign next witness value from tape
+                    let val = wit_tape.next().expect("not enough witness values");
+                    wit.push(val);
+                    cells[dst] = val;
                 }
             }
         }
 
-        // copy outputs to witness
+        // copy (now assigned) outputs to witness
         wit[1..=self.output].copy_from_slice(&cells[..self.output]);
 
         // wrap in extended witness

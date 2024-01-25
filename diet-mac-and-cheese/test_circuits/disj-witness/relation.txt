@@ -1,0 +1,62 @@
+// Minimal example of private
+// gates inside disjunctions
+version 2.0.0;
+circuit;
+@type field 2305843009213693951;
+@begin
+    @function(clause_inv_sum, @out: 0:1, @in: 0:3)
+        // inverse of sum
+        $4 <- @private(0);
+
+        // $1 + $2 + $3
+        $5 <- @add($1, $2);
+        $6 <- @add($5, $3);
+
+        // assert inverse
+        $7 <- @mul($6, $4);
+        $8 <- @addc($7, <2305843009213693950>); // -1
+        @assert_zero(0: $8);
+
+        // return inverse
+        $0 <- $4;
+    @end
+
+    @function(clause_just_add, @out: 0:1, @in: 0:3)
+        // $1 + $2 + $3
+        $4 <- @add($1, $2);
+        $0 <- @add($4, $3);
+    @end
+
+    @function(branch_example, @out: 0:1, @in: 0:1, 0:3)
+        @plugin(
+            galois_disjunction_v0,
+            switch,
+            strict,
+            5, clause_inv_sum,
+            7, clause_just_add
+        );
+
+    @new(0: $0 ... $3);
+
+    // cond5: output should be (a + b + c)^-1
+
+    $0 <- @private(0);
+    $1 <- @private(0);
+    $2 <- @private(0);
+    $3 <- @private(0);
+
+    $5 <- @call(branch_example, $0, $1 ... $3);
+    $6 <- @addc($5, <1241205951153170685>); //  -(a + b + c)^-1
+    @assert_zero(0: $6);
+
+    // cond7 : output should be (a + b + c)
+
+    $0 <- @private(0);
+    $1 <- @private(0);
+    $2 <- @private(0);
+    $3 <- @private(0);
+
+    $5 <- @call(branch_example, $0, $1 ... $3);
+    $6 <- @addc($5, <42653715811538807>); // -(a + b + c)
+    @assert_zero(0: $6);
+@end
