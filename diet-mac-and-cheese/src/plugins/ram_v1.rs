@@ -204,7 +204,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Any count on the number of wires _must_ fit in a u64 by the SIEVE IR spec.
-                let addr_count = addr_count.as_words()[0] as usize;
+                let addr_count = addr_count.as_words()[0];
 
                 let PluginTypeArg::Number(value_count) = ram_output_type.params[2] else {
                     eyre::bail!(
@@ -224,7 +224,7 @@ impl Plugin for RamBoolV1 {
 
                 Ok(PluginExecution::Ram(RamVersion::RamBool(RamBoolV1::new(
                     field_id,
-                    addr_count,
+                    addr_count as usize,
                     value_count as usize,
                     op,
                 ))))
