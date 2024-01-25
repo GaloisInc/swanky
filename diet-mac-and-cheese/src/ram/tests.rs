@@ -15,9 +15,9 @@ fn test_ram() {
 
     use super::{protocol::DoraRam, Arithmetic};
 
-    const RAM_SIZE: usize = 100;
-    const RAM_STEPS: usize = 100;
-    const REPEATS: usize = 5;
+    const RAM_SIZE: usize = 1_000_000;
+    const RAM_STEPS: usize = 10_000_000;
+
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let handle = std::thread::spawn(move || {
@@ -30,25 +30,20 @@ fn test_ram() {
             DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
                 .unwrap();
 
-        for _ in 0..REPEATS {
-            let mut ram = DoraRam::<Prover, F61p, F61p, _, _, _>::new(
-                &mut prover,
-                2,
-                Arithmetic::new(RAM_SIZE),
-            );
+        let mut ram =
+            DoraRam::<Prover, F61p, F61p, _, _, _>::new(&mut prover, 2, Arithmetic::new(RAM_SIZE));
 
-            for _ in 0..RAM_STEPS {
-                let addr = rand::random::<u32>() % (RAM_SIZE as u32);
-                let addr = F61p::try_from(addr as u128).unwrap();
-                let addr = prover.input_private(Some(addr)).unwrap();
+        for _ in 0..RAM_STEPS {
+            let addr = rand::random::<u32>() % (RAM_SIZE as u32);
+            let addr = F61p::try_from(addr as u128).unwrap();
+            let addr = prover.input_private(Some(addr)).unwrap();
 
-                let value = ram.remove(&mut prover, &[addr]).unwrap();
+            let value = ram.remove(&mut prover, &[addr]).unwrap();
 
-                ram.insert(&mut prover, &[addr], &value).unwrap();
-            }
-            ram.finalize(&mut prover).unwrap();
+            ram.insert(&mut prover, &[addr], &value).unwrap();
         }
 
+        ram.finalize(&mut prover).unwrap();
         prover.finalize().unwrap();
     });
 
@@ -62,19 +57,18 @@ fn test_ram() {
             DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
                 .unwrap();
 
-        for _ in 0..REPEATS {
-            let mut ram = DoraRam::<Verifier, F61p, F61p, _, _, _>::new(
-                &mut verifier,
-                2,
-                Arithmetic::new(RAM_SIZE),
-            );
-            for _ in 0..RAM_STEPS {
-                let addr = verifier.input_private(None).unwrap();
-                let value = ram.remove(&mut verifier, &[addr]).unwrap();
-                ram.insert(&mut verifier, &[addr], &value).unwrap();
-            }
-            ram.finalize(&mut verifier).unwrap();
+        let mut ram = DoraRam::<Verifier, F61p, F61p, _, _, _>::new(
+            &mut verifier,
+            2,
+            Arithmetic::new(RAM_SIZE),
+        );
+        for _ in 0..RAM_STEPS {
+            let addr = verifier.input_private(None).unwrap();
+            let value = ram.remove(&mut verifier, &[addr]).unwrap();
+            ram.insert(&mut verifier, &[addr], &value).unwrap();
         }
+
+        ram.finalize(&mut verifier).unwrap();
         verifier.finalize().unwrap();
     }
 
