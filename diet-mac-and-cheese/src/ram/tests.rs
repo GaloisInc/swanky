@@ -5,7 +5,7 @@ fn test_ram() {
         os::unix::net::UnixStream,
     };
 
-    use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_SETUP_MEDIUM};
+    use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
     use scuttlebutt::{AesRng, Channel};
     use swanky_field_f61p::F61p;
@@ -27,14 +27,8 @@ fn test_ram() {
         let mut channel = Channel::new(reader, writer);
 
         let mut prover: DietMacAndCheese<Prover, F61p, F61p, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_MEDIUM,
-                LPN_EXTEND_MEDIUM,
-                false,
-            )
-            .unwrap();
+            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+                .unwrap();
 
         for _ in 0..REPEATS {
             let mut ram = DoraRam::<Prover, F61p, F61p, _, _, _>::new(
@@ -65,14 +59,8 @@ fn test_ram() {
         let mut channel = Channel::new(reader, writer);
 
         let mut verifier: DietMacAndCheese<Verifier, F61p, F61p, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_MEDIUM,
-                LPN_EXTEND_MEDIUM,
-                false,
-            )
-            .unwrap();
+            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
+                .unwrap();
 
         for _ in 0..REPEATS {
             let mut ram = DoraRam::<Verifier, F61p, F61p, _, _, _>::new(
