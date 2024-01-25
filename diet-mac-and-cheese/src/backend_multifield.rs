@@ -135,6 +135,7 @@ pub trait BackendDisjunctionT: BackendT {
     fn disjunction(
         &mut self,
         inswit: &mut FieldInputs,
+        fun_store: &FunStore,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>>;
@@ -148,6 +149,7 @@ where
     fn disjunction(
         &mut self,
         _inswit: &mut FieldInputs,
+        _fun_store: &FunStore,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
@@ -410,6 +412,7 @@ impl<
     fn disjunction(
         &mut self,
         inswit: &mut FieldInputs,
+        fun_store: &FunStore,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
@@ -464,7 +467,7 @@ impl<
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
-                let disjunction = Disjunction::compile(disj);
+                let disjunction = Disjunction::compile(disj, fun_store);
 
                 let mut resolver: ProverPrivate<P, HashMap<FP, _>> =
                     ProverPrivate::new(Default::default());
@@ -718,6 +721,7 @@ trait EvaluatorT<P: Party> {
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
+        fun_store: &FunStore,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
@@ -881,6 +885,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
+        fun_store: &FunStore,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
@@ -919,7 +924,9 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
                 debug_assert_eq!(wires.len() as WireCount, disj.inputs() + disj.cond());
 
                 // invoke disjunction implement on the backend
-                let wires = self.backend.disjunction(inswit, &wires[..], disj)?;
+                let wires = self
+                    .backend
+                    .disjunction(inswit, fun_store, &wires[..], disj)?;
                 debug_assert_eq!(wires.len() as u64, disj.outputs());
 
                 // write back output wires
@@ -1753,6 +1760,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // The permutation plugin does not need to execute `callframe_start` or `callframe_end`
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        fun_store,
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -1764,6 +1772,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // since the inputs/outputs must be flattened to an R1CS witness.
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        fun_store,
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -1774,6 +1783,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     self.callframe_start(func, out_ranges, in_ranges)?;
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        fun_store,
                         out_ranges,
                         in_ranges,
                         body.execution(),

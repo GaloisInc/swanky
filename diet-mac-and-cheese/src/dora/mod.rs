@@ -24,13 +24,17 @@ mod protocol;
 #[cfg(test)]
 mod tests;
 
+// conversion from circuit_ir to disjunction
+mod translate;
+
 type WireId = usize;
 
 pub use disjunction::Disjunction;
 pub use protocol::Dora;
 use swanky_field::PrimeFiniteField;
+use translate::translate;
 
-use crate::circuit_ir::{GateM, TypeId};
+use crate::circuit_ir::{FunStore, GateM, TypeId};
 
 use generic_array::typenum::Unsigned;
 
@@ -46,6 +50,8 @@ fn fiat_shamir<F: FiniteField>() -> bool {
 }
 
 // a restricted set of gates possible in clauses
+// note: this is a "cell machine" which may assign to the same cell multiple times
+// (unlike the circuit_ir which should not)
 #[derive(Debug, Clone, Copy)]
 enum DisjGate<F: FiniteField> {
     // translation of supported GateM variants
@@ -78,6 +84,7 @@ impl<F: PrimeFiniteField> Clause<F> {
     /// where cond is not exposed to the body of the clause.
     pub(crate) fn new(
         typ: TypeId,
+        fun_store: &FunStore,
         inputs: usize, // inputs to clause (body, not including guard/cond)
         outputs: usize,
         guard: &[F],     // guard value
@@ -96,76 +103,8 @@ impl<F: PrimeFiniteField> Clause<F> {
         }
 
         // translate body
-        for gate in gates.iter().cloned() {
-            translate_gate(&mut body, typ, gate);
-        }
-
+        translate(&mut body, fun_store, typ, gates.iter().cloned());
+        body.shrink_to_fit();
         Clause { gates: body }
-    }
-}
-
-fn tidx(w: u64) -> usize {
-    w as usize
-}
-
-// Translates `gate` to one or more low-level `DisjGate`, pushing the result(s) to
-// `disj_gates`. Checks that all gates are for `typ`.
-fn translate_gate<F: PrimeFiniteField>(
-    disj_gates: &mut Vec<DisjGate<F>>,
-    typ: TypeId,
-    gate: GateM,
-) {
-    match gate {
-        GateM::Add(typ2, dst, lhs, rhs) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            disj_gates.push(DisjGate::Add(tidx(dst), tidx(lhs), tidx(rhs)))
-        }
-        GateM::Sub(typ2, dst, lhs, rhs) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            disj_gates.push(DisjGate::Sub(tidx(dst), tidx(lhs), tidx(rhs)))
-        }
-        GateM::Mul(typ2, dst, lhs, rhs) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            disj_gates.push(DisjGate::Mul(tidx(dst), tidx(lhs), tidx(rhs)))
-        }
-        GateM::Copy(typ2, dst, src) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            let mut curr_out = dst.0;
-            for curr_input_range in *src {
-                for curr_inp in curr_input_range.0..=curr_input_range.1 {
-                    disj_gates.push(DisjGate::Copy(tidx(curr_out), tidx(curr_inp)));
-                    curr_out += 1;
-                }
-            }
-        }
-        GateM::Witness(typ2, dst) => {
-            // split high dimensional witness gate
-            // into multiple 1-dimensional gates
-            assert_eq!(typ2, typ, "different types in disjunction");
-            for curr_dst in dst.0..=dst.1 {
-                disj_gates.push(DisjGate::Witness(tidx(curr_dst)))
-            }
-        }
-        GateM::Constant(typ2, dst, cnst) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            let val = F::try_from_int(*cnst).unwrap();
-            disj_gates.push(DisjGate::Constant(tidx(dst), val))
-        }
-        GateM::AddConstant(typ2, dst, src, cnst) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            let val = F::try_from_int(*cnst).unwrap();
-            disj_gates.push(DisjGate::AddConstant(tidx(dst), tidx(src), val))
-        }
-        GateM::MulConstant(typ2, dst, src, cnst) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            let val = F::try_from_int(*cnst).unwrap();
-            disj_gates.push(DisjGate::MulConstant(tidx(dst), tidx(src), val))
-        }
-        GateM::AssertZero(typ2, src) => {
-            assert_eq!(typ2, typ, "different types in disjunction");
-            disj_gates.push(DisjGate::AssertZero(tidx(src)))
-        }
-        GateM::New(_, _, _) | GateM::Comment(_) => {}
-        _ => panic!("unsupported gate: {:?}", gate),
     }
 }
