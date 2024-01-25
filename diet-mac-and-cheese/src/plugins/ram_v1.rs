@@ -1,4 +1,4 @@
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::F2;
 
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
@@ -9,7 +9,7 @@ use super::{Plugin, PluginExecution};
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum RamOp {
     /// Initialize a RAM with the given number of cells.
-    Init(Number),
+    Init(usize),
 
     /// Read a value from the RAM.
     Read,
@@ -116,8 +116,10 @@ impl Plugin for RamBoolV1 {
                         Self::NAME
                     );
                 };
+                // NOTE: Assuming the given RAM size fits in a u64!
+                let size = size.as_words()[0];
 
-                let op = RamOp::Init(size);
+                let op = RamOp::Init(size as usize);
 
                 eyre::ensure!(
                     input_counts.len() == 1,
@@ -530,8 +532,10 @@ impl Plugin for RamArithV1 {
                         Self::NAME
                     );
                 };
+                // NOTE: Assuming the given RAM size fits in a u64!
+                let size = size.as_words()[0];
 
-                let op = RamOp::Init(size);
+                let op = RamOp::Init(size as usize);
 
                 eyre::ensure!(
                     input_counts.len() == 1,
