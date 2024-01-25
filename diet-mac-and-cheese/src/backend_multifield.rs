@@ -773,6 +773,7 @@ impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
 
     fn plugin_call_gate(
         &mut self,
+        _inswit: &mut FieldInputs,
         _outputs: &[WireRange],
         _inputs: &[WireRange],
         _plugin: &PluginExecution,
@@ -1970,7 +1971,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // No callframes: RAMs are all 'global', and RAM-typed
                     // wires are to be thought of as (mutable) references.
                     let type_id = plugin.type_id() as usize;
-                    self.eval[type_id].plugin_call_gate(out_ranges, in_ranges, body.execution())?;
+                    self.eval[type_id].plugin_call_gate(
+                        self.inputs.get(type_id),
+                        out_ranges,
+                        in_ranges,
+                        body.execution(),
+                    )?;
                 }
             },
         };
