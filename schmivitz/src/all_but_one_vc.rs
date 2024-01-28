@@ -244,6 +244,11 @@ fn num_rec(j: &[bool]) -> usize {
 /// partial decommitment is produced by the prover and will be sent to the verifier to reconstruct
 /// all but one seeds using [`reconstruct`] and verify the commitment using [`verify`].
 pub(crate) fn open(decom: Decom, j: Vec<bool>) -> Pdecom {
+    assert_eq!(
+        decom.1.len(),
+        1 << j.len(),
+        "Open function from all-but-one vector commitment scheme failed because of incompatible lengths of decommitment and index to open."
+    );
     let j_num = num_rec(&j);
     let mut cop: Vec<Key> = Vec::with_capacity(j.len());
 
@@ -275,7 +280,11 @@ pub(crate) fn open(decom: Decom, j: Vec<bool>) -> Pdecom {
 /// This function is used by the verifier after receiving the [`Pdecom`] from the prover.
 pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Seeds) {
     let prg = PRG::new_with_iv(iv);
-    assert_eq!(pdecom.0.len(), j.len());
+    assert_eq!(
+        pdecom.0.len(),
+        j.len(),
+        "Incompatible partial decommitment length with index binary decomposition length"
+    );
     let d = j.len();
 
     let (cop, com_j) = pdecom;
@@ -304,13 +313,13 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Seeds) {
     }
     // After computing all the commitments, except com_j, it is finally setup in
     // the right spot.
-    assert_eq!(pos, num_rec(&j));
+    debug_assert_eq!(pos, num_rec(&j));
     coms[pos] = com_j;
 
     // compute the hash using H1
     let h_computed = h1(&coms);
 
-    assert_eq!(seeds.len(), (1 << d) - 1);
+    debug_assert_eq!(seeds.len(), (1 << d) - 1);
     (h_computed, seeds)
 }
 
@@ -320,8 +329,11 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Seeds) {
 /// at an index `j`, and the initial vector `iv`. This function is run by the verifier and relies on
 /// [`reconstruct`] for its internal computation.
 pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> bool {
-    assert_eq!(pdecom.0.len(), j.len());
-
+    assert_eq!(
+        pdecom.0.len(),
+        j.len(),
+        "Incompatible length of partial decommitment with index binary decomposition length"
+    );
     let (h_computed, _seeds) = reconstruct(pdecom, j, iv);
     h_com == h_computed
 }
