@@ -332,9 +332,33 @@ mod test {
     use proptest::prelude::*;
 
     #[test]
-    fn test_num_rec() {
+    fn test_num_rec_at_len_4() {
+        let v = num_rec(&[false, false, false, false]);
+        assert_eq!(v, 0);
+        let v = num_rec(&[true, false, false, false]);
+        assert_eq!(v, 1);
+        let v = num_rec(&[true, true, true, true]);
+        assert_eq!(v, 15);
+        let v = num_rec(&[false, true, true, true]);
+        assert_eq!(v, 14);
         let v = num_rec(&[true, false, true, true]);
         assert_eq!(v, 13);
+    }
+
+    #[test]
+    fn test_num_rec_at_len_8() {
+        let v = num_rec(&[false, false, false, false, false, false, false, false]);
+        assert_eq!(v, 0);
+        let v = num_rec(&[true, false, false, false, false, false, false, false]);
+        assert_eq!(v, 1);
+        let v = num_rec(&[true, true, true, true, true, true, true, true]);
+        assert_eq!(v, 255);
+        let v = num_rec(&[false, true, true, true, true, true, true, true]);
+        assert_eq!(v, 254);
+        let v = num_rec(&[true, false, true, true, false, false, false, false]);
+        assert_eq!(v, 13);
+        let v = num_rec(&[true, false, true, true, false, true, false, true]);
+        assert_eq!(v, 173);
     }
 
     // Test the correctness of values computed by commit/open/verify/reconstruct
@@ -353,12 +377,12 @@ mod test {
         let (_, seeds) = reconstruct((cop, com_j), j, iv);
 
         let mut prv_i = 0;
-        for vrf_i in 0..(1 << depth) - 1 {
+        for (vrf_i, seed) in seeds.iter().enumerate() {
             if vrf_i == j_num {
                 // if the index is equal to j then we skip a seed in the prover
                 prv_i += 1;
             }
-            prop_assert_eq!(sd[prv_i], seeds[vrf_i]);
+            prop_assert_eq!(sd[prv_i], *seed);
             prv_i += 1;
         }
         Ok(())
