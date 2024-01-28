@@ -22,6 +22,7 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
 #![allow(dead_code)]
+use eyre::{bail, Result};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 // The following types are instrumental in the 4 functions
@@ -328,14 +329,20 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Seeds) {
 /// Verify the correctness of the full hash of commitments `h_com` using the partial decommitment `pdecom`,
 /// at an index `j`, and the initial vector `iv`. This function is run by the verifier and relies on
 /// [`reconstruct`] for its internal computation.
-pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> bool {
+pub(crate) fn verify(h_com: H1, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<()> {
     assert_eq!(
         pdecom.0.len(),
         j.len(),
         "Incompatible length of partial decommitment with index binary decomposition length"
     );
-    let (h_computed, _seeds) = reconstruct(pdecom, j, iv);
-    h_com == h_computed
+    let (reconstructed_hash, _seeds) = reconstruct(pdecom, j, iv);
+    if h_com != reconstructed_hash {
+        bail!(
+            "Verify algotithm for all-but-one vector commitment scheme failed:
+            recomputed hash of commitments differs from received hash from prover."
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -382,8 +389,10 @@ mod test {
 
         // verifier side
         let j_num = num_rec(&j);
-        let b = verify(h, (cop.clone(), com_j), j.clone(), iv);
-        prop_assert!(b); // check verify
+        let r = verify(h, (cop.clone(), com_j), j.clone(), iv);
+        if r.is_err() {
+            return Err(TestCaseError::fail(r.err().unwrap().to_string()));
+        }
 
         // test that the seeds from the prover are the same as the ones found by the verifier
         let (_, seeds) = reconstruct((cop, com_j), j, iv);
