@@ -12,7 +12,7 @@ use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::read_sieveir_phase2::BufRelation;
-use crate::svole_thread::{SvoleAtomic, ThreadSvole};
+use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
 use crate::text_reader::TextRelation;
 use crate::DietMacAndCheese;
@@ -1120,37 +1120,33 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
 
     /// New evaluator initializing the F2 Svole in a separate thread.
     pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send>(
-        mut channel_vole: C2,
+        channels_vole: Vec<C2>,
         rng: AesRng,
         inputs: CircInputs,
         type_store: TypeStore,
         no_batching: bool,
         lpn_small: bool,
     ) -> Result<(
-        EvaluatorCirc<P, C, SvoleAtomic<P, F2, F40b>>,
-        std::thread::JoinHandle<()>,
+        EvaluatorCirc<P, C, SvoleAtomicRoundRobin<P, F2, F40b>>,
+        Vec<std::thread::JoinHandle<Result<()>>>,
     )> {
         let (lpn_setup, lpn_extend) = if lpn_small {
             (LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
         } else {
             (LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM)
         };
-        let svole_atomic = SvoleAtomic::<P, F2, F40b>::create();
-        let svole_atomic2 = svole_atomic.duplicate();
-        let svole_atomic3 = svole_atomic.duplicate();
-        let svole_thread = std::thread::spawn(move || {
-            let mut rng2 = AesRng::new();
-            let mut svole_sender = ThreadSvole::init(
-                &mut channel_vole,
-                &mut rng2,
+        let (svole_round_robin, svoles_atomics, threads) =
+            SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads(
+                channels_vole,
                 lpn_setup,
                 lpn_extend,
-                svole_atomic,
-            )
-            .unwrap();
-            svole_sender.run(&mut channel_vole, &mut rng2).unwrap();
-        });
-        let fcom_f2 = FCom::init_with_vole(svole_atomic2)?;
+            )?;
+        let multithreaded_voles: Vec<Box<dyn SvoleStopSignal>> = svoles_atomics
+            .into_iter()
+            .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
+            .collect();
+
+        let fcom_f2 = FCom::init_with_vole(svole_round_robin)?;
         Ok((
             EvaluatorCirc {
                 inputs,
@@ -1158,11 +1154,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 type_store,
                 eval: Vec::new(),
                 rng,
-                multithreaded_voles: vec![Box::new(svole_atomic3)],
+                multithreaded_voles,
                 no_batching,
                 phantom: PhantomData,
             },
-            svole_thread,
+            threads,
         ))
     }
 
@@ -1443,7 +1439,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     >(
         &mut self,
         channel: &mut C,
-        mut channel_vole: C2,
+        channels_vole: Vec<C2>,
         rng: AesRng,
         idx: usize,
         lpn_small: bool,
@@ -1451,7 +1447,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         extend_small: LpnParams,
         setup_normal: LpnParams,
         extend_normal: LpnParams,
-    ) -> Result<std::thread::JoinHandle<()>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
         let (lpn_setup, lpn_extend) = if lpn_small {
@@ -1459,52 +1455,47 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else {
             (setup_normal, extend_normal)
         };
-        let svole_atomic = SvoleAtomic::<P, FE, FE>::create();
-        let svole_atomic2 = svole_atomic.duplicate();
-        let svole_atomic3 = svole_atomic.duplicate();
-
-        let svole_thread = std::thread::spawn(move || {
-            let mut rng2 = AesRng::new();
-            let mut svole = ThreadSvole::<P, FE, FE>::init(
-                &mut channel_vole,
-                &mut rng2,
+        let (svole_round_robin, svoles_atomics, threads) =
+            SvoleAtomicRoundRobin::<P, FE, FE>::create_and_spawn_svole_threads(
+                channels_vole,
                 lpn_setup,
                 lpn_extend,
-                svole_atomic,
-            )
-            .unwrap();
-            svole.run(&mut channel_vole, &mut rng2).unwrap();
-        });
+            )?;
+        self.multithreaded_voles.extend(
+            svoles_atomics
+                .into_iter()
+                .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
+                .collect::<Vec<_>>(),
+        );
 
         debug!("Starting DietMacAndCheese...");
         let dmc =
-            DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomic<P, FE, FE>>::init_with_svole(
+            DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomicRoundRobin<P, FE, FE>>::init_with_svole(
                 channel,
                 rng,
                 self.fcom_f2.as_ref().unwrap(),
-                svole_atomic2,
+                svole_round_robin,
                 self.no_batching,
             )?;
         back = Box::new(EvaluatorSingle::new(dmc, false));
         self.eval.push(back);
-        self.multithreaded_voles.push(Box::new(svole_atomic3));
-        Ok(svole_thread)
+        Ok(threads)
     }
 
     fn load_backend_multi_any<C2: AbstractChannel + Clone + 'static + Send>(
         &mut self,
         channel: &mut C,
-        channel_vole: C2,
+        channels_vole: Vec<C2>,
         rng: AesRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_small: bool,
-    ) -> Result<std::thread::JoinHandle<()>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F161p");
             self.load_backend_multithreaded_fe::<F61p, C2>(
                 channel,
-                channel_vole,
+                channels_vole,
                 rng,
                 idx,
                 lpn_small,
@@ -1517,7 +1508,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field F128p");
             self.load_backend_multithreaded_fe::<F128p, C2>(
                 channel,
-                channel_vole,
+                channels_vole,
                 rng,
                 idx,
                 lpn_small,
@@ -1530,7 +1521,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field Secp256k1");
             self.load_backend_multithreaded_fe::<Secp256k1, C2>(
                 channel,
-                channel_vole,
+                channels_vole,
                 rng,
                 idx,
                 lpn_small,
@@ -1543,7 +1534,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field Secp256k1order");
             self.load_backend_multithreaded_fe::<Secp256k1order, C2>(
                 channel,
-                channel_vole,
+                channels_vole,
                 rng,
                 idx,
                 lpn_small,
@@ -1556,7 +1547,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field F384p");
             self.load_backend_multithreaded_fe::<F384p, C2>(
                 channel,
-                channel_vole,
+                channels_vole,
                 rng,
                 idx,
                 lpn_small,
@@ -1569,7 +1560,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             info!("loading field F384q");
             self.load_backend_multithreaded_fe::<F384q, C2>(
                 channel,
-                channel_vole,
+                channels_vole,
                 rng,
                 idx,
                 lpn_small,
@@ -1587,9 +1578,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send>(
         &mut self,
         channel: &mut C,
-        mut channels_svole: Vec<C2>,
+        mut channels_vole: Vec<C2>,
         lpn_small: bool,
-    ) -> Result<Vec<std::thread::JoinHandle<()>>> {
+        threads_per_field: usize,
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         let type_store = self.type_store.clone();
         let mut handles = vec![];
         for (idx, spec) in type_store.iter() {
@@ -1598,18 +1590,26 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 TypeSpecification::Field(field) => {
                     if *field == std::any::TypeId::of::<F2>() {
                         self.load_backend_multithreaded_f2(channel, rng, *idx as usize, lpn_small)?;
-                    } else if let Some(channel_vole) = channels_svole.pop() {
-                        let handle = self.load_backend_multi_any(
+                    } else {
+                        if channels_vole.len() < threads_per_field {
+                            bail!(
+                                "not enough channels available: {} channels available instead of {}",
+                                channels_vole.len(),
+                                threads_per_field
+                            );
+                        }
+                        let channels_for_field =
+                            channels_vole.split_off(channels_vole.len() - threads_per_field + 1);
+
+                        let more_handles = self.load_backend_multi_any(
                             channel,
-                            channel_vole,
+                            channels_for_field,
                             rng,
                             *field,
                             *idx as usize,
                             lpn_small,
                         )?;
-                        handles.push(handle);
-                    } else {
-                        bail!("no more channel available to load a backend");
+                        handles.extend(more_handles);
                     }
                 }
                 _ => {
