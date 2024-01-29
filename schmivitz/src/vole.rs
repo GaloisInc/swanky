@@ -18,6 +18,8 @@ use swanky_field_binary::{F128b, F2};
 /// hardcoding some lengths and field sizes based on the [fixed parameters](crate::parameters)
 /// and generally having an API that corresponds to the components and uses of
 /// random VOLEs in Figure 7 of the paper, rather than the generic usage.
+/// One notable difference is that the paper uses 1-indexing to refer to specific VOLE instances,
+/// but this implementation uses 0-indexing.
 ///
 /// ⚠️ Beyond the API limitations, this trait cannot be used in an arbitrary protocol that requires
 /// a non-interactive VOLE. Specifically, the non-interactive decommitment step is equivalent to a
@@ -82,7 +84,7 @@ where
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     ///
-    /// The index `i` must be in the range $`[1, r\tau] = [1, 128]`$, where
+    /// The index `i` must be in the range $`[0, r\tau) = [0, 128)`$, where
     /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM) and
     /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
     ///
@@ -96,7 +98,7 @@ where
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
     ///
-    /// The index `i` must be in the range $`[1, \ell + r\tau]`$, where $`\ell + r\tau`$ is the
+    /// The index `i` must be in the range $`[0, \ell + r\tau)`$, where $`\ell + r\tau`$ is the
     /// value returned by [`RandomVole::count()`].
     fn vole_mask(&self, i: usize) -> Result<F128b>;
 

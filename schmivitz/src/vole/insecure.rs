@@ -95,26 +95,24 @@ impl RandomVole for InsecureVole {
     }
 
     fn commitment_mask(&self, i: u8) -> Result<F128b> {
-        if i < 1 || i as usize > REPETITION_PARAM * VOLE_SIZE_PARAM {
+        if i as usize > REPETITION_PARAM * VOLE_SIZE_PARAM {
             bail!(
-                "commitment mask index out of range: should be in [1, 128], but got {}",
+                "commitment mask index out of range: should be in [0, 128), but got {}",
                 i
             );
         }
-        // The paper one-indexes stuff; subtract 1 to make it a zero-index.
-        Ok(self.values[self.extended_witness_length + i as usize - 1].into())
+        Ok(self.values[self.extended_witness_length + i as usize].into())
     }
 
     fn vole_mask(&self, i: usize) -> Result<F128b> {
-        if i < 1 || i > self.count() {
+        if i >= self.count() {
             bail!(
-                "vole mask index out of range: should be in [1, {}], but got {}",
+                "vole mask index out of range: should be in [0, {}), but got {}",
                 self.count(),
                 i
             );
         }
-        // Adjust for one-indexing
-        Ok(F8b::form_superfield(&self.masks[i - 1].into()))
+        Ok(F8b::form_superfield(&self.masks[i].into()))
     }
 
     fn decommit(self, _transcript: &mut merlin::Transcript) -> Self::Decommitment {
