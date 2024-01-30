@@ -5,7 +5,7 @@
 //! - Secure version as described in FAEST spec and paper
 //!
 
-mod insecure;
+pub(crate) mod insecure;
 
 use eyre::Result;
 use merlin::Transcript;
