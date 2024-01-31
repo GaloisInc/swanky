@@ -201,3 +201,25 @@ where
         }
     }
 }
+
+/// A RAM with addresses/values represented by one or more F2 elements.
+///
+/// This is a high-level wrapper around [`DoraRam`] for the case described
+/// above. Use of this structure over `DoraRam` is preferred, as it provides
+/// the more familiar read/write interface and properly executes the protocol
+/// steps for these operations.
+pub struct BinaryRam;
+
+/// A RAM over F2 or an arithmetic field.
+pub enum Ram<
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, V, F>,
+> where
+    F::PrimeField: IsSubFieldOf<V>,
+{
+    Arithmetic(ArithmeticRam<P, V, F, C, SVOLE>),
+    Binary(BinaryRam),
+}
