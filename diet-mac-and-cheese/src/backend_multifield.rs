@@ -142,6 +142,26 @@ pub trait BackendDisjunctionT: BackendT {
     ) -> Result<Vec<Self::Wire>>;
 }
 
+/// A backend type that supports RAM operations.
+///
+/// Backends implementing this trait may create, read from, and write to RAMs.
+pub trait BackendRamT: BackendT {
+    /// Create a new RAW with `size` cells, `addr_count`-wide addresses, and
+    /// `value_count`-wide values.
+    ///
+    /// For arithmetic field backends, `addr_count` and `value_count` must be 1.
+    fn init_ram(&mut self, size: usize, addr_count: usize, value_count: usize) -> eyre::Result<()>;
+
+    /// Read and return the value at `addr`.
+    fn ram_read(&mut self, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>>;
+
+    /// Write `new` to `addr`.
+    fn ram_write(&mut self, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()>;
+
+    /// Finalize all RAM operations.
+    fn finalize_ram(&mut self) -> Result<()>;
+}
+
 impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
     BackendDisjunctionT for DietMacAndCheese<P, V, F40b, C, SVOLE>
 where
