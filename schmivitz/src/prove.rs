@@ -35,7 +35,7 @@ impl Proof {
         println!(
             "The total number of required VOLEs is {}",
             extended_witness_counter.count()
-                + (parameters::VOLE_SIZE_PARAM * parameters::REPETITION_PARAM) as u64
+                + (parameters::VOLE_SIZE_PARAM * parameters::REPETITION_PARAM)
         );
 
         todo!()

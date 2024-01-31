@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs::File, path::Path};
 
-use eyre::bail;
+use eyre::{bail, eyre};
 use mac_n_cheese_sieve_parser::{
     text_parser::ValueStreamReader, ConversionSemantics, FunctionBodyVisitor, Identifier, Number,
     RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
@@ -27,11 +27,11 @@ pub(crate) struct VoleCircuitPreparer<StreamReader>
 where
     StreamReader: ValueStreamReaderT,
 {
-    /// Count of gates in the circuit whose outputs are part of the extended witness.
-    count: u64,
-
     /// Complete map of values on every wire in the circuit.
     wire_values: HashMap<WireId, F2>,
+
+    /// Set of wire values that correspond to elements in the extended witness.
+    witness: Vec<F2>,
 
     /// Private input stream, used in circuit evaluation.
     private_inputs: StreamReader,
@@ -42,16 +42,16 @@ impl VoleCircuitPreparer<ValueStreamReader<File>> {
         let private_inputs =
             ValueStreamReader::open(ValueStreamKind::Private, private_inputs_path)?;
         Ok(Self {
-            count: 0,
             wire_values: HashMap::default(),
+            witness: Vec::default(),
             private_inputs,
         })
     }
 }
 
 impl<StreamReader: ValueStreamReaderT> VoleCircuitPreparer<StreamReader> {
-    pub(crate) fn count(&self) -> u64 {
-        self.count
+    pub(crate) fn count(&self) -> usize {
+        self.witness.len()
     }
 
     /// Save a value in our wire map.
@@ -65,6 +65,14 @@ impl<StreamReader: ValueStreamReaderT> VoleCircuitPreparer<StreamReader> {
             );
         }
         Ok(())
+    }
+
+    /// Get the witness and wire values.
+    ///
+    /// These values will be empty if the circuit has not yet been traversed.
+    #[allow(unused)]
+    pub(crate) fn into_parts(self) -> (Vec<F2>, HashMap<WireId, F2>) {
+        (self.witness, self.wire_values)
     }
 }
 
@@ -91,13 +99,13 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for VoleCircuitPrepar
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
 
-        self.count += 1;
-
         let product = match (self.wire_values.get(&left), self.wire_values.get(&right)) {
             (Some(l_val), Some(r_val)) => l_val * r_val,
             _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
         };
 
+        // Save product to the witness and associate it with its wire ID
+        self.witness.push(product);
         self.save_wire(dst, product)
     }
 
@@ -133,22 +141,18 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for VoleCircuitPrepar
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
 
-        // Add all private inputs here to the extended witness count
-        self.count += dst.len();
-
-        // Save each input value to its corresponding wire ID
         for wid in dst.start..=dst.end {
+            // Extract each input from the input stream and check that it's in F2
             let value = self
                 .private_inputs
                 .next()?
-                .ok_or(eyre::eyre!("Expected a private input but stream is empty"))?;
+                .ok_or(eyre!("Expected a private input but stream is empty"))?;
+            let maybe_f2: Option<F2> = F2::try_from_int(value).into();
+            let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
 
-            let f2_value = F2::try_from_int(value);
-            if f2_value.is_some().into() {
-                self.save_wire(wid, f2_value.unwrap())?;
-            } else {
-                bail!("Invalid input: Private input was not in F2")
-            }
+            // Save private input to the witness and associate it with its wire ID
+            self.witness.push(f2);
+            self.save_wire(wid, f2)?;
         }
         Ok(())
     }
