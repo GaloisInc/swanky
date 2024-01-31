@@ -31,7 +31,7 @@ use swanky_field_binary::{F128b, F2};
 /// [^vole]: Carsten Baum, Lennart Braun, Cyprien Delpech de Saint Guilhem, Michael Klooß,
 /// Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 /// Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
-pub(crate) trait RandomVole
+pub trait RandomVole
 where
     Self: Sized,
 {
