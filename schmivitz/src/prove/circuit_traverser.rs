@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use eyre::{bail, eyre, Result};
-use mac_n_cheese_sieve_parser::{FunctionBodyVisitor, WireId};
+use mac_n_cheese_sieve_parser::{FunctionBodyVisitor, Identifier, RelationVisitor, WireId};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F2};
 
@@ -349,6 +349,32 @@ impl<Vole: RandomVole> FunctionBodyVisitor for CircuitTraverser<Vole> {
         _args: &[mac_n_cheese_sieve_parser::WireRange],
     ) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `call` gates");
+    }
+}
+
+impl<Vole: RandomVole> RelationVisitor for CircuitTraverser<Vole> {
+    type FBV<'a> = Self;
+    fn define_function<BodyCb>(
+        &mut self,
+        _name: Identifier,
+        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _body: BodyCb,
+    ) -> eyre::Result<()>
+    where
+        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
+    {
+        bail!("Invalid input: VOLE-in-the-head does not support function definition");
+    }
+
+    fn define_plugin_function(
+        &mut self,
+        _name: Identifier,
+        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _body: mac_n_cheese_sieve_parser::PluginBinding,
+    ) -> eyre::Result<()> {
+        bail!("Invalid input: VOLE-in-the-head does not support function definition");
     }
 }
 
