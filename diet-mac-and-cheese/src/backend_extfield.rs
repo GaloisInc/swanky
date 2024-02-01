@@ -1,5 +1,5 @@
 use crate::{
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT},
     backend_trait::BackendT,
     circuit_ir::FieldInputs,
     homcom::FCom,
@@ -168,6 +168,45 @@ impl<
 
     fn lift(&mut self) -> &mut Self::LiftedBackend {
         &mut self.lifted_dmc
+    }
+}
+
+impl<
+        P: Party,
+        C: AbstractChannel + Clone,
+        SVOLE1: SvoleT<P, F2, F40b>,
+        SVOLE2: SvoleT<P, F40b, F40b>,
+    > BackendRamT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+{
+    fn init_ram(
+        &mut self,
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
+    ) -> eyre::Result<crate::backend_multifield::RamId> {
+        todo!("Create and store a BinaryRam state, returning its position in the store.")
+    }
+
+    fn ram_read(
+        &mut self,
+        ram: crate::backend_multifield::RamId,
+        addr: &[Self::Wire],
+    ) -> eyre::Result<Vec<Self::Wire>> {
+        todo!("Read from the BinaryRam with ID ram.")
+    }
+
+    fn ram_write(
+        &mut self,
+        ram: crate::backend_multifield::RamId,
+        addr: &[Self::Wire],
+        new: &[Self::Wire],
+    ) -> eyre::Result<()> {
+        todo!("Write to the BinaryRam with ID ram.")
+    }
+
+    fn finalize_ram(&mut self, ram: crate::backend_multifield::RamId) -> eyre::Result<()> {
+        todo!("Finalize the BinaryRam with ID ram.")
     }
 }
 

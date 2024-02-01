@@ -721,6 +721,42 @@ impl<
     }
 }
 
+impl<
+        P: Party,
+        FE: PrimeFiniteField,
+        C: AbstractChannel + Clone,
+        SvoleF2: SvoleT<P, F2, F40b>,
+        SvoleFE: SvoleT<P, FE, FE>,
+    > BackendRamT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+{
+    fn init_ram(
+        &mut self,
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
+    ) -> eyre::Result<RamId> {
+        todo!("Create and store an ArithmeticRam state, returning its position in the store.")
+    }
+
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>> {
+        todo!("Read from the ArithmeticRam with ID ram.")
+    }
+
+    fn ram_write(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        new: &[Self::Wire],
+    ) -> eyre::Result<()> {
+        todo!("Write to the ArithmeticRam with ID ram.")
+    }
+
+    fn finalize_ram(&mut self, ram: RamId) -> eyre::Result<()> {
+        todo!("Finalize the ArithmeticRam with ID ram.")
+    }
+}
+
 pub(super) struct DoraState<
     P: Party,
     V: IsSubFieldOf<F>,
@@ -872,7 +908,7 @@ impl<B: BackendT> EvaluatorSingle<B> {
     }
 }
 
-impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> EvaluatorT<P>
+impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + BackendRamT> EvaluatorT<P>
     for EvaluatorSingle<B>
 {
     // TODO: Revisit the type of instances / witnesses when we implement
