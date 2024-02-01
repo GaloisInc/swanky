@@ -209,17 +209,3 @@ where
 /// the more familiar read/write interface and properly executes the protocol
 /// steps for these operations.
 pub struct BinaryRam;
-
-/// A RAM over F2 or an arithmetic field.
-pub enum Ram<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, F>,
-> where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    Arithmetic(ArithmeticRam<P, V, F, C, SVOLE>),
-    Binary(BinaryRam),
-}
