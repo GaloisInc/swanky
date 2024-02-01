@@ -4,7 +4,7 @@ use clap::Parser;
 use cli::{Cli, LpnSize};
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::read_sieveir_phase2::{
+use diet_mac_and_cheese::sieveir_reader_fbs::{
     read_private_inputs, read_public_inputs, read_types,
 };
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;

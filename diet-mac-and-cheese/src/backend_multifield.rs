@@ -11,7 +11,7 @@ use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{DisjunctionBody, PluginExecution};
-use crate::read_sieveir_phase2::BufRelation;
+use crate::sieveir_reader_fbs::BufRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
 use crate::text_reader::TextRelation;
