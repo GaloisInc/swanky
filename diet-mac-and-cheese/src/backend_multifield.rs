@@ -759,7 +759,11 @@ impl<
         addr: &[Self::Wire],
         new: &[Self::Wire],
     ) -> eyre::Result<()> {
-        todo!("Write to the ArithmeticRam with ID ram.")
+        debug_assert!(ram < self.ram_states.len());
+        debug_assert_eq!(addr.len(), 1);
+        debug_assert_eq!(new.len(), 1);
+
+        self.ram_states[ram].write(&mut self.dmc, &addr[0], &new[0])
     }
 
     fn finalize_ram(&mut self, ram: RamId) -> eyre::Result<()> {
