@@ -1113,10 +1113,10 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                     ..
                 })) => match op {
                     RamOp::Init(size) => {
-                        debug_assert_eq!(inputs.len(), 1);
-                        debug_assert_eq!((inputs[0].1 - inputs[0].0 + 1) as usize, *value_count);
-                        debug_assert_eq!(outputs.len(), 1);
-                        debug_assert_eq!(outputs[0].1 - outputs[0].0 + 1, 1);
+                        assert_eq!(inputs.len(), 1);
+                        assert_eq!((inputs[0].1 - inputs[0].0 + 1) as usize, *value_count);
+                        assert_eq!(outputs.len(), 1);
+                        assert_eq!(outputs[0].0, outputs[0].1);
 
                         let init_value: Vec<_> =
                             copy_mem(&self.memory, inputs[0]).copied().collect();
@@ -1128,11 +1128,11 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                         self.ram_wires.set(outputs[0].0, &ram_id);
                     }
                     RamOp::Read => {
-                        debug_assert_eq!(inputs.len(), 2);
-                        debug_assert_eq!(inputs[0].0, inputs[0].1);
-                        debug_assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
-                        debug_assert_eq!(outputs.len(), 1);
-                        debug_assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
+                        assert_eq!(inputs.len(), 2);
+                        assert_eq!(inputs[0].0, inputs[0].1);
+                        assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
+                        assert_eq!(outputs.len(), 1);
+                        assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
 
                         let &ram_id = self.ram_wires.get(inputs[0].0);
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
@@ -1145,11 +1145,11 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                         }
                     }
                     RamOp::Write => {
-                        debug_assert_eq!(inputs.len(), 3);
-                        debug_assert_eq!(inputs[0].0, inputs[0].1);
-                        debug_assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
-                        debug_assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
-                        debug_assert_eq!(outputs.len(), 0);
+                        assert_eq!(inputs.len(), 3);
+                        assert_eq!(inputs[0].0, inputs[0].1);
+                        assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
+                        assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
+                        assert_eq!(outputs.len(), 0);
 
                         let &ram_id = self.ram_wires.get(inputs[0].0);
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
