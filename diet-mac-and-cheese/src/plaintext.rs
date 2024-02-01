@@ -323,6 +323,6 @@ where
     }
 
     fn finalize_rams(&mut self) -> eyre::Result<()> {
-        unimplemented!("The plaintext backend does not support the RAM plugin")
+        Ok(())
     }
 }

@@ -206,7 +206,7 @@ impl<
     }
 
     fn finalize_rams(&mut self) -> eyre::Result<()> {
-        todo!("Finalize the BinaryRam with ID ram.")
+        Ok(())
     }
 }
 
