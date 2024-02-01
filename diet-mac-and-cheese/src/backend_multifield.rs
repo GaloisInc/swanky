@@ -747,7 +747,10 @@ impl<
     }
 
     fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>> {
-        todo!("Read from the ArithmeticRam with ID ram.")
+        debug_assert!(ram < self.ram_states.len());
+        debug_assert_eq!(addr.len(), 1);
+
+        Ok(vec![self.ram_states[ram].read(&mut self.dmc, &addr[0])?])
     }
 
     fn ram_write(
