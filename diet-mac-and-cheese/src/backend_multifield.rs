@@ -736,7 +736,14 @@ impl<
         value_count: usize,
         init_value: &[Self::Wire],
     ) -> eyre::Result<RamId> {
-        todo!("Create and store an ArithmeticRam state, returning its position in the store.")
+        debug_assert_eq!(addr_count, 1);
+        debug_assert_eq!(value_count, 1);
+        debug_assert_eq!(init_value.len(), 1);
+
+        let ram_id = self.ram_states.len();
+        self.ram_states.push(ArithmeticRam::new(size));
+
+        Ok(ram_id)
     }
 
     fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>> {
