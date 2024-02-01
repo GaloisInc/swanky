@@ -177,8 +177,8 @@ pub trait BackendRamT: BackendT {
         new: &[Self::Wire],
     ) -> eyre::Result<()>;
 
-    /// Finalize all operations on `ram`.
-    fn finalize_ram(&mut self, ram: RamId) -> eyre::Result<()>;
+    /// Finalize all operations on all RAMs.
+    fn finalize_rams(&mut self) -> eyre::Result<()>;
 }
 
 impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
@@ -766,10 +766,11 @@ impl<
         self.ram_states[ram].write(&mut self.dmc, &addr[0], &new[0])
     }
 
-    fn finalize_ram(&mut self, ram: RamId) -> eyre::Result<()> {
-        debug_assert!(ram < self.ram_states.len());
-
-        self.ram_states[ram].finalize(&mut self.dmc)
+    fn finalize_rams(&mut self) -> eyre::Result<()> {
+        self.ram_states
+            .iter_mut()
+            .map(|ram| ram.finalize(&mut self.dmc))
+            .collect::<eyre::Result<_>>()
     }
 }
 

@@ -205,7 +205,7 @@ impl<
         todo!("Write to the BinaryRam with ID ram.")
     }
 
-    fn finalize_ram(&mut self, ram: crate::backend_multifield::RamId) -> eyre::Result<()> {
+    fn finalize_rams(&mut self) -> eyre::Result<()> {
         todo!("Finalize the BinaryRam with ID ram.")
     }
 }
