@@ -893,6 +893,7 @@ impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
 /// to manage memory for the evaluation.
 pub struct EvaluatorSingle<B: BackendT> {
     memory: Memory<<B as BackendT>::Wire>,
+    ram_wires: Memory<RamId>,
     backend: B,
     is_boolean: bool,
 }
@@ -900,8 +901,10 @@ pub struct EvaluatorSingle<B: BackendT> {
 impl<B: BackendT> EvaluatorSingle<B> {
     fn new(backend: B, is_boolean: bool) -> Self {
         let memory = Memory::new();
+        let ram_wires = Memory::new();
         EvaluatorSingle {
             memory,
+            ram_wires,
             backend,
             is_boolean,
         }
