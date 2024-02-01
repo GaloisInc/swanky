@@ -143,24 +143,42 @@ pub trait BackendDisjunctionT: BackendT {
     ) -> Result<Vec<Self::Wire>>;
 }
 
-/// A backend type that supports RAM operations.
+/// Identifiers for RAMs.
+///
+/// Per underlying field type, RAMs are globally scoped, and referred to by a
+/// unique ID. Wires of RAM type carry these unique IDs so RAMs may be correctly
+/// accessed from within any function scope.
+pub type RamId = usize;
+
+/// A backend type that supports operations on RAMs.
 ///
 /// Backends implementing this trait may create, read from, and write to RAMs.
 pub trait BackendRamT: BackendT {
     /// Create a new RAW with `size` cells, `addr_count`-wide addresses, and
-    /// `value_count`-wide values.
+    /// `value_count`-wide values. Cells will be initialized to `init_value`.
     ///
     /// For arithmetic field backends, `addr_count` and `value_count` must be 1.
-    fn init_ram(&mut self, size: usize, addr_count: usize, value_count: usize) -> eyre::Result<()>;
+    fn init_ram(
+        &mut self,
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
+    ) -> eyre::Result<RamId>;
 
-    /// Read and return the value at `addr`.
-    fn ram_read(&mut self, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>>;
+    /// Read and return the value at `addr` in `ram`.
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>>;
 
-    /// Write `new` to `addr`.
-    fn ram_write(&mut self, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()>;
+    /// Write `new` to `addr` in `ram`.
+    fn ram_write(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        new: &[Self::Wire],
+    ) -> eyre::Result<()>;
 
-    /// Finalize all RAM operations.
-    fn finalize_ram(&mut self) -> Result<()>;
+    /// Finalize all operations on `ram`.
+    fn finalize_ram(&mut self, ram: RamId) -> eyre::Result<()>;
 }
 
 impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
