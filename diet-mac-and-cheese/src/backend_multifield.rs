@@ -1112,13 +1112,20 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                     op,
                     ..
                 })) => match op {
-                    RamOp::Init(_size) => {
+                    RamOp::Init(size) => {
                         debug_assert_eq!(inputs.len(), 1);
                         debug_assert_eq!((inputs[0].1 - inputs[0].0 + 1) as usize, *value_count);
                         debug_assert_eq!(outputs.len(), 1);
                         debug_assert_eq!(outputs[0].1 - outputs[0].0 + 1, 1);
 
-                        todo!("Initialize a RAM state object associated with the out wire/addr count/value count.")
+                        let init_value: Vec<_> =
+                            copy_mem(&self.memory, inputs[0]).copied().collect();
+
+                        let ram_id =
+                            self.backend
+                                .init_ram(*size, *addr_count, *value_count, &init_value)?;
+
+                        self.ram_wires.set(outputs[0].0, &ram_id);
                     }
                     RamOp::Read => {
                         debug_assert_eq!(inputs.len(), 2);
@@ -1127,7 +1134,15 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                         debug_assert_eq!(outputs.len(), 1);
                         debug_assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
 
-                        todo!("Fetch RAM state object & perform a read on it.")
+                        let &ram_id = self.ram_wires.get(inputs[0].0);
+                        let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
+
+                        let values = self.backend.ram_read(ram_id, &addr)?;
+                        debug_assert_eq!(values.len(), *value_count);
+
+                        for (w, value) in (outputs[0].0..=outputs[0].1).zip(values.into_iter()) {
+                            self.memory.set(w, &value);
+                        }
                     }
                     RamOp::Write => {
                         debug_assert_eq!(inputs.len(), 3);
@@ -1136,7 +1151,11 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                         debug_assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
                         debug_assert_eq!(outputs.len(), 0);
 
-                        todo!("Fetch RAM state object & perform a write on it.")
+                        let &ram_id = self.ram_wires.get(inputs[0].0);
+                        let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
+                        let new: Vec<_> = copy_mem(&self.memory, inputs[2]).copied().collect();
+
+                        self.backend.ram_write(ram_id, &addr, &new)?
                     }
                 },
             },
