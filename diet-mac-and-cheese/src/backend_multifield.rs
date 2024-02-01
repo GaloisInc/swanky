@@ -1198,10 +1198,12 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo) {
         self.memory.push_frame(compiled_info);
+        self.ram_wires.push_frame(compiled_info);
     }
 
     fn pop_frame(&mut self) {
         self.memory.pop_frame();
+        self.ram_wires.pop_frame();
     }
 
     fn allocate_new(&mut self, first_id: WireId, last_id: WireId) {
