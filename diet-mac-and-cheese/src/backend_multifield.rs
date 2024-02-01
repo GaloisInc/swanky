@@ -13,6 +13,7 @@ use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
     DisjunctionBody, PluginExecution, PluginType, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
 };
+use crate::ram::ArithmeticRam;
 use crate::read_sieveir_phase2::BufRelation;
 use crate::svole_thread::{SvoleAtomic, ThreadSvole};
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
@@ -237,6 +238,7 @@ pub(crate) struct DietMacAndCheeseConv<
     dmc: DietMacAndCheese<P, FE, FE, C, SvoleFE>,
     conv: Conv<P, FE, SvoleF2, SvoleFE>,
     dora_states: HashMap<usize, DoraState<P, FE, FE, C, SvoleFE>>,
+    ram_states: Vec<ArithmeticRam<P, FE, FE, C, SvoleFE>>,
     edabits_map: EdabitsMap<Edabits<P, FE>>,
     dmc_f2: DietMacAndCheese<P, F2, F40b, C, SvoleF2>,
     no_batching: bool,
@@ -271,6 +273,7 @@ impl<
             dmc,
             conv,
             dora_states: Default::default(),
+            ram_states: Default::default(),
             edabits_map: EdabitsMap::new(),
             dmc_f2: DietMacAndCheese::<P, F2, F40b, C, SvoleF2>::init_with_fcom(
                 channel,
@@ -303,6 +306,7 @@ impl<
             dmc,
             conv,
             dora_states: Default::default(),
+            ram_states: Default::default(),
             edabits_map: EdabitsMap::new(),
             dmc_f2: DietMacAndCheese::<P, F2, F40b, C, SvoleF2>::init_with_fcom(
                 channel,
