@@ -767,7 +767,9 @@ impl<
     }
 
     fn finalize_ram(&mut self, ram: RamId) -> eyre::Result<()> {
-        todo!("Finalize the ArithmeticRam with ID ram.")
+        debug_assert!(ram < self.ram_states.len());
+
+        self.ram_states[ram].finalize(&mut self.dmc)
     }
 }
 
