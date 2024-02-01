@@ -180,27 +180,27 @@ impl<
 {
     fn init_ram(
         &mut self,
-        size: usize,
-        addr_count: usize,
-        value_count: usize,
-        init_value: &[Self::Wire],
+        _size: usize,
+        _addr_count: usize,
+        _value_count: usize,
+        _init_value: &[Self::Wire],
     ) -> eyre::Result<crate::backend_multifield::RamId> {
         todo!("Create and store a BinaryRam state, returning its position in the store.")
     }
 
     fn ram_read(
         &mut self,
-        ram: crate::backend_multifield::RamId,
-        addr: &[Self::Wire],
+        _ram: crate::backend_multifield::RamId,
+        _addr: &[Self::Wire],
     ) -> eyre::Result<Vec<Self::Wire>> {
         todo!("Read from the BinaryRam with ID ram.")
     }
 
     fn ram_write(
         &mut self,
-        ram: crate::backend_multifield::RamId,
-        addr: &[Self::Wire],
-        new: &[Self::Wire],
+        _ram: crate::backend_multifield::RamId,
+        _addr: &[Self::Wire],
+        _new: &[Self::Wire],
     ) -> eyre::Result<()> {
         todo!("Write to the BinaryRam with ID ram.")
     }
