@@ -2,7 +2,7 @@
 
 use crate::{
     backend::Monitor,
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT},
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::FieldInputs,
     mac::{make_x_i, Mac, MacT},
@@ -301,32 +301,28 @@ where
 {
     fn init_ram(
         &mut self,
-        size: usize,
-        addr_count: usize,
-        value_count: usize,
-        init_value: &[Self::Wire],
-    ) -> eyre::Result<crate::backend_multifield::RamId> {
+        _size: usize,
+        _addr_count: usize,
+        _value_count: usize,
+        _init_value: &[Self::Wire],
+    ) -> eyre::Result<RamId> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn ram_read(
-        &mut self,
-        ram: crate::backend_multifield::RamId,
-        addr: &[Self::Wire],
-    ) -> eyre::Result<Vec<Self::Wire>> {
+    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
     fn ram_write(
         &mut self,
-        ram: crate::backend_multifield::RamId,
-        addr: &[Self::Wire],
-        new: &[Self::Wire],
+        _ram: RamId,
+        _addr: &[Self::Wire],
+        _new: &[Self::Wire],
     ) -> eyre::Result<()> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn finalize_ram(&mut self, ram: crate::backend_multifield::RamId) -> eyre::Result<()> {
+    fn finalize_ram(&mut self, _ram: RamId) -> eyre::Result<()> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 }
