@@ -769,8 +769,7 @@ impl<
     fn finalize_rams(&mut self) -> eyre::Result<()> {
         self.ram_states
             .iter_mut()
-            .map(|ram| ram.finalize(&mut self.dmc))
-            .collect::<eyre::Result<_>>()
+            .try_for_each(|ram| ram.finalize(&mut self.dmc))
     }
 }
 
