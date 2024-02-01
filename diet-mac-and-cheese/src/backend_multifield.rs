@@ -827,8 +827,10 @@ trait EvaluatorT<P: Party> {
 /// requires that all types used in a circuit provide a backend for evaluation,
 /// even if that backend will never be invoked.
 ///
-/// Note that all `EvaluatorT` methods for this type `panic!` to reflect the
-/// above-described use-case.
+/// Note that almost all `EvaluatorT` methods for this type `panic!` to reflect
+/// the above-described use-case; the exceptions are push_frame and pop_frame,
+/// which are invoked during the processing of functions to appropriately set up
+/// stack frames for calls. These methods simply do nothing for EvaluatorDummy.
 struct EvaluatorDummy;
 
 impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
@@ -859,13 +861,9 @@ impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
         unimplemented!("EvaluatorDummy cannot evaluate plugin calls.")
     }
 
-    fn push_frame(&mut self, _compiled_info: &CompiledInfo) {
-        unimplemented!("EvaluatorDummy cannot push stack frames.")
-    }
+    fn push_frame(&mut self, _compiled_info: &CompiledInfo) {}
 
-    fn pop_frame(&mut self) {
-        unimplemented!("EvaluatorDummy cannot pop stack frames.")
-    }
+    fn pop_frame(&mut self) {}
 
     fn allocate_new(&mut self, _first_id: WireId, _last_id: WireId) {
         unimplemented!("EvaluatorDummy cannot allocate wire memory.")
