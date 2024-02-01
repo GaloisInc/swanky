@@ -1262,6 +1262,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
         debug!("Finalize in EvaluatorSingle");
         self.backend.finalize_conv()?;
         self.backend.finalize_disj()?;
+        self.backend.finalize_rams()?;
         self.backend.finalize()?;
         Ok(())
     }
