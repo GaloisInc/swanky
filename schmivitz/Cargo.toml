@@ -28,6 +28,7 @@ proptest.workspace = true
 rand.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
+swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]

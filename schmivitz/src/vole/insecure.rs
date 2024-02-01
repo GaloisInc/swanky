@@ -14,6 +14,7 @@ use swanky_field_binary::{F128b, F8b, F2};
 
 use super::RandomVole;
 
+#[derive(Clone)]
 pub(crate) struct InsecureVole {
     /// Number of VOLEs requested.
     extended_witness_length: usize,
@@ -161,7 +162,7 @@ impl RandomVole for InsecureVole {
     }
 }
 
-#[allow(unused)]
+#[derive(Debug, Clone)]
 pub(crate) struct InsecureCommitments {
     /// Number of VOLEs requested.
     extended_witness_length: usize,

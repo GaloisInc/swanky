@@ -2188,6 +2188,7 @@ dependencies = [
  "rand",
  "swanky-field",
  "swanky-field-binary",
+ "swanky-serialization",
  "tempfile",
  "vectoreyes",
 ]

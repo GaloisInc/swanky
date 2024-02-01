@@ -50,6 +50,7 @@ impl VoleCircuitPreparer<ValueStreamReader<File>> {
 }
 
 impl<StreamReader: ValueStreamReaderT> VoleCircuitPreparer<StreamReader> {
+    #[cfg(test)]
     pub(crate) fn count(&self) -> usize {
         self.witness.len()
     }
@@ -70,7 +71,6 @@ impl<StreamReader: ValueStreamReaderT> VoleCircuitPreparer<StreamReader> {
     /// Get the witness and wire values.
     ///
     /// These values will be empty if the circuit has not yet been traversed.
-    #[allow(unused)]
     pub(crate) fn into_parts(self) -> (Vec<F2>, HashMap<WireId, F2>) {
         (self.witness, self.wire_values)
     }

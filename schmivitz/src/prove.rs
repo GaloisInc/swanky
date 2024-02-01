@@ -4,12 +4,17 @@ use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use std::{
     io::{Read, Seek},
+    iter::{repeat_with, zip},
     path::Path,
 };
+use swanky_field::FiniteRing;
+use swanky_field_binary::{F128b, F2};
+use swanky_serialization::CanonicalSerialize;
 
 use crate::{
-    parameters::{self, FIELD_SIZE},
-    prove::witness_counter::VoleCircuitPreparer,
+    helpers::combine,
+    parameters::FIELD_SIZE,
+    prove::{circuit_traverser::CircuitTraverser, witness_counter::VoleCircuitPreparer},
     vole::RandomVole,
 };
 
@@ -17,41 +22,103 @@ pub(crate) mod circuit_traverser;
 pub(crate) mod witness_counter;
 
 /// Zero-knowledge proof of knowledge of a circuit.
+///
+/// TODO #251: Add VOLE challenge and decommitment challenge to this type.
+#[allow(unused)]
 #[derive(Debug, Clone)]
-pub struct Proof {}
+pub struct Proof<Vole: RandomVole> {
+    /// Commitment to the extended witness ($`d`$ in the paper).
+    witness_commitment: Vec<F2>,
+    /// Challenges generated after committing to the witness
+    witness_challenges: Vec<F128b>,
+    /// Aggregated commitment to the degree-0 term coefficients for each gate in the circuit
+    /// ($`\tilde b`$ in the paper).
+    degree_0_commitment: F128b,
+    /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
+    /// ($`\tilde a`$ in the paper).
+    degree_1_commitment: F128b,
+    /// Partial decommitment of the VOLEs.
+    partial_decommitment: Vole::Decommitment,
+}
 
-impl Proof {
+impl<Vole: RandomVole> Proof<Vole> {
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
-    pub fn prove<T, R, Vole>(
+    pub fn prove<T, R>(
         circuit: &mut T,
         private_input: &Path,
-        _transcript: &mut Transcript,
-        _rng: R,
+        transcript: &mut Transcript,
+        rng: &mut R,
     ) -> Result<Self>
     where
-        T: Read + Seek,
+        T: Read + Seek + Clone,
         R: CryptoRng + RngCore,
-        Vole: RandomVole,
     {
-        let reader = RelationReader::new(circuit)?;
+        let reader = RelationReader::new(circuit.clone())?;
         Self::validate_circuit_header(&reader)?;
 
         // Check the circuit for the number of extended-witness-contributing gates
-        let mut extended_witness_counter = VoleCircuitPreparer::new_from_path(private_input)?;
-        reader.read(&mut extended_witness_counter)?;
-        println!(
-            "The extended witness size is {}",
-            extended_witness_counter.count()
-        );
+        let mut prepared_circuit = VoleCircuitPreparer::new_from_path(private_input)?;
+        reader.read(&mut prepared_circuit)?;
+        let (witness, wire_values) = prepared_circuit.into_parts();
+        let witness_len = witness.len();
 
-        // Get the number of VOLEs by adding extended witness count to r * tau
-        println!(
-            "The total number of required VOLEs is {}",
-            extended_witness_counter.count()
-                + (parameters::VOLE_SIZE_PARAM * parameters::REPETITION_PARAM)
-        );
+        // TODO #251: Add public values to transcript here!!!
+        transcript.append_message(b"commit to public values", b"todo: commit properly");
 
-        todo!()
+        // Get a set of random VOLEs, one for each value in the extended witness
+        // TODO #251: This should return a challenge as well to put into the proof
+        let voles = Vole::create(witness_len, transcript, rng);
+
+        // Commit to extended witness (`d` in the paper)
+        let witness_commitment = zip(witness, voles.witness_mask())
+            .map(|(w, u)| w - u)
+            .collect::<Vec<_>>();
+
+        // TODO #251: Add witness commitment to transcript here!!!
+        transcript.append_message(b"commit to witness", b"todo: commit the actual value");
+
+        // Generate challenges
+        let witness_challenges = repeat_with(|| {
+            let mut bytes = [0u8; 16];
+            transcript.challenge_bytes(b"challenge part 2", &mut bytes);
+            F128b::from_uniform_bytes(&bytes)
+        })
+        .take(witness_len)
+        .collect::<Vec<_>>();
+
+        // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
+        // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
+        // the challenges.
+        let mut circuit_traverser = CircuitTraverser::new(wire_values, witness_challenges, voles)?;
+        RelationReader::new(circuit)?.read(&mut circuit_traverser)?;
+        let (degree_0_aggregation, degree_1_aggregation, voles, witness_challenges) =
+            circuit_traverser.into_parts();
+
+        // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
+        let degree_0_mask = combine(voles.aggregate_commitment_masks());
+        let degree_1_mask = combine(voles.aggregate_commitment_values());
+
+        // Finish computing aggregated responses (`a~`, `b~` in the paper)
+        let degree_0_commitment = degree_0_aggregation + degree_0_mask;
+        let degree_1_commitment = degree_1_aggregation + degree_1_mask;
+
+        // TODO #251: Add aggregated responses to transcript here!!!
+        transcript.append_message(b"b~: degree 0 commitment", &degree_0_commitment.to_bytes());
+        transcript.append_message(b"a~: degree 1 commitment", &degree_1_commitment.to_bytes());
+
+        // Decommit the VOLEs
+        // TODO #251: This should also return the challenge used to decommit, so we can put it
+        // into the proof.
+        let partial_decommitment = voles.decommit(transcript);
+
+        // Form the proof
+        Ok(Self {
+            witness_commitment,
+            witness_challenges,
+            degree_0_commitment,
+            degree_1_commitment,
+            partial_decommitment,
+        })
     }
 
     /// Validate that the circuit can be processed by the system, according to the header info.
@@ -108,7 +175,7 @@ mod tests {
             @end ";
         let plugin_cursor = &mut Cursor::new(plugin.as_bytes());
         let reader = RelationReader::new(plugin_cursor).unwrap();
-        assert!(Proof::validate_circuit_header(&reader).is_err());
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
     }
 
     #[test]
@@ -122,7 +189,7 @@ mod tests {
             @end ";
         let conversion_cursor = &mut Cursor::new(trivial_conversion.as_bytes());
         let reader = RelationReader::new(conversion_cursor).unwrap();
-        assert!(Proof::validate_circuit_header(&reader).is_err());
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
     }
 
     #[test]
@@ -134,7 +201,7 @@ mod tests {
             @end ";
         let big_field_cursor = &mut Cursor::new(big_field.as_bytes());
         let reader = RelationReader::new(big_field_cursor).unwrap();
-        assert!(Proof::validate_circuit_header(&reader).is_err());
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
 
         let extra_field = "version 2.0.0;
             circuit;
@@ -144,7 +211,7 @@ mod tests {
             @end ";
         let extra_field_cursor = &mut Cursor::new(extra_field.as_bytes());
         let reader = RelationReader::new(extra_field_cursor).unwrap();
-        assert!(Proof::validate_circuit_header(&reader).is_err());
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
     }
 
     #[test]
@@ -156,17 +223,14 @@ mod tests {
             @end ";
         let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
         let reader = RelationReader::new(tiny_header_cursor)?;
-        assert!(Proof::validate_circuit_header(&reader).is_ok());
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_ok());
         Ok(())
     }
 
     #[test]
-    #[should_panic(expected = "not yet implemented")]
-    fn prove_doesnt_explode() {
-        assert!(prove_doesnt_explode_result().is_ok())
-    }
-
-    fn prove_doesnt_explode_result() -> Result<()> {
+    fn prove_doesnt_explode() -> Result<()> {
+        // This doesn't test anything, per se. Just makes sure the prove algorithm runs without
+        // borking on a valid input.
         let mini_circuit_bytes = "version 2.0.0;
             circuit;
             @type field 2;
@@ -192,8 +256,12 @@ mod tests {
 
         let rng = &mut thread_rng();
 
-        let _proof =
-            Proof::prove::<_, _, InsecureVole>(mini_circuit, &private_input_path, transcript, rng)?;
+        let _proof = Proof::<InsecureVole>::prove::<_, _>(
+            mini_circuit,
+            &private_input_path,
+            transcript,
+            rng,
+        )?;
 
         Ok(())
     }

@@ -2,12 +2,22 @@
 //!
 //!
 
+use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F128b;
 
 /// Convert a list of field elements into a single 128-bit value.
 ///
-/// TODO: This is not correct!!!
-#[allow(unused)]
+/// Specifically, we compute
+/// $` \sum_{i = 0}^{128} v_i X^i`$,
+/// where $`X`$ is [`F128b::GENERATOR`], the generator for the field.
 pub(crate) fn combine(values: [F128b; 128]) -> F128b {
-    values.into_iter().sum()
+    // Start with `X^0 = 1`
+    let mut power = F128b::ONE;
+    let mut acc = F128b::ZERO;
+
+    for vi in values {
+        acc += vi * power;
+        power *= F128b::GENERATOR;
+    }
+    acc
 }

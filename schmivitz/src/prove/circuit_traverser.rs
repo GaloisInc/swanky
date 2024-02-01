@@ -160,6 +160,19 @@ impl<Vole: RandomVole> CircuitTraverser<Vole> {
         self.save_computed_vole(wid, self.voles.vole_mask(next_index)?)?;
         Ok(self.challenges[next_index])
     }
+
+    /// Decomposes into the aggregate components that we constructed during the
+    /// full circuit traversal.
+    ///
+    /// The components that were passed to [`Self::new()`] are returned unchanged.
+    pub(crate) fn into_parts(self) -> (F128b, F128b, Vole, Vec<F128b>) {
+        (
+            self.aggregate_degree_0,
+            self.aggregate_degree_1,
+            self.voles,
+            self.challenges,
+        )
+    }
 }
 
 impl<Vole: RandomVole> FunctionBodyVisitor for CircuitTraverser<Vole> {
