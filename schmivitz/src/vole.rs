@@ -12,6 +12,8 @@ use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field_binary::{F128b, F2};
 
+use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
+
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
 /// It's tailored to the specific use case of the VOLE-in-the-head paper[^vole], including
@@ -45,8 +47,7 @@ where
     ///
     /// This is particular to the protocol by Baum et al., so the total number of VOLEs created
     /// should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length`;
-    /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM); and
-    /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
+    /// $`r`$ is the [`VOLE_SIZE_PARAM`]; and $`\tau`$ is the [`REPETITION_PARAM`].
     ///
     /// The [`Transcript`] passed here must already incorporate all public information known to
     /// both parties at the beginning of the proof, including
@@ -66,34 +67,40 @@ where
     ///
     /// This should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length` parameter
     /// passed to [`RandomVole::create()`];
-    /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM); and
-    /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
+    /// $`r`$ is the [`VOLE_SIZE_PARAM`]; and $`\tau`$ is the [`REPETITION_PARAM`].
     fn count(&self) -> usize;
 
     /// Get the number of extended witness elements supported by this random VOLE instance.
     fn extended_witness_length(&self) -> usize;
 
     /// Get the mask for the witness; this is $`\bf u_{[1..\ell]}`$ in the paper, where
-    /// $`\ell`$ is the `extended_witness_length` passed to [`RandomVole::create()`].
+    /// $`\ell`$ is the value returned by [`RandomVole::extended_witness_length()`].
     ///
     /// In the paper, this is used in Figure 7, Round 1, step 1.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
-    /// [`RandomVole::commitment_mask()`].
+    /// [`RandomVole::aggregate_commitment_values()`].
     fn witness_mask(&self) -> &[F2];
 
-    /// Gets the `i`th component of the random value (`u` in the paper), embedded into [`F128b`]
-    /// from [`F2`].
+    /// Gets the VOLE values ($`u_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
+    /// embedded into [`F128b`] from [`F2`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
-    ///
-    /// The index `i` must be in the range $`[0, r\tau) = [0, 128)`$, where
-    /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM) and
-    /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
+    /// These are combined into a mask for the aggregated commitment $`\tilde a`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVole::witness_mask()`].
-    fn commitment_mask(&self, i: u8) -> Result<F128b>;
+    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+
+    /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
+    /// lifted into [`F128b`] from `[`[F8b](swanky_field_binary::F8b)`; 16]`.
+    ///
+    /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
+    /// These are combined into a mask for the aggregated commitment $`\tilde b`$.
+    ///
+    /// Important: the values returned from this method must not overlap with those returned by
+    /// [`RandomVole::witness_mask()`].
+    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
     /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`](swanky_field_binary::F8b).
@@ -101,8 +108,8 @@ where
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
     ///
-    /// The index `i` must be in the range $`[0, \ell + r\tau)`$, where $`\ell + r\tau`$ is the
-    /// value returned by [`RandomVole::count()`].
+    /// The index `i` must be in the range $`[0, \ell)`$, where $`\ell`$ is the
+    /// value returned by [`RandomVole::extended_witness_length()`].
     fn vole_mask(&self, i: usize) -> Result<F128b>;
 
     /// Compute a partial decommitment to this set of random VOLEs.

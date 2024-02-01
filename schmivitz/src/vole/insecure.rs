@@ -98,21 +98,31 @@ impl RandomVole for InsecureVole {
         &self.values[0..self.extended_witness_length]
     }
 
-    fn commitment_mask(&self, i: u8) -> Result<F128b> {
-        if i as usize > REPETITION_PARAM * VOLE_SIZE_PARAM {
-            bail!(
-                "commitment mask index out of range: should be in [0, 128), but got {}",
-                i
-            );
-        }
-        Ok(self.values[self.extended_witness_length + i as usize].into())
+    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+        self.values
+            .iter()
+            .skip(self.extended_witness_length)
+            .map(|f2| F128b::from(*f2))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
+    }
+
+    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+        self.masks
+            .iter()
+            .skip(self.extended_witness_length)
+            .map(|mask| F8b::form_superfield(mask.into()))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
     }
 
     fn vole_mask(&self, i: usize) -> Result<F128b> {
-        if i >= self.count() {
+        if i >= self.extended_witness_length() {
             bail!(
                 "vole mask index out of range: should be in [0, {}), but got {}",
-                self.count(),
+                self.extended_witness_length(),
                 i
             );
         }
@@ -220,6 +230,17 @@ mod tests {
 
         assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
         assert_eq!(voles.witness_mask().len(), witness);
+        // These will panic if there's a length problem:
+        voles.aggregate_commitment_masks();
+        voles.aggregate_commitment_values();
+
+        for i in 0..voles.count() {
+            if i < witness {
+                assert!(voles.vole_mask(i).is_ok());
+            } else {
+                assert!(voles.vole_mask(i).is_err());
+            }
+        }
 
         let decom = voles.decommit(transcript);
 
