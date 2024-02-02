@@ -835,36 +835,34 @@ trait EvaluatorT<P: Party> {
     fn finalize(&mut self) -> Result<()>;
 }
 
-/// An [`EvaluatorT`] for types that don't actually need to implement evaluation.
+/// An [`EvaluatorT`] for RAM types.
 ///
-/// In particular, this can be used for plugin-defined types, such as RAM, that
-/// are actually evaluated in the context of the address/value field. This is
-/// necessary due to the dynamic dispatch approach of Diet Mac'n'Cheese, which
-/// requires that all types used in a circuit provide a backend for evaluation,
-/// even if that backend will never be invoked.
+/// This evaluator does nothing but manage the memory for RAM-typed wires. The
+/// SIEVE IR RAM specification does not allow evaluation of any gates (besides
+/// function calls) on RAM-typed wires, and RAM type conversions are undefined.
 ///
-/// Note that almost all `EvaluatorT` methods for this type `panic!` to reflect
-/// the above-described use-case; the exceptions are push_frame and pop_frame,
-/// which are invoked during the processing of functions to appropriately set up
-/// stack frames for calls. These methods simply do nothing for EvaluatorDummy.
-struct EvaluatorDummy;
+/// The evaluation of RAM operations and finalization is handled by the
+/// underlying address/value field's [`EvaluatorSingle`], so `plugin_call_gate`
+/// and `finalize` are also (counterintuitively) considered undefined for this
+/// evaluator.
+struct EvaluatorRam(Memory<RamId>);
 
-impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
+impl<P: Party> EvaluatorT<P> for EvaluatorRam {
     fn evaluate_gate(
         &mut self,
         _gate: &GateM,
         _instances: Option<Vec<Number>>,
         _witnesses: Option<Vec<Number>>,
     ) -> Result<()> {
-        unimplemented!("EvaluatorDummy cannot evaluate gates.")
+        unimplemented!("EvaluatorRam cannot evaluate gates.")
     }
 
     fn conv_gate_get(&mut self, _gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>> {
-        unimplemented!("EvaluatorDummy cannot convert between field types.")
+        unimplemented!("EvaluatorRam cannot convert between field types.")
     }
 
     fn conv_gate_set(&mut self, _gate: &ConvGate, _bits: &[Mac<P, F2, F40b>]) -> Result<()> {
-        unimplemented!("EvaluatorDummy cannot convert between field types.")
+        unimplemented!("EvaluatorRam cannot convert between field types.")
     }
 
     fn plugin_call_gate(
@@ -874,30 +872,40 @@ impl<P: Party> EvaluatorT<P> for EvaluatorDummy {
         _inputs: &[WireRange],
         _plugin: &PluginExecution,
     ) -> Result<()> {
-        unimplemented!("EvaluatorDummy cannot evaluate plugin calls.")
+        unimplemented!("RAM operations are handled by the underlying address/value field.")
     }
 
-    fn push_frame(&mut self, _compiled_info: &CompiledInfo) {}
+    fn push_frame(&mut self, compiled_info: &CompiledInfo) {
+        self.0.push_frame(compiled_info);
+    }
 
-    fn pop_frame(&mut self) {}
+    fn pop_frame(&mut self) {
+        self.0.pop_frame();
+    }
 
-    fn allocate_new(&mut self, _first_id: WireId, _last_id: WireId) {
-        unimplemented!("EvaluatorDummy cannot allocate wire memory.")
+    fn allocate_new(&mut self, first_id: WireId, last_id: WireId) {
+        // RAMs may only be allocated one wire at a time.
+        debug_assert_eq!(first_id, last_id);
+        self.0.allocation_new(first_id, last_id);
     }
 
     fn allocate_slice(
         &mut self,
-        _src_first: WireId,
-        _src_last: WireId,
-        _start: WireId,
-        _count: WireId,
-        _allow_allocation: bool,
+        src_first: WireId,
+        src_last: WireId,
+        start: WireId,
+        count: WireId,
+        allow_allocation: bool,
     ) {
-        unimplemented!("EvaluatorDummy cannot allocate wire memory.")
+        // RAMs may only be allocated one wire at a time.
+        debug_assert_eq!(src_first, src_last);
+        self.0
+            .allocate_slice(src_first, src_last, start, count, allow_allocation);
     }
 
     fn finalize(&mut self) -> Result<()> {
-        unimplemented!("EvaluatorDummy cannot be finalized.")
+        // RAM finalization is handled by the underlying address/value field.
+        Ok(())
     }
 }
 
@@ -1444,7 +1452,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                         bail!("The Boolean RAM type expects a number as its third parameter, but a string was found")
                     }
 
-                    self.eval.push(Box::new(EvaluatorDummy));
+                    self.eval.push(Box::new(EvaluatorRam(Memory::new())));
 
                     Ok(())
                 }
@@ -1467,7 +1475,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                         bail!("The first arithmetic RAM type parameter must refer to a field")
                     }
 
-                    self.eval.push(Box::new(EvaluatorDummy));
+                    self.eval.push(Box::new(EvaluatorRam(Memory::new())));
 
                     Ok(())
                 }
