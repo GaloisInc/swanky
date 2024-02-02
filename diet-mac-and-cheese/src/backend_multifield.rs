@@ -811,6 +811,12 @@ trait EvaluatorT<P: Party> {
     /// Finish the conversion for a [`ConvGate`].
     fn conv_gate_set(&mut self, gate: &ConvGate, bits: &[Mac<P, F2, F40b>]) -> Result<()>;
 
+    /// Get the [`RamId`] at `wire_id`.
+    fn get_ram_id(&mut self, wire_id: WireId) -> Result<RamId>;
+
+    /// Set the [`RamId`] at `wire_id`.
+    fn set_ram_id(&mut self, wire_id: WireId, ram_id: RamId) -> Result<()>;
+
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
@@ -863,6 +869,15 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
 
     fn conv_gate_set(&mut self, _gate: &ConvGate, _bits: &[Mac<P, F2, F40b>]) -> Result<()> {
         unimplemented!("EvaluatorRam cannot convert between field types.")
+    }
+
+    fn get_ram_id(&mut self, wire_id: WireId) -> Result<RamId> {
+        Ok(*self.0.get(wire_id))
+    }
+
+    fn set_ram_id(&mut self, wire_id: WireId, ram_id: RamId) -> Result<()> {
+        self.0.set(wire_id, &ram_id);
+        Ok(())
     }
 
     fn plugin_call_gate(
@@ -1237,6 +1252,14 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
             self.memory.set(*start, &v);
             Ok(())
         }
+    }
+
+    fn get_ram_id(&mut self, _wire_id: WireId) -> Result<RamId> {
+        unimplemented!("This method should only be called on EvaluatorRams")
+    }
+
+    fn set_ram_id(&mut self, _wire_id: WireId, _ram_id: RamId) -> Result<()> {
+        unimplemented!("This method should only be called on EvaluatorRams")
     }
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo) {
