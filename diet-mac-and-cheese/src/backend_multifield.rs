@@ -2131,14 +2131,54 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 PluginExecution::Ram(plugin) => {
                     // No callframes: RAMs are all 'global', and RAM-typed
                     // wires are to be thought of as (mutable) references.
-                    let type_id = plugin.type_id() as usize;
-                    self.eval[type_id].plugin_call_gate(
-                        self.inputs.get(type_id),
-                        todo!("Need to inspect the plugin to decide this input"),
-                        out_ranges,
-                        in_ranges,
-                        body.execution(),
-                    )?;
+                    match plugin {
+                        RamVersion::RamArith(RamArithV1(RamV1 {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        }))
+                        | RamVersion::RamBool(RamBoolV1(RamV1 {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        })) => match op {
+                            RamOp::Init(_) => {
+                                let ram_id = self.eval[*field_id as usize]
+                                    .plugin_call_gate(
+                                        self.inputs.get(*field_id as usize),
+                                        None,
+                                        out_ranges,
+                                        in_ranges,
+                                        body.execution(),
+                                    )?
+                                    .ok_or_eyre("RamInit should return a RamId")?;
+
+                                // Safety: The above will fail if out_ranges is
+                                // not exactly one wire range of length 1
+                                self.eval[*ram_type_id as usize]
+                                    .set_ram_id(out_ranges[0].0, ram_id)?;
+                            }
+                            RamOp::Read | RamOp::Write => {
+                                assert!(!in_ranges.is_empty());
+
+                                // Safety: in_ranges is not empty, and if any
+                                // other invariants are violated, the subsequent
+                                // call to plugin_call_gate will fail
+                                let ram_id =
+                                    self.eval[*ram_type_id as usize].get_ram_id(in_ranges[0].0)?;
+
+                                self.eval[*field_id as usize].plugin_call_gate(
+                                    self.inputs.get(*field_id as usize),
+                                    Some(ram_id),
+                                    out_ranges,
+                                    in_ranges,
+                                    body.execution(),
+                                )?;
+                            }
+                        },
+                    }
                 }
             },
         };
