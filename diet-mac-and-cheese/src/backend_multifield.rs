@@ -25,7 +25,7 @@ use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
 };
-use eyre::{bail, ensure, Result};
+use eyre::{bail, ensure, OptionExt, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
@@ -944,7 +944,6 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
 /// to manage memory for the evaluation.
 pub struct EvaluatorSingle<B: BackendT> {
     memory: Memory<<B as BackendT>::Wire>,
-    ram_wires: Memory<RamId>,
     backend: B,
     is_boolean: bool,
 }
@@ -952,10 +951,8 @@ pub struct EvaluatorSingle<B: BackendT> {
 impl<B: BackendT> EvaluatorSingle<B> {
     fn new(backend: B, is_boolean: bool) -> Self {
         let memory = Memory::new();
-        let ram_wires = Memory::new();
         EvaluatorSingle {
             memory,
-            ram_wires,
             backend,
             is_boolean,
         }
@@ -1163,7 +1160,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                             self.backend
                                 .init_ram(*size, *addr_count, *value_count, &init_value)?;
 
-                        self.ram_wires.set(outputs[0].0, &ram_id);
+                        return Ok(Some(ram_id));
                     }
                     RamOp::Read => {
                         assert_eq!(inputs.len(), 2);
@@ -1172,7 +1169,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                         assert_eq!(outputs.len(), 1);
                         assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
 
-                        let &ram_id = self.ram_wires.get(inputs[0].0);
+                        let ram_id = ram_id.ok_or_eyre("ram_id should be Some for Read/Write")?;
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
 
                         let values = self.backend.ram_read(ram_id, &addr)?;
@@ -1189,7 +1186,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                         assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
                         assert_eq!(outputs.len(), 0);
 
-                        let &ram_id = self.ram_wires.get(inputs[0].0);
+                        let ram_id = ram_id.ok_or_eyre("ram_id should be Some for Read/Write")?;
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
                         let new: Vec<_> = copy_mem(&self.memory, inputs[2]).copied().collect();
 
@@ -1279,12 +1276,10 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo) {
         self.memory.push_frame(compiled_info);
-        self.ram_wires.push_frame(compiled_info);
     }
 
     fn pop_frame(&mut self) {
         self.memory.pop_frame();
-        self.ram_wires.pop_frame();
     }
 
     fn allocate_new(&mut self, first_id: WireId, last_id: WireId) {
