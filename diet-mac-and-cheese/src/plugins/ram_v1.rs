@@ -92,14 +92,6 @@ pub(crate) enum RamVersion {
 }
 
 impl RamVersion {
-    /// Return the [`TypeId`] of the RAM.
-    pub fn ram_type_id(&self) -> TypeId {
-        match self {
-            Self::RamBool(RamBoolV1(RamV1 { ram_type_id, .. }))
-            | Self::RamArith(RamArithV1(RamV1 { ram_type_id, .. })) => *ram_type_id,
-        }
-    }
-
     /// Return the [`TypeId`] of the address/value field.
     pub fn type_id(&self) -> TypeId {
         match self {
