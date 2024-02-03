@@ -1,0 +1,117 @@
+version 2.0.0;
+circuit;
+@type field 2305843009213693951;
+@begin
+    @new(0: $0 ... $50);
+    
+    // inner product of dimension 4
+    @function(inner_prod_4, @out: 0:1, @in: 0:4, 0:4)
+        // compute Hadamard product
+        $9 <- @mul($1, $5);
+        $10 <- @mul($2, $6);
+        $11 <- @mul($3, $7);
+        $12 <- @mul($4, $8);
+
+        // compute sum
+        $13 <- @add($9, $10);
+        $14 <- @add($11, $12);
+        $0 <- @add($13, $14);
+    @end
+
+    // test inner product
+    $0 <- @private(0);
+    $1 <- @private(0);
+    $2 <- @private(0);
+    $3 <- @private(0);
+
+    $4 <- @private(0);
+    $5 <- @private(0);
+    $6 <- @private(0);
+    $7 <- @private(0);
+
+    $8 <- @call(inner_prod_4, $0 ... $3, $4 ... $7);
+    $9 <- @addc($8, <1701746329705598631>);
+    @assert_zero(0: $9);
+
+    // inner product of dimension 8
+    @function(inner_prod_8, @out: 0:1, @in: 0:8, 0:8)
+        // first half
+        $17 <- @call(inner_prod_4, $1 ... $4, $9 ... $12);
+
+        // second half
+        $18 <- @call(inner_prod_4, $5 ... $8, $13 ... $16);
+
+        // sum
+        $19 <- @add($17, $18);
+        $0 <- $19;
+    @end
+
+    // test inner product
+    $10 <- @private(0);
+    $11 <- @private(0);
+    $12 <- @private(0);
+    $13 <- @private(0);
+
+    $14 <- @private(0);
+    $15 <- @private(0);
+    $16 <- @private(0);
+    $17 <- @private(0);
+
+    $18 <- @private(0);
+    $19 <- @private(0);
+    $20 <- @private(0);
+    $21 <- @private(0);
+
+    $22 <- @private(0);
+    $23 <- @private(0);
+    $24 <- @private(0);
+    $25 <- @private(0);
+
+    $26 <- @call(inner_prod_8, $10 ... $17, $18 ... $25);
+    $27 <- @addc($26, <82141372414428977>);
+    @assert_zero(0: $27);
+
+    // disjunction over inner products
+    @function(clause_f0, @out: 0:1, @in: 0:8, 0:8)
+        $17 <- @addc($1, <1>);
+        $18 <- @addc($2, <2>);
+        $19 <- @addc($3, <3>);
+        $20 <- @addc($4, <4>);
+        $21 <- @addc($5, <5>);
+        $22 <- @addc($6, <6>);
+        $23 <- @addc($7, <7>);
+        $24 <- @addc($8, <8>);
+
+        // inner product
+        $25 <- @call(inner_prod_8, $17 ... $24, $9 ... $16);
+        $0 <- $25;
+    @end
+
+    @function(clause_f1, @out: 0:1, @in: 0:8, 0:8)
+        $17 <- @call(inner_prod_8, $1 ... $8, $1 ... $8);
+        $18 <- @addc($17, <1000>);
+        $19 <- @mul($18, $18);
+        $0 <- $19;
+    @end
+
+    @function(branch_example, @out: 0:1, @in: 0:1, 0:8, 0:8)
+        @plugin(
+            galois_disjunction_v0,
+            switch,
+            strict,
+            0, clause_f0,
+            1, clause_f1
+        );
+
+    // test branch
+    $28 <- @private(0);
+    $29 <- @call(branch_example, $28, $10 ... $17, $18 ... $25);
+    $30 <- @addc($29, <1517472909648057945>);
+    @assert_zero(0: $30);
+
+    // test other clause
+    $31 <- @private(0);
+    $32 <- @call(branch_example, $31, $10 ... $17, $18 ... $25);
+    $33 <- @addc($32, <1728584567697147041>);
+    @assert_zero(0: $33);
+@end

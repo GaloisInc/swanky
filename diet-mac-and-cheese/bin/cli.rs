@@ -9,6 +9,7 @@ use std::{fmt::Display, path::PathBuf};
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NO_BATCHING: bool = false;
 const DEFAULT_THREADS: usize = 1;
+const DEFAULT_THREADS_PER_FIELD: usize = 1;
 
 /// Lpn params as small, medium or large.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
@@ -63,6 +64,9 @@ pub(crate) struct Config {
 
     /// The number of threads to use (for SVOLE).
     threads: Option<usize>,
+
+    /// The number of threads per field.
+    threads_per_field: Option<usize>,
 }
 
 impl Default for Config {
@@ -71,6 +75,7 @@ impl Default for Config {
             lpn: Some(LpnSize::default()),
             no_batching: Some(DEFAULT_NO_BATCHING),
             threads: Some(DEFAULT_THREADS),
+            threads_per_field: Some(DEFAULT_THREADS_PER_FIELD),
         }
     }
 }
@@ -95,6 +100,10 @@ impl Config {
             res.threads = Some(threads)
         }
 
+        if let Some(threads_per_field) = toml_contents.threads_per_field {
+            res.threads_per_field = Some(threads_per_field)
+        }
+
         Ok(res)
     }
 
@@ -111,6 +120,11 @@ impl Config {
     /// The number of threads to use for SVOLE.
     pub fn threads(&self) -> usize {
         self.threads.unwrap()
+    }
+
+    /// The number of threads per field
+    pub fn threads_per_field(&self) -> usize {
+        self.threads_per_field.unwrap()
     }
 }
 

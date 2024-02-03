@@ -92,18 +92,34 @@ Every svole extension operation requires a few rounds of communications, between
 
 ### Multithreading
 
-`dietmc` may operate single-threaded (the default) or multithreaded.
-The parameter associated is `threads` and takes a number as argument.
-When the number of threads indicated is greater or equal to 2, then `dietmc` runs multithreaded.
-Currently it is expected to spawn one thread per field used in the circuit, for example a circuit using
-4 different fields would spawn 4 threads in addition to the main thread, a total of 5 threads,
-in that case the `threads` parameter has to be set to 5 `threads = 5`.
+`dietmc` may operate single-threaded (the default) or multithreaded, where the threads are used to
+execute the protocol generating svole random commitments.
+Two parameters are used to control the multithreading `threads` and `threads_per_field`.
+The main parameter is `threads` and takes a number as argument; it indicates the total number of
+threads used by `dietmc`.
+When the number of threads is greater or equal to 2, then `dietmc` runs multithreaded.
+by default when using multithreading, it spawns one thread per field used in the circuit,
+for example a circuit using 4 different fields would spawn 4 threads in addition to the main thread,
+a total of 5 threads, in that case the `threads` parameter has to be set to 5 `threads = 5`.
 When using multiple fields, do not forget to count the field F2 which is used for field switching.
+
+By using the additional parameter `threads_per_field`, it sets the number of threads per single field
+where each thread computes a fraction of the svole random commitments used for that field.
+Here is an example configuration file using these parameters:
+```
+threads = 21
+threads_per_field = 10
+lpn = 'small'
+```
+This configuration indicates that the circuit operates on 2 fields (one of which is likely $`GF(2)`$)
+each using 10 threads, resulting in a total number of 21 = 2*10 + 1 threads.
 
 Each thread requires its own tcp connection, therefore the number of threads implies the number
 of tcp connections opened.
 
-It is worth noting that multithreading doubles the number of memory required for svole extensions.
+It is worth noting that every addition thread increases the memory of `dietmc` by adding a vector
+to store the svole random commitments. Therefore it may be useful to use smaller Lpn parameters
+when running multithreading.
 
 ### No-batching
 

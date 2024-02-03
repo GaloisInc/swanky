@@ -1,7 +1,7 @@
 use crate::{
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT},
     backend_trait::BackendT,
-    circuit_ir::FieldInputs,
+    circuit_ir::{FieldInputs, FunStore},
     homcom::FCom,
     mac::Mac,
     plugins::DisjunctionBody,
@@ -146,6 +146,7 @@ impl<
     fn disjunction(
         &mut self,
         _inswit: &mut FieldInputs,
+        _fun_store: &FunStore,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {

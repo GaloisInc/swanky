@@ -5,8 +5,11 @@
 //! - Secure version as described in FAEST spec and paper
 //!
 
+mod insecure;
+
 use eyre::Result;
 use merlin::Transcript;
+use rand::{CryptoRng, RngCore};
 use swanky_field_binary::{F128b, F2};
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
@@ -15,6 +18,8 @@ use swanky_field_binary::{F128b, F2};
 /// hardcoding some lengths and field sizes based on the [fixed parameters](crate::parameters)
 /// and generally having an API that corresponds to the components and uses of
 /// random VOLEs in Figure 7 of the paper, rather than the generic usage.
+/// One notable difference is that the paper uses 1-indexing to refer to specific VOLE instances,
+/// but this implementation uses 0-indexing.
 ///
 /// ⚠️ Beyond the API limitations, this trait cannot be used in an arbitrary protocol that requires
 /// a non-interactive VOLE. Specifically, the non-interactive decommitment step is equivalent to a
@@ -51,7 +56,11 @@ where
     /// any external context provided at the application level.
     /// Internally, it must incorporate any additional public parameters defined by this
     /// instantiation of `RandomVole`.
-    fn create(extended_witness_length: u64, transcript: &mut Transcript) -> Self;
+    fn create(
+        extended_witness_length: usize,
+        transcript: &mut Transcript,
+        rng: &mut (impl CryptoRng + RngCore),
+    ) -> Self;
 
     /// Get the total number of VOLE correlations supported by this random VOLE instance.
     ///
@@ -59,7 +68,7 @@ where
     /// passed to [`RandomVole::create()`];
     /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM); and
     /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
-    fn count(&self) -> u64;
+    fn count(&self) -> usize;
 
     /// Get the mask for the witness; this is $`\bf u_{[1..\ell]}`$ in the paper, where
     /// $`\ell`$ is the `extended_witness_length` passed to [`RandomVole::create()`].
@@ -75,7 +84,7 @@ where
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     ///
-    /// The index `i` must be in the range $`[1, r\tau] = [1, 128]`$, where
+    /// The index `i` must be in the range $`[0, r\tau) = [0, 128)`$, where
     /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM) and
     /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
     ///
@@ -89,9 +98,9 @@ where
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
     ///
-    /// The index `i` must be in the range $`[1, \ell + r\tau]`$, where $`\ell + r\tau`$ is the
+    /// The index `i` must be in the range $`[0, \ell + r\tau)`$, where $`\ell + r\tau`$ is the
     /// value returned by [`RandomVole::count()`].
-    fn vole_mask(&self, i: u64) -> Result<F128b>;
+    fn vole_mask(&self, i: usize) -> Result<F128b>;
 
     /// Compute a partial decommitment to this set of random VOLEs.
     ///

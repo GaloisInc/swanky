@@ -91,6 +91,33 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
     Ok(tcp_streams)
 }
 
+// split the connections into
+// * one channel for the committing the witnesses and extended witnesses during circuit evaluation
+// * a vec of channels for F2
+// * a vec of channels for the other fields
+fn split_connections_for_multithreading(
+    config: &Config,
+    conns: Vec<TcpStream>,
+) -> Result<(
+    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
+    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
+)> {
+    let mut channels = conns
+        .into_iter()
+        .map(|conn| {
+            let reader = BufReader::new(conn.try_clone()?);
+            let writer = BufWriter::new(conn);
+            Ok(SyncChannel::new(reader, writer))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let channel = channels.remove(0);
+    let channels_f2_svole = channels.split_off(channels.len() - config.threads_per_field());
+    let channels_svole = channels;
+    Ok((channel, channels_f2_svole, channels_svole))
+}
+
 fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     info!("relation: {:?}", args.relation);
 
@@ -184,10 +211,14 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
     Ok((inputs, fields))
 }
 
-// Run with relation in text format
-fn run_text(args: &Cli, config: &Config) -> Result<()> {
+// Run singlethreaded
+fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
     let start = Instant::now();
-    let (inputs, type_store) = build_inputs_types_text(args)?;
+    let (inputs, type_store) = if is_text {
+        build_inputs_types_text(args)?
+    } else {
+        build_inputs_flatbuffers(args)?
+    };
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
     let relation_path = args.relation.clone();
@@ -216,9 +247,13 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
-            let relation_file = File::open(relation_path)?;
-            let relation_reader = BufReader::new(relation_file);
-            evaluator.evaluate_relation_text(relation_reader)?;
+            if is_text {
+                let relation_file = File::open(relation_path)?;
+                let relation_reader = BufReader::new(relation_file);
+                evaluator.evaluate_relation_text(relation_reader)?;
+            } else {
+                evaluator.evaluate_relation(&relation_path).unwrap();
+            }
             info!("time circ exec: {:?}", start.elapsed());
             info!("VERIFIER DONE!");
         }
@@ -245,9 +280,13 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
             evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
-            let relation_file = File::open(relation_path)?;
-            let relation_reader = BufReader::new(relation_file);
-            evaluator.evaluate_relation_text(relation_reader)?;
+            if is_text {
+                let relation_file = File::open(relation_path)?;
+                let relation_reader = BufReader::new(relation_file);
+                evaluator.evaluate_relation_text(relation_reader)?;
+            } else {
+                evaluator.evaluate_relation(&relation_path).unwrap();
+            }
             info!("time circ exec: {:?}", start.elapsed());
             info!("PROVER DONE!");
         }
@@ -255,10 +294,14 @@ fn run_text(args: &Cli, config: &Config) -> Result<()> {
     Ok(())
 }
 
-// Run with relation in flatbuffers format
-fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
+// Run multithreaded
+fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
     let start = Instant::now();
-    let (inputs, type_store) = build_inputs_types_text(args)?;
+    let (inputs, type_store) = if is_text {
+        build_inputs_types_text(args)?
+    } else {
+        build_inputs_flatbuffers(args)?
+    };
     info!("time reading ins/wit/rel: {:?}", start.elapsed());
 
     let addresses: Vec<String> = parse_addresses(args, config);
@@ -267,58 +310,48 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let mut conns = start_connection_verifier(&addresses)?;
+            let conns = start_connection_verifier(&addresses)?;
 
             let init_time = Instant::now();
             let total_time = Instant::now();
 
             let rng = AesRng::new();
 
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
+            let (mut channel, channels_f2_svole, channels_svole) =
+                split_connections_for_multithreading(config, conns)?;
 
             let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
+            let (mut evaluator, handles_f2) =
                 EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
+                    channels_f2_svole,
                     rng,
                     inputs,
                     type_store,
                     config.no_batching(),
                     config.lpn() == LpnSize::Small,
                 )?;
-            handles.push(handle_f2);
-
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
+            handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
                 config.lpn() == LpnSize::Small,
+                config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
 
             let start = Instant::now();
-            let relation_file = File::open(relation_path)?;
-            let relation_reader = BufReader::new(relation_file);
-            evaluator.evaluate_relation_text(relation_reader)?;
+            if is_text {
+                let relation_file = File::open(relation_path)?;
+                let relation_reader = BufReader::new(relation_file);
+                evaluator.evaluate_relation_text(relation_reader)?;
+            } else {
+                evaluator.evaluate_relation(&relation_path).unwrap();
+            }
             evaluator.terminate()?;
             for handle in handles {
-                handle.join().unwrap();
+                handle.join().expect("thread failed to join")?;
             }
             info!("circ exec time: {:?}", start.elapsed());
 
@@ -327,58 +360,48 @@ fn run_text_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let mut conns = start_connection_prover(&addresses)?;
+            let conns = start_connection_prover(&addresses)?;
 
             let init_time = Instant::now();
             let total_time = Instant::now();
 
             let rng = AesRng::new();
 
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
+            let (mut channel, channels_f2_svole, channels_svole) =
+                split_connections_for_multithreading(config, conns)?;
 
             let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
+            let (mut evaluator, handles_f2) =
                 EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
+                    channels_f2_svole,
                     rng,
                     inputs,
                     type_store,
                     config.no_batching(),
                     config.lpn() == LpnSize::Small,
                 )?;
-            handles.push(handle_f2);
-
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
+            handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
                 config.lpn() == LpnSize::Small,
+                config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
             info!("init time: {:?}", init_time.elapsed());
 
             let start = Instant::now();
-            let relation_file = File::open(relation_path)?;
-            let relation_reader = BufReader::new(relation_file);
-            evaluator.evaluate_relation_text(relation_reader)?;
+            if is_text {
+                let relation_file = File::open(relation_path)?;
+                let relation_reader = BufReader::new(relation_file);
+                evaluator.evaluate_relation_text(relation_reader)?;
+            } else {
+                evaluator.evaluate_relation(&relation_path).unwrap();
+            }
             evaluator.terminate()?;
             for handle in handles {
-                handle.join().unwrap();
+                handle.join().expect("thread failed to join")?;
             }
             info!("circ exec time: {:?}", start.elapsed());
 
@@ -430,72 +453,6 @@ fn run_plaintext(args: &Cli) -> Result<()> {
     Ok(())
 }
 
-// Run with relation in flatbuffers format
-fn run_flatbuffers(args: &Cli, config: &Config) -> Result<()> {
-    let start = Instant::now();
-    let (inputs, type_store) = build_inputs_flatbuffers(args)?;
-    info!("time reading ins/wit/rel: {:?}", start.elapsed());
-
-    let relation_path = args.relation.clone();
-    match args.witness {
-        None => {
-            // Verifier mode
-            let mut conns = start_connection_verifier(&[args.connection_addr.clone()])?;
-            let stream = conns.pop().unwrap();
-
-            let reader = BufReader::new(stream.try_clone()?);
-            let writer = BufWriter::new(stream);
-            let mut channel = Channel::new(reader, writer);
-
-            let start = Instant::now();
-            let rng = AesRng::new();
-
-            let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
-                &mut channel,
-                rng,
-                inputs,
-                type_store,
-                config.lpn() == LpnSize::Small,
-                config.no_batching(),
-            )?;
-            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
-            info!("init time: {:?}", start.elapsed());
-
-            let start = Instant::now();
-            evaluator.evaluate_relation(&relation_path).unwrap();
-            info!("time circ exec: {:?}", start.elapsed());
-            info!("VERIFIER DONE!");
-        }
-        Some(_) => {
-            // Prover mode
-            let mut conns = start_connection_prover(&[args.connection_addr.clone()])?;
-            let stream = conns.pop().unwrap();
-
-            let reader = BufReader::new(stream.try_clone()?);
-            let writer = BufWriter::new(stream);
-            let mut channel = Channel::new(reader, writer);
-
-            let start = Instant::now();
-            let rng = AesRng::new();
-
-            let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>>::new(
-                &mut channel,
-                rng,
-                inputs,
-                type_store,
-                config.lpn() == LpnSize::Small,
-                config.no_batching(),
-            )?;
-            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
-            info!("init time: {:?}", start.elapsed());
-            let start = Instant::now();
-            evaluator.evaluate_relation(&relation_path)?;
-            info!("time circ exec: {:?}", start.elapsed());
-        }
-    }
-    Ok(())
-}
-
 fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
     let mut addresses: Vec<String> = args
         .connection_addr
@@ -522,135 +479,6 @@ fn parse_addresses(args: &Cli, config: &Config) -> Vec<String> {
     addresses
 }
 
-// Run with relation in flatbuffers format
-fn run_flatbuffers_multihtreaded(args: &Cli, config: &Config) -> Result<()> {
-    let start = Instant::now();
-    let (inputs, type_store) = build_inputs_flatbuffers(args)?;
-    info!("time reading ins/wit/rel: {:?}", start.elapsed());
-
-    let addresses: Vec<String> = parse_addresses(args, config);
-
-    let relation_path = args.relation.clone();
-    match args.witness {
-        None => {
-            // Verifier mode
-            let mut conns = start_connection_verifier(&addresses)?;
-
-            let init_time = Instant::now();
-            let total_time = Instant::now();
-
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
-
-            let rng = AesRng::new();
-
-            let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn() == LpnSize::Small,
-                )?;
-            handles.push(handle_f2);
-
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
-
-            let handles_fields = evaluator.load_backends_multithreaded(
-                &mut channel,
-                channels_svole,
-                config.lpn() == LpnSize::Small,
-            )?;
-            handles.extend(handles_fields);
-            info!("init time: {:?}", init_time.elapsed());
-
-            let start = Instant::now();
-            evaluator.evaluate_relation(&relation_path).unwrap();
-            evaluator.terminate()?;
-            for handle in handles {
-                handle.join().unwrap();
-            }
-            info!("circ exec time: {:?}", start.elapsed());
-
-            info!("total time: {:?}", total_time.elapsed());
-            info!("VERIFIER DONE!");
-        }
-        Some(_) => {
-            // Prover mode
-            let mut conns = start_connection_prover(&addresses)?;
-
-            let init_time = Instant::now();
-            let total_time = Instant::now();
-
-            let conn = conns.pop().unwrap();
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            let channel_f2_svole = SyncChannel::new(reader, writer);
-
-            let rng = AesRng::new();
-            let mut handles = vec![];
-            let (mut evaluator, handle_f2) =
-                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channel_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn() == LpnSize::Small,
-                )?;
-            handles.push(handle_f2);
-
-            let mut channels_svole = vec![];
-            for _ in 1..conns.len() {
-                let conn = conns.pop().unwrap();
-                let reader = BufReader::new(conn.try_clone()?);
-                let writer = BufWriter::new(conn);
-                channels_svole.push(SyncChannel::new(reader, writer));
-            }
-            //eyre::ensure!(conns.len() == 1);
-            let conn_main = conns.pop().unwrap();
-            let reader = BufReader::new(conn_main.try_clone()?);
-            let writer = BufWriter::new(conn_main);
-            let mut channel = Channel::new(reader, writer);
-
-            let handles_fields = evaluator.load_backends_multithreaded(
-                &mut channel,
-                channels_svole,
-                config.lpn() == LpnSize::Small,
-            )?;
-            handles.extend(handles_fields);
-
-            info!("init time: {:?}", init_time.elapsed());
-            let start = Instant::now();
-            evaluator.evaluate_relation(&relation_path)?;
-            evaluator.terminate()?;
-            for handle in handles {
-                handle.join().unwrap();
-            }
-            info!("circ exec time: {:?}", start.elapsed());
-
-            info!("total time: {:?}", total_time.elapsed());
-            info!("PROVER DONE!");
-        }
-    }
-    Ok(())
-}
-
 fn run(args: &Cli) -> Result<()> {
     let config = if let Some(config) = &args.config {
         Config::from_toml_file(config)?
@@ -674,19 +502,12 @@ fn run(args: &Cli) -> Result<()> {
         // when running in plaintext mode, the `config` is ignored
         return run_plaintext(args);
     }
-
-    if args.text {
-        if config.threads() == 1 {
-            run_text(args, &config)
-        } else {
-            assert!(config.threads() > 1);
-            run_text_multihtreaded(args, &config)
-        }
-    } else if config.threads() == 1 {
-        run_flatbuffers(args, &config)
+    let is_text = args.text;
+    if config.threads() == 1 {
+        run_singlethreaded(args, &config, is_text)
     } else {
         assert!(config.threads() > 1);
-        run_flatbuffers_multihtreaded(args, &config)
+        run_multithreaded(args, &config, is_text)
     }
 }
 
