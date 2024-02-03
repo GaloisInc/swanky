@@ -817,13 +817,26 @@ trait EvaluatorT<P: Party> {
     /// Set the [`RamId`] at `wire_id`.
     fn set_ram_id(&mut self, wire_id: WireId, ram_id: RamId) -> Result<()>;
 
+    /// Evaluate a plugin call.
+    ///
+    /// `ram_id` is `Some(...)` iff `plugin` is a RAM read/write execution,
+    /// and the return value is `Ok(Some(...))` iff `plugin` is a RAM init
+    /// execution. Otherwise-successful evaluations should return `Ok(None)`.
+    ///
+    /// NOTE: This interface is a bit clunky, but then again, plugins are a bit
+    /// clunky. A better design in anticipation of additional need for auxiliary
+    /// inputs/outputs of plugins would be a type PluginExtras that is
+    /// Option-like, and starting with a variant for RamIds. Since we don't
+    /// anticipate additional new plugins being proposed, we go with the design
+    /// as documented above.
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
+        ram_id: Option<RamId>,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
-    ) -> Result<()>;
+    ) -> Result<Option<RamId>>;
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo);
     fn pop_frame(&mut self);
@@ -883,10 +896,11 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
     fn plugin_call_gate(
         &mut self,
         _inswit: &mut FieldInputs,
+        _ram_id: Option<RamId>,
         _outputs: &[WireRange],
         _inputs: &[WireRange],
         _plugin: &PluginExecution,
-    ) -> Result<()> {
+    ) -> Result<Option<RamId>> {
         unimplemented!("RAM operations are handled by the underlying address/value field.")
     }
 
@@ -1069,10 +1083,11 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
+        ram_id: Option<RamId>,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
-    ) -> Result<()> {
+    ) -> Result<Option<RamId>> {
         fn copy_mem<W>(mem: &Memory<W>, range: WireRange) -> impl Iterator<Item = &W>
         where
             W: Copy + Clone + Debug + Default,
@@ -1184,7 +1199,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
             },
             _ => bail!("Plugin {plugin:?} is unsupported"),
         };
-        Ok(())
+        Ok(None)
     }
 
     // The cases covered for field switching are:
@@ -2088,6 +2103,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // The permutation plugin does not need to execute `callframe_start` or `callframe_end`
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        None,
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -2099,6 +2115,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // since the inputs/outputs must be flattened to an R1CS witness.
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        None,
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -2109,6 +2126,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     self.callframe_start(func, out_ranges, in_ranges)?;
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        None,
                         out_ranges,
                         in_ranges,
                         body.execution(),
@@ -2121,6 +2139,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     let type_id = plugin.type_id() as usize;
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        todo!("Need to inspect the plugin to decide this input"),
                         out_ranges,
                         in_ranges,
                         body.execution(),
