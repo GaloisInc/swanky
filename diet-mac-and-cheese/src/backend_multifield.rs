@@ -2,8 +2,8 @@
 
 use crate::backend_extfield::DietMacAndCheeseExtField;
 use crate::circuit_ir::{
-    CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeId,
-    TypeSpecification, TypeStore, WireCount, WireId, WireRange,
+    CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification,
+    TypeStore, WireCount, WireId, WireRange,
 };
 use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
@@ -33,7 +33,6 @@ use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
-use rustc_hash::FxHashMap;
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
 use std::collections::hash_map::Entry;
@@ -2042,7 +2041,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             self.eval[*ty as usize].push_frame(&func.compiled_info);
         }
 
-        let mut prevs: FxHashMap<TypeId, WireId> = Default::default();
+        let mut prevs: [WireId; 256] = [0; 256];
         let output_counts = func.output_counts();
         ensure!(
             out_ranges.len() == output_counts.len(),
@@ -2053,9 +2052,15 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         for i in 0..output_counts.len() {
             let (field_idx, count) = output_counts[i];
             let (src_first, src_last) = out_ranges[i];
-            let prev = prevs.entry(field_idx).or_insert(0);
-            self.eval[field_idx as usize].allocate_slice(src_first, src_last, *prev, count, true);
-            *prev += count;
+
+            self.eval[field_idx as usize].allocate_slice(
+                src_first,
+                src_last,
+                prevs[field_idx as usize],
+                count,
+                true,
+            );
+            prevs[field_idx as usize] += count;
         }
 
         let input_counts = func.input_counts();
@@ -2068,9 +2073,15 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         for i in 0..input_counts.len() {
             let (field_idx, count) = input_counts[i];
             let (src_first, src_last) = in_ranges[i];
-            let prev = prevs.entry(field_idx).or_insert(0);
-            self.eval[field_idx as usize].allocate_slice(src_first, src_last, *prev, count, false);
-            *prev += count;
+
+            self.eval[field_idx as usize].allocate_slice(
+                src_first,
+                src_last,
+                prevs[field_idx as usize],
+                count,
+                false,
+            );
+            prevs[field_idx as usize] += count;
         }
         Ok(())
     }
