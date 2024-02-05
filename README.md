@@ -77,6 +77,12 @@ of `swanky` will maintain backwards compatibility.
 It is also advisable to copy over swanky's `.cargo/config` file, and to enable
 LTO in your release builds (`lto = true` in your `Cargo.toml` file).
 
+# Software Requirements
+
+To compile Swanky, you should install and use Rust via [rustup](https://rustup.rs/). The swanky repo will direct rustup to use the correct version of Rust.
+
+The `./swanky` tool automates some tasks in the codebase. For example, `./swanky lint` will run the Swanky linting checks. In order to use this tool, you need to [install the Nix package manager](https://nixos.org/download).
+
 # Citing `swanky`
 
 If you use `swanky` in your academic paper, please cite it as follows:
