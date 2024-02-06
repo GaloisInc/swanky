@@ -29,6 +29,17 @@ use super::{tx::TxChannel, MemorySpace};
 /// address/value type, and representation of 'actual' RAM cells. See the
 /// module-level documentation for structures providing convenient
 /// instantiations exposing the more familiar read/write interface.
+///
+/// The actual RAM is private to the prover, and is represented as a map from
+/// addresses (given as arrays of value-field elements) to values+challenges
+/// (also given as arrays of value-field elements). For a given `DoraRam`, a
+/// single read or write is given by a [`remove`] followed by an [`insert`].
+/// The former is given as a commitment in the bag `rds`, the latter as a
+/// commitment in the bag `wrs`. At the end of the protocol, a permutation check
+/// is performed on `rds` and `wrs`.
+///
+/// This is a drastic over-simplification of the protocol; Dora is described in
+/// detail here: https://eprint.iacr.org/2023/1749
 pub struct DoraRam<
     P: Party,
     V: IsSubFieldOf<F>,
@@ -98,6 +109,8 @@ where
 
     /// Read, remove, and return the value at `addr` in the underlying memory
     /// space, adding this read to the bag `rds`.
+    ///
+    /// This must always be called before [`insert`] for a given `addr`.
     pub fn remove(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
@@ -160,6 +173,9 @@ where
 
     /// Write `value` to `addr` in the underlying memory space, adding this
     /// write to the bag `wrs`.
+    ///
+    /// For a given `addr`, it is an error to call this method without first
+    /// calling [`remove`].
     pub fn insert(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
