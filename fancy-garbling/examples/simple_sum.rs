@@ -5,11 +5,17 @@ use fancy_garbling::{
 };
 use std::env;
 
+/// A structure that contains both the garbler and the evaluators
+/// wires. This structure simplifies the API of the garbled circuit.
+struct SUMInputs<F> {
+    pub garbler_wires: BinaryBundle<F>,
+    pub evaluator_wires: BinaryBundle<F>,
+}
+
 /// The main fancy function which describes the garbled circuit for summation.
 fn fancy_sum<F>(
     f: &mut F,
-    garbler_wires: BinaryBundle<F::Item>,
-    evaluator_wires: BinaryBundle<F::Item>,
+    wire_inputs: SUMInputs<F::Item>,
 ) -> Result<BinaryBundle<F::Item>, F::Error>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
@@ -17,7 +23,7 @@ where
     // The garbler and the evaluator's values are added together.
     // For simplicity we assume that the addition will not result
     // in a carry.
-    let sum = f.bin_addition_no_carry(&garbler_wires, &evaluator_wires)?;
+    let sum = f.bin_addition_no_carry(&wire_inputs.garbler_wires, &wire_inputs.evaluator_wires)?;
 
     Ok(sum)
 }
