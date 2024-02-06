@@ -200,11 +200,3 @@ where
         }
     }
 }
-
-/// A RAM with addresses/values represented by one or more F2 elements.
-///
-/// This is a high-level wrapper around [`DoraRam`] for the case described
-/// above. Use of this structure over `DoraRam` is preferred, as it provides
-/// the more familiar read/write interface and properly executes the protocol
-/// steps for these operations.
-pub struct BinaryRam;
