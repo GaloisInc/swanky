@@ -1,3 +1,4 @@
+use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 use crate::circuit_ir::{
@@ -19,8 +20,8 @@ impl Plugin for VectorsV1 {
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> eyre::Result<PluginExecution> {
-        eyre::ensure!(
+    ) -> Result<PluginExecution> {
+        ensure!(
             output_counts.len() == 1,
             "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
             Self::NAME,
@@ -29,26 +30,26 @@ impl Plugin for VectorsV1 {
 
         let t = output_counts[0].0;
         let TypeSpecification::Field(_) = type_store.get(&t)? else {
-            eyre::bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
+            bail!("{}: {operation} expects only field-typed inputs and outputs, but the type with index {} is plugin-defined.", Self::NAME, t);
         };
 
         match operation {
             "add" | "mul" => {
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 2,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifics {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].0 == input_counts[1].0,
                     "{}: The type indices of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
@@ -56,7 +57,7 @@ impl Plugin for VectorsV1 {
                     input_counts[1].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == input_counts[1].1,
                     "{}: The lengths of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
@@ -64,7 +65,7 @@ impl Plugin for VectorsV1 {
                     input_counts[1].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == input_counts[0].0,
                     "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
                     Self::NAME,
@@ -72,7 +73,7 @@ impl Plugin for VectorsV1 {
                     input_counts[0].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == input_counts[0].1,
                     "{}: The length of the output of {operation} must match the lengths of the inputs: {} != {}.",
                     Self::NAME,
@@ -94,21 +95,21 @@ impl Plugin for VectorsV1 {
                 Ok(GatesBody::new(gates).into())
             }
             "addc" | "mulc" => {
-                eyre::ensure!(
+                ensure!(
                     params.len() == 1,
                     "{}: {operation} expects 1 parameter (the constant), but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 1,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == input_counts[0].0,
                     "{}: The type of the output of {operation} must match the type of the input: {} != {}.",
                     Self::NAME,
@@ -116,7 +117,7 @@ impl Plugin for VectorsV1 {
                     input_counts[0].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == input_counts[0].1,
                     "{}: The length of the output of {operation} must match the length of the input: {} != {}.",
                     Self::NAME,
@@ -127,7 +128,7 @@ impl Plugin for VectorsV1 {
                 let s = output_counts[0].1;
 
                 let PluginTypeArg::Number(c) = params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The constant parameter must be numeric, not a string.",
                         Self::NAME
                     );
@@ -145,21 +146,21 @@ impl Plugin for VectorsV1 {
                 Ok(GatesBody::new(gates).into())
             }
             "add_scalar" | "mul_scalar" => {
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 2,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].0 == input_counts[1].0,
                     "{}: The type indices of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
@@ -167,7 +168,7 @@ impl Plugin for VectorsV1 {
                     input_counts[1].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == input_counts[0].0,
                     "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
                     Self::NAME,
@@ -175,7 +176,7 @@ impl Plugin for VectorsV1 {
                     input_counts[0].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == input_counts[0].1,
                     "{}: The length of the output of {operation} must match the length of the vector input: {} != {}",
                     Self::NAME,
@@ -183,7 +184,7 @@ impl Plugin for VectorsV1 {
                     input_counts[0].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].1 == 1,
                     "{}: The scalar input to {operation} must be given on a single wire.",
                     Self::NAME,
@@ -205,21 +206,21 @@ impl Plugin for VectorsV1 {
                 Ok(GatesBody::new(gates).into())
             }
             "sum" | "product" => {
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}; {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 1,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == input_counts[0].0,
                     "{}: The type of the output of {operation} must match the type of the input: {} != {}.",
                     Self::NAME,
@@ -227,7 +228,7 @@ impl Plugin for VectorsV1 {
                     input_counts[0].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == 1,
                     "{}: The length of the output of {operation} must be 1, but this declaration specifies {}.",
                     Self::NAME,
@@ -278,21 +279,21 @@ impl Plugin for VectorsV1 {
                 Ok(GatesBody::new(gates).into())
             }
             "dotproduct" => {
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 2,
                     "{}: {operation} takes 2 wire ranges as input, but this declarations specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].0 == input_counts[1].0,
                     "{}: The type indices of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
@@ -300,7 +301,7 @@ impl Plugin for VectorsV1 {
                     input_counts[1].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == input_counts[1].1,
                     "{}: The lengths of the inputs to {operation} must match: {} != {}.",
                     Self::NAME,
@@ -308,7 +309,7 @@ impl Plugin for VectorsV1 {
                     input_counts[1].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == input_counts[0].0,
                     "{}: The type of the output of {operation} must match the types of the inputs: {} != {}.",
                     Self::NAME,
@@ -316,7 +317,7 @@ impl Plugin for VectorsV1 {
                     input_counts[0].0,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == 1,
                     "{}: The length of the output of {operation} must be 1, but this declaration specifies {}.",
                     Self::NAME,
@@ -361,7 +362,7 @@ impl Plugin for VectorsV1 {
 
                 Ok(GatesBody::new(gates).into())
             }
-            _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME,),
+            _ => bail!("{}: Unknown operation: {operation}", Self::NAME,),
         }
     }
 }

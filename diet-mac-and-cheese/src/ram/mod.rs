@@ -4,6 +4,7 @@ mod tx;
 
 use std::marker::PhantomData;
 
+use eyre::Result;
 use protocol::DoraRam;
 use scuttlebutt::AbstractChannel;
 use swanky_field::{FiniteField, IsSubFieldOf};
@@ -18,7 +19,7 @@ fn combine<'a, B: BackendT>(
     backend: &'a mut B,
     mut elems: impl Iterator<Item = &'a B::Wire>,
     x: B::FieldElement,
-) -> eyre::Result<B::Wire> {
+) -> Result<B::Wire> {
     let mut y = backend.copy(elems.next().unwrap())?;
     for c in elems {
         y = backend.mul_constant(&y, x)?;
@@ -31,7 +32,7 @@ pub(super) fn collapse_vec<B: BackendT>(
     backend: &mut B,
     elems: &[Vec<B::Wire>],
     x: B::FieldElement,
-) -> eyre::Result<Vec<B::Wire>> {
+) -> Result<Vec<B::Wire>> {
     let mut out = Vec::with_capacity(elems.len());
     for e in elems {
         out.push(combine(backend, e.iter(), x)?);
@@ -155,7 +156,7 @@ where
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &Mac<P, V, F>,
-    ) -> eyre::Result<Mac<P, V, F>> {
+    ) -> Result<Mac<P, V, F>> {
         match self.dora.as_mut() {
             Some(ram) => {
                 let value = ram.remove(dmc, &[*addr])?;
@@ -175,7 +176,7 @@ where
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &Mac<P, V, F>,
         value: &Mac<P, V, F>,
-    ) -> eyre::Result<()> {
+    ) -> Result<()> {
         match self.dora.as_mut() {
             Some(ram) => {
                 ram.remove(dmc, &[*addr])?;
@@ -190,7 +191,7 @@ where
         }
     }
 
-    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
+    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> Result<()> {
         match self.dora.take() {
             Some(ram) => ram.finalize(dmc),
             None => Ok(()),

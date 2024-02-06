@@ -1,5 +1,6 @@
 use std::{collections::hash_map::Entry, iter, marker::PhantomData};
 
+use eyre::{ensure, Result};
 use rustc_hash::FxHashMap;
 
 use scuttlebutt::AbstractChannel;
@@ -97,8 +98,8 @@ where
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &[Mac<P, V, F>],
-    ) -> eyre::Result<Vec<Mac<P, V, F>>> {
-        eyre::ensure!(
+    ) -> Result<Vec<Mac<P, V, F>>> {
+        ensure!(
             addr.len() == self.space.addr_size(),
             "Address should be {} elements, but got {}.",
             self.space.addr_size(),
@@ -155,14 +156,14 @@ where
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         addr: &[Mac<P, V, F>],
         value: &[Mac<P, V, F>],
-    ) -> eyre::Result<()> {
-        eyre::ensure!(
+    ) -> Result<()> {
+        ensure!(
             addr.len() == self.space.addr_size(),
             "Address should be {} elements, but got {}.",
             self.space.addr_size(),
             addr.len()
         );
-        eyre::ensure!(
+        ensure!(
             value.len() == self.space.value_size(),
             "Value should be {} elements, but got {}.",
             self.space.value_size(),
@@ -219,7 +220,7 @@ where
     }
 
     /// Finalize the RAM protocol (check that `rds` is a permutation of `wrs`).
-    pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> eyre::Result<()> {
+    pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> Result<()> {
         log::info!("finalizing ram: {} operations", self.wrs.len(),);
 
         let flattened_size = self.space.addr_size() + self.space.value_size() + self.challenge_size;

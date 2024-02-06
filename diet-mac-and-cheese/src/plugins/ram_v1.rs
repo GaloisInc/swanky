@@ -1,3 +1,4 @@
+use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::F2;
 
@@ -111,10 +112,10 @@ impl Plugin for RamBoolV1 {
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> eyre::Result<PluginExecution> {
+    ) -> Result<PluginExecution> {
         match operation {
             "init" => {
-                eyre::ensure!(
+                ensure!(
                     params.len() == 1,
                     "{}: {operation} expects 1 parameter, but {} were given.",
                     Self::NAME,
@@ -122,7 +123,7 @@ impl Plugin for RamBoolV1 {
                 );
 
                 let PluginTypeArg::Number(size) = params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The parameter to {operation} must be numeric.",
                         Self::NAME
                     );
@@ -132,7 +133,7 @@ impl Plugin for RamBoolV1 {
 
                 let op = RamOp::Init(size as usize);
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 1,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
@@ -143,23 +144,23 @@ impl Plugin for RamBoolV1 {
                 let &TypeSpecification::Field(initial_value_rust_type_id) =
                     type_store.get(&initial_value_type_id)?
                 else {
-                    eyre::bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
+                    bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
                 };
 
-                eyre::ensure!(
+                ensure!(
                     initial_value_rust_type_id == std::any::TypeId::of::<F2>(),
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts.len() == 1,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == 1,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -170,24 +171,24 @@ impl Plugin for RamBoolV1 {
                 let TypeSpecification::Plugin(ram_output_type) =
                     type_store.get(&ram_output_type_id)?
                 else {
-                    eyre::bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
+                    bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
                 };
 
-                eyre::ensure!(
+                ensure!(
                     ram_output_type.name.as_str() == Self::NAME,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_output_type.name,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_output_type.operation.as_str() == "ram",
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_output_type.operation,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_output_type.params.len() == 3,
                     "{}: The ram type expects 3 parameters, but {} were given.",
                     Self::NAME,
@@ -195,7 +196,7 @@ impl Plugin for RamBoolV1 {
                 );
 
                 let PluginTypeArg::Number(field_id) = ram_output_type.params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -203,14 +204,14 @@ impl Plugin for RamBoolV1 {
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
                 let field_id = u8::try_from(field_id.as_words()[0])?;
-                eyre::ensure!(
+                ensure!(
                     field_id == initial_value_type_id,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_output_type.params[1] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -220,7 +221,7 @@ impl Plugin for RamBoolV1 {
                 let addr_count = addr_count.as_words()[0];
 
                 let PluginTypeArg::Number(value_count) = ram_output_type.params[2] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -229,7 +230,7 @@ impl Plugin for RamBoolV1 {
                 // Ditto
                 let value_count = value_count.as_words()[0];
 
-                eyre::ensure!(
+                ensure!(
                     value_count == input_counts[0].1,
                     "{}: The number of wires in the input to {operation} must match the output RAM's value size.",
                     Self::NAME,
@@ -246,21 +247,21 @@ impl Plugin for RamBoolV1 {
             "read" => {
                 let op = RamOp::Read;
 
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 2,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == 1,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -271,27 +272,27 @@ impl Plugin for RamBoolV1 {
                 let TypeSpecification::Plugin(ram_input_type) =
                     type_store.get(&ram_input_type_id)?
                 else {
-                    eyre::bail!(
+                    bail!(
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
                 };
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.operation.as_str() == "ram",
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.params.len() == 3,
                     "{}: The ram type expects 3 parameters, but {} were given.",
                     Self::NAME,
@@ -299,7 +300,7 @@ impl Plugin for RamBoolV1 {
                 );
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -309,17 +310,17 @@ impl Plugin for RamBoolV1 {
                 let field_id = u8::try_from(field_id.as_words()[0])?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
-                    eyre::bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
                 };
 
-                eyre::ensure!(
+                ensure!(
                     field_rust_id == std::any::TypeId::of::<F2>(),
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_input_type.params[1] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -329,7 +330,7 @@ impl Plugin for RamBoolV1 {
                 let addr_count = addr_count.as_words()[0];
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -338,33 +339,33 @@ impl Plugin for RamBoolV1 {
                 // Ditto
                 let value_count = value_count.as_words()[0];
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].0 == field_id,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].1 == addr_count,
                     "{}: The second input to {operation} must have exactly {addr_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts.len() == 1,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == field_id,
                     "{}: The type of the output of {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == value_count,
                     "{}: {operation} outputs exactly {value_count} wires, but this declaration specifies {}.",
                     Self::NAME,
@@ -382,21 +383,21 @@ impl Plugin for RamBoolV1 {
             "write" => {
                 let op = RamOp::Write;
 
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 3,
                     "{}: {operation} takes 3 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == 1,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -407,27 +408,27 @@ impl Plugin for RamBoolV1 {
                 let TypeSpecification::Plugin(ram_input_type) =
                     type_store.get(&ram_input_type_id)?
                 else {
-                    eyre::bail!(
+                    bail!(
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
                 };
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.operation.as_str() == "ram",
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.params.len() == 3,
                     "{}: The ram type expects 3 parameters, but {} were given.",
                     Self::NAME,
@@ -435,7 +436,7 @@ impl Plugin for RamBoolV1 {
                 );
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -445,17 +446,17 @@ impl Plugin for RamBoolV1 {
                 let field_id = u8::try_from(field_id.as_words()[0])?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
-                    eyre::bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
                 };
 
-                eyre::ensure!(
+                ensure!(
                     field_rust_id == std::any::TypeId::of::<F2>(),
                     "{}: This plugin only supports Boolean fields.",
                     Self::NAME,
                 );
 
                 let PluginTypeArg::Number(addr_count) = ram_input_type.params[1] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The second ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -465,7 +466,7 @@ impl Plugin for RamBoolV1 {
                 let addr_count = addr_count.as_words()[0];
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The third ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -474,33 +475,33 @@ impl Plugin for RamBoolV1 {
                 // Ditto
                 let value_count = value_count.as_words()[0];
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].0 == field_id,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].1 == addr_count,
                     "{}: The second input to {operation} must have exactly {addr_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[2].0 == field_id,
                     "{}: The type of the third input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[2].1 == value_count,
                     "{}: The third input to {operation} must have exactly {value_count} wires, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[2].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts.is_empty(),
                     "{}: {operation} outputs 0 wire ranges, but this declaration specifies {}.",
                     Self::NAME,
@@ -515,7 +516,7 @@ impl Plugin for RamBoolV1 {
                     op,
                 ))))
             }
-            _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME),
+            _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
         }
     }
 }
@@ -530,10 +531,10 @@ impl Plugin for RamArithV1 {
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> eyre::Result<PluginExecution> {
+    ) -> Result<PluginExecution> {
         match operation {
             "init" => {
-                eyre::ensure!(
+                ensure!(
                     params.len() == 1,
                     "{}: {operation} expects 1 parameter, but {} were given.",
                     Self::NAME,
@@ -541,7 +542,7 @@ impl Plugin for RamArithV1 {
                 );
 
                 let PluginTypeArg::Number(size) = params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The parameter to {operation} must be numeric.",
                         Self::NAME
                     );
@@ -551,7 +552,7 @@ impl Plugin for RamArithV1 {
 
                 let op = RamOp::Init(size as usize);
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 1,
                     "{}: {operation} takes 1 wire range as input, but this declaration specifies {}.",
                     Self::NAME,
@@ -560,24 +561,24 @@ impl Plugin for RamArithV1 {
 
                 let initial_value_type_id = input_counts[0].0;
                 let &TypeSpecification::Field(_) = type_store.get(&initial_value_type_id)? else {
-                    eyre::bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
+                    bail!("{}: No type with index {initial_value_type_id}, or that index refers to a plugin-defined type.", Self::NAME)
                 };
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == 1,
                     "{}: {operation} takes exactly 1 wire as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[0].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts.len() == 1,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == 1,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -588,24 +589,24 @@ impl Plugin for RamArithV1 {
                 let TypeSpecification::Plugin(ram_output_type) =
                     type_store.get(&ram_output_type_id)?
                 else {
-                    eyre::bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
+                    bail!("{}: {operation} must output a plugin-defined type, but the type with index {ram_output_type_id} refers to a field (or is undefined).", Self::NAME);
                 };
 
-                eyre::ensure!(
+                ensure!(
                     ram_output_type.name.as_str() == Self::NAME,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_output_type.name,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_output_type.operation.as_str() == "ram",
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_output_type.operation,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_output_type.params.len() == 1,
                     "{}: The ram type expects 1 parameters, but {} were given.",
                     Self::NAME,
@@ -613,7 +614,7 @@ impl Plugin for RamArithV1 {
                 );
 
                 let PluginTypeArg::Number(field_id) = ram_output_type.params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -621,7 +622,7 @@ impl Plugin for RamArithV1 {
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
                 let field_id = u8::try_from(field_id.as_words()[0])?;
-                eyre::ensure!(
+                ensure!(
                     field_id == initial_value_type_id,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
                     Self::NAME,
@@ -636,21 +637,21 @@ impl Plugin for RamArithV1 {
             "read" => {
                 let op = RamOp::Read;
 
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 2,
                     "{}: {operation} takes 2 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == 1,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -661,27 +662,27 @@ impl Plugin for RamArithV1 {
                 let TypeSpecification::Plugin(ram_input_type) =
                     type_store.get(&ram_input_type_id)?
                 else {
-                    eyre::bail!(
+                    bail!(
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
                 };
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.operation.as_str() == "ram",
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.params.len() == 1,
                     "{}: The ram type expects 1 parameter, but {} were given.",
                     Self::NAME,
@@ -689,7 +690,7 @@ impl Plugin for RamArithV1 {
                 );
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -699,36 +700,36 @@ impl Plugin for RamArithV1 {
                 let field_id = u8::try_from(field_id.as_words()[0])?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
-                    eyre::bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
                 };
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].0 == field_id,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].1 == 1,
                     "{}: The second input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts.len() == 1,
                     "{}: {operation} outputs 1 wire range, but this declaration specifies {}.",
                     Self::NAME,
                     output_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].0 == field_id,
                     "{}: The type of the output of {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts[0].1 == 1,
                     "{}: {operation} outputs exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -744,21 +745,21 @@ impl Plugin for RamArithV1 {
             "write" => {
                 let op = RamOp::Write;
 
-                eyre::ensure!(
+                ensure!(
                     params.is_empty(),
                     "{}: {operation} expects 0 parameters, but {} were given.",
                     Self::NAME,
                     params.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts.len() == 3,
                     "{}: {operation} takes 3 wire ranges as input, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts.len(),
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[0].1 == 1,
                     "{}: The first input to {operation} must be exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
@@ -769,27 +770,27 @@ impl Plugin for RamArithV1 {
                 let TypeSpecification::Plugin(ram_input_type) =
                     type_store.get(&ram_input_type_id)?
                 else {
-                    eyre::bail!(
+                    bail!(
                         "{}: {operation} takes a plugin-defined type as its first input.",
                         Self::NAME
                     );
                 };
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.name.as_str() == Self::NAME,
                     "{}: Expected this plugin, but got {}.",
                     Self::NAME,
                     ram_input_type.name,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.operation.as_str() == "ram",
                     "{}: Expected type 'ram', but got '{}'.",
                     Self::NAME,
                     ram_input_type.operation,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     ram_input_type.params.len() == 1,
                     "{}: The ram type expects 1 parameter, but {} were given.",
                     Self::NAME,
@@ -797,7 +798,7 @@ impl Plugin for RamArithV1 {
                 );
 
                 let PluginTypeArg::Number(field_id) = ram_input_type.params[0] else {
-                    eyre::bail!(
+                    bail!(
                         "{}: The first ram type argument must be numeric.",
                         Self::NAME
                     );
@@ -807,36 +808,36 @@ impl Plugin for RamArithV1 {
                 let field_id = u8::try_from(field_id.as_words()[0])?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
-                    eyre::bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
+                    bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
                 };
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].0 == field_id,
                     "{}: The type of the second input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[1].1 == 1,
                     "{}: The second input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[1].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[2].0 == field_id,
                     "{}: The type of the third input to {operation} must match the input RAM's address/value type.",
                     Self::NAME,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     input_counts[2].1 == 1,
                     "{}: The third input to {operation} must have exactly 1 wire, but this declaration specifies {}.",
                     Self::NAME,
                     input_counts[2].1,
                 );
 
-                eyre::ensure!(
+                ensure!(
                     output_counts.is_empty(),
                     "{}: {operation} outputs 0 wire ranges, but this declaration specifies {}.",
                     Self::NAME,
@@ -849,7 +850,7 @@ impl Plugin for RamArithV1 {
                     op,
                 ))))
             }
-            _ => eyre::bail!("{}: Unknown operation: {operation}", Self::NAME),
+            _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
         }
     }
 }

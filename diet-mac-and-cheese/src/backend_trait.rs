@@ -1,7 +1,7 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use crate::mac::MacT;
-use eyre::Result;
+use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::Number;
 use std::any::type_name;
 use swanky_field::{FiniteField, PrimeFiniteField};
@@ -57,7 +57,7 @@ where
     fn from_number(&val: &Number) -> Result<Self::FieldElement> {
         let x = T::FieldElement::try_from_int(val);
         if x.is_none().into() {
-            eyre::bail!(
+            bail!(
                 "{val} is too large to be an element of {}",
                 type_name::<T::FieldElement>()
             )

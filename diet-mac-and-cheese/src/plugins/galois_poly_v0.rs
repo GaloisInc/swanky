@@ -3,7 +3,7 @@ use crate::circuit_ir::{
     first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
     WireCount,
 };
-use eyre::{ensure, eyre, Result};
+use eyre::{bail, ensure, eyre, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::{F128b, F63b, F2};
 use swanky_field_f61p::F61p;
@@ -282,7 +282,7 @@ impl GaloisPolyV0 {
     ) -> Result<usize> {
         let type_spec = type_store.get(type_id)?;
         let TypeSpecification::Field(field) = type_spec else {
-            eyre::bail!("Invalid type specification for inputs; must be `Field`.");
+            bail!("Invalid type specification for inputs; must be `Field`.");
         };
 
         if degree == 0 {

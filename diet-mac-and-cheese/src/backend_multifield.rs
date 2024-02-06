@@ -165,21 +165,16 @@ pub trait BackendRamT: BackendT {
         addr_count: usize,
         value_count: usize,
         init_value: &[Self::Wire],
-    ) -> eyre::Result<RamId>;
+    ) -> Result<RamId>;
 
     /// Read and return the value at `addr` in `ram`.
-    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>>;
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>>;
 
     /// Write `new` to `addr` in `ram`.
-    fn ram_write(
-        &mut self,
-        ram: RamId,
-        addr: &[Self::Wire],
-        new: &[Self::Wire],
-    ) -> eyre::Result<()>;
+    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()>;
 
     /// Finalize all operations on all RAMs.
-    fn finalize_rams(&mut self) -> eyre::Result<()>;
+    fn finalize_rams(&mut self) -> Result<()>;
 }
 
 impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
@@ -738,7 +733,7 @@ impl<
         addr_count: usize,
         value_count: usize,
         init_value: &[Self::Wire],
-    ) -> eyre::Result<RamId> {
+    ) -> Result<RamId> {
         debug_assert_eq!(addr_count, 1);
         debug_assert_eq!(value_count, 1);
         debug_assert_eq!(init_value.len(), 1);
@@ -749,19 +744,14 @@ impl<
         Ok(ram_id)
     }
 
-    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>> {
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
         debug_assert!(ram < self.ram_states.len());
         debug_assert_eq!(addr.len(), 1);
 
         Ok(vec![self.ram_states[ram].read(&mut self.dmc, &addr[0])?])
     }
 
-    fn ram_write(
-        &mut self,
-        ram: RamId,
-        addr: &[Self::Wire],
-        new: &[Self::Wire],
-    ) -> eyre::Result<()> {
+    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()> {
         debug_assert!(ram < self.ram_states.len());
         debug_assert_eq!(addr.len(), 1);
         debug_assert_eq!(new.len(), 1);
@@ -769,7 +759,7 @@ impl<
         self.ram_states[ram].write(&mut self.dmc, &addr[0], &new[0])
     }
 
-    fn finalize_rams(&mut self) -> eyre::Result<()> {
+    fn finalize_rams(&mut self) -> Result<()> {
         self.ram_states
             .iter_mut()
             .try_for_each(|ram| ram.finalize(&mut self.dmc))

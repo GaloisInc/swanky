@@ -1,5 +1,5 @@
 use crate::{
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT},
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
     homcom::FCom,
@@ -185,28 +185,19 @@ impl<
         _addr_count: usize,
         _value_count: usize,
         _init_value: &[Self::Wire],
-    ) -> eyre::Result<crate::backend_multifield::RamId> {
+    ) -> Result<RamId> {
         todo!("Create and store a BinaryRam state, returning its position in the store.")
     }
 
-    fn ram_read(
-        &mut self,
-        _ram: crate::backend_multifield::RamId,
-        _addr: &[Self::Wire],
-    ) -> eyre::Result<Vec<Self::Wire>> {
+    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
         todo!("Read from the BinaryRam with ID ram.")
     }
 
-    fn ram_write(
-        &mut self,
-        _ram: crate::backend_multifield::RamId,
-        _addr: &[Self::Wire],
-        _new: &[Self::Wire],
-    ) -> eyre::Result<()> {
+    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
         todo!("Write to the BinaryRam with ID ram.")
     }
 
-    fn finalize_rams(&mut self) -> eyre::Result<()> {
+    fn finalize_rams(&mut self) -> Result<()> {
         Ok(())
     }
 }

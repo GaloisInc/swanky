@@ -1,6 +1,7 @@
 //! SIEVE IR0+ text reader.
 
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
+use eyre::{bail, Result};
 use log::info;
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
@@ -25,33 +26,33 @@ impl TextRelation {
 }
 
 impl FunctionBodyVisitor for TextRelation {
-    fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()> {
+    fn new(&mut self, ty: TypeId, first: WireId, last: WireId) -> Result<()> {
         self.gates.push(GateM::New(ty, first, last));
         Ok(())
     }
-    fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> eyre::Result<()> {
+    fn delete(&mut self, ty: TypeId, first: WireId, last: WireId) -> Result<()> {
         self.gates.push(GateM::Delete(ty, first, last));
         Ok(())
     }
-    fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
+    fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> Result<()> {
         self.gates.push(GateM::Add(ty, dst, left, right));
         Ok(())
     }
-    fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
+    fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> Result<()> {
         self.gates.push(GateM::Mul(ty, dst, left, right));
         Ok(())
     }
-    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> eyre::Result<()> {
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> Result<()> {
         self.gates
             .push(GateM::AddConstant(ty, dst, left, Box::new(right)));
         Ok(())
     }
-    fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> eyre::Result<()> {
+    fn mulc(&mut self, ty: TypeId, dst: WireId, left: WireId, &right: &Number) -> Result<()> {
         self.gates
             .push(GateM::MulConstant(ty, dst, left, Box::new(right)));
         Ok(())
     }
-    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> eyre::Result<()> {
+    fn copy(&mut self, ty: TypeId, dst: WireRange, src: &[WireRange]) -> Result<()> {
         self.gates.push(GateM::Copy(
             ty,
             (dst.start, dst.end),
@@ -59,19 +60,19 @@ impl FunctionBodyVisitor for TextRelation {
         ));
         Ok(())
     }
-    fn constant(&mut self, ty: TypeId, dst: WireId, &src: &Number) -> eyre::Result<()> {
+    fn constant(&mut self, ty: TypeId, dst: WireId, &src: &Number) -> Result<()> {
         self.gates.push(GateM::Constant(ty, dst, Box::new(src)));
         Ok(())
     }
-    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+    fn public_input(&mut self, ty: TypeId, dst: WireRange) -> Result<()> {
         self.gates.push(GateM::Instance(ty, (dst.start, dst.end)));
         Ok(())
     }
-    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> eyre::Result<()> {
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> Result<()> {
         self.gates.push(GateM::Witness(ty, (dst.start, dst.end)));
         Ok(())
     }
-    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> eyre::Result<()> {
+    fn assert_zero(&mut self, ty: TypeId, src: WireId) -> Result<()> {
         self.gates.push(GateM::AssertZero(ty, src));
         Ok(())
     }
@@ -80,9 +81,9 @@ impl FunctionBodyVisitor for TextRelation {
         dst: TypedWireRange,
         src: TypedWireRange,
         semantics: ConversionSemantics,
-    ) -> eyre::Result<()> {
+    ) -> Result<()> {
         if let ConversionSemantics::Modulus = semantics {
-            eyre::bail!("Diet Mac'n'Cheese only supports no-modulus conversion semantics")
+            bail!("Diet Mac'n'Cheese only supports no-modulus conversion semantics")
         }
 
         // read the output wires
@@ -103,12 +104,7 @@ impl FunctionBodyVisitor for TextRelation {
         ))));
         Ok(())
     }
-    fn call(
-        &mut self,
-        dst: &[WireRange],
-        name: Identifier,
-        args: &[WireRange],
-    ) -> eyre::Result<()> {
+    fn call(&mut self, dst: &[WireRange], name: Identifier, args: &[WireRange]) -> Result<()> {
         let mut outids = Vec::with_capacity(dst.len());
         for o in dst {
             outids.push((o.start, o.end));
@@ -137,9 +133,9 @@ impl RelationVisitor for TextRelation {
         outputs: &[TypedCount],
         inputs: &[TypedCount],
         body: BodyCb,
-    ) -> eyre::Result<()>
+    ) -> Result<()>
     where
-        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
+        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> Result<()>,
     {
         let mut body_struct = TextRelation::new(self.type_store.clone(), self.fun_store.clone());
         body(&mut body_struct)?;
@@ -173,7 +169,7 @@ impl RelationVisitor for TextRelation {
         outputs: &[TypedCount],
         inputs: &[TypedCount],
         body: PluginBinding,
-    ) -> eyre::Result<()> {
+    ) -> Result<()> {
         let name_s: String = std::str::from_utf8(name)?.into();
 
         let mut output_counts = vec![];

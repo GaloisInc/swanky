@@ -307,24 +307,19 @@ where
         _addr_count: usize,
         _value_count: usize,
         _init_value: &[Self::Wire],
-    ) -> eyre::Result<RamId> {
+    ) -> Result<RamId> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> eyre::Result<Vec<Self::Wire>> {
+    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn ram_write(
-        &mut self,
-        _ram: RamId,
-        _addr: &[Self::Wire],
-        _new: &[Self::Wire],
-    ) -> eyre::Result<()> {
+    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn finalize_rams(&mut self) -> eyre::Result<()> {
+    fn finalize_rams(&mut self) -> Result<()> {
         Ok(())
     }
 }
