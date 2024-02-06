@@ -659,40 +659,46 @@ impl FunStore {
     }
 }
 
+/// Trait for Tape.
+///
+/// Tapes are used for instances/public-inputs or witnesses/private-inputs.
+/// The interface of the trait allows to either ingest values into the tape, or pop values from the tape.
+pub trait TapeT {
+    /// Ingest a tape value.
+    fn ingest(&mut self, n: Number);
+
+    /// Ingest several tape values.
+    fn ingest_many(&mut self, ns: VecDeque<Number>);
+
+    /// Pop a tape value.
+    fn pop(&mut self) -> Option<Number>;
+
+    /// Pop many tape values into a vector.
+    fn pop_many(&mut self, num: u64) -> Option<Vec<Number>>;
+}
+
+/// Simple Tape type.
+///
+/// The internal of the type is a `VecDeque<...>`.
+/// This makes the implementation of the [`TapeT`] trait straightforward using the standard
+/// functions from the `VecDeque` collection.
 #[derive(Debug, Default)]
 pub struct Tape(VecDeque<Number>);
 
-impl Tape {
-    pub fn iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
-        TapeF(self, PhantomData)
-    }
-
-    pub fn pop_field<F: PrimeFiniteField>(&mut self) -> Option<F> {
-        let val = self.0.pop_front()?;
-        F::try_from_int(val).into()
-    }
-
-    pub fn ingest(&mut self, n: Number) {
+impl TapeT for Tape {
+    fn ingest(&mut self, n: Number) {
         self.0.push_back(n);
     }
 
-    pub fn ingest_many(&mut self, ns: VecDeque<Number>) {
+    fn ingest_many(&mut self, ns: VecDeque<Number>) {
         self.0.extend(ns);
     }
 
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub fn pop(&mut self) -> Option<Number> {
+    fn pop(&mut self) -> Option<Number> {
         self.0.pop_front()
     }
 
-    pub fn pop_many(&mut self, num: u64) -> Option<Vec<Number>> {
+    fn pop_many(&mut self, num: u64) -> Option<Vec<Number>> {
         let mut numbers = Vec::with_capacity(num as usize);
         for _ in 0..num {
             numbers.push(self.pop()?);
@@ -704,37 +710,57 @@ impl Tape {
 /// Allows strongly typed iteration
 /// over the tape with minimal overhead
 #[repr(transparent)]
-pub struct TapeF<'a, F: PrimeFiniteField>(&'a mut Tape, PhantomData<F>);
+pub struct TapeF<'a, F: PrimeFiniteField>(&'a mut Box<dyn TapeT>, PhantomData<F>);
 
 impl<'a, F: PrimeFiniteField> Iterator for TapeF<'a, F> {
     type Item = F;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop_field::<F>()
+        let val = self.0.pop()?;
+        F::try_from_int(val).into()
     }
 }
 
-#[derive(Debug, Default)]
+/// Contains an instance tape and a witness tape.
 pub struct FieldInputs {
-    ins: Tape,
-    wit: Tape,
+    ins: Box<dyn TapeT>,
+    wit: Box<dyn TapeT>,
+}
+
+impl Default for FieldInputs {
+    /// The default is to use [`Tape`] for the instance and witness tape.
+    fn default() -> Self {
+        Self {
+            ins: Box::<Tape>::default(),
+            wit: Box::<Tape>::default(),
+        }
+    }
 }
 
 impl FieldInputs {
     /// Access the witness tape for this field.
-    pub fn wit(&mut self) -> &mut Tape {
+    pub fn wit(&mut self) -> &mut Box<dyn TapeT> {
         &mut self.wit
     }
 
     /// Access the instance tape for this field.
-    pub fn ins(&mut self) -> &mut Tape {
+    pub fn ins(&mut self) -> &mut Box<dyn TapeT> {
         &mut self.ins
+    }
+
+    /// Make an iterator for witness tape.
+    pub fn wit_iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+        TapeF(self.wit(), PhantomData)
+    }
+
+    /// Make an iterator for the instance tape.
+    pub fn ins_iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+        TapeF(self.ins(), PhantomData)
     }
 }
 
-// TODO: add type synonym for Vec<u8> serialized field values,
-//       maybe use Box<[u8]> like in other places.
-#[derive(Debug, Default)]
+/// Inputs associated with a circuit.
+#[derive(Default)]
 pub struct CircInputs {
     field: Vec<FieldInputs>,
 }
@@ -754,20 +780,16 @@ impl CircInputs {
         }
     }
 
-    // Return the number of instances associated with a given `type_id`
-    pub fn num_instances(&self, type_id: usize) -> usize {
-        match self.field.get(type_id) {
-            Some(field) => field.ins.len(),
-            None => 0,
-        }
+    /// Set instances from a dynamic tape implementing [`TapeT`].
+    pub fn set_instances(&mut self, type_id: usize, instances: Box<dyn TapeT>) {
+        self.adjust_type_idx(type_id);
+        self.field[type_id].ins = instances;
     }
 
-    // Return the number of witnesses associated with a given `type_id`
-    pub fn num_witnesses(&self, type_id: usize) -> usize {
-        match self.field.get(type_id) {
-            Some(field) => field.wit.len(),
-            None => 0,
-        }
+    /// Set witnesses from a dynamic tape implementing [`TapeT`].
+    pub fn set_witnesses(&mut self, type_id: usize, witnesses: Box<dyn TapeT>) {
+        self.adjust_type_idx(type_id);
+        self.field[type_id].wit = witnesses;
     }
 
     /// Ingest instance.

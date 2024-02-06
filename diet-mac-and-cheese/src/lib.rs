@@ -33,7 +33,7 @@ pub mod mac;
 mod memory;
 mod sieveir_phase2;
 pub mod sieveir_reader_fbs;
-pub mod text_reader;
+pub mod sieveir_reader_text;
 pub use backend::DietMacAndCheese;
 mod plugins;
 pub mod svole_thread;

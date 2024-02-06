@@ -12,9 +12,9 @@ use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{DisjunctionBody, PluginExecution};
 use crate::sieveir_reader_fbs::BufRelation;
+use crate::sieveir_reader_text::TextRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
-use crate::text_reader::TextRelation;
 use crate::DietMacAndCheese;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
@@ -453,7 +453,7 @@ impl<
                 WhichParty::Prover(ev) => execute_branch(
                     ev,
                     &mut self.dmc,
-                    inswit.wit().iter::<FP::PrimeField>(),
+                    inswit.wit_iter::<FP::PrimeField>(),
                     inputs,
                     disj.cond() as usize,
                     entry.get_mut(),
@@ -489,7 +489,7 @@ impl<
                     WhichParty::Prover(ev) => execute_branch(
                         ev,
                         &mut self.dmc,
-                        inswit.wit().iter::<FP::PrimeField>(),
+                        inswit.wit_iter::<FP::PrimeField>(),
                         inputs,
                         disj.cond() as usize,
                         dora,
