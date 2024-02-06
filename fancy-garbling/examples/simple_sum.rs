@@ -11,7 +11,6 @@ use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
 use std::fmt::Debug;
 
-use std::env;
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -130,10 +129,26 @@ where
 fn sum_in_clear(gb_value: u128, ev_value: u128) -> u128 {
     gb_value + ev_value
 }
+
+use clap::Parser;
+#[derive(Parser)]
+/// Example usage:
+///
+/// cargo run --example simple_sum 2 3
+///
+/// Computes the SUM(2,3)
+/// Where 2 is the garbler's value and 3 the evaluator's
+struct Cli {
+    /// The first integer the garbler's value
+    gb_value: u128,
+    /// The second integer the evaluator's value
+    ev_value: u128,
+}
+
 fn main() {
-    let args: Vec<_> = env::args().collect();
-    let gb_value: u128 = args[1].parse().unwrap();
-    let ev_value: u128 = args[2].parse().unwrap();
+    let cli = Cli::parse();
+    let gb_value: u128 = cli.gb_value;
+    let ev_value: u128 = cli.ev_value;
 
     let (sender, receiver) = UnixStream::pair().unwrap();
 
