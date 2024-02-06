@@ -22,7 +22,7 @@ use super::{tx::TxChannel, MemorySpace};
 /// Values of this type represent RAMs in the Dora protocol. Rather than the
 /// usual read/write interface to memory, `DoraRam` exposes the operations
 /// required by the protocol: `remove`, `insert`, and a `finalize` method to
-//  execute the final stages of the protocol (after all operations on the RAM
+/// execute the final stages of the protocol (after all operations on the RAM
 /// are complete.)
 ///
 /// This is a low-level representation of RAM, generalized over the party,
