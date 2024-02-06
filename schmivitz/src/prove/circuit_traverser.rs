@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use eyre::{bail, eyre, Result};
-use mac_n_cheese_sieve_parser::{FunctionBodyVisitor, Identifier, RelationVisitor, WireId};
+use mac_n_cheese_sieve_parser::{
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
+    TypeId, TypedCount, TypedWireRange, WireId, WireRange,
+};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F2};
 
@@ -24,25 +27,22 @@ pub(crate) struct CircuitTraverser<Vole> {
 
     /// Random VOLE values. There should be one for each extended witness value.
     voles: Vole,
-    /// Computed VOLE values. This is augmented during circuit traversal with the computed output
-    /// VOLE values for linear gates.
-    computed_voles: HashMap<WireId, F128b>,
-    /// Map from wire IDs in the circuit to VOLE indexes.
+    /// Assignment of VOLE values to specific wires in the circuit.
     ///
-    /// This is used to correctly index into `voles` and `challenges` and is constructed during
-    /// circuit traversal.
-    vole_assignment: HashMap<WireId, usize>,
+    /// This is constructed during circuit traversal; it holds computed output VOLE values for
+    /// linear gates and assigned VOLE values (pulled out of `voles`) for non-linear gates.
+    assigned_voles: HashMap<WireId, F128b>,
+    /// Count of how many of the custom VOLEs have been assigned.
+    vole_assignment_count: usize,
 
     /// Partial aggregation of the value $`\tilde a`$ from the protocol.
     ///
-    /// After traversal, this should have the value
-    /// $$`\sum_{i \in [t]} \chi_i \cdot A_{i,1}`$$.
-    aggregate_a: F128b,
+    /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,1}`$$.
+    aggregate_degree_0: F128b,
     /// Partial aggregation of the value $`\tilde b`$ from the protocol.
     ///
-    /// After traversal, this should have the value
-    /// $$`\sum_{i \in [t]} \chi_i \cdot A_{i,0}`$$.
-    aggregate_b: F128b,
+    /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,0}`$$.
+    aggregate_degree_1: F128b,
 }
 
 impl<Vole: RandomVole> CircuitTraverser<Vole> {
@@ -76,19 +76,19 @@ impl<Vole: RandomVole> CircuitTraverser<Vole> {
             wire_values,
             challenges,
 
-            computed_voles: HashMap::new(),
-            vole_assignment: HashMap::with_capacity(voles.extended_witness_length()),
             voles,
+            assigned_voles: HashMap::new(),
+            vole_assignment_count: 0,
 
-            aggregate_a: F128b::ZERO,
-            aggregate_b: F128b::ZERO,
+            aggregate_degree_0: F128b::ZERO,
+            aggregate_degree_1: F128b::ZERO,
         })
     }
 
-    /// Retrieve the witness (wire) value associated with the [`WireId`].
+    /// Retrieve the wire value associated with the [`WireId`].
     ///
     /// Fails if the wire value map provided by the caller does not contain the given ID.
-    fn witness(&self, wid: WireId) -> Result<F2> {
+    fn wire_value(&self, wid: WireId) -> Result<F2> {
         self.wire_values
             .get(&wid)
             .ok_or_else(|| {
@@ -104,31 +104,17 @@ impl<Vole: RandomVole> CircuitTraverser<Vole> {
     ///
     /// Fails if the [`WireId`] has not been associated with a VOLE, either by assigning
     /// a new VOLE to a non-linear gate with [`Self::assign_vole()`] or computing the appropriate
-    /// VOLE for a linear gate and assigning it via [`Self::save_vole()`].
+    /// VOLE for a linear gate and assigning it via [`Self::save_computed_vole()`].
     fn vole(&self, wid: WireId) -> Result<F128b> {
-        // VOLE should be either assigned (for witness gates) or computed (for non-witness gates)
-        match (
-            self.vole_assignment.get(&wid),
-            self.computed_voles.get(&wid),
-        ) {
-            // If it's assigned, get the VOLE mask
-            (Some(vole_id), None) => self.voles.vole_mask(*vole_id),
-
-            // If we computed it at some point, return the computed value
-            (None, Some(vole)) => Ok(*vole),
-
-            // If we don't have a VOLE for this wire ID, there's a problem
-            (None, None) => bail!(
-                "Internal invariant failed: expected a VOLE correlated to wire ID {}",
-                wid
-            ),
-
-            // There should never be both an assigned _and_ computed version for one wire
-            (Some(_), Some(_)) => bail!(
-                "Expected exactly one VOLE correlated with wire ID {} but got two",
-                wid
-            ),
-        }
+        self.assigned_voles
+            .get(&wid)
+            .ok_or_else(|| {
+                eyre!(
+                    "Internal invariant failed: expected a VOLE correlated to wire ID {}",
+                    wid
+                )
+            })
+            .copied()
     }
 
     /// Associates the given VOLE with the [`WireId`].
@@ -139,182 +125,104 @@ impl<Vole: RandomVole> CircuitTraverser<Vole> {
     /// does not validate the correctness of the VOLE.
     ///
     /// Fails if the wire ID was already associated with a VOLE.
-    fn save_vole(&mut self, wid: WireId, vole: F128b) -> Result<()> {
-        match (
-            self.computed_voles.insert(wid, vole),
-            self.vole_assignment.get(&wid),
-        ) {
-            // This wire ID should not have any existing VOLEs assigned to it
-            (None, None) => Ok(()),
-            _ => bail!(
+    fn save_computed_vole(&mut self, wid: WireId, vole: F128b) -> Result<()> {
+        match self.assigned_voles.insert(wid, vole) {
+            Some(_) => bail!(
                 "Something went wrong assigning a VOLE to {}; it was already assigned!",
                 wid
             ),
+            None => Ok(()),
         }
     }
 
-    /// Assigns the wire ID to the next available, unused VOLE.
+    /// Assigns an unused VOLE to the wire ID and returns a challenge for the gate.
     ///
     /// This should be called with the destination [`WireId`] for each non-linear gate.
-    /// It should _not_ be used with linear gates! See [`Self::save_vole()`] for the correct way to
+    /// It should _not_ be used with linear gates! Use [`Self::save_computed_vole()`] to
     /// assign a VOLE value to a linear gate.
     ///
     /// Fails if there aren't enough VOLEs or if the [`WireId`] is already assigned to a VOLE.
-    fn assign_vole(&mut self, wid: WireId) -> Result<()> {
-        let next_index = self.vole_assignment.len();
-        if next_index > self.voles.extended_witness_length() {
+    fn assign_vole(&mut self, wid: WireId) -> Result<F128b> {
+        let next_index = self.vole_assignment_count;
+        self.vole_assignment_count += 1;
+
+        // These two checks should be equivalent because we checked at construction that the
+        // challenge list is exactly the extended witness length.
+        if next_index >= self.voles.extended_witness_length() || next_index >= self.challenges.len()
+        {
             bail!(
                 "Bad input: needed at least {} VOLEs, but only got {}",
                 next_index,
                 self.voles.extended_witness_length()
             )
         }
-        match (
-            self.vole_assignment.insert(wid, next_index),
-            self.computed_voles.get(&wid),
-        ) {
-            (None, None) => Ok(()),
-            _ => bail!(
-                "Something went wrong assigning a VOLE to {}; it was already assigned!",
-                wid
-            ),
-        }
-    }
 
-    /// Get the challenge associated with the wire ID.
-    ///
-    /// Fails if we run out of challenges or if the [`WireId`] has not been associated with a VOLE
-    /// yet. In general, this method needs to be called for non-linear gates _after_ calling
-    /// [`Self::assign_vole()`].
-    fn challenge(&self, wid: WireId) -> Result<F128b> {
-        let challenge_index = self.vole_assignment.get(&wid).ok_or_else(|| {
-            eyre!(
-                "Internal invariant failed: expected a VOLE assigned to wire ID {}",
-                wid
-            )
-        })?;
-        self.challenges.get(*challenge_index).ok_or_else(||
-            eyre!("Internal invariant failed: expected at least {} challenges, but wasn't able to access {}", 
-                self.voles.extended_witness_length(), wid))
-            .copied()
+        self.save_computed_vole(wid, self.voles.vole_mask(next_index)?)?;
+        Ok(self.challenges[next_index])
     }
 }
 
 impl<Vole: RandomVole> FunctionBodyVisitor for CircuitTraverser<Vole> {
-    fn new(
-        &mut self,
-        __ty: mac_n_cheese_sieve_parser::TypeId,
-        _first: WireId,
-        _last: WireId,
-    ) -> Result<()> {
+    fn new(&mut self, __ty: TypeId, _first: WireId, _last: WireId) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `new` gates");
     }
 
-    fn delete(
-        &mut self,
-        _ty: mac_n_cheese_sieve_parser::TypeId,
-        _first: WireId,
-        _last: WireId,
-    ) -> Result<()> {
+    fn delete(&mut self, _ty: TypeId, _first: WireId, _last: WireId) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `delete` gates");
     }
 
-    fn add(
-        &mut self,
-        ty: mac_n_cheese_sieve_parser::TypeId,
-        dst: WireId,
-        left: WireId,
-        right: WireId,
-    ) -> Result<()> {
+    fn add(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> Result<()> {
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
 
         // Compute the correct VOLE for the output wire
         let sum_vole = self.vole(left)? + self.vole(right)?;
-        self.save_vole(dst, sum_vole)
+        self.save_computed_vole(dst, sum_vole)
 
         // Linear gates don't contribute to the aggregated values being computed
     }
 
-    fn mul(
-        &mut self,
-        ty: mac_n_cheese_sieve_parser::TypeId,
-        dst: WireId,
-        left: WireId,
-        right: WireId,
-    ) -> Result<()> {
+    fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> Result<()> {
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
 
-        // Assign a fresh VOLE to the output wire
-        self.assign_vole(dst)?;
+        // Assign a fresh VOLE to the output wire and get the corresponding challenge
+        let challenge = self.assign_vole(dst)?;
 
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
-        let coefficient_a = self.vole(left)? * self.vole(right)?;
-        let coefficient_b = self.witness(right)? * self.vole(left)?
-            + self.witness(left)? * self.vole(right)?
+        let degree_0_coeff = self.vole(left)? * self.vole(right)?;
+        let degree_1_coeff = self.wire_value(right)? * self.vole(left)?
+            + self.wire_value(left)? * self.vole(right)?
             - self.vole(dst)?;
 
-        let challenge = self.challenge(dst)?;
-
-        self.aggregate_a += challenge * coefficient_a;
-        self.aggregate_b += challenge * coefficient_b;
+        self.aggregate_degree_0 += challenge * degree_0_coeff;
+        self.aggregate_degree_1 += challenge * degree_1_coeff;
 
         Ok(())
     }
 
-    fn addc(
-        &mut self,
-        _ty: mac_n_cheese_sieve_parser::TypeId,
-        _dst: WireId,
-        _left: WireId,
-        _right: &mac_n_cheese_sieve_parser::Number,
-    ) -> Result<()> {
+    fn addc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
     }
 
-    fn mulc(
-        &mut self,
-        _ty: mac_n_cheese_sieve_parser::TypeId,
-        _dst: WireId,
-        _left: WireId,
-        _right: &mac_n_cheese_sieve_parser::Number,
-    ) -> Result<()> {
+    fn mulc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `mulc` gates");
     }
 
-    fn copy(
-        &mut self,
-        _ty: mac_n_cheese_sieve_parser::TypeId,
-        _dst: mac_n_cheese_sieve_parser::WireRange,
-        _src: &[mac_n_cheese_sieve_parser::WireRange],
-    ) -> Result<()> {
+    fn copy(&mut self, _ty: TypeId, _dst: WireRange, _src: &[WireRange]) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `copy` gates");
     }
 
-    fn constant(
-        &mut self,
-        _ty: mac_n_cheese_sieve_parser::TypeId,
-        _dst: WireId,
-        _src: &mac_n_cheese_sieve_parser::Number,
-    ) -> Result<()> {
+    fn constant(&mut self, _ty: TypeId, _dst: WireId, _src: &Number) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `constant` gates");
     }
 
-    fn public_input(
-        &mut self,
-        _ty: mac_n_cheese_sieve_parser::TypeId,
-        _dst: mac_n_cheese_sieve_parser::WireRange,
-    ) -> Result<()> {
+    fn public_input(&mut self, _ty: TypeId, _dst: WireRange) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `public_input` gates");
     }
 
-    fn private_input(
-        &mut self,
-        ty: mac_n_cheese_sieve_parser::TypeId,
-        dst: mac_n_cheese_sieve_parser::WireRange,
-    ) -> Result<()> {
+    fn private_input(&mut self, ty: TypeId, dst: WireRange) -> Result<()> {
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
 
@@ -329,25 +237,20 @@ impl<Vole: RandomVole> FunctionBodyVisitor for CircuitTraverser<Vole> {
         Ok(())
     }
 
-    fn assert_zero(&mut self, _ty: mac_n_cheese_sieve_parser::TypeId, _src: WireId) -> Result<()> {
+    fn assert_zero(&mut self, _ty: TypeId, _src: WireId) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `assert_zero` gates");
     }
 
     fn convert(
         &mut self,
-        _dst: mac_n_cheese_sieve_parser::TypedWireRange,
-        _src: mac_n_cheese_sieve_parser::TypedWireRange,
-        _semantics: mac_n_cheese_sieve_parser::ConversionSemantics,
+        _dst: TypedWireRange,
+        _src: TypedWireRange,
+        _semantics: ConversionSemantics,
     ) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `convert` gates");
     }
 
-    fn call(
-        &mut self,
-        _dst: &[mac_n_cheese_sieve_parser::WireRange],
-        _name: mac_n_cheese_sieve_parser::Identifier,
-        _args: &[mac_n_cheese_sieve_parser::WireRange],
-    ) -> Result<()> {
+    fn call(&mut self, _dst: &[WireRange], _name: Identifier, _args: &[WireRange]) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `call` gates");
     }
 }
@@ -357,12 +260,12 @@ impl<Vole: RandomVole> RelationVisitor for CircuitTraverser<Vole> {
     fn define_function<BodyCb>(
         &mut self,
         _name: Identifier,
-        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _outputs: &[TypedCount],
+        _inputs: &[TypedCount],
         _body: BodyCb,
-    ) -> eyre::Result<()>
+    ) -> Result<()>
     where
-        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> eyre::Result<()>,
+        for<'a, 'b> BodyCb: FnOnce(&'a mut Self::FBV<'b>) -> Result<()>,
     {
         bail!("Invalid input: VOLE-in-the-head does not support function definition");
     }
@@ -370,10 +273,10 @@ impl<Vole: RandomVole> RelationVisitor for CircuitTraverser<Vole> {
     fn define_plugin_function(
         &mut self,
         _name: Identifier,
-        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _body: mac_n_cheese_sieve_parser::PluginBinding,
-    ) -> eyre::Result<()> {
+        _outputs: &[TypedCount],
+        _inputs: &[TypedCount],
+        _body: PluginBinding,
+    ) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support function definition");
     }
 }
@@ -404,7 +307,8 @@ mod tests {
 
     #[test]
     fn vole_assignment_works_as_expected() -> Result<()> {
-        let mut traverser = dummy_traverser(4);
+        let len = 20;
+        let mut traverser = dummy_traverser(len);
         // Assume every gate is non-linear, for fun
         let non_linear_gates = traverser.wire_values.keys().cloned().collect::<Vec<_>>();
 
@@ -416,11 +320,14 @@ mod tests {
             traverser.assign_vole(gate)?;
 
             // ...and make sure the assignment is in order wrt the VOLE indexes (0, 1, 2...)
-            assert_eq!(traverser.vole_assignment.get(&gate).unwrap(), &expected_idx);
+            assert_eq!(traverser.vole_assignment_count, expected_idx + 1);
 
             // Now you can retrieve the VOLE
             assert!(traverser.vole(gate).is_ok());
         }
+
+        // Can't assign more VOLEs than you have
+        assert!(traverser.assign_vole(len as u64).is_err());
 
         Ok(())
     }
@@ -439,7 +346,7 @@ mod tests {
 
             // "Compute" a VOLE for the gate...
             let vole = F128b::random(rng);
-            traverser.save_vole(wid, vole)?;
+            traverser.save_computed_vole(wid, vole)?;
 
             // ...and make sure they were assigned as expected
             assert_eq!(traverser.vole(wid)?, vole)
@@ -462,7 +369,7 @@ mod tests {
 
             // "Compute" a VOLE for the wire
             let vole = F128b::random(rng);
-            traverser.save_vole(*wid, vole)?;
+            traverser.save_computed_vole(*wid, vole)?;
 
             // You shouldn't be able to also assign a VOLE to the wire
             assert!(traverser.assign_vole(*wid).is_err());
@@ -477,28 +384,9 @@ mod tests {
 
             // You shouldn't be able to also "compute" & assign a VOLE to the wire
             let vole = F128b::random(rng);
-            assert!(traverser.save_vole(*wid, vole).is_err());
+            assert!(traverser.save_computed_vole(*wid, vole).is_err());
         }
 
-        Ok(())
-    }
-
-    #[test]
-    fn challenge_retrieval_works_as_expected() -> Result<()> {
-        let len = 5;
-        let mut traverser = dummy_traverser(len);
-
-        let wire_ids = traverser.wire_values.keys().cloned().collect::<Vec<_>>();
-        for wid in wire_ids {
-            // If gates haven't been assigned, you can't get the right challenge
-            assert!(traverser.challenge(wid).is_err());
-
-            // Add wire id -> challenge index assignments
-            traverser.assign_vole(wid)?;
-
-            // You can get a challenge for every witness
-            assert!(traverser.challenge(wid).is_ok());
-        }
         Ok(())
     }
 }
