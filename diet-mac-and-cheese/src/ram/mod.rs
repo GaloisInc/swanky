@@ -1,6 +1,3 @@
-// TODO: Turn this off!
-#![allow(dead_code)]
-
 mod protocol;
 mod tests;
 mod tx;
