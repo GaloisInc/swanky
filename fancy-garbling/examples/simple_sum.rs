@@ -2,11 +2,14 @@
 //! using fancy-garbling.
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyReveal,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
+    FancyReveal,
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
 use scuttlebutt::{AbstractChannel, AesRng};
+
+use std::fmt::Debug;
 
 use std::env;
 
@@ -19,6 +22,7 @@ struct SUMInputs<F> {
 
 /// The garbler's main method:
 /// (1) The garbler is first created using the passed rng and value.
+/// (2) The garbler then exchanges their wires obliviously with the evaluator.
 
 fn gb_sum<C>(rng: &mut AesRng, channel: &mut C, input: u128)
 where
@@ -27,11 +31,32 @@ where
     // (1)
     let mut gb =
         Garbler::<C, AesRng, OtSender, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    // (2)
+    let circuit_wires = gb_set_fancy_inputs(&mut gb, input);
+}
+
+/// The garbler's wire exchange method
+fn gb_set_fancy_inputs<F, E>(gb: &mut F, input: u128) -> SUMInputs<F::Item>
+where
+    F: FancyInput<Item = AllWire, Error = E>,
+    E: Debug,
+{
+    // The number of bits needed to represent a single input, in this case a u128
+    let nbits = 128;
+    // The garbler encodes their input into binary wires
+    let garbler_wires: BinaryBundle<F::Item> = gb.bin_encode(input, nbits).unwrap();
+    // The evaluator receives their input labels using Oblivious Transfer (OT)
+    let evaluator_wires: BinaryBundle<F::Item> = gb.bin_receive(nbits).unwrap();
+
+    SUMInputs {
+        garbler_wires,
+        evaluator_wires,
+    }
 }
 
 /// The evaluator's main method:
 /// (1) The evaluator is first created using the passed rng and value.
-
+/// (2) The evaluator then exchanges their wires obliviously with the garbler.
 fn ev_sum<C>(rng: &mut AesRng, channel: &mut C, input: u128) -> u128
 where
     C: AbstractChannel + std::clone::Clone,
@@ -39,7 +64,27 @@ where
     // (1)
     let mut ev =
         Evaluator::<C, AesRng, OtReceiver, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    // (2)
+    let circuit_wires = ev_set_fancy_inputs(&mut ev, input);
+
     todo!()
+}
+fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128) -> SUMInputs<F::Item>
+where
+    F: FancyInput<Item = AllWire, Error = E>,
+    E: Debug,
+{
+    // The number of bits needed to represent a single input, in this case a u128
+    let nbits = 128;
+    // The evaluator receives the garblers input labels.
+    let garbler_wires: BinaryBundle<F::Item> = ev.bin_receive(nbits).unwrap();
+    // The evaluator receives their input labels using Oblivious Transfer (OT).
+    let evaluator_wires: BinaryBundle<F::Item> = ev.bin_encode(input, nbits).unwrap();
+
+    SUMInputs {
+        garbler_wires,
+        evaluator_wires,
+    }
 }
 
 /// The main fancy function which describes the garbled circuit for summation.
