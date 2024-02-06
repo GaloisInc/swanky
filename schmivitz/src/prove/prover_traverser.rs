@@ -242,7 +242,7 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
 
         // Assign a fresh VOLE to each of the output wires
         for wid in dst.start..=dst.end {
-            self.assign_vole(wid)?;
+            let _challenge = self.assign_vole(wid)?;
         }
 
         // Private input gates don't define a polynomial that would contribute to the aggregated
