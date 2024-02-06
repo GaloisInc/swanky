@@ -23,7 +23,7 @@ struct SUMInputs<F> {
 /// The garbler's main method:
 /// (1) The garbler is first created using the passed rng and value.
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
-
+/// (3) The garbler and the evaluator then run the garbled circuit.
 fn gb_sum<C>(rng: &mut AesRng, channel: &mut C, input: u128)
 where
     C: AbstractChannel + std::clone::Clone,
@@ -33,6 +33,8 @@ where
         Garbler::<C, AesRng, OtSender, AllWire>::new(channel.clone(), rng.clone()).unwrap();
     // (2)
     let circuit_wires = gb_set_fancy_inputs(&mut gb, input);
+    // (3)
+    let sum = fancy_sum::<Garbler<C, AesRng, OtSender, AllWire>>(&mut gb, circuit_wires).unwrap();
 }
 
 /// The garbler's wire exchange method
@@ -57,6 +59,7 @@ where
 /// The evaluator's main method:
 /// (1) The evaluator is first created using the passed rng and value.
 /// (2) The evaluator then exchanges their wires obliviously with the garbler.
+/// (3) The evaluator and the garbler then run the garbled circuit.
 fn ev_sum<C>(rng: &mut AesRng, channel: &mut C, input: u128) -> u128
 where
     C: AbstractChannel + std::clone::Clone,
@@ -66,9 +69,14 @@ where
         Evaluator::<C, AesRng, OtReceiver, AllWire>::new(channel.clone(), rng.clone()).unwrap();
     // (2)
     let circuit_wires = ev_set_fancy_inputs(&mut ev, input);
+    // (3)
+    let sum =
+        fancy_sum::<Evaluator<C, AesRng, OtReceiver, AllWire>>(&mut ev, circuit_wires).unwrap();
 
     todo!()
 }
+
+/// The evaluator's wire exchange method
 fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128) -> SUMInputs<F::Item>
 where
     F: FancyInput<Item = AllWire, Error = E>,
