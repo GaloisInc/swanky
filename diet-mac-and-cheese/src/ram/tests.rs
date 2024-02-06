@@ -30,8 +30,12 @@ fn test_ram() {
             DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
                 .unwrap();
 
-        let mut ram =
-            DoraRam::<Prover, F61p, F61p, _, _, _>::new(&mut prover, 2, Arithmetic::new(RAM_SIZE));
+        let mut ram = DoraRam::<Prover, F61p, F61p, _, _, _>::new(
+            &mut prover,
+            vec![Default::default()],
+            2,
+            Arithmetic::new(RAM_SIZE),
+        );
 
         for _ in 0..RAM_STEPS {
             let addr = rand::random::<u32>() % (RAM_SIZE as u32);
@@ -59,6 +63,7 @@ fn test_ram() {
 
         let mut ram = DoraRam::<Verifier, F61p, F61p, _, _, _>::new(
             &mut verifier,
+            vec![Default::default()],
             2,
             Arithmetic::new(RAM_SIZE),
         );

@@ -39,6 +39,7 @@ pub struct DoraRam<
 > where
     F::PrimeField: IsSubFieldOf<V>,
 {
+    init_value: Vec<Mac<P, V, F>>,
     challenge_size: usize,
     space: M,
     ch: TxChannel<C>,
@@ -74,10 +75,17 @@ where
     /// memory value, the size of challenges, and the address space.
     pub fn new(
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        mut init_value: Vec<Mac<P, V, F>>,
         challenge_size: usize,
         space: M,
     ) -> Self {
+        // Extend the initial value with  challenge values
+        // We pay a small price here for a very efficient copy when finalizing
+        init_value.append(&mut commit_pub(&vec![V::default(); challenge_size]));
+        debug_assert_eq!(init_value.len(), space.value_size() + challenge_size);
+
         Self {
+            init_value,
             challenge_size,
             space,
             ch: TxChannel::new(dmc.channel.clone(), Default::default()),
@@ -115,7 +123,12 @@ where
                     .as_mut()
                     .into_inner(ev)
                     .remove(&val_addr)
-                    .unwrap_or(vec![V::default(); stored_size]);
+                    .unwrap_or_else(|| {
+                        self.init_value
+                            .iter()
+                            .map(|v| v.value().into_inner(ev))
+                            .collect()
+                    });
 
                 for elem in iter::empty()
                     .chain(addr.iter().copied())
@@ -221,11 +234,21 @@ where
 
         let flattened_size = self.space.addr_size() + self.space.value_size() + self.challenge_size;
         let mut pre = match P::WHICH {
-            WhichParty::Prover(_) => commit_pub::<P, _, _>(&vec![V::default(); flattened_size]),
-            WhichParty::Verifier(_) => vec![V::default(); flattened_size]
-                .into_iter()
-                .map(|x| dmc.input_public(x).unwrap())
-                .collect(),
+            WhichParty::Prover(_) => {
+                let mut pre = commit_pub::<P, _, _>(&vec![V::default(); flattened_size]);
+                pre[self.space.addr_size()..].copy_from_slice(&self.init_value);
+                debug_assert_eq!(pre.len(), flattened_size);
+                pre
+            }
+            WhichParty::Verifier(_) => {
+                let mut pre: Vec<_> = vec![V::default(); flattened_size]
+                    .into_iter()
+                    .map(|x| dmc.input_public(x).unwrap())
+                    .collect();
+                pre[self.space.addr_size()..].copy_from_slice(&self.init_value);
+                debug_assert_eq!(pre.len(), flattened_size);
+                pre
+            }
         };
 
         for addr in self.space.enumerate() {

@@ -739,7 +739,8 @@ impl<
         debug_assert_eq!(init_value.len(), 1);
 
         let ram_id = self.ram_states.len();
-        self.ram_states.push(ArithmeticRam::new(size));
+        self.ram_states
+            .push(ArithmeticRam::new(size, init_value[0]));
 
         Ok(ram_id)
     }

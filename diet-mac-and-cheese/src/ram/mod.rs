@@ -132,6 +132,7 @@ pub struct ArithmeticRam<
     F::PrimeField: IsSubFieldOf<V>,
 {
     size: usize,
+    init_value: Mac<P, V, F>,
     dora: Option<DoraRam<P, V, F, C, Arithmetic<V>, SVOLE>>,
 }
 
@@ -145,8 +146,12 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn new(size: usize) -> Self {
-        Self { size, dora: None }
+    pub fn new(size: usize, init_value: Mac<P, V, F>) -> Self {
+        Self {
+            size,
+            init_value,
+            dora: None,
+        }
     }
 
     pub fn read(
@@ -161,7 +166,7 @@ where
                 Ok(value[0])
             }
             None => {
-                let ram = DoraRam::new(dmc, 2, Arithmetic::new(self.size));
+                let ram = DoraRam::new(dmc, vec![self.init_value], 2, Arithmetic::new(self.size));
                 self.dora = Some(ram);
                 self.read(dmc, addr)
             }
@@ -181,7 +186,7 @@ where
                 Ok(())
             }
             None => {
-                let ram = DoraRam::new(dmc, 2, Arithmetic::new(self.size));
+                let ram = DoraRam::new(dmc, vec![self.init_value], 2, Arithmetic::new(self.size));
                 self.dora = Some(ram);
                 self.write(dmc, addr, value)
             }
