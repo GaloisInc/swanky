@@ -12,9 +12,6 @@ use swanky_party::Party;
 
 use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
 
-const PRE_ALLOC_MEM: usize = 1 << 20;
-const PRE_ALLOC_STEPS: usize = (1 << 23) + PRE_ALLOC_MEM;
-
 fn combine<'a, B: BackendT>(
     backend: &'a mut B,
     mut elems: impl Iterator<Item = &'a B::Wire>,

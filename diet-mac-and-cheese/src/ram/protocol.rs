@@ -15,7 +15,7 @@ use crate::{
     svole_trait::SvoleT, DietMacAndCheese,
 };
 
-use super::{tx::TxChannel, MemorySpace, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
+use super::{tx::TxChannel, MemorySpace};
 
 /// The Dora RAM protocol state.
 ///
@@ -70,12 +70,8 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    /// Create a new `DoraRam` using the Diet Mac'n'Cheese protocol, the size
-    /// of challenges, and the 'actual' memory space.
-    ///
-    /// Note: We currently pre-allocate very large `Vec`s for the bags of reads
-    /// and writes. Given that the cost of re-allocation would be amortized
-    /// away for large numbers of operations, this might change in the future.
+    /// Create a new `DoraRam` using the Diet Mac'n'Cheese protocol, the initial
+    /// memory value, the size of challenges, and the address space.
     pub fn new(
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
         challenge_size: usize,
@@ -86,8 +82,8 @@ where
             space,
             ch: TxChannel::new(dmc.channel.clone(), Default::default()),
             memory: Default::default(),
-            rds: Vec::with_capacity(PRE_ALLOC_MEM + PRE_ALLOC_STEPS),
-            wrs: Vec::with_capacity(PRE_ALLOC_MEM + PRE_ALLOC_STEPS),
+            rds: vec![],
+            wrs: vec![],
             _ph: PhantomData,
         }
     }
