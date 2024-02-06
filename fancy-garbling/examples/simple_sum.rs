@@ -7,11 +7,15 @@ use fancy_garbling::{
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
-use scuttlebutt::{AbstractChannel, AesRng};
+use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
 use std::fmt::Debug;
 
 use std::env;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+};
 
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
@@ -131,10 +135,29 @@ fn main() {
     let gb_value: u128 = args[1].parse().unwrap();
     let ev_value: u128 = args[2].parse().unwrap();
 
+    let (sender, receiver) = UnixStream::pair().unwrap();
+
+    std::thread::spawn(move || {
+        let rng_gb = AesRng::new();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        gb_sum(&mut rng_gb.clone(), &mut channel, gb_value);
+    });
+
+    let rng_ev = AesRng::new();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+
+    let sum = sum_in_clear(gb_value, ev_value);
+    let result = ev_sum(&mut rng_ev.clone(), &mut channel, ev_value);
     println!(
-        "Sum({} + {}) = {}",
-        gb_value,
-        ev_value,
-        sum_in_clear(gb_value, ev_value)
+        "Garbled Circuit result is : SUM({}, {}) = {}",
+        gb_value, ev_value, result
+    );
+    assert!(
+        result == sum,
+        "The garbled circuit result is incorrect and sould be {sum}"
     );
 }
