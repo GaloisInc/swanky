@@ -10,11 +10,8 @@ use swanky_party::{
 };
 
 use crate::{
-    backend_trait::BackendT,
-    mac::Mac,
-    ram::{collapse_vec, perm::permutation},
-    svole_trait::SvoleT,
-    DietMacAndCheese,
+    backend_trait::BackendT, dora::perm::permutation, mac::Mac, ram::collapse_vec,
+    svole_trait::SvoleT, DietMacAndCheese,
 };
 
 use super::{tx::TxChannel, MemorySpace, PRE_ALLOC_MEM, PRE_ALLOC_STEPS};
