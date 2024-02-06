@@ -1,24 +1,41 @@
 /bristol-fashion/ @isweet
+/bristol-fashion @isweet
 /diet-mac-and-cheese/ @benoit.razet @cphifer
+/diet-mac-and-cheese @benoit.razet @cphifer
 
 /crates/channel/ @marc
+/crates/channel @marc
 /crates/flatbuffer-build/ @marc
+/crates/flatbuffer-build @marc
 /crates/party/ @marc @cphifer
+/crates/party @marc @cphifer
 /crates/serialization/ @marc @cphifer
+/crates/serialization @marc @cphifer
 /keyed_arena/ @marc
+/keyed_arena @marc
 /vectoreyes/ @marc
+/vectoreyes @marc
 
 [Finite Fields] @marc @cphifer
 /crates/field/
+/crates/field
 /crates/field-binary/
+/crates/field-binary
 /crates/field-f61p/
+/crates/field-f61p
 /crates/field-ff-primes/
+/crates/field-ff-primes
 /crates/field-test/
+/crates/field-test
 
 [CI Infrastructure] @marc @cphifer
 /swanky
 /rust-toolchain
 /.gitlab-ci.yml
 /.cargo
+/.cargo/
 /etc
+/etc/
 /.gitlab
+/.gitlab/
+
