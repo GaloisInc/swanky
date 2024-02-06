@@ -146,6 +146,8 @@ impl<
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
+    /// Create a new `ArithmeticRam` with `size` cells, each containing
+    /// `init_value`.
     pub fn new(size: usize, init_value: Mac<P, V, F>) -> Self {
         Self {
             size,
@@ -154,6 +156,7 @@ where
         }
     }
 
+    /// Read and return the value at `addr`.
     pub fn read(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
@@ -173,6 +176,7 @@ where
         }
     }
 
+    /// Write `value` to `addr`.
     pub fn write(
         &mut self,
         dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
@@ -193,6 +197,10 @@ where
         }
     }
 
+    /// Finalize this `ArithmeticRam`.
+    ///
+    /// This should only be called when no more reads/writes will occur on this
+    /// RAM.
     pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> Result<()> {
         match self.dora.take() {
             Some(ram) => ram.finalize(dmc),
