@@ -6,6 +6,7 @@ import rich
 from etc.fmt import fmt
 from etc.lint import LintResult
 from etc.lint import flatbuffers as lint_flatbuffers
+from etc.lint import gitlab as lint_gitlab
 from etc.lint import rust as lint_rust
 from etc.lint.mypy import mypy as lint_mypy
 from etc.readme import gen_crate_list as readme_gen_crate_list
@@ -43,6 +44,7 @@ LINTS: List[Callable[[click.Context], LintResult]] = [
     existing_command_as_lint(
         "Run ./swanky readme gen-crate-list --check", readme_gen_crate_list, check=True
     ),
+    lint_gitlab.lint_codeowners_file,
     lint_rust.require_deny_missing_docs,
     lint_mypy,
     lint_flatbuffers.check_version_matches,
