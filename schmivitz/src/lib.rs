@@ -18,8 +18,7 @@
 
 #[allow(unused)]
 pub mod parameters;
-mod proof;
+mod prove;
 mod vole;
-mod witness_counter;
 
-pub use proof::Proof;
+pub use prove::Proof;

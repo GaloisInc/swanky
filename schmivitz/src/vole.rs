@@ -5,7 +5,7 @@
 //! - Secure version as described in FAEST spec and paper
 //!
 
-mod insecure;
+pub(crate) mod insecure;
 
 use eyre::Result;
 use merlin::Transcript;
@@ -31,7 +31,7 @@ use swanky_field_binary::{F128b, F2};
 /// [^vole]: Carsten Baum, Lennart Braun, Cyprien Delpech de Saint Guilhem, Michael Klooß,
 /// Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 /// Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
-trait RandomVole
+pub(crate) trait RandomVole
 where
     Self: Sized,
 {
@@ -69,6 +69,9 @@ where
     /// $`r`$ is the [`VOLE_SIZE_PARAM`](crate::parameters::VOLE_SIZE_PARAM); and
     /// $`\tau`$ is the [`REPETITION_PARAM`](crate::parameters::REPETITION_PARAM).
     fn count(&self) -> usize;
+
+    /// Get the number of extended witness elements supported by this random VOLE instance.
+    fn extended_witness_length(&self) -> usize;
 
     /// Get the mask for the witness; this is $`\bf u_{[1..\ell]}`$ in the paper, where
     /// $`\ell`$ is the `extended_witness_length` passed to [`RandomVole::create()`].
