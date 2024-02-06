@@ -205,7 +205,7 @@ mod tests {
     use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
     use std::io::Cursor;
 
-    use crate::witness_counter::VoleCircuitPreparer;
+    use crate::prove::witness_counter::VoleCircuitPreparer;
 
     /// Stream reader that produces an arbitrary-length stream of random inputs in F_2.
     struct RandomStreamReader {
