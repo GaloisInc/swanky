@@ -279,14 +279,23 @@ impl RelationVisitor for TextRelation {
             input_counts.push((input.ty, input.count));
         }
 
+        let mut public_count = vec![];
+        for p in body.public_counts.iter() {
+            public_count.push((p.ty, p.count));
+        }
+        let mut private_count = vec![];
+        for p in body.private_counts.iter() {
+            private_count.push((p.ty, p.count));
+        }
+
         let fun_body = FuncDecl::new_plugin(
             output_counts,
             input_counts,
             body.plugin_type.name,
             body.plugin_type.operation,
             body.plugin_type.args,
-            vec![], // TODO: Add them !
-            vec![], // TODO: Add them!
+            public_count,
+            private_count,
             &self.type_store,
             &self.fun_store,
         )?;
