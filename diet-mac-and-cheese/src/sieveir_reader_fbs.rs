@@ -16,7 +16,7 @@ use crate::{
 use eyre::{ensure, eyre, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
 use log::info;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg, ValueStreamKind};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -152,17 +152,12 @@ pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Number>)
     bigint_from_bytes(type_field.bytes())
 }
 
-enum InputType {
-    PublicInput,
-    PrivateInput,
-}
-
 pub struct InputFlatbuffers {
     buffer_file: BufReader<File>,
     buffer_mem: Vec<u8>,
     queue: VecDeque<Number>,
     field: Option<Number>,
-    ty: InputType,
+    ty: ValueStreamKind,
 }
 
 impl InputFlatbuffers {
@@ -176,7 +171,7 @@ impl InputFlatbuffers {
             buffer_mem,
             queue: Default::default(),
             field: Default::default(),
-            ty: InputType::PrivateInput,
+            ty: ValueStreamKind::Private,
         };
         private_inputs.load_more_in_queue()?;
         Ok(private_inputs)
@@ -191,7 +186,7 @@ impl InputFlatbuffers {
             buffer_mem,
             queue: Default::default(),
             field: Default::default(),
-            ty: InputType::PublicInput,
+            ty: ValueStreamKind::Public,
         };
         public_inputs.load_more_in_queue()?;
         Ok(public_inputs)
@@ -212,18 +207,17 @@ impl InputFlatbuffers {
         }
     }
 
-    /// Load more instances or witnesses in the internal queue
+    /// Load more instances or witnesses in the internal queue.
     fn load_more_in_queue(&mut self) -> Result<Option<()>> {
-        // the queue is empty let's read some more
         let msg = read_size_prefix_in_vec(&mut self.buffer_file, &mut self.buffer_mem)?;
         match msg {
             None => Ok(None),
             Some(_) => {
                 let field_read = match self.ty {
-                    InputType::PrivateInput => {
+                    ValueStreamKind::Private => {
                         read_private_inputs_bytes(&self.buffer_mem, &mut self.queue)
                     }
-                    InputType::PublicInput => {
+                    ValueStreamKind::Public => {
                         read_public_inputs_bytes(&self.buffer_mem, &mut self.queue)
                     }
                 };
