@@ -666,11 +666,17 @@ impl FunStore {
 /// This interface allows for some implementation to only store a small number of the stream's values in memory at once.
 pub trait TapeT {
     /// Ingest a tape value.
+    ///
+    /// This is an optional function is unimplemented by default. It makes sense to implement it when
+    /// the tape is not a stream.
     fn ingest(&mut self, _n: Number) {
         unimplemented!("The function ingest() is not required.")
     }
 
     /// Ingest several tape values.
+    ///
+    /// This is an optional function is unimplemented by default. It makes sense to implement it when
+    /// the tape is not a stream.
     fn ingest_many(&mut self, _ns: VecDeque<Number>) {
         unimplemented!("The function ingest_many() is not required.")
     }
