@@ -2192,12 +2192,15 @@ dependencies = [
 name = "schmivitz"
 version = "0.5.0"
 dependencies = [
+ "blake3",
  "eyre",
  "mac-n-cheese-sieve-parser",
  "merlin",
+ "proptest",
  "rand",
  "swanky-field",
  "swanky-field-binary",
+ "vectoreyes",
 ]
 
 [[package]]
