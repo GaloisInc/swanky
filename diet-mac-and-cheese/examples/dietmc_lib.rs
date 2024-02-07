@@ -27,6 +27,7 @@ use swanky_field_binary::{F40b, F2};
 use swanky_party::{Prover, Verifier};
 
 fn field_to_number<F: FiniteField>(v: F) -> Number {
+    // NOTE: We assume that `to_bytes()` converts a field value into a sequence of bytes in lower-endian.
     let bytes = v.to_bytes();
     assert!(bytes.len() <= Number::BYTES, "number too big",);
     let mut bigint_bytes = [0; Number::BYTES];
