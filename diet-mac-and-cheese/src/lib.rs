@@ -40,3 +40,58 @@ pub use backend::DietMacAndCheese;
 mod plugins;
 pub mod svole_thread;
 pub mod svole_trait;
+
+use ocelot::svole::{
+    LpnParams, LPN_EXTEND_EXTRASMALL, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_EXTEND_SMALL_MEDIUM,
+    LPN_SETUP_EXTRASMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL, LPN_SETUP_SMALL_MEDIUM,
+};
+use serde::Deserialize;
+use std::fmt::Display;
+
+/// Size of LPN parameters
+///
+/// This parameter is available to the user to indicate, at a high-level, the size of the LPN parameters
+/// without specifiying exactly their values.
+/// It has three possible values small, medium and large.
+/// The size is mapped to actual LPN parameters using [`mapping_lpn_size`] or
+/// [`mapping_lpn_size_large_field`].
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LpnSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+impl Display for LpnSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LpnSize::Small => write!(f, "small"),
+            LpnSize::Medium => write!(f, "medium"),
+            LpnSize::Large => write!(f, "large"),
+        }
+    }
+}
+
+/// Mapping [`LpnSize`] to LPN parameters
+pub(crate) fn mapping_lpn_size(lpn_size: LpnSize) -> (LpnParams, LpnParams) {
+    match lpn_size {
+        LpnSize::Small => (LPN_SETUP_SMALL, LPN_EXTEND_SMALL),
+        LpnSize::Medium => (LPN_SETUP_SMALL_MEDIUM, LPN_EXTEND_SMALL_MEDIUM),
+        LpnSize::Large => (LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM),
+    }
+}
+
+/// Mapping [`LpnSize`] to LPN parameters for large fields
+///
+/// For large fields it is usually desriable to use smaller LPN parameters.
+/// This makes the computing svole extensions faster (even though it draws fewer at a time)
+/// and also it reduces the memory usage by reducing the size of the vectors holding the VOLEs.
+pub(crate) fn mapping_lpn_size_large_field(lpn_size: LpnSize) -> (LpnParams, LpnParams) {
+    match lpn_size {
+        LpnSize::Small => (LPN_SETUP_EXTRASMALL, LPN_EXTEND_EXTRASMALL),
+        LpnSize::Medium => (LPN_SETUP_SMALL, LPN_EXTEND_SMALL),
+        LpnSize::Large => (LPN_SETUP_SMALL_MEDIUM, LPN_EXTEND_SMALL_MEDIUM),
+    }
+}

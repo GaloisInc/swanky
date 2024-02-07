@@ -1,7 +1,7 @@
 mod cli;
 
 use clap::Parser;
-use cli::{Cli, LpnSize};
+use cli::Cli;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::sieveir_reader_fbs::{read_types, InputFlatbuffers};
@@ -204,10 +204,10 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
                 rng,
                 inputs,
                 type_store,
-                config.lpn() == LpnSize::Small,
+                config.lpn(),
                 config.no_batching(),
             )?;
-            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn())?;
             info!("init time: {:?}", start.elapsed());
 
             let start = Instant::now();
@@ -238,10 +238,10 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
                 rng,
                 inputs,
                 type_store,
-                config.lpn() == LpnSize::Small,
+                config.lpn(),
                 config.no_batching(),
             )?;
-            evaluator.load_backends(&mut channel, config.lpn() == LpnSize::Small)?;
+            evaluator.load_backends(&mut channel, config.lpn())?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
             if is_text {
@@ -292,14 +292,14 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
                     inputs,
                     type_store,
                     config.no_batching(),
-                    config.lpn() == LpnSize::Small,
+                    config.lpn(),
                 )?;
             handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                config.lpn() == LpnSize::Small,
+                config.lpn(),
                 config.threads_per_field(),
             )?;
             handles.extend(handles_fields);
@@ -342,14 +342,14 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
                     inputs,
                     type_store,
                     config.no_batching(),
-                    config.lpn() == LpnSize::Small,
+                    config.lpn(),
                 )?;
             handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
                 channels_svole,
-                config.lpn() == LpnSize::Small,
+                config.lpn(),
                 config.threads_per_field(),
             )?;
             handles.extend(handles_fields);

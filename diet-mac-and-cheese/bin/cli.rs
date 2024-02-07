@@ -3,33 +3,14 @@ Cli utilities.
 
 */
 use clap::Parser;
+use diet_mac_and_cheese::LpnSize;
 use serde::Deserialize;
-use std::{fmt::Display, path::PathBuf};
+use std::path::PathBuf;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:5527";
 const DEFAULT_NO_BATCHING: bool = false;
 const DEFAULT_THREADS: usize = 1;
 const DEFAULT_THREADS_PER_FIELD: usize = 1;
-
-/// Lpn params as small, medium or large.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum LpnSize {
-    Small,
-    #[default]
-    Medium,
-    Large,
-}
-
-impl Display for LpnSize {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LpnSize::Small => write!(f, "small"),
-            LpnSize::Medium => write!(f, "medium"),
-            LpnSize::Large => write!(f, "large"),
-        }
-    }
-}
 
 /// Internal Diet Mac'n'Cheese configurations.
 ///
