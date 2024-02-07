@@ -2,7 +2,7 @@
 
 use crate::svole_trait::{field_name, SvoleStopSignal, SvoleT};
 use eyre::{ensure, Result};
-use log::{debug, info, warn};
+use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng};
@@ -122,7 +122,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
     fn delta(&self, _ev: IsParty<P, Verifier>) -> T {
         // Need to wait for delta to be available
         while (*self.delta.lock().unwrap()).is_none() {
-            warn!(
+            debug!(
                 "Waiting for DELTA: {:?}",
                 std::any::type_name::<T>().split("::").last().unwrap()
             );
@@ -310,6 +310,7 @@ where
             };
 
             let svole_thread = std::thread::spawn(move || {
+                info!("spawning SVOLE thread for field {:?}", field_name::<T>());
                 let mut rng2 = AesRng::new();
                 let mut svole = ThreadSvole::<P, V, T>::init(
                     &mut channel_vole,
