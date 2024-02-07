@@ -9,12 +9,12 @@ use mac_n_cheese_sieve_parser::{
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
 
-/// This prepares for VOLE-in-the-head by evaluating a circuit and counting the number of elements
-/// in the extended witness.
+/// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
+/// circuit in the clear and determining the full extended witness.
 ///
-/// The total extended witness includes two measures:
-/// - The number of private inputs (this is the "non-extended" witness)
-/// - The number of non-linear (multiplication) gates (this is the "extended" part)
+/// The total extended witness includes two types of values:
+/// - Private inputs to the circuit (this is the "non-extended" witness)
+/// - Outputs of non-linear (multiplication) gates (this is the "extended" part)
 ///
 /// ## Failure modes
 /// This type is only designed to be used with a VOLE-in-the-head circuit. Its methods will fail
@@ -23,7 +23,7 @@ use swanky_field_binary::F2;
 /// - there is more than one type ID used for any gate
 /// - any private input to the circuit is not in $`F2`$
 #[derive(Debug, Default)]
-pub(crate) struct VoleCircuitPreparer<StreamReader>
+pub(crate) struct ProverPreparer<StreamReader>
 where
     StreamReader: ValueStreamReaderT,
 {
@@ -37,7 +37,7 @@ where
     private_inputs: StreamReader,
 }
 
-impl VoleCircuitPreparer<ValueStreamReader<File>> {
+impl ProverPreparer<ValueStreamReader<File>> {
     pub(crate) fn new_from_path(private_inputs_path: &Path) -> eyre::Result<Self> {
         let private_inputs =
             ValueStreamReader::open(ValueStreamKind::Private, private_inputs_path)?;
@@ -49,7 +49,7 @@ impl VoleCircuitPreparer<ValueStreamReader<File>> {
     }
 }
 
-impl<StreamReader: ValueStreamReaderT> VoleCircuitPreparer<StreamReader> {
+impl<StreamReader: ValueStreamReaderT> ProverPreparer<StreamReader> {
     #[cfg(test)]
     pub(crate) fn count(&self) -> usize {
         self.witness.len()
@@ -76,7 +76,7 @@ impl<StreamReader: ValueStreamReaderT> VoleCircuitPreparer<StreamReader> {
     }
 }
 
-impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for VoleCircuitPreparer<StreamReader> {
+impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<StreamReader> {
     fn new(&mut self, __ty: TypeId, _first: WireId, _last: WireId) -> eyre::Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `new` gates");
     }
@@ -146,7 +146,7 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for VoleCircuitPrepar
             let value = self
                 .private_inputs
                 .next()?
-                .ok_or(eyre!("Expected a private input but stream is empty"))?;
+                .ok_or_else(|| eyre!("Expected a private input but stream is empty"))?;
             let maybe_f2: Option<F2> = F2::try_from_int(value).into();
             let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
 
@@ -178,7 +178,7 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for VoleCircuitPrepar
     }
 }
 
-impl<StreamReader: ValueStreamReaderT> RelationVisitor for VoleCircuitPreparer<StreamReader> {
+impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<StreamReader> {
     type FBV<'a> = Self;
     fn define_function<BodyCb>(
         &mut self,
@@ -209,7 +209,7 @@ mod tests {
     use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
     use std::io::Cursor;
 
-    use crate::prove::witness_counter::VoleCircuitPreparer;
+    use crate::prove::prover_preparer::ProverPreparer;
 
     /// Stream reader that produces an arbitrary-length stream of random inputs in F_2.
     struct RandomStreamReader {
@@ -248,10 +248,10 @@ mod tests {
     }
 
     /// Take a string description of a circuit and parse it with the circuit preparer.
-    fn prepare_circuit(circuit: &str) -> eyre::Result<VoleCircuitPreparer<RandomStreamReader>> {
+    fn prepare_circuit(circuit: &str) -> eyre::Result<ProverPreparer<RandomStreamReader>> {
         let cursor = &mut Cursor::new(circuit.as_bytes());
         let reader = RelationReader::new(cursor)?;
-        let mut counter: VoleCircuitPreparer<RandomStreamReader> = VoleCircuitPreparer::default();
+        let mut counter: ProverPreparer<RandomStreamReader> = ProverPreparer::default();
         reader.read(&mut counter)?;
         Ok(counter)
     }

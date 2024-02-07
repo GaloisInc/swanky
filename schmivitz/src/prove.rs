@@ -14,12 +14,12 @@ use swanky_serialization::CanonicalSerialize;
 use crate::{
     helpers::combine,
     parameters::FIELD_SIZE,
-    prove::{circuit_traverser::CircuitTraverser, witness_counter::VoleCircuitPreparer},
+    prove::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
     vole::RandomVole,
 };
 
-pub(crate) mod circuit_traverser;
-pub(crate) mod witness_counter;
+pub(crate) mod prover_preparer;
+pub(crate) mod prover_traverser;
 
 /// Zero-knowledge proof of knowledge of a circuit.
 ///
@@ -56,8 +56,8 @@ impl<Vole: RandomVole> Proof<Vole> {
         let reader = RelationReader::new(circuit.clone())?;
         Self::validate_circuit_header(&reader)?;
 
-        // Check the circuit for the number of extended-witness-contributing gates
-        let mut prepared_circuit = VoleCircuitPreparer::new_from_path(private_input)?;
+        // Evaluate the circuit in the clear to get the full witness and all wire values
+        let mut prepared_circuit = ProverPreparer::new_from_path(private_input)?;
         reader.read(&mut prepared_circuit)?;
         let (witness, wire_values) = prepared_circuit.into_parts();
         let witness_len = witness.len();
@@ -89,7 +89,7 @@ impl<Vole: RandomVole> Proof<Vole> {
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
-        let mut circuit_traverser = CircuitTraverser::new(wire_values, witness_challenges, voles)?;
+        let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
         RelationReader::new(circuit)?.read(&mut circuit_traverser)?;
         let (degree_0_aggregation, degree_1_aggregation, voles, witness_challenges) =
             circuit_traverser.into_parts();
