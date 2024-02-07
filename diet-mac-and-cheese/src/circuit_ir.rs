@@ -659,21 +659,26 @@ impl FunStore {
     }
 }
 
-/// Trait for Tape.
+/// Types that act like a stream of values.
 ///
-/// Tapes are used for instances/public-inputs or witnesses/private-inputs.
+/// Tapes are used store instances/public-inputs or witnesses/private-inputs.
 /// The interface of the trait allows to either ingest values into the tape, or pop values from the tape.
+/// This interface allows for some implementation to only store a small number of the stream's values in memory at once.
 pub trait TapeT {
     /// Ingest a tape value.
-    fn ingest(&mut self, n: Number);
+    fn ingest(&mut self, _n: Number) {
+        unimplemented!("The function ingest() is not required.")
+    }
 
     /// Ingest several tape values.
-    fn ingest_many(&mut self, ns: VecDeque<Number>);
+    fn ingest_many(&mut self, _ns: VecDeque<Number>) {
+        unimplemented!("The function ingest_many() is not required.")
+    }
 
-    /// Pop a tape value.
+    /// Pop a value from the tape.
     fn pop(&mut self) -> Option<Number>;
 
-    /// Pop many tape values into a vector.
+    /// Pop many values from the tape into a vector.
     fn pop_many(&mut self, num: u64) -> Option<Vec<Number>>;
 }
 

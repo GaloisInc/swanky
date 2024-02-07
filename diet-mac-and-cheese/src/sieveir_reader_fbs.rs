@@ -235,14 +235,6 @@ impl InputFlatbuffers {
 }
 
 impl TapeT for InputFlatbuffers {
-    fn ingest(&mut self, _n: Number) {
-        unimplemented!("InputFlatbuffers does not ingest")
-    }
-
-    fn ingest_many(&mut self, _ns: VecDeque<Number>) {
-        unimplemented!("InputFlatbuffers does not ingest_many")
-    }
-
     fn pop(&mut self) -> Option<Number> {
         match self.next_one() {
             Ok(r) => r,

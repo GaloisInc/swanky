@@ -60,8 +60,6 @@ impl InputText {
 
     /// Load more instances or witnesses in the internal queue
     fn load_more_in_queue(&mut self) -> Result<Option<()>> {
-        // the queue is empty let's read some more
-
         for i in 0..(1 << 16) {
             if let Some(v) = self.reader.next()? {
                 self.queue.push_back(v);
@@ -76,14 +74,6 @@ impl InputText {
 }
 
 impl TapeT for InputText {
-    fn ingest(&mut self, _n: Number) {
-        unimplemented!("InputText does not ingest")
-    }
-
-    fn ingest_many(&mut self, _ns: VecDeque<Number>) {
-        unimplemented!("InputText does not ingest_many")
-    }
-
     fn pop(&mut self) -> Option<Number> {
         match self.next_one() {
             Ok(r) => r,
