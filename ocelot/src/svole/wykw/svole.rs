@@ -66,6 +66,19 @@ pub const LPN_EXTEND_SMALL: LpnParams = LpnParams {
     rows: 5_060,
 };
 
+/// Small-Medium LPN parameters for setup phase.
+pub const LPN_SETUP_SMALL_MEDIUM: LpnParams = LpnParams {
+    weight: 2_600,
+    cols: 41_600, // cols / weight = 16
+    rows: 5_060,
+};
+/// Small-Medium LPN parameters for extend phase.
+pub const LPN_EXTEND_SMALL_MEDIUM: LpnParams = LpnParams {
+    weight: 2_508,
+    cols: 642_048, // cols / weight = 256
+    rows: 19_870,
+};
+
 /// Medium LPN parameters for setup phase.
 pub const LPN_SETUP_MEDIUM: LpnParams = LpnParams {
     weight: 2_600,
