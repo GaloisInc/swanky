@@ -8,6 +8,7 @@ use std::iter::{repeat_with, zip};
 
 use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 use eyre::{bail, Result};
+use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
@@ -37,13 +38,7 @@ pub(crate) struct InsecureVole {
 impl RandomVole for InsecureVole {
     type Decommitment = InsecureCommitments;
 
-    fn create(
-        extended_witness_length: usize,
-        transcript: &mut merlin::Transcript,
-        rng: &mut (impl CryptoRng + RngCore),
-    ) -> Self {
-        // In a secure version of VOLE, we would populate the transcript with more useful
-        // or relevant context about the VOLE instantiation.
+    fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize) {
         transcript.append_message(
             b"VOLE type",
             format!(
@@ -52,6 +47,16 @@ impl RandomVole for InsecureVole {
             )
             .as_bytes(),
         );
+    }
+
+    fn create(
+        extended_witness_length: usize,
+        transcript: &mut merlin::Transcript,
+        rng: &mut (impl CryptoRng + RngCore),
+    ) -> Self {
+        // In a secure version of VOLE, we would populate the transcript with more useful
+        // or relevant context about the VOLE instantiation.
+        Self::update_transcript(transcript, extended_witness_length);
 
         let total_vole_count = extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
 

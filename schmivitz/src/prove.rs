@@ -122,6 +122,37 @@ impl<Vole: RandomVole> Proof<Vole> {
         })
     }
 
+    fn extended_witness_length(&self) -> usize {
+        self.witness_commitment.len()
+    }
+
+    /// Verify the proof.
+    pub fn verify(&self, transcript: &mut Transcript) -> Result<()> {
+        // TODO #251: Add public values to transcript here!!!
+        transcript.append_message(b"commit to public values", b"todo: commit properly");
+        Vole::update_transcript(transcript, self.extended_witness_length());
+
+        // TODO #251: Squeeze first VOLE challenge and check it against the value in the proof
+
+        // TODO #251: Add witness commitment to transcript here!!!
+        let _witness_commitment = self.witness_commitment.as_slice();
+        transcript.append_message(b"commit to witness", b"todo: commit the actual value");
+
+        // Generate challenges
+        let expected_witness_challenges = repeat_with(|| {
+            let mut bytes = [0u8; 16];
+            transcript.challenge_bytes(b"challenge part 2", &mut bytes);
+            F128b::from_uniform_bytes(&bytes)
+        })
+        .take(self.witness_challenges.len())
+        .collect::<Vec<_>>();
+
+        if expected_witness_challenges != self.witness_challenges {
+            bail!("Verification failed: Witness challenges did not match expected values");
+        }
+        Ok(())
+    }
+
     /// Validate that the circuit can be processed by the system, according to the header info.
     ///
     /// Note that the system can still fail to form proofs over circuits that pass this check, like
@@ -257,12 +288,15 @@ mod tests {
 
         let rng = &mut thread_rng();
 
-        let _proof = Proof::<InsecureVole>::prove::<_, _>(
+        let proof = Proof::<InsecureVole>::prove::<_, _>(
             mini_circuit,
             &private_input_path,
             transcript,
             rng,
         )?;
+
+        let verification_transcript = &mut Transcript::new(b"basic happy test transcript");
+        assert!(proof.verify(verification_transcript).is_ok());
 
         Ok(())
     }
