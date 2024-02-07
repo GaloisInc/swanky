@@ -216,7 +216,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             info!("time circ exec: {:?}", start.elapsed());
             info!("VERIFIER DONE!");
@@ -249,7 +249,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             info!("time circ exec: {:?}", start.elapsed());
             info!("PROVER DONE!");
@@ -311,7 +311,7 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             evaluator.terminate()?;
             for handle in handles {
@@ -361,7 +361,7 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             evaluator.terminate()?;
             for handle in handles {
