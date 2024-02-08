@@ -47,11 +47,8 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let type_id = 0;
     inputs.ingest_instances(type_id, instances);
     info!(
-        "Loaded type_id:{:?} field:{:?} file:{:?} num public instances:{:?}",
-        type_id,
-        field,
-        instance,
-        inputs.num_instances(type_id)
+        "Loaded type_id:{:?} field:{:?} file:{:?}",
+        type_id, field, instance,
     );
 
     let rel = RelationReader::open(relation.as_path())?;

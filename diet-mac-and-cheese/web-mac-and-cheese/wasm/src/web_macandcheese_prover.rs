@@ -39,12 +39,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     let field = stream_inp.modulus();
     let type_id = 0;
     inputs.ingest_instances(type_id, instances);
-    info!(
-        "Loaded type_id:{:?} field:{:?} num public instances:{:?}",
-        type_id,
-        field,
-        inputs.num_instances(type_id)
-    );
+    info!("Loaded type_id:{:?} field:{:?}", type_id, field,);
 
     alert("*** INSTANCE LOADING: done!");
 
@@ -58,12 +53,7 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     let field = stream_inp.modulus();
     let type_id = 0;
     inputs.ingest_witnesses(type_id, witnesses);
-    info!(
-        "Loaded type_id:{:?} field:{:?} num private instances:{:?}",
-        type_id,
-        field,
-        inputs.num_witnesses(type_id)
-    );
+    info!("Loaded type_id:{:?} field:{:?}", type_id, field,);
     alert("*** WITNESS LOADING: done!");
 
     // Loading the relation

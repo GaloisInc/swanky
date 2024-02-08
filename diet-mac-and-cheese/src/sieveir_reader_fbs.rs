@@ -1,19 +1,22 @@
 /*!
-SIEVE IR0+ flatbuffer reader.
+SIEVE IR reader in flatbuffers format.
 */
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::{self as g};
-use crate::{circuit_ir::TypeId, sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs};
 use crate::{
     circuit_ir::{FunStore, FuncDecl, GateM, TypeSpecification, TypeStore},
     plugins::PluginType,
 };
 use crate::{
+    circuit_ir::{TapeT, TypeId},
+    sieveir_phase2::sieve_ir_generated::sieve_ir::GateSet as gs,
+};
+use crate::{
     fields::modulus_to_type_id, sieveir_phase2::sieve_ir_generated::sieve_ir::DirectiveSet as ds,
 };
-use eyre::{eyre, Result};
+use eyre::{ensure, eyre, Result};
 use flatbuffers::{read_scalar_at, UOffsetT, SIZE_UOFFSET};
 use log::info;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg, ValueStreamKind};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -39,11 +42,11 @@ fn read_size_prefix(buf: &[u8]) -> usize {
     SIZE_UOFFSET + size
 }
 
-// Read from a stream a size prefix and stores the content in a vector provided as an argument.
-// it returns an `Option<()>` with `Some(())` indicating there is more to read
-// and `None` it has reached the end.
-//
-// This function is adapted from `read_buffer` from zkinterface.
+/// Read from a stream a size prefix and stores the content in a vector provided as an argument.
+///
+/// It returns an `Option<()>` with `Some(())` indicating that it succeeded to read more
+/// and `None` if there was nothing more to read.
+/// This function is adapted from `read_buffer` from zkinterface.
 fn read_size_prefix_in_vec(stream: &mut impl Read, buffer: &mut Vec<u8>) -> Result<Option<()>> {
     buffer.clear();
     buffer.extend_from_slice(&[0u8; 4]);
@@ -147,6 +150,105 @@ pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Number>)
     }
 
     bigint_from_bytes(type_field.bytes())
+}
+
+pub struct InputFlatbuffers {
+    buffer_file: BufReader<File>,
+    buffer_mem: Vec<u8>,
+    queue: VecDeque<Number>,
+    field: Option<Number>,
+    ty: ValueStreamKind,
+}
+
+impl InputFlatbuffers {
+    pub fn new_private_inputs(path: &PathBuf) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let buffer_file = BufReader::new(file);
+        let buffer_mem = vec![];
+
+        let mut private_inputs = Self {
+            buffer_file,
+            buffer_mem,
+            queue: Default::default(),
+            field: Default::default(),
+            ty: ValueStreamKind::Private,
+        };
+        private_inputs.load_more_in_queue()?;
+        Ok(private_inputs)
+    }
+
+    pub fn new_public_inputs(path: &PathBuf) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let buffer_file = BufReader::new(file);
+        let buffer_mem = vec![];
+        let mut public_inputs = Self {
+            buffer_file,
+            buffer_mem,
+            queue: Default::default(),
+            field: Default::default(),
+            ty: ValueStreamKind::Public,
+        };
+        public_inputs.load_more_in_queue()?;
+        Ok(public_inputs)
+    }
+
+    fn next_one(&mut self) -> Result<Option<Number>> {
+        if let Some(n) = self.queue.pop_front() {
+            return Ok(Some(n));
+        }
+
+        // the queue is empty let's load some more
+        self.load_more_in_queue()?;
+
+        if let Some(n) = self.queue.pop_front() {
+            Ok(Some(n))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Load more instances or witnesses in the internal queue.
+    fn load_more_in_queue(&mut self) -> Result<Option<()>> {
+        let msg = read_size_prefix_in_vec(&mut self.buffer_file, &mut self.buffer_mem)?;
+        match msg {
+            None => Ok(None),
+            Some(_) => {
+                let field_read = match self.ty {
+                    ValueStreamKind::Private => {
+                        read_private_inputs_bytes(&self.buffer_mem, &mut self.queue)
+                    }
+                    ValueStreamKind::Public => {
+                        read_public_inputs_bytes(&self.buffer_mem, &mut self.queue)
+                    }
+                };
+                ensure!(
+                    self.field.is_none() || self.field.unwrap() == field_read,
+                    "inconsistent field in tape, previous:{} current:{}",
+                    self.field.unwrap(),
+                    field_read,
+                );
+                self.field = Some(field_read);
+                Ok(Some(()))
+            }
+        }
+    }
+}
+
+impl TapeT for InputFlatbuffers {
+    fn pop(&mut self) -> Option<Number> {
+        match self.next_one() {
+            Ok(r) => r,
+            Err(_) => None,
+        }
+    }
+
+    fn pop_many(&mut self, num: u64) -> Option<Vec<Number>> {
+        let mut numbers = Vec::with_capacity(num as usize);
+        for _ in 0..num {
+            numbers.push(self.pop()?);
+        }
+        Some(numbers)
+    }
 }
 
 /// Read witnesses from path and return the associated field.

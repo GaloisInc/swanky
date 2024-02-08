@@ -4,20 +4,16 @@ use clap::Parser;
 use cli::{Cli, LpnSize};
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
-use diet_mac_and_cheese::read_sieveir_phase2::{
-    read_private_inputs, read_public_inputs, read_types,
-};
+use diet_mac_and_cheese::sieveir_reader_fbs::{read_types, InputFlatbuffers};
+use diet_mac_and_cheese::sieveir_reader_text::InputText;
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;
 use diet_mac_and_cheese::svole_trait::Svole;
 use eyre::{bail, Result, WrapErr};
 use log::info;
-use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
+use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::RelationReader as RR;
-use mac_n_cheese_sieve_parser::ValueStreamKind;
-use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
 use scuttlebutt::field::{F40b, F2};
 use scuttlebutt::{AesRng, Channel, SyncChannel};
-use std::collections::VecDeque;
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
@@ -128,20 +124,9 @@ fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
 
     let instance_paths = path_to_files(instance_path)?;
     for (i, instance_path) in instance_paths.iter().enumerate() {
-        let mut instances = VecDeque::new();
-        let mut stream_inp =
-            ValueStreamReader::open(ValueStreamKind::Public, instance_path.as_path())?;
-
-        while let Some(v) = stream_inp.next()? {
-            instances.push_back(v);
-        }
-        let field = stream_inp.modulus();
-        let ninstances = instances.len();
-        inputs.ingest_instances(i, instances);
-        info!(
-            "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
-            i, field, instance_path, ninstances
-        );
+        let instances_stream = InputText::new_public_inputs(instance_path)?;
+        inputs.set_instances(i, Box::new(instances_stream));
+        info!("Loaded idx:{:?} file:{:?}", i, instance_path,);
     }
 
     if let Some(witness) = &args.witness {
@@ -149,20 +134,9 @@ fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
         info!("witness: {:?}", witness);
         let witness_paths = path_to_files(witness.to_path_buf())?;
         for (i, witness_path) in witness_paths.iter().enumerate() {
-            let mut witnesses = VecDeque::new();
-            let mut stream_wit =
-                ValueStreamReader::open(ValueStreamKind::Private, witness_path.as_path())?;
-
-            while let Some(v) = stream_wit.next()? {
-                witnesses.push_back(v);
-            }
-            let field = stream_wit.modulus();
-            let nwitnesses = witnesses.len();
-            inputs.ingest_witnesses(i, witnesses);
-            info!(
-                "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
-                i, field, witness_path, nwitnesses
-            );
+            let witnesses_stream = InputText::new_private_inputs(witness_path)?;
+            inputs.set_witnesses(i, Box::new(witnesses_stream));
+            info!("Loaded idx:{:?} file:{:?}", i, witness_path,);
         }
     }
 
@@ -181,14 +155,9 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
 
     let instance_paths = path_to_files(instance_path)?;
     for (i, instance_path) in instance_paths.iter().enumerate() {
-        let mut instances = VecDeque::new();
-        let field = read_public_inputs(instance_path, &mut instances);
-        let ninstances = instances.len();
-        inputs.ingest_instances(i, instances);
-        info!(
-            "Loaded idx:{:?} field:{:?} file:{:?} num public instances:{:?}",
-            i, field, instance_path, ninstances
-        );
+        let instances = InputFlatbuffers::new_public_inputs(instance_path)?;
+        inputs.set_instances(i, Box::new(instances));
+        info!("Loaded idx:{:?} file:{:?}", i, instance_path,);
     }
 
     if let Some(witness) = &args.witness {
@@ -196,14 +165,9 @@ fn build_inputs_flatbuffers(args: &Cli) -> Result<(CircInputs, TypeStore)> {
         info!("witness: {:?}", witness);
         let witness_paths = path_to_files(witness.to_path_buf())?;
         for (i, witness_path) in witness_paths.iter().enumerate() {
-            let mut witnesses = VecDeque::new();
-            let field = read_private_inputs(witness_path, &mut witnesses);
-            let nwitnesses = witnesses.len();
-            inputs.ingest_witnesses(i, witnesses);
-            info!(
-                "Loaded idx:{:?} field:{:?} file:{:?} num private witnesses:{:?}",
-                i, field, witness_path, nwitnesses,
-            );
+            let witnesses = InputFlatbuffers::new_private_inputs(witness_path)?;
+            inputs.set_witnesses(i, Box::new(witnesses));
+            info!("Loaded idx:{:?} file:{:?}", i, witness_path,);
         }
     }
 
@@ -252,7 +216,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             info!("time circ exec: {:?}", start.elapsed());
             info!("VERIFIER DONE!");
@@ -285,7 +249,7 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             info!("time circ exec: {:?}", start.elapsed());
             info!("PROVER DONE!");
@@ -347,7 +311,7 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             evaluator.terminate()?;
             for handle in handles {
@@ -397,7 +361,7 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
                 let relation_reader = BufReader::new(relation_file);
                 evaluator.evaluate_relation_text(relation_reader)?;
             } else {
-                evaluator.evaluate_relation(&relation_path).unwrap();
+                evaluator.evaluate_relation(&relation_path)?;
             }
             evaluator.terminate()?;
             for handle in handles {
