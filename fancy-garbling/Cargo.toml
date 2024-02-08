@@ -26,6 +26,7 @@ scuttlebutt.workspace = true
 ocelot.workspace = true
 vectoreyes.workspace = true
 itertools.workspace = true
+clap.workspace = true
 rand.workspace = true
 regex.workspace = true
 subtle.workspace = true

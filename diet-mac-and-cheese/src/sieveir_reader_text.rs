@@ -1,12 +1,94 @@
-//! SIEVE IR0+ text reader.
+//! SIEVE IR reader in text format.
 
+use crate::circuit_ir::TapeT;
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
 use eyre::{bail, Result};
 use log::info;
+use mac_n_cheese_sieve_parser::text_parser::ValueStreamReader;
+use mac_n_cheese_sieve_parser::ValueStreamKind;
+use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
+use std::collections::VecDeque;
+use std::fs::File;
+use std::path::Path;
+
+pub struct InputText {
+    reader: ValueStreamReader<File>,
+    queue: VecDeque<Number>,
+}
+
+impl InputText {
+    pub fn new_private_inputs(path: &Path) -> Result<Self> {
+        let reader = ValueStreamReader::open(ValueStreamKind::Private, path)?;
+
+        let mut private_inputs = Self {
+            reader,
+            queue: Default::default(),
+        };
+        private_inputs.load_more_in_queue()?;
+        Ok(private_inputs)
+    }
+
+    pub fn new_public_inputs(path: &Path) -> Result<Self> {
+        let reader = ValueStreamReader::open(ValueStreamKind::Public, path)?;
+
+        let mut private_inputs = Self {
+            reader,
+            queue: Default::default(),
+        };
+        private_inputs.load_more_in_queue()?;
+        Ok(private_inputs)
+    }
+
+    fn next_one(&mut self) -> Result<Option<Number>> {
+        if let Some(n) = self.queue.pop_front() {
+            return Ok(Some(n));
+        }
+
+        // the queue is empty let's load some more
+        self.load_more_in_queue()?;
+
+        if let Some(n) = self.queue.pop_front() {
+            Ok(Some(n))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Load more instances or witnesses in the internal queue
+    fn load_more_in_queue(&mut self) -> Result<Option<()>> {
+        for i in 0..(1 << 16) {
+            if let Some(v) = self.reader.next()? {
+                self.queue.push_back(v);
+            } else if i > 0 {
+                return Ok(Some(()));
+            } else {
+                return Ok(None);
+            }
+        }
+        Ok(Some(()))
+    }
+}
+
+impl TapeT for InputText {
+    fn pop(&mut self) -> Option<Number> {
+        match self.next_one() {
+            Ok(r) => r,
+            Err(_) => None,
+        }
+    }
+
+    fn pop_many(&mut self, num: u64) -> Option<Vec<Number>> {
+        let mut numbers = Vec::with_capacity(num as usize);
+        for _ in 0..num {
+            numbers.push(self.pop()?);
+        }
+        Some(numbers)
+    }
+}
 
 #[derive(Default)]
 pub(crate) struct TextRelation {
@@ -182,14 +264,23 @@ impl RelationVisitor for TextRelation {
             input_counts.push((input.ty, input.count));
         }
 
+        let mut public_count = vec![];
+        for p in body.public_counts.iter() {
+            public_count.push((p.ty, p.count));
+        }
+        let mut private_count = vec![];
+        for p in body.private_counts.iter() {
+            private_count.push((p.ty, p.count));
+        }
+
         let fun_body = FuncDecl::new_plugin(
             output_counts,
             input_counts,
             body.plugin_type.name,
             body.plugin_type.operation,
             body.plugin_type.args,
-            vec![], // TODO: Add them !
-            vec![], // TODO: Add them!
+            public_count,
+            private_count,
             &self.type_store,
             &self.fun_store,
         )?;
