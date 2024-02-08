@@ -213,11 +213,14 @@ fn main() {
     let mut channel = Channel::new(reader, writer);
 
     let result = ev_gcd(&mut rng_ev.clone(), &mut channel, ev_value, upper_bound);
-
+    let resut_in_clear = gcd_in_clear(gb_value, ev_value, upper_bound);
     println!(
-        "GCD({}, {}) = {}",
-        gb_value,
-        ev_value,
-        gcd_in_clear(gb_value, ev_value, upper_bound)
+        "Garbled Circuit result is : GCD({}, {}) = {}",
+        gb_value, ev_value, result
+    );
+    assert!(
+        result == resut_in_clear,
+        "The result is incorrect and should be {} \n (Note: If this is not the value that you are expecting,\n consider changing the upper bound)",
+        resut_in_clear
     );
 }
