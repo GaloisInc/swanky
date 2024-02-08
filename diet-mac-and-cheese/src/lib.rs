@@ -53,8 +53,6 @@ use std::fmt::Display;
 /// This parameter is available to the user to indicate, at a high-level, the size of the LPN parameters
 /// without specifiying exactly their values.
 /// It has three possible values small, medium and large.
-/// The size is mapped to actual LPN parameters using [`mapping_lpn_size`] or
-/// [`mapping_lpn_size_large_field`].
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LpnSize {
@@ -74,7 +72,7 @@ impl Display for LpnSize {
     }
 }
 
-/// Mapping [`LpnSize`] to LPN parameters
+/// Mapping [`LpnSize`] to LPN parameters.
 pub(crate) fn mapping_lpn_size(lpn_size: LpnSize) -> (LpnParams, LpnParams) {
     match lpn_size {
         LpnSize::Small => (LPN_SETUP_SMALL, LPN_EXTEND_SMALL),
@@ -86,7 +84,7 @@ pub(crate) fn mapping_lpn_size(lpn_size: LpnSize) -> (LpnParams, LpnParams) {
 /// Mapping [`LpnSize`] to LPN parameters for large fields
 ///
 /// For large fields it is usually desriable to use smaller LPN parameters.
-/// This makes the computing svole extensions faster (even though it draws fewer at a time)
+/// This makes computing svole extensions faster (even though it draws fewer at a time)
 /// and also it reduces the memory usage by reducing the size of the vectors holding the VOLEs.
 pub(crate) fn mapping_lpn_size_large_field(lpn_size: LpnSize) -> (LpnParams, LpnParams) {
     match lpn_size {
