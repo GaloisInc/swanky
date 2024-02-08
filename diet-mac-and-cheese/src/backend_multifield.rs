@@ -25,14 +25,13 @@ use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
 };
+use crate::{mapping_lpn_size, mapping_lpn_size_large_field, LpnSize};
 use eyre::{bail, ensure, OptionExt, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use ocelot::svole::LpnParams;
-use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
-use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
 use scuttlebutt::AbstractChannel;
 use scuttlebutt::AesRng;
 use std::collections::hash_map::Entry;
@@ -1340,18 +1339,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         mut rng: AesRng,
         inputs: CircInputs,
         type_store: TypeStore,
-        lpn_small: bool,
+        lpn_size: LpnSize,
         no_batching: bool,
     ) -> Result<Self> {
-        let lpn_setup;
-        let lpn_extend;
-        if lpn_small {
-            lpn_setup = LPN_SETUP_SMALL;
-            lpn_extend = LPN_EXTEND_SMALL;
-        } else {
-            lpn_setup = LPN_SETUP_MEDIUM;
-            lpn_extend = LPN_EXTEND_MEDIUM;
-        }
+        let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
         let fcom_f2 = FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?;
 
         Ok(EvaluatorCirc {
@@ -1386,16 +1377,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         inputs: CircInputs,
         type_store: TypeStore,
         no_batching: bool,
-        lpn_small: bool,
+        lpn_size: LpnSize,
     ) -> Result<(
         EvaluatorCirc<P, C, SvoleAtomicRoundRobin<P, F2, F40b>>,
         Vec<std::thread::JoinHandle<Result<()>>>,
     )> {
-        let (lpn_setup, lpn_extend) = if lpn_small {
-            (LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-        } else {
-            (LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM)
-        };
+        let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
         let (svole_round_robin, svoles_atomics, threads) =
             SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads(
                 channels_vole,
@@ -1423,13 +1410,13 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         ))
     }
 
-    pub fn load_backends(&mut self, channel: &mut C, lpn_small: bool) -> Result<()> {
+    pub fn load_backends(&mut self, channel: &mut C, lpn_size: LpnSize) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
             let rng = self.rng.fork();
             match spec {
                 TypeSpecification::Field(field) => {
-                    self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
+                    self.load_backend(channel, rng, *field, *idx as usize, lpn_size)?;
                 }
                 TypeSpecification::Plugin(PluginType {
                     name,
@@ -1520,19 +1507,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         channel: &mut C,
         rng: AesRng,
         idx: usize,
-        lpn_small: bool,
-        setup_small: LpnParams,
-        extend_small: LpnParams,
-        setup_normal: LpnParams,
-        extend_normal: LpnParams,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<()> {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
-        let (lpn_setup, lpn_extend) = if lpn_small {
-            (setup_small, extend_small)
-        } else {
-            (setup_normal, extend_normal)
-        };
         let dmc = DietMacAndCheeseConv::<P, FE, _, _, Svole<_, FE, FE>>::init(
             channel,
             rng,
@@ -1552,22 +1531,14 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         rng: AesRng,
         field: std::any::TypeId,
         idx: usize,
-        lpn_small: bool,
+        lpn_size: LpnSize,
     ) -> Result<()> {
         // Loading the backends in order
         let back: Box<dyn EvaluatorT<P>>;
         if field == std::any::TypeId::of::<F2>() {
             info!("loading field F2");
             assert_eq!(idx, self.eval.len());
-            let lpn_setup;
-            let lpn_extend;
-            if lpn_small {
-                lpn_setup = LPN_SETUP_SMALL;
-                lpn_extend = LPN_EXTEND_SMALL;
-            } else {
-                lpn_setup = LPN_SETUP_MEDIUM;
-                lpn_extend = LPN_EXTEND_MEDIUM;
-            }
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
 
             // Note for F2 we do not use the backend with Conv but the one that can lift values to its extension field
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
@@ -1583,81 +1554,33 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             Ok(())
         } else if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F61p");
-            self.load_backend_fe::<F61p>(
-                channel,
-                rng,
-                idx,
-                lpn_small,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                LPN_SETUP_MEDIUM,
-                LPN_EXTEND_MEDIUM,
-            )?;
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
+            self.load_backend_fe::<F61p>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
-            self.load_backend_fe::<F128p>(
-                channel,
-                rng,
-                idx,
-                lpn_small,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                LPN_SETUP_MEDIUM,
-                LPN_EXTEND_MEDIUM,
-            )?;
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
+            self.load_backend_fe::<F128p>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else if field == std::any::TypeId::of::<Secp256k1>() {
             info!("loading field Secp256k1");
-            self.load_backend_fe::<Secp256k1>(
-                channel,
-                rng,
-                idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )?;
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
+            self.load_backend_fe::<Secp256k1>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else if field == std::any::TypeId::of::<Secp256k1order>() {
             info!("loading field Secp256k1order");
-            self.load_backend_fe::<Secp256k1order>(
-                channel,
-                rng,
-                idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )?;
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
+            self.load_backend_fe::<Secp256k1order>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else if field == std::any::TypeId::of::<F384p>() {
             info!("loading field F384p");
-            self.load_backend_fe::<F384p>(
-                channel,
-                rng,
-                idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )?;
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
+            self.load_backend_fe::<F384p>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else if field == std::any::TypeId::of::<F384q>() {
             info!("loading field F384q");
-            self.load_backend_fe::<F384q>(
-                channel,
-                rng,
-                idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )?;
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
+            self.load_backend_fe::<F384q>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
         } else {
             bail!("Unknown or unsupported field {:?}", field);
@@ -1738,18 +1661,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         channel: &mut C,
         rng: AesRng,
         _idx: usize,
-        lpn_small: bool,
+        lpn_size: LpnSize,
     ) -> Result<()> {
         info!("loading field F2");
-        let lpn_setup;
-        let lpn_extend;
-        if lpn_small {
-            lpn_setup = LPN_SETUP_SMALL;
-            lpn_extend = LPN_EXTEND_SMALL;
-        } else {
-            lpn_setup = LPN_SETUP_MEDIUM;
-            lpn_extend = LPN_EXTEND_MEDIUM;
-        }
+        let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
 
         let back: Box<dyn EvaluatorT<P>> = {
             let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b,F40b>>::init_with_fcom(
@@ -1777,19 +1692,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         channels_vole: Vec<C2>,
         rng: AesRng,
         idx: usize,
-        lpn_small: bool,
-        setup_small: LpnParams,
-        extend_small: LpnParams,
-        setup_normal: LpnParams,
-        extend_normal: LpnParams,
+        lpn_setup: LpnParams,
+        lpn_extend: LpnParams,
     ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
-        let (lpn_setup, lpn_extend) = if lpn_small {
-            (setup_small, extend_small)
-        } else {
-            (setup_normal, extend_normal)
-        };
         let (svole_round_robin, svoles_atomics, threads) =
             SvoleAtomicRoundRobin::<P, FE, FE>::create_and_spawn_svole_threads(
                 channels_vole,
@@ -1824,85 +1731,73 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         rng: AesRng,
         field: std::any::TypeId,
         idx: usize,
-        lpn_small: bool,
+        lpn_size: LpnSize,
     ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F161p");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
             self.load_backend_multithreaded_fe::<F61p, C2>(
                 channel,
                 channels_vole,
                 rng,
                 idx,
-                lpn_small,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                LPN_SETUP_MEDIUM,
-                LPN_EXTEND_MEDIUM,
+                lpn_setup,
+                lpn_extend,
             )
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
             self.load_backend_multithreaded_fe::<F128p, C2>(
                 channel,
                 channels_vole,
                 rng,
                 idx,
-                lpn_small,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                LPN_SETUP_MEDIUM,
-                LPN_EXTEND_MEDIUM,
+                lpn_setup,
+                lpn_extend,
             )
         } else if field == std::any::TypeId::of::<Secp256k1>() {
             info!("loading field Secp256k1");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
             self.load_backend_multithreaded_fe::<Secp256k1, C2>(
                 channel,
                 channels_vole,
                 rng,
                 idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+                lpn_setup,
+                lpn_extend,
             )
         } else if field == std::any::TypeId::of::<Secp256k1order>() {
             info!("loading field Secp256k1order");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
             self.load_backend_multithreaded_fe::<Secp256k1order, C2>(
                 channel,
                 channels_vole,
                 rng,
                 idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+                lpn_setup,
+                lpn_extend,
             )
         } else if field == std::any::TypeId::of::<F384p>() {
             info!("loading field F384p");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
             self.load_backend_multithreaded_fe::<F384p, C2>(
                 channel,
                 channels_vole,
                 rng,
                 idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+                lpn_setup,
+                lpn_extend,
             )
         } else if field == std::any::TypeId::of::<F384q>() {
             info!("loading field F384q");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
             self.load_backend_multithreaded_fe::<F384q, C2>(
                 channel,
                 channels_vole,
                 rng,
                 idx,
-                lpn_small,
-                LPN_SETUP_EXTRASMALL,
-                LPN_EXTEND_EXTRASMALL,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+                lpn_setup,
+                lpn_extend,
             )
         } else {
             bail!("Unknown or unsupported field {:?}", field);
@@ -1914,7 +1809,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         &mut self,
         channel: &mut C,
         mut channels_vole: Vec<C2>,
-        lpn_small: bool,
+        lpn_size: LpnSize,
         threads_per_field: usize,
     ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
         let type_store = self.type_store.clone();
@@ -1924,7 +1819,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             match spec {
                 TypeSpecification::Field(field) => {
                     if *field == std::any::TypeId::of::<F2>() {
-                        self.load_backend_multithreaded_f2(channel, rng, *idx as usize, lpn_small)?;
+                        self.load_backend_multithreaded_f2(channel, rng, *idx as usize, lpn_size)?;
                     } else {
                         if channels_vole.len() < threads_per_field {
                             bail!(
@@ -1942,7 +1837,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                             rng,
                             *field,
                             *idx as usize,
-                            lpn_small,
+                            lpn_size,
                         )?;
                         handles.extend(more_handles);
                     }
@@ -2327,6 +2222,7 @@ impl<P: Party, C: AbstractChannel + Clone, SvoleF2: SvoleT<P, F2, F40b>> Drop
 pub(crate) mod tests {
     use super::TypeStore;
     use crate::svole_trait::Svole;
+    use crate::LpnSize;
     use crate::{
         backend_multifield::EvaluatorCirc,
         fields::{F2_MODULUS, F61P_MODULUS, SECP256K1ORDER_MODULUS, SECP256K1_MODULUS},
@@ -2446,10 +2342,10 @@ pub(crate) mod tests {
                 rng,
                 inputs,
                 type_store_prover,
-                true,
+                LpnSize::Small,
                 false,
             )?;
-            eval.load_backends(&mut channel, true)?;
+            eval.load_backends(&mut channel, LpnSize::Small)?;
             eval.evaluate_gates(&gates_prover, &func_store_prover)?;
             eyre::Result::Ok(())
         });
@@ -2470,11 +2366,11 @@ pub(crate) mod tests {
             rng,
             inputs,
             type_store,
-            true,
+            LpnSize::Small,
             false,
         )
         .unwrap();
-        eval.load_backends(&mut channel, true)?;
+        eval.load_backends(&mut channel, LpnSize::Small)?;
         eval.evaluate_gates(&gates, &func_store)?;
 
         handle.join().unwrap()

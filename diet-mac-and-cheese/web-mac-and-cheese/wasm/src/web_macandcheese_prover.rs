@@ -2,6 +2,7 @@ use crate::js_channel::ShimChannel;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::svole_trait::Svole;
+use diet_mac_and_cheese::LpnSize;
 use log::info;
 use log::Level;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -66,12 +67,11 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
         rng,
         inputs,
         TypeStore::try_from(rel.header().types.clone()).unwrap(),
-        false,
+        LpnSize::Medium,
         no_batching,
     )
     .unwrap();
-    let lpn_is_small = true;
-    let tmp = evaluator.load_backends(&mut channel, lpn_is_small);
+    let tmp = evaluator.load_backends(&mut channel, LpnSize::Medium);
     if tmp.is_err() {
         alert("error while loading backends");
         return false;

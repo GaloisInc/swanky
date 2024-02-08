@@ -19,6 +19,7 @@ use std::net::{TcpListener, TcpStream};
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, FunStore, GateM, TypeStore};
 use diet_mac_and_cheese::svole_trait::Svole;
+use diet_mac_and_cheese::LpnSize;
 use mac_n_cheese_sieve_parser::Number;
 use scuttlebutt::field::F61p;
 use scuttlebutt::{AesRng, Channel};
@@ -64,7 +65,7 @@ fn main() -> Result<()> {
     let is_prover = args.iter().any(|x| x == "--prover");
 
     // Some configuration flags
-    let lpn_small = true; // use small lpn parameters
+    let lpn_size = LpnSize::Medium;
     let no_batching = false; // let's batch the various checks
 
     let ty = 0;
@@ -106,7 +107,7 @@ fn main() -> Result<()> {
             AesRng::new(),
             CircInputs::default(),
             TypeStore::default(),
-            lpn_small,
+            lpn_size,
             no_batching,
         )?;
 
@@ -116,7 +117,7 @@ fn main() -> Result<()> {
             AesRng::new(),
             std::any::TypeId::of::<F61p>(),
             ty as usize,
-            true,
+            lpn_size,
         )?;
 
         println!("Evaluate gates with inputs");
@@ -146,7 +147,7 @@ fn main() -> Result<()> {
             AesRng::new(),
             CircInputs::default(),
             TypeStore::default(),
-            lpn_small,
+            lpn_size,
             no_batching,
         )?;
 
@@ -156,7 +157,7 @@ fn main() -> Result<()> {
             AesRng::new(),
             std::any::TypeId::of::<F61p>(),
             ty as usize,
-            true,
+            lpn_size,
         )?;
 
         println!("Evaluate gates with inputs");

@@ -3,6 +3,7 @@ use core::fmt::Debug;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::svole_trait::Svole;
+use diet_mac_and_cheese::LpnSize;
 use eyre::Result;
 use log::info;
 use mac_n_cheese_sieve_parser::text_parser::{RelationReader, ValueStreamReader};
@@ -78,11 +79,10 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
         rng,
         inputs,
         TypeStore::try_from(rel.header().types.clone())?,
-        false,
+        LpnSize::Medium,
         no_batching,
     )?;
-    let lpn_is_small = true;
-    evaluator.load_backends(&mut channel, lpn_is_small)?;
+    evaluator.load_backends(&mut channel, LpnSize::Medium)?;
     info!("init time: {:?}", start.elapsed());
 
     let start = Instant::now();
