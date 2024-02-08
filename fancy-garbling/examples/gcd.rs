@@ -8,11 +8,15 @@ use fancy_garbling::{
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
-use scuttlebutt::{AbstractChannel, AesRng};
+use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
 use std::cmp::{max, Ordering};
 use std::env;
 use std::fmt::Debug;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+};
 
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
@@ -192,6 +196,23 @@ fn main() {
     let gb_value: u128 = args[1].parse().unwrap();
     let ev_value: u128 = args[2].parse().unwrap();
     let upper_bound: u128 = max(gb_value, ev_value);
+
+    let (sender, receiver) = UnixStream::pair().unwrap();
+
+    std::thread::spawn(move || {
+        let rng_gb = AesRng::new();
+        let reader = BufReader::new(sender.try_clone().unwrap());
+        let writer = BufWriter::new(sender);
+        let mut channel = Channel::new(reader, writer);
+        gb_gcd(&mut rng_gb.clone(), &mut channel, gb_value, upper_bound);
+    });
+
+    let rng_ev = AesRng::new();
+    let reader = BufReader::new(receiver.try_clone().unwrap());
+    let writer = BufWriter::new(receiver);
+    let mut channel = Channel::new(reader, writer);
+
+    let result = ev_gcd(&mut rng_ev.clone(), &mut channel, ev_value, upper_bound);
 
     println!(
         "GCD({}, {}) = {}",
