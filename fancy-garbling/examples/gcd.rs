@@ -30,6 +30,7 @@ struct GCDInputs<F> {
 /// (1) The garbler is first created using the passed rng and value.
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
 /// (3) The garbler and the evaluator then run the garbled circuit.
+/// (4) The garbler and the evaluator open the result of the computation.
 fn gb_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128)
 where
     C: AbstractChannel + std::clone::Clone,
@@ -43,6 +44,8 @@ where
     let gcd =
         fancy_gcd::<Garbler<C, AesRng, OtSender, AllWire>>(&mut gb, circuit_wires, upper_bound)
             .unwrap();
+    // (4)
+    gb.outputs(gcd.wires()).unwrap();
 }
 /// The garbler's wire exchange method
 fn gb_set_fancy_inputs<F, E>(gb: &mut F, input: u128) -> GCDInputs<F::Item>
@@ -72,6 +75,7 @@ where
 /// (1) The evaluator is first created using the passed rng and value.
 /// (2) The evaluator then exchanges their wires obliviously with the garbler.
 /// (3) The evaluator and the garbler then run the garbled circuit.
+/// (4) The evaluator and the garbler open the result of the computation.
 fn ev_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128) -> u128
 where
     C: AbstractChannel + std::clone::Clone,
@@ -85,6 +89,11 @@ where
     let gcd =
         fancy_gcd::<Evaluator<C, AesRng, OtReceiver, AllWire>>(&mut ev, circuit_wires, upper_bound)
             .unwrap();
+    // (4)
+    let gcd_binary = ev
+        .outputs(gcd.wires())
+        .unwrap()
+        .expect("evaluator should produce outputs");
 
     todo!()
 }
