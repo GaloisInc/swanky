@@ -8,18 +8,24 @@ use fancy_garbling::{
 use std::cmp::{max, Ordering};
 use std::env;
 
+/// A structure that contains both the garbler and the evaluators
+/// wires. This structure simplifies the API of the garbled circuit.
+struct GCDInputs<F> {
+    pub garbler_wires: BinaryBundle<F>,
+    pub evaluator_wires: BinaryBundle<F>,
+}
+
 /// The main fancy function which describes the garbled circuit for gcd.
 fn fancy_gcd<F>(
     f: &mut F,
-    garbler_wires: BinaryBundle<F::Item>,
-    evaluator_wires: BinaryBundle<F::Item>,
+    wire_inputs: GCDInputs<F::Item>,
     upper_bound: u128,
 ) -> Result<BinaryBundle<F::Item>, F::Error>
 where
     F: FancyReveal + Fancy + BinaryGadgets + FancyBinary + FancyArithmetic,
 {
-    let mut a: BinaryBundle<_> = garbler_wires;
-    let mut b: BinaryBundle<_> = evaluator_wires;
+    let mut a: BinaryBundle<_> = wire_inputs.garbler_wires;
+    let mut b: BinaryBundle<_> = wire_inputs.evaluator_wires;
 
     // Since the garbled circuit is oblivious, we cannot terminate the gcd algorithm by conditioning on
     // the values of `a` or `b` as is the case in the insecure version of gcd.
