@@ -20,7 +20,7 @@ fn eval_zero_poly<B: BackendT>(
     Ok(rs)
 }
 
-pub(super) fn permutation<B: BackendT>(
+pub fn permutation<B: BackendT>(
     backend: &mut B,
     x: B::FieldElement,
     lhs: &[B::Wire],

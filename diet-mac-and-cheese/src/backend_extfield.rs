@@ -1,5 +1,5 @@
 use crate::{
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
     homcom::FCom,
@@ -169,6 +169,36 @@ impl<
 
     fn lift(&mut self) -> &mut Self::LiftedBackend {
         &mut self.lifted_dmc
+    }
+}
+
+impl<
+        P: Party,
+        C: AbstractChannel + Clone,
+        SVOLE1: SvoleT<P, F2, F40b>,
+        SVOLE2: SvoleT<P, F40b, F40b>,
+    > BackendRamT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+{
+    fn init_ram(
+        &mut self,
+        _size: usize,
+        _addr_count: usize,
+        _value_count: usize,
+        _init_value: &[Self::Wire],
+    ) -> Result<RamId> {
+        todo!("Create and store a BinaryRam state, returning its position in the store.")
+    }
+
+    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+        todo!("Read from the BinaryRam with ID ram.")
+    }
+
+    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
+        todo!("Write to the BinaryRam with ID ram.")
+    }
+
+    fn finalize_rams(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 

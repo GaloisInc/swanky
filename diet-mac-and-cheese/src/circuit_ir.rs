@@ -3,7 +3,7 @@
 
 use crate::{
     fields::{extension_field_to_type_id, modulus_to_type_id},
-    plugins::{Plugin, PluginBody, PluginType},
+    plugins::{Plugin, PluginBody, PluginType, RamArithV1, RamBoolV1},
 };
 use eyre::{bail, ensure, eyre, Result};
 use log::debug;
@@ -153,7 +153,7 @@ impl TypeStore {
     }
 
     /// Get the [`TypeSpecification`] associated with the given [`TypeId`].
-    pub(crate) fn get(&self, key: &TypeId) -> eyre::Result<&TypeSpecification> {
+    pub(crate) fn get(&self, key: &TypeId) -> Result<&TypeSpecification> {
         self.0
             .get(key)
             .ok_or_else(|| eyre!("Type ID {key} not found in `TypeStore`"))
@@ -539,6 +539,22 @@ impl FuncDecl {
                 type_store,
                 fun_store,
             )?,
+            RamBoolV1::NAME => RamBoolV1::instantiate(
+                &operation,
+                &params,
+                &output_counts,
+                &input_counts,
+                type_store,
+                fun_store,
+            )?,
+            RamArithV1::NAME => RamArithV1::instantiate(
+                &operation,
+                &params,
+                &output_counts,
+                &input_counts,
+                type_store,
+                fun_store,
+            )?,
             name => bail!("Unsupported plugin: {name}"),
         };
 
@@ -609,7 +625,7 @@ impl FunStore {
     /// Insert a function to the `FunStore` with its name and returns a fresh `FunId`.
     /// It returns an error if the `FunStore` already contains a function associated with the same
     /// name.
-    pub fn insert(&mut self, name: String, func: FuncDecl) -> eyre::Result<FunId> {
+    pub fn insert(&mut self, name: String, func: FuncDecl) -> Result<FunId> {
         ensure!(
             !self.0.contains_key(&name),
             "Function with name {name} already exists."
@@ -625,7 +641,7 @@ impl FunStore {
     }
 
     /// Get function associated with a given [`FunId`].
-    pub fn get_func(&self, fun_id: FunId) -> eyre::Result<&FuncDecl> {
+    pub fn get_func(&self, fun_id: FunId) -> Result<&FuncDecl> {
         ensure!(
             (fun_id as usize) < self.1.len(),
             "Missing function id {} in func store",
@@ -635,13 +651,13 @@ impl FunStore {
     }
 
     /// Get function associated with a given name.
-    pub fn get_func_by_name(&self, name: &String) -> eyre::Result<&FuncDecl> {
+    pub fn get_func_by_name(&self, name: &String) -> Result<&FuncDecl> {
         let fun_id = self.name_to_fun_id(name)?;
         self.get_func(fun_id)
     }
 
     /// Get the id associated with a function name.
-    pub fn name_to_fun_id(&self, name: &String) -> eyre::Result<FunId> {
+    pub fn name_to_fun_id(&self, name: &String) -> Result<FunId> {
         self.0
             .get(name)
             .copied()
@@ -649,7 +665,7 @@ impl FunStore {
     }
 
     /// Get the name associated with a `FunId`.
-    pub fn id_to_name(&self, fun_id: FunId) -> eyre::Result<&String> {
+    pub fn id_to_name(&self, fun_id: FunId) -> Result<&String> {
         ensure!(
             (fun_id as usize) < self.1.len(),
             "No function name asociated to function id {}",

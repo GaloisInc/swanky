@@ -16,7 +16,7 @@ mod r1cs;
 mod comm;
 
 // permutation proof
-mod perm;
+pub(crate) mod perm;
 
 // Dora
 mod protocol;

@@ -103,7 +103,7 @@ impl Plugin for PermutationCheckV1 {
         input_counts: &[(TypeId, WireCount)],
         type_store: &TypeStore,
         _fun_store: &FunStore,
-    ) -> eyre::Result<PluginExecution> {
+    ) -> Result<PluginExecution> {
         ensure!(
             operation == "assert_perm",
             "{}: Invalid operation: {operation}",

@@ -10,7 +10,10 @@ use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
-use crate::plugins::{DisjunctionBody, PluginExecution};
+use crate::plugins::{
+    DisjunctionBody, PluginExecution, PluginType, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
+};
+use crate::ram::ArithmeticRam;
 use crate::sieveir_reader_fbs::BufRelation;
 use crate::sieveir_reader_text::TextRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
@@ -22,11 +25,11 @@ use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
 };
-use eyre::{bail, ensure, Result};
+use eyre::{bail, ensure, OptionExt, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use mac_n_cheese_sieve_parser::Number;
+use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use ocelot::svole::LpnParams;
 use ocelot::svole::{LPN_EXTEND_EXTRASMALL, LPN_SETUP_EXTRASMALL};
 use ocelot::svole::{LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_SETUP_MEDIUM, LPN_SETUP_SMALL};
@@ -141,6 +144,39 @@ pub trait BackendDisjunctionT: BackendT {
     ) -> Result<Vec<Self::Wire>>;
 }
 
+/// Identifiers for RAMs.
+///
+/// Per underlying field type, RAMs are globally scoped, and referred to by a
+/// unique ID. Wires of RAM type carry these unique IDs so RAMs may be correctly
+/// accessed from within any function scope.
+pub type RamId = usize;
+
+/// A backend type that supports operations on RAMs.
+///
+/// Backends implementing this trait may create, read from, and write to RAMs.
+pub trait BackendRamT: BackendT {
+    /// Create a new RAW with `size` cells, `addr_count`-wide addresses, and
+    /// `value_count`-wide values. Cells will be initialized to `init_value`.
+    ///
+    /// For arithmetic field backends, `addr_count` and `value_count` must be 1.
+    fn init_ram(
+        &mut self,
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
+    ) -> Result<RamId>;
+
+    /// Read and return the value at `addr` in `ram`.
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>>;
+
+    /// Write `new` to `addr` in `ram`.
+    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()>;
+
+    /// Finalize all operations on all RAMs.
+    fn finalize_rams(&mut self) -> Result<()>;
+}
+
 impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
     BackendDisjunctionT for DietMacAndCheese<P, V, F40b, C, SVOLE>
 where
@@ -217,6 +253,7 @@ pub(crate) struct DietMacAndCheeseConv<
     dmc: DietMacAndCheese<P, FE, FE, C, SvoleFE>,
     conv: Conv<P, FE, SvoleF2, SvoleFE>,
     dora_states: HashMap<usize, DoraState<P, FE, FE, C, SvoleFE>>,
+    ram_states: Vec<ArithmeticRam<P, FE, FE, C, SvoleFE>>,
     edabits_map: EdabitsMap<Edabits<P, FE>>,
     dmc_f2: DietMacAndCheese<P, F2, F40b, C, SvoleF2>,
     no_batching: bool,
@@ -251,6 +288,7 @@ impl<
             dmc,
             conv,
             dora_states: Default::default(),
+            ram_states: Default::default(),
             edabits_map: EdabitsMap::new(),
             dmc_f2: DietMacAndCheese::<P, F2, F40b, C, SvoleF2>::init_with_fcom(
                 channel,
@@ -283,6 +321,7 @@ impl<
             dmc,
             conv,
             dora_states: Default::default(),
+            ram_states: Default::default(),
             edabits_map: EdabitsMap::new(),
             dmc_f2: DietMacAndCheese::<P, F2, F40b, C, SvoleF2>::init_with_fcom(
                 channel,
@@ -680,6 +719,54 @@ impl<
     }
 }
 
+impl<
+        P: Party,
+        FE: PrimeFiniteField,
+        C: AbstractChannel + Clone,
+        SvoleF2: SvoleT<P, F2, F40b>,
+        SvoleFE: SvoleT<P, FE, FE>,
+    > BackendRamT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+{
+    fn init_ram(
+        &mut self,
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
+    ) -> Result<RamId> {
+        debug_assert_eq!(addr_count, 1);
+        debug_assert_eq!(value_count, 1);
+        debug_assert_eq!(init_value.len(), 1);
+
+        let ram_id = self.ram_states.len();
+        self.ram_states
+            .push(ArithmeticRam::new(size, init_value[0]));
+
+        Ok(ram_id)
+    }
+
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+        debug_assert!(ram < self.ram_states.len());
+        debug_assert_eq!(addr.len(), 1);
+
+        Ok(vec![self.ram_states[ram].read(&mut self.dmc, &addr[0])?])
+    }
+
+    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()> {
+        debug_assert!(ram < self.ram_states.len());
+        debug_assert_eq!(addr.len(), 1);
+        debug_assert_eq!(new.len(), 1);
+
+        self.ram_states[ram].write(&mut self.dmc, &addr[0], &new[0])
+    }
+
+    fn finalize_rams(&mut self) -> Result<()> {
+        self.ram_states
+            .iter_mut()
+            .try_for_each(|ram| ram.finalize(&mut self.dmc))
+    }
+}
+
 pub(super) struct DoraState<
     P: Party,
     V: IsSubFieldOf<F>,
@@ -718,14 +805,33 @@ trait EvaluatorT<P: Party> {
     /// Finish the conversion for a [`ConvGate`].
     fn conv_gate_set(&mut self, gate: &ConvGate, bits: &[Mac<P, F2, F40b>]) -> Result<()>;
 
+    /// Get the [`RamId`] at `wire_id`.
+    fn get_ram_id(&mut self, wire_id: WireId) -> Result<RamId>;
+
+    /// Set the [`RamId`] at `wire_id`.
+    fn set_ram_id(&mut self, wire_id: WireId, ram_id: RamId) -> Result<()>;
+
+    /// Evaluate a plugin call.
+    ///
+    /// `ram_id` is `Some(...)` iff `plugin` is a RAM read/write execution,
+    /// and the return value is `Ok(Some(...))` iff `plugin` is a RAM init
+    /// execution. Otherwise-successful evaluations should return `Ok(None)`.
+    ///
+    /// NOTE: This interface is a bit clunky, but then again, plugins are a bit
+    /// clunky. A better design in anticipation of additional need for auxiliary
+    /// inputs/outputs of plugins would be a type PluginExtras that is
+    /// Option-like, and starting with a variant for RamIds. Since we don't
+    /// anticipate additional new plugins being proposed, we go with the design
+    /// as documented above.
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
+        ram_id: Option<RamId>,
         fun_store: &FunStore,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
-    ) -> Result<()>;
+    ) -> Result<Option<RamId>>;
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo);
     fn pop_frame(&mut self);
@@ -741,6 +847,91 @@ trait EvaluatorT<P: Party> {
     );
 
     fn finalize(&mut self) -> Result<()>;
+}
+
+/// An [`EvaluatorT`] for RAM types.
+///
+/// This evaluator does nothing but manage the memory for RAM-typed wires. The
+/// SIEVE IR RAM specification does not allow evaluation of any gates (besides
+/// function calls) on RAM-typed wires, and RAM type conversions are undefined.
+///
+/// The evaluation of RAM operations and finalization is handled by the
+/// underlying address/value field's [`EvaluatorSingle`], so `plugin_call_gate`
+/// and `finalize` are also (counterintuitively) considered undefined for this
+/// evaluator.
+struct EvaluatorRam(Memory<RamId>);
+
+impl<P: Party> EvaluatorT<P> for EvaluatorRam {
+    fn evaluate_gate(
+        &mut self,
+        _gate: &GateM,
+        _instances: Option<Vec<Number>>,
+        _witnesses: Option<Vec<Number>>,
+    ) -> Result<()> {
+        unimplemented!("EvaluatorRam cannot evaluate gates.")
+    }
+
+    fn conv_gate_get(&mut self, _gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>> {
+        unimplemented!("EvaluatorRam cannot convert between field types.")
+    }
+
+    fn conv_gate_set(&mut self, _gate: &ConvGate, _bits: &[Mac<P, F2, F40b>]) -> Result<()> {
+        unimplemented!("EvaluatorRam cannot convert between field types.")
+    }
+
+    fn get_ram_id(&mut self, wire_id: WireId) -> Result<RamId> {
+        Ok(*self.0.get(wire_id))
+    }
+
+    fn set_ram_id(&mut self, wire_id: WireId, ram_id: RamId) -> Result<()> {
+        self.0.set(wire_id, &ram_id);
+        Ok(())
+    }
+
+    fn plugin_call_gate(
+        &mut self,
+        _inswit: &mut FieldInputs,
+        _ram_id: Option<RamId>,
+        _fun_store: &FunStore,
+        _outputs: &[WireRange],
+        _inputs: &[WireRange],
+        _plugin: &PluginExecution,
+    ) -> Result<Option<RamId>> {
+        unimplemented!("RAM operations are handled by the underlying address/value field.")
+    }
+
+    fn push_frame(&mut self, compiled_info: &CompiledInfo) {
+        self.0.push_frame(compiled_info);
+    }
+
+    fn pop_frame(&mut self) {
+        self.0.pop_frame();
+    }
+
+    fn allocate_new(&mut self, first_id: WireId, last_id: WireId) {
+        // RAMs may only be allocated one wire at a time.
+        debug_assert_eq!(first_id, last_id);
+        self.0.allocation_new(first_id, last_id);
+    }
+
+    fn allocate_slice(
+        &mut self,
+        src_first: WireId,
+        src_last: WireId,
+        start: WireId,
+        count: WireId,
+        allow_allocation: bool,
+    ) {
+        // RAMs may only be allocated one wire at a time.
+        debug_assert_eq!(src_first, src_last);
+        self.0
+            .allocate_slice(src_first, src_last, start, count, allow_allocation);
+    }
+
+    fn finalize(&mut self) -> Result<()> {
+        // RAM finalization is handled by the underlying address/value field.
+        Ok(())
+    }
 }
 
 /// A circuit evaluator for a single [`BackendT`].
@@ -764,7 +955,7 @@ impl<B: BackendT> EvaluatorSingle<B> {
     }
 }
 
-impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> EvaluatorT<P>
+impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + BackendRamT> EvaluatorT<P>
     for EvaluatorSingle<B>
 {
     // TODO: Revisit the type of instances / witnesses when we implement
@@ -885,11 +1076,12 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
+        ram_id: Option<RamId>,
         fun_store: &FunStore,
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
-    ) -> Result<()> {
+    ) -> Result<Option<RamId>> {
         fn copy_mem<W>(mem: &Memory<W>, range: WireRange) -> impl Iterator<Item = &W>
         where
             W: Copy + Clone + Debug + Default,
@@ -941,9 +1133,69 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
             PluginExecution::Mux(plugin) => {
                 plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
             }
+            PluginExecution::Ram(plugin) => match plugin {
+                RamVersion::RamBool(RamBoolV1(RamV1 {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                }))
+                | RamVersion::RamArith(RamArithV1(RamV1 {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                })) => match op {
+                    RamOp::Init(size) => {
+                        assert_eq!(inputs.len(), 1);
+                        assert_eq!((inputs[0].1 - inputs[0].0 + 1) as usize, *value_count);
+                        assert_eq!(outputs.len(), 1);
+                        assert_eq!(outputs[0].0, outputs[0].1);
+
+                        let init_value: Vec<_> =
+                            copy_mem(&self.memory, inputs[0]).copied().collect();
+
+                        let ram_id =
+                            self.backend
+                                .init_ram(*size, *addr_count, *value_count, &init_value)?;
+
+                        return Ok(Some(ram_id));
+                    }
+                    RamOp::Read => {
+                        assert_eq!(inputs.len(), 2);
+                        assert_eq!(inputs[0].0, inputs[0].1);
+                        assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
+                        assert_eq!(outputs.len(), 1);
+                        assert_eq!((outputs[0].1 - outputs[0].0 + 1) as usize, *value_count);
+
+                        let ram_id = ram_id.ok_or_eyre("ram_id should be Some for Read/Write")?;
+                        let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
+
+                        let values = self.backend.ram_read(ram_id, &addr)?;
+                        debug_assert_eq!(values.len(), *value_count);
+
+                        for (w, value) in (outputs[0].0..=outputs[0].1).zip(values.into_iter()) {
+                            self.memory.set(w, &value);
+                        }
+                    }
+                    RamOp::Write => {
+                        assert_eq!(inputs.len(), 3);
+                        assert_eq!(inputs[0].0, inputs[0].1);
+                        assert_eq!((inputs[1].1 - inputs[1].0 + 1) as usize, *addr_count);
+                        assert_eq!((inputs[2].1 - inputs[2].0 + 1) as usize, *value_count);
+                        assert_eq!(outputs.len(), 0);
+
+                        let ram_id = ram_id.ok_or_eyre("ram_id should be Some for Read/Write")?;
+                        let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
+                        let new: Vec<_> = copy_mem(&self.memory, inputs[2]).copied().collect();
+
+                        self.backend.ram_write(ram_id, &addr, &new)?
+                    }
+                },
+            },
             _ => bail!("Plugin {plugin:?} is unsupported"),
         };
-        Ok(())
+        Ok(None)
     }
 
     // The cases covered for field switching are:
@@ -1013,6 +1265,14 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
         }
     }
 
+    fn get_ram_id(&mut self, _wire_id: WireId) -> Result<RamId> {
+        unimplemented!("This method should only be called on EvaluatorRams")
+    }
+
+    fn set_ram_id(&mut self, _wire_id: WireId, _ram_id: RamId) -> Result<()> {
+        unimplemented!("This method should only be called on EvaluatorRams")
+    }
+
     fn push_frame(&mut self, compiled_info: &CompiledInfo) {
         self.memory.push_frame(compiled_info);
     }
@@ -1041,6 +1301,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT> Evaluato
         debug!("Finalize in EvaluatorSingle");
         self.backend.finalize_conv()?;
         self.backend.finalize_disj()?;
+        self.backend.finalize_rams()?;
         self.backend.finalize()?;
         Ok(())
     }
@@ -1170,12 +1431,86 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 TypeSpecification::Field(field) => {
                     self.load_backend(channel, rng, *field, *idx as usize, lpn_small)?;
                 }
-                _ => {
-                    bail!("Type not supported yet: {:?}", spec);
-                }
+                TypeSpecification::Plugin(PluginType {
+                    name,
+                    operation,
+                    params,
+                }) => self.load_backend_plugin(&type_store, name, operation, params)?,
             }
         }
         Ok(())
+    }
+
+    fn load_backend_plugin(
+        &mut self,
+        type_store: &TypeStore,
+        name: &str,
+        operation: &str,
+        params: &[PluginTypeArg],
+    ) -> Result<()> {
+        match name {
+            "ram_bool_v1" => match operation {
+                "ram" => {
+                    ensure!(
+                        params.len() == 3,
+                        "Boolean RAM types must specify three parameters, but {} were given",
+                        params.len()
+                    );
+
+                    // Validate type index refers to F2
+                    let PluginTypeArg::Number(field_id) = params[0] else {
+                        bail!("The Boolean RAM type expects a number as its first parameter, but a string was found")
+                    };
+                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
+                    else {
+                        bail!("The first Boolean RAM type parameter must refer to a field")
+                    };
+                    ensure!(
+                        field_rust_id == std::any::TypeId::of::<F2>(),
+                        "Boolean RAMs only support Boolean addresses/values"
+                    );
+
+                    // Just check that the other parameters are numeric
+                    if let PluginTypeArg::String(_) = params[1] {
+                        bail!("The Boolean RAM type expects a number as its second parameter, but a string was found")
+                    }
+
+                    if let PluginTypeArg::String(_) = params[2] {
+                        bail!("The Boolean RAM type expects a number as its third parameter, but a string was found")
+                    }
+
+                    self.eval.push(Box::new(EvaluatorRam(Memory::new())));
+
+                    Ok(())
+                }
+                _ => bail!("{} is not a type defined by {}", operation, name),
+            },
+            "ram_arith_v1" => match operation {
+                "ram" => {
+                    ensure!(
+                        params.len() == 1,
+                        "Arithmetic RAM types must specify one parameter, but {} were given",
+                        params.len()
+                    );
+
+                    // Validate type index refers to a field
+                    let PluginTypeArg::Number(field_id) = params[0] else {
+                        bail!("The arithmetic RAM type expects a number as its first parameter, but a string was found")
+                    };
+                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
+                        bail!("The first arithmetic RAM type parameter must refer to a field")
+                    }
+
+                    self.eval.push(Box::new(EvaluatorRam(Memory::new())));
+
+                    Ok(())
+                }
+                _ => bail!("{} is not a type defined by {}", operation, name),
+            },
+            _ => bail!("Plugin type not supported yet: {}:{}", name, operation),
+        }
     }
 
     // All of these parameters are required to load a backend
@@ -1612,9 +1947,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                         handles.extend(more_handles);
                     }
                 }
-                _ => {
-                    todo!("Type not supported yet: {:?}", spec);
-                }
+                TypeSpecification::Plugin(PluginType {
+                    name,
+                    operation,
+                    params,
+                }) => self.load_backend_plugin(&type_store, name, operation, params)?,
             }
         }
         Ok(handles)
@@ -1695,7 +2032,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             self.eval[*ty as usize].push_frame(&func.compiled_info);
         }
 
-        let mut prev = 0;
+        let mut prevs: [WireId; 256] = [0; 256];
         let output_counts = func.output_counts();
         ensure!(
             out_ranges.len() == output_counts.len(),
@@ -1706,8 +2043,15 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         for i in 0..output_counts.len() {
             let (field_idx, count) = output_counts[i];
             let (src_first, src_last) = out_ranges[i];
-            self.eval[field_idx as usize].allocate_slice(src_first, src_last, prev, count, true);
-            prev += count;
+
+            self.eval[field_idx as usize].allocate_slice(
+                src_first,
+                src_last,
+                prevs[field_idx as usize],
+                count,
+                true,
+            );
+            prevs[field_idx as usize] += count;
         }
 
         let input_counts = func.input_counts();
@@ -1720,8 +2064,15 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         for i in 0..input_counts.len() {
             let (field_idx, count) = input_counts[i];
             let (src_first, src_last) = in_ranges[i];
-            self.eval[field_idx as usize].allocate_slice(src_first, src_last, prev, count, false);
-            prev += count;
+
+            self.eval[field_idx as usize].allocate_slice(
+                src_first,
+                src_last,
+                prevs[field_idx as usize],
+                count,
+                false,
+            );
+            prevs[field_idx as usize] += count;
         }
         Ok(())
     }
@@ -1760,6 +2111,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // The permutation plugin does not need to execute `callframe_start` or `callframe_end`
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        None,
                         fun_store,
                         out_ranges,
                         in_ranges,
@@ -1772,6 +2124,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // since the inputs/outputs must be flattened to an R1CS witness.
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        None,
                         fun_store,
                         out_ranges,
                         in_ranges,
@@ -1783,12 +2136,67 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     self.callframe_start(func, out_ranges, in_ranges)?;
                     self.eval[type_id].plugin_call_gate(
                         self.inputs.get(type_id),
+                        None,
                         fun_store,
                         out_ranges,
                         in_ranges,
                         body.execution(),
                     )?;
                     self.callframe_end(func);
+                }
+                PluginExecution::Ram(plugin) => {
+                    // No callframes: RAMs are all 'global', and RAM-typed
+                    // wires are to be thought of as (mutable) references.
+                    match plugin {
+                        RamVersion::RamArith(RamArithV1(RamV1 {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        }))
+                        | RamVersion::RamBool(RamBoolV1(RamV1 {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        })) => match op {
+                            RamOp::Init(_) => {
+                                let ram_id = self.eval[*field_id as usize]
+                                    .plugin_call_gate(
+                                        self.inputs.get(*field_id as usize),
+                                        None,
+                                        fun_store,
+                                        out_ranges,
+                                        in_ranges,
+                                        body.execution(),
+                                    )?
+                                    .ok_or_eyre("RamInit should return a RamId")?;
+
+                                // Safety: The above will fail if out_ranges is
+                                // not exactly one wire range of length 1
+                                self.eval[*ram_type_id as usize]
+                                    .set_ram_id(out_ranges[0].0, ram_id)?;
+                            }
+                            RamOp::Read | RamOp::Write => {
+                                assert!(!in_ranges.is_empty());
+
+                                // Safety: in_ranges is not empty, and if any
+                                // other invariants are violated, the subsequent
+                                // call to plugin_call_gate will fail
+                                let ram_id =
+                                    self.eval[*ram_type_id as usize].get_ram_id(in_ranges[0].0)?;
+
+                                self.eval[*field_id as usize].plugin_call_gate(
+                                    self.inputs.get(*field_id as usize),
+                                    Some(ram_id),
+                                    fun_store,
+                                    out_ranges,
+                                    in_ranges,
+                                    body.execution(),
+                                )?;
+                            }
+                        },
+                    }
                 }
             },
         };

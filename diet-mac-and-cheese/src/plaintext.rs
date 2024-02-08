@@ -2,12 +2,13 @@
 
 use crate::{
     backend::Monitor,
-    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT},
+    backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
     mac::{make_x_i, Mac, MacT},
     plugins::DisjunctionBody,
 };
+
 use eyre::{bail, Result};
 use generic_array::GenericArray;
 use scuttlebutt::AesRng;
@@ -292,6 +293,33 @@ impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintex
     }
 
     fn finalize_conv(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl<V: IsSubFieldOf<T>, T: FiniteField> BackendRamT for DietMacAndCheesePlaintext<V, T>
+where
+    T::PrimeField: IsSubFieldOf<V>,
+{
+    fn init_ram(
+        &mut self,
+        _size: usize,
+        _addr_count: usize,
+        _value_count: usize,
+        _init_value: &[Self::Wire],
+    ) -> Result<RamId> {
+        unimplemented!("The plaintext backend does not support the RAM plugin")
+    }
+
+    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+        unimplemented!("The plaintext backend does not support the RAM plugin")
+    }
+
+    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
+        unimplemented!("The plaintext backend does not support the RAM plugin")
+    }
+
+    fn finalize_rams(&mut self) -> Result<()> {
         Ok(())
     }
 }

@@ -3,7 +3,7 @@ use crate::circuit_ir::{
     first_unused_wire_id, FunStore, FuncDecl, GateM, GatesBody, TypeId, TypeStore, WireCount,
     WireId, WireRange,
 };
-use eyre::Context;
+use eyre::{bail, ensure, eyre, Context, Result};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 pub(crate) struct IterV0;
@@ -18,7 +18,7 @@ impl Plugin for IterV0 {
         input_counts: &[(TypeId, WireCount)],
         _type_store: &TypeStore,
         fun_store: &FunStore,
-    ) -> eyre::Result<PluginExecution> {
+    ) -> Result<PluginExecution> {
         fn ranges_for_iteration(
             which_iteration: u64,
             mut starting_id: WireId,
@@ -40,10 +40,10 @@ impl Plugin for IterV0 {
         let enumerated = match operation {
             "map" => false,
             "map_enumerated" => true,
-            _ => eyre::bail!("{}: Unknown operation {operation}.", Self::NAME),
+            _ => bail!("{}: Unknown operation {operation}.", Self::NAME),
         };
 
-        eyre::ensure!(
+        ensure!(
             params.len() == 3,
             "{}: {operation} expects 3 parametesr, but {} were given.",
             Self::NAME,
@@ -51,7 +51,7 @@ impl Plugin for IterV0 {
         );
 
         let PluginTypeArg::String(ref func_name) = params[0] else {
-            eyre::bail!(
+            bail!(
                 "{}: The function name parameter must be a string.",
                 Self::NAME
             );
@@ -62,13 +62,13 @@ impl Plugin for IterV0 {
             input_counts: f_input_counts,
             ..
         } = fun_store.get_func_by_name(func_name).with_context(|| {
-            eyre::eyre!(
+            eyre!(
                 "{}: A function named {func_name} was not found.",
                 Self::NAME
             )
         })?;
 
-        eyre::ensure!(
+        ensure!(
             output_counts.len() == f_output_counts.len(),
             "{}: {operation} should return the same number of output ranges as {func_name}: {} != {}.",
             Self::NAME,
@@ -77,7 +77,7 @@ impl Plugin for IterV0 {
         );
 
         // Functions used with map_enumerated expect an additional input range
-        eyre::ensure!(
+        ensure!(
             input_counts.len() == f_input_counts.len() - if enumerated { 1 } else { 0 },
             "{}: {operation} expected {} inputs, but got {}.",
             Self::NAME,
@@ -86,13 +86,13 @@ impl Plugin for IterV0 {
         );
 
         let PluginTypeArg::Number(num_env) = params[1] else {
-            eyre::bail!("{}: The #env parameter must be numeric.", Self::NAME);
+            bail!("{}: The #env parameter must be numeric.", Self::NAME);
         };
         // TODO: Should we assume this param fits in a u64?
         let num_env = num_env.as_words()[0];
 
         let PluginTypeArg::Number(iter_count) = params[2] else {
-            eyre::bail!(
+            bail!(
                 "{}: The iteration count parameter must be numeric.",
                 Self::NAME
             );
@@ -101,13 +101,13 @@ impl Plugin for IterV0 {
         let iter_count: u64 = iter_count.as_words()[0];
 
         for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
-            eyre::ensure!(
+            ensure!(
                 t == t_f,
                 "{}: The output at position {i} has type {t}, but {func_name} expects {t_f}.",
                 Self::NAME,
             );
 
-            eyre::ensure!(
+            ensure!(
                 wc == wc_f * iter_count,
                 "{}: The output at position {i} should be {iter_count} times as large as the corresponding output of {func_name}: {wc} != {wc_f} * {iter_count}.",
                 Self::NAME,
@@ -119,13 +119,13 @@ impl Plugin for IterV0 {
             .zip(&f_input_counts[..num_env as usize])
             .enumerate()
         {
-            eyre::ensure!(
+            ensure!(
                 t == t_f,
                 "{}: The parameter at position {i} has type {t}, but {func_name} expects {t_f}.",
                 Self::NAME,
             );
 
-            eyre::ensure!(
+            ensure!(
             wc == wc_f,
             "{}: The input at position {i} must have exactly the same count as the corresponding input of {func_name}: {wc} != {wc_f}.",
             Self::NAME,
@@ -143,13 +143,13 @@ impl Plugin for IterV0 {
             .zip(&f_input_counts[input_start..])
             .enumerate()
         {
-            eyre::ensure!(
+            ensure!(
                 t == t_f,
                 "{}: The parameter at position {i} has type {t}, but {func_name} expects {t_f}.",
                 Self::NAME,
             );
 
-            eyre::ensure!(
+            ensure!(
                 wc == wc_f * iter_count,
                 "{}: The input at position {i} should be {iter_count} times as large as the corresponding input of {func_name}: {wc} != {wc_f} * {iter_count}.",
                 Self::NAME,
