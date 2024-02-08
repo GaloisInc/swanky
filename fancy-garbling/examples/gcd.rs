@@ -3,7 +3,7 @@
 
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
+    util, AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
     FancyReveal,
 };
 
@@ -76,6 +76,8 @@ where
 /// (2) The evaluator then exchanges their wires obliviously with the garbler.
 /// (3) The evaluator and the garbler then run the garbled circuit.
 /// (4) The evaluator and the garbler open the result of the computation.
+/// (5) The evaluator translates the binary output of the circuit into its decimal
+///     representation.
 fn ev_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128) -> u128
 where
     C: AbstractChannel + std::clone::Clone,
@@ -95,7 +97,8 @@ where
         .unwrap()
         .expect("evaluator should produce outputs");
 
-    todo!()
+    // (5)
+    util::u128_from_bits(&gcd_binary)
 }
 fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128) -> GCDInputs<F::Item>
 where
