@@ -2,8 +2,12 @@
 //! using fancy-garbling.
 
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyReveal,
+    twopac::semihonest::{Evaluator, Garbler},
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyReveal,
 };
+
+use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
+use scuttlebutt::{AbstractChannel, AesRng};
 
 use std::cmp::{max, Ordering};
 use std::env;
@@ -13,6 +17,41 @@ use std::env;
 struct GCDInputs<F> {
     pub garbler_wires: BinaryBundle<F>,
     pub evaluator_wires: BinaryBundle<F>,
+}
+
+/// The garbler's main method:
+/// Given an `input` and public `upper_bound` (which must be pre-shared with the evaluator)
+/// securely compute and return the GCD of `input` and the evaluator's input
+///
+/// In more detail:
+///
+/// (1) The garbler is first created using the passed rng and value.
+
+fn gb_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128)
+where
+    C: AbstractChannel + std::clone::Clone,
+{
+    // (1)
+    let mut gb =
+        Garbler::<C, AesRng, OtSender, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+}
+
+/// The evaluator's main method:
+/// Given an `input` and public `upper_bound` (which must be pre-shared with the garbler)
+/// securely compute and return the GCD of `input` and the garbler's input
+///
+/// In more detail:
+///
+/// (1) The evaluator is first created using the passed rng and value.
+
+fn ev_gcd<C>(rng: &mut AesRng, channel: &mut C, input: u128, upper_bound: u128) -> u128
+where
+    C: AbstractChannel + std::clone::Clone,
+{
+    // (1)
+    let mut ev =
+        Evaluator::<C, AesRng, OtReceiver, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    todo!()
 }
 
 /// The main fancy function which describes the garbled circuit for gcd.
