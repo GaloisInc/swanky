@@ -139,7 +139,7 @@ where
     // terminate by. The Euclidean algorithm based on subtractions will take no more than N steps where N
     // is the larger of the two numbers we are computing the gcd for (think of GCD(X,1) for any X).
     // This is a loose upper bound. To keep input values secret, we can choose the upper bound in the circuit
-    // to be a known maximal value that both party know that neither of their values will exceed,
+    // to be a known maximal value that both parties know that neither of their values will exceed,
     // for example 2^32 i.e. std::u32::MAX. This is a very loose upper bound, and is only chosen for
     // illustrative purposes.
     for _ in 0..upper_bound {
