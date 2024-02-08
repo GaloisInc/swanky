@@ -11,7 +11,6 @@ use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
 use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
 use std::cmp::{max, Ordering};
-use std::env;
 use std::fmt::Debug;
 use std::{
     io::{BufReader, BufWriter},
@@ -191,10 +190,26 @@ fn gcd_in_clear(a: u128, b: u128, upper_bound: u128) -> u128 {
     r_1
 }
 
+use clap::Parser;
+#[derive(Parser)]
+/// Example usage:
+///
+/// cargo run --example gcd 2 3
+///
+/// Computes the GCD(2,3)
+/// Where 2 is the garbler's value and 3 the evaluator's
+struct Cli {
+    /// The first integer the garbler's value
+    gb_value: u128,
+    /// The second integer the evaluator's value
+    ev_value: u128,
+}
+
 fn main() {
-    let args: Vec<_> = env::args().collect();
-    let gb_value: u128 = args[1].parse().unwrap();
-    let ev_value: u128 = args[2].parse().unwrap();
+    let cli = Cli::parse();
+    let gb_value: u128 = cli.gb_value;
+    let ev_value: u128 = cli.ev_value;
+
     let upper_bound: u128 = max(gb_value, ev_value);
 
     let (sender, receiver) = UnixStream::pair().unwrap();
