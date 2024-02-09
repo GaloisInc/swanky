@@ -40,15 +40,10 @@ fn run(
         let filename = "/tmp/bench_result.txt";
         let mut file;
         if Path::new(filename).exists() {
-            file = fs::OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open(filename)
-                .unwrap();
+            file = fs::OpenOptions::new().append(true).open(filename).unwrap();
         } else {
             file = fs::OpenOptions::new()
                 .create_new(true)
-                .write(true)
                 .append(true)
                 .open(filename)
                 .unwrap();
