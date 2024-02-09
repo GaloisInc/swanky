@@ -717,7 +717,11 @@ impl<
         }
 
         // step 1)
-        let mut c_m = ProverPrivate::new(vec![Vec::with_capacity(gamma); s]);
+        let mut c_m = ProverPrivate::new(
+            (0..s)
+                .map(|_| Vec::with_capacity(gamma))
+                .collect::<Vec<_>>(),
+        );
         let mut c_m_mac = match P::WHICH {
             WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(s)),
             WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(s)),
@@ -881,7 +885,7 @@ impl<
             }
         };
         let mut e_rng = AesRng::from_seed(seed);
-        let mut e = vec![Vec::with_capacity(n); s];
+        let mut e = (0..s).map(|_| Vec::with_capacity(n)).collect::<Vec<_>>();
         for ek in e.iter_mut() {
             for _ in 0..n {
                 let b = F2::random(&mut e_rng);
