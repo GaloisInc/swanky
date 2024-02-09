@@ -1,8 +1,12 @@
 //! An example that secretly retrieves an element from an ORAM in a binary garbled circuit
 //! using fancy-garbling.
 use fancy_garbling::{
-    BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyReveal,
+    twopac::semihonest::{Evaluator, Garbler},
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyReveal,
 };
+
+use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
+use scuttlebutt::{AbstractChannel, AesRng};
 
 use std::env;
 
@@ -11,6 +15,29 @@ use std::env;
 struct ORAMInputs<F> {
     ram: Vec<BinaryBundle<F>>,
     query: BinaryBundle<F>,
+}
+/// The garbler's main method:
+/// (1) The garbler is first created using the passed rng and value.
+
+fn gb_linear_oram<C>(rng: &mut AesRng, channel: &mut C, inputs: &[u128])
+where
+    C: AbstractChannel + std::clone::Clone,
+{
+    // (1)
+    let mut gb =
+        Garbler::<C, AesRng, OtSender, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+}
+
+/// The evaluator's main method:
+/// (1) The evaluator is first created using the passed rng and value.
+fn ev_linear_oram<C>(rng: &mut AesRng, channel: &mut C, input: u128) -> u128
+where
+    C: AbstractChannel + std::clone::Clone,
+{
+    // (1)
+    let mut ev =
+        Evaluator::<C, AesRng, OtReceiver, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    todo!()
 }
 
 /// The main fancy function which describes the garbled circuit for linear ORAM.
