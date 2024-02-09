@@ -18,8 +18,9 @@ use crate::{
     vole::RandomVole,
 };
 
-pub(crate) mod prover_preparer;
-pub(crate) mod prover_traverser;
+mod prover_preparer;
+mod prover_traverser;
+mod verifier_traverser;
 
 /// Zero-knowledge proof of knowledge of a circuit.
 ///
