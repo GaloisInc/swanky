@@ -10,11 +10,12 @@ use swanky_field_binary::{F128b, F2};
 
 use crate::vole::RandomVole;
 
-/// Prover-side circuit traversal.
+/// A [`ProverTraverser`] allows the prover to execute the gate-by-gate evaluation portion of the
+/// VOLE-in-the-head protocol.
 ///
-/// At a high level, this type can traverse a full circuit, assigning VOLEs to each wire and
-/// computing various aggregated values used in the proof.
-pub(crate) struct CircuitTraverser<Vole> {
+/// The primary steps in circuit traversal include assigning VOLEs to each wire and
+/// computing the two aggregated values used in the proof.
+pub(crate) struct ProverTraverser<Vole> {
     /// Map containing the full set of wire values for the entire circuit.
     ///
     /// Note: It is actually only necessary for this to contain the input wires for
@@ -45,7 +46,7 @@ pub(crate) struct CircuitTraverser<Vole> {
     aggregate_degree_1: F128b,
 }
 
-impl<Vole: RandomVole> CircuitTraverser<Vole> {
+impl<Vole: RandomVole> ProverTraverser<Vole> {
     /// Create a new circuit traverser.
     ///
     /// Requirements on inputs:
@@ -160,9 +161,22 @@ impl<Vole: RandomVole> CircuitTraverser<Vole> {
         self.save_computed_vole(wid, self.voles.vole_mask(next_index)?)?;
         Ok(self.challenges[next_index])
     }
+
+    /// Decomposes into the aggregate components that we constructed during the
+    /// full circuit traversal.
+    ///
+    /// The components that were passed to [`Self::new()`] are returned unchanged.
+    pub(crate) fn into_parts(self) -> (F128b, F128b, Vole, Vec<F128b>) {
+        (
+            self.aggregate_degree_0,
+            self.aggregate_degree_1,
+            self.voles,
+            self.challenges,
+        )
+    }
 }
 
-impl<Vole: RandomVole> FunctionBodyVisitor for CircuitTraverser<Vole> {
+impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
     fn new(&mut self, __ty: TypeId, _first: WireId, _last: WireId) -> Result<()> {
         bail!("Invalid input: VOLE-in-the-head does not support `new` gates");
     }
@@ -255,7 +269,7 @@ impl<Vole: RandomVole> FunctionBodyVisitor for CircuitTraverser<Vole> {
     }
 }
 
-impl<Vole: RandomVole> RelationVisitor for CircuitTraverser<Vole> {
+impl<Vole: RandomVole> RelationVisitor for ProverTraverser<Vole> {
     type FBV<'a> = Self;
     fn define_function<BodyCb>(
         &mut self,
@@ -293,16 +307,16 @@ mod tests {
 
     use crate::vole::{insecure::InsecureVole, RandomVole};
 
-    use super::CircuitTraverser;
+    use super::ProverTraverser;
 
-    fn dummy_traverser(len: usize) -> CircuitTraverser<InsecureVole> {
+    fn dummy_traverser(len: usize) -> ProverTraverser<InsecureVole> {
         let transcript = &mut Transcript::new(b"dummy for tests");
         let rng = &mut thread_rng();
 
         let voles = InsecureVole::create(len, transcript, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
         let wire_ids = repeat_with(|| (rng.gen(), F2::random(rng))).take(len);
-        CircuitTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
+        ProverTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
     }
 
     #[test]
