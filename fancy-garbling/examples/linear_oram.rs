@@ -20,6 +20,7 @@ struct ORAMInputs<F> {
 /// The garbler's main method:
 /// (1) The garbler is first created using the passed rng and value.
 /// (2) The garbler then exchanges their wires obliviously with the evaluator.
+/// (3) The garbler and the evaluator then run the garbled circuit.
 fn gb_linear_oram<C>(rng: &mut AesRng, channel: &mut C, inputs: &[u128])
 where
     C: AbstractChannel + std::clone::Clone,
@@ -32,6 +33,9 @@ where
     let _ = channel.write_usize(inputs.len());
     // (2)
     let circuit_wires = gb_set_fancy_inputs(&mut gb, inputs);
+    // (3)
+    let query =
+        fancy_linear_oram::<Garbler<C, AesRng, OtSender, AllWire>>(&mut gb, circuit_wires).unwrap();
 }
 
 /// The garbler's wire exchange method
@@ -53,6 +57,7 @@ where
 /// The evaluator's main method:
 /// (1) The evaluator is first created using the passed rng and value.
 /// (2) The evaluator then exchanges their wires obliviously with the garbler.
+/// (3) The evaluator and the garbler then run the garbled circuit.
 fn ev_linear_oram<C>(rng: &mut AesRng, channel: &mut C, input: u128) -> u128
 where
     C: AbstractChannel + std::clone::Clone,
@@ -63,6 +68,10 @@ where
     let ram_size = channel.read_usize().unwrap();
     // (2)
     let circuit_wires = ev_set_fancy_inputs(&mut ev, input, ram_size);
+    // (3)
+    let query =
+        fancy_linear_oram::<Evaluator<C, AesRng, OtReceiver, AllWire>>(&mut ev, circuit_wires)
+            .unwrap();
 
     todo!()
 }
