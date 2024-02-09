@@ -12,6 +12,8 @@ use crate::{
 use scuttlebutt::{AbstractChannel, Block};
 use subtle::ConditionallySelectable;
 
+use super::security_warning::warn_proj;
+
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
 ///
 /// Evaluates a garbled circuit on the fly, using messages containing ciphertexts and
@@ -215,6 +217,7 @@ impl<C: AbstractChannel, Wire: WireLabel + ArithmeticWire> FancyArithmetic for E
     }
 
     fn proj(&mut self, x: &Wire, q: u16, _: Option<Vec<u16>>) -> Result<Wire, EvaluatorError> {
+        warn_proj();
         let ngates = (x.modulus() - 1) as usize;
         let mut gate = Vec::with_capacity(ngates);
         for _ in 0..ngates {

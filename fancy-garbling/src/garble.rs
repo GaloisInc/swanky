@@ -2,6 +2,7 @@
 
 mod evaluator;
 mod garbler;
+mod security_warning;
 
 pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
 

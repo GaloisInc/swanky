@@ -13,6 +13,8 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use subtle::ConditionallySelectable;
 
+use super::security_warning::warn_proj;
+
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<C, RNG, Wire> {
     pub(crate) channel: C,
@@ -403,6 +405,7 @@ impl<C: AbstractChannel, RNG: RngCore + CryptoRng, Wire: WireLabel + ArithmeticW
     }
 
     fn proj(&mut self, A: &Wire, q_out: u16, tt: Option<Vec<u16>>) -> Result<Wire, GarblerError> {
+        warn_proj();
         let tt = tt.ok_or(GarblerError::TruthTableRequired)?;
 
         let q_in = A.modulus();
