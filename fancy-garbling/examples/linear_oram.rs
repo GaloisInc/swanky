@@ -7,10 +7,15 @@ use fancy_garbling::{
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
-use scuttlebutt::{AbstractChannel, AesRng};
+use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
 use std::env;
 use std::fmt::Debug;
+use std::{
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+};
+
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
 struct ORAMInputs<F> {
@@ -142,7 +147,7 @@ fn ram_in_clear(index: usize, ram: &[u128]) -> u128 {
 fn main() {
     let args: Vec<_> = env::args().collect();
 
-    let ev_index: usize = args[1].parse().unwrap();
+    let ev_index: u128 = args[1].parse().unwrap();
     let gb_ram_string: String = args[2].parse::<String>().unwrap();
     let gb_ram: Vec<u128> = gb_ram_string
         .split_terminator(['[', ',', ']', ' '])
@@ -150,9 +155,25 @@ fn main() {
         .map(|s| s.parse::<u128>().unwrap())
         .collect();
 
+    let (sender, receiver) = UnixStream::pair().unwrap();
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            let mut rng_gb = AesRng::new();
+            let reader = BufReader::new(sender.try_clone().unwrap());
+            let writer = BufWriter::new(sender);
+            let mut channel = Channel::new(reader, writer);
+            gb_linear_oram(&mut rng_gb, &mut channel, &gb_ram);
+        });
+        let rng_ev = AesRng::new();
+        let reader = BufReader::new(receiver.try_clone().unwrap());
+        let writer = BufWriter::new(receiver);
+        let mut channel = Channel::new(reader, writer);
+
+        let result = ev_linear_oram(&mut rng_ev.clone(), &mut channel, ev_index);
+    });
     println!(
         "ORAM(index:{ev_index}, ram:{:?}) = {}",
         gb_ram,
-        ram_in_clear(ev_index, &gb_ram)
+        ram_in_clear(ev_index as usize, &gb_ram)
     );
 }
