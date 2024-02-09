@@ -9,7 +9,6 @@ use fancy_garbling::{
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
 use scuttlebutt::{AbstractChannel, AesRng, Channel};
 
-use std::env;
 use std::fmt::Debug;
 use std::{
     io::{BufReader, BufWriter},
@@ -144,16 +143,25 @@ fn ram_in_clear(index: usize, ram: &[u128]) -> u128 {
     ram[index]
 }
 
-fn main() {
-    let args: Vec<_> = env::args().collect();
+use clap::Parser;
+#[derive(Parser)]
+/// Example usage:
+///
+/// cargo run --example linear_oram 5 1 2 3 7 7 25
+///
+/// Computes RAM([1,2,3,7,7,25], at index: 5)
+struct Cli {
+    /// The first integer specifies the evaluator's query
+    query: u128,
+    /// The rest of the integers contitute the garbler's RAM
+    ram: Vec<u128>,
+}
 
-    let ev_index: u128 = args[1].parse().unwrap();
-    let gb_ram_string: String = args[2].parse::<String>().unwrap();
-    let gb_ram: Vec<u128> = gb_ram_string
-        .split_terminator(['[', ',', ']', ' '])
-        .filter(|&x| !x.is_empty())
-        .map(|s| s.parse::<u128>().unwrap())
-        .collect();
+fn main() {
+    let cli = Cli::parse();
+
+    let ev_index: u128 = cli.query;
+    let gb_ram = cli.ram;
 
     let (sender, receiver) = UnixStream::pair().unwrap();
     std::thread::scope(|s| {
