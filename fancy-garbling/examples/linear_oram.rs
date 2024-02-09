@@ -2,14 +2,15 @@
 //! using fancy-garbling.
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyReveal,
+    AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyArithmetic, FancyBinary, FancyInput,
+    FancyReveal,
 };
 
 use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
 use scuttlebutt::{AbstractChannel, AesRng};
 
 use std::env;
-
+use std::fmt::Debug;
 /// A structure that contains both the garbler and the evaluators
 /// wires. This structure simplifies the API of the garbled circuit.
 struct ORAMInputs<F> {
@@ -18,7 +19,7 @@ struct ORAMInputs<F> {
 }
 /// The garbler's main method:
 /// (1) The garbler is first created using the passed rng and value.
-
+/// (2) The garbler then exchanges their wires obliviously with the evaluator.
 fn gb_linear_oram<C>(rng: &mut AesRng, channel: &mut C, inputs: &[u128])
 where
     C: AbstractChannel + std::clone::Clone,
@@ -26,10 +27,32 @@ where
     // (1)
     let mut gb =
         Garbler::<C, AesRng, OtSender, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    // The size of the RAM is assumed to be public. The garbler sends their number of
+    // of input wires. We note that every element of the RAM has a fixed size of 128 bits.
+    let _ = channel.write_usize(inputs.len());
+    // (2)
+    let circuit_wires = gb_set_fancy_inputs(&mut gb, inputs);
+}
+
+/// The garbler's wire exchange method
+fn gb_set_fancy_inputs<F, E>(gb: &mut F, inputs: &[u128]) -> ORAMInputs<F::Item>
+where
+    F: FancyInput<Item = AllWire, Error = E>,
+    E: Debug,
+{
+    // The number of bits needed to represent a single input value
+    let nbits = 128;
+    // The garbler encodes their wires with the appropriate moduli per wire.
+    let ram: Vec<BinaryBundle<F::Item>> = gb.bin_encode_many(inputs, nbits).unwrap();
+    // The evaluator receives their input labels using Oblivious Transfer (OT)
+    let query: BinaryBundle<F::Item> = gb.bin_receive(nbits).unwrap();
+
+    ORAMInputs { ram, query }
 }
 
 /// The evaluator's main method:
 /// (1) The evaluator is first created using the passed rng and value.
+/// (2) The evaluator then exchanges their wires obliviously with the garbler.
 fn ev_linear_oram<C>(rng: &mut AesRng, channel: &mut C, input: u128) -> u128
 where
     C: AbstractChannel + std::clone::Clone,
@@ -37,7 +60,25 @@ where
     // (1)
     let mut ev =
         Evaluator::<C, AesRng, OtReceiver, AllWire>::new(channel.clone(), rng.clone()).unwrap();
+    let ram_size = channel.read_usize().unwrap();
+    // (2)
+    let circuit_wires = ev_set_fancy_inputs(&mut ev, input, ram_size);
+
     todo!()
+}
+fn ev_set_fancy_inputs<F, E>(ev: &mut F, input: u128, ram_size: usize) -> ORAMInputs<F::Item>
+where
+    F: FancyInput<Item = AllWire, Error = E>,
+    E: Debug,
+{
+    // The number of bits needed to represent a single input value
+    let nbits = 128;
+    // The evaluator receives the garblers input labels.
+    let ram: Vec<BinaryBundle<F::Item>> = ev.bin_receive_many(ram_size, nbits).unwrap();
+    // The evaluator encodes their input labels.
+    let query: BinaryBundle<F::Item> = ev.bin_encode(input, nbits).unwrap();
+
+    ORAMInputs { ram, query }
 }
 
 /// The main fancy function which describes the garbled circuit for linear ORAM.
