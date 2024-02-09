@@ -91,7 +91,7 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone>(rng: &mut AesRng, v: &mut Vec<T>) {
+fn generate_permutation<T: Clone>(rng: &mut AesRng, v: &mut [T]) {
     let size = v.len();
     if size == 0 {
         return;
@@ -692,7 +692,7 @@ impl<
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        dabits: &Vec<Dabit<P, FE>>,
+        dabits: &[Dabit<P, FE>],
     ) -> Result<()> {
         let s = FDABIT_SECURITY_PARAMETER;
         let n = dabits.len();
