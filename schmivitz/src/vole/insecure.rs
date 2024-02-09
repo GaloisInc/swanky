@@ -184,9 +184,29 @@ pub(crate) struct InsecureCommitments {
 
 #[allow(unused)]
 impl InsecureCommitments {
+    /// Validate that the partial decommitment is correctly formed with respect to itself.
+    pub(crate) fn validate_commitments(&self) -> Result<()> {
+        let expected_num_commitments =
+            self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
+        if self.verifier_commitments.len() != expected_num_commitments {
+            bail!(
+                "Invalid insecure partial vole decommit: expected {} commitments, got {}",
+                expected_num_commitments,
+                self.verifier_commitments.len()
+            )
+        }
+
+        Ok(())
+    }
+
     /// Get the length of the extended witness (e.g. the number of VOLEs requested).
     pub(crate) fn extended_witness_length(&self) -> usize {
         self.extended_witness_length
+    }
+
+    /// Get verifier key ($`\bf\Delta`$ in the paper).
+    pub(crate) fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
+        &self.verifier_key
     }
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
