@@ -91,7 +91,7 @@ fn power_two<FE: FiniteField>(m: usize) -> FE {
 
 // Permutation pseudorandomly generated following Fisher-Yates method
 // `https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle`
-fn generate_permutation<T: Clone>(rng: &mut AesRng, v: &mut Vec<T>) {
+fn generate_permutation<T: Clone>(rng: &mut AesRng, v: &mut [T]) {
     let size = v.len();
     if size == 0 {
         return;
@@ -692,7 +692,7 @@ impl<
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        dabits: &Vec<Dabit<P, FE>>,
+        dabits: &[Dabit<P, FE>],
     ) -> Result<()> {
         let s = FDABIT_SECURITY_PARAMETER;
         let n = dabits.len();
@@ -717,7 +717,11 @@ impl<
         }
 
         // step 1)
-        let mut c_m = ProverPrivate::new(vec![Vec::with_capacity(gamma); s]);
+        let mut c_m = ProverPrivate::new(
+            (0..s)
+                .map(|_| Vec::with_capacity(gamma))
+                .collect::<Vec<_>>(),
+        );
         let mut c_m_mac = match P::WHICH {
             WhichParty::Prover(ev) => PartyEither::prover_new(ev, Vec::with_capacity(s)),
             WhichParty::Verifier(ev) => PartyEither::verifier_new(ev, Vec::with_capacity(s)),
@@ -881,7 +885,7 @@ impl<
             }
         };
         let mut e_rng = AesRng::from_seed(seed);
-        let mut e = vec![Vec::with_capacity(n); s];
+        let mut e = (0..s).map(|_| Vec::with_capacity(n)).collect::<Vec<_>>();
         for ek in e.iter_mut() {
             for _ in 0..n {
                 let b = F2::random(&mut e_rng);
