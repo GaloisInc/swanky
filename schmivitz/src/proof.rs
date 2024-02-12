@@ -1,3 +1,12 @@
+//! General-purpose VOLE-in-the-head proof.
+//!
+//! Much of the documentation refers to notation in "the paper"; this is referencing
+//! Baum et al.[^vole].
+//!
+//! [^vole]: Carsten Baum, Lennart Braun, Cyprien Delpech de Saint Guilhem, Michael Klooß,
+//! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
+//! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
+//!
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use merlin::Transcript;
@@ -24,11 +33,10 @@ mod transcript;
 mod verifier_traverser;
 
 /// Zero-knowledge proof of knowledge of a circuit.
-///
-/// TODO #251: Add VOLE challenge to this type.
-#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct Proof<Vole: RandomVole> {
+    /// Challenge generated in VOLE creation.
+    vole_challenge: Vole::VoleChallenge,
     /// Commitment to the extended witness ($`d`$ in the paper).
     witness_commitment: Vec<F2>,
     /// Challenges generated after committing to the witness
@@ -39,9 +47,8 @@ pub struct Proof<Vole: RandomVole> {
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
     degree_1_commitment: F128b,
-    /// Challenge generated after committing to the degree coefficients.
-    /// TODO #251: This type might change depending on what is acutally needed to decommit VOLEs.
-    decommitment_challenge: [u8; 16],
+    /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
+    decommitment_challenge: Vole::VoleDecommitmentChallenge,
     /// Partial decommitment of the VOLEs.
     partial_decommitment: Vole::Decommitment,
 }
@@ -61,29 +68,28 @@ impl<Vole: RandomVole> Proof<Vole> {
         let reader = RelationReader::new(circuit.clone())?;
         Self::validate_circuit_header(&reader)?;
 
-        let mut my_transcript = transcript::Transcript::from(transcript);
+        let mut transcript = transcript::Transcript::from(transcript);
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
-        let mut prepared_circuit = ProverPreparer::new_from_path(private_input)?;
-        reader.read(&mut prepared_circuit)?;
-        let (witness, wire_values) = prepared_circuit.into_parts();
+        let mut circuit_preparer = ProverPreparer::new_from_path(private_input)?;
+        reader.read(&mut circuit_preparer)?;
+        let (witness, wire_values) = circuit_preparer.into_parts();
         let witness_len = witness.len();
 
-        my_transcript.append_public_values();
+        // Update transcript with general public information
+        transcript.append_public_values();
 
         // Get a set of random VOLEs, one for each value in the extended witness
-        // TODO #251: This should return a challenge as well to put into the proof
-        let voles = Vole::create(witness_len, my_transcript.as_mut(), rng);
+        let (voles, vole_challenge) = Vole::create(witness_len, transcript.as_mut(), rng);
 
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
             .map(|(w, u)| w - u)
             .collect();
 
-        my_transcript.append_witness_commitment(witness_commitment.as_slice());
-
-        // Generate witness challenges
-        let witness_challenges = my_transcript.extract_witness_challenges(witness_len);
+        // Add witness commitment to the transcript and generate a challenge for each polynomial
+        transcript.append_witness_commitment(witness_commitment.as_slice());
+        let witness_challenges = transcript.extract_witness_challenges(witness_len);
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
@@ -102,27 +108,19 @@ impl<Vole: RandomVole> Proof<Vole> {
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
         // Add aggregated responses to transcript
-        my_transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
+        transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
 
         // Decommit the VOLEs
-        // TODO #251: This should also return the challenge used to decommit, so we can put it
-        // into the proof. As a temporary placeholder, we manually get a challenge outside the
-        // VOLE API.
-        let transcript = my_transcript.as_mut();
-        let partial_decommitment = voles.decommit(transcript);
-        let mut wrong_decommitment_challenge = [0u8; 16];
-        transcript.challenge_bytes(
-            b"VOLE decommitment challenge (but done incorrectly)",
-            &mut wrong_decommitment_challenge,
-        );
+        let (partial_decommitment, decommitment_challenge) = voles.decommit(transcript.as_mut());
 
         // Form the proof
         Ok(Self {
+            vole_challenge,
             witness_commitment,
             witness_challenges,
             degree_0_commitment,
             degree_1_commitment,
-            decommitment_challenge: wrong_decommitment_challenge,
+            decommitment_challenge,
             partial_decommitment,
         })
     }
@@ -192,37 +190,35 @@ impl Proof<InsecureVole> {
         T: Read + Seek + Clone,
     {
         self.validate_proof()?;
-        let mut my_transcript = transcript::Transcript::from(transcript);
+        let mut transcript = transcript::Transcript::from(transcript);
 
-        // Add public values to transcript for both the overall proof and the specific VOLE instantiation
-        my_transcript.append_public_values();
-        InsecureVole::update_transcript(my_transcript.as_mut(), self.extended_witness_length());
+        // Add public values to transcript for both the overall proof...
+        transcript.append_public_values();
 
-        // TODO #251: Squeeze first VOLE challenge and check it against the value in the proof
+        // ...and the specific VOLE instantiation, and get the VOLE challenge
+        let expected_vole_challenge = InsecureVole::extract_vole_challenge(
+            transcript.as_mut(),
+            self.extended_witness_length(),
+        );
+        if self.vole_challenge != expected_vole_challenge {
+            bail!("Verification failed: Vole challenge did not match expected value");
+        }
 
-        // Add witness commitment to transcript
-        my_transcript.append_witness_commitment(self.witness_commitment.as_slice());
-
-        // Generate challenges for each polynomial
+        // Add witness commitment to transcript and generate challenges for each polynomial
+        transcript.append_witness_commitment(self.witness_commitment.as_slice());
         let expected_witness_challenges =
-            my_transcript.extract_witness_challenges(self.witness_challenges.len());
-
+            transcript.extract_witness_challenges(self.witness_challenges.len());
         if expected_witness_challenges != self.witness_challenges {
             bail!("Verification failed: Witness challenges did not match expected values");
         }
 
-        // TODO #251: Add a~, b~ to transcript!! The TODO is to abstract this to a method.
-        my_transcript
+        // Add aggregated responses to the transcript
+        transcript
             .append_polynomial_commitments(&self.degree_0_commitment, &self.degree_1_commitment);
-        let transcript = my_transcript.as_mut();
 
-        // TODO #251: Squeeze expected decommitment challenge and check it against the value in the proof!
-        // This should likely be a method on the decommitment or VOLE type instead of being hard-coded.
-        let mut expected_decommitment_challenge = [0u8; 16];
-        transcript.challenge_bytes(
-            b"VOLE decommitment challenge (but done incorrectly)",
-            &mut expected_decommitment_challenge,
-        );
+        // Get the VOLE decommitment challenge and make sure it's valid
+        let expected_decommitment_challenge =
+            InsecureVole::extract_decommitment_challenge(transcript.as_mut());
         if self.decommitment_challenge != expected_decommitment_challenge {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }

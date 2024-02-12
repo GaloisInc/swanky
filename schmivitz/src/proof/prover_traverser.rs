@@ -313,7 +313,7 @@ mod tests {
         let transcript = &mut Transcript::new(b"dummy for tests");
         let rng = &mut thread_rng();
 
-        let voles = InsecureVole::create(len, transcript, rng);
+        let (voles, _) = InsecureVole::create(len, transcript, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
         let wire_ids = repeat_with(|| (rng.gen(), F2::random(rng))).take(len);
         ProverTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
