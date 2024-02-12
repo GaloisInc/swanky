@@ -4,12 +4,11 @@ use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use std::{
     io::{Read, Seek},
-    iter::{repeat_with, zip},
+    iter::zip,
     path::Path,
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
-use swanky_serialization::CanonicalSerialize;
 
 use crate::{
     parameters::FIELD_SIZE,
@@ -21,6 +20,7 @@ use self::verifier_traverser::VerifierTraverser;
 
 mod prover_preparer;
 mod prover_traverser;
+mod transcript;
 mod verifier_traverser;
 
 /// Zero-knowledge proof of knowledge of a circuit.
@@ -61,35 +61,29 @@ impl<Vole: RandomVole> Proof<Vole> {
         let reader = RelationReader::new(circuit.clone())?;
         Self::validate_circuit_header(&reader)?;
 
+        let mut my_transcript = transcript::Transcript::from(transcript);
+
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let mut prepared_circuit = ProverPreparer::new_from_path(private_input)?;
         reader.read(&mut prepared_circuit)?;
         let (witness, wire_values) = prepared_circuit.into_parts();
         let witness_len = witness.len();
 
-        // TODO #251: Add public values to transcript here!!!
-        transcript.append_message(b"commit to public values", b"todo: commit properly");
+        my_transcript.append_public_values();
 
         // Get a set of random VOLEs, one for each value in the extended witness
         // TODO #251: This should return a challenge as well to put into the proof
-        let voles = Vole::create(witness_len, transcript, rng);
+        let voles = Vole::create(witness_len, my_transcript.as_mut(), rng);
 
         // Commit to extended witness (`d` in the paper)
-        let witness_commitment = zip(witness, voles.witness_mask())
+        let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
             .map(|(w, u)| w - u)
             .collect();
 
-        // TODO #251: Add witness commitment to transcript here!!!
-        transcript.append_message(b"commit to witness", b"todo: commit the actual value");
+        my_transcript.append_witness_commitment(witness_commitment.as_slice());
 
-        // Generate challenges
-        let witness_challenges = repeat_with(|| {
-            let mut bytes = [0u8; 16];
-            transcript.challenge_bytes(b"challenge part 2", &mut bytes);
-            F128b::from_uniform_bytes(&bytes)
-        })
-        .take(witness_len)
-        .collect();
+        // Generate witness challenges
+        let witness_challenges = my_transcript.extract_witness_challenges(witness_len);
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
@@ -107,14 +101,14 @@ impl<Vole: RandomVole> Proof<Vole> {
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
-        // TODO #251: Add aggregated responses to transcript here!!!
-        transcript.append_message(b"b~: degree 0 commitment", &degree_0_commitment.to_bytes());
-        transcript.append_message(b"a~: degree 1 commitment", &degree_1_commitment.to_bytes());
+        // Add aggregated responses to transcript
+        my_transcript.append_polynomial_commitments(&degree_0_commitment, &degree_1_commitment);
 
         // Decommit the VOLEs
         // TODO #251: This should also return the challenge used to decommit, so we can put it
         // into the proof. As a temporary placeholder, we manually get a challenge outside the
         // VOLE API.
+        let transcript = my_transcript.as_mut();
         let partial_decommitment = voles.decommit(transcript);
         let mut wrong_decommitment_challenge = [0u8; 16];
         transcript.challenge_bytes(
@@ -198,40 +192,29 @@ impl Proof<InsecureVole> {
         T: Read + Seek + Clone,
     {
         self.validate_proof()?;
+        let mut my_transcript = transcript::Transcript::from(transcript);
 
-        // TODO #251: Add public values to transcript here!!!
-        transcript.append_message(b"commit to public values", b"todo: commit properly");
-        InsecureVole::update_transcript(transcript, self.extended_witness_length());
+        // Add public values to transcript for both the overall proof and the specific VOLE instantiation
+        my_transcript.append_public_values();
+        InsecureVole::update_transcript(my_transcript.as_mut(), self.extended_witness_length());
 
         // TODO #251: Squeeze first VOLE challenge and check it against the value in the proof
 
-        // TODO #251: Add witness commitment to transcript here!!! The TODO is to abstract to a
-        // method and actually put the witness commitment in.
-        let _witness_commitment = self.witness_commitment.as_slice();
-        transcript.append_message(b"commit to witness", b"todo: commit the actual value");
+        // Add witness commitment to transcript
+        my_transcript.append_witness_commitment(self.witness_commitment.as_slice());
 
         // Generate challenges for each polynomial
-        let expected_witness_challenges = repeat_with(|| {
-            let mut bytes = [0u8; 16];
-            transcript.challenge_bytes(b"challenge part 2", &mut bytes);
-            F128b::from_uniform_bytes(&bytes)
-        })
-        .take(self.witness_challenges.len())
-        .collect::<Vec<_>>();
+        let expected_witness_challenges =
+            my_transcript.extract_witness_challenges(self.witness_challenges.len());
 
         if expected_witness_challenges != self.witness_challenges {
             bail!("Verification failed: Witness challenges did not match expected values");
         }
 
         // TODO #251: Add a~, b~ to transcript!! The TODO is to abstract this to a method.
-        transcript.append_message(
-            b"b~: degree 0 commitment",
-            &self.degree_0_commitment.to_bytes(),
-        );
-        transcript.append_message(
-            b"a~: degree 1 commitment",
-            &self.degree_1_commitment.to_bytes(),
-        );
+        my_transcript
+            .append_polynomial_commitments(&self.degree_0_commitment, &self.degree_1_commitment);
+        let transcript = my_transcript.as_mut();
 
         // TODO #251: Squeeze expected decommitment challenge and check it against the value in the proof!
         // This should likely be a method on the decommitment or VOLE type instead of being hard-coded.
