@@ -12,11 +12,11 @@ cargo run --release --example web_macandcheese_verifier -- --instance <PATH-TO-F
 # term 2
 cd wasm
 wasm-pack build --target web --no-typescript
-cp pkg/web_mac_and_cheese_wasm_bg.wasm ../www/pkg/.
+cp pkg/web_mac_n_cheese_wasm_bg.wasm ../www/pkg/.
 # in addition to copying the wasm file, it might be necessary to copy the js interface file when the interface changes
 # or when the wasm toolchain is upgraded. Look at the diff, remove the `export` modifer in front
 #  of `function test_web_macandcheese`, delete the unnecessary `async` part
-cp pkg/web_mac_and_cheese_wasm.js ../www/copied_from_prover_wasm.js
+cp pkg/web_mac_n_cheese_wasm.js ../www/copied_from_prover_wasm.js
 
 # term 3
 cd www
