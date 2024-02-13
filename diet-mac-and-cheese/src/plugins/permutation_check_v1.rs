@@ -122,7 +122,12 @@ impl Plugin for PermutationCheckV1 {
             );
         };
         // TODO: Should we assume this param fits in a u64?
+        #[cfg(not(target_arch = "wasm32"))]
         let tuple_size: u64 = tuple_size.as_words()[0];
+
+        #[cfg(target_arch = "wasm32")]
+        let tuple_size: u64 = tuple_size.as_words()[0] as u64;
+
         ensure!(tuple_size != 0, "{}: Tuple size cannot be zero", Self::NAME);
         ensure!(
             output_counts.is_empty(),

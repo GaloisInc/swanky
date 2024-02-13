@@ -228,7 +228,11 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Ditto
+                #[cfg(not(target_arch = "wasm32"))]
                 let value_count = value_count.as_words()[0];
+
+                #[cfg(target_arch = "wasm32")]
+                let value_count = value_count.as_words()[0] as u64;
 
                 ensure!(
                     value_count == input_counts[0].1,
@@ -327,7 +331,11 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Any count on the number of wires _must_ fit in a u64 by the SIEVE IR spec.
+                #[cfg(not(target_arch = "wasm32"))]
                 let addr_count = addr_count.as_words()[0];
+
+                #[cfg(target_arch = "wasm32")]
+                let addr_count = addr_count.as_words()[0] as u64;
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
@@ -337,7 +345,11 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Ditto
+                #[cfg(not(target_arch = "wasm32"))]
                 let value_count = value_count.as_words()[0];
+
+                #[cfg(target_arch = "wasm32")]
+                let value_count = value_count.as_words()[0] as u64;
 
                 ensure!(
                     input_counts[1].0 == field_id,
@@ -463,7 +475,11 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Any count on the number of wires _must_ fit in a u64 by the SIEVE IR spec.
+                #[cfg(not(target_arch = "wasm32"))]
                 let addr_count = addr_count.as_words()[0];
+
+                #[cfg(target_arch = "wasm32")]
+                let addr_count = addr_count.as_words()[0] as u64;
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
@@ -473,7 +489,11 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Ditto
+                #[cfg(not(target_arch = "wasm32"))]
                 let value_count = value_count.as_words()[0];
+
+                #[cfg(target_arch = "wasm32")]
+                let value_count = value_count.as_words()[0] as u64;
 
                 ensure!(
                     input_counts[1].0 == field_id,

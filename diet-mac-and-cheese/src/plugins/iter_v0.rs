@@ -98,7 +98,11 @@ impl Plugin for IterV0 {
             );
         };
         // TODO: Should we assume this param fits in a u64?
+        #[cfg(not(target_arch = "wasm32"))]
         let iter_count: u64 = iter_count.as_words()[0];
+
+        #[cfg(target_arch = "wasm32")]
+        let iter_count: u64 = iter_count.as_words()[0] as u64;
 
         for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
             ensure!(
