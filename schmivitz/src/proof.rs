@@ -371,6 +371,31 @@ mod tests {
         Transcript::new(b"basic happy test transcript")
     }
 
+    // Create a proof for the given circuit and input.
+    fn create_proof(
+        circuit_bytes: &'static str,
+        private_input_bytes: &'static str,
+    ) -> (Result<Proof<InsecureVole>>, Cursor<&'static [u8]>) {
+        let circuit = Cursor::new(circuit_bytes.as_bytes());
+
+        let dir = tempdir().unwrap();
+        let private_input_path = dir.path().join("schmivitz_private_inputs");
+        let mut private_input = File::create(private_input_path.clone()).unwrap();
+        writeln!(private_input, "{}", private_input_bytes).unwrap();
+
+        let rng = &mut thread_rng();
+
+        (
+            Proof::<InsecureVole>::prove::<_, _>(
+                &mut circuit.clone(),
+                &private_input_path,
+                &mut transcript(),
+                rng,
+            ),
+            circuit,
+        )
+    }
+
     #[test]
     fn prove_doesnt_explode() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
@@ -381,78 +406,76 @@ mod tests {
               $1 <- @mul(0: $0, $0);
               $2 <- @add(0: $0, $0);
             @end ";
-        let mini_circuit = &mut Cursor::new(mini_circuit_bytes.as_bytes());
-
-        let dir = tempdir()?;
-        let private_input_path = dir.path().join("basic_happy_test_path");
-        let mut private_input = File::create(private_input_path.clone())?;
         let private_input_bytes = "version 2.0.0;
             private_input;
             @type field 2;
             @begin
                 < 1 >;
             @end";
-        writeln!(private_input, "{}", private_input_bytes)?;
 
-        let rng = &mut thread_rng();
-
-        let proof = Proof::<InsecureVole>::prove::<_, _>(
-            &mut mini_circuit.clone(),
-            &private_input_path,
-            &mut transcript(),
-            rng,
-        )?;
-
-        assert!(proof.verify(mini_circuit, &mut transcript()).is_ok());
+        let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        assert!(proof?.verify(&mut mini_circuit, &mut transcript()).is_ok());
 
         Ok(())
     }
 
+    const SMALL_CIRCUIT: &str = "version 2.0.0;
+        circuit;
+        @type field 2;
+        @begin
+          $0 ... $4 <- @private(0);
+          $5 <- @add(0: $0, $0);
+          $6 <- @add(0: $0, $1);
+          $7 <- @add(0: $0, $2);
+          $8 <- @add(0: $0, $3);
+          $9 <- @add(0: $0, $4);
+          $10 <- @mul(0: $0, $5);
+          $11 <- @mul(0: $0, $6);
+          $12 <- @mul(0: $0, $7);
+          $13 <- @mul(0: $0, $8);
+          $14 <- @mul(0: $0, $9);
+        @end ";
+
     #[test]
     fn prove_works_on_slightly_larger_circuit() -> Result<()> {
-        let small_circuit_bytes = "version 2.0.0;
-            circuit;
-            @type field 2;
-            @begin
-              $0 ... $4 <- @private(0);
-              $5 <- @add(0: $0, $0);
-              $6 <- @add(0: $0, $1);
-              $7 <- @add(0: $0, $2);
-              $8 <- @add(0: $0, $3);
-              $9 <- @add(0: $0, $4);
-              $10 <- @mul(0: $0, $5);
-              $11 <- @mul(0: $0, $6);
-              $12 <- @mul(0: $0, $7);
-              $13 <- @mul(0: $0, $8);
-              $14 <- @mul(0: $0, $9);
-            @end ";
-        let small_circuit = &mut Cursor::new(small_circuit_bytes.as_bytes());
-
-        let dir = tempdir()?;
-        let private_input_path = dir.path().join("basic_happy_small_test_path");
-        let mut private_input = File::create(private_input_path.clone())?;
         let private_input_bytes = "version 2.0.0;
             private_input;
             @type field 2;
             @begin
                 < 1 >;
-                < 0 >;
+                < 1 >;
                 < 1 >;
                 < 0 >;
-                < 1 >;
+                < 0 >;
             @end ";
-        writeln!(private_input, "{}", private_input_bytes)?;
 
-        let rng = &mut thread_rng();
+        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
 
-        let proof = Proof::<InsecureVole>::prove::<_, _>(
-            &mut small_circuit.clone(),
-            &private_input_path,
-            &mut transcript(),
-            rng,
-        )?;
+        Ok(())
+    }
 
-        assert!(proof.verify(small_circuit, &mut transcript()).is_ok());
+    #[test]
+    fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
+        let private_input_bytes = "version 2.0.0;
+        private_input;
+        @type field 2;
+        @begin
+            < 1 >;
+            < 0 >;
+            < 1 >;
+            < 0 >;
+            < 1 >;
+        @end ";
+
+        // This uses the output of `transcript()` as-is to prove. This should work
+        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        assert!(proof.is_ok());
+
+        // If we use a different transcript to verify, it'll fail
+        let transcript = &mut transcript();
+        transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
+        assert!(proof?.verify(&mut small_circuit, transcript).is_err());
 
         Ok(())
     }
