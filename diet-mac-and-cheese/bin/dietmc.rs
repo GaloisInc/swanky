@@ -1,5 +1,6 @@
 mod cli;
 
+use crate::cli::Config;
 use clap::Parser;
 use cli::Cli;
 use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
@@ -22,10 +23,10 @@ use std::path::PathBuf;
 use std::time::Instant;
 use swanky_party::{Prover, Verifier};
 
+#[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;
 
-use crate::cli::Config;
-
+#[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 

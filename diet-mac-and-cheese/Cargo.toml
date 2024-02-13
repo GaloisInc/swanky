@@ -14,6 +14,11 @@ version.workspace = true
 [lints]
 workspace = true
 
+# jemallocator is available via feature flag because the library does not support
+# the wasm32-unknown-unknown target used by web-mac-n-cheese
+[features]
+jemalloc = ["jemallocator"]
+
 [dependencies]
 blake3.workspace = true
 crypto-bigint.workspace = true
@@ -21,7 +26,7 @@ rand.workspace = true
 clap.workspace = true
 eyre.workspace = true
 generic-array.workspace = true
-jemallocator.workspace = true
+jemallocator = { workspace = true, optional = true }
 log.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 pretty_env_logger.workspace = true

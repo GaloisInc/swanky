@@ -62,6 +62,11 @@ cargo run --bin dietmc --release -- --config <PATH>/dmc.toml --instance <PATH>/*
   --witness <PATH>/*.sieve
 ```
 
+To improve performance, use the `jemalloc` feature flag when building `dietmc`:
+```bash
+cargo run --bin dietmc --release --features jemalloc  ...
+```
+
 ## Using parameters
 
 ### Lpn parameters
