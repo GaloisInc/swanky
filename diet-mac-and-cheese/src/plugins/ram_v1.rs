@@ -3,6 +3,7 @@ use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::F2;
 
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
+use crate::number_to_u64;
 
 use super::{Plugin, PluginExecution};
 
@@ -129,7 +130,7 @@ impl Plugin for RamBoolV1 {
                     );
                 };
                 // NOTE: Assuming the given RAM size fits in a u64!
-                let size = size.as_words()[0];
+                let size = number_to_u64(&size)?;
 
                 let op = RamOp::Init(size as usize);
 
@@ -218,7 +219,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Any count on the number of wires _must_ fit in a u64 by the SIEVE IR spec.
-                let addr_count = addr_count.as_words()[0];
+                let addr_count = number_to_u64(&addr_count)?;
 
                 let PluginTypeArg::Number(value_count) = ram_output_type.params[2] else {
                     bail!(
@@ -228,11 +229,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Ditto
-                #[cfg(not(target_arch = "wasm32"))]
-                let value_count = value_count.as_words()[0];
-
-                #[cfg(target_arch = "wasm32")]
-                let value_count = value_count.as_words()[0] as u64;
+                let value_count = number_to_u64(&value_count)?;
 
                 ensure!(
                     value_count == input_counts[0].1,
@@ -331,11 +328,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Any count on the number of wires _must_ fit in a u64 by the SIEVE IR spec.
-                #[cfg(not(target_arch = "wasm32"))]
-                let addr_count = addr_count.as_words()[0];
-
-                #[cfg(target_arch = "wasm32")]
-                let addr_count = addr_count.as_words()[0] as u64;
+                let addr_count = number_to_u64(&addr_count)?;
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
@@ -345,11 +338,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Ditto
-                #[cfg(not(target_arch = "wasm32"))]
-                let value_count = value_count.as_words()[0];
-
-                #[cfg(target_arch = "wasm32")]
-                let value_count = value_count.as_words()[0] as u64;
+                let value_count = number_to_u64(&value_count)?;
 
                 ensure!(
                     input_counts[1].0 == field_id,
@@ -475,11 +464,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Any count on the number of wires _must_ fit in a u64 by the SIEVE IR spec.
-                #[cfg(not(target_arch = "wasm32"))]
-                let addr_count = addr_count.as_words()[0];
-
-                #[cfg(target_arch = "wasm32")]
-                let addr_count = addr_count.as_words()[0] as u64;
+                let addr_count = number_to_u64(&addr_count)?;
 
                 let PluginTypeArg::Number(value_count) = ram_input_type.params[2] else {
                     bail!(
@@ -489,11 +474,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // Ditto
-                #[cfg(not(target_arch = "wasm32"))]
-                let value_count = value_count.as_words()[0];
-
-                #[cfg(target_arch = "wasm32")]
-                let value_count = value_count.as_words()[0] as u64;
+                let value_count = number_to_u64(&value_count)?;
 
                 ensure!(
                     input_counts[1].0 == field_id,
@@ -568,7 +549,7 @@ impl Plugin for RamArithV1 {
                     );
                 };
                 // NOTE: Assuming the given RAM size fits in a u64!
-                let size = size.as_words()[0];
+                let size = number_to_u64(&size)?;
 
                 let op = RamOp::Init(size as usize);
 

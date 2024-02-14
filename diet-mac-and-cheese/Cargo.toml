@@ -39,6 +39,7 @@ swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
 subtle.workspace = true
 ocelot.workspace = true
+proptest.workspace = true
 flatbuffers.workspace = true
 nix.workspace = true
 serde = { workspace = true, features = ["derive"] }

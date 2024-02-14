@@ -719,6 +719,7 @@ dependencies = [
  "num-traits",
  "ocelot",
  "pretty_env_logger",
+ "proptest",
  "rand",
  "rustc-hash",
  "scuttlebutt",

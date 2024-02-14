@@ -26,6 +26,7 @@ use crate::{
     circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount},
     gadgets::{permutation_check, permutation_check_binary},
     mac::MacT,
+    number_to_u64,
 };
 use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
@@ -121,12 +122,7 @@ impl Plugin for PermutationCheckV1 {
                 Self::NAME
             );
         };
-        // TODO: Should we assume this param fits in a u64?
-        #[cfg(not(target_arch = "wasm32"))]
-        let tuple_size: u64 = tuple_size.as_words()[0];
-
-        #[cfg(target_arch = "wasm32")]
-        let tuple_size: u64 = tuple_size.as_words()[0] as u64;
+        let tuple_size: u64 = number_to_u64(&tuple_size)?;
 
         ensure!(tuple_size != 0, "{}: Tuple size cannot be zero", Self::NAME);
         ensure!(
