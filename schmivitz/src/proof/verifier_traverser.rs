@@ -130,6 +130,10 @@ impl VerifierTraverser {
             })
             .copied()
     }
+
+    pub(crate) fn into_parts(self) -> F128b {
+        self.aggregate
+    }
 }
 
 impl FunctionBodyVisitor for VerifierTraverser {
