@@ -63,6 +63,9 @@ impl<'a> Transcript<'a> {
     }
 
     /// Extracts a challenge for each polynomial from the transcript.
+    ///
+    /// TODO #259: Consider simplifying this into a single seed drawn from the transcript and fed
+    /// into a PRG.
     pub(crate) fn extract_witness_challenges(&mut self, polynomial_count: usize) -> Vec<F128b> {
         repeat_with(|| {
             let mut bytes = [0u8; 16];
