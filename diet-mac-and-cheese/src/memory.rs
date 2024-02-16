@@ -685,18 +685,18 @@ where
         // 3) pool allocated, we need to search through
         // 4) unallocated, the last option
         if frame.memframe_pool.present(src_first) {
-            #[allow(clippy::needless_return)]
             return;
-        } else if src_first != src_last {
+        }
+
+        // That's 4)
+        if src_first != src_last {
             // Unallocated range
             frame.memframe_pool.insert(src_first, src_last);
-            return;
         } else {
             // Unallocated single wire
             frame
                 .memframe_unallocated
                 .insert(src_first, Box::<X>::default());
-            return;
         }
     }
 
