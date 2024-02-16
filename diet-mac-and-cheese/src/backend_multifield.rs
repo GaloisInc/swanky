@@ -835,7 +835,6 @@ trait EvaluatorT<P: Party> {
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo);
     fn pop_frame(&mut self);
-    fn allocate_new(&mut self, first_id: WireId, last_id: WireId);
     // TODO: Make allocate_slice return a result in case the operation violate some memory management
     fn allocate_slice(
         &mut self,
@@ -918,12 +917,6 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
 
     fn pop_frame(&mut self) {
         self.0.pop_frame();
-    }
-
-    fn allocate_new(&mut self, first_id: WireId, last_id: WireId) {
-        // RAMs may only be allocated one wire at a time.
-        debug_assert_eq!(first_id, last_id);
-        self.0.allocation_new(first_id, last_id);
     }
 
     fn allocate_slice(
@@ -1315,10 +1308,6 @@ where
 
     fn pop_frame(&mut self) {
         self.memory.pop_frame();
-    }
-
-    fn allocate_new(&mut self, first_id: WireId, last_id: WireId) {
-        self.memory.allocation_new(first_id, last_id);
     }
 
     fn allocate_slice(
