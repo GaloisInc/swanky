@@ -991,6 +991,29 @@ mod tests {
     }
 
     #[test]
+    fn test_allocate_possibly() {
+        let mut mem = Memory::<char>::new();
+
+        // tests some allocation that will allocate
+        mem.allocate_possibly(100, 120);
+        mem.allocate_possibly(121, 121);
+        mem.allocate_possibly(122, 200);
+
+        // delete one wire
+        mem.allocation_delete(121, 121);
+        // delete a range
+        mem.allocation_delete(100, 120);
+
+        // allocate a new range
+        mem.allocation_new(200, 210);
+
+        // allocate_possibly should do nothing on this wire
+        mem.allocate_possibly(205, 205);
+        // allocate_possibly should do nothing on this range
+        mem.allocate_possibly(206, 210);
+    }
+
+    #[test]
     fn test_cache() {
         test_cache1();
         test_cache2();
