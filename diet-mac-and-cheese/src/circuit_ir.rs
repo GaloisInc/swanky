@@ -15,6 +15,12 @@ use std::{
 };
 use swanky_field::PrimeFiniteField;
 
+/// Types that can be deserialized from SIEVE IR constants.
+pub(crate) trait SieveIrDeserialize: Copy {
+    /// Deserialize a value from a [`Number`].
+    fn from_number(val: &Number) -> Result<Self>;
+}
+
 /// The wire index.
 pub type WireId = u64;
 /// A count of the number of wires.
