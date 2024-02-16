@@ -93,3 +93,34 @@ pub(crate) fn mapping_lpn_size_large_field(lpn_size: LpnSize) -> (LpnParams, Lpn
         LpnSize::Large => (LPN_SETUP_SMALL_MEDIUM, LPN_EXTEND_SMALL_MEDIUM),
     }
 }
+
+use mac_n_cheese_sieve_parser::Number;
+
+/// Convert a [`Number`] into `Some(u64)` if it'll fit, `None` otherwise.
+pub(crate) fn number_to_u64(x: &Number) -> eyre::Result<u64> {
+    use crypto_bigint::SplitMixed;
+    let (hi, lo): (_, crypto_bigint::U64) = x.split_mixed();
+    if hi == crypto_bigint::Uint::ZERO {
+        Ok(u64::from(lo))
+    } else {
+        eyre::bail!("Number does not fit in u64")
+    }
+}
+
+#[cfg(test)]
+proptest::proptest! {
+    #[test]
+    fn test_successful_conversion(x in 0..=u64::MAX) {
+        proptest::prop_assert!(
+            number_to_u64(&Number::from_u64(x)).is_ok() && number_to_u64(&Number::from_u64(x)).unwrap() == x
+        );
+    }
+}
+
+#[cfg(test)]
+proptest::proptest! {
+    #[test]
+    fn test_unsuccessful_conversion(x in u128::from(u64::MAX)..=u128::MAX) {
+        proptest::prop_assert!(number_to_u64(&Number::from_u128(x)).is_err());
+    }
+}

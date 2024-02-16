@@ -23,7 +23,7 @@ use scuttlebutt::{
 /// Type for LPN parameters used internally in the setup phase and the extend phase of the
 /// protocol. LPN parameters are provided during the initialization of the protocol so that
 /// the extension produces small, medium or large number of values.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct LpnParams {
     /// Hamming weight `t` of the error vector `e` used in the LPN assumption.
     weight: usize,

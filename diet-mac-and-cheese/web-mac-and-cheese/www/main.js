@@ -201,7 +201,7 @@ function load_mod(mod) {
   wasm_mod_loaded = mod;
 }
 
-WebAssembly.compileStreaming(fetch('/pkg/web_mac_and_cheese_wasm_bg.wasm'))
+WebAssembly.compileStreaming(fetch('/pkg/web_mac_n_cheese_wasm_bg.wasm'))
   .then(mod =>
     load_mod(mod)
   );

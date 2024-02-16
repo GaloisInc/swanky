@@ -3,6 +3,7 @@ use crate::circuit_ir::{
     first_unused_wire_id, FunStore, FuncDecl, GateM, GatesBody, TypeId, TypeStore, WireCount,
     WireId, WireRange,
 };
+use crate::number_to_u64;
 use eyre::{bail, ensure, eyre, Context, Result};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
@@ -89,7 +90,7 @@ impl Plugin for IterV0 {
             bail!("{}: The #env parameter must be numeric.", Self::NAME);
         };
         // TODO: Should we assume this param fits in a u64?
-        let num_env = num_env.as_words()[0];
+        let num_env = number_to_u64(&num_env)?;
 
         let PluginTypeArg::Number(iter_count) = params[2] else {
             bail!(
@@ -97,8 +98,7 @@ impl Plugin for IterV0 {
                 Self::NAME
             );
         };
-        // TODO: Should we assume this param fits in a u64?
-        let iter_count: u64 = iter_count.as_words()[0];
+        let iter_count: u64 = number_to_u64(&iter_count)?;
 
         for (i, (&(t, wc), &(t_f, wc_f))) in output_counts.iter().zip(f_output_counts).enumerate() {
             ensure!(
