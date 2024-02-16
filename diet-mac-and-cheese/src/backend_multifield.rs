@@ -1052,6 +1052,7 @@ where
             }
 
             Instance(_, out) => {
+                self.memory.allocate_possibly(out.0, out.1);
                 let mut curr_out = out.0;
                 for instance in instances.unwrap() {
                     let v = self
@@ -1063,6 +1064,7 @@ where
             }
 
             Witness(_, out) => {
+                self.memory.allocate_possibly(out.0, out.1);
                 for (i, curr_out) in (out.0..=out.1).enumerate() {
                     let w = witnesses
                         .as_ref()

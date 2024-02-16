@@ -667,6 +667,39 @@ where
         }
     }
 
+    // Allocate single wire or wire ranges when they are not already allocated.
+    pub(crate) fn allocate_possibly(&mut self, src_first: WireId, src_last: WireId) {
+        let callframe_size = self.get_frame().callframe_size;
+        let frame = self.get_frame_mut();
+
+        // 1) wire from callframe
+        if src_first < callframe_size {
+            return;
+        }
+        // else 2) the slice is in a vector memframe
+        if frame.memframe_is_vector {
+            return;
+        }
+
+        // else slice in either
+        // 3) pool allocated, we need to search through
+        // 4) unallocated, the last option
+        if frame.memframe_pool.present(src_first) {
+            #[allow(clippy::needless_return)]
+            return;
+        } else if src_first != src_last {
+            // Unallocated range
+            frame.memframe_pool.insert(src_first, src_last);
+            return;
+        } else {
+            // Unallocated single wire
+            frame
+                .memframe_unallocated
+                .insert(src_first, Box::<X>::default());
+            return;
+        }
+    }
+
     // This functions takes the first and last index of the caller,
     // finds the original slice associated with them,
     // and create a new slice added to the last frame.
