@@ -9,6 +9,7 @@ use eyre::{bail, ensure, eyre, Result};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
+    any::type_name,
     cmp::max,
     collections::{BTreeMap, VecDeque},
     marker::PhantomData,
@@ -19,6 +20,21 @@ use swanky_field::PrimeFiniteField;
 pub(crate) trait SieveIrDeserialize: Copy {
     /// Deserialize a value from a [`Number`].
     fn from_number(val: &Number) -> Result<Self>;
+}
+
+impl<F: PrimeFiniteField> SieveIrDeserialize for F {
+    fn from_number(&val: &Number) -> Result<Self> {
+        let x = F::try_from_int(val);
+        if x.is_none().into() {
+            bail!(
+                "{val} is too large to be an element of {}",
+                type_name::<F>()
+            )
+        } else {
+            // Safe: We've already checked that x is not none.
+            Ok(x.unwrap())
+        }
+    }
 }
 
 /// The wire index.
