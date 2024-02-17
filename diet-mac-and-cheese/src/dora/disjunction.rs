@@ -1,10 +1,9 @@
 use std::cmp;
 
 use scuttlebutt::field::FiniteField;
-use swanky_field::PrimeFiniteField;
 
 use crate::{
-    circuit_ir::{FunStore, WireCount},
+    circuit_ir::{FunStore, SieveIrDeserialize, WireCount},
     plugins::DisjunctionBody,
 };
 
@@ -20,11 +19,11 @@ pub struct Disjunction<F: FiniteField> {
     clauses: Vec<R1CS<F>>, // R1CS relations for each clause
 }
 
-impl<FP: PrimeFiniteField> Disjunction<FP> {
+impl<FP: FiniteField + SieveIrDeserialize> Disjunction<FP> {
     pub fn compile(disj: &DisjunctionBody, fun_store: &FunStore) -> Self {
         Self::new(
             disj.clauses().map(|cls| {
-                let guard = FP::try_from_int(cls.guard).unwrap();
+                let guard = FP::from_number(&cls.guard).unwrap();
                 Clause::new(
                     disj.field(),
                     fun_store,

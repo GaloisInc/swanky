@@ -31,10 +31,9 @@ type WireId = usize;
 
 pub use disjunction::Disjunction;
 pub use protocol::Dora;
-use swanky_field::PrimeFiniteField;
 use translate::translate;
 
-use crate::circuit_ir::{FunStore, GateM, TypeId};
+use crate::circuit_ir::{FunStore, GateM, SieveIrDeserialize, TypeId};
 
 use generic_array::typenum::Unsigned;
 
@@ -74,7 +73,7 @@ pub struct Clause<F: FiniteField> {
     gates: Vec<DisjGate<F>>,
 }
 
-impl<F: PrimeFiniteField> Clause<F> {
+impl<F: FiniteField + SieveIrDeserialize> Clause<F> {
     /// also acts as a sanitizer to verify that only disjunction safe gates are used
     ///
     /// It add gates to enforce the guard for each clause,
