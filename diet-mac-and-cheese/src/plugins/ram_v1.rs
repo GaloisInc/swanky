@@ -204,7 +204,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(field_id.as_words()[0])?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                 ensure!(
                     field_id == initial_value_type_id,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
@@ -308,7 +308,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(field_id.as_words()[0])?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
@@ -444,7 +444,7 @@ impl Plugin for RamBoolV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(field_id.as_words()[0])?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)? else {
                     bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
@@ -622,7 +622,7 @@ impl Plugin for RamArithV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(field_id.as_words()[0])?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                 ensure!(
                     field_id == initial_value_type_id,
                     "{}: The type of the input to {operation} must match the output RAM's address/value type.",
@@ -698,7 +698,7 @@ impl Plugin for RamArithV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(field_id.as_words()[0])?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
@@ -806,7 +806,7 @@ impl Plugin for RamArithV1 {
                 };
 
                 // The `field_id` _must_ fit in a u8 by the SIEVE IR spec.
-                let field_id = u8::try_from(field_id.as_words()[0])?;
+                let field_id = u8::try_from(number_to_u64(&field_id)?)?;
 
                 let &TypeSpecification::Field(_) = type_store.get(&field_id)? else {
                     bail!("{}: No type with index {field_id}, or that index refers to a plugin-defined type.", Self::NAME);
