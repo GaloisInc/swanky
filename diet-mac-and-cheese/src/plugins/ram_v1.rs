@@ -22,7 +22,7 @@ pub(crate) enum RamOp {
 
 /// Description of a field-generic RAM operation execution.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RamV1 {
+pub(crate) struct Ram {
     /// The RAM type.
     pub(crate) ram_type_id: TypeId,
 
@@ -41,13 +41,13 @@ pub(crate) struct RamV1 {
 
 /// Description of a RAM operation execution, for arithmetic fields.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RamArithV1(pub RamV1);
+pub(crate) struct RamArithV1(pub Ram);
 
 impl RamArithV1 {
     /// Create a new [`RamArithV1`] execution of `op` for a RAM over
     /// `field_id` addresses/values.
     pub fn new(ram_type_id: TypeId, field_id: TypeId, op: RamOp) -> Self {
-        Self(RamV1 {
+        Self(Ram {
             ram_type_id,
             field_id,
             addr_count: 1,
@@ -59,7 +59,7 @@ impl RamArithV1 {
 
 /// Description of a RAM operation execution, for F2.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RamBoolV1(pub RamV1);
+pub(crate) struct RamBoolV1(pub Ram);
 
 impl RamBoolV1 {
     /// Create a new [`RamBoolV1`] execution of `op` for a RAM over
@@ -72,7 +72,7 @@ impl RamBoolV1 {
         value_count: usize,
         op: RamOp,
     ) -> Self {
-        Self(RamV1 {
+        Self(Ram {
             ram_type_id,
             field_id,
             addr_count,
@@ -97,8 +97,8 @@ impl RamVersion {
     /// Return the [`TypeId`] of the address/value field.
     pub fn type_id(&self) -> TypeId {
         match self {
-            Self::RamBool(RamBoolV1(RamV1 { field_id, .. }))
-            | Self::RamArith(RamArithV1(RamV1 { field_id, .. })) => *field_id,
+            Self::RamBool(RamBoolV1(Ram { field_id, .. }))
+            | Self::RamArith(RamArithV1(Ram { field_id, .. })) => *field_id,
         }
     }
 }

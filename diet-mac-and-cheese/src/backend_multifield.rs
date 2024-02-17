@@ -11,7 +11,7 @@ use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
-    DisjunctionBody, PluginExecution, PluginType, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
+    DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV1, RamBoolV1, RamOp, RamVersion,
 };
 use crate::ram::ArithmeticRam;
 use crate::sieveir_reader_fbs::BufRelation;
@@ -1133,13 +1133,13 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                 plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
             }
             PluginExecution::Ram(plugin) => match plugin {
-                RamVersion::RamBool(RamBoolV1(RamV1 {
+                RamVersion::RamBool(RamBoolV1(Ram {
                     addr_count,
                     value_count,
                     op,
                     ..
                 }))
-                | RamVersion::RamArith(RamArithV1(RamV1 {
+                | RamVersion::RamArith(RamArithV1(Ram {
                     addr_count,
                     value_count,
                     op,
@@ -2043,13 +2043,13 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // No callframes: RAMs are all 'global', and RAM-typed
                     // wires are to be thought of as (mutable) references.
                     match plugin {
-                        RamVersion::RamArith(RamArithV1(RamV1 {
+                        RamVersion::RamArith(RamArithV1(Ram {
                             ram_type_id,
                             field_id,
                             op,
                             ..
                         }))
-                        | RamVersion::RamBool(RamBoolV1(RamV1 {
+                        | RamVersion::RamBool(RamBoolV1(Ram {
                             ram_type_id,
                             field_id,
                             op,
