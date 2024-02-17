@@ -241,8 +241,8 @@ impl Plugin for RamBoolV0 {
                 );
 
                 ensure!(
-                    ram_output_type.params.len() == 3,
-                    "{}: The ram type expects 3 parameters, but {} were given.",
+                    ram_output_type.params.len() == 6,
+                    "{}: The ram type expects 6 parameters, but {} were given.",
                     Self::NAME,
                     ram_output_type.params.len(),
                 );
@@ -345,8 +345,8 @@ impl Plugin for RamBoolV0 {
                 );
 
                 ensure!(
-                    ram_input_type.params.len() == 3,
-                    "{}: The ram type expects 3 parameters, but {} were given.",
+                    ram_input_type.params.len() == 6,
+                    "{}: The ram type expects 6 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
                 );
@@ -481,8 +481,8 @@ impl Plugin for RamBoolV0 {
                 );
 
                 ensure!(
-                    ram_input_type.params.len() == 3,
-                    "{}: The ram type expects 3 parameters, but {} were given.",
+                    ram_input_type.params.len() == 6,
+                    "{}: The ram type expects 6 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
                 );
@@ -1078,8 +1078,8 @@ impl Plugin for RamArithV0 {
                 );
 
                 ensure!(
-                    ram_output_type.params.len() == 1,
-                    "{}: The ram type expects 1 parameters, but {} were given.",
+                    ram_output_type.params.len() == 4,
+                    "{}: The ram type expects 4 parameters, but {} were given.",
                     Self::NAME,
                     ram_output_type.params.len(),
                 );
@@ -1152,8 +1152,8 @@ impl Plugin for RamArithV0 {
                 );
 
                 ensure!(
-                    ram_input_type.params.len() == 1,
-                    "{}: The ram type expects 1 parameter, but {} were given.",
+                    ram_input_type.params.len() == 4,
+                    "{}: The ram type expects 4 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
                 );
@@ -1258,8 +1258,8 @@ impl Plugin for RamArithV0 {
                 );
 
                 ensure!(
-                    ram_input_type.params.len() == 1,
-                    "{}: The ram type expects 1 parameter, but {} were given.",
+                    ram_input_type.params.len() == 4,
+                    "{}: The ram type expects 4 parameters, but {} were given.",
                     Self::NAME,
                     ram_input_type.params.len(),
                 );
