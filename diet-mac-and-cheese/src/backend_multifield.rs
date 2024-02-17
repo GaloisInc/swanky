@@ -98,7 +98,7 @@ const CONVERSION_BATCH_SIZE: usize = 10_321;
 const CONVERSION_PARAM_B_SAFE: usize = 5;
 const CONVERSION_BATCH_SIZE_SAFE: usize = 1_024;
 
-/// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
+/// This trait extends the [`BackendT`] trait with `assert_conv_*`
 /// functions to go to bits.
 pub trait BackendConvT<P: Party>: BackendT {
     // Convert a wire to bits in lower-endian
