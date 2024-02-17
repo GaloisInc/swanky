@@ -19,7 +19,6 @@ use crate::sieveir_reader_fbs::BufRelation;
 use crate::sieveir_reader_text::TextRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
-use crate::DietMacAndCheese;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{
@@ -27,6 +26,7 @@ use crate::{
     gadgets::less_than_eq_with_public,
 };
 use crate::{mapping_lpn_size, mapping_lpn_size_large_field, LpnSize};
+use crate::{number_to_u64, DietMacAndCheese};
 use eyre::{bail, ensure, OptionExt, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
@@ -1461,7 +1461,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!("The Boolean RAM type expects a number as its first parameter, but a string was found")
                     };
-                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
                         bail!("The first Boolean RAM type parameter must refer to a field")
@@ -1498,7 +1498,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!("The arithmetic RAM type expects a number as its first parameter, but a string was found")
                     };
-                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!("The first arithmetic RAM type parameter must refer to a field")
                     }
