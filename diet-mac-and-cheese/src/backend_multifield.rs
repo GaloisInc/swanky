@@ -11,7 +11,8 @@ use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
-    DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV1, RamBoolV1, RamOp, RamVersion,
+    DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV0, RamArithV1, RamBoolV0,
+    RamBoolV1, RamOp, RamVersion,
 };
 use crate::ram::ArithmeticRam;
 use crate::sieveir_reader_fbs::BufRelation;
@@ -1133,7 +1134,19 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                 plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
             }
             PluginExecution::Ram(plugin) => match plugin {
-                RamVersion::RamBoolV1(RamBoolV1(Ram {
+                RamVersion::RamBoolV0(RamBoolV0(Ram {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                }))
+                | RamVersion::RamBoolV1(RamBoolV1(Ram {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                }))
+                | RamVersion::RamArithV0(RamArithV0(Ram {
                     addr_count,
                     value_count,
                     op,
@@ -2043,7 +2056,19 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // No callframes: RAMs are all 'global', and RAM-typed
                     // wires are to be thought of as (mutable) references.
                     match plugin {
-                        RamVersion::RamArithV1(RamArithV1(Ram {
+                        RamVersion::RamArithV0(RamArithV0(Ram {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        }))
+                        | RamVersion::RamArithV1(RamArithV1(Ram {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        }))
+                        | RamVersion::RamBoolV0(RamBoolV0(Ram {
                             ram_type_id,
                             field_id,
                             op,
