@@ -864,11 +864,23 @@ struct EvaluatorRam(Memory<RamId>);
 impl<P: Party> EvaluatorT<P> for EvaluatorRam {
     fn evaluate_gate(
         &mut self,
-        _gate: &GateM,
+        gate: &GateM,
         _instances: Option<Vec<Number>>,
         _witnesses: Option<Vec<Number>>,
     ) -> Result<()> {
-        unimplemented!("EvaluatorRam cannot evaluate gates.")
+        use GateM::*;
+
+        match gate {
+            New(_, first, last) => {
+                self.0.allocation_new(*first, *last);
+            }
+            Delete(_, first, last) => {
+                self.0.allocation_delete(*first, *last);
+            }
+            _ => unimplemented!("EvaluatorRam cannot evaluate gates other than new and delete."),
+        }
+
+        Ok(())
     }
 
     fn conv_gate_get(&mut self, _gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>> {
