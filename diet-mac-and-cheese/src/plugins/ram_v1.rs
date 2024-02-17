@@ -87,18 +87,18 @@ impl RamBoolV1 {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum RamVersion {
     /// A ram_bool_v1 execution.
-    RamBool(RamBoolV1),
+    RamBoolV1(RamBoolV1),
 
     /// A ram_arith_v1 execution.
-    RamArith(RamArithV1),
+    RamArithV1(RamArithV1),
 }
 
 impl RamVersion {
     /// Return the [`TypeId`] of the address/value field.
     pub fn type_id(&self) -> TypeId {
         match self {
-            Self::RamBool(RamBoolV1(Ram { field_id, .. }))
-            | Self::RamArith(RamArithV1(Ram { field_id, .. })) => *field_id,
+            Self::RamBoolV1(RamBoolV1(Ram { field_id, .. }))
+            | Self::RamArithV1(RamArithV1(Ram { field_id, .. })) => *field_id,
         }
     }
 }
@@ -237,7 +237,7 @@ impl Plugin for RamBoolV1 {
                     Self::NAME,
                 );
 
-                Ok(PluginExecution::Ram(RamVersion::RamBool(RamBoolV1::new(
+                Ok(PluginExecution::Ram(RamVersion::RamBoolV1(RamBoolV1::new(
                     ram_output_type_id,
                     field_id,
                     addr_count as usize,
@@ -373,7 +373,7 @@ impl Plugin for RamBoolV1 {
                     output_counts[0].1,
                 );
 
-                Ok(PluginExecution::Ram(RamVersion::RamBool(RamBoolV1::new(
+                Ok(PluginExecution::Ram(RamVersion::RamBoolV1(RamBoolV1::new(
                     ram_input_type_id,
                     field_id,
                     addr_count as usize,
@@ -509,7 +509,7 @@ impl Plugin for RamBoolV1 {
                     output_counts.len(),
                 );
 
-                Ok(PluginExecution::Ram(RamVersion::RamBool(RamBoolV1::new(
+                Ok(PluginExecution::Ram(RamVersion::RamBoolV1(RamBoolV1::new(
                     ram_input_type_id,
                     field_id,
                     addr_count as usize,
@@ -629,11 +629,9 @@ impl Plugin for RamArithV1 {
                     Self::NAME,
                 );
 
-                Ok(PluginExecution::Ram(RamVersion::RamArith(RamArithV1::new(
-                    ram_output_type_id,
-                    field_id,
-                    op,
-                ))))
+                Ok(PluginExecution::Ram(RamVersion::RamArithV1(
+                    RamArithV1::new(ram_output_type_id, field_id, op),
+                )))
             }
             "read" => {
                 let op = RamOp::Read;
@@ -737,11 +735,9 @@ impl Plugin for RamArithV1 {
                     output_counts[0].1,
                 );
 
-                Ok(PluginExecution::Ram(RamVersion::RamArith(RamArithV1::new(
-                    ram_input_type_id,
-                    field_id,
-                    op,
-                ))))
+                Ok(PluginExecution::Ram(RamVersion::RamArithV1(
+                    RamArithV1::new(ram_input_type_id, field_id, op),
+                )))
             }
             "write" => {
                 let op = RamOp::Write;
@@ -845,11 +841,9 @@ impl Plugin for RamArithV1 {
                     output_counts.len(),
                 );
 
-                Ok(PluginExecution::Ram(RamVersion::RamArith(RamArithV1::new(
-                    ram_input_type_id,
-                    field_id,
-                    op,
-                ))))
+                Ok(PluginExecution::Ram(RamVersion::RamArithV1(
+                    RamArithV1::new(ram_input_type_id, field_id, op),
+                )))
             }
             _ => bail!("{}: Unknown operation: {operation}", Self::NAME),
         }

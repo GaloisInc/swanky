@@ -1133,13 +1133,13 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                 plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
             }
             PluginExecution::Ram(plugin) => match plugin {
-                RamVersion::RamBool(RamBoolV1(Ram {
+                RamVersion::RamBoolV1(RamBoolV1(Ram {
                     addr_count,
                     value_count,
                     op,
                     ..
                 }))
-                | RamVersion::RamArith(RamArithV1(Ram {
+                | RamVersion::RamArithV1(RamArithV1(Ram {
                     addr_count,
                     value_count,
                     op,
@@ -2043,13 +2043,13 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // No callframes: RAMs are all 'global', and RAM-typed
                     // wires are to be thought of as (mutable) references.
                     match plugin {
-                        RamVersion::RamArith(RamArithV1(Ram {
+                        RamVersion::RamArithV1(RamArithV1(Ram {
                             ram_type_id,
                             field_id,
                             op,
                             ..
                         }))
-                        | RamVersion::RamBool(RamBoolV1(Ram {
+                        | RamVersion::RamBoolV1(RamBoolV1(Ram {
                             ram_type_id,
                             field_id,
                             op,
