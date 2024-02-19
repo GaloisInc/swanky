@@ -1,10 +1,8 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use crate::mac::MacT;
-use eyre::{bail, Result};
-use mac_n_cheese_sieve_parser::Number;
-use std::any::type_name;
-use swanky_field::{FiniteField, PrimeFiniteField};
+use eyre::Result;
+use swanky_field::FiniteField;
 
 /// An interface for computing a proof over a single [`FiniteField`].
 pub trait BackendT {
@@ -39,31 +37,4 @@ pub trait BackendT {
 
     /// Finalize the internal checks.
     fn finalize(&mut self) -> Result<()>;
-}
-
-/// Backends that admit a conversion from [`Number`] to the underlying field
-/// element type.
-pub trait PrimeBackendT: BackendT {
-    /// Try to convert a [`Number`] to a `Self::FieldElement`.
-    fn from_number(val: &Number) -> Result<Self::FieldElement>;
-}
-
-/// Blanket implementation of `PrimeBackendT` for all types whose `FieldElement`
-/// is a `PrimeFiniteField`.
-impl<T: BackendT> PrimeBackendT for T
-where
-    T::FieldElement: PrimeFiniteField,
-{
-    fn from_number(&val: &Number) -> Result<Self::FieldElement> {
-        let x = T::FieldElement::try_from_int(val);
-        if x.is_none().into() {
-            bail!(
-                "{val} is too large to be an element of {}",
-                type_name::<T::FieldElement>()
-            )
-        } else {
-            // Safe: We've already checked that x is not none.
-            Ok(x.unwrap())
-        }
-    }
 }

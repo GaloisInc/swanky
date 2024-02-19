@@ -1,6 +1,6 @@
-use swanky_field::PrimeFiniteField;
+use swanky_field::FiniteField;
 
-use crate::circuit_ir::{self, FunStore, FunctionBody, GateM, TypeId};
+use crate::circuit_ir::{self, FunStore, FunctionBody, GateM, SieveIrDeserialize, TypeId};
 
 use super::DisjGate;
 
@@ -60,7 +60,7 @@ impl WireFrame {
 }
 
 /// Translates a SIEVE-IR gate to a list of `DisjGate`
-pub(crate) fn translate<F: PrimeFiniteField>(
+pub(crate) fn translate<F: FiniteField + SieveIrDeserialize>(
     inputs: usize,
     outputs: usize,
     disj_gates: &mut Vec<DisjGate<F>>,
@@ -77,7 +77,7 @@ pub(crate) fn translate<F: PrimeFiniteField>(
     );
 }
 
-fn translate_gates<F: PrimeFiniteField>(
+fn translate_gates<F: FiniteField + SieveIrDeserialize>(
     disj_gates: &mut Vec<DisjGate<F>>,
     fun_store: &FunStore,
     typ: TypeId,
@@ -91,7 +91,7 @@ fn translate_gates<F: PrimeFiniteField>(
 
 // Translates `gate` to one or more `DisjGate`, pushing the result(s) to
 // `disj_gates`. Checks that all gates are for `typ`.
-fn translate_gate<F: PrimeFiniteField>(
+fn translate_gate<F: FiniteField + SieveIrDeserialize>(
     disj_gates: &mut Vec<DisjGate<F>>,
     fun_store: &FunStore,
     typ: TypeId,
@@ -147,12 +147,12 @@ fn translate_gate<F: PrimeFiniteField>(
         }
         GateM::Constant(typ2, dst, cnst) => {
             assert_eq!(typ2, typ, "different types in disjunction");
-            let val = F::try_from_int(*cnst).unwrap();
+            let val = F::from_number(&cnst).unwrap();
             disj_gates.push(DisjGate::Constant(frame.translate(dst), val))
         }
         GateM::AddConstant(typ2, dst, src, cnst) => {
             assert_eq!(typ2, typ, "different types in disjunction");
-            let val = F::try_from_int(*cnst).unwrap();
+            let val = F::from_number(&cnst).unwrap();
             disj_gates.push(DisjGate::AddConstant(
                 frame.translate(dst),
                 frame.translate(src),
@@ -161,7 +161,7 @@ fn translate_gate<F: PrimeFiniteField>(
         }
         GateM::MulConstant(typ2, dst, src, cnst) => {
             assert_eq!(typ2, typ, "different types in disjunction");
-            let val = F::try_from_int(*cnst).unwrap();
+            let val = F::from_number(&cnst).unwrap();
             disj_gates.push(DisjGate::MulConstant(
                 frame.translate(dst),
                 frame.translate(src),

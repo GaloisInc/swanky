@@ -5,6 +5,7 @@ use crate::circuit_ir::{
     CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification,
     TypeStore, WireCount, WireId, WireRange,
 };
+use crate::circuit_ir::{ConvGate, SieveIrDeserialize};
 use crate::edabits::{Conv, Edabits};
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
@@ -20,7 +21,6 @@ use crate::sieveir_reader_text::TextRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
-use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
@@ -98,9 +98,9 @@ const CONVERSION_BATCH_SIZE: usize = 10_321;
 const CONVERSION_PARAM_B_SAFE: usize = 5;
 const CONVERSION_BATCH_SIZE_SAFE: usize = 1_024;
 
-/// This trait extends the [`PrimeBackendT`] trait with `assert_conv_*`
+/// This trait extends the [`BackendT`] trait with `assert_conv_*`
 /// functions to go to bits.
-pub trait BackendConvT<P: Party>: PrimeBackendT {
+pub trait BackendConvT<P: Party>: BackendT {
     // Convert a wire to bits in lower-endian
     fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>>;
     // convert bits in lower-endian to a wire
@@ -969,6 +969,8 @@ impl<B: BackendT> EvaluatorSingle<B> {
 
 impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + BackendRamT> EvaluatorT<P>
     for EvaluatorSingle<B>
+where
+    B::FieldElement: SieveIrDeserialize,
 {
     // TODO: Revisit the type of instances / witnesses when we implement
     // streaming for these values. They should probably be
@@ -984,7 +986,9 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
 
         match gate {
             Constant(_, out, value) => {
-                let v = self.backend.constant(B::from_number(value)?)?;
+                let v = self
+                    .backend
+                    .constant(B::FieldElement::from_number(value)?)?;
                 self.memory.set(*out, &v);
             }
 
@@ -1032,21 +1036,27 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
             AddConstant(_, out, inp, constant) => {
                 let l = self.memory.get(*inp);
                 let r = constant;
-                let v = self.backend.add_constant(l, B::from_number(r)?)?;
+                let v = self
+                    .backend
+                    .add_constant(l, B::FieldElement::from_number(r)?)?;
                 self.memory.set(*out, &v);
             }
 
             MulConstant(_, out, inp, constant) => {
                 let l = self.memory.get(*inp);
                 let r = constant;
-                let v = self.backend.mul_constant(l, B::from_number(r)?)?;
+                let v = self
+                    .backend
+                    .mul_constant(l, B::FieldElement::from_number(r)?)?;
                 self.memory.set(*out, &v);
             }
 
             Instance(_, out) => {
                 let mut curr_out = out.0;
                 for instance in instances.unwrap() {
-                    let v = self.backend.input_public(B::from_number(&instance)?)?;
+                    let v = self
+                        .backend
+                        .input_public(B::FieldElement::from_number(&instance)?)?;
                     self.memory.set(curr_out, &v);
                     curr_out += 1;
                 }
@@ -1056,7 +1066,7 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                 for (i, curr_out) in (out.0..=out.1).enumerate() {
                     let w = witnesses
                         .as_ref()
-                        .and_then(|wv| B::from_number(&wv[i]).ok());
+                        .and_then(|wv| B::FieldElement::from_number(&wv[i]).ok());
                     let v = self.backend.input_private(w)?;
                     self.memory.set(curr_out, &v);
                 }

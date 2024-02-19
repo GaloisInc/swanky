@@ -9,11 +9,33 @@ use eyre::{bail, ensure, eyre, Result};
 use log::debug;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
+    any::type_name,
     cmp::max,
     collections::{BTreeMap, VecDeque},
     marker::PhantomData,
 };
-use swanky_field::PrimeFiniteField;
+use swanky_field::{FiniteField, PrimeFiniteField};
+
+/// Types that can be deserialized from SIEVE IR constants.
+pub trait SieveIrDeserialize: Copy {
+    /// Deserialize a value from a [`Number`].
+    fn from_number(val: &Number) -> Result<Self>;
+}
+
+impl<F: PrimeFiniteField> SieveIrDeserialize for F {
+    fn from_number(&val: &Number) -> Result<Self> {
+        let x = F::try_from_int(val);
+        if x.is_none().into() {
+            bail!(
+                "{val} is too large to be an element of {}",
+                type_name::<F>()
+            )
+        } else {
+            // Safe: We've already checked that x is not none.
+            Ok(x.unwrap())
+        }
+    }
+}
 
 /// The wire index.
 pub type WireId = u64;
@@ -753,14 +775,14 @@ impl TapeT for Tape {
 /// Allows strongly typed iteration
 /// over the tape with minimal overhead
 #[repr(transparent)]
-pub struct TapeF<'a, F: PrimeFiniteField>(&'a mut Box<dyn TapeT>, PhantomData<F>);
+pub struct TapeF<'a, F>(&'a mut Box<dyn TapeT>, PhantomData<F>);
 
-impl<'a, F: PrimeFiniteField> Iterator for TapeF<'a, F> {
+impl<'a, F: FiniteField + SieveIrDeserialize> Iterator for TapeF<'a, F> {
     type Item = F;
 
     fn next(&mut self) -> Option<Self::Item> {
         let val = self.0.pop()?;
-        F::try_from_int(val).into()
+        F::from_number(&val).ok()
     }
 }
 
@@ -792,12 +814,12 @@ impl FieldInputs {
     }
 
     /// Make an iterator for witness tape.
-    pub fn wit_iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+    pub fn wit_iter<F>(&mut self) -> TapeF<F> {
         TapeF(self.wit(), PhantomData)
     }
 
     /// Make an iterator for the instance tape.
-    pub fn ins_iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+    pub fn ins_iter<F>(&mut self) -> TapeF<F> {
         TapeF(self.ins(), PhantomData)
     }
 }
