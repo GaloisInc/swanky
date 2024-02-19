@@ -1351,6 +1351,9 @@ pub struct EvaluatorCirc<
     eval: Vec<Box<dyn EvaluatorT<P>>>,
     rng: AesRng,
     multithreaded_voles: Vec<Box<dyn SvoleStopSignal>>,
+    // Helper array used in `callframe_start` to avoid allocating a new array everytime the function is called.
+    // This is an optimization.
+    helper_callframe_arr: [WireId; 256],
     no_batching: bool,
     phantom: PhantomData<C>, // Storing the channel type here, is almost a convenience to prevent adding the type paramter to
                              // a handful of functions in the `impl`, maybe a TODO to eliminate the phatom and bring the type down to the
@@ -1378,6 +1381,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             eval: Vec::new(),
             rng,
             multithreaded_voles: vec![],
+            helper_callframe_arr: [0; 256],
             no_batching,
             phantom: PhantomData,
         })
@@ -1391,6 +1395,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             eval: Vec::new(),
             rng: AesRng::new(),
             multithreaded_voles: vec![],
+            helper_callframe_arr: [0; 256],
             no_batching: false, // unused
             phantom: PhantomData,
         })
@@ -1429,6 +1434,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 eval: Vec::new(),
                 rng,
                 multithreaded_voles,
+                helper_callframe_arr: [0; 256],
                 no_batching,
                 phantom: PhantomData,
             },
@@ -2018,7 +2024,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             self.eval[*ty as usize].push_frame(&func.compiled_info);
         }
 
-        let mut prevs: [WireId; 256] = [0; 256];
+        // For every type appearing in the function, initialize the counter to 0
+        for i in func.compiled_info.type_ids.iter() {
+            self.helper_callframe_arr[*i as usize] = 0;
+        }
+
         let output_counts = func.output_counts();
         ensure!(
             out_ranges.len() == output_counts.len(),
@@ -2029,15 +2039,14 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         for i in 0..output_counts.len() {
             let (field_idx, count) = output_counts[i];
             let (src_first, src_last) = out_ranges[i];
-
             self.eval[field_idx as usize].allocate_slice(
                 src_first,
                 src_last,
-                prevs[field_idx as usize],
+                self.helper_callframe_arr[field_idx as usize],
                 count,
                 true,
             );
-            prevs[field_idx as usize] += count;
+            self.helper_callframe_arr[field_idx as usize] += count;
         }
 
         let input_counts = func.input_counts();
@@ -2054,11 +2063,11 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             self.eval[field_idx as usize].allocate_slice(
                 src_first,
                 src_last,
-                prevs[field_idx as usize],
+                self.helper_callframe_arr[field_idx as usize],
                 count,
                 false,
             );
-            prevs[field_idx as usize] += count;
+            self.helper_callframe_arr[field_idx as usize] += count;
         }
         Ok(())
     }
