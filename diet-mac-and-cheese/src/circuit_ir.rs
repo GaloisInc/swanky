@@ -14,10 +14,10 @@ use std::{
     collections::{BTreeMap, VecDeque},
     marker::PhantomData,
 };
-use swanky_field::PrimeFiniteField;
+use swanky_field::{FiniteField, PrimeFiniteField};
 
 /// Types that can be deserialized from SIEVE IR constants.
-pub(crate) trait SieveIrDeserialize: Copy {
+pub trait SieveIrDeserialize: Copy {
     /// Deserialize a value from a [`Number`].
     fn from_number(val: &Number) -> Result<Self>;
 }
@@ -775,14 +775,14 @@ impl TapeT for Tape {
 /// Allows strongly typed iteration
 /// over the tape with minimal overhead
 #[repr(transparent)]
-pub struct TapeF<'a, F: PrimeFiniteField>(&'a mut Box<dyn TapeT>, PhantomData<F>);
+pub struct TapeF<'a, F>(&'a mut Box<dyn TapeT>, PhantomData<F>);
 
-impl<'a, F: PrimeFiniteField> Iterator for TapeF<'a, F> {
+impl<'a, F: FiniteField + SieveIrDeserialize> Iterator for TapeF<'a, F> {
     type Item = F;
 
     fn next(&mut self) -> Option<Self::Item> {
         let val = self.0.pop()?;
-        F::try_from_int(val).into()
+        F::from_number(&val).ok()
     }
 }
 
@@ -814,12 +814,12 @@ impl FieldInputs {
     }
 
     /// Make an iterator for witness tape.
-    pub fn wit_iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+    pub fn wit_iter<F>(&mut self) -> TapeF<F> {
         TapeF(self.wit(), PhantomData)
     }
 
     /// Make an iterator for the instance tape.
-    pub fn ins_iter<F: PrimeFiniteField>(&mut self) -> TapeF<F> {
+    pub fn ins_iter<F>(&mut self) -> TapeF<F> {
         TapeF(self.ins(), PhantomData)
     }
 }
