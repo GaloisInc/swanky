@@ -667,6 +667,39 @@ where
         }
     }
 
+    // Allocate single wire or wire ranges when they are not already allocated.
+    pub(crate) fn allocate_possibly(&mut self, src_first: WireId, src_last: WireId) {
+        let callframe_size = self.get_frame().callframe_size;
+        let frame = self.get_frame_mut();
+
+        // 1) wire from callframe
+        if src_first < callframe_size {
+            return;
+        }
+        // else 2) the slice is in a vector memframe
+        if frame.memframe_is_vector {
+            return;
+        }
+
+        // else slice in either
+        // 3) pool allocated, we need to search through
+        // 4) unallocated, the last option
+        if frame.memframe_pool.present(src_first) {
+            return;
+        }
+
+        // That's 4)
+        if src_first != src_last {
+            // Unallocated range
+            frame.memframe_pool.insert(src_first, src_last);
+        } else {
+            // Unallocated single wire
+            frame
+                .memframe_unallocated
+                .insert(src_first, Box::<X>::default());
+        }
+    }
+
     // This functions takes the first and last index of the caller,
     // finds the original slice associated with them,
     // and create a new slice added to the last frame.
@@ -955,6 +988,29 @@ mod tests {
         mem.allocation_new(122, 140);
 
         mem.allocation_delete(100, 140);
+    }
+
+    #[test]
+    fn test_allocate_possibly() {
+        let mut mem = Memory::<char>::new();
+
+        // tests some allocation that will allocate
+        mem.allocate_possibly(100, 120);
+        mem.allocate_possibly(121, 121);
+        mem.allocate_possibly(122, 200);
+
+        // delete one wire
+        mem.allocation_delete(121, 121);
+        // delete a range
+        mem.allocation_delete(100, 120);
+
+        // allocate a new range
+        mem.allocation_new(200, 210);
+
+        // allocate_possibly should do nothing on this wire
+        mem.allocate_possibly(205, 205);
+        // allocate_possibly should do nothing on this range
+        mem.allocate_possibly(206, 210);
     }
 
     #[test]
