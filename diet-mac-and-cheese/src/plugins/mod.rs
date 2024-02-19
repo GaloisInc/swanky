@@ -157,5 +157,5 @@ mod iter_v0;
 pub(crate) use iter_v0::IterV0;
 mod vectors_v1;
 pub(crate) use vectors_v1::VectorsV1;
-mod ram_v1;
-pub(crate) use ram_v1::{RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion};
+mod ram;
+pub(crate) use ram::{Ram, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1, RamOp, RamVersion};

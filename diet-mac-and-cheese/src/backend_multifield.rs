@@ -11,14 +11,14 @@ use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
 use crate::plaintext::DietMacAndCheesePlaintext;
 use crate::plugins::{
-    DisjunctionBody, PluginExecution, PluginType, RamArithV1, RamBoolV1, RamOp, RamV1, RamVersion,
+    DisjunctionBody, PluginExecution, PluginType, Ram, RamArithV0, RamArithV1, RamBoolV0,
+    RamBoolV1, RamOp, RamVersion,
 };
 use crate::ram::ArithmeticRam;
 use crate::sieveir_reader_fbs::BufRelation;
 use crate::sieveir_reader_text::TextRelation;
 use crate::svole_thread::SvoleAtomicRoundRobin;
 use crate::svole_trait::{Svole, SvoleStopSignal, SvoleT};
-use crate::DietMacAndCheese;
 use crate::{backend_trait::BackendT, circuit_ir::FunctionBody};
 use crate::{backend_trait::PrimeBackendT, circuit_ir::ConvGate};
 use crate::{
@@ -26,6 +26,7 @@ use crate::{
     gadgets::less_than_eq_with_public,
 };
 use crate::{mapping_lpn_size, mapping_lpn_size_large_field, LpnSize};
+use crate::{number_to_u64, DietMacAndCheese};
 use eyre::{bail, ensure, OptionExt, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
@@ -863,11 +864,23 @@ struct EvaluatorRam(Memory<RamId>);
 impl<P: Party> EvaluatorT<P> for EvaluatorRam {
     fn evaluate_gate(
         &mut self,
-        _gate: &GateM,
+        gate: &GateM,
         _instances: Option<Vec<Number>>,
         _witnesses: Option<Vec<Number>>,
     ) -> Result<()> {
-        unimplemented!("EvaluatorRam cannot evaluate gates.")
+        use GateM::*;
+
+        match gate {
+            New(_, first, last) => {
+                self.0.allocation_new(*first, *last);
+            }
+            Delete(_, first, last) => {
+                self.0.allocation_delete(*first, *last);
+            }
+            _ => unimplemented!("EvaluatorRam cannot evaluate gates other than new and delete."),
+        }
+
+        Ok(())
     }
 
     fn conv_gate_get(&mut self, _gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>> {
@@ -1133,13 +1146,25 @@ impl<P: Party, B: BackendConvT<P> + BackendDisjunctionT + BackendLiftT + Backend
                 plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
             }
             PluginExecution::Ram(plugin) => match plugin {
-                RamVersion::RamBool(RamBoolV1(RamV1 {
+                RamVersion::RamBoolV0(RamBoolV0(Ram {
                     addr_count,
                     value_count,
                     op,
                     ..
                 }))
-                | RamVersion::RamArith(RamArithV1(RamV1 {
+                | RamVersion::RamBoolV1(RamBoolV1(Ram {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                }))
+                | RamVersion::RamArithV0(RamArithV0(Ram {
+                    addr_count,
+                    value_count,
+                    op,
+                    ..
+                }))
+                | RamVersion::RamArithV1(RamArithV1(Ram {
                     addr_count,
                     value_count,
                     op,
@@ -1436,6 +1461,41 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         params: &[PluginTypeArg],
     ) -> Result<()> {
         match name {
+            "ram_bool_v0" => match operation {
+                "ram" => {
+                    ensure!(
+                        params.len() == 6,
+                        "v0 Boolean RAM types must specify six parameters, but {} were given.",
+                        params.len()
+                    );
+
+                    // Validate type index refers to F2
+                    let PluginTypeArg::Number(field_id) = params[0] else {
+                        bail!("The v0 Boolean RAM type expects a number as its first parameter, but a string was found")
+                    };
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                    let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
+                    else {
+                        bail!("The first v0 Boolean RAM type parameter must refer to a field")
+                    };
+                    ensure!(
+                        field_rust_id == std::any::TypeId::of::<F2>(),
+                        "v0 Boolean RAMs only support Boolean addresses/values"
+                    );
+
+                    // Just check that the other parameters are numeric
+                    for (i, p) in params.iter().enumerate().skip(1) {
+                        if let PluginTypeArg::String(_) = p {
+                            bail!("The v0 Boolean RAM type expects a number for parameter {}, but a string was found", i)
+                        }
+                    }
+
+                    self.eval.push(Box::new(EvaluatorRam(Memory::new())));
+
+                    Ok(())
+                }
+                _ => bail!("{} is not a type defined by {}", operation, name),
+            },
             "ram_bool_v1" => match operation {
                 "ram" => {
                     ensure!(
@@ -1448,7 +1508,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!("The Boolean RAM type expects a number as its first parameter, but a string was found")
                     };
-                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     let &TypeSpecification::Field(field_rust_id) = type_store.get(&field_id)?
                     else {
                         bail!("The first Boolean RAM type parameter must refer to a field")
@@ -1473,6 +1533,36 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                 }
                 _ => bail!("{} is not a type defined by {}", operation, name),
             },
+            "ram_arith_v0" => match operation {
+                "ram" => {
+                    ensure!(
+                        params.len() == 4,
+                        "v0 Arithmetic RAM types must specify four parameters, but {} were given",
+                        params.len()
+                    );
+
+                    // Validate type index refers to a field
+                    let PluginTypeArg::Number(field_id) = params[0] else {
+                        bail!("The v0 arithmetic RAM type expects a number as its first parameter, but a string was found")
+                    };
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
+                    if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
+                        bail!("The first v0 arithmetic RAM type parameter must refer to a field")
+                    }
+
+                    // Just check that the other parameters are numeric
+                    for (i, p) in params.iter().enumerate().skip(1) {
+                        if let PluginTypeArg::String(_) = p {
+                            bail!("The v0 arithmetic RAM type expects a number for parameter {}, but a string was found", i)
+                        }
+                    }
+
+                    self.eval.push(Box::new(EvaluatorRam(Memory::new())));
+
+                    Ok(())
+                }
+                _ => bail!("{} is not a type defined by {}", operation, name),
+            },
             "ram_arith_v1" => match operation {
                 "ram" => {
                     ensure!(
@@ -1485,7 +1575,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     let PluginTypeArg::Number(field_id) = params[0] else {
                         bail!("The arithmetic RAM type expects a number as its first parameter, but a string was found")
                     };
-                    let field_id = u8::try_from(field_id.as_words()[0])?;
+                    let field_id = u8::try_from(number_to_u64(&field_id)?)?;
                     if let TypeSpecification::Plugin(_) = type_store.get(&field_id)? {
                         bail!("The first arithmetic RAM type parameter must refer to a field")
                     }
@@ -2043,13 +2133,25 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
                     // No callframes: RAMs are all 'global', and RAM-typed
                     // wires are to be thought of as (mutable) references.
                     match plugin {
-                        RamVersion::RamArith(RamArithV1(RamV1 {
+                        RamVersion::RamArithV0(RamArithV0(Ram {
                             ram_type_id,
                             field_id,
                             op,
                             ..
                         }))
-                        | RamVersion::RamBool(RamBoolV1(RamV1 {
+                        | RamVersion::RamArithV1(RamArithV1(Ram {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        }))
+                        | RamVersion::RamBoolV0(RamBoolV0(Ram {
+                            ram_type_id,
+                            field_id,
+                            op,
+                            ..
+                        }))
+                        | RamVersion::RamBoolV1(RamBoolV1(Ram {
                             ram_type_id,
                             field_id,
                             op,
