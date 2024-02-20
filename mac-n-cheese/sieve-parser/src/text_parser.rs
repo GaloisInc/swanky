@@ -327,7 +327,6 @@ impl<T: Read + Seek> RelationReader<T> {
     fn parse_header(&mut self) -> eyre::Result<()> {
         let mut buf = Vec::with_capacity(1024);
         self.ps.expect_token(&mut buf, b"version")?;
-        self.ps.expect_token(&mut buf, b"2.0.0")?;
         self.ps.read_while(|x| Ok(x != b';'))?;
         self.ps.semi()?;
         self.ps.expect_token(&mut buf, b"circuit")?;
