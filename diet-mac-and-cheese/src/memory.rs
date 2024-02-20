@@ -30,8 +30,9 @@ impl<X> Default for WirePointer<X> {
 }
 
 impl<X> WirePointer<X> {
-    fn incr(&self, i: WireId) -> Self {
-        Self(unsafe { self.0.add(i as usize) })
+    #[inline]
+    fn incr(&self, i: isize) -> Self {
+        Self(unsafe { self.0.offset(i) })
     }
 }
 
@@ -99,8 +100,6 @@ impl<X> Cache<X> {
 
     fn invalidate(&mut self) {
         self.vector = None;
-        self.first = 0;
-        self.last = 0;
     }
 }
 
@@ -518,17 +517,6 @@ where
     }
 
     pub(crate) fn pop_frame(&mut self) {
-        // TODO: Is there some cleanup to do here to keep to the memory peak under control???
-        let frame = self.get_frame_mut();
-
-        if frame.callframe_is_vector
-            && frame.callframe_vector.len()
-                > std::cmp::max(VEC_SIZE_CALLFRAME_THRESHOLD / 5, VEC_SIZE_INIT)
-        {
-            frame.callframe_vector = vec![Default::default(); VEC_SIZE_INIT];
-            frame.callframe_size = 0;
-        }
-
         self.top -= 1;
     }
 
@@ -558,10 +546,6 @@ where
     #[inline]
     fn get_frame(&self) -> &Frame<X> {
         &self.stack[self.top]
-    }
-    #[inline]
-    fn get_frame_previous(&self) -> &Frame<X> {
-        &self.stack[self.top - 1]
     }
 
     #[inline]
@@ -652,9 +636,10 @@ where
         let frame = self.get_frame_mut();
 
         if frame.callframe_is_vector {
-            for i in 0..count {
-                let idx = (start + i) as usize;
+            let mut idx = start as usize;
+            for i in 0..(count as isize) {
                 frame.callframe_vector[idx] = wire_ptr.incr(i);
+                idx += 1;
             }
         } else if allow_allocation {
             frame
@@ -723,11 +708,10 @@ where
         // In any case we are going to increase the size of the Call Frame by count
         self.get_frame_mut().callframe_size += count;
 
-        let previous_callframe_size = self.get_frame_previous().callframe_size;
-        let previous_callframe_is_vector = self.get_frame_previous().callframe_is_vector;
         let callframe_is_vector = self.get_frame().callframe_is_vector;
-
         let frame = self.get_frame_previous_mut();
+        let previous_callframe_size = frame.callframe_size;
+        let previous_callframe_is_vector = frame.callframe_is_vector;
 
         // 1) wire from callframe
         if src_first < previous_callframe_size {
@@ -781,9 +765,10 @@ where
                     //println!("callframe is vector");
                     new_slice = wire_ptr;
                     let last_frame = self.get_frame_mut();
-                    for i in 0..count {
-                        let idx = (start + i) as usize;
+                    let mut idx = start as usize;
+                    for i in 0..(count as isize) {
                         last_frame.callframe_vector[idx] = new_slice.incr(i);
+                        idx += 1;
                     }
                 } else {
                     let last_frame = self.get_frame_mut();
