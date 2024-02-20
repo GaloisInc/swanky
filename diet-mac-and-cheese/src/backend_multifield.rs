@@ -435,7 +435,7 @@ impl<
 // This should be expanded in the future to allow disjunctions over extension fields.
 impl<
         P: Party,
-        FP: PrimeFiniteField,
+        FP: PrimeFiniteField + SieveIrDeserialize,
         C: AbstractChannel + Clone,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFP: SvoleT<P, FP, FP>,
@@ -1599,7 +1599,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
 
     // All of these parameters are required to load a backend
     #[allow(clippy::too_many_arguments)]
-    fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField>(
+    fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize>(
         &mut self,
         channel: &mut C,
         rng: AesRng,
@@ -1699,7 +1699,9 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         Ok(())
     }
 
-    fn load_backend_fe_plaintext<FE: PrimeFiniteField + StatisticallySecureField>(
+    fn load_backend_fe_plaintext<
+        FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize,
+    >(
         &mut self,
         idx: usize,
     ) -> Result<()> {
@@ -1781,7 +1783,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     // All of these parameters are required to load a backend
     #[allow(clippy::too_many_arguments)]
     fn load_backend_multithreaded_fe<
-        FE: PrimeFiniteField + StatisticallySecureField,
+        FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize,
         C2: AbstractChannel + Clone + 'static + Send,
     >(
         &mut self,

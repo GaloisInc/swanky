@@ -15,6 +15,9 @@ use std::{
     marker::PhantomData,
 };
 use swanky_field::{FiniteField, PrimeFiniteField};
+use swanky_field_binary::{F40b, F2};
+use swanky_field_f61p::F61p;
+use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
 
 /// Types that can be deserialized from SIEVE IR constants.
 pub trait SieveIrDeserialize: Copy {
@@ -22,18 +25,31 @@ pub trait SieveIrDeserialize: Copy {
     fn from_number(val: &Number) -> Result<Self>;
 }
 
-impl<F: PrimeFiniteField> SieveIrDeserialize for F {
-    fn from_number(&val: &Number) -> Result<Self> {
-        let x = F::try_from_int(val);
-        if x.is_none().into() {
-            bail!(
-                "{val} is too large to be an element of {}",
-                type_name::<F>()
-            )
-        } else {
-            // Safe: We've already checked that x is not none.
-            Ok(x.unwrap())
-        }
+macro_rules! impl_sieve_ir_deserialize_prime_field {
+    ( $($t:ty),* ) => {
+        $( impl SieveIrDeserialize for $t {
+            fn from_number(&val: &Number) -> Result<Self> {
+                let x = <$t>::try_from_int(val);
+                if x.is_none().into() {
+                    bail!(
+                        "{val} is too large to be an element of {}",
+                        type_name::<$t>()
+                    )
+                } else {
+                    // Safe: We've already checked that x is not none.
+                    Ok(x.unwrap())
+                }
+            }
+        }) *
+    }
+}
+
+// NOTE: Must be updated with fields.rs!
+impl_sieve_ir_deserialize_prime_field! { F2, F61p, F128p, Secp256k1, Secp256k1order, F384p, F384q }
+
+impl SieveIrDeserialize for F40b {
+    fn from_number(_val: &Number) -> Result<Self> {
+        todo!("Implement for F40b")
     }
 }
 
