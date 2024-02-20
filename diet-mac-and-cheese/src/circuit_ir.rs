@@ -44,7 +44,7 @@ macro_rules! impl_sieve_ir_deserialize_prime_field {
     }
 }
 
-// NOTE: Must be updated with fields.rs!
+// NOTE: Must be kept up-to-date with fields.rs and backend_multifield::load_backend!
 impl_sieve_ir_deserialize_prime_field! { F2, F61p, F128p, Secp256k1, Secp256k1order, F384p, F384q }
 
 impl SieveIrDeserialize for F40b {
