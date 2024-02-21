@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use crate::{
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
+    dora::DoraState,
     homcom::FCom,
     mac::Mac,
     plugins::DisjunctionBody,
@@ -26,6 +29,7 @@ pub(crate) struct DietMacAndCheeseExtField<
 {
     dmc: DietMacAndCheese<P, F2, T, C, SVOLE1>,
     lifted_dmc: DietMacAndCheese<P, T, T, C, SVOLE2>,
+    dora_states: HashMap<usize, DoraState<P, T, T, C, SVOLE2>>,
 }
 
 impl<
@@ -48,7 +52,11 @@ where
     ) -> Result<Self> {
         let mut dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom, no_batching)?;
         let lifted_dmc = dmc.lift(lpn_setup, lpn_extend)?;
-        Ok(Self { dmc, lifted_dmc })
+        Ok(Self {
+            dmc,
+            lifted_dmc,
+            dora_states: Default::default(),
+        })
     }
 }
 
