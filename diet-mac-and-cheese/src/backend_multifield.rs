@@ -44,9 +44,7 @@ use std::io::{Read, Seek};
 use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_field::{
-    FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField, StatisticallySecureField,
-};
+use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
@@ -177,26 +175,6 @@ pub trait BackendRamT: BackendT {
 
     /// Finalize all operations on all RAMs.
     fn finalize_rams(&mut self) -> Result<()>;
-}
-
-impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
-    BackendDisjunctionT for DietMacAndCheese<P, V, F40b, C, SVOLE>
-where
-    <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
-{
-    fn disjunction(
-        &mut self,
-        _inswit: &mut FieldInputs,
-        _fun_store: &FunStore,
-        _inputs: &[Self::Wire],
-        _disj: &DisjunctionBody,
-    ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("disjunction plugin is not sound for GF(2)")
-    }
-
-    fn finalize_disj(&mut self) -> Result<()> {
-        Ok(())
-    }
 }
 
 impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
