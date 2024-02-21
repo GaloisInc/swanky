@@ -6,6 +6,7 @@ use crate::circuit_ir::{
     CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification,
     TypeStore, WireCount, WireId, WireRange,
 };
+use crate::dora::DoraState;
 use crate::edabits::{Conv, Edabits};
 use crate::fields::SieveIrDeserialize;
 use crate::homcom::FCom;
@@ -766,21 +767,6 @@ impl<
             .iter_mut()
             .try_for_each(|ram| ram.finalize(&mut self.dmc))
     }
-}
-
-pub(super) struct DoraState<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    // map used to lookup the guard -> active clause index
-    clause_resolver: ProverPrivate<P, HashMap<F, usize>>,
-    // dora for this particular switch/mux
-    dora: Dora<P, V, F, C, SvoleF>,
 }
 
 // II) Instance/Witness/Relation/Gates/FunStore
