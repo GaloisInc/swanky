@@ -1,6 +1,9 @@
 use swanky_field::FiniteField;
 
-use crate::circuit_ir::{self, FunStore, FunctionBody, GateM, SieveIrDeserialize, TypeId};
+use crate::{
+    circuit_ir::{self, FunStore, FunctionBody, GateM, TypeId},
+    fields::SieveIrDeserialize,
+};
 
 use super::DisjGate;
 

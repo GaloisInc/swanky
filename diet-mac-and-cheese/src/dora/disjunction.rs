@@ -3,7 +3,8 @@ use std::cmp;
 use scuttlebutt::field::FiniteField;
 
 use crate::{
-    circuit_ir::{FunStore, SieveIrDeserialize, WireCount},
+    circuit_ir::{FunStore, WireCount},
+    fields::SieveIrDeserialize,
     plugins::DisjunctionBody,
 };
 

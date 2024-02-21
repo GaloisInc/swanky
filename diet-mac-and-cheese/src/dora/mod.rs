@@ -33,7 +33,10 @@ pub use disjunction::Disjunction;
 pub use protocol::Dora;
 use translate::translate;
 
-use crate::circuit_ir::{FunStore, GateM, SieveIrDeserialize, TypeId};
+use crate::{
+    circuit_ir::{FunStore, GateM, TypeId},
+    fields::SieveIrDeserialize,
+};
 
 use generic_array::typenum::Unsigned;
 

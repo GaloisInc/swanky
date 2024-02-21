@@ -1,12 +1,13 @@
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_extfield::DietMacAndCheeseExtField;
+use crate::circuit_ir::ConvGate;
 use crate::circuit_ir::{
     CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification,
     TypeStore, WireCount, WireId, WireRange,
 };
-use crate::circuit_ir::{ConvGate, SieveIrDeserialize};
 use crate::edabits::{Conv, Edabits};
+use crate::fields::SieveIrDeserialize;
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
