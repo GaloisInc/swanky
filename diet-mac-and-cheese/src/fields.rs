@@ -171,4 +171,4 @@ macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
 }
 
 impl_sieve_ir_deserialize_prime_field! { F2, F61p, F128p, Secp256k1, Secp256k1order, F384p, F384q }
-impl_sieve_ir_deserialize_binary_ext_field! { F40b }
+impl_sieve_ir_deserialize_binary_ext_field! { F40b, F63b }
