@@ -1,11 +1,13 @@
+use eyre::bail;
 use generic_array::GenericArray;
 use std::{
     fmt::Debug,
     ops::{Add, Mul, Neg, Sub},
 };
 use subtle::{Choice, ConditionallySelectable};
-use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
-use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover};
+use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
+use swanky_field_binary::{F40b, F2};
+use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover, WhichParty};
 
 pub(crate) fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
@@ -43,6 +45,37 @@ impl<T: FiniteField> MacT for T {
 /// `t = v · Δ + k`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Mac<P: Party, V: Copy, T>(ProverPrivateCopy<P, V>, T);
+
+// TODO: Is this safe?
+impl<P: Party> From<Mac<P, F2, F40b>> for Mac<P, F40b, F40b> {
+    fn from(value: Mac<P, F2, F40b>) -> Self {
+        Mac::new(value.0.map(|v| v.into()), value.1)
+    }
+}
+
+// TODO: Is this safe?
+impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
+    type Error = eyre::Error;
+
+    fn try_from(value: Mac<P, F40b, F40b>) -> Result<Self, Self::Error> {
+        Ok(Mac::new(
+            match P::WHICH {
+                WhichParty::Prover(ev) => {
+                    if value.value().into_inner(ev) == F40b::ZERO {
+                        ProverPrivateCopy::new(F2::ZERO)
+                    } else if value.value().into_inner(ev) == F40b::ONE {
+                        ProverPrivateCopy::new(F2::ONE)
+                    } else {
+                        bail!("F40b value too large to be an F2 value.")
+                    }
+                }
+
+                WhichParty::Verifier(ev) => ProverPrivateCopy::empty(ev),
+            },
+            value.1,
+        ))
+    }
+}
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     #[inline]
