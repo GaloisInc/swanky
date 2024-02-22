@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    iter,
+};
 
 use crate::{
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
@@ -12,6 +15,7 @@ use crate::{
     DietMacAndCheese,
 };
 use eyre::Result;
+use generic_array::GenericArray;
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, IsSubFieldOf};
@@ -159,6 +163,23 @@ impl<
         _disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
         unimplemented!("disjunction plugin is not sound for GF(2)")
+        // Assumes `inputs` is in the expected input format (input wires in
+        // their proper order, then big-endian condition wires).
+        fn lift_guard<P: Party>(
+            inputs: &[Mac<P, F2, F40b>],
+            num_cond: usize,
+        ) -> Mac<P, F40b, F40b> {
+            Mac::lift(&GenericArray::from_iter(
+                inputs[inputs.len() - num_cond..]
+                    .iter()
+                    .copied()
+                    .rev()
+                    .chain(iter::repeat(Mac::new(
+                        ProverPrivateCopy::new(F2::ZERO),
+                        F40b::ZERO,
+                    ))),
+            ))
+        }
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
