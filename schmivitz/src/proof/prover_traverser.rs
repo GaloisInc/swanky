@@ -35,6 +35,8 @@ pub(crate) struct ProverTraverser<Vole> {
     assigned_voles: HashMap<WireId, F128b>,
     /// Count of how many of the custom VOLEs have been assigned.
     vole_assignment_count: usize,
+    /// Count of how many of the challenges have been assigned to polynomials (non-linear gates).
+    challenge_count: usize,
 
     /// Partial aggregation of the value $`\tilde a`$ from the protocol.
     ///
@@ -52,8 +54,8 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
     /// Requirements on inputs:
     /// - The `wire_values` must contain a corresponding value for the input and output wires on
     ///   every non-linear gate;
-    /// - The challenges must be exactly the length of the extended witness, according to the
-    ///   [`RandomVole`];
+    /// - The challenges must correspond to the number of polynomials. In this setting, that must
+    ///   be no greater than the length of the extended witness (as defined by the [`RandomVole`]);
     /// - The [`RandomVole::extended_witness_length()`] must be large enough to have a VOLE
     ///   corresponding to every gate in the extended witness.
     #[allow(unused)]
@@ -63,7 +65,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
         voles: Vole,
     ) -> Result<Self> {
         if wire_values.len() < challenges.len()
-            || voles.extended_witness_length() != challenges.len()
+            || voles.extended_witness_length() < challenges.len()
         {
             bail!(
                 "Bad input: Length of challenges ({}), extended witness ({}), and VOLEs ({}) did not meet requirements",
@@ -80,6 +82,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
             voles,
             assigned_voles: HashMap::new(),
             vole_assignment_count: 0,
+            challenge_count: 0,
 
             aggregate_degree_0: F128b::ZERO,
             aggregate_degree_1: F128b::ZERO,
@@ -136,29 +139,43 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
         }
     }
 
-    /// Assigns an unused VOLE to the wire ID and returns a challenge for the gate.
+    /// Assigns an unused VOLE to the wire ID.
     ///
     /// This should be called with the destination [`WireId`] for each non-linear gate.
     /// It should _not_ be used with linear gates! Use [`Self::save_computed_vole()`] to
     /// assign a VOLE value to a linear gate.
     ///
     /// Fails if there aren't enough VOLEs or if the [`WireId`] is already assigned to a VOLE.
-    fn assign_vole(&mut self, wid: WireId) -> Result<F128b> {
+    fn assign_vole(&mut self, wid: WireId) -> Result<()> {
         let next_index = self.vole_assignment_count;
         self.vole_assignment_count += 1;
 
         // These two checks should be equivalent because we checked at construction that the
         // challenge list is exactly the extended witness length.
-        if next_index >= self.voles.extended_witness_length() || next_index >= self.challenges.len()
-        {
+        if next_index >= self.voles.extended_witness_length() {
             bail!(
                 "Bad input: needed at least {} VOLEs, but only got {}",
-                next_index,
+                self.vole_assignment_count,
                 self.voles.extended_witness_length()
             )
         }
 
-        self.save_computed_vole(wid, self.voles.vole_mask(next_index)?)?;
+        self.save_computed_vole(wid, self.voles.vole_mask(next_index)?)
+    }
+
+    /// Retrieves the next unused challenge.
+    ///
+    /// Fails if there aren't enough challenges.
+    fn next_challenge(&mut self) -> Result<F128b> {
+        let next_index = self.challenge_count;
+        self.challenge_count += 1;
+        if next_index >= self.challenges.len() {
+            bail!(
+                "Bad input: needed at least {} challenges, but only got {}",
+                self.challenge_count,
+                self.challenges.len()
+            )
+        }
         Ok(self.challenges[next_index])
     }
 
@@ -166,13 +183,29 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
     /// full circuit traversal.
     ///
     /// The components that were passed to [`Self::new()`] are returned unchanged.
-    pub(crate) fn into_parts(self) -> (F128b, F128b, Vole, Vec<F128b>) {
-        (
+    ///
+    /// This will fail if there were unused challenges or VOLEs.
+    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, Vole, Vec<F128b>)> {
+        if self.challenge_count != self.challenges.len() {
+            bail!(
+                "Traversal contained more challenges than it needed! Had {}, used {}",
+                self.challenges.len(),
+                self.challenge_count
+            );
+        }
+        if self.vole_assignment_count != self.voles.extended_witness_length() {
+            bail!(
+                "Traversal contained more VOLEs than it needed! Had {}, used {}",
+                self.voles.extended_witness_length(),
+                self.vole_assignment_count
+            );
+        }
+        Ok((
             self.aggregate_degree_0,
             self.aggregate_degree_1,
             self.voles,
             self.challenges,
-        )
+        ))
     }
 }
 
@@ -201,7 +234,8 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
         assert_eq!(ty, 0);
 
         // Assign a fresh VOLE to the output wire and get the corresponding challenge
-        let challenge = self.assign_vole(dst)?;
+        self.assign_vole(dst)?;
+        let challenge = self.next_challenge()?;
 
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
@@ -242,7 +276,7 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
 
         // Assign a fresh VOLE to each of the output wires
         for wid in dst.start..=dst.end {
-            let _challenge = self.assign_vole(wid)?;
+            self.assign_vole(wid)?;
         }
 
         // Private input gates don't define a polynomial that would contribute to the aggregated

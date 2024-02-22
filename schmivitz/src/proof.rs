@@ -73,14 +73,13 @@ impl<Vole: RandomVole> Proof<Vole> {
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let mut circuit_preparer = ProverPreparer::new_from_path(private_input)?;
         reader.read(&mut circuit_preparer)?;
-        let (witness, wire_values) = circuit_preparer.into_parts();
-        let witness_len = witness.len();
+        let (witness, wire_values, challenge_count) = circuit_preparer.into_parts();
 
         // Update transcript with general public information
         transcript.append_public_values();
 
         // Get a set of random VOLEs, one for each value in the extended witness
-        let (voles, vole_challenge) = Vole::create(witness_len, transcript.as_mut(), rng);
+        let (voles, vole_challenge) = Vole::create(witness.len(), transcript.as_mut(), rng);
 
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
@@ -89,7 +88,7 @@ impl<Vole: RandomVole> Proof<Vole> {
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
         transcript.append_witness_commitment(witness_commitment.as_slice());
-        let witness_challenges = transcript.extract_witness_challenges(witness_len);
+        let witness_challenges = transcript.extract_witness_challenges(challenge_count);
 
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
@@ -97,7 +96,7 @@ impl<Vole: RandomVole> Proof<Vole> {
         let mut circuit_traverser = ProverTraverser::new(wire_values, witness_challenges, voles)?;
         RelationReader::new(circuit)?.read(&mut circuit_traverser)?;
         let (degree_0_aggregation, degree_1_aggregation, voles, witness_challenges) =
-            circuit_traverser.into_parts();
+            circuit_traverser.into_parts()?;
 
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
         let degree_0_mask = combine(voles.aggregate_commitment_masks());
@@ -251,13 +250,13 @@ impl Proof<InsecureVole> {
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let mut verifier_traverser = VerifierTraverser::new(
-            expected_witness_challenges,
+            self.witness_challenges.clone(),
             self.partial_decommitment.verifier_key(),
             masked_witnesses,
         )?;
         let reader = RelationReader::new(circuit)?;
         reader.read(&mut verifier_traverser)?;
-        let validation_aggregate = verifier_traverser.into_parts();
+        let validation_aggregate = verifier_traverser.into_parts()?;
 
         // Finally, compute c~ = aggregate + q*
         let validation = validation_aggregate + validation_mask;
@@ -298,6 +297,8 @@ mod tests {
     use merlin::Transcript;
     use rand::thread_rng;
     use std::io::Write;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F128b;
     use tempfile::tempdir;
 
     use crate::vole::insecure::InsecureVole;
@@ -476,6 +477,70 @@ mod tests {
         let transcript = &mut transcript();
         transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
         assert!(proof?.verify(&mut small_circuit, transcript).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn proof_requires_exact_number_of_challenges() -> Result<()> {
+        // Create a valid proof
+        let small_circuit_bytes = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 ... $4 <- @private(0);
+              $5 <- @add(0: $0, $0);
+              $6 <- @add(0: $0, $1);
+              $7 <- @add(0: $0, $2);
+              $8 <- @add(0: $0, $3);
+              $9 <- @add(0: $0, $4);
+              $10 <- @mul(0: $0, $5);
+              $11 <- @mul(0: $0, $6);
+              $12 <- @mul(0: $0, $7);
+              $13 <- @mul(0: $0, $8);
+              $14 <- @mul(0: $0, $9);
+            @end ";
+        let small_circuit = &mut Cursor::new(small_circuit_bytes.as_bytes());
+
+        let dir = tempdir()?;
+        let private_input_path = dir.path().join("basic_happy_small_test_path");
+        let mut private_input = File::create(private_input_path.clone())?;
+        let private_input_bytes = "version 2.0.0;
+            private_input;
+            @type field 2;
+            @begin
+                < 1 >;
+                < 0 >;
+                < 1 >;
+                < 0 >;
+                < 1 >;
+            @end ";
+        writeln!(private_input, "{}", private_input_bytes)?;
+
+        let rng = &mut thread_rng();
+
+        let proof = Proof::<InsecureVole>::prove::<_, _>(
+            &mut small_circuit.clone(),
+            &private_input_path,
+            &mut transcript(),
+            rng,
+        )?;
+
+        // Adding an extra challenge should fail
+        let mut too_many_challenges = proof.clone();
+        too_many_challenges
+            .witness_challenges
+            .push(F128b::random(rng));
+        assert!(too_many_challenges
+            .verify(&mut small_circuit.clone(), &mut transcript())
+            .is_err());
+
+        // Not having enough challenges should fail
+        let mut too_few_challenges = proof.clone();
+        too_few_challenges.witness_challenges.pop();
+        assert!(too_few_challenges
+            .verify(small_circuit, &mut transcript())
+            .is_err());
 
         Ok(())
     }

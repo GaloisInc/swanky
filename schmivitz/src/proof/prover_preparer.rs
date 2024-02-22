@@ -33,6 +33,9 @@ where
     /// Set of wire values that correspond to elements in the extended witness.
     witness: Vec<F2>,
 
+    /// Number of polynomials that will need challenges.
+    challenge_count: usize,
+
     /// Private input stream, used in circuit evaluation.
     private_inputs: StreamReader,
 }
@@ -44,6 +47,7 @@ impl ProverPreparer<ValueStreamReader<File>> {
         Ok(Self {
             wire_values: HashMap::default(),
             witness: Vec::default(),
+            challenge_count: 0,
             private_inputs,
         })
     }
@@ -68,11 +72,11 @@ impl<StreamReader: ValueStreamReaderT> ProverPreparer<StreamReader> {
         Ok(())
     }
 
-    /// Get the witness and wire values.
+    /// Get the witness, wire values, and number of challenges required.
     ///
     /// These values will be empty if the circuit has not yet been traversed.
-    pub(crate) fn into_parts(self) -> (Vec<F2>, HashMap<WireId, F2>) {
-        (self.witness, self.wire_values)
+    pub(crate) fn into_parts(self) -> (Vec<F2>, HashMap<WireId, F2>, usize) {
+        (self.witness, self.wire_values, self.challenge_count)
     }
 }
 
@@ -98,6 +102,8 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<St
     fn mul(&mut self, ty: TypeId, dst: WireId, left: WireId, right: WireId) -> eyre::Result<()> {
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
+
+        self.challenge_count += 1;
 
         let product = match (self.wire_values.get(&left), self.wire_values.get(&right)) {
             (Some(l_val), Some(r_val)) => l_val * r_val,

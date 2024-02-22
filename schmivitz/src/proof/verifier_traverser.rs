@@ -15,8 +15,10 @@ use swanky_field_binary::F128b;
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
 pub(crate) struct VerifierTraverser {
-    /// Fiat-Shamir challenges. There should be one for each extended witness value.
+    /// Fiat-Shamir challenges. There should be one for each polynomial (non-linear gate).
     challenges: Vec<F128b>,
+    /// Number of challenges that have been assigned to a wire, so far.
+    challenge_count: usize,
 
     /// Verifier's chosen random VOLE key ($`\Delta`$ in the paper).
     verifier_key: F128b,
@@ -52,15 +54,16 @@ impl VerifierTraverser {
         verifier_key: F128b,
         masked_witnesses: Vec<F128b>,
     ) -> Result<Self> {
-        if challenges.len() != masked_witnesses.len() {
+        if challenges.len() > masked_witnesses.len() {
             bail!(
-                "Bad input: There should be the same number of challenges ({}) and masked witnesses ({})",
+                "Bad input: There should be no more challenges ({}) than masked witnesses ({})",
                 challenges.len(),
                 masked_witnesses.len(),
             );
         }
         Ok(Self {
             challenges,
+            challenge_count: 0,
             verifier_key,
             masked_witnesses,
             assigned_masked_witnesses: HashMap::new(),
@@ -95,21 +98,36 @@ impl VerifierTraverser {
     ///
     /// Fails if there aren't enough unused witnesses or if the [`WireId`] is already assigned to
     /// a masked witness.
-    fn assign_masked_witness(&mut self, wid: WireId) -> Result<F128b> {
+    fn assign_masked_witness(&mut self, wid: WireId) -> Result<()> {
         let next_index = self.assigned_witness_count;
         self.assigned_witness_count += 1;
 
         // These two checks should be equivalent because we checked at construction that the
         // challenge list is exactly the extended witness length.
-        if next_index >= self.masked_witnesses.len() || next_index >= self.challenges.len() {
+        if next_index >= self.masked_witnesses.len() {
             bail!(
                 "Bad input: needed at least {} masked witnesses, but only got {}",
-                next_index,
+                self.assigned_witness_count,
                 self.masked_witnesses.len()
             )
         }
 
-        self.save_computed_masked_witness(wid, self.masked_witnesses[next_index])?;
+        self.save_computed_masked_witness(wid, self.masked_witnesses[next_index])
+    }
+
+    /// Retrieves the next unused challenge.
+    ///
+    /// Fails if there aren't enough challenges.
+    fn next_challenge(&mut self) -> Result<F128b> {
+        let next_index = self.challenge_count;
+        self.challenge_count += 1;
+        if next_index >= self.challenges.len() {
+            bail!(
+                "Bad input: needed at least {} challenges, but only got {}",
+                self.challenge_count,
+                self.challenges.len()
+            )
+        }
         Ok(self.challenges[next_index])
     }
 
@@ -131,8 +149,26 @@ impl VerifierTraverser {
             .copied()
     }
 
-    pub(crate) fn into_parts(self) -> F128b {
-        self.aggregate
+    /// Decomposes into the aggregate component (a partial construction of `c~`) that was built
+    /// during full circuit traversal.
+    ///
+    /// This will fail if there were unused challenges or masked witnesses.
+    pub(crate) fn into_parts(self) -> Result<F128b> {
+        if self.challenge_count != self.challenges.len() {
+            bail!(
+                "Proof contained more challenges than it needed! Had {}, used {}",
+                self.challenges.len(),
+                self.challenge_count
+            );
+        }
+        if self.assigned_witness_count != self.masked_witnesses.len() {
+            bail!(
+                "Proof contained more masked witnesses than it needed! Had {}, used {}",
+                self.masked_witnesses.len(),
+                self.assigned_witness_count
+            );
+        }
+        Ok(self.aggregate)
     }
 }
 
@@ -163,7 +199,8 @@ impl FunctionBodyVisitor for VerifierTraverser {
         assert_eq!(ty, 0);
 
         // Assign the next masked witness to the destination wire
-        let challenge = self.assign_masked_witness(dst)?;
+        self.assign_masked_witness(dst)?;
+        let challenge = self.next_challenge()?;
 
         // Compute the contibution to the aggregate: ci​(Δ) = q_left * ​q_right ​− q_dst * ​Δ
         let eval = self.masked_witness(left)? * self.masked_witness(right)?
@@ -201,7 +238,7 @@ impl FunctionBodyVisitor for VerifierTraverser {
         // For each of the output wires:
         for wid in dst.start..=dst.end {
             // Assign a fresh masked witness to the wire
-            let _challenge = self.assign_masked_witness(wid)?;
+            self.assign_masked_witness(wid)?;
 
             // Private input gates don't define a polynomial that would contribute to the aggregate
             // being computed, so we ignore the challenge
