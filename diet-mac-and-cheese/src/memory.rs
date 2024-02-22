@@ -4,7 +4,6 @@ use crate::circuit_ir::WireId;
 use log::{debug, info};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Bound;
 use std::ptr::null_mut;
@@ -366,8 +365,8 @@ where
 // A frame is made of
 // 1) a call frame, and
 // 2) a memory frame. The memory frame can be either
-//    a) a `Pool` of allocated wire (`BTreeMap`) and a map unallocated wires (`HashMap`), or
-//    b) a vector for both allocated and unallocated wires.
+//    a) a `Pool` of allocated wire and a map of unallocated wires (`BTreeMap`), or
+//    b) a vector containing both allocated and unallocated wires.
 // The decision whether the memory frame is a pool or a vector is left to the function `push_frame`
 // provided the information about the `args_count` and `body_max`
 #[derive(Debug)]
@@ -380,7 +379,7 @@ struct Frame<X> {
     memframe_pool: Pool<X>,
     memframe_is_vector: bool,
     memframe_vector: Vec<X>,
-    memframe_unallocated: HashMap<WireId, Box<X>>,
+    memframe_unallocated: BTreeMap<WireId, Box<X>>,
     counter: usize,
 }
 
@@ -396,7 +395,7 @@ where
             callframe_vector: vec![],
             memframe_pool: Pool::new(),
             memframe_is_vector: false,
-            memframe_unallocated: HashMap::new(),
+            memframe_unallocated: BTreeMap::new(),
             memframe_vector: vec![Default::default(); VEC_SIZE_INIT],
             counter: 0,
         }
