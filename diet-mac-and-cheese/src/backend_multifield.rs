@@ -486,7 +486,7 @@ impl<
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
-                let disjunction = Disjunction::compile(disj, fun_store);
+                let disjunction = Disjunction::compile(disj, disj.cond(), fun_store);
 
                 let mut resolver: ProverPrivate<P, HashMap<FP, _>> =
                     ProverPrivate::new(Default::default());

@@ -21,7 +21,7 @@ pub struct Disjunction<F: FiniteField> {
 }
 
 impl<FP: FiniteField + SieveIrDeserialize> Disjunction<FP> {
-    pub fn compile(disj: &DisjunctionBody, fun_store: &FunStore) -> Self {
+    pub fn compile(disj: &DisjunctionBody, num_cond: u64, fun_store: &FunStore) -> Self {
         Self::new(
             disj.clauses().map(|cls| {
                 let guard = FP::from_number(&cls.guard).unwrap();
@@ -34,7 +34,7 @@ impl<FP: FiniteField + SieveIrDeserialize> Disjunction<FP> {
                     cls.body.gates(),
                 )
             }),
-            disj.inputs() + disj.cond(),
+            disj.inputs() + num_cond,
             disj.outputs(),
         )
     }
