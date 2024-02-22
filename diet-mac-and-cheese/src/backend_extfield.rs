@@ -18,7 +18,7 @@ use eyre::Result;
 use generic_array::GenericArray;
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
-use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
 use swanky_party::Party;
 
@@ -179,6 +179,20 @@ impl<
                         F40b::ZERO,
                     ))),
             ))
+        }
+
+        // Assumes `inputs` is in the expected input format.
+        fn adjust_inputs<P: Party>(
+            inputs: &[Mac<P, F2, F40b>],
+            num_cond: usize,
+            guard: Mac<P, F40b, F40b>,
+        ) -> Vec<Mac<P, F40b, F40b>> {
+            inputs[..inputs.len() - num_cond]
+                .iter()
+                .copied()
+                .map(|x| x.into())
+                .chain(iter::once(guard))
+                .collect()
         }
     }
 
