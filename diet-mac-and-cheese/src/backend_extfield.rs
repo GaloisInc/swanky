@@ -8,6 +8,7 @@ use crate::{
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
     dora::{Disjunction, Dora, DoraState},
+    fields::SieveIrDeserialize,
     homcom::FCom,
     mac::Mac,
     plugins::DisjunctionBody,
@@ -160,12 +161,11 @@ impl<
 {
     fn disjunction(
         &mut self,
-        _inswit: &mut FieldInputs,
-        _fun_store: &FunStore,
-        _inputs: &[Self::Wire],
-        _disj: &DisjunctionBody,
+        inswit: &mut FieldInputs,
+        fun_store: &FunStore,
+        inputs: &[Self::Wire],
+        disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("disjunction plugin is not sound for GF(2)")
         // Assumes `inputs` is in the expected input format (input wires in
         // their proper order, then big-endian condition wires).
         fn lift_guard<P: Party>(
@@ -241,6 +241,44 @@ impl<
                 .copied()
                 .map(<Mac<P, F2, F40b>>::try_from)
                 .collect()
+        }
+
+        match self.dora_states.entry(disj.id()) {
+            Entry::Occupied(mut entry) => execute_branch::<_, _, _, SVOLE1, _>(
+                &mut self.lifted_dmc,
+                inswit.wit_iter::<F2>(),
+                inputs,
+                disj.cond() as usize,
+                entry.get_mut(),
+            ),
+            Entry::Vacant(entry) => {
+                // Compile disjunction to F40b
+                // Note that this uses 1 condition wire!
+                let disjunction = Disjunction::compile(disj, 1, fun_store);
+
+                let mut resolver: ProverPrivate<P, HashMap<F40b, _>> = ProverPrivate::default();
+                if let WhichParty::Prover(ev) = P::WHICH {
+                    for (i, guard) in disj.guards().enumerate() {
+                        let guard = F40b::from_number(guard).unwrap();
+                        resolver.as_mut().into_inner(ev).insert(guard, i);
+                    }
+                }
+
+                // Create a new Dora instance
+                let dora = entry.insert(DoraState {
+                    dora: Dora::new(disjunction),
+                    clause_resolver: resolver,
+                });
+
+                // Compute opt
+                execute_branch::<_, _, _, SVOLE1, _>(
+                    &mut self.lifted_dmc,
+                    inswit.wit_iter::<F2>(),
+                    inputs,
+                    disj.cond() as usize,
+                    dora,
+                )
+            }
         }
     }
 
