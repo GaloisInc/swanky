@@ -162,6 +162,9 @@ impl<
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
+        for (_, disj) in std::mem::take(&mut self.dora_states) {
+            disj.dora.finalize(&mut self.lifted_dmc)?;
+        }
         Ok(())
     }
 }
