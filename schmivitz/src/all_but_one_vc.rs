@@ -41,7 +41,7 @@ pub(crate) type Seed = U8x16;
 ///
 /// In general a PRG generates a stream of randomness, but the 1-VC scheme only needs
 /// the PRG to generate 2 random keys from a key in the GGM tree.
-/// Therefore its interface is specialized to this with the [`encrypt_double`] function.
+/// Therefore its interface is specialized to this with the [`PRG::encrypt_double()`] function.
 #[allow(clippy::upper_case_acronyms)]
 pub(crate) struct PRG {
     aes0: Aes128EncryptOnly,
@@ -85,7 +85,7 @@ fn blake3_to_2_u8x16(v: [u8; 32]) -> (U8x16, U8x16) {
     )
 }
 
-/// Hash function that generates a [`Seed`] and a [`Com`]mitment from a [`Key`] and an initialization vector [`iv`].
+/// Hash function that generates a [`Seed`] and a [`Com`]mitment from a [`Key`] and an initialization vector [`IV`].
 ///
 /// This function is applied on the leaves keys of the Tree-PRG/GGM-tree to generate the seeds and commitments.
 /// This function corresponds to the H0 in the FAEST spec, defined page 16.

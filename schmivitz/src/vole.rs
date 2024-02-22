@@ -43,6 +43,12 @@ where
     /// the protocol.
     type Decommitment;
 
+    /// Type of the challenge generated when creating the VOLEs.
+    type VoleChallenge;
+
+    /// Type of the challenge generated when decommitting the VOLEs.
+    type VoleDecommitmentChallenge;
+
     /// Create a set of random VOLEs.
     ///
     /// This is particular to the protocol by Baum et al., so the total number of VOLEs created
@@ -56,20 +62,24 @@ where
     /// any public inputs to the circuit; and
     /// any external context provided at the application level.
     /// Internally, it must incorporate any additional public parameters defined by this
-    /// instantiation of `RandomVole`.
+    /// instantiation of `RandomVole` before generating the [`RandomVole::VoleChallenge`].
     fn create(
         extended_witness_length: usize,
         transcript: &mut Transcript,
         rng: &mut (impl CryptoRng + RngCore),
-    ) -> Self;
+    ) -> (Self, Self::VoleChallenge);
 
-    /// This method updates the transcript with the extended witness length, plus any additional
-    /// public parameters or public information known at time of creation.
+    /// Update the transcript with the extended witness length, plus any additional public
+    /// parameters or public information known at time of creation, and generate the challenge
+    /// used to create the random VOLE instances.
     ///
     /// It's implemented as a separate method so that a verifier can independently update the
     /// transcript without creating any VOLEs. A reasonable implementation would also call this
     /// method directly in the [`RandomVole::create()`] method.
-    fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize);
+    fn extract_vole_challenge(
+        transcript: &mut Transcript,
+        extended_witness_length: usize,
+    ) -> Self::VoleChallenge;
 
     /// Get the total number of VOLE correlations supported by this random VOLE instance.
     ///
@@ -120,12 +130,24 @@ where
     /// value returned by [`RandomVole::extended_witness_length()`].
     fn vole_mask(&self, i: usize) -> Result<F128b>;
 
+    /// This method extracts a challenge used to decommit to the VOLEs.
+    ///
+    /// It's implemented as a separate method so that a verifier can independently derive the
+    /// challenge without acutally calling the `decommit()` method (which is the responsibility of
+    /// the prover). A reasonable implementation would also call this
+    /// method directly in the [`RandomVole::decommit()`] method.
+    fn extract_decommitment_challenge(
+        transcript: &mut Transcript,
+    ) -> Self::VoleDecommitmentChallenge;
+
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
     /// This method simulates the verifier revealing their choice bits and receiving the
     /// decommitments to the VOLEs. As mentioned above, this must consume the VOLEs because
     /// it would be insecure for the prover to make any further computations based on the random
-    /// VOLEs after the verifier "reveals" their choice bits.
+    /// VOLEs after the verifier "reveals" their choice bits. The "verifier's choice" is simulated
+    /// via the [`RandomVole::VoleDecommitmentChallenge`] type, which must also be returned from
+    /// this function so it can be encoded into the proof.
     ///
     /// In the paper, this is implicit in Figure 7, Verification, step 1. However, the paper is
     /// written interactively; in this implementation, this will be called by the prover and the
@@ -134,5 +156,8 @@ where
     /// The [`Transcript`] passed to this method must incorporate all public information contained
     /// in the proof, including the commitment to the de-randomized VOLEs ($`\tilde a`$ and
     /// $`\tilde b`$ in the paper).
-    fn decommit(self, transcript: &mut Transcript) -> Self::Decommitment;
+    fn decommit(
+        self,
+        transcript: &mut Transcript,
+    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge);
 }

@@ -37,8 +37,13 @@ pub(crate) struct InsecureVole {
 }
 impl RandomVole for InsecureVole {
     type Decommitment = InsecureCommitments;
+    type VoleChallenge = [u8; 16];
+    type VoleDecommitmentChallenge = [u8; 16];
 
-    fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize) {
+    fn extract_vole_challenge(
+        transcript: &mut Transcript,
+        extended_witness_length: usize,
+    ) -> Self::VoleChallenge {
         transcript.append_message(
             b"VOLE type",
             format!(
@@ -47,16 +52,19 @@ impl RandomVole for InsecureVole {
             )
             .as_bytes(),
         );
+        let mut challenge = [0; 16];
+        transcript.challenge_bytes(b"insecure VOLE creation challenge", &mut challenge);
+        challenge
     }
 
     fn create(
         extended_witness_length: usize,
         transcript: &mut merlin::Transcript,
         rng: &mut (impl CryptoRng + RngCore),
-    ) -> Self {
+    ) -> (Self, Self::VoleChallenge) {
         // In a secure version of VOLE, we would populate the transcript with more useful
         // or relevant context about the VOLE instantiation.
-        Self::update_transcript(transcript, extended_witness_length);
+        let challenge = Self::extract_vole_challenge(transcript, extended_witness_length);
 
         let total_vole_count = extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
 
@@ -84,12 +92,15 @@ impl RandomVole for InsecureVole {
         .take(total_vole_count)
         .collect();
 
-        Self {
-            extended_witness_length,
-            values,
-            verifier_key,
-            masks,
-        }
+        (
+            Self {
+                extended_witness_length,
+                values,
+                verifier_key,
+                masks,
+            },
+            challenge,
+        )
     }
 
     fn count(&self) -> usize {
@@ -135,10 +146,22 @@ impl RandomVole for InsecureVole {
         Ok(F8b::form_superfield(&self.masks[i].into()))
     }
 
-    fn decommit(self, _transcript: &mut merlin::Transcript) -> Self::Decommitment {
+    fn extract_decommitment_challenge(
+        transcript: &mut Transcript,
+    ) -> Self::VoleDecommitmentChallenge {
+        let mut challenge = [0; 16];
+        transcript.challenge_bytes(b"insecure VOLE decommitment challenge", &mut challenge);
+        challenge
+    }
+
+    fn decommit(
+        self,
+        transcript: &mut merlin::Transcript,
+    ) -> (Self::Decommitment, Self::VoleDecommitmentChallenge) {
         // NB: in a real protocol, we would decommit based on a challenge pulled from the
-        // transcript. This is fully insecure, so there's no validation that the verifier
-        // could actually do.
+        // transcript. In the insecure version, we don't actually use this challenge to
+        // determine anything about the decommitment, but we still generate it for fun.
+        let challenge = Self::extract_decommitment_challenge(transcript);
 
         // Compute uΔ^T (where Δ^T is the transpose of the verifier key)
         let u_delta = self
@@ -159,11 +182,14 @@ impl RandomVole for InsecureVole {
             })
             .collect::<Vec<_>>();
 
-        Self::Decommitment {
-            extended_witness_length: self.extended_witness_length,
-            verifier_key: self.verifier_key,
-            verifier_commitments,
-        }
+        (
+            Self::Decommitment {
+                extended_witness_length: self.extended_witness_length,
+                verifier_key: self.verifier_key,
+                verifier_commitments,
+            },
+            challenge,
+        )
     }
 }
 
@@ -252,7 +278,7 @@ mod tests {
         let transcript = &mut Transcript::new(b"testing");
 
         let witness = 100;
-        let voles = InsecureVole::create(witness, transcript, rng);
+        let (voles, _challenge) = InsecureVole::create(witness, transcript, rng);
 
         assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
         assert_eq!(voles.witness_mask().len(), witness);
@@ -268,7 +294,7 @@ mod tests {
             }
         }
 
-        let decom = voles.decommit(transcript);
+        let (decom, _challenge) = voles.decommit(transcript);
 
         assert_eq!(decom.extended_witness_length(), witness);
         assert_eq!(decom.witness_voles().len(), witness);

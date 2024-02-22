@@ -18,12 +18,12 @@ use crate::vole::RandomVole;
 pub(crate) struct ProverTraverser<Vole> {
     /// Map containing the full set of wire values for the entire circuit.
     ///
-    /// Note: It is actually only necessary for this to contain the input wires for
-    /// multiplication gates, but the current structure of the
-    /// [`VoleCircuitPreparer`](crate::prove::witness_counter::VoleCircuitPreparer) will produce
-    /// the full set.
+    /// Note: For the currently-accepted set of gates, it is actually only necessary for this to
+    /// contain the input wires for multiplication gates, but the current structure of the
+    /// [`ProverPreparer`](crate::proof::prover_preparer::ProverPreparer) will produce
+    /// the full set of wire values.
     wire_values: HashMap<WireId, F2>,
-    /// Fiat-Shamir challenges. There should be one for each extended witness value.
+    /// Fiat-Shamir challenges. There should be one for each polynomial (e.g. non-linear gate).
     challenges: Vec<F128b>,
 
     /// Random VOLE values. There should be one for each extended witness value.
@@ -313,7 +313,7 @@ mod tests {
         let transcript = &mut Transcript::new(b"dummy for tests");
         let rng = &mut thread_rng();
 
-        let voles = InsecureVole::create(len, transcript, rng);
+        let (voles, _) = InsecureVole::create(len, transcript, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
         let wire_ids = repeat_with(|| (rng.gen(), F2::random(rng))).take(len);
         ProverTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
