@@ -1,3 +1,5 @@
+use swanky_field::FiniteField;
+
 use crate::{
     circuit_ir::{self, FunStore, FunctionBody, GateM, TypeId},
     fields::SieveIrDeserialize,
@@ -61,7 +63,7 @@ impl WireFrame {
 }
 
 /// Translates a SIEVE-IR gate to a list of `DisjGate`
-pub(crate) fn translate<F: SieveIrDeserialize>(
+pub(crate) fn translate<F: FiniteField + SieveIrDeserialize>(
     inputs: usize,
     outputs: usize,
     disj_gates: &mut Vec<DisjGate<F>>,
@@ -78,7 +80,7 @@ pub(crate) fn translate<F: SieveIrDeserialize>(
     );
 }
 
-fn translate_gates<F: SieveIrDeserialize>(
+fn translate_gates<F: FiniteField + SieveIrDeserialize>(
     disj_gates: &mut Vec<DisjGate<F>>,
     fun_store: &FunStore,
     typ: TypeId,
@@ -92,7 +94,7 @@ fn translate_gates<F: SieveIrDeserialize>(
 
 // Translates `gate` to one or more `DisjGate`, pushing the result(s) to
 // `disj_gates`. Checks that all gates are for `typ`.
-fn translate_gate<F: SieveIrDeserialize>(
+fn translate_gate<F: FiniteField + SieveIrDeserialize>(
     disj_gates: &mut Vec<DisjGate<F>>,
     fun_store: &FunStore,
     typ: TypeId,

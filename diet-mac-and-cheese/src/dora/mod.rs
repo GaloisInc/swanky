@@ -81,7 +81,7 @@ pub struct Clause<F: FiniteField> {
     gates: Vec<DisjGate<F>>,
 }
 
-impl<F: SieveIrDeserialize> Clause<F> {
+impl<F: FiniteField + SieveIrDeserialize> Clause<F> {
     /// also acts as a sanitizer to verify that only disjunction safe gates are used
     ///
     /// It add gates to enforce the guard for each clause,

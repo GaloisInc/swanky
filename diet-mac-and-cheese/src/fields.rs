@@ -8,7 +8,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use mac_n_cheese_sieve_parser::Number;
 use scuttlebutt::serialization::CanonicalSerialize;
 use std::any::{type_name, TypeId};
-use swanky_field::{FiniteField, PrimeFiniteField};
+use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F40b, F63b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
@@ -133,7 +133,7 @@ pub(crate) fn extension_field_to_type_id(
 }
 
 /// Types that can be deserialized from SIEVE IR constants.
-pub trait SieveIrDeserialize: FiniteField {
+pub trait SieveIrDeserialize: Copy {
     /// Deserialize a value from a [`Number`].
     fn from_number(val: &Number) -> Result<Self>;
 }
