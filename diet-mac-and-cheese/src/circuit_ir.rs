@@ -13,7 +13,6 @@ use std::{
     collections::{BTreeMap, VecDeque},
     marker::PhantomData,
 };
-use swanky_field::FiniteField;
 
 /// The wire index.
 pub type WireId = u64;
@@ -755,7 +754,7 @@ impl TapeT for Tape {
 #[repr(transparent)]
 pub struct TapeF<'a, F>(&'a mut Box<dyn TapeT>, PhantomData<F>);
 
-impl<'a, F: FiniteField + SieveIrDeserialize> Iterator for TapeF<'a, F> {
+impl<'a, F: SieveIrDeserialize> Iterator for TapeF<'a, F> {
     type Item = F;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -20,7 +20,7 @@ pub struct Disjunction<F: FiniteField> {
     clauses: Vec<R1CS<F>>, // R1CS relations for each clause
 }
 
-impl<FP: FiniteField + SieveIrDeserialize> Disjunction<FP> {
+impl<FP: SieveIrDeserialize> Disjunction<FP> {
     pub fn compile(disj: &DisjunctionBody, num_cond: u64, fun_store: &FunStore) -> Self {
         Self::new(
             disj.clauses().map(|cls| {
