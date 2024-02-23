@@ -923,7 +923,6 @@ impl<T: Read + Seek> ValueStreamReader<T> {
         };
         let mut buf = Vec::with_capacity(128);
         ps.expect_token(&mut buf, b"version")?;
-        ps.expect_token(&mut buf, b"2.0.0")?;
         ps.read_while(|x| Ok(x != b';'))?;
         ps.semi()?;
         ps.token(&mut buf)?;
