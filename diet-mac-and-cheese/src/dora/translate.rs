@@ -262,7 +262,7 @@ fn translate_gate<F: FiniteField + SieveIrDeserialize>(
             // cells allocated in the child scope as "next" is reset.
         }
 
-        GateM::New(_, _, _) | GateM::Comment(_) => {}
+        GateM::New(_, _, _) | GateM::Delete(_, _, _) | GateM::Comment(_) => {}
         _ => panic!("unsupported gate: {:?}", gate),
     }
 }
