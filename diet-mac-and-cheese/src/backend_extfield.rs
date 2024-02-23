@@ -177,10 +177,10 @@ impl<
                     .iter()
                     .copied()
                     .rev()
-                    .chain(iter::repeat(Mac::new(
-                        ProverPrivateCopy::new(F2::ZERO),
-                        F40b::ZERO,
-                    ))),
+                    .chain(
+                        iter::repeat(Mac::new(ProverPrivateCopy::new(F2::ZERO), F40b::ZERO))
+                            .take(40 - num_cond),
+                    ),
             ))
         }
 
