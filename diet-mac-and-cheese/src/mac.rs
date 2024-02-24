@@ -240,4 +240,20 @@ mod tests {
             validate(prover, verifier, delta);
         }
     }
+
+    #[test]
+    fn mac_f2_mac_f40b_roundtrip() {
+        let zero: Mac<Prover, F2, F40b> = Mac::new(ProverPrivateCopy::new(F2::ZERO), F40b::ZERO);
+        let one: Mac<Prover, F2, F40b> = Mac::new(ProverPrivateCopy::new(F2::ONE), F40b::ZERO);
+
+        assert_eq!(
+            <Mac<_, _, _>>::try_from(<Mac<_, F40b, _>>::from(zero)).unwrap(),
+            zero
+        );
+
+        assert_eq!(
+            <Mac<_, _, _>>::try_from(<Mac<_, F40b, _>>::from(one)).unwrap(),
+            one
+        );
+    }
 }
