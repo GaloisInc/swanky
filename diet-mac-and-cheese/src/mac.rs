@@ -4,7 +4,7 @@ use std::{
     fmt::Debug,
     ops::{Add, Mul, Neg, Sub},
 };
-use subtle::{Choice, ConditionallySelectable};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
 use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover, WhichParty};
@@ -61,12 +61,19 @@ impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
         Ok(Mac::new(
             match P::WHICH {
                 WhichParty::Prover(ev) => {
-                    if value.value().into_inner(ev) == F40b::ZERO {
-                        ProverPrivateCopy::new(F2::ZERO)
-                    } else if value.value().into_inner(ev) == F40b::ONE {
-                        ProverPrivateCopy::new(F2::ONE)
-                    } else {
+                    let value_eq_zero = value.value().into_inner(ev).ct_eq(&F40b::ZERO);
+                    let value_eq_one = value.value().into_inner(ev).ct_eq(&F40b::ONE);
+
+                    let res = CtOption::new(
+                        F2::conditional_select(&F2::ZERO, &F2::ONE, value_eq_one),
+                        value_eq_zero | value_eq_one,
+                    );
+
+                    if res.is_none().into() {
                         bail!("F40b value too large to be an F2 value.")
+                    } else {
+                        // Safe: We've already checked that res is not none.
+                        ProverPrivateCopy::new(res.unwrap())
                     }
                 }
 
