@@ -21,10 +21,7 @@ use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
-use swanky_party::{
-    private::{ProverPrivate, ProverPrivateCopy},
-    Party, WhichParty,
-};
+use swanky_party::{private::ProverPrivate, Party, WhichParty};
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
@@ -168,7 +165,8 @@ impl<
     ) -> Result<Vec<Self::Wire>> {
         // Assumes `inputs` is in the expected input format (input wires in
         // their proper order, then big-endian condition wires).
-        fn lift_guard<P: Party>(
+        fn lift_guard<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>>(
+            dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
             inputs: &[Mac<P, F2, F40b>],
             num_cond: usize,
         ) -> Mac<P, F40b, F40b> {
@@ -177,10 +175,7 @@ impl<
                     .iter()
                     .copied()
                     .rev()
-                    .chain(
-                        iter::repeat(Mac::new(ProverPrivateCopy::new(F2::ZERO), F40b::ZERO))
-                            .take(40 - num_cond),
-                    ),
+                    .chain(iter::repeat(dmc.input_public(F2::ZERO).unwrap()).take(40 - num_cond)),
             ))
         }
 
@@ -205,6 +200,7 @@ impl<
             SVOLE1: SvoleT<P, F2, F40b>,
             SVOLE2: SvoleT<P, F40b, F40b>,
         >(
+            dmcf2: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE1>,
             dmc: &mut DietMacAndCheese<P, F40b, F40b, C, SVOLE2>,
             wit_tape: I,
             inputs: &[<DietMacAndCheese<P, F2, F40b, C, SVOLE1> as BackendT>::Wire],
@@ -220,7 +216,7 @@ impl<
             // The guard is given by the last `cond` inputs.
             // These are F2 values in big-endian order, so we reverse and append
             // zeroes to pad to 40 bits, lifting to F40b.
-            let guard_val: Mac<P, F40b, F40b> = lift_guard(inputs, cond);
+            let guard_val: Mac<P, F40b, F40b> = lift_guard(dmcf2, inputs, cond);
 
             // Look up the clause based on the guard
             let opt = st
@@ -245,6 +241,7 @@ impl<
 
         match self.dora_states.entry(disj.id()) {
             Entry::Occupied(mut entry) => execute_branch::<_, _, _, SVOLE1, _>(
+                &mut self.dmc,
                 &mut self.lifted_dmc,
                 inswit.wit_iter::<F2>(),
                 inputs,
@@ -272,6 +269,7 @@ impl<
 
                 // Compute opt
                 execute_branch::<_, _, _, SVOLE1, _>(
+                    &mut self.dmc,
                     &mut self.lifted_dmc,
                     inswit.wit_iter::<F2>(),
                     inputs,
