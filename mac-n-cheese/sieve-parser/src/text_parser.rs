@@ -811,12 +811,43 @@ impl<T: Read + Seek> RelationReader<T> {
             self.ps.token(&mut buf)?;
             let operation = String::from_utf8_lossy(&buf).to_string();
 
+            // More permissive than the spec: Can intermix arguments and
+            // instance/witness declarations
             let mut args = Vec::new();
+            let mut private_counts = Vec::new();
+            let mut public_counts = Vec::new();
+            let mut dst;
+
             while self.ps.peek()? == Some(b',') {
                 self.ps.expect_byte(b',')?;
                 match self.ps.peek()? {
                     Some(x) if x.is_ascii_digit() => {
                         args.push(PluginTypeArg::Number(self.ps.parse_uint_generic()?))
+                    }
+                    Some(b'@') => {
+                        self.ps.consume_byte()?;
+                        self.ps.ws()?;
+                        match self.ps.consume_byte()? {
+                            b'p' => match self.ps.consume_byte()? {
+                                b'r' => {
+                                    self.ps.expect_token(&mut buf, b"ivate")?;
+                                    dst = &mut private_counts;
+                                }
+                                b'u' => {
+                                    self.ps.expect_token(&mut buf, b"blic")?;
+                                    dst = &mut public_counts;
+                                }
+                                ch => {
+                                    eyre::bail!("Expected 'r' or 'u'. Got {:?}", ascii_str(&[ch]))
+                                }
+                            },
+                            ch => eyre::bail!("Expected 'p'. Got {:?}", ascii_str(&[ch])),
+                        }
+                        self.ps.colon()?;
+                        let ty = self.ps.u8()?;
+                        self.ps.colon()?;
+                        let count = self.ps.u64()?;
+                        dst.push(TypedCount { ty, count });
                     }
                     _ => {
                         self.ps.token(&mut buf)?;
@@ -826,42 +857,7 @@ impl<T: Read + Seek> RelationReader<T> {
                     }
                 }
             }
-
-            let mut private_counts = Vec::new();
-            let mut public_counts = Vec::new();
-            let mut dst = &mut private_counts;
-            loop {
-                match self.ps.consume_byte()? {
-                    b',' => {}
-                    b')' => break,
-                    ch => eyre::bail!("Expected ',' or ')'. Got {:?}", ascii_str(&[ch])),
-                }
-
-                if self.ps.peek()? == Some(b'@') {
-                    self.ps.consume_byte()?;
-                    self.ps.ws()?;
-                    match self.ps.consume_byte()? {
-                        b'p' => match self.ps.consume_byte()? {
-                            b'r' => {
-                                self.ps.expect_token(&mut buf, b"ivate")?;
-                                dst = &mut private_counts;
-                            }
-                            b'u' => {
-                                self.ps.expect_token(&mut buf, b"blic")?;
-                                dst = &mut public_counts;
-                            }
-                            ch => eyre::bail!("Expected 'r' or 'u'. Got {:?}", ascii_str(&[ch])),
-                        },
-                        ch => eyre::bail!("Expected 'p'. Got {:?}", ascii_str(&[ch])),
-                    }
-                    self.ps.colon()?;
-                }
-
-                let ty = self.ps.u8()?;
-                self.ps.colon()?;
-                let count = self.ps.u64()?;
-                dst.push(TypedCount { ty, count });
-            }
+            self.ps.expect_byte(b')')?;
             self.ps.semi()?;
 
             rv.define_plugin_function(
