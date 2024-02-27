@@ -215,9 +215,12 @@ impl<T: Read + Seek> ParseState<T> {
         );
         Ok(())
     }
+    fn peek_exact(&mut self) -> eyre::Result<Option<u8>> {
+        Ok(self.inner.fill_buf()?.first().copied())
+    }
     fn peek(&mut self) -> eyre::Result<Option<u8>> {
         self.ws()?;
-        Ok(self.inner.fill_buf()?.first().copied())
+        self.peek_exact()
     }
 
     fn peek_n_bytes(&mut self, n: usize) -> eyre::Result<&[u8]> {
