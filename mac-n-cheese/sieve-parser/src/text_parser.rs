@@ -292,6 +292,11 @@ impl<T: Read + Seek> ParseState<T> {
     }
     fn valid_token_byte(ch: u8) -> bool {
         matches!(ch, b'0'..=b'9' | b'A'..=b'Z' | b'a' ..= b'z' | b'_' | b':' | b'.')
+    fn is_valid_token_start(ch: u8) -> bool {
+        matches!(ch, b'a'..=b'z' | b'A'..=b'Z' | b'_')
+    }
+    fn is_valid_token_char(ch: u8) -> bool {
+        Self::is_valid_token_start(ch) | matches!(ch, b'0'..=b'9')
     }
     fn larrow(&mut self) -> eyre::Result<()> {
         self.expect_byte(b'<')?;
