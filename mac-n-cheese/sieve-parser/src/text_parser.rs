@@ -122,9 +122,8 @@ impl<T: Read + Seek> ParseState<T> {
 
     /// Read a token consisting of
     /// ```regex
-    /// [a-zA-Z0-9\.:_]+
+    /// [a-zA-Z_][a-zA-Z0-9_]*((.|::)[a-zA-Z_][a-zA-Z0-9_]*)*
     /// ```
-    /// This is a bit more permisive than what the sieve IR spec allows.
     ///
     /// This clears the destination buffer.
     fn token(&mut self, dst: &mut Vec<u8>) -> eyre::Result<()> {
