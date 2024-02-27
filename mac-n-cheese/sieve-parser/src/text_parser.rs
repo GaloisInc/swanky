@@ -128,6 +128,28 @@ impl<T: Read + Seek> ParseState<T> {
     ///
     /// This clears the destination buffer.
     fn token(&mut self, dst: &mut Vec<u8>) -> eyre::Result<()> {
+        // NOTE: This helper function does not clear dst!
+        fn token_part<T: Read + Seek>(
+            ps: &mut ParseState<T>,
+            dst: &mut Vec<u8>,
+        ) -> eyre::Result<()> {
+            let byte = ps.consume_byte().context("Expected token")?;
+            eyre::ensure!(
+                ParseState::<T>::is_valid_token_start(byte),
+                "Invalid token start character {:X}",
+                byte
+            );
+            dst.push(byte);
+            ps.read_while(|byte| {
+                if ParseState::<T>::is_valid_token_char(byte) {
+                    dst.push(byte);
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            })
+        }
+
         dst.clear();
         self.ws()?;
         let byte = self.consume_byte().context("Expected token")?;
