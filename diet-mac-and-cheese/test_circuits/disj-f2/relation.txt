@@ -1,0 +1,46 @@
+version 2.0.0;
+circuit;
+@plugin disjunction_v0;
+@type field 2;
+
+@begin
+
+@function(clause_cond5, @out: 0:1, @in: 0:3)
+    $4 <- @mulc($2, <1>); // * -1
+    $5 <- @add($1, $4);
+    @assert_zero($5);
+
+    $0 <- $3;
+@end
+
+@function(clause_cond7, @out: 0:1, @in: 0:3)
+    $4 <- @mulc($2, <1>); // * -1
+    $5 <- @add($1, $4);
+
+    $6 <- @mul($5, $3);
+
+    $7 <- @addc($6, <1>); // + -1
+    @assert_zero($7);
+
+    $0 <- $2;
+@end
+
+@function(branch_example, @out: 0:1, @in: 0:4, 0:3)
+    @plugin(disjunction_v0, switch, strict, 5, clause_cond5, 7, clause_cond7, @private: 0:0);
+
+// Guard value; currently 5, change $2 to <1> for 7
+@new($0 ... $3);
+$0 <- <0>;
+$1 <- <1>;
+$2 <- <0>;
+$3 <- <1>;
+
+// Some bits. If using a guard of 5, make sure $4 == $5. If using a guard of 7,
+// make sure $4 != $5.
+@new($4 ... $6);
+$4 <- <1>;
+$5 <- <1>;
+$6 <- <1>;
+
+$7 <- @call(branch_example, $0 ... $3, $4 ... $6);
+@end
