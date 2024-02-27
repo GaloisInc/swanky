@@ -25,6 +25,19 @@ circuit;
     $0 <- $2;
 @end
 
+// branch_example is roughly equivalent to the following pseudo-C:
+// F branch_example(F cond, F a, F b, F c) {
+//     switch (cond) {
+//         case 5:
+//             assert(a == b);
+//             return c;
+//         case 7:
+//             assert(a != b);
+//             return b;
+//         default:
+//             assert(false);
+//     }
+// }
 @function(branch_example, @out: 0:1, @in: 0:4, 0:3)
     @plugin(disjunction_v0, switch, strict, 5, clause_cond5, 7, clause_cond7, @private: 0:0);
 
