@@ -152,21 +152,25 @@ impl<T: Read + Seek> ParseState<T> {
 
         dst.clear();
         self.ws()?;
-        let byte = self.consume_byte().context("Expected token")?;
-        eyre::ensure!(
-            Self::valid_token_byte(byte),
-            "Invalid token character {:X}",
-            byte
-        );
-        dst.push(byte);
-        self.read_while(|byte| {
-            if Self::valid_token_byte(byte) {
-                dst.push(byte);
-                Ok(true)
-            } else {
-                Ok(false)
+        token_part(self, dst)?;
+        loop {
+            match self.peek_n_exact(2)? {
+                Some([b'.', _]) => {
+                    self.consume_byte()?;
+                    dst.push(b'.');
+                    token_part(self, dst)?;
+                }
+                Some([b':', b':']) => {
+                    self.consume_byte()?;
+                    self.consume_byte()?;
+                    dst.push(b':');
+                    dst.push(b':');
+                    token_part(self, dst)?;
+                }
+                _ => break,
             }
-        })?;
+        }
+
         Ok(())
     }
     fn expect_byte(&mut self, expected: u8) -> eyre::Result<()> {
@@ -322,8 +326,6 @@ impl<T: Read + Seek> ParseState<T> {
         let out: Number = self.parse_uint_generic()?;
         Ok(out)
     }
-    fn valid_token_byte(ch: u8) -> bool {
-        matches!(ch, b'0'..=b'9' | b'A'..=b'Z' | b'a' ..= b'z' | b'_' | b':' | b'.')
     fn is_valid_token_start(ch: u8) -> bool {
         matches!(ch, b'a'..=b'z' | b'A'..=b'Z' | b'_')
     }
