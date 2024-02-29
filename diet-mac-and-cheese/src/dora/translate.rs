@@ -9,6 +9,7 @@ use crate::{
 
 use super::DisjGate;
 
+// TODO: Use `u64` instead of `usize` for wasm32 support.
 #[derive(Default)]
 struct WireFrame {
     // next available cell number
