@@ -122,29 +122,54 @@ impl<T: Read + Seek> ParseState<T> {
 
     /// Read a token consisting of
     /// ```regex
-    /// [a-zA-Z0-9\.:_]+
+    /// [a-zA-Z_][a-zA-Z0-9_]*((.|::)[a-zA-Z_][a-zA-Z0-9_]*)*
     /// ```
-    /// This is a bit more permisive than what the sieve IR spec allows.
     ///
     /// This clears the destination buffer.
     fn token(&mut self, dst: &mut Vec<u8>) -> eyre::Result<()> {
+        // NOTE: This helper function does not clear dst!
+        fn token_part<T: Read + Seek>(
+            ps: &mut ParseState<T>,
+            dst: &mut Vec<u8>,
+        ) -> eyre::Result<()> {
+            let byte = ps.consume_byte().context("Expected token")?;
+            eyre::ensure!(
+                ParseState::<T>::is_valid_token_start(byte),
+                "Invalid token start character {:X}",
+                byte
+            );
+            dst.push(byte);
+            ps.read_while(|byte| {
+                if ParseState::<T>::is_valid_token_char(byte) {
+                    dst.push(byte);
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            })
+        }
+
         dst.clear();
         self.ws()?;
-        let byte = self.consume_byte().context("Expected token")?;
-        eyre::ensure!(
-            Self::valid_token_byte(byte),
-            "Invalid token character {:X}",
-            byte
-        );
-        dst.push(byte);
-        self.read_while(|byte| {
-            if Self::valid_token_byte(byte) {
-                dst.push(byte);
-                Ok(true)
-            } else {
-                Ok(false)
+        token_part(self, dst)?;
+        loop {
+            match self.peek_n_exact(2)? {
+                Some([b'.', _]) => {
+                    self.consume_byte()?;
+                    dst.push(b'.');
+                    token_part(self, dst)?;
+                }
+                Some([b':', b':']) => {
+                    self.consume_byte()?;
+                    self.consume_byte()?;
+                    dst.push(b':');
+                    dst.push(b':');
+                    token_part(self, dst)?;
+                }
+                _ => break,
             }
-        })?;
+        }
+
         Ok(())
     }
     fn expect_byte(&mut self, expected: u8) -> eyre::Result<()> {
@@ -193,9 +218,19 @@ impl<T: Read + Seek> ParseState<T> {
         );
         Ok(())
     }
+    fn peek_exact(&mut self) -> eyre::Result<Option<u8>> {
+        Ok(self.inner.fill_buf()?.first().copied())
+    }
+    fn peek_n_exact(&mut self, n: usize) -> eyre::Result<Option<&[u8]>> {
+        let buf = self.inner.fill_buf()?;
+        if n > buf.len() {
+            return Ok(None);
+        }
+        Ok(Some(&buf[..n]))
+    }
     fn peek(&mut self) -> eyre::Result<Option<u8>> {
         self.ws()?;
-        Ok(self.inner.fill_buf()?.first().copied())
+        self.peek_exact()
     }
 
     fn peek_n_bytes(&mut self, n: usize) -> eyre::Result<&[u8]> {
@@ -290,8 +325,11 @@ impl<T: Read + Seek> ParseState<T> {
         let out: Number = self.parse_uint_generic()?;
         Ok(out)
     }
-    fn valid_token_byte(ch: u8) -> bool {
-        matches!(ch, b'0'..=b'9' | b'A'..=b'Z' | b'a' ..= b'z' | b'_' | b':' | b'.')
+    fn is_valid_token_start(ch: u8) -> bool {
+        matches!(ch, b'a'..=b'z' | b'A'..=b'Z' | b'_')
+    }
+    fn is_valid_token_char(ch: u8) -> bool {
+        Self::is_valid_token_start(ch) | matches!(ch, b'0'..=b'9')
     }
     fn larrow(&mut self) -> eyre::Result<()> {
         self.expect_byte(b'<')?;

@@ -1,55 +1,48 @@
+use std::collections::BTreeMap;
+
 use swanky_field::FiniteField;
 
-use crate::circuit_ir::{self, FunStore, FunctionBody, GateM, SieveIrDeserialize, TypeId};
+use crate::{
+    circuit_ir::{self, FunStore, FunctionBody, GateM, TypeId},
+    fields::SieveIrDeserialize,
+};
 
 use super::DisjGate;
 
+// TODO: Use `u64` instead of `usize` for wasm32 support.
 #[derive(Default)]
 struct WireFrame {
     // next available cell number
     next: usize,
     // maps SIEVE wire ids (index) to cell numbers
-    alias: Vec<Option<super::WireId>>,
+    alias: BTreeMap<usize, super::WireId>,
 }
 
 impl WireFrame {
     fn new(inputs: usize, outputs: usize) -> Self {
         WireFrame {
             next: inputs + outputs,
-            alias: (0..inputs + outputs).map(Some).collect(),
+            alias: (0..inputs + outputs).map(|i| (i, i)).collect(),
         }
     }
 
     // translates a SIEVE wire id to a cell number
     fn translate(&mut self, org: circuit_ir::WireId) -> super::WireId {
         let idx = org as usize;
-        if self.alias.len() <= idx {
-            self.alias.resize(idx + 1, None);
-        }
 
-        match &mut self.alias[idx] {
-            Some(cell) => *cell,
-            tx => {
-                let cell = self.next;
-                self.next = cell + 1;
-                *tx = Some(cell);
-                cell
-            }
-        }
+        *self.alias.entry(idx).or_insert_with(|| {
+            let cell = self.next;
+            self.next = cell + 1;
+            cell
+        })
     }
 
     // descend into a child scope (used with function calls)
     fn descend(&self, map: Vec<(circuit_ir::WireId, super::WireId)>) -> Self {
         // create initial alias map
-        let size = map
-            .iter()
-            .map(|(org, _)| (*org + 1) as usize)
-            .max()
-            .unwrap_or(0);
-
-        let mut alias = vec![None; size];
+        let mut alias = BTreeMap::new();
         for (org, dst) in map {
-            alias[org as usize] = Some(dst);
+            alias.insert(org as usize, dst);
         }
 
         WireFrame {
@@ -259,7 +252,7 @@ fn translate_gate<F: FiniteField + SieveIrDeserialize>(
             // cells allocated in the child scope as "next" is reset.
         }
 
-        GateM::New(_, _, _) | GateM::Comment(_) => {}
+        GateM::New(_, _, _) | GateM::Delete(_, _, _) | GateM::Comment(_) => {}
         _ => panic!("unsupported gate: {:?}", gate),
     }
 }

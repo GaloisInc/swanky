@@ -72,7 +72,7 @@ fn get_dora_id() -> usize {
 pub(crate) struct DisjunctionV0;
 
 impl Plugin for DisjunctionV0 {
-    const NAME: &'static str = "galois_disjunction_v0";
+    const NAME: &'static str = "disjunction_v0";
 
     fn instantiate(
         operation: &str,

@@ -4,13 +4,16 @@
 //! `backend_multifield::load_backend`!
 
 use eyre::{bail, ensure, Result};
+use generic_array::{typenum::Unsigned, GenericArray};
 use mac_n_cheese_sieve_parser::Number;
-use std::any::TypeId;
-#[cfg(test)]
+use scuttlebutt::serialization::CanonicalSerialize;
+use std::any::{type_name, TypeId};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F40b, F63b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
+
+use crate::number_to_u64;
 
 // Note: We can't use `PrimeFiniteField::modulus_int` because it is not `const`.
 
@@ -128,3 +131,44 @@ pub(crate) fn extension_field_to_type_id(
         _ => bail!("Degree {degree} not supported. Only degrees of 40 and 63 are supported."),
     }
 }
+
+/// Types that can be deserialized from SIEVE IR constants.
+pub trait SieveIrDeserialize: Copy {
+    /// Deserialize a value from a [`Number`].
+    fn from_number(val: &Number) -> Result<Self>;
+}
+
+macro_rules! impl_sieve_ir_deserialize_prime_field {
+    ( $($t:ty),* ) => {
+        $( impl SieveIrDeserialize for $t {
+            fn from_number(&val: &Number) -> Result<Self> {
+                let x = <$t>::try_from_int(val);
+                if x.is_none().into() {
+                    bail!(
+                        "{val} is too large to be an element of {}",
+                        type_name::<$t>()
+                    )
+                } else {
+                    // Safe: We've already checked that x is not none.
+                    Ok(x.unwrap())
+                }
+            }
+        }) *
+    }
+}
+
+macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
+    ( $($t:ty),* ) => {
+        $( impl SieveIrDeserialize for $t {
+            fn from_number(val: &Number) -> Result<Self> {
+                let val = number_to_u64(val)?;
+                Ok(<$t>::from_bytes(GenericArray::from_slice(
+                    &val.to_le_bytes()[0..<$t as CanonicalSerialize>::ByteReprLen::USIZE],
+                ))?)
+            }
+        }) *
+    }
+}
+
+impl_sieve_ir_deserialize_prime_field! { F2, F61p, F128p, Secp256k1, Secp256k1order, F384p, F384q }
+impl_sieve_ir_deserialize_binary_ext_field! { F40b, F63b }

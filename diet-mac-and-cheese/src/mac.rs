@@ -1,11 +1,13 @@
+use eyre::bail;
 use generic_array::GenericArray;
 use std::{
     fmt::Debug,
     ops::{Add, Mul, Neg, Sub},
 };
-use subtle::{Choice, ConditionallySelectable};
-use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
-use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
+use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
+use swanky_field_binary::{F40b, F2};
+use swanky_party::{private::ProverPrivateCopy, IsParty, Party, Prover, WhichParty};
 
 pub(crate) fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
     let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
@@ -43,6 +45,44 @@ impl<T: FiniteField> MacT for T {
 /// `t = v · Δ + k`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Mac<P: Party, V: Copy, T>(ProverPrivateCopy<P, V>, T);
+
+// TODO: Is this safe?
+impl<P: Party> From<Mac<P, F2, F40b>> for Mac<P, F40b, F40b> {
+    fn from(value: Mac<P, F2, F40b>) -> Self {
+        Mac::new(value.0.map(|v| v.into()), value.1)
+    }
+}
+
+// TODO: Is this safe?
+impl<P: Party> TryFrom<Mac<P, F40b, F40b>> for Mac<P, F2, F40b> {
+    type Error = eyre::Error;
+
+    fn try_from(value: Mac<P, F40b, F40b>) -> Result<Self, Self::Error> {
+        Ok(Mac::new(
+            match P::WHICH {
+                WhichParty::Prover(ev) => {
+                    let value_eq_zero = value.value().into_inner(ev).ct_eq(&F40b::ZERO);
+                    let value_eq_one = value.value().into_inner(ev).ct_eq(&F40b::ONE);
+
+                    let res = CtOption::new(
+                        F2::conditional_select(&F2::ZERO, &F2::ONE, value_eq_one),
+                        value_eq_zero | value_eq_one,
+                    );
+
+                    if res.is_none().into() {
+                        bail!("F40b value too large to be an F2 value.")
+                    } else {
+                        // Safe: We've already checked that res is not none.
+                        ProverPrivateCopy::new(res.unwrap())
+                    }
+                }
+
+                WhichParty::Verifier(ev) => ProverPrivateCopy::empty(ev),
+            },
+            value.1,
+        ))
+    }
+}
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     #[inline]
@@ -199,5 +239,21 @@ mod tests {
 
             validate(prover, verifier, delta);
         }
+    }
+
+    #[test]
+    fn mac_f2_mac_f40b_roundtrip() {
+        let zero: Mac<Prover, F2, F40b> = Mac::new(ProverPrivateCopy::new(F2::ZERO), F40b::ZERO);
+        let one: Mac<Prover, F2, F40b> = Mac::new(ProverPrivateCopy::new(F2::ONE), F40b::ZERO);
+
+        assert_eq!(
+            <Mac<_, _, _>>::try_from(<Mac<_, F40b, _>>::from(zero)).unwrap(),
+            zero
+        );
+
+        assert_eq!(
+            <Mac<_, _, _>>::try_from(<Mac<_, F40b, _>>::from(one)).unwrap(),
+            one
+        );
     }
 }

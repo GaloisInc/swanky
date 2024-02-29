@@ -1,4 +1,6 @@
-use scuttlebutt::field::FiniteField;
+use std::collections::HashMap;
+
+use scuttlebutt::{field::FiniteField, AbstractChannel};
 
 // handling of (FS) transcripts
 mod tx;
@@ -31,9 +33,15 @@ type WireId = usize;
 
 pub use disjunction::Disjunction;
 pub use protocol::Dora;
+use swanky_field::IsSubFieldOf;
+use swanky_party::{private::ProverPrivate, Party};
 use translate::translate;
 
-use crate::circuit_ir::{FunStore, GateM, SieveIrDeserialize, TypeId};
+use crate::{
+    circuit_ir::{FunStore, GateM, TypeId},
+    fields::SieveIrDeserialize,
+    svole_trait::SvoleT,
+};
 
 use generic_array::typenum::Unsigned;
 
@@ -114,4 +122,19 @@ impl<F: FiniteField + SieveIrDeserialize> Clause<F> {
         body.shrink_to_fit();
         Clause { gates: body }
     }
+}
+
+pub struct DoraState<
+    P: Party,
+    V: IsSubFieldOf<F>,
+    F: FiniteField,
+    C: AbstractChannel + Clone,
+    SvoleF: SvoleT<P, V, F>,
+> where
+    F::PrimeField: IsSubFieldOf<V>,
+{
+    // map used to lookup the guard -> active clause index
+    pub clause_resolver: ProverPrivate<P, HashMap<F, usize>>,
+    // dora for this particular switch/mux
+    pub dora: Dora<P, V, F, C, SvoleF>,
 }

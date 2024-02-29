@@ -1,7 +1,14 @@
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    iter,
+};
+
 use crate::{
     backend_multifield::{BackendConvT, BackendDisjunctionT, BackendLiftT, BackendRamT, RamId},
     backend_trait::BackendT,
     circuit_ir::{FieldInputs, FunStore},
+    dora::{Disjunction, Dora, DoraState},
+    fields::SieveIrDeserialize,
     homcom::FCom,
     mac::Mac,
     plugins::DisjunctionBody,
@@ -9,11 +16,12 @@ use crate::{
     DietMacAndCheese,
 };
 use eyre::Result;
+use generic_array::GenericArray;
 use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
-use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
-use swanky_party::Party;
+use swanky_party::{private::ProverPrivate, Party, WhichParty};
 
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
@@ -26,6 +34,7 @@ pub(crate) struct DietMacAndCheeseExtField<
 {
     dmc: DietMacAndCheese<P, F2, T, C, SVOLE1>,
     lifted_dmc: DietMacAndCheese<P, T, T, C, SVOLE2>,
+    dora_states: HashMap<usize, DoraState<P, T, T, C, SVOLE2>>,
 }
 
 impl<
@@ -48,7 +57,11 @@ where
     ) -> Result<Self> {
         let mut dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom, no_batching)?;
         let lifted_dmc = dmc.lift(lpn_setup, lpn_extend)?;
-        Ok(Self { dmc, lifted_dmc })
+        Ok(Self {
+            dmc,
+            lifted_dmc,
+            dora_states: Default::default(),
+        })
     }
 }
 
@@ -145,15 +158,132 @@ impl<
 {
     fn disjunction(
         &mut self,
-        _inswit: &mut FieldInputs,
-        _fun_store: &FunStore,
-        _inputs: &[Self::Wire],
-        _disj: &DisjunctionBody,
+        inswit: &mut FieldInputs,
+        fun_store: &FunStore,
+        inputs: &[Self::Wire],
+        disj: &DisjunctionBody,
     ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("disjunction plugin is not sound for GF(2)")
+        // Assumes `inputs` is in the expected input format (input wires in
+        // their proper order, then big-endian condition wires).
+        fn lift_guard<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>>(
+            dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
+            inputs: &[Mac<P, F2, F40b>],
+            num_cond: usize,
+        ) -> Mac<P, F40b, F40b> {
+            Mac::lift(&GenericArray::from_iter(
+                inputs[inputs.len() - num_cond..]
+                    .iter()
+                    .copied()
+                    .rev()
+                    .chain(iter::repeat(dmc.input_public(F2::ZERO).unwrap()).take(40 - num_cond)),
+            ))
+        }
+
+        // Assumes `inputs` is in the expected input format.
+        fn adjust_inputs<P: Party>(
+            inputs: &[Mac<P, F2, F40b>],
+            num_cond: usize,
+            guard: Mac<P, F40b, F40b>,
+        ) -> Vec<Mac<P, F40b, F40b>> {
+            inputs[..inputs.len() - num_cond]
+                .iter()
+                .copied()
+                .map(|x| x.into())
+                .chain(iter::once(guard))
+                .collect()
+        }
+
+        fn execute_branch<
+            I: Iterator<Item = F2>,
+            P: Party,
+            C: AbstractChannel + Clone,
+            SVOLE1: SvoleT<P, F2, F40b>,
+            SVOLE2: SvoleT<P, F40b, F40b>,
+        >(
+            dmcf2: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE1>,
+            dmc: &mut DietMacAndCheese<P, F40b, F40b, C, SVOLE2>,
+            wit_tape: I,
+            inputs: &[<DietMacAndCheese<P, F2, F40b, C, SVOLE1> as BackendT>::Wire],
+            cond: usize,
+            st: &mut DoraState<P, F40b, F40b, C, SVOLE2>,
+        ) -> Result<Vec<<DietMacAndCheese<P, F2, F40b, C, SVOLE1> as BackendT>::Wire>> {
+            // Must have at least one condition wire
+            debug_assert!(cond > 0);
+
+            // But no more than 40!
+            debug_assert!(cond <= 40);
+
+            // The guard is given by the last `cond` inputs.
+            // These are F2 values in big-endian order, so we reverse and append
+            // zeroes to pad to 40 bits, lifting to F40b.
+            let guard_val: Mac<P, F40b, F40b> = lift_guard(dmcf2, inputs, cond);
+
+            // Look up the clause based on the guard
+            let opt = st
+                .clause_resolver
+                .as_ref()
+                .zip(guard_val.value().into())
+                .map(|(resolver, guard)| {
+                    *resolver.get(&guard).expect("no clause guard is satisfied")
+                })
+                .into();
+
+            // Need to adjust the inputs to use exactly one condition wire
+            let adjusted_inputs = adjust_inputs(inputs, cond, guard_val);
+
+            st.dora
+                .mux(dmc, wit_tape.map(|x| x.into()), &adjusted_inputs, opt)?
+                .iter()
+                .copied()
+                .map(<Mac<P, F2, F40b>>::try_from)
+                .collect()
+        }
+
+        match self.dora_states.entry(disj.id()) {
+            Entry::Occupied(mut entry) => execute_branch::<_, _, _, SVOLE1, _>(
+                &mut self.dmc,
+                &mut self.lifted_dmc,
+                inswit.wit_iter::<F2>(),
+                inputs,
+                disj.cond() as usize,
+                entry.get_mut(),
+            ),
+            Entry::Vacant(entry) => {
+                // Compile disjunction to F40b
+                // Note that this uses 1 condition wire!
+                let disjunction = Disjunction::compile(disj, 1, fun_store);
+
+                let mut resolver: ProverPrivate<P, HashMap<F40b, _>> = ProverPrivate::default();
+                if let WhichParty::Prover(ev) = P::WHICH {
+                    for (i, guard) in disj.guards().enumerate() {
+                        let guard = F40b::from_number(guard).unwrap();
+                        resolver.as_mut().into_inner(ev).insert(guard, i);
+                    }
+                }
+
+                // Create a new Dora instance
+                let dora = entry.insert(DoraState {
+                    dora: Dora::new(disjunction),
+                    clause_resolver: resolver,
+                });
+
+                // Compute opt
+                execute_branch::<_, _, _, SVOLE1, _>(
+                    &mut self.dmc,
+                    &mut self.lifted_dmc,
+                    inswit.wit_iter::<F2>(),
+                    inputs,
+                    disj.cond() as usize,
+                    dora,
+                )
+            }
+        }
     }
 
     fn finalize_disj(&mut self) -> Result<()> {
+        for (_, disj) in std::mem::take(&mut self.dora_states) {
+            disj.dora.finalize(&mut self.lifted_dmc)?;
+        }
         Ok(())
     }
 }

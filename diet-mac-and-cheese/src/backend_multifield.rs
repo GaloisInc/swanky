@@ -1,12 +1,14 @@
 //! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
 
 use crate::backend_extfield::DietMacAndCheeseExtField;
+use crate::circuit_ir::ConvGate;
 use crate::circuit_ir::{
     CircInputs, CompiledInfo, FieldInputs, FunId, FunStore, FuncDecl, GateM, TypeSpecification,
     TypeStore, WireCount, WireId, WireRange,
 };
-use crate::circuit_ir::{ConvGate, SieveIrDeserialize};
+use crate::dora::DoraState;
 use crate::edabits::{Conv, Edabits};
+use crate::fields::SieveIrDeserialize;
 use crate::homcom::FCom;
 use crate::mac::{Mac, MacT};
 use crate::memory::Memory;
@@ -42,9 +44,7 @@ use std::io::{Read, Seek};
 use std::iter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_field::{
-    FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField, StatisticallySecureField,
-};
+use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
@@ -175,26 +175,6 @@ pub trait BackendRamT: BackendT {
 
     /// Finalize all operations on all RAMs.
     fn finalize_rams(&mut self) -> Result<()>;
-}
-
-impl<P: Party, V: IsSubFieldOf<F40b>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, V, F40b>>
-    BackendDisjunctionT for DietMacAndCheese<P, V, F40b, C, SVOLE>
-where
-    <F40b as FiniteField>::PrimeField: IsSubFieldOf<V>,
-{
-    fn disjunction(
-        &mut self,
-        _inswit: &mut FieldInputs,
-        _fun_store: &FunStore,
-        _inputs: &[Self::Wire],
-        _disj: &DisjunctionBody,
-    ) -> Result<Vec<Self::Wire>> {
-        unimplemented!("disjunction plugin is not sound for GF(2)")
-    }
-
-    fn finalize_disj(&mut self) -> Result<()> {
-        Ok(())
-    }
 }
 
 impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
@@ -435,7 +415,7 @@ impl<
 // This should be expanded in the future to allow disjunctions over extension fields.
 impl<
         P: Party,
-        FP: PrimeFiniteField,
+        FP: PrimeFiniteField + SieveIrDeserialize,
         C: AbstractChannel + Clone,
         SvoleF2: SvoleT<P, F2, F40b>,
         SvoleFP: SvoleT<P, FP, FP>,
@@ -506,7 +486,7 @@ impl<
             },
             Entry::Vacant(entry) => {
                 // compile disjunction to the field
-                let disjunction = Disjunction::compile(disj, fun_store);
+                let disjunction = Disjunction::compile(disj, disj.cond(), fun_store);
 
                 let mut resolver: ProverPrivate<P, HashMap<FP, _>> =
                     ProverPrivate::new(Default::default());
@@ -765,21 +745,6 @@ impl<
             .iter_mut()
             .try_for_each(|ram| ram.finalize(&mut self.dmc))
     }
-}
-
-pub(super) struct DoraState<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> where
-    F::PrimeField: IsSubFieldOf<V>,
-{
-    // map used to lookup the guard -> active clause index
-    clause_resolver: ProverPrivate<P, HashMap<F, usize>>,
-    // dora for this particular switch/mux
-    dora: Dora<P, V, F, C, SvoleF>,
 }
 
 // II) Instance/Witness/Relation/Gates/FunStore
@@ -1599,7 +1564,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
 
     // All of these parameters are required to load a backend
     #[allow(clippy::too_many_arguments)]
-    fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField>(
+    fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize>(
         &mut self,
         channel: &mut C,
         rng: AesRng,
@@ -1699,7 +1664,9 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         Ok(())
     }
 
-    fn load_backend_fe_plaintext<FE: PrimeFiniteField + StatisticallySecureField>(
+    fn load_backend_fe_plaintext<
+        FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize,
+    >(
         &mut self,
         idx: usize,
     ) -> Result<()> {
@@ -1781,7 +1748,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     // All of these parameters are required to load a backend
     #[allow(clippy::too_many_arguments)]
     fn load_backend_multithreaded_fe<
-        FE: PrimeFiniteField + StatisticallySecureField,
+        FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize,
         C2: AbstractChannel + Clone + 'static + Send,
     >(
         &mut self,
