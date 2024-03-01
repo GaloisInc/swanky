@@ -12,6 +12,7 @@ use crate::{
     homcom::FCom,
     mac::Mac,
     plugins::DisjunctionBody,
+    ram::BooleanRam,
     svole_trait::SvoleT,
     DietMacAndCheese,
 };
@@ -35,6 +36,7 @@ pub(crate) struct DietMacAndCheeseExtField<
     dmc: DietMacAndCheese<P, F2, T, C, SVOLE1>,
     lifted_dmc: DietMacAndCheese<P, T, T, C, SVOLE2>,
     dora_states: HashMap<usize, DoraState<P, T, T, C, SVOLE2>>,
+    ram_states: Vec<BooleanRam<P, T, C, SVOLE1>>,
 }
 
 impl<
@@ -61,6 +63,7 @@ where
             dmc,
             lifted_dmc,
             dora_states: Default::default(),
+            ram_states: Default::default(),
         })
     }
 }
