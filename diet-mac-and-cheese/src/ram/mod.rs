@@ -209,6 +209,22 @@ where
     }
 }
 
+struct Boolean {
+    addr_size: usize,
+    value_size: usize,
+    ram_size: usize,
+}
+
+impl Boolean {
+    fn new(addr_size: usize, value_size: usize, ram_size: usize) -> Self {
+        Self {
+            addr_size,
+            value_size,
+            ram_size,
+        }
+    }
+}
+
 /// A binary counter of a fixed width.
 ///
 /// Internally, LSB-first for easy counting, but can be borrowed as MSB-first.
