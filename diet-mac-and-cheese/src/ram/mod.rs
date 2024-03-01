@@ -7,7 +7,8 @@ use std::marker::PhantomData;
 use eyre::Result;
 use protocol::DoraRam;
 use scuttlebutt::AbstractChannel;
-use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
+use swanky_field_binary::{F40b, F2};
 use swanky_party::Party;
 
 use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
@@ -255,6 +256,50 @@ impl BinaryCounter {
     /// Return the counter value as an MSB-first `Vec`.
     fn curr_val(&self) -> Vec<F2> {
         self.0.iter().rev().copied().collect()
+    }
+}
+
+struct BooleanIter {
+    current: BinaryCounter,
+    rem: usize,
+}
+
+impl Iterator for BooleanIter {
+    type Item = Vec<F2>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rem > 0 {
+            let old = self.current.curr_val();
+            self.current.incr();
+            self.rem -= 1;
+            Some(old)
+        } else {
+            None
+        }
+    }
+}
+
+impl MemorySpace<F2> for Boolean {
+    type Addr = Vec<F2>;
+    type Enum = BooleanIter;
+
+    fn addr_size(&self) -> usize {
+        self.addr_size
+    }
+
+    fn value_size(&self) -> usize {
+        self.value_size
+    }
+
+    fn size(&self) -> usize {
+        self.ram_size
+    }
+
+    fn enumerate(&self) -> Self::Enum {
+        BooleanIter {
+            current: BinaryCounter::new(self.addr_size),
+            rem: self.ram_size,
+        }
     }
 }
 
