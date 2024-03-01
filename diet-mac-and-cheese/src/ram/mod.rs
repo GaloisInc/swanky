@@ -208,3 +208,69 @@ where
         }
     }
 }
+
+/// A binary counter of a fixed width.
+///
+/// Internally, LSB-first for easy counting, but can be borrowed as MSB-first.
+struct BinaryCounter(Vec<F2>);
+
+impl BinaryCounter {
+    /// Create a new counter that is `num_bits` wide.
+    ///
+    /// The counter is initialized to zero.
+    fn new(num_bits: usize) -> Self {
+        Self(vec![F2::ZERO; num_bits])
+    }
+
+    /// Increment the binary counter.
+    ///
+    /// Note that this is a 'cycling' counter, so incrementing the counter where
+    /// all bits are set results in the counter of all zeros.
+    fn incr(&mut self) {
+        let mut need_flip = true;
+        for bit in self.0.iter_mut() {
+            if need_flip {
+                *bit += F2::ONE;
+                need_flip = *bit == F2::ZERO;
+            }
+        }
+    }
+
+    /// Return the counter value as an MSB-first `Vec`.
+    fn curr_val(&self) -> Vec<F2> {
+        self.0.iter().rev().copied().collect()
+    }
+}
+
+#[cfg(test)]
+mod counter_tests {
+    use super::*;
+
+    #[test]
+    fn incr_zero() {
+        let mut bc = BinaryCounter(vec![F2::ZERO, F2::ZERO, F2::ZERO]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ZERO, F2::ONE].into_iter().eq(bc.curr_val()));
+    }
+
+    #[test]
+    fn incr_one() {
+        let mut bc = BinaryCounter(vec![F2::ONE, F2::ZERO, F2::ZERO]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ONE, F2::ZERO].into_iter().eq(bc.curr_val()));
+    }
+
+    #[test]
+    fn incr_two() {
+        let mut bc = BinaryCounter(vec![F2::ZERO, F2::ONE, F2::ZERO]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ONE, F2::ONE].into_iter().eq(bc.curr_val()));
+    }
+
+    #[test]
+    fn incr_max() {
+        let mut bc = BinaryCounter(vec![F2::ONE, F2::ONE, F2::ONE]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ZERO, F2::ZERO].into_iter().eq(bc.curr_val()));
+    }
+}
