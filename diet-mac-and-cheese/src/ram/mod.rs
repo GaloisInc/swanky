@@ -356,6 +356,8 @@ where
         dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
         addr: &[Mac<P, F2, T>],
     ) -> Result<Vec<Mac<P, F2, T>>> {
+        debug_assert_eq!(addr.len(), self.addr_size);
+
         match self.dora.as_mut() {
             Some(ram) => {
                 let value = ram.remove(dmc, addr)?;
@@ -382,6 +384,9 @@ where
         addr: &[Mac<P, F2, T>],
         value: &[Mac<P, F2, T>],
     ) -> Result<()> {
+        debug_assert_eq!(addr.len(), self.addr_size);
+        debug_assert_eq!(value.len(), self.value_size);
+
         match self.dora.as_mut() {
             Some(ram) => {
                 ram.remove(dmc, addr)?;
