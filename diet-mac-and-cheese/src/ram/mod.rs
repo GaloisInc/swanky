@@ -309,22 +309,37 @@ impl MemorySpace<F2> for Boolean {
 /// above. Use of this structure over `DoraRam` is preferred, as it provides
 /// the more familiar read/write interface and properly executes the protocol
 /// steps for these operations.
-pub struct BooleanRam<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> {
+pub struct BooleanRam<
+    P: Party,
+    T: FiniteField<PrimeField = F2>,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, F2, T>,
+> where
+    F2: IsSubFieldOf<T>,
+{
     addr_size: usize,
     value_size: usize,
     size: usize,
-    init_value: Vec<Mac<P, F2, F40b>>,
-    dora: Option<DoraRam<P, F2, F40b, C, Boolean, SVOLE>>,
+    init_value: Vec<Mac<P, F2, T>>,
+    dora: Option<DoraRam<P, F2, T, C, Boolean, SVOLE>>,
 }
 
-impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BooleanRam<P, C, SVOLE> {
+impl<
+        P: Party,
+        T: FiniteField<PrimeField = F2>,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, F2, T>,
+    > BooleanRam<P, T, C, SVOLE>
+where
+    F2: IsSubFieldOf<T>,
+{
     /// Create a new `BooleanRam` with `size` cells, each containing
     /// `init_value`.
     pub fn new(
         addr_size: usize,
         value_size: usize,
         size: usize,
-        init_value: Vec<Mac<P, F2, F40b>>,
+        init_value: Vec<Mac<P, F2, T>>,
     ) -> Self {
         Self {
             addr_size,
@@ -338,9 +353,9 @@ impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BooleanRa
     /// Read and return the value at `addr`.
     pub fn read(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
-        addr: &[Mac<P, F2, F40b>],
-    ) -> Result<Vec<Mac<P, F2, F40b>>> {
+        dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
+        addr: &[Mac<P, F2, T>],
+    ) -> Result<Vec<Mac<P, F2, T>>> {
         match self.dora.as_mut() {
             Some(ram) => {
                 let value = ram.remove(dmc, addr)?;
@@ -363,9 +378,9 @@ impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BooleanRa
     /// Write `value` to `addr`.
     pub fn write(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
-        addr: &[Mac<P, F2, F40b>],
-        value: &[Mac<P, F2, F40b>],
+        dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
+        addr: &[Mac<P, F2, T>],
+        value: &[Mac<P, F2, T>],
     ) -> Result<()> {
         match self.dora.as_mut() {
             Some(ram) => {
@@ -390,7 +405,7 @@ impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BooleanRa
     ///
     /// This should only be called when no more reads/writes will occur on this
     /// RAM.
-    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>) -> Result<()> {
+    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>) -> Result<()> {
         match self.dora.take() {
             Some(ram) => ram.finalize(dmc),
             None => Ok(()),
