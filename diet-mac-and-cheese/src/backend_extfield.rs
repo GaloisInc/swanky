@@ -314,12 +314,24 @@ impl<
 {
     fn init_ram(
         &mut self,
-        _size: usize,
-        _addr_count: usize,
-        _value_count: usize,
-        _init_value: &[Self::Wire],
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
     ) -> Result<RamId> {
-        todo!("Create and store a BinaryRam state, returning its position in the store.")
+        debug_assert!(addr_count >= 1);
+        debug_assert!(value_count >= 1);
+        debug_assert_eq!(init_value.len(), value_count);
+
+        let ram_id = self.ram_states.len();
+        self.ram_states.push(BooleanRam::new(
+            addr_count,
+            value_count,
+            size,
+            init_value.to_vec(),
+        ));
+
+        Ok(ram_id)
     }
 
     fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
