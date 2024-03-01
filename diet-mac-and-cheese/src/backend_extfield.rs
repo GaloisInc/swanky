@@ -340,8 +340,10 @@ impl<
         self.ram_states[ram].read(&mut self.dmc, addr)
     }
 
-    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
-        todo!("Write to the BinaryRam with ID ram.")
+    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()> {
+        debug_assert!(ram < self.ram_states.len());
+
+        self.ram_states[ram].write(&mut self.dmc, addr, new)
     }
 
     fn finalize_rams(&mut self) -> Result<()> {
