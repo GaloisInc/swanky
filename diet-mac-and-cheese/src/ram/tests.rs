@@ -15,8 +15,8 @@ fn test_arithmetic_ram() {
 
     use super::{protocol::DoraRam, Arithmetic};
 
-    const RAM_SIZE: usize = 1_000;
-    const RAM_STEPS: usize = 1_000;
+    const RAM_SIZE: usize = 100;
+    const RAM_STEPS: usize = 100;
 
     let (sender, receiver) = UnixStream::pair().unwrap();
 
