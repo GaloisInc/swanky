@@ -8,7 +8,7 @@ use eyre::Result;
 use protocol::DoraRam;
 use scuttlebutt::AbstractChannel;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F40b, F2};
+use swanky_field_binary::F2;
 use swanky_party::Party;
 
 use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
