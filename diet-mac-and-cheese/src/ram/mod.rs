@@ -303,6 +303,101 @@ impl MemorySpace<F2> for Boolean {
     }
 }
 
+/// A RAM with addresses/values represented by one or more F2 values.
+///
+/// This is a high-level wrapper around [`DoraRam`] for the case described
+/// above. Use of this structure over `DoraRam` is preferred, as it provides
+/// the more familiar read/write interface and properly executes the protocol
+/// steps for these operations.
+pub struct BooleanRam<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> {
+    addr_size: usize,
+    value_size: usize,
+    size: usize,
+    init_value: Vec<Mac<P, F2, F40b>>,
+    dora: Option<DoraRam<P, F2, F40b, C, Boolean, SVOLE>>,
+}
+
+impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BooleanRam<P, C, SVOLE> {
+    /// Create a new `BooleanRam` with `size` cells, each containing
+    /// `init_value`.
+    pub fn new(
+        addr_size: usize,
+        value_size: usize,
+        size: usize,
+        init_value: Vec<Mac<P, F2, F40b>>,
+    ) -> Self {
+        Self {
+            addr_size,
+            value_size,
+            size,
+            init_value,
+            dora: None,
+        }
+    }
+
+    /// Read and return the value at `addr`.
+    pub fn read(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
+        addr: &[Mac<P, F2, F40b>],
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
+        match self.dora.as_mut() {
+            Some(ram) => {
+                let value = ram.remove(dmc, addr)?;
+                ram.insert(dmc, addr, &value)?;
+                Ok(value)
+            }
+            None => {
+                let ram = DoraRam::new(
+                    dmc,
+                    self.init_value.clone(),
+                    2,
+                    Boolean::new(self.addr_size, self.value_size, self.size),
+                );
+                self.dora = Some(ram);
+                self.read(dmc, addr)
+            }
+        }
+    }
+
+    /// Write `value` to `addr`.
+    pub fn write(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
+        addr: &[Mac<P, F2, F40b>],
+        value: &[Mac<P, F2, F40b>],
+    ) -> Result<()> {
+        match self.dora.as_mut() {
+            Some(ram) => {
+                ram.remove(dmc, addr)?;
+                ram.insert(dmc, addr, value)?;
+                Ok(())
+            }
+            None => {
+                let ram = DoraRam::new(
+                    dmc,
+                    self.init_value.clone(),
+                    2,
+                    Boolean::new(self.addr_size, self.value_size, self.size),
+                );
+                self.dora = Some(ram);
+                self.write(dmc, addr, value)
+            }
+        }
+    }
+
+    /// Finalize this `BooleanRam`.
+    ///
+    /// This should only be called when no more reads/writes will occur on this
+    /// RAM.
+    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>) -> Result<()> {
+        match self.dora.take() {
+            Some(ram) => ram.finalize(dmc),
+            None => Ok(()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod counter_tests {
     use super::*;
