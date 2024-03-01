@@ -1,67 +1,103 @@
 version 2.0.0-beta;
 circuit;
-@plugin ram_arith_v1;
-@type field 2305843009213693951;
-@type @plugin(ram_arith_v1, ram, 0);
+@plugin ram_bool_v1;
+@type field 2;
+@type @plugin(ram_bool_v1, ram, 0, 3, 3);
 
 @begin
-@function(init_ram, @out: 1:1, @in: 0:1)
-    @plugin(ram_arith_v1, init, 1024);
+@function(init_ram, @out: 1:1, @in: 0:3)
+    @plugin(ram_bool_v1, init, 8);
 
-@function(init_wrapper, @out: 1:1, @in: 0:1)
-    $0 <- @call(init_ram, $0);
+@function(init_wrapper, @out: 1:1, @in: 0:3)
+    $0 <- @call(init_ram, $0 ... $2);
 @end
 
-@function(read_ram, @out: 0:1, @in: 1:1, 0:1)
-    @plugin(ram_arith_v1, read);
+@function(read_ram, @out: 0:3, @in: 1:1, 0:3)
+    @plugin(ram_bool_v1, read);
 
-@function(read_wrapper, @out: 0:1, @in: 1:1, 0:1)
-    $0 <- @call(read_ram, $0, $1);
+@function(read_wrapper, @out: 0:3, @in: 1:1, 0:3)
+    $0 ... $2 <- @call(read_ram, $0, $3 ... $5);
 @end
 
-@function(write_ram, @in: 1:1, 0:1, 0:1)
-    @plugin(ram_arith_v1, write);
+@function(write_ram, @in: 1:1, 0:3, 0:3)
+    @plugin(ram_bool_v1, write);
 
-@function(write_wrapper, @in: 1:1, 0:1, 0:1)
-    @call(write_ram, $0, $0, $1);
+@function(write_wrapper, @in: 1:1, 0:3, 0:3)
+    @call(write_ram, $0, $0 ... $2, $3 ... $5);
 @end
 
 // Address & Value
+@new($0 ... $2);
 $0 <- <0>;
-$1 <- <17>;
+$1 <- <0>;
+$2 <- <0>;
+
+@new($3 ... $5);
+$3 <- <0>;
+$4 <- <0>;
+$5 <- <1>;
 
 // Address & Value
-$2 <- <1>;
-$3 <- <18>;
+@new($6 ... $8);
+$6 <- <0>;
+$7 <- <0>;
+$8 <- <1>;
+
+@new($9 ... $11);
+$9 <- <0>;
+$10 <- <1>;
+$11 <- <0>;
 
 // An address we'll just read
-$4 <- <2>;
+@new($12 ... $14);
+$12 <- <0>;
+$13 <- <1>;
+$14 <- <0>;
 
 // The initial RAM value
-$5 <- <19>;
-
-// -1 For checks later
-$6 <- <2305843009213693950>;
+@new($15 ... $17);
+$15 <- <0>;
+$16 <- <1>;
+$17 <- <1>;
 
 // Initialize the RAM and write those address/value pairs
-$99 <- @call(init_wrapper, $5);
-@call(write_wrapper, $99, $0, $1);
-@call(write_wrapper, $99, $2, $3);
-@call(write_wrapper, $99, $4, $5);
+$99 <- @call(init_wrapper, $15 ... $17);
+@call(write_wrapper, $99, $0 ... $2, $3 ... $5);
+@call(write_wrapper, $99, $6 ... $8, $9 ... $11);
 
 // Read those addresses back
-$7 <- @call(read_wrapper, $99, $0);
-$8 <- @call(read_wrapper, $99, $2);
-$9 <- @call(read_wrapper, $99, $4);
+$18 ... $20 <- @call(read_wrapper, $99, $0 ... $2);
+$21 ... $23 <- @call(read_wrapper, $99, $6 ... $8);
+$24 ... $26 <- @call(read_wrapper, $99, $12 ... $14);
 
 // Check that we read the expected values
-$10 <- @mul($1, $6);
-$11 <- @add($10, $7);
-$12 <- @mul($3, $6);
-$13 <- @add($12, $8);
-$14 <- @mul($5, $6);
-$15 <- @add($14, $9);
-@assert_zero($11);
-@assert_zero($13);
-@assert_zero($15);
+$27 <- @mulc($3, <1>);
+$28 <- @mulc($4, <1>);
+$29 <- @mulc($5, <1>);
+$30 <- @add($27, $18);
+$31 <- @add($28, $19);
+$32 <- @add($29, $20);
+@assert_zero($30);
+@assert_zero($31);
+@assert_zero($32);
+
+$33 <- @mulc($9, <1>);
+$34 <- @mulc($10, <1>);
+$35 <- @mulc($11, <1>);
+$36 <- @add($33, $21);
+$37 <- @add($34, $22);
+$38 <- @add($35, $23);
+@assert_zero($36);
+@assert_zero($37);
+@assert_zero($38);
+
+$39 <- @mulc($15, <1>);
+$40 <- @mulc($16, <1>);
+$41 <- @mulc($17, <1>);
+$42 <- @add($39, $24);
+$43 <- @add($40, $25);
+$44 <- @add($41, $26);
+@assert_zero($42);
+@assert_zero($43);
+@assert_zero($44);
 @end
