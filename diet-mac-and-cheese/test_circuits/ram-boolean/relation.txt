@@ -1,0 +1,67 @@
+version 2.0.0-beta;
+circuit;
+@plugin ram_arith_v1;
+@type field 2305843009213693951;
+@type @plugin(ram_arith_v1, ram, 0);
+
+@begin
+@function(init_ram, @out: 1:1, @in: 0:1)
+    @plugin(ram_arith_v1, init, 1024);
+
+@function(init_wrapper, @out: 1:1, @in: 0:1)
+    $0 <- @call(init_ram, $0);
+@end
+
+@function(read_ram, @out: 0:1, @in: 1:1, 0:1)
+    @plugin(ram_arith_v1, read);
+
+@function(read_wrapper, @out: 0:1, @in: 1:1, 0:1)
+    $0 <- @call(read_ram, $0, $1);
+@end
+
+@function(write_ram, @in: 1:1, 0:1, 0:1)
+    @plugin(ram_arith_v1, write);
+
+@function(write_wrapper, @in: 1:1, 0:1, 0:1)
+    @call(write_ram, $0, $0, $1);
+@end
+
+// Address & Value
+$0 <- <0>;
+$1 <- <17>;
+
+// Address & Value
+$2 <- <1>;
+$3 <- <18>;
+
+// An address we'll just read
+$4 <- <2>;
+
+// The initial RAM value
+$5 <- <19>;
+
+// -1 For checks later
+$6 <- <2305843009213693950>;
+
+// Initialize the RAM and write those address/value pairs
+$99 <- @call(init_wrapper, $5);
+@call(write_wrapper, $99, $0, $1);
+@call(write_wrapper, $99, $2, $3);
+@call(write_wrapper, $99, $4, $5);
+
+// Read those addresses back
+$7 <- @call(read_wrapper, $99, $0);
+$8 <- @call(read_wrapper, $99, $2);
+$9 <- @call(read_wrapper, $99, $4);
+
+// Check that we read the expected values
+$10 <- @mul($1, $6);
+$11 <- @add($10, $7);
+$12 <- @mul($3, $6);
+$13 <- @add($12, $8);
+$14 <- @mul($5, $6);
+$15 <- @add($14, $9);
+@assert_zero($11);
+@assert_zero($13);
+@assert_zero($15);
+@end
