@@ -334,8 +334,10 @@ impl<
         Ok(ram_id)
     }
 
-    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
-        todo!("Read from the BinaryRam with ID ram.")
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+        debug_assert!(ram < self.ram_states.len());
+
+        self.ram_states[ram].read(&mut self.dmc, addr)
     }
 
     fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
