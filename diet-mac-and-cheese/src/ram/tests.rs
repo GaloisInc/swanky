@@ -1,5 +1,5 @@
 #[test]
-fn test_ram() {
+fn test_arithmetic_ram() {
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
