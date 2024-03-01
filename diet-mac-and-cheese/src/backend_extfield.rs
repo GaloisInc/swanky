@@ -347,7 +347,9 @@ impl<
     }
 
     fn finalize_rams(&mut self) -> Result<()> {
-        Ok(())
+        self.ram_states
+            .iter_mut()
+            .try_for_each(|ram| ram.finalize(&mut self.dmc))
     }
 }
 
