@@ -368,7 +368,7 @@ where
                 let ram = DoraRam::new(
                     dmc,
                     self.init_value.clone(),
-                    2,
+                    4,
                     Boolean::new(self.addr_size, self.value_size, self.size),
                 );
                 self.dora = Some(ram);
@@ -397,7 +397,7 @@ where
                 let ram = DoraRam::new(
                     dmc,
                     self.init_value.clone(),
-                    2,
+                    4,
                     Boolean::new(self.addr_size, self.value_size, self.size),
                 );
                 self.dora = Some(ram);
