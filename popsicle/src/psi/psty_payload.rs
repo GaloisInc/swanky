@@ -121,7 +121,7 @@ impl Sender {
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
     pub fn full_protocol<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -154,7 +154,7 @@ impl Sender {
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
     pub fn full_protocol_large<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -210,7 +210,7 @@ impl Sender {
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
     pub fn compute_payload<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -264,7 +264,7 @@ impl Sender {
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
     pub fn compute_aggregates<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -397,7 +397,7 @@ impl SenderState {
         Error,
     >
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
@@ -438,7 +438,7 @@ impl SenderState {
         gb: &mut Garbler<C, RNG, OtSender, AllWire>,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb).unwrap();
@@ -470,7 +470,7 @@ impl Receiver {
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
     pub fn full_protocol<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -515,7 +515,7 @@ impl Receiver {
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
     pub fn full_protocol_large<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -555,7 +555,7 @@ impl Receiver {
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
     pub fn compute_payload<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -605,7 +605,7 @@ impl Receiver {
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
     pub fn compute_aggregates<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -767,7 +767,7 @@ impl ReceiverState {
         Error,
     >
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
@@ -805,7 +805,7 @@ impl ReceiverState {
         channel: &mut C,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         channel.flush()?;
