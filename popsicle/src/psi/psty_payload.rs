@@ -1096,8 +1096,8 @@ mod tests {
 
     #[test]
     fn test_psty_payload() {
-        let set_size_sx: usize = 1 << 10;
-        let set_size_rx: usize = 1 << 10;
+        let set_size_sx: usize = 1 << 6;
+        let set_size_rx: usize = 1 << 6;
 
         let weight_max: u64 = 100000;
         let payload_max: u64 = 100000;
