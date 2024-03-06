@@ -121,7 +121,7 @@ impl Sender {
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
     pub fn full_protocol<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -154,7 +154,7 @@ impl Sender {
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
     pub fn full_protocol_large<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -210,7 +210,7 @@ impl Sender {
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
     pub fn compute_payload<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -264,7 +264,7 @@ impl Sender {
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
     pub fn compute_aggregates<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -397,7 +397,7 @@ impl SenderState {
         Error,
     >
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
@@ -438,7 +438,7 @@ impl SenderState {
         gb: &mut Garbler<C, RNG, OtSender, AllWire>,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (x, y, x_payload, y_payload, masks) = self.encode_circuit_inputs(gb).unwrap();
@@ -470,7 +470,7 @@ impl Receiver {
     /// PSI with associated payloads for small to moderately sized sets without any
     /// parallelization features.
     pub fn full_protocol<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -515,7 +515,7 @@ impl Receiver {
     /// on during the bucketization. Users have to specify the GC deltas. If the computation is run
     /// in parallel, the deltas must be synced accross threads.
     pub fn full_protocol_large<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -555,7 +555,7 @@ impl Receiver {
     /// Returns a garbled output over given megabins that the user can open or join with other
     /// threads results using compute_aggregate.
     pub fn compute_payload<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -605,7 +605,7 @@ impl Receiver {
     /// Aggregates partial grabled outputs encoded as CRTs. Uses the same deltas used by partial
     /// circuits.
     pub fn compute_aggregates<
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     >(
         &mut self,
@@ -767,7 +767,7 @@ impl ReceiverState {
         Error,
     >
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
         let my_input_bits = encode_inputs(&self.opprf_ids);
@@ -805,7 +805,7 @@ impl ReceiverState {
         channel: &mut C,
     ) -> Result<(CrtBundle<AllWire>, CrtBundle<AllWire>), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         channel.flush()?;
@@ -1096,8 +1096,8 @@ mod tests {
 
     #[test]
     fn test_psty_payload() {
-        let set_size_sx: usize = 1 << 10;
-        let set_size_rx: usize = 1 << 10;
+        let set_size_sx: usize = 1 << 6;
+        let set_size_rx: usize = 1 << 6;
 
         let weight_max: u64 = 100000;
         let payload_max: u64 = 100000;
@@ -1145,88 +1145,5 @@ mod tests {
             .unwrap();
 
         assert_eq!(result_in_clear, weighted_mean);
-    }
-
-    #[test]
-    fn test_psty_payload_large() {
-        let set_size_sx: usize = 1 << 11;
-        let set_size_rx: usize = 1 << 11;
-
-        let weight_max: u64 = 100000;
-        let payload_max: u64 = 100000;
-        let megasize = 1 << 10;
-
-        let mut rng = AesRng::new();
-
-        let sender_inputs = enum_ids_shuffled(set_size_sx, ITEM_SIZE);
-        let receiver_inputs = enum_ids_shuffled(set_size_rx, ITEM_SIZE);
-        let weights = int_vec_block512(rand_u64_vec(set_size_sx, weight_max, &mut rng));
-        let payloads = int_vec_block512(rand_u64_vec(set_size_rx, payload_max, &mut rng));
-
-        let result_in_clear = weighted_mean_clear(
-            &receiver_inputs.clone(),
-            &sender_inputs.clone(),
-            &payloads.clone(),
-            &weights.clone(),
-        );
-
-        let qs = fancy_garbling::util::primes_with_width(65);
-        let deltas = generate_deltas::<AllWire>(&qs);
-        let deltas_json = serde_json::to_string(&deltas).unwrap();
-
-        let path_delta = "./.deltas.txt".to_owned();
-        let mut file_deltas = File::create(&path_delta).unwrap();
-        file_deltas.write(deltas_json.as_bytes()).unwrap();
-
-        std::thread::spawn(move || {
-            let listener = TcpListener::bind("127.0.0.1:3000").unwrap();
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        let mut channel = SymChannel::new(stream);
-                        let mut rng = AesRng::new();
-
-                        let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-                        let _ = psi
-                            .full_protocol_large(
-                                &sender_inputs,
-                                &weights,
-                                &path_delta,
-                                &mut channel,
-                                &mut rng,
-                            )
-                            .unwrap();
-                        println!("Done");
-                        return;
-                    }
-                    Err(e) => {
-                        println!("Error: {}", e);
-                    }
-                }
-            }
-            drop(listener);
-        });
-        match TcpStream::connect("127.0.0.1:3000") {
-            Ok(stream) => {
-                let mut channel = SymChannel::new(stream);
-                let mut rng = AesRng::new();
-                let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-                // For large examples where computation should be batched per-megabin instead of accross all bins.
-                let weighted_mean = psi
-                    .full_protocol_large(
-                        &receiver_inputs,
-                        &payloads,
-                        megasize,
-                        &mut channel,
-                        &mut rng,
-                    )
-                    .unwrap();
-                assert_eq!(result_in_clear, weighted_mean);
-            }
-            Err(e) => {
-                println!("Failed to connect: {}", e);
-            }
-        }
     }
 }

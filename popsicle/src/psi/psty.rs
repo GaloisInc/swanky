@@ -123,7 +123,7 @@ impl SenderState {
         Error,
     >
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let mut gb =
@@ -138,7 +138,7 @@ impl SenderState {
     /// Compute the intersection.
     pub fn compute_intersection<C, RNG>(&self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
@@ -150,7 +150,7 @@ impl SenderState {
     /// Compute the cardinality of the intersection.
     pub fn compute_cardinality<C, RNG>(&self, channel: &mut C, rng: &mut RNG) -> Result<(), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
@@ -166,7 +166,7 @@ impl SenderState {
         channel: &mut C,
     ) -> Result<Vec<Vec<u8>>, Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
     {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
@@ -245,7 +245,7 @@ impl ReceiverState {
         Error,
     >
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: CryptoRng + RngCore + SeedableRng<Seed = Block>,
     {
         let nbins = self.cuckoo.nbins;
@@ -269,7 +269,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> Result<Vec<Msg>, Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
@@ -296,7 +296,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> Result<usize, Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
@@ -318,7 +318,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> Result<(), Error>
     where
-        C: AbstractChannel,
+        C: AbstractChannel + Clone,
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let payload_len = payloads[0].len();
