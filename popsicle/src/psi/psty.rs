@@ -2,6 +2,11 @@
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 
 use crate::{cuckoo::CuckooHash, errors::Error, utils};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Key, Nonce,
+};
+
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
     AllWire, ArithmeticBundleGadgets, BinaryBundle, CrtBundle, CrtGadgets, Fancy, FancyBinary,
@@ -12,7 +17,6 @@ use ocelot::{
     oprf::{KmprtReceiver, KmprtSender},
     ot::{AlszReceiver as OtReceiver, AlszSender as OtSender},
 };
-use openssl::symm::{decrypt, encrypt, Cipher};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 
@@ -170,10 +174,15 @@ impl SenderState {
     {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
-            let iv = channel.read_vec(16)?;
-            let ct = channel.read_vec(payload_len + PAD_LEN)?;
+            let nonce_bytes = channel.read_vec(16)?;
+            let ciphertext = channel.read_vec(payload_len + PAD_LEN)?;
+
             let key = opprf_output.prefix(16);
-            let mut dec = decrypt(Cipher::aes_128_ctr(), key, Some(&iv), &ct)?;
+            let key: &Key<Aes256Gcm> = key.into();
+            let cipher = Aes256Gcm::new(&key);
+
+            let nonce = Nonce::from_slice(&nonce_bytes);
+            let mut dec = cipher.decrypt(&nonce, ciphertext.as_ref())?;
             let payload = dec.split_off(PAD_LEN);
             if dec.into_iter().all(|x| x == 0) {
                 payloads.push(payload)
@@ -337,11 +346,18 @@ impl ReceiverState {
             } else {
                 payload.extend_from_slice(&dummy_payload);
             };
-            let iv: [u8; 16] = rng.gen();
             let key = opprf_output.prefix(16);
-            let ct = encrypt(Cipher::aes_128_ctr(), &key, Some(&iv), &payload)?;
-            channel.write_bytes(&iv)?;
-            channel.write_bytes(&ct)?;
+            let key: &Key<Aes256Gcm> = key.into();
+
+            let mut nonce_bytes = [0u8; 16];
+            rand::thread_rng().fill_bytes(&mut nonce_bytes);
+            let nonce = Nonce::from_slice(&nonce_bytes);
+
+            let cipher = Aes256Gcm::new(&key);
+            let ciphertext = cipher.encrypt(&nonce, payload.as_ref())?;
+
+            channel.write_bytes(&nonce)?;
+            channel.write_bytes(&ciphertext)?;
         }
         channel.flush()?;
         Ok(())
@@ -432,7 +448,7 @@ mod tests {
     const SET_SIZE: usize = 1000;
 
     #[test]
-    fn full_protocol() {
+    fn psty_full_protocol() {
         let mut rng = AesRng::new();
         let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
