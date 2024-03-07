@@ -14,7 +14,7 @@ use swanky_party::Party;
 use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
 
 const ARITHMETIC_CHALLENGE_SIZE: usize = 2;
-const BOOLEAN_CHALLENGE_SIZE: usize = 1 << 40;
+const BOOLEAN_CHALLENGE_SIZE: usize = 40;
 
 fn combine<'a, B: BackendT>(
     backend: &'a mut B,
