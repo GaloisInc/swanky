@@ -30,6 +30,9 @@ const HASH_SIZE: usize = 4;
 // payload methods.
 const PAD_LEN: usize = 16;
 
+// This is the size of the authentication tag that is append to AES GCM
+const TAG_SIZE: usize = 16;
+
 /// The type of values in the sender and receiver's sets.
 pub type Msg = Vec<u8>;
 
@@ -175,7 +178,7 @@ impl SenderState {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
             let nonce_bytes = channel.read_vec(12)?;
-            let ciphertext = channel.read_vec(payload_len + PAD_LEN)?;
+            let ciphertext = channel.read_vec(payload_len + PAD_LEN + TAG_SIZE)?;
 
             let key = opprf_output.prefix(32);
             let key: &Key<Aes256Gcm> = key.into();
