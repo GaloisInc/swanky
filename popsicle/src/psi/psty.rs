@@ -185,10 +185,12 @@ impl SenderState {
             let cipher = Aes256Gcm::new(&key);
 
             let nonce = Nonce::from_slice(&nonce_bytes);
-            let mut dec = cipher.decrypt(&nonce, ciphertext.as_ref())?;
-            let payload = dec.split_off(PAD_LEN);
-            if dec.into_iter().all(|x| x == 0) {
-                payloads.push(payload)
+            match cipher.decrypt(&nonce, ciphertext.as_ref()) {
+                Ok(dec) => {
+                    let payload = dec.to_owned().split_off(PAD_LEN);
+                    payloads.push(payload)
+                }
+                Err(_e) => println!("Unable to decrypt, this item doesn't match!"),
             }
         }
         Ok(payloads)
