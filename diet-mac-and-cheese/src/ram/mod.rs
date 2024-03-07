@@ -13,6 +13,9 @@ use swanky_party::Party;
 
 use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
 
+const ARITHMETIC_CHALLENGE_SIZE: usize = 2;
+const BOOLEAN_CHALLENGE_SIZE: usize = 1 << 40;
+
 fn combine<'a, B: BackendT>(
     backend: &'a mut B,
     mut elems: impl Iterator<Item = &'a B::Wire>,
@@ -170,7 +173,12 @@ where
                 Ok(value[0])
             }
             None => {
-                let ram = DoraRam::new(dmc, vec![self.init_value], 2, Arithmetic::new(self.size));
+                let ram = DoraRam::new(
+                    dmc,
+                    vec![self.init_value],
+                    ARITHMETIC_CHALLENGE_SIZE,
+                    Arithmetic::new(self.size),
+                );
                 self.dora = Some(ram);
                 self.read(dmc, addr)
             }
@@ -191,7 +199,12 @@ where
                 Ok(())
             }
             None => {
-                let ram = DoraRam::new(dmc, vec![self.init_value], 2, Arithmetic::new(self.size));
+                let ram = DoraRam::new(
+                    dmc,
+                    vec![self.init_value],
+                    ARITHMETIC_CHALLENGE_SIZE,
+                    Arithmetic::new(self.size),
+                );
                 self.dora = Some(ram);
                 self.write(dmc, addr, value)
             }
@@ -368,7 +381,7 @@ where
                 let ram = DoraRam::new(
                     dmc,
                     self.init_value.clone(),
-                    4,
+                    BOOLEAN_CHALLENGE_SIZE,
                     Boolean::new(self.addr_size, self.value_size, self.size),
                 );
                 self.dora = Some(ram);
@@ -397,7 +410,7 @@ where
                 let ram = DoraRam::new(
                     dmc,
                     self.init_value.clone(),
-                    4,
+                    BOOLEAN_CHALLENGE_SIZE,
                     Boolean::new(self.addr_size, self.value_size, self.size),
                 );
                 self.dora = Some(ram);
