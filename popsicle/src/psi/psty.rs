@@ -350,7 +350,7 @@ impl ReceiverState {
             let key: &Key<Aes256Gcm> = key.into();
 
             let mut nonce_bytes = [0u8; 16];
-            rand::thread_rng().fill_bytes(&mut nonce_bytes);
+            rng.fill_bytes(&mut nonce_bytes);
             let nonce = Nonce::from_slice(&nonce_bytes);
 
             let cipher = Aes256Gcm::new(&key);
