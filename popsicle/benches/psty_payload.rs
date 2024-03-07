@@ -5,7 +5,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fancy_garbling::util::generate_deltas;
 use fancy_garbling::AllWire;
 use popsicle::psty_payload::{Receiver, Sender};
-use scuttlebutt::{AesRng, Block512, Channel, SymChannel};
+use scuttlebutt::{AesRng, Block512, Channel, SymChannel, TrackChannel};
 
 use rand::{CryptoRng, Rng};
 
@@ -119,7 +119,7 @@ fn bench_psty_payload_large(
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
-                    let mut channel = SymChannel::new(stream);
+                    let mut channel = TrackChannel::new(SymChannel::new(stream));
                     let mut rng = AesRng::new();
 
                     let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
@@ -145,7 +145,7 @@ fn bench_psty_payload_large(
 
     match TcpStream::connect("127.0.0.1:3000") {
         Ok(stream) => {
-            let mut channel = SymChannel::new(stream);
+            let mut channel = TrackChannel::new(SymChannel::new(stream));
             let mut rng = AesRng::new();
             let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
 
