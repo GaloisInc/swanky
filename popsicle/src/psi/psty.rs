@@ -174,10 +174,10 @@ impl SenderState {
     {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
-            let nonce_bytes = channel.read_vec(16)?;
+            let nonce_bytes = channel.read_vec(12)?;
             let ciphertext = channel.read_vec(payload_len + PAD_LEN)?;
 
-            let key = opprf_output.prefix(16);
+            let key = opprf_output.prefix(32);
             let key: &Key<Aes256Gcm> = key.into();
             let cipher = Aes256Gcm::new(&key);
 
@@ -346,10 +346,10 @@ impl ReceiverState {
             } else {
                 payload.extend_from_slice(&dummy_payload);
             };
-            let key = opprf_output.prefix(16);
+            let key = opprf_output.prefix(32);
             let key: &Key<Aes256Gcm> = key.into();
 
-            let mut nonce_bytes = [0u8; 16];
+            let mut nonce_bytes = [0u8; 12];
             rng.fill_bytes(&mut nonce_bytes);
             let nonce = Nonce::from_slice(&nonce_bytes);
 
