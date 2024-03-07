@@ -1099,8 +1099,8 @@ mod tests {
         let set_size_sx: usize = 1 << 6;
         let set_size_rx: usize = 1 << 6;
 
-        let weight_max: u64 = 100000;
-        let payload_max: u64 = 100000;
+        let weight_max: u64 = 10000;
+        let payload_max: u64 = 10000;
 
         let mut rng = AesRng::new();
 

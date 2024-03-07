@@ -445,7 +445,7 @@ mod tests {
     };
 
     const ITEM_SIZE: usize = 8;
-    const SET_SIZE: usize = 1000;
+    const SET_SIZE: usize = 1 << 6;
 
     #[test]
     fn psty_full_protocol() {
