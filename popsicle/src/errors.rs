@@ -22,19 +22,19 @@ pub enum Error {
     PsiProtocolError(String),
     /// Not enough payloads.
     InvalidPayloadsLength,
-    /// SSL Error
+    /// AES GCM Error
     #[cfg(feature = "psty")]
-    SSLError(openssl::error::ErrorStack),
+    AESGCMError(aes_gcm::Error),
     /// An error occurred in the underlying 2PC protocol.
     #[cfg(feature = "psty")]
     TwopacError(fancy_garbling::errors::TwopacError),
 }
 
 #[cfg(feature = "psty")]
-impl From<openssl::error::ErrorStack> for Error {
+impl From<aes_gcm::Error> for Error {
     #[inline]
-    fn from(e: openssl::error::ErrorStack) -> Error {
-        Error::SSLError(e)
+    fn from(e: aes_gcm::Error) -> Error {
+        Error::AESGCMError(e)
     }
 }
 
@@ -85,7 +85,7 @@ impl std::fmt::Display for Error {
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
             Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
             #[cfg(feature = "psty")]
-            Error::SSLError(e) => write!(f, "SSL Error: {}", e),
+            Error::AESGCMError(e) => write!(f, "AES GCM Error: {}", e),
             #[cfg(feature = "psty")]
             Error::TwopacError(e) => write!(f, "2PC protocol error: {}", e),
         }

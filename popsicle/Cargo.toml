@@ -25,6 +25,7 @@ scuttlebutt.workspace = true
 itertools.workspace = true
 rand.workspace = true
 sha2.workspace = true
+aes-gcm.workspace = true
 fancy-garbling = { workspace = true, optional = true }
 serde          = { workspace = true, features = ["derive"], optional = true }
 serde_json     = { workspace = true, optional = true }
