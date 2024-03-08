@@ -33,6 +33,12 @@ const PAD_LEN: usize = 16;
 // This is the size of the authentication tag that is append to AES GCM
 const TAG_SIZE: usize = 16;
 
+// This is the size of the key used by AES GCM
+const KEY_SIZE: usize = 32;
+
+// This is the size of the nonce used by AES GCM
+const NONCE_SIZE: usize = 12;
+
 /// The type of values in the sender and receiver's sets.
 pub type Msg = Vec<u8>;
 
@@ -177,10 +183,10 @@ impl SenderState {
     {
         let mut payloads = Vec::new();
         for opprf_output in self.opprf_outputs.iter() {
-            let nonce_bytes = channel.read_vec(12)?;
+            let nonce_bytes = channel.read_vec(NONCE_SIZE)?;
             let ciphertext = channel.read_vec(payload_len + PAD_LEN + TAG_SIZE)?;
 
-            let key = opprf_output.prefix(32);
+            let key = opprf_output.prefix(KEY_SIZE);
             let key: &Key<Aes256Gcm> = key.into();
             let cipher = Aes256Gcm::new(&key);
 
@@ -351,10 +357,10 @@ impl ReceiverState {
             } else {
                 payload.extend_from_slice(&dummy_payload);
             };
-            let key = opprf_output.prefix(32);
+            let key = opprf_output.prefix(KEY_SIZE);
             let key: &Key<Aes256Gcm> = key.into();
 
-            let mut nonce_bytes = [0u8; 12];
+            let mut nonce_bytes = [0u8; NONCE_SIZE];
             rng.fill_bytes(&mut nonce_bytes);
             let nonce = Nonce::from_slice(&nonce_bytes);
 
