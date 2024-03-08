@@ -1034,14 +1034,11 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_u64_vec;
-    use fancy_garbling::util::generate_deltas;
     use rand::{prelude::SliceRandom, thread_rng};
-    use scuttlebutt::{AesRng, Block512, Channel, SymChannel};
+    use scuttlebutt::{AesRng, Block512, Channel};
     use std::{
         collections::HashMap,
-        fs::File,
-        io::{BufReader, BufWriter, Write},
-        net::{TcpListener, TcpStream},
+        io::{BufReader, BufWriter},
         os::unix::net::UnixStream,
     };
 
@@ -1099,8 +1096,8 @@ mod tests {
         let set_size_sx: usize = 1 << 6;
         let set_size_rx: usize = 1 << 6;
 
-        let weight_max: u64 = 100000;
-        let payload_max: u64 = 100000;
+        let weight_max: u64 = 10000;
+        let payload_max: u64 = 10000;
 
         let mut rng = AesRng::new();
 

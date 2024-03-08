@@ -23,14 +23,11 @@ pub enum Error {
     /// Not enough payloads.
     InvalidPayloadsLength,
     /// AES GCM Error
-    #[cfg(feature = "psty")]
     AESGCMError(aes_gcm::Error),
     /// An error occurred in the underlying 2PC protocol.
-    #[cfg(feature = "psty")]
     TwopacError(fancy_garbling::errors::TwopacError),
 }
 
-#[cfg(feature = "psty")]
 impl From<aes_gcm::Error> for Error {
     #[inline]
     fn from(e: aes_gcm::Error) -> Error {
@@ -59,7 +56,6 @@ impl From<scuttlebutt::cointoss::Error> for Error {
     }
 }
 
-#[cfg(feature = "psty")]
 impl From<fancy_garbling::errors::TwopacError> for Error {
     #[inline]
     fn from(e: fancy_garbling::errors::TwopacError) -> Error {
@@ -84,9 +80,7 @@ impl std::fmt::Display for Error {
             ),
             Error::PsiProtocolError(s) => write!(f, "PSI protocol error: {}", s),
             Error::InvalidPayloadsLength => write!(f, "Invalid length of payloads!"),
-            #[cfg(feature = "psty")]
             Error::AESGCMError(e) => write!(f, "AES GCM Error: {}", e),
-            #[cfg(feature = "psty")]
             Error::TwopacError(e) => write!(f, "2PC protocol error: {}", e),
         }
     }
