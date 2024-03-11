@@ -7,10 +7,14 @@ use std::marker::PhantomData;
 use eyre::Result;
 use protocol::DoraRam;
 use scuttlebutt::AbstractChannel;
-use swanky_field::{FiniteField, IsSubFieldOf};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
+use swanky_field_binary::F2;
 use swanky_party::Party;
 
 use crate::{backend_trait::BackendT, mac::Mac, svole_trait::SvoleT, DietMacAndCheese};
+
+const ARITHMETIC_CHALLENGE_SIZE: usize = 2;
+const BOOLEAN_CHALLENGE_SIZE: usize = 40;
 
 fn combine<'a, B: BackendT>(
     backend: &'a mut B,
@@ -169,7 +173,12 @@ where
                 Ok(value[0])
             }
             None => {
-                let ram = DoraRam::new(dmc, vec![self.init_value], 2, Arithmetic::new(self.size));
+                let ram = DoraRam::new(
+                    dmc,
+                    vec![self.init_value],
+                    ARITHMETIC_CHALLENGE_SIZE,
+                    Arithmetic::new(self.size),
+                );
                 self.dora = Some(ram);
                 self.read(dmc, addr)
             }
@@ -190,7 +199,12 @@ where
                 Ok(())
             }
             None => {
-                let ram = DoraRam::new(dmc, vec![self.init_value], 2, Arithmetic::new(self.size));
+                let ram = DoraRam::new(
+                    dmc,
+                    vec![self.init_value],
+                    ARITHMETIC_CHALLENGE_SIZE,
+                    Arithmetic::new(self.size),
+                );
                 self.dora = Some(ram);
                 self.write(dmc, addr, value)
             }
@@ -206,5 +220,246 @@ where
             Some(ram) => ram.finalize(dmc),
             None => Ok(()),
         }
+    }
+}
+
+struct Boolean {
+    addr_size: usize,
+    value_size: usize,
+    ram_size: usize,
+}
+
+impl Boolean {
+    fn new(addr_size: usize, value_size: usize, ram_size: usize) -> Self {
+        Self {
+            addr_size,
+            value_size,
+            ram_size,
+        }
+    }
+}
+
+/// A binary counter of a fixed width.
+///
+/// Internally, LSB-first for easy counting, but can be borrowed as MSB-first.
+struct BinaryCounter(Vec<F2>);
+
+impl BinaryCounter {
+    /// Create a new counter that is `num_bits` wide.
+    ///
+    /// The counter is initialized to zero.
+    fn new(num_bits: usize) -> Self {
+        Self(vec![F2::ZERO; num_bits])
+    }
+
+    /// Increment the binary counter.
+    ///
+    /// Note that this is a 'cycling' counter, so incrementing the counter where
+    /// all bits are set results in the counter of all zeros.
+    fn incr(&mut self) {
+        let mut need_flip = true;
+        for bit in self.0.iter_mut() {
+            if need_flip {
+                *bit += F2::ONE;
+                need_flip = *bit == F2::ZERO;
+            }
+        }
+    }
+
+    /// Return the counter value as an MSB-first `Vec`.
+    fn curr_val(&self) -> Vec<F2> {
+        self.0.iter().rev().copied().collect()
+    }
+}
+
+struct BooleanIter {
+    current: BinaryCounter,
+    rem: usize,
+}
+
+impl Iterator for BooleanIter {
+    type Item = Vec<F2>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rem > 0 {
+            let old = self.current.curr_val();
+            self.current.incr();
+            self.rem -= 1;
+            Some(old)
+        } else {
+            None
+        }
+    }
+}
+
+impl MemorySpace<F2> for Boolean {
+    type Addr = Vec<F2>;
+    type Enum = BooleanIter;
+
+    fn addr_size(&self) -> usize {
+        self.addr_size
+    }
+
+    fn value_size(&self) -> usize {
+        self.value_size
+    }
+
+    fn size(&self) -> usize {
+        self.ram_size
+    }
+
+    fn enumerate(&self) -> Self::Enum {
+        BooleanIter {
+            current: BinaryCounter::new(self.addr_size),
+            rem: self.ram_size,
+        }
+    }
+}
+
+/// A RAM with addresses/values represented by one or more F2 values.
+///
+/// This is a high-level wrapper around [`DoraRam`] for the case described
+/// above. Use of this structure over `DoraRam` is preferred, as it provides
+/// the more familiar read/write interface and properly executes the protocol
+/// steps for these operations.
+pub struct BooleanRam<
+    P: Party,
+    T: FiniteField<PrimeField = F2>,
+    C: AbstractChannel + Clone,
+    SVOLE: SvoleT<P, F2, T>,
+> where
+    F2: IsSubFieldOf<T>,
+{
+    addr_size: usize,
+    value_size: usize,
+    size: usize,
+    init_value: Vec<Mac<P, F2, T>>,
+    dora: Option<DoraRam<P, F2, T, C, Boolean, SVOLE>>,
+}
+
+impl<
+        P: Party,
+        T: FiniteField<PrimeField = F2>,
+        C: AbstractChannel + Clone,
+        SVOLE: SvoleT<P, F2, T>,
+    > BooleanRam<P, T, C, SVOLE>
+where
+    F2: IsSubFieldOf<T>,
+{
+    /// Create a new `BooleanRam` with `size` cells, each containing
+    /// `init_value`.
+    pub fn new(
+        addr_size: usize,
+        value_size: usize,
+        size: usize,
+        init_value: Vec<Mac<P, F2, T>>,
+    ) -> Self {
+        Self {
+            addr_size,
+            value_size,
+            size,
+            init_value,
+            dora: None,
+        }
+    }
+
+    /// Read and return the value at `addr`.
+    pub fn read(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
+        addr: &[Mac<P, F2, T>],
+    ) -> Result<Vec<Mac<P, F2, T>>> {
+        debug_assert_eq!(addr.len(), self.addr_size);
+
+        match self.dora.as_mut() {
+            Some(ram) => {
+                let value = ram.remove(dmc, addr)?;
+                ram.insert(dmc, addr, &value)?;
+                Ok(value)
+            }
+            None => {
+                let ram = DoraRam::new(
+                    dmc,
+                    self.init_value.clone(),
+                    BOOLEAN_CHALLENGE_SIZE,
+                    Boolean::new(self.addr_size, self.value_size, self.size),
+                );
+                self.dora = Some(ram);
+                self.read(dmc, addr)
+            }
+        }
+    }
+
+    /// Write `value` to `addr`.
+    pub fn write(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
+        addr: &[Mac<P, F2, T>],
+        value: &[Mac<P, F2, T>],
+    ) -> Result<()> {
+        debug_assert_eq!(addr.len(), self.addr_size);
+        debug_assert_eq!(value.len(), self.value_size);
+
+        match self.dora.as_mut() {
+            Some(ram) => {
+                ram.remove(dmc, addr)?;
+                ram.insert(dmc, addr, value)?;
+                Ok(())
+            }
+            None => {
+                let ram = DoraRam::new(
+                    dmc,
+                    self.init_value.clone(),
+                    BOOLEAN_CHALLENGE_SIZE,
+                    Boolean::new(self.addr_size, self.value_size, self.size),
+                );
+                self.dora = Some(ram);
+                self.write(dmc, addr, value)
+            }
+        }
+    }
+
+    /// Finalize this `BooleanRam`.
+    ///
+    /// This should only be called when no more reads/writes will occur on this
+    /// RAM.
+    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>) -> Result<()> {
+        match self.dora.take() {
+            Some(ram) => ram.finalize(dmc),
+            None => Ok(()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod counter_tests {
+    use super::*;
+
+    #[test]
+    fn incr_zero() {
+        let mut bc = BinaryCounter(vec![F2::ZERO, F2::ZERO, F2::ZERO]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ZERO, F2::ONE].into_iter().eq(bc.curr_val()));
+    }
+
+    #[test]
+    fn incr_one() {
+        let mut bc = BinaryCounter(vec![F2::ONE, F2::ZERO, F2::ZERO]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ONE, F2::ZERO].into_iter().eq(bc.curr_val()));
+    }
+
+    #[test]
+    fn incr_two() {
+        let mut bc = BinaryCounter(vec![F2::ZERO, F2::ONE, F2::ZERO]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ONE, F2::ONE].into_iter().eq(bc.curr_val()));
+    }
+
+    #[test]
+    fn incr_max() {
+        let mut bc = BinaryCounter(vec![F2::ONE, F2::ONE, F2::ONE]);
+        bc.incr();
+        assert!(&[F2::ZERO, F2::ZERO, F2::ZERO].into_iter().eq(bc.curr_val()));
     }
 }

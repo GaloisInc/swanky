@@ -12,6 +12,7 @@ use crate::{
     homcom::FCom,
     mac::Mac,
     plugins::DisjunctionBody,
+    ram::BooleanRam,
     svole_trait::SvoleT,
     DietMacAndCheese,
 };
@@ -35,6 +36,7 @@ pub(crate) struct DietMacAndCheeseExtField<
     dmc: DietMacAndCheese<P, F2, T, C, SVOLE1>,
     lifted_dmc: DietMacAndCheese<P, T, T, C, SVOLE2>,
     dora_states: HashMap<usize, DoraState<P, T, T, C, SVOLE2>>,
+    ram_states: Vec<BooleanRam<P, T, C, SVOLE1>>,
 }
 
 impl<
@@ -61,6 +63,7 @@ where
             dmc,
             lifted_dmc,
             dora_states: Default::default(),
+            ram_states: Default::default(),
         })
     }
 }
@@ -311,24 +314,42 @@ impl<
 {
     fn init_ram(
         &mut self,
-        _size: usize,
-        _addr_count: usize,
-        _value_count: usize,
-        _init_value: &[Self::Wire],
+        size: usize,
+        addr_count: usize,
+        value_count: usize,
+        init_value: &[Self::Wire],
     ) -> Result<RamId> {
-        todo!("Create and store a BinaryRam state, returning its position in the store.")
+        debug_assert!(addr_count >= 1);
+        debug_assert!(value_count >= 1);
+        debug_assert_eq!(init_value.len(), value_count);
+
+        let ram_id = self.ram_states.len();
+        self.ram_states.push(BooleanRam::new(
+            addr_count,
+            value_count,
+            size,
+            init_value.to_vec(),
+        ));
+
+        Ok(ram_id)
     }
 
-    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
-        todo!("Read from the BinaryRam with ID ram.")
+    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+        debug_assert!(ram < self.ram_states.len());
+
+        self.ram_states[ram].read(&mut self.dmc, addr)
     }
 
-    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
-        todo!("Write to the BinaryRam with ID ram.")
+    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()> {
+        debug_assert!(ram < self.ram_states.len());
+
+        self.ram_states[ram].write(&mut self.dmc, addr, new)
     }
 
     fn finalize_rams(&mut self) -> Result<()> {
-        Ok(())
+        self.ram_states
+            .iter_mut()
+            .try_for_each(|ram| ram.finalize(&mut self.dmc))
     }
 }
 
