@@ -2148,7 +2148,7 @@ impl<
                 self.evaluate_gates_passed(body.gates(), fun_store)?;
                 self.callframe_end(func);
             }
-            FunctionBody::Plugin(body) => match &body.execution() {
+            FunctionBody::Plugin(body) => match body {
                 PluginExecution::Gates(body) => {
                     self.callframe_start(func, out_ranges, in_ranges)?;
                     self.evaluate_gates_passed(body.gates(), fun_store)?;
@@ -2163,7 +2163,7 @@ impl<
                         fun_store,
                         out_ranges,
                         in_ranges,
-                        body.execution(),
+                        body,
                     )?;
                 }
                 PluginExecution::Disjunction(plugin) => {
@@ -2176,7 +2176,7 @@ impl<
                         fun_store,
                         out_ranges,
                         in_ranges,
-                        body.execution(),
+                        body,
                     )?;
                 }
                 PluginExecution::Mux(plugin) => {
@@ -2188,7 +2188,7 @@ impl<
                         fun_store,
                         out_ranges,
                         in_ranges,
-                        body.execution(),
+                        body,
                     )?;
                     self.callframe_end(func);
                 }
@@ -2228,7 +2228,7 @@ impl<
                                         fun_store,
                                         out_ranges,
                                         in_ranges,
-                                        body.execution(),
+                                        body,
                                     )?
                                     .ok_or_eyre("RamInit should return a RamId")?;
 
@@ -2252,7 +2252,7 @@ impl<
                                     fun_store,
                                     out_ranges,
                                     in_ranges,
-                                    body.execution(),
+                                    body,
                                 )?;
                             }
                         },
