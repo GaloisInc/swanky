@@ -92,10 +92,6 @@ impl<F: FiniteField> Disjunction<F> {
         self.dim_err
     }
 
-    pub fn dim_input(&self) -> usize {
-        self.inputs
-    }
-
     pub fn dim_output(&self) -> usize {
         self.outputs
     }
@@ -106,10 +102,6 @@ impl<F: FiniteField> Disjunction<F> {
 
     pub fn dim_ext(&self) -> usize {
         1 + self.inputs + self.dim_wit
-    }
-
-    pub fn inputs(&self) -> usize {
-        self.inputs
     }
 
     pub fn outputs(&self) -> usize {

@@ -23,7 +23,6 @@ pub mod circuit_ir;
 mod gadgets;
 pub mod plaintext;
 
-#[allow(dead_code)] // because, well, it's not used yet.
 mod dora;
 
 mod ram;

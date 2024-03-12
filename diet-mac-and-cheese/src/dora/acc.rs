@@ -182,33 +182,6 @@ impl<F: FiniteField> Accumulator<F> {
         true
     }
 
-    pub fn send<C: AbstractChannel + Clone>(&self, chan: &mut C) -> Result<()> {
-        for w in self.wit.iter() {
-            chan.write_serializable(w)?;
-        }
-        for e in self.err.iter() {
-            chan.write_serializable(e)?;
-        }
-        Ok(())
-    }
-
-    pub fn recv<C: AbstractChannel + Clone>(chan: &mut C, r1cs: &R1CS<F>) -> Result<Self> {
-        let mut wit = Vec::with_capacity(r1cs.dim());
-        let mut err = Vec::with_capacity(r1cs.rows());
-
-        for _ in 0..r1cs.dim() {
-            wit.push(chan.read_serializable()?);
-        }
-
-        for _ in 0..r1cs.rows() {
-            err.push(chan.read_serializable()?);
-        }
-
-        let acc = Self { wit, err };
-        debug_assert!(acc.check(r1cs));
-        Ok(acc)
-    }
-
     pub fn combine<B: BackendT<FieldElement = F>>(
         &self,
         backend: &mut B,
