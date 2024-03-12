@@ -5,8 +5,7 @@ use crate::mac::Mac;
 use crate::svole_trait::{field_name, SvoleT};
 use eyre::{bail, ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
-#[allow(unused)]
-use log::{debug, info, warn};
+use log::{debug, info};
 use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block, SyncChannel};
@@ -22,23 +21,8 @@ use swanky_party::{IsParty, Party, Prover, WhichParty};
 /// Edabits struct
 #[derive(Clone)]
 pub struct Edabits<P: Party, FE: FiniteField> {
-    #[allow(missing_docs)]
     pub bits: Vec<Mac<P, F2, F40b>>,
-    #[allow(missing_docs)]
     pub value: Mac<P, FE::PrimeField, FE>,
-}
-
-#[allow(unused)]
-fn copy_edabits<P: Party, FE: FiniteField>(edabits: &Edabits<P, FE>) -> Edabits<P, FE> {
-    let num_bits = edabits.bits.len();
-    let mut bits_par = Vec::with_capacity(num_bits);
-    for j in 0..num_bits {
-        bits_par.push(edabits.bits[j]);
-    }
-    Edabits {
-        bits: bits_par,
-        value: edabits.value,
-    }
 }
 
 /// Dabit struct
@@ -140,7 +124,6 @@ fn check_parameters<FE: FiniteField>(n: usize, gamma: usize) -> Result<()> {
 
 /// The edabits conversion protocol
 pub struct Conv<P: Party, FE: Copy, SvoleF2: SvoleT<P, F2, F40b>, SvoleFE: SvoleT<P, FE, FE>> {
-    #[allow(missing_docs)]
     pub fcom_f2: FCom<P, F2, F40b, SvoleF2>,
     fcom_fe: FCom<P, FE, FE, SvoleFE>,
 }
@@ -1247,8 +1230,7 @@ mod tests {
     use super::convert_bits_to_field;
     use super::{f2_to_fe, Conv, Dabit, Edabits};
     use crate::svole_trait::Svole;
-    #[allow(unused)]
-    use log::{debug, info, warn};
+    use log::debug;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use scuttlebutt::field::F384p;
     use scuttlebutt::ring::FiniteRing;

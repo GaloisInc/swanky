@@ -2401,16 +2401,13 @@ pub(crate) mod tests {
         fields::{F384P_MODULUS, F384Q_MODULUS},
     };
     use mac_n_cheese_sieve_parser::Number;
-    use pretty_env_logger;
     use rand::SeedableRng;
+    use scuttlebutt::field::F2;
     use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
-    #[allow(unused_imports)]
-    use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::SyncChannel;
     use scuttlebutt::{field::F61p, AesRng, Channel};
-    use std::env;
     use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
@@ -2421,9 +2418,7 @@ pub(crate) mod tests {
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
-    #[allow(dead_code)]
     const FF2: u8 = 2;
-    #[allow(dead_code)]
     const FF3: u8 = 3;
 
     pub(crate) fn zero<FE: PrimeFiniteField>() -> Number {
@@ -2463,17 +2458,6 @@ pub(crate) mod tests {
 
     fn wr(w: WireId) -> WireRange {
         (w, w)
-    }
-
-    #[allow(dead_code)]
-    fn setup_logger() {
-        // if log-level `RUST_LOG` not already set, then set to info
-        match env::var("RUST_LOG") {
-            Ok(val) => println!("loglvl: {}", val),
-            Err(_) => env::set_var("RUST_LOG", "info"),
-        };
-
-        pretty_env_logger::init_timed();
     }
 
     pub(crate) fn test_circuit(
