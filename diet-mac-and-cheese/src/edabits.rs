@@ -5,7 +5,7 @@ use crate::mac::Mac;
 use crate::svole_trait::{field_name, SvoleT};
 use eyre::{bail, ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
-use log::{debug, info};
+use log::info;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block, SyncChannel};
 use std::io::{BufReader, BufWriter};
@@ -395,39 +395,6 @@ impl<
         }
 
         Ok(res)
-    }
-
-    /// input edabits
-    pub fn input_edabits<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-        aux_bits: Vec<Vec<Mac<P, F2, F40b>>>,
-    ) -> Result<Vec<Edabits<P, FE>>> {
-        let num = aux_bits.len();
-        debug!("HOW MANY {:?}", num);
-        debug!("SIZE {:?}", aux_bits[0].len());
-        let mut edabits_vec = Vec::with_capacity(num);
-
-        for bits in aux_bits.into_iter() {
-            let value = match P::WHICH {
-                WhichParty::Prover(ev) => {
-                    let r_m: FE::PrimeField = convert_bits_to_field::<FE>(
-                        bits.iter()
-                            .map(|x| x.value().into_inner(ev))
-                            .collect::<Vec<F2>>()
-                            .as_slice(),
-                    );
-                    let r_m_mac = self.fcom_fe.input_prover(ev, channel, rng, &[r_m])?[0];
-                    Mac::new(ProverPrivateCopy::new(r_m), r_m_mac)
-                }
-                WhichParty::Verifier(ev) => self.fcom_fe.input_verifier(ev, channel, rng, 1)?[0],
-            };
-
-            edabits_vec.push(Edabits { bits, value });
-        }
-
-        Ok(edabits_vec)
     }
 
     /// generate random edabits
