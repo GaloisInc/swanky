@@ -473,12 +473,6 @@ where
         }
     }
 
-    /// Multiply by a constant.
-    #[inline]
-    pub fn affine_mult_cst(&self, cst: V, x: Mac<P, V, T>) -> Mac<P, V, T> {
-        x * cst
-    }
-
     /// Subtract two [`Mac`]s.
     #[inline]
     pub fn sub(&self, a: Mac<P, V, T>, b: Mac<P, V, T>) -> Mac<P, V, T> {
@@ -795,7 +789,7 @@ mod tests {
                 let cst = V::random(&mut rng);
                 channel.write_serializable::<V>(&cst).unwrap();
                 channel.flush().unwrap();
-                let m = fcom.affine_mult_cst(cst, x);
+                let m = x * cst;
                 v.push(m);
                 let a = fcom.affine_add_cst(cst, x);
                 v.push(a);
@@ -820,7 +814,7 @@ mod tests {
         for _ in 0..count {
             let x_mac = fcom.random(&mut channel, &mut rng).unwrap();
             let cst = channel.read_serializable::<V>().unwrap();
-            let m_mac = fcom.affine_mult_cst(cst, x_mac);
+            let m_mac = x_mac * cst;
             v.push(m_mac);
             let a_mac = fcom.affine_add_cst(cst, x_mac);
             v.push(a_mac);
