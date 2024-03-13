@@ -37,7 +37,7 @@ pub(crate) struct DietMacAndCheesePlaintext<V: IsSubFieldOf<T>, T: FiniteField> 
     // It is necessary for lifting `F2` values to its tag extension field `F40b`.
     extfield_backend: Option<Box<DietMacAndCheesePlaintext<F40b, F40b>>>,
     // Monitor gates
-    monitor: Monitor<V>,
+    monitor: Monitor<V, T>,
     // The Tag field is not used
     phantom: PhantomData<T>,
 }

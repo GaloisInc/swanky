@@ -191,7 +191,11 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
             // In particular if one side decides to fill up an svole while the other has received a
             // stop signal
             if *self.svole_atomic.stop_signal.lock().unwrap() && full {
-                info!("Stop running svole functionality for {}", field_name::<T>());
+                info!(
+                    "Stop running svole functionality for field:{} tag:{}",
+                    field_name::<V>(),
+                    field_name::<T>()
+                );
                 break;
             }
 

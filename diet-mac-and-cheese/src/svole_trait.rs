@@ -130,7 +130,12 @@ where
                     rng,
                     out.as_mut().verifier_into(ev),
                 )?;
-                info!("SVOLE<{} {:?}>", field_name::<T>(), start.elapsed());
+                info!(
+                    "SVOLE<{},{} {:?}>",
+                    field_name::<V>(),
+                    field_name::<T>(),
+                    start.elapsed()
+                );
             }
         }
         Ok(())
