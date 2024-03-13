@@ -28,7 +28,7 @@ mod dora;
 mod ram;
 
 mod edabits;
-pub mod fields;
+mod fields;
 mod homcom;
 mod mac;
 mod memory;
