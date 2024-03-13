@@ -27,7 +27,7 @@ mod dora;
 
 mod ram;
 
-pub mod edabits;
+mod edabits;
 pub mod fields;
 pub mod homcom;
 pub mod mac;
