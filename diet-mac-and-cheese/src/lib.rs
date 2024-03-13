@@ -29,8 +29,8 @@ mod ram;
 
 mod edabits;
 pub mod fields;
-pub mod homcom;
-pub mod mac;
+mod homcom;
+mod mac;
 mod memory;
 mod sieveir_phase2;
 pub mod sieveir_reader_fbs;
