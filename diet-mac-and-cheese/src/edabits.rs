@@ -210,7 +210,7 @@ impl<
             let c_m = f2_to_fe::<FE::PrimeField>(c);
 
             let choice = c.ct_eq(&F2::ONE);
-            let x = self.fcom_fe.neg(r.value);
+            let x = -r.value;
             let beq = self.fcom_fe.affine_add_cst(c_m, x);
             let bneq = self.fcom_fe.affine_add_cst(c_m, r.value);
             let x_m = Mac::conditional_select(&bneq, &beq, choice);

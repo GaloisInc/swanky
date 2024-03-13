@@ -479,12 +479,6 @@ where
         x * cst
     }
 
-    /// Negate a [`Mac`].
-    #[inline]
-    pub fn neg(&self, a: Mac<P, V, T>) -> Mac<P, V, T> {
-        -a
-    }
-
     /// Subtract two [`Mac`]s.
     #[inline]
     pub fn sub(&self, a: Mac<P, V, T>, b: Mac<P, V, T>) -> Mac<P, V, T> {
