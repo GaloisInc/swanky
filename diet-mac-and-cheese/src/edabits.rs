@@ -176,7 +176,7 @@ impl<
                     c_batch
                         .as_mut()
                         .prover_into(ev)
-                        .push(self.fcom_f2.add(r_batch[i].bit, x_batch[i]));
+                        .push(r_batch[i].bit + x_batch[i]);
                 }
                 self.fcom_f2.open(
                     channel,
@@ -189,7 +189,7 @@ impl<
                     r_mac_plus_x_mac
                         .as_mut()
                         .into_inner(ev)
-                        .push(self.fcom_f2.add(r_batch[i].bit, x_batch[i]));
+                        .push(r_batch[i].bit + x_batch[i]);
                 }
                 self.fcom_f2.open(
                     channel,
@@ -365,7 +365,7 @@ impl<
                         );
 
                         let ci = ci_batch.as_ref().verifier_into(ev)[n];
-                        let c_mac = self.fcom_f2.add(ci, and_res_mac);
+                        let c_mac = ci + and_res_mac;
                         ci_batch.as_mut().verifier_into(ev)[n] = c_mac;
                     }
                 }
