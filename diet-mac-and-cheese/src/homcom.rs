@@ -473,12 +473,6 @@ where
         }
     }
 
-    /// Subtract two [`Mac`]s.
-    #[inline]
-    pub fn sub(&self, a: Mac<P, V, T>, b: Mac<P, V, T>) -> Mac<P, V, T> {
-        a - b
-    }
-
     /// Check that a batch of [`Mac`]s are zero.
     pub fn check_zero<C: AbstractChannel + Clone>(
         &mut self,
