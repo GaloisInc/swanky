@@ -2460,6 +2460,18 @@ pub(crate) mod tests {
         (w, w)
     }
 
+    // This function is useful when debugging tests.
+    #[allow(dead_code)]
+    fn setup_logger() {
+        // if log-level `RUST_LOG` not already set, then set to info
+        match env::var("RUST_LOG") {
+            Ok(val) => println!("loglvl: {}", val),
+            Err(_) => env::set_var("RUST_LOG", "info"),
+        };
+
+        pretty_env_logger::init_timed();
+    }
+
     pub(crate) fn test_circuit(
         fields: Vec<Number>,
         func_store: FunStore,
