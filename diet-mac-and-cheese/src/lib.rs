@@ -15,31 +15,29 @@ solely on the `input_private()` function. Also the API satisfies the following i
 if any function call returns an error then any subsequent gate function call
 will directly return an error.
 */
-mod backend;
-mod backend_extfield;
 mod backend_multifield;
 pub use backend_multifield::EvaluatorCirc;
-mod backend_trait;
 pub mod circuit_ir;
-mod gadgets;
-pub mod plaintext;
+pub mod sieveir_reader_fbs;
+pub mod sieveir_reader_text;
+pub mod svole_thread;
+pub mod svole_trait;
 
+mod backend;
+pub(crate) use backend::DietMacAndCheese;
+mod backend_extfield;
+mod backend_trait;
 mod dora;
-
-mod ram;
-
 mod edabits;
 mod fields;
+mod gadgets;
 mod homcom;
 mod mac;
 mod memory;
-mod sieveir_phase2;
-pub mod sieveir_reader_fbs;
-pub mod sieveir_reader_text;
-pub use backend::DietMacAndCheese;
+mod plaintext;
 mod plugins;
-pub mod svole_thread;
-pub mod svole_trait;
+mod ram;
+mod sieveir_phase2;
 
 use ocelot::svole::{
     LpnParams, LPN_EXTEND_EXTRASMALL, LPN_EXTEND_MEDIUM, LPN_EXTEND_SMALL, LPN_EXTEND_SMALL_MEDIUM,
