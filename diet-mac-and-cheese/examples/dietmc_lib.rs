@@ -102,14 +102,15 @@ fn main() -> Result<()> {
         circ_inputs.ingest_instance(0, field_to_number(twentyone));
 
         println!("Create an evaluator");
-        let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
-            &mut channel,
-            AesRng::new(),
-            CircInputs::default(),
-            TypeStore::default(),
-            lpn_size,
-            no_batching,
-        )?;
+        let mut evaluator =
+            EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                &mut channel,
+                AesRng::new(),
+                CircInputs::default(),
+                TypeStore::default(),
+                lpn_size,
+                no_batching,
+            )?;
 
         println!("Load the F61p backend");
         evaluator.load_backend(
@@ -142,14 +143,15 @@ fn main() -> Result<()> {
         circ_inputs.ingest_instance(ty as usize, field_to_number(twentyone));
 
         println!("Create an evaluator");
-        let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>>::new(
-            &mut channel,
-            AesRng::new(),
-            CircInputs::default(),
-            TypeStore::default(),
-            lpn_size,
-            no_batching,
-        )?;
+        let mut evaluator =
+            EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                &mut channel,
+                AesRng::new(),
+                CircInputs::default(),
+                TypeStore::default(),
+                lpn_size,
+                no_batching,
+            )?;
 
         println!("Load the F61p backend");
         evaluator.load_backend(
