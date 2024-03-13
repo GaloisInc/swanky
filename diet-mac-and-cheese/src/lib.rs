@@ -17,7 +17,8 @@ will directly return an error.
 */
 mod backend;
 mod backend_extfield;
-pub mod backend_multifield;
+mod backend_multifield;
+pub use backend_multifield::EvaluatorCirc;
 mod backend_trait;
 pub mod circuit_ir;
 mod gadgets;

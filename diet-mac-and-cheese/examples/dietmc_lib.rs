@@ -16,9 +16,9 @@ use std::env;
 use std::io::{BufReader, BufWriter};
 use std::net::{TcpListener, TcpStream};
 
-use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, FunStore, GateM, TypeStore};
 use diet_mac_and_cheese::svole_trait::Svole;
+use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use mac_n_cheese_sieve_parser::Number;
 use scuttlebutt::field::F61p;
