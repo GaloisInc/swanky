@@ -6,7 +6,6 @@ use crate::svole_trait::{field_name, SvoleT};
 use eyre::{bail, ensure, eyre, Result};
 use generic_array::typenum::Unsigned;
 use log::{debug, info};
-use ocelot::svole::LpnParams;
 use rand::{Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block, SyncChannel};
 use std::io::{BufReader, BufWriter};
@@ -137,19 +136,6 @@ impl<
         SvoleFE: SvoleT<P, FE, FE>,
     > Conv<P, FE, SvoleF2, SvoleFE>
 {
-    /// initialize
-    pub fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
-        rng: &mut AesRng,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
-    ) -> Result<Self> {
-        Ok(Self {
-            fcom_f2: FCom::init(channel, rng, lpn_setup, lpn_extend)?,
-            fcom_fe: FCom::init(channel, rng, lpn_setup, lpn_extend)?,
-        })
-    }
-
     /// Initialize provided the commitment functionalities.
     pub fn init_with_fcoms(
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
@@ -1225,10 +1211,10 @@ impl<
 
 #[cfg(test)]
 mod tests {
-
     use super::super::mac::Mac;
     use super::convert_bits_to_field;
     use super::{f2_to_fe, Conv, Dabit, Edabits};
+    use crate::homcom::FCom;
     use crate::svole_trait::Svole;
     use log::debug;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
@@ -1258,11 +1244,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
             )
             .unwrap();
 
@@ -1321,11 +1305,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
         )
         .unwrap();
 
@@ -1393,11 +1375,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
             )
             .unwrap();
 
@@ -1451,11 +1431,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
         )
         .unwrap();
 
@@ -1513,11 +1491,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_EXTEND_SMALL,
-                LPN_SETUP_SMALL,
+            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
             )
             .unwrap();
 
@@ -1547,11 +1523,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_EXTEND_SMALL,
-            LPN_SETUP_SMALL,
+        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
         )
         .unwrap();
 
@@ -1593,11 +1567,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
             )
             .unwrap();
 
@@ -1608,11 +1580,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
         )
         .unwrap();
 
@@ -1631,11 +1601,9 @@ mod tests {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);
             let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
+            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
             )
             .unwrap();
 
@@ -1660,11 +1628,9 @@ mod tests {
         let reader = BufReader::new(receiver.try_clone().unwrap());
         let writer = BufWriter::new(receiver);
         let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
         )
         .unwrap();
 
