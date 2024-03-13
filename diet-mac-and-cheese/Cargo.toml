@@ -53,17 +53,8 @@ swanky-flatbuffer-build.workspace = true
 proptest.workspace = true
 
 [[example]]
-name = "network_edabits"
-path = "examples/network_edabits.rs"
-
-[[example]]
-name = "edabits"
-path = "examples/edabits.rs"
-
-[[example]]
 name = "dietmc_lib"
 path = "examples/dietmc_lib.rs"
-
 
 [[bin]]
 name = "dietmc"
