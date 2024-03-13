@@ -2408,6 +2408,7 @@ pub(crate) mod tests {
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::SyncChannel;
     use scuttlebutt::{field::F61p, AesRng, Channel};
+    use std::env;
     use std::net::TcpStream;
     use std::{collections::VecDeque, thread::JoinHandle};
     use std::{
