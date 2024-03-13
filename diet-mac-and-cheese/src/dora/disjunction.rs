@@ -24,6 +24,7 @@ impl<FP: FiniteField + SieveIrDeserialize> Disjunction<FP> {
     pub fn compile(disj: &DisjunctionBody, num_cond: u64, fun_store: &FunStore) -> Self {
         Self::new(
             disj.clauses().map(|cls| {
+                log::info!("Disjunction clause {}", cls.func_name);
                 let guard = FP::from_number(&cls.guard).unwrap();
                 Clause::new(
                     disj.field(),
