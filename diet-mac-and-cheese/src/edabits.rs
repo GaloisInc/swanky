@@ -567,63 +567,6 @@ impl<
         Ok(dabit_vec)
     }
 
-    /// Generate random triples
-    pub fn random_triples<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-        num: usize,
-        out: &mut Vec<(Mac<P, F2, F40b>, Mac<P, F2, F40b>, Mac<P, F2, F40b>)>,
-    ) -> Result<()> {
-        let mut pairs = Vec::with_capacity(num);
-        let mut zs = ProverPrivate::new(Vec::with_capacity(num));
-        for _ in 0..num {
-            let x = self.fcom_f2.random(channel, rng)?;
-            let y = self.fcom_f2.random(channel, rng)?;
-            pairs.push((x, y));
-
-            if let WhichParty::Prover(ev) = P::WHICH {
-                let z = x.value().into_inner(ev) * y.value().into_inner(ev);
-                zs.as_mut().into_inner(ev).push(z);
-            }
-        }
-        let zs_mac = match P::WHICH {
-            WhichParty::Prover(ev) => {
-                let mut zs_mac = Vec::with_capacity(num);
-                self.fcom_f2.input_prover_low_level(
-                    ev,
-                    channel,
-                    rng,
-                    zs.as_ref().into_inner(ev),
-                    &mut zs_mac,
-                )?;
-                PartyEither::prover_new(ev, zs_mac)
-            }
-            WhichParty::Verifier(ev) => {
-                let mut zs_mac = Vec::with_capacity(num);
-                self.fcom_f2
-                    .input_verifier_low_level(ev, channel, rng, num, &mut zs_mac)?;
-                PartyEither::verifier_new(ev, zs_mac)
-            }
-        };
-
-        for i in 0..num {
-            let (x, y) = pairs[i];
-            let z = match P::WHICH {
-                WhichParty::Prover(ev) => Mac::new(
-                    zs.as_ref().map(|zs| zs[i]).into(),
-                    zs_mac.as_ref().prover_into(ev)[i],
-                ),
-                WhichParty::Verifier(ev) => zs_mac.as_ref().verifier_into(ev)[i],
-            };
-            out.push((x, y, z));
-        }
-        if let WhichParty::Prover(_) = P::WHICH {
-            channel.flush()?;
-        }
-        Ok(())
-    }
-
     fn fdabit<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
