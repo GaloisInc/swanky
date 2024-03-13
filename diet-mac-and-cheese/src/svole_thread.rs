@@ -274,6 +274,17 @@ impl<P: Party, V, T: Copy> SvoleAtomicRoundRobin<P, V, T> {
     }
 }
 
+fn get_channel<C2: AbstractChannel + Clone + 'static + Send, I>(channels: &mut I) -> Result<C2>
+where
+    I: Iterator<Item = C2>,
+{
+    if let Some(c) = channels.next() {
+        Ok(c)
+    } else {
+        eyre::bail!("not enough channels available")
+    }
+}
+
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField + Copy + Default + Debug>
     SvoleAtomicRoundRobin<P, V, T>
 where
@@ -281,46 +292,46 @@ where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
     // Create a `SvoleAtomicRounRobin`
-    pub(crate) fn create_and_spawn_svole_threads<C2: AbstractChannel + Clone + 'static + Send>(
-        channels_vole: Vec<C2>,
+    pub(crate) fn create_and_spawn_svole_threads<C: AbstractChannel + Clone + 'static + Send, I>(
+        channels_vole: &mut I,
+        threads_per_field: usize,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
+        delta: Option<T>,
     ) -> Result<(
         Self,
         Vec<SvoleAtomic<P, V, T>>,
         Vec<std::thread::JoinHandle<Result<()>>>,
-    )> {
+    )>
+    where
+        I: Iterator<Item = C>,
+    {
         let mut threads = vec![];
         let mut svoles_atomics: Vec<SvoleAtomic<P, V, T>> = vec![];
         let mut svoles_atomics_to_stop: Vec<SvoleAtomic<P, V, T>> = vec![];
 
-        for (i, mut channel_vole) in channels_vole.into_iter().enumerate() {
+        for _ in 0..threads_per_field {
+            let mut channel = get_channel(channels_vole)?;
             let svole_atomic = SvoleAtomic::<P, V, T>::create();
             let svole_atomic2 = svole_atomic.duplicate();
             let svole_atomic3 = svole_atomic.duplicate();
 
-            let delta = if i != 0 {
-                // We get the delta from the first vole.
-                match P::WHICH {
-                    WhichParty::Verifier(ev) => Some(svoles_atomics[0].delta(ev)),
-                    WhichParty::Prover(_) => None,
-                }
-            } else {
-                None
-            };
-
             let svole_thread = std::thread::spawn(move || {
-                info!("spawning SVOLE thread for field {:?}", field_name::<T>());
+                info!(
+                    "Spawning VOLE thread for field:{:?} tag:{:?} ",
+                    field_name::<V>(),
+                    field_name::<T>()
+                );
                 let mut rng2 = AesRng::new();
                 let mut svole = ThreadSvole::<P, V, T>::init(
-                    &mut channel_vole,
+                    &mut channel,
                     &mut rng2,
                     lpn_setup,
                     lpn_extend,
                     svole_atomic,
                     delta,
                 )?;
-                svole.run(&mut channel_vole, &mut rng2)?;
+                svole.run(&mut channel, &mut rng2)?;
                 Ok(())
             });
             threads.push(svole_thread);

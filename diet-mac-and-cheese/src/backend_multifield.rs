@@ -1366,10 +1366,14 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         })
     }
 
-    /// New evaluator initializing the F2 Svole in a separate thread.
-    pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send>(
-        channels_vole: Vec<C2>,
-        rng: AesRng,
+    /// Create a new multithreaded evaluator.
+    ///
+    /// It initializes the F2 voles in separate threads as well as
+    /// the corresponding lifted F40b full field voles.
+    pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
+        channels_vole: &mut I,
+        threads_per_field: usize,
+        mut rng: AesRng,
         inputs: CircInputs,
         type_store: TypeStore,
         no_batching: bool,
@@ -1377,19 +1381,35 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     ) -> Result<(
         EvaluatorCirc<P, C, SvoleAtomicRoundRobin<P, F2, F40b>>,
         Vec<std::thread::JoinHandle<Result<()>>>,
-    )> {
+    )>
+    where
+        I: Iterator<Item = C2>,
+    {
         let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-        let (svole_round_robin, svoles_atomics, threads) =
-            SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads(
+
+        let delta =
+            // The verified generates a random delta for voles.
+            match P::WHICH {
+                WhichParty::Verifier(_ev) => Some(F40b::random(&mut rng)),
+                WhichParty::Prover(_) => None,
+            }
+        ;
+
+        let mut multithreaded_voles: Vec<Box<dyn SvoleStopSignal>> = vec![];
+
+        // Setting up all the threads for F2 voles
+        let (svole_round_robin, svoles_atomics, threads_f2) =
+            SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads::<C2, I>(
                 channels_vole,
+                threads_per_field,
                 lpn_setup,
                 lpn_extend,
+                delta,
             )?;
-        let multithreaded_voles: Vec<Box<dyn SvoleStopSignal>> = svoles_atomics
+        let multithreaded_voles_f2: Vec<Box<dyn SvoleStopSignal>> = svoles_atomics
             .into_iter()
             .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
             .collect();
-
         let fcom_f2 = FCom::init_with_vole(svole_round_robin)?;
         Ok((
             EvaluatorCirc {
@@ -1750,22 +1770,36 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     fn load_backend_multithreaded_fe<
         FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize,
         C2: AbstractChannel + Clone + 'static + Send,
+        I,
     >(
         &mut self,
         channel: &mut C,
-        channels_vole: Vec<C2>,
-        rng: AesRng,
+        channels_vole: &mut I,
+        threads_per_field: usize,
+        mut rng: AesRng,
         idx: usize,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
-    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>>
+    where
+        I: Iterator<Item = C2>,
+    {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
+
+        let delta =
+            // The verifier generates a random delta for the voles.
+            match P::WHICH {
+                WhichParty::Verifier(_ev) => Some(FE::random(&mut rng)),
+                WhichParty::Prover(_) => None,
+            }        ;
         let (svole_round_robin, svoles_atomics, threads) =
             SvoleAtomicRoundRobin::<P, FE, FE>::create_and_spawn_svole_threads(
                 channels_vole,
+                threads_per_field,
                 lpn_setup,
                 lpn_extend,
+                delta,
             )?;
         self.multithreaded_voles.extend(
             svoles_atomics
@@ -1788,21 +1822,27 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         Ok(threads)
     }
 
-    fn load_backend_multi_any<C2: AbstractChannel + Clone + 'static + Send>(
+    #[allow(clippy::too_many_arguments)]
+    fn load_backend_multi_any<C2: AbstractChannel + Clone + 'static + Send, I>(
         &mut self,
         channel: &mut C,
-        channels_vole: Vec<C2>,
+        channels_vole: &mut I,
+        threads_per_field: usize,
         rng: AesRng,
         field: std::any::TypeId,
         idx: usize,
         lpn_size: LpnSize,
-    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>>
+    where
+        I: Iterator<Item = C2>,
+    {
         if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F161p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-            self.load_backend_multithreaded_fe::<F61p, C2>(
+            self.load_backend_multithreaded_fe::<F61p, C2, I>(
                 channel,
                 channels_vole,
+                threads_per_field,
                 rng,
                 idx,
                 lpn_setup,
@@ -1811,9 +1851,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-            self.load_backend_multithreaded_fe::<F128p, C2>(
+            self.load_backend_multithreaded_fe::<F128p, C2, I>(
                 channel,
                 channels_vole,
+                threads_per_field,
                 rng,
                 idx,
                 lpn_setup,
@@ -1822,9 +1863,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else if field == std::any::TypeId::of::<Secp256k1>() {
             info!("loading field Secp256k1");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<Secp256k1, C2>(
+            self.load_backend_multithreaded_fe::<Secp256k1, C2, I>(
                 channel,
                 channels_vole,
+                threads_per_field,
                 rng,
                 idx,
                 lpn_setup,
@@ -1833,9 +1875,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else if field == std::any::TypeId::of::<Secp256k1order>() {
             info!("loading field Secp256k1order");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<Secp256k1order, C2>(
+            self.load_backend_multithreaded_fe::<Secp256k1order, C2, I>(
                 channel,
                 channels_vole,
+                threads_per_field,
                 rng,
                 idx,
                 lpn_setup,
@@ -1844,9 +1887,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else if field == std::any::TypeId::of::<F384p>() {
             info!("loading field F384p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<F384p, C2>(
+            self.load_backend_multithreaded_fe::<F384p, C2, I>(
                 channel,
                 channels_vole,
+                threads_per_field,
                 rng,
                 idx,
                 lpn_setup,
@@ -1855,9 +1899,10 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         } else if field == std::any::TypeId::of::<F384q>() {
             info!("loading field F384q");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<F384q, C2>(
+            self.load_backend_multithreaded_fe::<F384q, C2, I>(
                 channel,
                 channels_vole,
+                threads_per_field,
                 rng,
                 idx,
                 lpn_setup,
@@ -1869,13 +1914,16 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     }
 
     /// Load several backends with different fields by going over its internal type store.
-    pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send>(
+    pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         &mut self,
         channel: &mut C,
-        mut channels_vole: Vec<C2>,
+        channels_vole: &mut I,
         lpn_size: LpnSize,
         threads_per_field: usize,
-    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>> {
+    ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>>
+    where
+        I: Iterator<Item = C2>,
+    {
         let type_store = self.type_store.clone();
         let mut handles = vec![];
         for (idx, spec) in type_store.iter() {
@@ -1883,21 +1931,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             match spec {
                 TypeSpecification::Field(field) => {
                     if *field == std::any::TypeId::of::<F2>() {
-                        self.load_backend_multithreaded_f2(channel, rng, *idx as usize, lpn_size)?;
+                        self.load_backend_multithreaded_f2(channel, rng, *idx as usize)?;
                     } else {
-                        if channels_vole.len() < threads_per_field {
-                            bail!(
-                                "not enough channels available: {} channels available instead of {}",
-                                channels_vole.len(),
-                                threads_per_field
-                            );
-                        }
-                        let channels_for_field =
-                            channels_vole.split_off(channels_vole.len() - threads_per_field + 1);
-
                         let more_handles = self.load_backend_multi_any(
                             channel,
-                            channels_for_field,
+                            channels_vole,
+                            threads_per_field,
                             rng,
                             *field,
                             *idx as usize,
