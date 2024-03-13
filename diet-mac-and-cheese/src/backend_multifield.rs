@@ -1305,13 +1305,17 @@ pub struct EvaluatorCirc<
     // See use of phantom for details on `C`
     C: AbstractChannel + Clone + 'static,
     SvoleF2: SvoleT<P, F2, F40b>,
+    SvoleF2Ext: SvoleT<P, F40b, F40b>,
 > {
     inputs: CircInputs,
-    // Fcom F2 functionality shared between the F2 backend and for field switching.
+    // Fcom <F2,F40b> functionality shared between the F2 backend and for field switching.
     // This is an optional to allow using none in the plaintext mode.
     // NOTE: If not in plaintext mode, in the current implementation it is always used,
     // which could be a TODO to only use it if an F2 backend is necessary or if any field switching is used.
     fcom_f2: Option<FCom<P, F2, F40b, SvoleF2>>,
+    // Fcom functionality for full field voles on F40b. This is used for the permutation check on F2,
+    // and for the disjunction plugin on F2.
+    fcom_f2_ext: Option<FCom<P, F40b, F40b, SvoleF2Ext>>,
     type_store: TypeStore,
     eval: Vec<Box<dyn EvaluatorT<P>>>,
     rng: AesRng,
@@ -1325,8 +1329,12 @@ pub struct EvaluatorCirc<
                              // functions. One benefit would be to not have to pass a dummy channel for the plaintext mode
 }
 
-impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b> + 'static>
-    EvaluatorCirc<P, C, SvoleF2>
+impl<
+        P: Party,
+        C: AbstractChannel + Clone + 'static,
+        SvoleF2: SvoleT<P, F2, F40b> + 'static,
+        SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static,
+    > EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
 {
     pub fn new(
         channel: &mut C,
@@ -1337,11 +1345,26 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         no_batching: bool,
     ) -> Result<Self> {
         let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-        let fcom_f2 = FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?;
+        let fcom_f2 = FCom::<_, F2, F40b, SvoleF2>::init(channel, &mut rng, lpn_setup, lpn_extend)?;
+
+        let fcom_f2_ext = match P::WHICH {
+            // For the verifier Fcom is initialized with delta
+            WhichParty::Verifier(ev) => FCom::<_, F40b, F40b, SvoleF2Ext>::init_with_delta(
+                channel,
+                &mut rng,
+                lpn_setup,
+                lpn_extend,
+                fcom_f2.get_delta().into_inner(ev),
+            )?,
+            WhichParty::Prover(_) => {
+                FCom::<_, F40b, F40b, SvoleF2Ext>::init(channel, &mut rng, lpn_setup, lpn_extend)?
+            }
+        };
 
         Ok(EvaluatorCirc {
             inputs,
             fcom_f2: Some(fcom_f2),
+            fcom_f2_ext: Some(fcom_f2_ext),
             type_store,
             eval: Vec::new(),
             rng,
@@ -1356,6 +1379,7 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         Ok(EvaluatorCirc {
             inputs,
             fcom_f2: None,
+            fcom_f2_ext: None,
             type_store,
             eval: Vec::new(),
             rng: AesRng::new(),
@@ -1379,7 +1403,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         no_batching: bool,
         lpn_size: LpnSize,
     ) -> Result<(
-        EvaluatorCirc<P, C, SvoleAtomicRoundRobin<P, F2, F40b>>,
+        EvaluatorCirc<
+            P,
+            C,
+            SvoleAtomicRoundRobin<P, F2, F40b>,
+            SvoleAtomicRoundRobin<P, F40b, F40b>,
+        >,
         Vec<std::thread::JoinHandle<Result<()>>>,
     )>
     where
@@ -1411,10 +1440,33 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
             .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
             .collect();
         let fcom_f2 = FCom::init_with_vole(svole_round_robin)?;
+
+        // Setting up all the threads for full field F40b voles
+        let (svole_round_robin, svoles_atomics, threads_f2_ext) =
+            SvoleAtomicRoundRobin::<P, F40b, F40b>::create_and_spawn_svole_threads::<C2, I>(
+                channels_vole,
+                threads_per_field,
+                lpn_setup,
+                lpn_extend,
+                delta,
+            )?;
+        let multithreaded_voles_f2_ext: Vec<Box<dyn SvoleStopSignal>> = svoles_atomics
+            .into_iter()
+            .map::<Box<dyn SvoleStopSignal>, _>(|s| Box::new(s))
+            .collect();
+        let fcom_f2_ext = FCom::init_with_vole(svole_round_robin)?;
+
+        // Combining components from F2 voles and their full field F40b version
+        multithreaded_voles.extend(multithreaded_voles_f2);
+        multithreaded_voles.extend(multithreaded_voles_f2_ext);
+        let mut threads = threads_f2;
+        threads.extend(threads_f2_ext);
+
         Ok((
             EvaluatorCirc {
                 inputs,
                 fcom_f2: Some(fcom_f2),
+                fcom_f2_ext: Some(fcom_f2_ext),
                 type_store,
                 eval: Vec::new(),
                 rng,
@@ -1620,15 +1672,13 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         if field == std::any::TypeId::of::<F2>() {
             info!("loading field F2");
             assert_eq!(idx, self.eval.len());
-            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
 
             // Note for F2 we do not use the backend with Conv but the one that can lift values to its extension field
-            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b, F40b>>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, SvoleF2Ext>::init_with_fcom(
                 channel,
                 rng,
                 self.fcom_f2.as_ref().unwrap(),
-                lpn_setup,
-                lpn_extend,
+                self.fcom_f2_ext.as_ref().unwrap(),
                 self.no_batching,
             )?;
             back = Box::new(EvaluatorSingle::new(dmc, true));
@@ -1745,18 +1795,15 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
         channel: &mut C,
         rng: AesRng,
         _idx: usize,
-        lpn_size: LpnSize,
     ) -> Result<()> {
         info!("loading field F2");
-        let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
 
         let back: Box<dyn EvaluatorT<P>> = {
-            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, Svole<P, F40b,F40b>>::init_with_fcom(
+            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, SvoleF2Ext>::init_with_fcom(
                 channel,
                 rng,
                 self.fcom_f2.as_ref().unwrap(),
-                lpn_setup,
-                lpn_extend,
+                self.fcom_f2_ext.as_ref().unwrap(),
                 self.no_batching,
             )?;
             Box::new(EvaluatorSingle::new(dmc, true))
@@ -2323,8 +2370,12 @@ impl<P: Party, C: AbstractChannel + Clone + 'static, SvoleF2: SvoleT<P, F2, F40b
     }
 }
 
-impl<P: Party, C: AbstractChannel + Clone, SvoleF2: SvoleT<P, F2, F40b>> Drop
-    for EvaluatorCirc<P, C, SvoleF2>
+impl<
+        P: Party,
+        C: AbstractChannel + Clone,
+        SvoleF2: SvoleT<P, F2, F40b>,
+        SvoleF2Ext: SvoleT<P, F40b, F40b>,
+    > Drop for EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
 {
     fn drop(&mut self) {
         if !self.multithreaded_voles.is_empty() {
@@ -2455,7 +2506,7 @@ pub(crate) mod tests {
                 inputs.ingest_witnesses(id, VecDeque::from(witnesses));
             }
 
-            let mut eval = EvaluatorCirc::<Prover, _, Svole<_, _, _>>::new(
+            let mut eval = EvaluatorCirc::<Prover, _, Svole<_, _, _>, Svole<_, _, _>>::new(
                 &mut channel,
                 rng,
                 inputs,
@@ -2479,7 +2530,7 @@ pub(crate) mod tests {
             inputs.ingest_instances(id, VecDeque::from(inst));
         }
 
-        let mut eval = EvaluatorCirc::<Verifier, _, Svole<_, _, _>>::new(
+        let mut eval = EvaluatorCirc::<Verifier, _, Svole<_, _, _>, Svole<_, _, _>>::new(
             &mut channel,
             rng,
             inputs,
@@ -2516,6 +2567,7 @@ pub(crate) mod tests {
         let mut eval = EvaluatorCirc::<
             Prover,
             SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
+            Svole<_, _, _>,
             Svole<_, _, _>,
         >::new_plaintext(inputs, type_store)?;
         eval.load_backends_plaintext()?;

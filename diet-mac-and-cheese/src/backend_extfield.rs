@@ -18,7 +18,6 @@ use crate::{
 };
 use eyre::Result;
 use generic_array::GenericArray;
-use ocelot::svole::LpnParams;
 use scuttlebutt::{AbstractChannel, AesRng};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F40b, F2};
@@ -53,12 +52,11 @@ where
         channel: &mut C,
         rng: AesRng,
         fcom: &FCom<P, F2, T, SVOLE1>,
-        lpn_setup: LpnParams,
-        lpn_extend: LpnParams,
+        fcom_ext: &FCom<P, T, T, SVOLE2>,
         no_batching: bool,
     ) -> Result<Self> {
-        let mut dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom, no_batching)?;
-        let lifted_dmc = dmc.lift(lpn_setup, lpn_extend)?;
+        let dmc = DietMacAndCheese::init_with_fcom(channel, rng.clone(), fcom, no_batching)?;
+        let lifted_dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom_ext, no_batching)?;
         Ok(Self {
             dmc,
             lifted_dmc,
@@ -387,20 +385,21 @@ mod test {
                 LPN_EXTEND_SMALL,
             )?;
 
-            let mut eval = DietMacAndCheeseExtField::<
-                Prover,
-                F40b,
-                _,
-                Svole<Prover, F2, F40b>,
-                Svole<Prover, F40b, F40b>,
-            >::init_with_fcom(
+            let fcom_ext = FCom::<Prover, F40b, F40b, Svole<Prover, F40b, F40b>>::init(
                 &mut channel,
-                rng,
-                &fcom,
+                &mut rng,
                 LPN_SETUP_SMALL,
                 LPN_EXTEND_SMALL,
-                false,
             )?;
+
+            let mut eval =
+                DietMacAndCheeseExtField::<
+                    Prover,
+                    F40b,
+                    _,
+                    Svole<Prover, F2, F40b>,
+                    Svole<Prover, F40b, F40b>,
+                >::init_with_fcom(&mut channel, rng, &fcom, &fcom_ext, false)?;
             eval.finalize().unwrap();
             eyre::Result::Ok(())
         });
@@ -417,20 +416,20 @@ mod test {
             LPN_EXTEND_SMALL,
         )?;
 
+        let fcom_ext = FCom::<Verifier, F40b, F40b, Svole<Verifier, F40b, F40b>>::init(
+            &mut channel,
+            &mut rng,
+            LPN_SETUP_SMALL,
+            LPN_EXTEND_SMALL,
+        )?;
+
         let mut eval = DietMacAndCheeseExtField::<
             Verifier,
             F40b,
             _,
             Svole<Verifier, F2, F40b>,
             Svole<Verifier, F40b, F40b>,
-        >::init_with_fcom(
-            &mut channel,
-            rng,
-            &fcom,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
-        )?;
+        >::init_with_fcom(&mut channel, rng, &fcom, &fcom_ext, false)?;
         eval.finalize().unwrap();
 
         handle.join().unwrap()
