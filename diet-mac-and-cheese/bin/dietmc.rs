@@ -14,14 +14,16 @@ use log::info;
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use scuttlebutt::field::{F40b, F2};
+use scuttlebutt::AbstractChannel;
 use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
-use swanky_party::{Prover, Verifier};
+use swanky_party::{Party, Prover, Verifier, WhichParty};
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;
@@ -88,31 +90,73 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
     Ok(tcp_streams)
 }
 
-// split the connections into
-// * one channel for the committing the witnesses and extended witnesses during circuit evaluation
-// * a vec of channels for F2
-// * a vec of channels for the other fields
-fn split_connections_for_multithreading(
-    config: &Config,
-    conns: Vec<TcpStream>,
-) -> Result<(
-    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
-    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
-    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
-)> {
-    let mut channels = conns
-        .into_iter()
-        .map(|conn| {
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            Ok(SyncChannel::new(reader, writer))
-        })
-        .collect::<Result<Vec<_>>>()?;
+/// Structure to generate a stream of channels given a set of addresses.
+struct ChannelIterator<P: Party, C: AbstractChannel> {
+    addresses: Vec<String>,
+    idx: usize,
+    phantom: PhantomData<(P, C)>,
+}
 
-    let channel = channels.remove(0);
-    let channels_f2_svole = channels.split_off(channels.len() - config.threads_per_field());
-    let channels_svole = channels;
-    Ok((channel, channels_f2_svole, channels_svole))
+impl<P: Party> ChannelIterator<P, SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>> {
+    /// Create a new [`ChannelIterator`] given a list of addresses.
+    fn new(addresses: &[String]) -> Self {
+        Self {
+            addresses: addresses.to_vec(),
+            idx: 0,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Next address when there is one.
+    fn next_address(&mut self) -> Option<String> {
+        if self.idx >= self.addresses.len() {
+            None
+        } else {
+            let addr = self.addresses[self.idx].clone();
+            self.idx += 1;
+            Some(addr)
+        }
+    }
+}
+
+impl<P: Party> Iterator
+    for ChannelIterator<P, SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>
+{
+    type Item = SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(addr) = self.next_address() {
+            match P::WHICH {
+                WhichParty::Verifier(_ev) => {
+                    if let Ok(listener) = TcpListener::bind(addr.clone()) {
+                        if let Ok((stream, _addr)) = listener.accept() {
+                            info!("accept connection on {:?}", addr);
+                            let reader = BufReader::new(stream.try_clone().unwrap());
+                            let writer = BufWriter::new(stream);
+                            Some(SyncChannel::new(reader, writer))
+                        } else {
+                            info!("Error accepting addr {:?}", addr);
+                            None
+                        }
+                    } else {
+                        log::error!("Error binding addr {}", addr);
+                        None
+                    }
+                }
+                WhichParty::Prover(_) => loop {
+                    let c = TcpStream::connect(addr.clone());
+                    if let Ok(stream) = c {
+                        info!("connection accepted by {:?}", addr);
+                        let reader = BufReader::new(stream.try_clone().unwrap());
+                        let writer = BufWriter::new(stream);
+                        return Some(SyncChannel::new(reader, writer));
+                    }
+                },
+            }
+        } else {
+            None
+        }
+    }
 }
 
 fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
