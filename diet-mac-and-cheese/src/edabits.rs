@@ -453,77 +453,6 @@ impl<
         Ok(edabits_vec)
     }
 
-    /// generate random edabits
-    pub fn random_edabits_b2a<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-        nb_bits: usize,
-        num: usize, // in the paper: NB + C
-    ) -> Result<Vec<Edabits<P, FE>>> {
-        let mut edabits_vec = Vec::with_capacity(num);
-        let mut aux_bits = Vec::with_capacity(num);
-        let mut aux_r_m = ProverPrivate::new(Vec::with_capacity(num));
-        if let WhichParty::Prover(ev) = P::WHICH {
-            for _ in 0..num {
-                aux_r_m.as_mut().into_inner(ev).push(FE::random(rng));
-            }
-        }
-        let aux_r_m_mac = match P::WHICH {
-            WhichParty::Prover(ev) => PartyEither::prover_new(
-                ev,
-                self.fcom_fe
-                    .input_prover(ev, channel, rng, aux_r_m.as_ref().into_inner(ev))?,
-            ),
-            WhichParty::Verifier(ev) => {
-                PartyEither::verifier_new(ev, self.fcom_fe.input_verifier(ev, channel, rng, num)?)
-            }
-        };
-
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                for &r_m in aux_r_m.as_ref().into_inner(ev).iter() {
-                    let bits = r_m
-                        .bit_decomposition()
-                        .iter()
-                        .map(|&b| F2::from(b))
-                        .collect::<Vec<F2>>();
-                    debug_assert_eq!(r_m, convert_bits_to_field(&bits));
-                    let mut bits_mac = Vec::with_capacity(nb_bits);
-                    for &bit in bits.iter() {
-                        let bit_mac = self.fcom_f2.input1_prover(ev, channel, rng, bit)?;
-                        bits_mac.push(Mac::new(ProverPrivateCopy::new(bit), bit_mac));
-                    }
-                    aux_bits.push(bits_mac);
-                }
-            }
-            WhichParty::Verifier(ev) => {
-                for _ in 0..num {
-                    let mut bits = Vec::with_capacity(nb_bits);
-                    for _ in 0..nb_bits {
-                        bits.push(self.fcom_f2.input1_verifier(ev, channel, rng)?);
-                    }
-                    aux_bits.push(bits);
-                }
-            }
-        }
-
-        for (i, aux_bits) in aux_bits.into_iter().enumerate() {
-            let value = match P::WHICH {
-                WhichParty::Prover(ev) => Mac::new(
-                    aux_r_m.as_ref().map(|aux_r_m| aux_r_m[i]).into(),
-                    aux_r_m_mac.as_ref().prover_into(ev)[i],
-                ),
-                WhichParty::Verifier(ev) => aux_r_m_mac.as_ref().verifier_into(ev)[i],
-            };
-            edabits_vec.push(Edabits {
-                bits: aux_bits,
-                value,
-            })
-        }
-        Ok(edabits_vec)
-    }
-
     fn random_dabits<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
@@ -1122,13 +1051,10 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::super::mac::Mac;
-    use super::convert_bits_to_field;
     use super::{f2_to_fe, Conv, Dabit, Edabits};
     use crate::homcom::FCom;
     use crate::svole_trait::Svole;
-    use log::debug;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
-    use scuttlebutt::field::F384p;
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::{
         field::{F61p, FiniteField, F2},
@@ -1393,82 +1319,6 @@ mod tests {
         assert_eq!(carry, c[0]);
     }
 
-    fn test_random_edabits_b2a<FE: FiniteField<PrimeField = FE>>(nb_bits: usize) {
-        let count = 1000;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            )
-            .unwrap();
-
-            let edabits = fconv
-                .random_edabits_b2a(&mut channel, &mut rng, nb_bits, count)
-                .unwrap();
-            for e in edabits.iter() {
-                fconv
-                    .fcom_f2
-                    .open(
-                        &mut channel,
-                        &e.bits,
-                        &mut VerifierPrivate::empty(IS_PROVER),
-                    )
-                    .unwrap();
-                fconv
-                    .fcom_fe
-                    .open(
-                        &mut channel,
-                        &[e.value],
-                        &mut VerifierPrivate::empty(IS_PROVER),
-                    )
-                    .unwrap();
-            }
-        });
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-        )
-        .unwrap();
-
-        let edabits = fconv
-            .random_edabits_b2a(&mut channel, &mut rng, nb_bits, count)
-            .unwrap();
-        for e in edabits.iter() {
-            let mut out_bits = Vec::new();
-            fconv
-                .fcom_f2
-                .open(
-                    &mut channel,
-                    &e.bits,
-                    &mut VerifierPrivate::new(&mut out_bits),
-                )
-                .unwrap();
-            let x = convert_bits_to_field::<FE::PrimeField>(&out_bits);
-            let mut out_value = Vec::new();
-            fconv
-                .fcom_fe
-                .open(
-                    &mut channel,
-                    &[e.value],
-                    &mut VerifierPrivate::new(&mut out_value),
-                )
-                .unwrap();
-            debug!("{:?} {:?}", x, out_value[0]);
-            assert_eq!(x, out_value[0]);
-        }
-
-        handle.join().unwrap();
-    }
-
     fn test_fdabit<FE: FiniteField<PrimeField = FE>>() {
         let count = 5;
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -1567,16 +1417,6 @@ mod tests {
     #[test]
     fn test_convert_bit_2_field_f61p() {
         test_convert_bit_2_field::<F61p>();
-    }
-
-    #[test]
-    fn test_random_edabits_b2a_f61p() {
-        test_random_edabits_b2a::<F61p>(61);
-    }
-
-    #[test]
-    fn test_random_edabits_b2a_f384p() {
-        test_random_edabits_b2a::<F384p>(384);
     }
 
     #[test]
