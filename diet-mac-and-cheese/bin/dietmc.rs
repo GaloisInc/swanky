@@ -14,7 +14,6 @@ use log::info;
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::RelationReader as RR;
 use scuttlebutt::field::{F40b, F2};
-use scuttlebutt::AbstractChannel;
 use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::env;
 use std::fs::File;
@@ -91,13 +90,17 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
 }
 
 /// Structure to generate a stream of channels given a set of addresses.
-struct ChannelIterator<P: Party, C: AbstractChannel> {
+///
+/// The type is generic over parameters `P`, `C`.
+/// The parameter `P` is for both a prover or a verifier to use this type via the `Party` trait.
+/// The parameter `C` is to allow different types of channels.
+struct ChannelIterator<P, C> {
     addresses: Vec<String>,
     idx: usize,
     phantom: PhantomData<(P, C)>,
 }
 
-impl<P: Party, C: AbstractChannel> ChannelIterator<P, C> {
+impl<P, C> ChannelIterator<P, C> {
     /// Create a new [`ChannelIterator`] given a list of addresses.
     fn new(addresses: &[String]) -> Self {
         Self {
