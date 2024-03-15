@@ -128,14 +128,14 @@ impl<P: Party> Iterator
         if let Some(addr) = self.next_address() {
             match P::WHICH {
                 WhichParty::Verifier(_ev) => {
-                    if let Ok(listener) = TcpListener::bind(addr.clone()) {
+                    if let Ok(listener) = TcpListener::bind(&addr) {
                         if let Ok((stream, _addr)) = listener.accept() {
-                            info!("accept connection on {:?}", addr);
+                            info!("accept connection on {}", addr);
                             let reader = BufReader::new(stream.try_clone().unwrap());
                             let writer = BufWriter::new(stream);
                             Some(SyncChannel::new(reader, writer))
                         } else {
-                            info!("Error accepting addr {:?}", addr);
+                            info!("Error accepting addr {}", addr);
                             None
                         }
                     } else {
@@ -144,9 +144,9 @@ impl<P: Party> Iterator
                     }
                 }
                 WhichParty::Prover(_) => loop {
-                    let c = TcpStream::connect(addr.clone());
+                    let c = TcpStream::connect(&addr);
                     if let Ok(stream) = c {
-                        info!("connection accepted by {:?}", addr);
+                        info!("connection accepted by {}", addr);
                         let reader = BufReader::new(stream.try_clone().unwrap());
                         let writer = BufWriter::new(stream);
                         return Some(SyncChannel::new(reader, writer));
