@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub(crate) struct ClauseGuard {
     pub guard: Number,
     pub body: GatesBody,
+    // The function name that originated the clause is only added for logging purpose
+    pub func_name: String,
 }
 
 #[derive(Clone, Debug)]
@@ -164,6 +166,7 @@ impl Plugin for DisjunctionV0 {
             clauses.push(ClauseGuard {
                 guard: *guard,
                 body: GatesBody::new(gates.to_owned()),
+                func_name: name.clone(),
             });
         }
 

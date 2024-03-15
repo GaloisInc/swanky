@@ -18,10 +18,11 @@ use scuttlebutt::{AesRng, Channel, SyncChannel};
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
-use swanky_party::{Prover, Verifier};
+use swanky_party::{Party, Prover, Verifier, WhichParty};
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;
@@ -88,31 +89,77 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
     Ok(tcp_streams)
 }
 
-// split the connections into
-// * one channel for the committing the witnesses and extended witnesses during circuit evaluation
-// * a vec of channels for F2
-// * a vec of channels for the other fields
-fn split_connections_for_multithreading(
-    config: &Config,
-    conns: Vec<TcpStream>,
-) -> Result<(
-    SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
-    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
-    Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>,
-)> {
-    let mut channels = conns
-        .into_iter()
-        .map(|conn| {
-            let reader = BufReader::new(conn.try_clone()?);
-            let writer = BufWriter::new(conn);
-            Ok(SyncChannel::new(reader, writer))
-        })
-        .collect::<Result<Vec<_>>>()?;
+/// Structure to generate a stream of channels given a set of addresses.
+///
+/// The type is generic over parameters `P`, `C`.
+/// The parameter `P` is for both a prover or a verifier to use this type via the `Party` trait.
+/// The parameter `C` is to allow different types of channels.
+struct ChannelIterator<P, C> {
+    addresses: Vec<String>,
+    idx: usize,
+    phantom: PhantomData<(P, C)>,
+}
 
-    let channel = channels.remove(0);
-    let channels_f2_svole = channels.split_off(channels.len() - config.threads_per_field());
-    let channels_svole = channels;
-    Ok((channel, channels_f2_svole, channels_svole))
+impl<P, C> ChannelIterator<P, C> {
+    /// Create a new [`ChannelIterator`] given a list of addresses.
+    fn new(addresses: &[String]) -> Self {
+        Self {
+            addresses: addresses.to_vec(),
+            idx: 0,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Next address when there is one.
+    fn next_address(&mut self) -> Option<String> {
+        if self.idx >= self.addresses.len() {
+            None
+        } else {
+            let addr = self.addresses[self.idx].clone();
+            self.idx += 1;
+            Some(addr)
+        }
+    }
+}
+
+impl<P: Party> Iterator
+    for ChannelIterator<P, SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>
+{
+    type Item = SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(addr) = self.next_address() {
+            match P::WHICH {
+                WhichParty::Verifier(_ev) => {
+                    if let Ok(listener) = TcpListener::bind(&addr) {
+                        if let Ok((stream, _addr)) = listener.accept() {
+                            info!("accept connection on {}", addr);
+                            let reader = BufReader::new(stream.try_clone().unwrap());
+                            let writer = BufWriter::new(stream);
+                            Some(SyncChannel::new(reader, writer))
+                        } else {
+                            info!("Error accepting addr {}", addr);
+                            None
+                        }
+                    } else {
+                        log::error!("Error binding addr {}", addr);
+                        None
+                    }
+                }
+                WhichParty::Prover(_) => loop {
+                    let c = TcpStream::connect(&addr);
+                    if let Ok(stream) = c {
+                        info!("connection accepted by {}", addr);
+                        let reader = BufReader::new(stream.try_clone().unwrap());
+                        let writer = BufWriter::new(stream);
+                        return Some(SyncChannel::new(reader, writer));
+                    }
+                },
+            }
+        } else {
+            None
+        }
+    }
 }
 
 fn build_inputs_types_text(args: &Cli) -> Result<(CircInputs, TypeStore)> {
@@ -200,14 +247,15 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
-                &mut channel,
-                rng,
-                inputs,
-                type_store,
-                config.lpn(),
-                config.no_batching(),
-            )?;
+            let mut evaluator =
+                EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                    &mut channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    config.lpn(),
+                    config.no_batching(),
+                )?;
             evaluator.load_backends(&mut channel, config.lpn())?;
             info!("init time: {:?}", start.elapsed());
 
@@ -234,14 +282,15 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let start = Instant::now();
             let rng = AesRng::new();
 
-            let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>>::new(
-                &mut channel,
-                rng,
-                inputs,
-                type_store,
-                config.lpn(),
-                config.no_batching(),
-            )?;
+            let mut evaluator =
+                EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                    &mut channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    config.lpn(),
+                    config.no_batching(),
+                )?;
             evaluator.load_backends(&mut channel, config.lpn())?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
@@ -275,31 +324,43 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let conns = start_connection_verifier(&addresses)?;
+            let mut channels = ChannelIterator::<
+                Verifier,
+                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+            >::new(&addresses);
+
+            // This is the channel for the main thread
+            let mut channel = if let Some(c) = channels.next() {
+                c
+            } else {
+                bail!("cannot open first channel");
+            };
 
             let init_time = Instant::now();
             let total_time = Instant::now();
 
             let rng = AesRng::new();
 
-            let (mut channel, channels_f2_svole, channels_svole) =
-                split_connections_for_multithreading(config, conns)?;
-
             let mut handles = vec![];
-            let (mut evaluator, handles_f2) =
-                EvaluatorCirc::<Verifier, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channels_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn(),
-                )?;
+            let (mut evaluator, handles_f2) = EvaluatorCirc::<
+                Verifier,
+                _,
+                SvoleAtomic<_, F2, F40b>,
+                SvoleAtomic<_, F40b, F40b>,
+            >::new_multithreaded(
+                &mut channels,
+                config.threads_per_field(),
+                rng,
+                inputs,
+                type_store,
+                config.no_batching(),
+                config.lpn(),
+            )?;
             handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
-                channels_svole,
+                &mut channels,
                 config.lpn(),
                 config.threads_per_field(),
             )?;
@@ -325,31 +386,43 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let conns = start_connection_prover(&addresses)?;
+            let mut channels = ChannelIterator::<
+                Prover,
+                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
+            >::new(&addresses);
+
+            // This is the channel for the main thread
+            let mut channel = if let Some(c) = channels.next() {
+                c
+            } else {
+                bail!("cannot open first channel");
+            };
 
             let init_time = Instant::now();
             let total_time = Instant::now();
 
             let rng = AesRng::new();
 
-            let (mut channel, channels_f2_svole, channels_svole) =
-                split_connections_for_multithreading(config, conns)?;
-
             let mut handles = vec![];
-            let (mut evaluator, handles_f2) =
-                EvaluatorCirc::<Prover, _, SvoleAtomic<_, F2, F40b>>::new_multithreaded(
-                    channels_f2_svole,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.no_batching(),
-                    config.lpn(),
-                )?;
+            let (mut evaluator, handles_f2) = EvaluatorCirc::<
+                Prover,
+                _,
+                SvoleAtomic<_, F2, F40b>,
+                SvoleAtomic<_, F40b, F40b>,
+            >::new_multithreaded(
+                &mut channels,
+                config.threads_per_field(),
+                rng,
+                inputs,
+                type_store,
+                config.no_batching(),
+                config.lpn(),
+            )?;
             handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
                 &mut channel,
-                channels_svole,
+                &mut channels,
                 config.lpn(),
                 config.threads_per_field(),
             )?;
@@ -399,6 +472,7 @@ fn run_plaintext(args: &Cli) -> Result<()> {
                 Prover,
                 SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
                 Svole<_, F2, F40b>,
+                Svole<_, F40b, F40b>,
             >::new_plaintext(inputs, type_store)?;
             evaluator.load_backends_plaintext()?;
             info!("init time: {:?}", start.elapsed());

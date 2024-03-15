@@ -74,14 +74,15 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
     let rng = AesRng::new();
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>>::new(
-        &mut channel,
-        rng,
-        inputs,
-        TypeStore::try_from(rel.header().types.clone())?,
-        LpnSize::Medium,
-        no_batching,
-    )?;
+    let mut evaluator =
+        EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+            &mut channel,
+            rng,
+            inputs,
+            TypeStore::try_from(rel.header().types.clone())?,
+            LpnSize::Medium,
+            no_batching,
+        )?;
     evaluator.load_backends(&mut channel, LpnSize::Medium)?;
     info!("init time: {:?}", start.elapsed());
 

@@ -26,7 +26,7 @@ const QUEUE_CAPACITY: usize = 3_000_000;
 const TICK_TIMER: usize = 5_000_000;
 
 #[derive(Default)]
-pub(crate) struct Monitor<T> {
+pub(crate) struct Monitor<V, T> {
     tick: usize,
     monitor_instance: usize,
     monitor_witness: usize,
@@ -38,10 +38,10 @@ pub(crate) struct Monitor<T> {
     monitor_check_zero: usize,
     monitor_zk_check_zero: usize,
     monitor_zk_mult_check: usize,
-    phantom: PhantomData<T>,
+    phantom: PhantomData<(V, T)>,
 }
 
-impl<T: FiniteField> Monitor<T> {
+impl<V: FiniteField, T: FiniteField> Monitor<V, T> {
     fn tick(&mut self) {
         self.tick += 1;
         if self.tick >= TICK_TIMER {
@@ -92,7 +92,8 @@ impl<T: FiniteField> Monitor<T> {
 
     pub(crate) fn log_monitor(&self) {
         info!(
-            "field:{} inp:{:<11} witn:{:<11} mul:{:<11} czero:{:<11}",
+            "field,tag:{},{} ins:{:<11} witn:{:<11} mul:{:<11} czero:{:<11}",
+            field_name::<V>(),
             field_name::<T>(),
             self.monitor_instance,
             self.monitor_witness,
@@ -102,7 +103,11 @@ impl<T: FiniteField> Monitor<T> {
     }
 
     pub(crate) fn log_final_monitor(&self) {
-        info!("Monitor for field: {}", field_name::<T>());
+        info!(
+            "Report for field,tag:{},{}",
+            field_name::<V>(),
+            field_name::<T>()
+        );
         if self.monitor_mul != self.monitor_zk_mult_check {
             warn!(
                 "diff numb of mult gates {} and zk_mult_check {}",
@@ -137,7 +142,7 @@ pub struct DietMacAndCheese<
     mult_check_state: MultCheckState<P, T>,
     zero_check_state: ZeroCheckState<P, T>,
     no_batching: bool,
-    monitor: Monitor<T>,
+    monitor: Monitor<V, T>,
 }
 
 impl<
