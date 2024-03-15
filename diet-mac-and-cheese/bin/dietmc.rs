@@ -97,7 +97,7 @@ struct ChannelIterator<P: Party, C: AbstractChannel> {
     phantom: PhantomData<(P, C)>,
 }
 
-impl<P: Party> ChannelIterator<P, SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>> {
+impl<P: Party, C: AbstractChannel> ChannelIterator<P, C> {
     /// Create a new [`ChannelIterator`] given a list of addresses.
     fn new(addresses: &[String]) -> Self {
         Self {
