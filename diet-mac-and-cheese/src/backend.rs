@@ -196,7 +196,8 @@ where
         })
     }
 
-    pub(crate) fn init_with_delta(
+    #[cfg(test)]
+    fn init_with_delta(
         channel: &mut C,
         mut rng: AesRng,
         lpn_setup: LpnParams,
@@ -220,6 +221,7 @@ where
     /// "Lifts" a verifier operating over `(V, T)` into one operating over `(T, T)`.
     ///
     /// This enforces that the same `Δ` is shared between the old and new verifier.
+    #[cfg(test)]
     pub fn lift<VOLE2: SvoleT<P, T, T>>(
         &mut self,
         lpn_setup: LpnParams,
