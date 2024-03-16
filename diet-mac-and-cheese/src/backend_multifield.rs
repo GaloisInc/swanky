@@ -2462,6 +2462,7 @@ pub(crate) mod tests {
     }
 
     // This function is useful when debugging tests.
+    #[cfg(test)]
     #[allow(dead_code)]
     fn setup_logger() {
         // if log-level `RUST_LOG` not already set, then set to info
