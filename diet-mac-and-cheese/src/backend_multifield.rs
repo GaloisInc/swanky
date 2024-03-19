@@ -47,7 +47,7 @@ use std::path::PathBuf;
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F40b, F2};
 use swanky_field_f61p::F61p;
-use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
+use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
 use swanky_party::private::{ProverPrivate, ProverPrivateCopy};
 use swanky_party::{IsParty, Party, Prover, WhichParty};
 
@@ -1689,6 +1689,11 @@ impl<
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
             self.load_backend_fe::<F61p>(channel, rng, idx, lpn_setup, lpn_extend)?;
             Ok(())
+        } else if field == std::any::TypeId::of::<F127p>() {
+            info!("loading field F127p");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
+            self.load_backend_fe::<F127p>(channel, rng, idx, lpn_setup, lpn_extend)?;
+            Ok(())
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
@@ -1764,6 +1769,10 @@ impl<
         } else if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F61p");
             self.load_backend_fe_plaintext::<F61p>(idx)?;
+            Ok(())
+        } else if field == std::any::TypeId::of::<F127p>() {
+            info!("loading field F127p");
+            self.load_backend_fe_plaintext::<F127p>(idx)?;
             Ok(())
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
@@ -1887,6 +1896,18 @@ impl<
             info!("loading field F161p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
             self.load_backend_multithreaded_fe::<F61p, C2, I>(
+                channel,
+                channels_vole,
+                threads_per_field,
+                rng,
+                idx,
+                lpn_setup,
+                lpn_extend,
+            )
+        } else if field == std::any::TypeId::of::<F127p>() {
+            info!("loading field F127p");
+            let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
+            self.load_backend_multithreaded_fe::<F127p, C2, I>(
                 channel,
                 channels_vole,
                 threads_per_field,
