@@ -549,6 +549,30 @@ mod tests {
     }
 
     #[test]
+    fn psty_test_cardinality_random_sets() {
+        let mut rng = AesRng::new();
+
+        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
+        let receiver_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
+
+        let cardinality = psty_cardinality(sender_inputs.clone(), receiver_inputs.clone());
+
+        let mut true_cardinality = 0;
+        for (s, r) in sender_inputs.iter().zip(receiver_inputs) {
+            let mut s_buf = [0u8; 8];
+            s_buf[..8].copy_from_slice(&s[..8]);
+            let s_64 = u64::from_le_bytes(s_buf);
+
+            let mut r_buf = [0u8; 8];
+            r_buf[..8].copy_from_slice(&r[..8]);
+            let r_64 = u64::from_le_bytes(r_buf);
+
+            true_cardinality += if s_64 == r_64 { 1 } else { 0 };
+        }
+        assert_eq!(cardinality, true_cardinality);
+    }
+
+    #[test]
     fn payloads() {
         let payload_size = 16;
 
