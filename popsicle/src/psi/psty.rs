@@ -458,13 +458,8 @@ mod tests {
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
 
-    #[test]
-    fn psty_test_cardinality_same_sets() {
-        let mut rng = AesRng::new();
+    fn psty_cardinality(sender_inputs: Vec<Vec<u8>>, receiver_inputs: Vec<Vec<u8>>) -> usize {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
-        let receiver_inputs = sender_inputs.clone();
-
         std::thread::spawn(move || {
             let mut rng = AesRng::new();
             let reader = BufReader::new(sender.try_clone().unwrap());
@@ -485,15 +480,22 @@ mod tests {
         let state = psi
             .receive(&receiver_inputs, &mut channel, &mut rng)
             .unwrap();
-        let cardinality = state.compute_cardinality(&mut channel, &mut rng).unwrap();
+        state.compute_cardinality(&mut channel, &mut rng).unwrap()
+    }
 
+    #[test]
+    fn psty_test_cardinality_same_sets() {
+        let mut rng = AesRng::new();
+
+        let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
+        let receiver_inputs = sender_inputs.clone();
+
+        let cardinality = psty_cardinality(sender_inputs, receiver_inputs);
         assert_eq!(cardinality, SET_SIZE);
     }
 
     #[test]
     fn psty_test_cardinality_disjoint_sets() {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
         let sender_inputs: Vec<Vec<u8>> = (0..SET_SIZE)
             .map(|i: usize| i.to_le_bytes().to_vec())
             .collect_vec();
@@ -507,27 +509,7 @@ mod tests {
             .map(|i: usize| (i + SET_SIZE).to_le_bytes().to_vec())
             .collect_vec();
 
-        std::thread::spawn(move || {
-            let mut rng = AesRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-
-            let state = psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
-            state.compute_cardinality(&mut channel, &mut rng).unwrap();
-        });
-
-        let mut rng = AesRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-        let state = psi
-            .receive(&receiver_inputs, &mut channel, &mut rng)
-            .unwrap();
-        let cardinality = state.compute_cardinality(&mut channel, &mut rng).unwrap();
+        let cardinality = psty_cardinality(sender_inputs, receiver_inputs);
 
         assert_eq!(cardinality, 0);
     }
