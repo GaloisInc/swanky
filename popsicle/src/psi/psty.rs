@@ -325,7 +325,10 @@ impl ReceiverState {
             .outputs(&result.wires().to_vec())?
             .expect("evaluator should produce outputs");
 
-        let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
+        let mut cardinality: u128 = 0;
+        for (i, s) in cardinality_outs.into_iter().enumerate() {
+            cardinality += (s as u128) << i;
+        }
         Ok(cardinality as usize)
     }
 
