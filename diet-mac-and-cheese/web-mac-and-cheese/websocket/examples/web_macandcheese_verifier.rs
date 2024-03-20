@@ -1,8 +1,8 @@
 use clap::{Arg, Command};
 use core::fmt::Debug;
-use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::svole_trait::Svole;
+use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use eyre::Result;
 use log::info;

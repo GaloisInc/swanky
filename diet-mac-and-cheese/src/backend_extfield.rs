@@ -359,7 +359,6 @@ mod test {
     use crate::svole_trait::Svole;
     use ocelot::svole::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
     use rand::SeedableRng;
-    #[allow(unused_imports)]
     use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::{AesRng, Channel};
     use std::thread::JoinHandle;

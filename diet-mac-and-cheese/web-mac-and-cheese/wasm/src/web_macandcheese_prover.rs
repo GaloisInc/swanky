@@ -1,7 +1,7 @@
 use crate::js_channel::ShimChannel;
-use diet_mac_and_cheese::backend_multifield::EvaluatorCirc;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, TypeStore};
 use diet_mac_and_cheese::svole_trait::Svole;
+use diet_mac_and_cheese::EvaluatorCirc;
 use diet_mac_and_cheese::LpnSize;
 use log::info;
 use log::Level;

@@ -2148,7 +2148,7 @@ impl<
                 self.evaluate_gates_passed(body.gates(), fun_store)?;
                 self.callframe_end(func);
             }
-            FunctionBody::Plugin(body) => match &body.execution() {
+            FunctionBody::Plugin(body) => match body {
                 PluginExecution::Gates(body) => {
                     self.callframe_start(func, out_ranges, in_ranges)?;
                     self.evaluate_gates_passed(body.gates(), fun_store)?;
@@ -2163,7 +2163,7 @@ impl<
                         fun_store,
                         out_ranges,
                         in_ranges,
-                        body.execution(),
+                        body,
                     )?;
                 }
                 PluginExecution::Disjunction(plugin) => {
@@ -2176,7 +2176,7 @@ impl<
                         fun_store,
                         out_ranges,
                         in_ranges,
-                        body.execution(),
+                        body,
                     )?;
                 }
                 PluginExecution::Mux(plugin) => {
@@ -2188,7 +2188,7 @@ impl<
                         fun_store,
                         out_ranges,
                         in_ranges,
-                        body.execution(),
+                        body,
                     )?;
                     self.callframe_end(func);
                 }
@@ -2228,7 +2228,7 @@ impl<
                                         fun_store,
                                         out_ranges,
                                         in_ranges,
-                                        body.execution(),
+                                        body,
                                     )?
                                     .ok_or_eyre("RamInit should return a RamId")?;
 
@@ -2252,7 +2252,7 @@ impl<
                                     fun_store,
                                     out_ranges,
                                     in_ranges,
-                                    body.execution(),
+                                    body,
                                 )?;
                             }
                         },
@@ -2401,11 +2401,9 @@ pub(crate) mod tests {
         fields::{F384P_MODULUS, F384Q_MODULUS},
     };
     use mac_n_cheese_sieve_parser::Number;
-    use pretty_env_logger;
     use rand::SeedableRng;
+    use scuttlebutt::field::F2;
     use scuttlebutt::field::{F384p, F384q, PrimeFiniteField};
-    #[allow(unused_imports)]
-    use scuttlebutt::field::{F40b, F2};
     use scuttlebutt::field::{Secp256k1, Secp256k1order};
     use scuttlebutt::ring::FiniteRing;
     use scuttlebutt::SyncChannel;
@@ -2421,9 +2419,7 @@ pub(crate) mod tests {
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;
-    #[allow(dead_code)]
     const FF2: u8 = 2;
-    #[allow(dead_code)]
     const FF3: u8 = 3;
 
     pub(crate) fn zero<FE: PrimeFiniteField>() -> Number {
@@ -2465,6 +2461,8 @@ pub(crate) mod tests {
         (w, w)
     }
 
+    // This function is useful when debugging tests.
+    #[cfg(test)]
     #[allow(dead_code)]
     fn setup_logger() {
         // if log-level `RUST_LOG` not already set, then set to info

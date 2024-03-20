@@ -1,7 +1,6 @@
 use crate::circuit_ir::CompiledInfo;
 use crate::circuit_ir::WireId;
-#[allow(unused_imports)]
-use log::{debug, info};
+use log::debug;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::Debug;

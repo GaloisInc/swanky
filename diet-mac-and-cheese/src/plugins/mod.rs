@@ -91,29 +91,6 @@ impl From<GatesBody> for PluginExecution {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct PluginBody {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    operation: String,
-    execution: PluginExecution,
-}
-
-impl PluginBody {
-    pub(crate) fn new(name: String, operation: String, execution: PluginExecution) -> Self {
-        Self {
-            name,
-            operation,
-            execution,
-        }
-    }
-
-    pub(crate) fn execution(&self) -> &PluginExecution {
-        &self.execution
-    }
-}
-
 /// This trait defines a Circuit IR plugin.
 pub(crate) trait Plugin {
     /// The name of the plugin.

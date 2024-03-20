@@ -3,7 +3,7 @@
 
 use crate::{
     fields::{extension_field_to_type_id, modulus_to_type_id, SieveIrDeserialize},
-    plugins::{Plugin, PluginBody, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
+    plugins::{Plugin, PluginExecution, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
 };
 use eyre::{bail, ensure, eyre, Result};
 use log::debug;
@@ -335,7 +335,7 @@ pub(crate) enum FunctionBody {
     /// The function body as a sequence of gates.
     Gates(GatesBody),
     /// The function body as a plugin.
-    Plugin(PluginBody),
+    Plugin(PluginExecution),
 }
 
 /// Collected information associated with a Circuit IR function.
@@ -589,10 +589,9 @@ impl FuncDecl {
         }
 
         let type_ids = type_presence.to_type_ids();
-        let plugin_body = PluginBody::new(plugin_name, operation, execution);
 
         Ok(FuncDecl {
-            body: FunctionBody::Plugin(plugin_body),
+            body: FunctionBody::Plugin(execution),
             output_counts,
             input_counts,
             compiled_info: CompiledInfo {
