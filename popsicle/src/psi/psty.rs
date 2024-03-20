@@ -9,8 +9,7 @@ use aes_gcm::{
 
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    AllWire, ArithmeticBundleGadgets, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, CrtBundle,
-    CrtGadgets, Fancy, FancyBinary, FancyInput,
+    AllWire, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, Fancy, FancyBinary, FancyInput,
 };
 use itertools::Itertools;
 use ocelot::{
