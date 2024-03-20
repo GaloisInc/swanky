@@ -167,8 +167,8 @@ impl SenderState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
-        let (outs, _) = fancy_compute_cardinality(&mut gb, &x, &y)?;
-        gb.outputs(&outs)?;
+        let result = fancy_compute_cardinality(&mut gb, &x, &y)?;
+        gb.outputs(&result.wires().to_vec())?;
         Ok(())
     }
 
@@ -320,9 +320,9 @@ impl ReceiverState {
         RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
-        let (outs, mods) = fancy_compute_cardinality(&mut ev, &x, &y)?;
-        let mpc_outs = ev
-            .outputs(&outs)?
+        let result = fancy_compute_cardinality(&mut ev, &x, &y)?;
+        let cardinality_outs = ev
+            .outputs(&result.wires().to_vec())?
             .expect("evaluator should produce outputs");
 
         let cardinality = fancy_garbling::util::crt_inv(&mpc_outs, &mods);
