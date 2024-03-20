@@ -530,6 +530,25 @@ mod tests {
     }
 
     #[test]
+    // test fancy cardinality for sets that only differ in a few elements
+    fn psty_test_cardinality_few_elements_diff() {
+        let mut rng = AesRng::new();
+        let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
+        let mut receiver_inputs = sender_inputs.clone();
+
+        for i in 0..NUM_DIFF {
+            // change the value of the first byte at that index,
+            // if its above 0, set it to 0, otherwise set it to 1.
+            // this ensures that
+            // receiver_inputs[differing_index] != sender_inputs[differing_index]
+            receiver_inputs[i][0] = if receiver_inputs[i][0] > 0 { 0 } else { 1 };
+        }
+
+        let cardinality = psty_cardinality(sender_inputs, receiver_inputs);
+        assert_eq!(cardinality, SET_SIZE - NUM_DIFF);
+    }
+
+    #[test]
     fn payloads() {
         let payload_size = 16;
 
