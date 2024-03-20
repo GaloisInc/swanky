@@ -405,41 +405,39 @@ fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
         .collect()
 }
 
-/// Fancy function to compute the cardinaility and return CRT value containing the result
-/// along with the moduli of that value.
-fn fancy_compute_cardinality<F: Fancy + ArithmeticBundleGadgets + FancyBinary>(
+/// Fancy function to compute the cardinality
+fn fancy_compute_cardinality<F: Fancy + BinaryBundleGadgets + FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
-) -> Result<(Vec<F::Item>, Vec<u16>), F::Error> {
+) -> Result<BinaryBundle<F::Item>, F::Error> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.eq_bundles(
+            f.bin_eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
             )
         })
         .collect::<Result<Vec<F::Item>, F::Error>>()?;
 
-    let qs = fancy_garbling::util::primes_with_width(16);
-    let q = fancy_garbling::util::product(&qs);
-    let mut acc = f.crt_constant_bundle(0, q)?;
-    let one = f.crt_constant_bundle(1, q)?;
+    let mut acc = f.bin_constant_bundle(0, HASH_SIZE * 8)?;
 
     for b in eqs.into_iter() {
+        let one = f.bin_constant_bundle(1, HASH_SIZE * 8)?;
         let b_ws = one
             .iter()
-            .map(|w| f.mul(w, &b))
-            .collect::<Result<Vec<F::Item>, F::Error>>()?;
-        let b_crt = CrtBundle::new(b_ws);
-        acc = f.crt_add(&acc, &b_crt)?;
+            .map(|w| f.and(w, &b))
+            .collect::<Result<Vec<_>, _>>()?;
+        let b_binary = BinaryBundle::new(b_ws);
+
+        acc = f.bin_addition_no_carry(&acc, &b_binary)?;
     }
 
-    Ok((acc.wires().to_vec(), qs))
+    Ok(acc)
 }
 
 impl SemiHonest for Sender {}
