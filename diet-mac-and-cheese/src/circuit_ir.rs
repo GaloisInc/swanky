@@ -24,8 +24,13 @@ use std::{
 };
 use swanky_field::FiniteField;
 
-/// The wire index.
+/// A SIEVE IR wire identifier.
+///
+/// In a circuit, `WireId`s are scoped to a type. That is, for each [`TypeId`]
+/// defined in a circuit relation, the full range `0` to `u64::MAX` is available
+/// for `WireId` values.
 pub type WireId = u64;
+
 /// A count of the number of wires.
 pub type WireCount = u64;
 /// The type index.
