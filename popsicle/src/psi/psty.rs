@@ -457,6 +457,7 @@ mod tests {
 
     const ITEM_SIZE: usize = 8;
     const SET_SIZE: usize = 1 << 6;
+    const NUM_DIFF: usize = 10;
 
     fn psty_cardinality(sender_inputs: Vec<Vec<u8>>, receiver_inputs: Vec<Vec<u8>>) -> usize {
         let (sender, receiver) = UnixStream::pair().unwrap();
@@ -513,6 +514,21 @@ mod tests {
 
         assert_eq!(cardinality, 0);
     }
+
+    #[test]
+    fn psty_test_cardinality_subsets_different_set_size() {
+        if SET_SIZE >= NUM_DIFF {
+            let mut rng = AesRng::new();
+            let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
+            let mut receiver_inputs = vec![vec![0; ITEM_SIZE]; SET_SIZE - NUM_DIFF];
+            receiver_inputs.clone_from_slice(&sender_inputs[3..]);
+
+            let cardinality = psty_cardinality(sender_inputs, receiver_inputs);
+
+            assert_eq!(cardinality, SET_SIZE - NUM_DIFF);
+        }
+    }
+
     #[test]
     fn payloads() {
         let payload_size = 16;
