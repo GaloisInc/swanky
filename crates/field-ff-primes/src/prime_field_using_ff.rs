@@ -385,6 +385,19 @@ prime_field_using_ff!(
 
 prime_field_using_ff!(
     /// The finite field over the prime
+    /// $`P = 2^{127} - 1`$.
+    F127p,
+    f127p,
+    modulus = "170141183460469231731687303715884105727",
+    generator = "43",
+    limbs = 2,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U16,
+    num_bits = generic_array::typenum::U127,
+);
+
+prime_field_using_ff!(
+    /// The finite field over the prime
     /// $`P = 2^{128} - 159`$.
     F128p,
     f128p,

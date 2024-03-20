@@ -31,6 +31,13 @@ fn main() {
             endianness: Little,
         },
         PrimeFieldCodegen {
+            ident: "F127p",
+            is_pub: true,
+            modulus: "170141183460469231731687303715884105727",
+            generator: "43",
+            endianness: Little,
+        },
+        PrimeFieldCodegen {
             ident: "F128p",
             is_pub: true,
             modulus: "340282366920938463463374607431768211297",

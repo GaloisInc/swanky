@@ -11,7 +11,7 @@ use std::any::{type_name, TypeId};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::{F40b, F63b, F2};
 use swanky_field_f61p::F61p;
-use swanky_field_ff_primes::{F128p, F384p, F384q, Secp256k1, Secp256k1order};
+use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
 
 use crate::number_to_u64;
 
@@ -21,6 +21,9 @@ use crate::number_to_u64;
 pub const F2_MODULUS: Number = Number::from_u64(2);
 /// The modulus for [`F61p`], as a [`Number`].
 pub const F61P_MODULUS: Number = Number::from_u64((1 << 61) - 1);
+/// The modulus for [`F127p`], as a [`Number`].
+pub const F127P_MODULUS: Number =
+    Number::from_be_hex("00000000000000000000000000000000000000000000000000000000000000007FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 /// The modulus for [`F128p`], as a [`Number`].
 pub const F128P_MODULUS: Number =
     Number::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffff61");
@@ -45,6 +48,11 @@ fn f2_modulus_is_correct() {
 #[test]
 fn f61p_modulus_is_correct() {
     assert_eq!(F61P_MODULUS, F61p::modulus_int());
+}
+
+#[test]
+fn f127p_modulus_is_correct() {
+    assert_eq!(F127P_MODULUS, F127p::modulus_int());
 }
 
 #[test]
@@ -78,6 +86,8 @@ pub fn modulus_to_type_id(modulus: Number) -> Result<TypeId> {
         Ok(TypeId::of::<F2>())
     } else if modulus == F61P_MODULUS {
         Ok(TypeId::of::<F61p>())
+    } else if modulus == F127P_MODULUS {
+        Ok(TypeId::of::<F127p>())
     } else if modulus == F128P_MODULUS {
         Ok(TypeId::of::<F128p>())
     } else if modulus == SECP256K1_MODULUS {
@@ -170,5 +180,5 @@ macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
     }
 }
 
-impl_sieve_ir_deserialize_prime_field! { F2, F61p, F128p, Secp256k1, Secp256k1order, F384p, F384q }
+impl_sieve_ir_deserialize_prime_field! { F2, F61p, F127p, F128p, Secp256k1, Secp256k1order, F384p, F384q }
 impl_sieve_ir_deserialize_binary_ext_field! { F40b, F63b }
