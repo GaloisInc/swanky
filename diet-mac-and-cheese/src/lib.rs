@@ -48,17 +48,19 @@ use ocelot::svole::{
 use serde::Deserialize;
 use std::fmt::Display;
 
-/// Size of LPN parameters
+/// The size of LPN parameters to use for sVOLE.
 ///
-/// This parameter is available to the user to indicate, at a high-level, the size of the LPN parameters
-/// without specifiying exactly their values.
-/// It has three possible values small, medium and large.
+/// At a high-level, these parameters describe the number of values to generate
+/// during the setup and extend phases of the sVOLE protocol.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LpnSize {
+    /// Small LPN parameter set
     Small,
+    /// Medium LPN parameter set
     #[default]
     Medium,
+    /// Large LPN parameter set
     Large,
 }
 
