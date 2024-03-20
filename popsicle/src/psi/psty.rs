@@ -9,8 +9,8 @@ use aes_gcm::{
 
 use fancy_garbling::{
     twopac::semihonest::{Evaluator, Garbler},
-    AllWire, ArithmeticBundleGadgets, BinaryBundle, CrtBundle, CrtGadgets, Fancy, FancyBinary,
-    FancyInput,
+    AllWire, ArithmeticBundleGadgets, BinaryBundle, BinaryBundleGadgets, BinaryGadgets, CrtBundle,
+    CrtGadgets, Fancy, FancyBinary, FancyInput,
 };
 use itertools::Itertools;
 use ocelot::{
@@ -387,7 +387,7 @@ fn encode_inputs(opprf_outputs: &[Block512]) -> Vec<u16> {
 }
 
 /// Fancy function to compute the intersection and return encoded vector of 0/1 masks.
-fn fancy_compute_intersection<F: Fancy + ArithmeticBundleGadgets>(
+fn fancy_compute_intersection<F: Fancy + BinaryBundleGadgets>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
@@ -397,7 +397,7 @@ fn fancy_compute_intersection<F: Fancy + ArithmeticBundleGadgets>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            f.eq_bundles(
+            f.bin_eq_bundles(
                 &BinaryBundle::new(xs.to_vec()),
                 &BinaryBundle::new(ys.to_vec()),
             )
