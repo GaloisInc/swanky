@@ -1,6 +1,15 @@
-//! This module contains types pertaining to the internal representation of the
-//! SIEVE Circuit IR.
+/*!
+In-memory representations of SIEVE IR resources.
 
+This module provides types for the expression of circuits in the SIEVE IR
+format. Typically, values of these types will be returned by one of the parsers
+in [`crate::sieveir_reader_fbs`] or [`crate::sieveir_reader_text`] - but they
+may be manually constructed when using DMC as a library / circuits are generated
+by other means.
+
+ **NOTE:** If you manually construct values, you're responsible for checking for
+validity (e.g. wires are SSA) as defined by the SIEVE IR specification!
+*/
 use crate::{
     fields::{extension_field_to_type_id, modulus_to_type_id, SieveIrDeserialize},
     plugins::{Plugin, PluginExecution, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
