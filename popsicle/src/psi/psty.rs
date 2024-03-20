@@ -521,7 +521,7 @@ mod tests {
             let mut rng = AesRng::new();
             let sender_inputs: Vec<Vec<u8>> = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
             let mut receiver_inputs = vec![vec![0; ITEM_SIZE]; SET_SIZE - NUM_DIFF];
-            receiver_inputs.clone_from_slice(&sender_inputs[3..]);
+            receiver_inputs.clone_from_slice(&sender_inputs[NUM_DIFF..]);
 
             let cardinality = psty_cardinality(sender_inputs, receiver_inputs);
 
