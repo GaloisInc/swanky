@@ -16,7 +16,8 @@ At a high level, DMC provides the following:
 There is an example of using DMC as a library in the crate's `examples`
 directory; this shows off everything but the SIEVE IR parsers. Additional detail
 can be found in the module documentation for each component.
-*/
+ */
+
 mod backend_multifield;
 pub use backend_multifield::EvaluatorCirc;
 pub mod circuit_ir;
