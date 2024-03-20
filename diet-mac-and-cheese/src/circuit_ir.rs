@@ -633,7 +633,7 @@ pub struct FunStore(
     // The internal representation maintains two mappings, one from names to `FunId` using a `BTreeMap`,
     // and another one associating a [`FunId`] to the [`FuncDecl`] using a vector indexed by [`FunId`].
     BTreeMap<String, FunId>,
-    Vec<(String, FuncDecl)>,
+    Vec<FuncDecl>,
 );
 
 impl FunStore {
@@ -651,7 +651,7 @@ impl FunStore {
             .try_into()
             .expect("Function store length greater than 2^32 - 1");
         self.0.insert(name.clone(), fun_id);
-        self.1.push((name, func));
+        self.1.push(func);
         Ok(fun_id)
     }
 
@@ -662,7 +662,7 @@ impl FunStore {
             "Missing function id {} in func store",
             fun_id
         );
-        Ok(&self.1[fun_id as usize].1)
+        Ok(&self.1[fun_id as usize])
     }
 
     /// Get function associated with a given name.
@@ -677,16 +677,6 @@ impl FunStore {
             .get(name)
             .copied()
             .ok_or_else(|| eyre!("Missing function {name}"))
-    }
-
-    /// Get the name associated with a `FunId`.
-    pub fn id_to_name(&self, fun_id: FunId) -> Result<&String> {
-        ensure!(
-            (fun_id as usize) < self.1.len(),
-            "No function name asociated to function id {}",
-            fun_id
-        );
-        Ok(&self.1[fun_id as usize].0)
     }
 }
 
