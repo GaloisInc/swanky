@@ -1411,6 +1411,15 @@ impl<
         })
     }
 
+    /// Initialize a new (plaintext) `EvaluatorCirc`.
+    ///
+    /// An alternative constructor, specifically curated for plaintext SIEVE IR
+    /// evaluation (in particular: sVOLE initialization and instance/witness
+    /// values are not required).
+    ///
+    /// For single-threaded zero-knowledge evaluation, use [`Self::new`]. For
+    /// multithreaded zero-knowledge evaluation, use
+    /// [`Self::new_multithreaded`].
     pub fn new_plaintext(inputs: CircInputs, type_store: TypeStore) -> Result<Self> {
         Ok(EvaluatorCirc {
             inputs,
