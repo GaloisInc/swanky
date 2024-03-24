@@ -1357,6 +1357,21 @@ impl<
         SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static,
     > EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
 {
+    /// Initialize a new (single-threaded) `EvaluatorCirc`.
+    ///
+    /// This requires an [`AbstractChannel`] and an [`AesRng`] to initialize the
+    /// homomorphic commitment scheme for [`F2`] and its extension field
+    /// [`F40b`]. This is suboptimal; ideally, these protocols would only start
+    /// in circuits where they are strictly required (i.e., Boolean circuits or
+    /// circuits where field conversion is used).
+    ///
+    /// The [`CircInputs`] paramater are instance and witness values as defined
+    /// by the SIEVE IR; the [`TypeStore`] is the type environment as defined by
+    /// the relation's header. The [`LpnSize`] configures the sVOLE protocol,
+    /// and `no_batching`, if `true`, disables conversion check batching.
+    ///
+    /// For plaintext evaluation, see [`Self::new_plaintext`]. For multithreaded
+    /// evaluation, see [`Self::new_multithreaded`].
     pub fn new(
         channel: &mut C,
         mut rng: AesRng,
