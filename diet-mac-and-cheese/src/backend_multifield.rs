@@ -1,5 +1,3 @@
-//! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
-
 use crate::backend_extfield::DietMacAndCheeseExtField;
 use crate::circuit_ir::ConvGate;
 use crate::circuit_ir::{
