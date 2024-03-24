@@ -1435,10 +1435,15 @@ impl<
         })
     }
 
-    /// Create a new multithreaded evaluator.
+    /// Initialize a new (multithreaded) `EvaluatorCirc`.
     ///
-    /// It initializes the F2 voles in separate threads as well as
-    /// the corresponding lifted F40b full field voles.
+    /// sVOLE tends to be where most time is spent during evaluation. To improve
+    /// performance, `new_multithreaded` is provided as an alternative to
+    /// [`Self::new`], the primary difference being that the F2 and F40b VOLEs
+    /// are handled on (potentially many) separate threads.
+    ///
+    /// The returned `JoinHandle`s should, after [`Self::terminate`] is
+    /// called, be `join`ed.
     pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         channels_vole: &mut I,
         threads_per_field: usize,
