@@ -1297,7 +1297,30 @@ where
 
 // V) Evaluator for multiple fields
 
-/// Evaluator for Circuit IR (previously known as SIEVE IR0+)
+/// A SIEVE IR circuit evaluator.
+///
+/// `EvaluatorCirc` provides everything needed to execute a zero-knowledge
+/// proof described by SIEVE IR, provided either on disk via text or flatbuffers
+/// or as in-memory resources as defined by [`crate::circuit_ir`]. A plaintext
+/// evaluation mode (with limited functionality) is available.
+///
+/// A full example of using `EvaluatorCirc` as a library can be found in the
+/// crate's `examples` directory. Briefly, the process is:
+///
+/// 1. Create an `EvaluatorCirc` (using the appropriate `new_*` method for your
+///    situation)
+/// 2. Call the corresponding `load_backends_*` method
+/// 3. Evaluate a relation
+///    - The [`crate::sieveir_reader_fbs`] and [`crate::sieveir_reader_text`]
+///      modules can read SIEVE IR resources from disk (to provide the types,
+///      function definitions, and gates)
+///    - The module [`crate::circuit_ir`] can otherwise be used to construct
+///      SIEVE IR resources. **Caution!** `EvaluatorCirc` expects all resources
+///      to be syntactically valid and resource valid as defined by the SIEVE IR
+///      specification. It is an unchecked runtime error to invoke
+///      `EvaluatorCirc` methods on invalid SIEVE IR resources.
+/// 4. Call [`Self::finish`] to indicate there are no more items in the relation, and
+///    all protocols may execute their final steps
 pub struct EvaluatorCirc<
     P: Party,
     // See use of phantom for details on `C`
