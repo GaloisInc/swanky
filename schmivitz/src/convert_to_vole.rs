@@ -85,7 +85,8 @@ fn h1(inp: &[u8], out: &mut [u8]) {
     reader.read(out);
 }
 
-type Chall3 = [u8; REPETITION_PARAM];
+/// Third challenge
+pub type Chall3 = [u8; REPETITION_PARAM];
 
 fn h_chall3(/* TODO */) -> Chall3 {
     [0u8; REPETITION_PARAM]
@@ -275,7 +276,7 @@ pub fn vole_reconstruct(
 /// Lines 7-14 of Figure 8.3
 pub fn vole_recompose_q(
     q: Vec<Vec<F8b>>,
-    chall3: Chall3,
+    chall3: &Chall3,
     corr: Corrections,
     how_many: usize,
 ) -> Vec<F128b> {
@@ -291,7 +292,7 @@ pub fn vole_recompose_q(
         qs[pos][0] = q[0][pos];
     }
     for tau in 1..REPETITION_PARAM {
-        let delta = chal_dec(&chall3, tau);
+        let delta = chal_dec(chall3, tau);
 
         for pos in 0..how_many {
             let c_tau = corr[tau - 1][pos];
@@ -307,11 +308,11 @@ pub fn vole_recompose_q(
         }
     }
 
-    let mut q128b: Vec<F128b> = Vec::with_capacity(how_many);
+    let mut q_128b: Vec<F128b> = Vec::with_capacity(how_many);
     for pos in 0..how_many {
-        q128b.push(F8b::form_superfield(&qs[pos].into()));
+        q_128b.push(F8b::form_superfield(&qs[pos].into()));
     }
-    q128b
+    q_128b
 }
 
 type Signature = (Corrections, Vec<Pdecom>, Chall3, IV);
@@ -381,6 +382,10 @@ mod test {
     use crate::all_but_one_vc::{commit, open, Seed};
     use crate::convert_to_vole::{chal_dec, vole_open};
 
+    use super::{
+        bools_to_f8b, convert_to_vole_prover, convert_to_vole_verifier, vole_commit,
+        vole_recompose_q, vole_reconstruct, Chall3,
+    };
     use crate::parameters::REPETITION_PARAM;
     use rand::{thread_rng, Rng, RngCore};
     use swanky_field::{FiniteRing, IsSubFieldOf};
@@ -404,7 +409,7 @@ mod test {
 
         let delta = 3u8;
         let how_many = 10;
-        let (u, vs) = super::convert_to_vole_prover(&seeds, iv, how_many);
+        let (u, vs) = convert_to_vole_prover(&seeds, iv, how_many);
 
         let mut seeds_verifier = [U8x16::default(); 256];
         for i in 0..256 {
@@ -412,7 +417,7 @@ mod test {
                 seeds_verifier[i] = seeds[i];
             }
         }
-        let qs = super::convert_to_vole_verifier(&seeds_verifier, iv, how_many, delta);
+        let qs = convert_to_vole_verifier(&seeds_verifier, iv, how_many, delta);
 
         println!("Minus one {:?}", -(F8b::ONE));
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
@@ -438,54 +443,47 @@ mod test {
         //let delta = super::chal_dec(); //vec![false; 8];
         let how_many = 10_000;
 
-        let (h, decom, corr, u, v) = super::vole_commit(seeds[0], iv, how_many);
+        let (h, decom, corr, u, v) = vole_commit(seeds[0], iv, how_many);
 
-        let chall3 = vec![0; REPETITION_PARAM];
+        let mut chall3: Chall3 = Default::default();
+        chall3[0] = 2;
+
         let pdecom = vole_open(&chall3, decom);
 
-        let which = 2;
-
-        let mut vs = [F8b::ZERO; REPETITION_PARAM];
-        for tau in 0..REPETITION_PARAM {
-            vs[tau] = v[tau][which];
+        let mut vs = Vec::with_capacity(how_many);
+        for _ in 0..how_many {
+            vs.push([F8b::ZERO; REPETITION_PARAM]);
         }
-        let big_v: F128b = F8b::form_superfield(&vs.into());
 
-        let (h_ver, q) = super::vole_reconstruct(&chall3, pdecom, iv, how_many);
+        for pos in 0..how_many {
+            for tau in 0..REPETITION_PARAM {
+                vs[pos][tau] = v[tau][pos];
+            }
+        }
+        let mut v_f128b: Vec<F128b> = Vec::with_capacity(how_many);
+        for pos in 0..how_many {
+            v_f128b.push(F8b::form_superfield(&vs[pos].into()));
+        }
+
+        let (h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, how_many);
 
         // Change Q_i with the corrections:
         // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
         // Q = (Q_0 ... Q_{tau-1})
-        let mut qs = [F8b::default(); REPETITION_PARAM];
-        qs[0] = q[0][which];
-        for tau in 1..REPETITION_PARAM {
-            //let corrected = vec![];
-            let delta = chal_dec(&chall3, tau);
-
-            let c_tau = corr[tau - 1][which];
-            let mut delta_times_corr = [F2::default(); 8];
-            for (i, d) in delta.iter().enumerate() {
-                let corr = (if *d { F2::ONE } else { F2::ZERO }) * c_tau;
-                //println!("bit:{:?} corr:{:?}", *d, corr);
-                delta_times_corr[i] = corr;
-            }
-            let delta_times_corr_f8b: F8b = F2::form_superfield(&delta_times_corr.into());
-            println!("delta_times:{:?}", delta_times_corr_f8b);
-            qs[tau] = q[tau][which] + delta_times_corr_f8b;
-        }
-        let big_q: F128b = F8b::form_superfield(&qs.into());
+        let q_f128b = vole_recompose_q(q, &chall3, corr, how_many);
 
         // compute the big delta
         let mut big_delta = [F8b::default(); REPETITION_PARAM];
         for tau in 0..REPETITION_PARAM {
             let delta_i = chal_dec(&chall3, tau);
-            let delta_f8b = F8b(super::bools_to_f8b(&delta_i));
+            let delta_f8b = F8b(bools_to_f8b(&delta_i));
             big_delta[tau] = delta_f8b;
         }
         let big_delta_f128b: F128b = F8b::form_superfield(&big_delta.into());
 
-        println!("V:{:?}", big_v);
-        println!("Q:{:?}", big_q);
-        assert_eq!(big_v + u[which] * big_delta_f128b, big_q)
+        for pos in 0..how_many {
+            //assert_eq!(v_f128b[pos], q_f128b[pos]);
+            assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
+        }
     }
 }

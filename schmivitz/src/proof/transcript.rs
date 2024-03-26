@@ -88,4 +88,8 @@ impl<'a> Transcript<'a> {
         self.0
             .append_message(b"a~: degree 1 commitment", &degree_1_commitment.to_bytes());
     }
+
+    pub(crate) fn get_challenge_vc(&mut self, dest: &mut [u8]) {
+        self.0.challenge_bytes(b"challene to open vc", dest);
+    }
 }
