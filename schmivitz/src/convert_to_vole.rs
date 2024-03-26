@@ -179,7 +179,7 @@ fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b
 
 ///
 pub fn bools_to_u8(d: &[bool]) -> u8 {
-    debug_assert!(d.len() == 8);
+    debug_assert_eq!(d.len(), 8);
     let mut r: u8 = 0;
     for (i, b) in d.iter().enumerate() {
         r |= if *b { 1u8 << i } else { 0u8 };
@@ -379,16 +379,49 @@ fn l_hat(l: usize) -> usize {
 }
 
 fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
-    let mut out = Vec::with_capacity(corr.len());
+    // Corrections are a vector containing tau vectors of long size
+    let how_many = corr[0].len();
+    let tau = corr.len();
+    let mut out = Vec::with_capacity((how_many * tau) / 8);
+
+    let mut b = 0u8;
+    let mut i = 0;
     for c in corr.iter() {
-        out.push(bools_to_u8(
-            c.iter()
-                .map(|b| if *b == F2::ZERO { false } else { true })
-                .collect::<Vec<_>>()
-                .as_slice(),
-        ));
+        for bit in c.iter() {
+            b |= if *bit == F2::ZERO { 0 } else { 1 << i };
+            if i == 7 {
+                out.push(b);
+                b = 0u8;
+                i = 0;
+            } else {
+                i += 1;
+            }
+        }
     }
     out
+}
+
+fn compute_chall_1(mu: &H1, h_com: &Com, corr: &Corrections, iv: &IV) -> Chall1 {
+    let mut inp = vec![];
+    inp.extend(mu);
+    // TODO: add `h``
+    inp.extend(corrections_to_bytes(&corr));
+    inp.extend(iv.to_bytes());
+    h_chall1(&inp)
+}
+
+fn compute_chall_2(chall1: &Chall1 /* TODO remaining parameters*/) -> Chall2 {
+    let mut inp = vec![];
+    inp.extend(chall1);
+    // TODO: add more
+    h_chall2(&inp)
+}
+
+fn compute_chall_3(chall2: &Chall2 /* TODO remaining parameters*/) -> Chall3 {
+    let mut inp = vec![];
+    inp.extend(chall2);
+    // TODO: add more
+    h_chall3(&inp)
 }
 
 /// Adaptation of FAEST Sign function adapted from Fig. 8.2
@@ -403,30 +436,29 @@ pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     h3_inp.extend(sk);
     h3_inp.extend(mu);
     h3_inp.extend(rho);
-    let r_iv = h3(&h3_inp);
+    let r_iv: H3 = h3(&h3_inp);
 
     // splitting r_iv into r and iv
-    let mut r_part: [u8; 16] = [0u8; 16];
-    r_part.copy_from_slice(&r_iv[0..8]);
+    let mut r_part: [u8; 16] = [0u8; SECURITY_PARAM / 8];
+    r_part.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
     let r = U8x16::from_bytes((&r_part).into()).unwrap();
-    let mut iv_part: [u8; 16] = [0u8; 16];
-    iv_part.copy_from_slice(&r_iv[8..16]);
+    let mut iv_part: [u8; 16] = [0u8; 128 / 8];
+    iv_part.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
     let iv = U8x16::from_bytes(&iv_part.into()).unwrap();
 
-    // line 4
+    // lines 4-5
     let (h, decom, corr, u, v) = vole_commit(r, iv, l_hat(l));
 
-    // TODO: lines 6-20
-    let mut chall1_inp = vec![];
-    chall1_inp.extend(mu);
-    chall1_inp.extend(corrections_to_bytes(&corr));
-    // TODO: add more elements to the input for computing the 1st challenge
-    let chall1 = h_chall1(&chall1_inp);
+    // lines 6
+    let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
 
-    let mut chall3_inp = vec![];
-    chall3_inp.extend(&chall1);
-    // TODO: add more elements to the chall3 input
-    let chall3 = h_chall3(&chall3_inp);
+    // TODO: lines 7-12
+
+    // line 13
+    let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
+
+    // Line 18
+    let chall3 = compute_chall_3(&chall2 /*TODO: add more */);
 
     // lines 20-22
     let pdecom = vole_open(&chall3, decom);
@@ -439,14 +471,33 @@ pub fn verify(pk: Vec<u8>, sig: Signature, l: usize) -> bool {
     // line 1
     let (corr, pdecom, chall3, iv) = sig;
 
-    let rho = [0u8; 16];
-
     // line 2
     let mu: H1 = h1(&pk);
 
-    let (h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, l_hat(l));
+    // lines 3-4
+    let (h, q) = vole_reconstruct(&chall3, pdecom, iv, l_hat(l));
 
-    return true;
+    // line 5
+    let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
+
+    // lines 6-14
+    let q_f128b = vole_recompose_q(
+        q,
+        &chall3,
+        corr,
+        l_hat(l), /* TODO: unsure about this value*/
+    );
+
+    // TODO: line 15
+    // TODO: line 16
+
+    // line 17
+    let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
+
+    // Line 20
+    let chall3_prime = compute_chall_3(&chall2 /*TODO: add more */);
+
+    return chall3_prime == chall3;
 }
 
 mod test {
@@ -517,7 +568,7 @@ mod test {
 
         // This is the delta challenge, set to zero for now, but should come from a challenge
         //let delta = super::chal_dec(); //vec![false; 8];
-        let how_many = 10_000;
+        let how_many = 1_000;
 
         let (h, decom, corr, u, v) = vole_commit(seeds[0], iv, how_many);
 
@@ -561,5 +612,15 @@ mod test {
             //assert_eq!(v_f128b[pos], q_f128b[pos]);
             assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
         }
+    }
+
+    #[test]
+    fn test_sign_verify() {
+        let how_many = 100;
+        let sk = vec![1u8];
+        let pk = vec![1u8];
+        let sig = super::sign(sk, pk.clone(), how_many);
+        let b = super::verify(pk, sig, how_many);
+        assert!(b);
     }
 }
