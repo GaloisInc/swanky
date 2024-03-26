@@ -16,7 +16,8 @@
 
 #![deny(missing_docs)]
 
-mod all_but_one_vc;
+pub mod all_but_one_vc;
+pub mod convert_to_vole;
 pub mod parameters;
 mod proof;
 mod vole;
