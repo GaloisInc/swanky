@@ -401,6 +401,23 @@ fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
     out
 }
 
+fn compute_r_iv(sk: &[u8], mu: &H1, rho: &[u8]) -> (U8x16, U8x16) {
+    let mut h3_inp = vec![];
+    h3_inp.extend(sk);
+    h3_inp.extend(mu);
+    h3_inp.extend(rho);
+    let r_iv: H3 = h3(&h3_inp);
+
+    // splitting r_iv into r and iv
+    let mut r_part: [u8; 16] = [0u8; SECURITY_PARAM / 8];
+    r_part.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
+    let r = U8x16::from_bytes((&r_part).into()).unwrap();
+    let mut iv_part: [u8; 16] = [0u8; 128 / 8];
+    iv_part.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
+    let iv = U8x16::from_bytes(&iv_part.into()).unwrap();
+    (r, iv)
+}
+
 fn compute_chall_1(mu: &H1, h_com: &Com, corr: &Corrections, iv: &IV) -> Chall1 {
     let mut inp = vec![];
     inp.extend(mu);
@@ -432,19 +449,7 @@ pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     let mu: H1 = h1(&pk); // DIFF: the FAEST spec also hashes an input `msg`, but we dont have this here
 
     // line 3
-    let mut h3_inp = vec![];
-    h3_inp.extend(sk);
-    h3_inp.extend(mu);
-    h3_inp.extend(rho);
-    let r_iv: H3 = h3(&h3_inp);
-
-    // splitting r_iv into r and iv
-    let mut r_part: [u8; 16] = [0u8; SECURITY_PARAM / 8];
-    r_part.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
-    let r = U8x16::from_bytes((&r_part).into()).unwrap();
-    let mut iv_part: [u8; 16] = [0u8; 128 / 8];
-    iv_part.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
-    let iv = U8x16::from_bytes(&iv_part.into()).unwrap();
+    let (r, iv) = compute_r_iv(&sk, &mu, &rho);
 
     // lines 4-5
     let (h, decom, corr, u, v) = vole_commit(r, iv, l_hat(l));
@@ -509,8 +514,9 @@ mod test {
     use crate::convert_to_vole::{chal_dec, vole_open};
 
     use super::{
-        bools_to_u8, convert_to_vole_prover, convert_to_vole_verifier, vole_commit,
-        vole_recompose_q, vole_reconstruct, Chall3,
+        bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3, compute_r_iv,
+        convert_to_vole_prover, convert_to_vole_verifier, h1, vole_commit, vole_recompose_q,
+        vole_reconstruct, Chall3, H1,
     };
     use crate::parameters::REPETITION_PARAM;
     use rand::{thread_rng, Rng, RngCore};
@@ -554,26 +560,20 @@ mod test {
 
     #[test]
     fn test_vole_commit_reconstruct() {
-        let mut seeds = vec![];
-        let rng = &mut thread_rng();
+        let sk = vec![1u8];
+        let pk = vec![1u8];
 
-        let mut arr = [0u8; 16];
-        for _ in 0..256 {
-            rng.try_fill_bytes(&mut arr).unwrap();
-            seeds.push(U8x16::from_bytes(&arr.into()).unwrap());
-        }
-
-        rng.try_fill_bytes(&mut arr).unwrap();
-        let iv = U8x16::from_bytes(&arr.into()).unwrap();
-
-        // This is the delta challenge, set to zero for now, but should come from a challenge
-        //let delta = super::chal_dec(); //vec![false; 8];
         let how_many = 1_000;
 
-        let (h, decom, corr, u, v) = vole_commit(seeds[0], iv, how_many);
+        let mu: H1 = h1(&pk);
+        let rho = [0u8; 16];
+        let (r, iv) = compute_r_iv(&sk, &mu, &rho);
 
-        let mut chall3: Chall3 = Default::default();
-        chall3[0] = 2;
+        let (h, decom, corr, u, v) = vole_commit(r, iv, how_many);
+
+        let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
+        let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
+        let chall3 = compute_chall_3(&chall2 /*TODO: add more */);
 
         let pdecom = vole_open(&chall3, decom);
 
@@ -616,7 +616,7 @@ mod test {
 
     #[test]
     fn test_sign_verify() {
-        let how_many = 100;
+        let how_many = 1_000;
         let sk = vec![1u8];
         let pk = vec![1u8];
         let sig = super::sign(sk, pk.clone(), how_many);
