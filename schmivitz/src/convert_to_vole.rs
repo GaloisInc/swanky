@@ -114,8 +114,9 @@ fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b
         let prg = PRG::new(*seed, iv);
         let v = prg.prg(l);
         for (j, r) in v.iter().enumerate() {
+            let i_f8b: F8b = i.into();
             u_res[j] += r;
-            v_res[j] += *r * F8b(i);
+            v_res[j] += *r * i_f8b;
         }
         i = i.wrapping_add(1);
     }
@@ -146,7 +147,9 @@ fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<
             let prg = PRG::new(*seed, iv);
             let v = prg.prg(l);
             for (j, r) in v.iter().enumerate() {
-                v_res[j] += *r * (F8b(delta) - F8b(i));
+                let delta_f8b: F8b = delta.into();
+                let i_f8b: F8b = i.into();
+                v_res[j] += *r * (delta_f8b - i_f8b);
             }
         } else {
             assert_eq!(*seed, U8x16::default());
@@ -421,7 +424,8 @@ mod test {
 
         println!("Minus one {:?}", -(F8b::ONE));
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
-            assert_eq!(*q, (*u * F8b(delta)) - *v);
+            let delta_f8b: F8b = delta.into();
+            assert_eq!(*q, (*u * delta_f8b) - *v);
         }
     }
 
@@ -476,7 +480,7 @@ mod test {
         let mut big_delta = [F8b::default(); REPETITION_PARAM];
         for tau in 0..REPETITION_PARAM {
             let delta_i = chal_dec(&chall3, tau);
-            let delta_f8b = F8b(bools_to_f8b(&delta_i));
+            let delta_f8b: F8b = bools_to_f8b(&delta_i).into();
             big_delta[tau] = delta_f8b;
         }
         let big_delta_f128b: F128b = F8b::form_superfield(&big_delta.into());
