@@ -157,6 +157,7 @@ rustls-pemfile = "2.0.0"
 serde = "1.0.196"
 serde_json = "1.0.113"
 sha2 = "0.10.8"
+sha3 = "0.10.8"
 smallvec = { version = "1.13.1", features = [
   "const_generics",
   "union",
