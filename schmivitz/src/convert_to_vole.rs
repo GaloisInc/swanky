@@ -77,26 +77,79 @@ impl PRG {
     }
 }
 
-fn h1(inp: &[u8], out: &mut [u8]) {
-    assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2 /* IV*/);
+fn h1_core(inp: &[u8], out: &mut [u8]) {
+    assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
     let mut hasher = sha3::Shake128::default();
     hasher.update(inp);
+    hasher.update(&[1u8]);
     let mut reader = hasher.finalize_xof();
     reader.read(out);
 }
 
-/// Third challenge
-pub type Chall3 = [u8; REPETITION_PARAM];
+/// Result of [`h1`] hash function.
+pub type H1 = [u8; (SECURITY_PARAM / 8) * 2];
 
-fn h_chall3(/* TODO */) -> Chall3 {
-    [0u8; REPETITION_PARAM]
+/// H1 hash function.
+///
+/// It is called at the beginning of the protocol on both sides.
+fn h1(inp: &[u8]) -> H1 {
+    let mut out = H1::default();
+    h1_core(inp, &mut out);
+    out
+}
+
+/// This is `$H_2^3$` in FAEST spec
+fn h2(inp: &[u8], out: &mut [u8]) {
+    let mut hasher = Shake128::default();
+    hasher.update(inp);
+    hasher.update(&[2u8]);
+    let mut reader = hasher.finalize_xof();
+    reader.read(out);
+}
+
+/// Length of 1st challenge in bytes.
+const CHALL1_LENGTH: usize = (SECURITY_PARAM * 5 + 64) / 8;
+/// First challenge
+pub type Chall1 = [u8; CHALL1_LENGTH];
+
+/// This is `$H_2^2$` in FAEST spec.
+fn h_chall1(inp: &[u8]) -> Chall1 {
+    let mut out: Chall1 = [0u8; CHALL1_LENGTH]; // NOTE: default does not work here
+    h2(inp, &mut out);
+    out
+}
+
+/// Length of 2nd challenge in bytes.
+const CHALL2_LENGTH: usize = (SECURITY_PARAM * 3 + 64) / 8;
+/// Second challenge
+pub type Chall2 = [u8; CHALL2_LENGTH];
+
+/// This is `$H_2^2$` in FAEST spec.
+fn h_chall2(inp: &[u8]) -> Chall2 {
+    let mut out: Chall2 = [0u8; CHALL2_LENGTH]; // NOTE: default does not work here
+    h2(inp, &mut out);
+    out
+}
+
+/// Length of 3rd challenge in bytes.
+const CHALL3_LENGTH: usize = SECURITY_PARAM / 8;
+/// Third challenge.
+pub type Chall3 = [u8; CHALL3_LENGTH];
+
+/// This is `$H_2^3$` in FAEST spec.
+fn h_chall3(inp: &[u8]) -> Chall3 {
+    let mut out = Chall3::default();
+    h2(inp, &mut out);
+    out
 }
 
 type H3 = [u8; SECURITY_PARAM / 8 + 128 / 8];
 
+/// H3 function
 fn h3(inp: &[u8]) -> H3 {
-    let mut hasher = sha3::Shake128::default();
+    let mut hasher = Shake128::default();
     hasher.update(inp);
+    hasher.update(&[3u8]);
     let mut reader = hasher.finalize_xof();
 
     let mut out: H3 = Default::default();
@@ -123,8 +176,9 @@ fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b
 
     (u_res, v_res)
 }
+
 ///
-pub fn bools_to_f8b(d: &[bool]) -> u8 {
+pub fn bools_to_u8(d: &[bool]) -> u8 {
     debug_assert!(d.len() == 8);
     let mut r: u8 = 0;
     for (i, b) in d.iter().enumerate() {
@@ -252,7 +306,7 @@ pub fn vole_reconstruct(
 
         // let's recompose the seeds and
         let mut seeds_shifted = vec![U8x16::default(); 256];
-        let delta_u8 = bools_to_f8b(&delta);
+        let delta_u8 = bools_to_u8(&delta);
         //println!("delta_u8 {}", delta_u8);
         let mut c = 0;
         for i in 0..256 {
@@ -262,7 +316,7 @@ pub fn vole_reconstruct(
             }
         }
 
-        let q_i = convert_to_vole_verifier(&seeds_shifted, iv, l, bools_to_f8b(&delta));
+        let q_i = convert_to_vole_verifier(&seeds_shifted, iv, l, bools_to_u8(&delta));
 
         //let tmp: [F8b; 16];
         //tmp.copy_from_slice(&q_i);
@@ -324,13 +378,25 @@ fn l_hat(l: usize) -> usize {
     l + 16 + 2 * SECURITY_PARAM
 }
 
+fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
+    let mut out = Vec::with_capacity(corr.len());
+    for c in corr.iter() {
+        out.push(bools_to_u8(
+            c.iter()
+                .map(|b| if *b == F2::ZERO { false } else { true })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        ));
+    }
+    out
+}
+
 /// Adaptation of FAEST Sign function adapted from Fig. 8.2
 pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     let rho = [0u8; 16];
 
     // line 2
-    let mut mu = vec![0; SECURITY_PARAM / 8 + 128 / 8 /*IV*/ ];
-    h1(&pk, &mut mu);
+    let mu: H1 = h1(&pk); // DIFF: the FAEST spec also hashes an input `msg`, but we dont have this here
 
     // line 3
     let mut h3_inp = vec![];
@@ -351,9 +417,16 @@ pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     let (h, decom, corr, u, v) = vole_commit(r, iv, l_hat(l));
 
     // TODO: lines 6-20
-    let chall1 = vec![0u8; 0];
+    let mut chall1_inp = vec![];
+    chall1_inp.extend(mu);
+    chall1_inp.extend(corrections_to_bytes(&corr));
+    // TODO: add more elements to the input for computing the 1st challenge
+    let chall1 = h_chall1(&chall1_inp);
 
-    let chall3 = h_chall3();
+    let mut chall3_inp = vec![];
+    chall3_inp.extend(&chall1);
+    // TODO: add more elements to the chall3 input
+    let chall3 = h_chall3(&chall3_inp);
 
     // lines 20-22
     let pdecom = vole_open(&chall3, decom);
@@ -369,8 +442,7 @@ pub fn verify(pk: Vec<u8>, sig: Signature, l: usize) -> bool {
     let rho = [0u8; 16];
 
     // line 2
-    let mut mu = vec![0; SECURITY_PARAM / 8 + 128 / 8 /*IV*/ ];
-    h1(&pk, &mut mu);
+    let mu: H1 = h1(&pk);
 
     let (h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, l_hat(l));
 
@@ -386,7 +458,7 @@ mod test {
     use crate::convert_to_vole::{chal_dec, vole_open};
 
     use super::{
-        bools_to_f8b, convert_to_vole_prover, convert_to_vole_verifier, vole_commit,
+        bools_to_u8, convert_to_vole_prover, convert_to_vole_verifier, vole_commit,
         vole_recompose_q, vole_reconstruct, Chall3,
     };
     use crate::parameters::REPETITION_PARAM;
@@ -480,7 +552,7 @@ mod test {
         let mut big_delta = [F8b::default(); REPETITION_PARAM];
         for tau in 0..REPETITION_PARAM {
             let delta_i = chal_dec(&chall3, tau);
-            let delta_f8b: F8b = bools_to_f8b(&delta_i).into();
+            let delta_f8b: F8b = bools_to_u8(&delta_i).into();
             big_delta[tau] = delta_f8b;
         }
         let big_delta_f128b: F128b = F8b::form_superfield(&big_delta.into());

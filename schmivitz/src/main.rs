@@ -5,7 +5,7 @@ use rand::{thread_rng, Rng, RngCore};
 use schmivitz::all_but_one_vc::IV;
 use schmivitz::all_but_one_vc::{commit, open, Seed};
 use schmivitz::convert_to_vole::{
-    bools_to_f8b, chal_dec, vole_commit, vole_open, vole_recompose_q, vole_reconstruct, Chall3,
+    bools_to_u8, chal_dec, vole_commit, vole_open, vole_recompose_q, vole_reconstruct, Chall3,
 };
 use schmivitz::parameters::REPETITION_PARAM;
 use swanky_field::{FiniteRing, IsSubFieldOf};
@@ -62,7 +62,7 @@ fn main() {
     let mut big_delta = [F8b::default(); REPETITION_PARAM];
     for tau in 0..REPETITION_PARAM {
         let delta_i = chal_dec(&chall3, tau);
-        let delta_f8b: F8b = bools_to_f8b(&delta_i).into();
+        let delta_f8b: F8b = bools_to_u8(&delta_i).into();
         big_delta[tau] = delta_f8b;
     }
     let big_delta_f128b: F128b = F8b::form_superfield(&big_delta.into());
