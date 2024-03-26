@@ -239,7 +239,7 @@ pub(crate) fn num_rec(j: &[bool]) -> usize {
 /// Generates a partial decommitment [`Pdecom`] given a full decommitment `decom`. This
 /// partial decommitment is produced by the prover and will be sent to the verifier to reconstruct
 /// all but one seeds using [`reconstruct`] and verify the commitment using [`verify`].
-pub(crate) fn open(decom: Decom, j: Vec<bool>) -> Pdecom {
+pub fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
     assert_eq!(
         decom.1.len(),
         1 << j.len(),
@@ -380,7 +380,7 @@ mod test {
         let depth = j.len();
         // prover side
         let (h, decom, sd) = commit(r, iv, depth);
-        let (cop, com_j) = open(decom, j.clone());
+        let (cop, com_j) = open(&decom, j.clone());
 
         // verifier side
         let j_num = num_rec(&j);
