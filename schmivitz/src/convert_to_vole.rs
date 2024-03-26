@@ -41,7 +41,7 @@ impl PRG {
 
     /// Function that returns a pseudo-random vector of F2 values
     fn prg(mut self, l: usize) -> Vec<F2> {
-        let mut res = vec![];
+        let mut res = Vec::with_capacity(l);
         let mut remaining: i64 = l.try_into().unwrap();
 
         while remaining > 0 {
@@ -169,10 +169,10 @@ pub fn vole_commit(
     l: usize,
 ) -> (Com, Vec<Decom>, Corrections, Vec<F2>, Vec<Vec<F8b>>) {
     let prg_seeds = PRG::new(r, iv).generate_prg_seeds(REPETITION_PARAM);
-    let mut u = vec![];
-    let mut v = vec![];
-    let mut decom = vec![];
-    let mut com = vec![];
+    let mut u = Vec::with_capacity(REPETITION_PARAM);
+    let mut v = Vec::with_capacity(REPETITION_PARAM);
+    let mut decom = Vec::with_capacity(REPETITION_PARAM);
+    let mut com = Vec::with_capacity(REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
         let (u_i, v_i) = convert_to_vole_prover(&seeds, iv, l);
@@ -184,7 +184,7 @@ pub fn vole_commit(
 
     // let's compute the corrections
     let u_0 = u[0].clone(); // TODO: opt transmute here
-    let mut corr = vec![];
+    let mut corr = Vec::with_capacity(REPETITION_PARAM - 1);
     for i in 1..REPETITION_PARAM {
         let mut ci = Vec::with_capacity(l);
         debug_assert_eq!(l, u_0.len());
