@@ -1318,9 +1318,8 @@ where
 ///      SIEVE IR resources. **Caution!** `EvaluatorCirc` expects all resources
 ///      to be syntactically valid and resource valid as defined by the SIEVE IR
 ///      specification. It is an unchecked runtime error to invoke
-///      `EvaluatorCirc` methods on invalid SIEVE IR resources.
-/// 4. Call [`Self::finish`] to indicate there are no more items in the relation, and
-///    all protocols may execute their final steps
+///      `EvaluatorCirc` methods on invalid SIEVE IR resources
+/// 4. Call [`Self::terminate`] to stop and reset  any sVOLE functionality
 pub struct EvaluatorCirc<
     P: Party,
     // See use of phantom for details on `C`
