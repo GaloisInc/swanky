@@ -21,6 +21,8 @@ can be found in the module documentation for each component.
 mod backend_multifield;
 pub use backend_multifield::EvaluatorCirc;
 pub mod circuit_ir;
+mod fields;
+pub use fields::modulus_to_type_id;
 pub mod sieveir_reader_fbs;
 pub mod sieveir_reader_text;
 pub mod svole_thread;
@@ -32,7 +34,6 @@ mod backend_extfield;
 mod backend_trait;
 mod dora;
 mod edabits;
-mod fields;
 mod gadgets;
 mod homcom;
 mod mac;
