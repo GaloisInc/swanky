@@ -17,9 +17,10 @@
 #![deny(missing_docs)]
 
 pub mod all_but_one_vc;
+pub mod circuit;
 pub mod convert_to_vole;
 pub mod parameters;
-mod proof;
+pub mod proof;
 mod vole;
 
 pub use proof::Proof;

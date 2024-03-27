@@ -1,4 +1,9 @@
+use std::env;
+use std::path::PathBuf;
+
+use diet_mac_and_cheese::sieveir_reader_fbs::{read_types, InputFlatbuffers};
 use eyre::{bail, Result};
+use schmivitz::circuit::{run_prover, RelationStreamer};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 use rand::{thread_rng, Rng, RngCore};
@@ -13,7 +18,9 @@ use swanky_field_binary::F2;
 use swanky_field_binary::{F128b, F8b};
 use swanky_serialization::CanonicalSerialize;
 
-fn main() {
+use schmivitz::proof::ProverPreparer2;
+
+fn test1() {
     let mut seeds = vec![];
     let rng = &mut thread_rng();
 
@@ -70,4 +77,32 @@ fn main() {
     for pos in 0..how_many {
         assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
     }
+}
+
+fn grit() {
+    let args: Vec<String> = env::args().collect();
+
+    // Check that two arguments are provided
+    if args.len() != 3 {
+        eprintln!("Usage: {} <inputs> <relation>", args[0]);
+        std::process::exit(1);
+    }
+
+    // Extract the paths provided as arguments
+    let inputs = &args[1];
+    let relation = &args[2];
+
+    // Transform the paths into PathBuf
+    let path_inputs = PathBuf::from(inputs);
+    let path_relation = PathBuf::from(relation);
+
+    // Display the transformed paths
+    println!("Path inputs: {:?}", path_inputs);
+    println!("Path relation: {:?}", path_relation);
+
+    run_prover(path_inputs, path_relation).unwrap();
+}
+
+fn main() {
+    grit()
 }

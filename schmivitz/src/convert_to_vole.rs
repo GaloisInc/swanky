@@ -1,12 +1,11 @@
 /*! */
-use blake3::hash;
 use eyre::{bail, Result};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 use crate::all_but_one_vc::IV;
 use crate::all_but_one_vc::{commit, open, reconstruct, Com, Decom, Pdecom, Seed};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
-use swanky_field::{FiniteRing, IsSubFieldOf};
+use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
@@ -108,7 +107,7 @@ fn h2(inp: &[u8], out: &mut [u8]) {
 }
 
 /// Length of 1st challenge in bytes.
-const CHALL1_LENGTH: usize = (SECURITY_PARAM * 5 + 64) / 8;
+const CHALL1_LENGTH: usize = (SECURITY_PARAM * 6) / 8;
 /// First challenge
 pub type Chall1 = [u8; CHALL1_LENGTH];
 
@@ -266,11 +265,6 @@ pub fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
     }
     pdecom
 }
-
-const FIXED_CHALLENGE: [bool; 8] = //[false; 8];
-    [true, true, false, true, false, true, false, true];
-//[false, true, false, true, false, false, false, true];
-//
 
 /// TODO: remove pub
 pub fn chal_dec(buf: &[u8], i: usize) -> Vec<bool> {
@@ -441,6 +435,90 @@ fn compute_chall_3(chall2: &Chall2 /* TODO remaining parameters*/) -> Chall3 {
     h_chall3(&inp)
 }
 
+const B: usize = 16;
+
+fn to_field_f128_and_pad(x: &[F2]) -> Vec<F128b> {
+    let floor = x.len() / 128;
+    let how_many = floor + if (x.len() - (floor) * 128) != 0 { 1 } else { 0 };
+    let mut out = Vec::with_capacity(how_many);
+
+    let mut b_128 = [0u8; 128 / 8];
+    let mut byte_num = 0;
+    let mut bit_num: usize = 0;
+    for b in x.iter() {
+        b_128[byte_num] |= if *b == F2::ZERO { 0 } else { 1 << bit_num };
+        if bit_num == 7 {
+            bit_num = 0; // restart at the beginning of byte
+            if byte_num == (128 / 8) - 1 {
+                out.push(F128b::from_bytes(&b_128.into()).unwrap());
+                byte_num = 0;
+                b_128 = [0u8; 128 / 8];
+            } else {
+                byte_num += 1;
+            }
+        } else {
+            bit_num += 1;
+        }
+    }
+    if (bit_num != 7) | (byte_num != (128 / 8) - 1) {
+        out.push(F128b::from_bytes(&b_128.into()).unwrap())
+    }
+
+    assert_eq!(out.len(), how_many);
+    out
+}
+
+fn vole_hash(seed: &[u8], x0: &[F2], x1: &[F2]) -> Vec<F2> {
+    assert_eq!(seed.len(), CHALL1_LENGTH);
+    let byte_len: usize = 128 / 8;
+    let mut tmp = [u8::default(); 128 / 8];
+    tmp.copy_from_slice(&seed[0..byte_len]);
+    let r0 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len..byte_len * 2]);
+    let r1 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 2..byte_len * 3]);
+    let r2 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 3..byte_len * 4]);
+    let r3 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 4..byte_len * 5]);
+    let s0 = F128b::from_bytes(&tmp.into()).unwrap();
+    tmp.copy_from_slice(&seed[byte_len * 5..byte_len * 6]);
+    let s1 = F128b::from_bytes(&tmp.into()).unwrap();
+
+    // TODO: we dont need to compute how_many, we could directly use `x0_vec.len()`
+    let floor = x0.len() / 128;
+    let how_many = floor + if (x0.len() - floor * 128) != 0 { 1 } else { 0 };
+
+    let x0_vec = to_field_f128_and_pad(x0);
+    let mut h0 = F128b::ZERO;
+    let mut h1 = F128b::ZERO;
+    let mut s0_power = s0;
+    let mut s1_power = s1;
+    for i in 0..how_many {
+        println!("h0:{:?}", h0);
+        h0 += s0_power * x0_vec[i];
+        h1 += s1_power * x0_vec[i];
+        s0_power *= s0; // TODO: should I do the power in reverse order?? as in the spec
+        s1_power *= s1;
+    }
+    let h2 = r0 * h0 + r1 * h1;
+    let h3 = r2 * h0 + r3 * h1;
+
+    let h2_bits = h2.bit_decomposition();
+    let h3_bits = h3.bit_decomposition();
+
+    let mut all_bits = vec![];
+    all_bits.extend_from_slice(h2_bits.as_slice());
+    all_bits.extend_from_slice(h3_bits.as_slice());
+
+    all_bits.truncate(x1.len());
+    all_bits
+        .iter()
+        .zip(x1.iter())
+        .map(|(b1, b2)| (if *b1 { F2::ONE } else { F2::ZERO }) + b2)
+        .collect()
+}
+
 /// Adaptation of FAEST Sign function adapted from Fig. 8.2
 pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     let rho = [0u8; 16];
@@ -457,7 +535,14 @@ pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     // lines 6
     let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
 
-    // TODO: lines 7-12
+    // line 7-8
+    let u_tilda = vole_hash(
+        &chall1,
+        &u[0..l + SECURITY_PARAM],
+        &u[l + SECURITY_PARAM..l + 2 * SECURITY_PARAM + B],
+    );
+
+    // TODO: lines 9-12
 
     // line 13
     let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
@@ -505,20 +590,20 @@ pub fn verify(pk: Vec<u8>, sig: Signature, l: usize) -> bool {
     return chall3_prime == chall3;
 }
 
+#[cfg(test)]
 mod test {
     use eyre::{bail, Result};
-    use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
-
-    use crate::all_but_one_vc::IV;
-    use crate::all_but_one_vc::{commit, open, Seed};
-    use crate::convert_to_vole::{chal_dec, vole_open};
+    use vectoreyes::U8x16;
 
     use super::{
         bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3, compute_r_iv,
-        convert_to_vole_prover, convert_to_vole_verifier, h1, vole_commit, vole_recompose_q,
-        vole_reconstruct, Chall3, H1,
+        convert_to_vole_prover, convert_to_vole_verifier, h1, sign, verify, vole_commit, vole_hash,
+        vole_recompose_q, vole_reconstruct, Chall3, B, H1,
     };
-    use crate::parameters::REPETITION_PARAM;
+    use crate::all_but_one_vc::IV;
+    use crate::all_but_one_vc::{commit, open, Seed};
+    use crate::convert_to_vole::{chal_dec, vole_open};
+    use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
     use rand::{thread_rng, Rng, RngCore};
     use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::F2;
@@ -614,13 +699,46 @@ mod test {
         }
     }
 
+    // Test that [`vole_hash`] returns 0 when all the inputs are 0.
+    #[test]
+    fn test_vole_hash_zero() {
+        let seeds = [0u8; (SECURITY_PARAM * 6) / 8];
+
+        const HOW_MANY: usize = 1000;
+        let x0 = [F2::ZERO; HOW_MANY + SECURITY_PARAM];
+        let x1 = [F2::ZERO; SECURITY_PARAM + B];
+        let v = vole_hash(&seeds, &x0, &x1);
+        for b in v.iter() {
+            assert_eq!(*b, F2::ZERO);
+        }
+    }
+
+    #[test]
+    fn test_vole_hash_last_xor() {
+        let seeds = [0u8; (SECURITY_PARAM * 6) / 8];
+
+        const HOW_MANY: usize = 1000;
+        let x0 = [F2::ZERO; HOW_MANY + SECURITY_PARAM];
+        let mut x1 = [F2::ZERO; SECURITY_PARAM + 16];
+        let pos = 13;
+        x1[pos] = F2::ONE;
+        let v = vole_hash(&seeds, &x0, &x1);
+        for (i, b) in v.iter().enumerate() {
+            if i == pos {
+                assert_eq!(*b, F2::ONE);
+            } else {
+                assert_eq!(*b, F2::ZERO);
+            }
+        }
+    }
+
     #[test]
     fn test_sign_verify() {
         let how_many = 1_000;
         let sk = vec![1u8];
         let pk = vec![1u8];
-        let sig = super::sign(sk, pk.clone(), how_many);
-        let b = super::verify(pk, sig, how_many);
+        let sig = sign(sk, pk.clone(), how_many);
+        let b = verify(pk, sig, how_many);
         assert!(b);
     }
 }
