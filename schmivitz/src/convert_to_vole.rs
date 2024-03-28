@@ -324,6 +324,14 @@ pub fn vole_reconstruct(
     )
 }
 
+fn bitwise_compose(v: &[F8b; REPETITION_PARAM]) -> F128b {
+    let mut tmp: [u8; REPETITION_PARAM] = [0; REPETITION_PARAM];
+    for (i, b) in v.iter().enumerate() {
+        tmp[i] = b.to_bytes()[0];
+    }
+    F128b::from_bytes(&tmp.into()).unwrap()
+}
+
 /// Lines 7-14 of Figure 8.3
 pub fn vole_recompose_q(
     q: Vec<Vec<F8b>>,
@@ -361,15 +369,43 @@ pub fn vole_recompose_q(
 
     let mut q_128b: Vec<F128b> = Vec::with_capacity(how_many);
     for pos in 0..how_many {
-        q_128b.push(F8b::form_superfield(&qs[pos].into()));
+        let val = bitwise_compose(&qs[pos]);
+        q_128b.push(val);
     }
     q_128b
 }
 
-type Signature = (Corrections, Vec<Pdecom>, Chall3, IV);
+fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
+    assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
+    let how_many = u_tilda.len();
+    let mut qs = Vec::with_capacity(how_many * REPETITION_PARAM * 8);
+    //for _ in 0..how_many {
+    //    qs.push([u8::default(); REPETITION_PARAM]);
+    //}
+    for tau in 0..REPETITION_PARAM {
+        let delta = chal_dec(chall3, tau);
+        let delta_u8 = bools_to_u8(&delta);
+        let delta_f2: Vec<_> = delta
+            .iter()
+            .map(|b| if *b { F2::ONE } else { F2::ZERO })
+            .collect();
+        for (pos, b) in u_tilda.iter().enumerate() {
+            if *b == F2::ONE {
+                //qs[pos][tau] = delta_u8;
+                qs.extend_from_slice(&delta_f2);
+            } else {
+                qs.extend_from_slice(&[F2::ZERO; 8]);
+            }
+        }
+    }
+    //qs.iter()
+    //    .map(|arr| F8b::form_superfield(&arr.map(|b| b.into()).into()))
+    //    .collect()
+    qs
+}
 
 fn l_hat(l: usize) -> usize {
-    l + 16 + 2 * SECURITY_PARAM
+    l + B + 2 * SECURITY_PARAM
 }
 
 fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
@@ -437,22 +473,22 @@ fn compute_chall_3(chall2: &Chall2 /* TODO remaining parameters*/) -> Chall3 {
 
 const B: usize = 16;
 
-fn to_field_f128_and_pad(x: &[F2]) -> Vec<F128b> {
-    let floor = x.len() / 128;
-    let how_many = floor + if (x.len() - (floor) * 128) != 0 { 1 } else { 0 };
+fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128b> {
+    let floor = x_len / 128;
+    let how_many = floor + if (x_len - (floor) * 128) != 0 { 1 } else { 0 };
     let mut out = Vec::with_capacity(how_many);
 
     let mut b_128 = [0u8; 128 / 8];
     let mut byte_num = 0;
     let mut bit_num: usize = 0;
-    for b in x.iter() {
-        b_128[byte_num] |= if *b == F2::ZERO { 0 } else { 1 << bit_num };
+    for b in x.into_iter() {
+        b_128[byte_num] |= if b == F2::ZERO { 0 } else { 1 << bit_num };
         if bit_num == 7 {
             bit_num = 0; // restart at the beginning of byte
             if byte_num == (128 / 8) - 1 {
                 out.push(F128b::from_bytes(&b_128.into()).unwrap());
                 byte_num = 0;
-                b_128 = [0u8; 128 / 8];
+                b_128 = [0u8; 128 / 8]; // reset
             } else {
                 byte_num += 1;
             }
@@ -460,7 +496,7 @@ fn to_field_f128_and_pad(x: &[F2]) -> Vec<F128b> {
             bit_num += 1;
         }
     }
-    if (bit_num != 7) | (byte_num != (128 / 8) - 1) {
+    if (bit_num != 0) | (byte_num != 0) {
         out.push(F128b::from_bytes(&b_128.into()).unwrap())
     }
 
@@ -468,7 +504,13 @@ fn to_field_f128_and_pad(x: &[F2]) -> Vec<F128b> {
     out
 }
 
-fn vole_hash(seed: &[u8], x0: &[F2], x1: &[F2]) -> Vec<F2> {
+fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
+    seed: &[u8],
+    x0: I1,
+    x0_len: usize,
+    x1: I2,
+    x1_len: usize,
+) -> Vec<F2> {
     assert_eq!(seed.len(), CHALL1_LENGTH);
     let byte_len: usize = 128 / 8;
     let mut tmp = [u8::default(); 128 / 8];
@@ -486,16 +528,20 @@ fn vole_hash(seed: &[u8], x0: &[F2], x1: &[F2]) -> Vec<F2> {
     let s1 = F128b::from_bytes(&tmp.into()).unwrap();
 
     // TODO: we dont need to compute how_many, we could directly use `x0_vec.len()`
-    let floor = x0.len() / 128;
-    let how_many = floor + if (x0.len() - floor * 128) != 0 { 1 } else { 0 };
+    let floor = x0_len / SECURITY_PARAM;
+    let how_many = floor
+        + if (x0_len - floor * SECURITY_PARAM) != 0 {
+            1
+        } else {
+            0
+        };
 
-    let x0_vec = to_field_f128_and_pad(x0);
+    let x0_vec = to_field_f128_and_pad(x0, x0_len);
     let mut h0 = F128b::ZERO;
     let mut h1 = F128b::ZERO;
     let mut s0_power = s0;
     let mut s1_power = s1;
     for i in 0..how_many {
-        println!("h0:{:?}", h0);
         h0 += s0_power * x0_vec[i];
         h1 += s1_power * x0_vec[i];
         s0_power *= s0; // TODO: should I do the power in reverse order?? as in the spec
@@ -511,13 +557,111 @@ fn vole_hash(seed: &[u8], x0: &[F2], x1: &[F2]) -> Vec<F2> {
     all_bits.extend_from_slice(h2_bits.as_slice());
     all_bits.extend_from_slice(h3_bits.as_slice());
 
-    all_bits.truncate(x1.len());
+    all_bits.truncate(x1_len);
     all_bits
         .iter()
-        .zip(x1.iter())
+        .zip(x1.into_iter())
         .map(|(b1, b2)| (if *b1 { F2::ONE } else { F2::ZERO }) + b2)
         .collect()
 }
+
+struct BitDecomposer<'a> {
+    data: &'a Vec<Vec<F8b>>,
+    outer_index: usize,
+    inner_index: usize,
+    bit_index: u8,
+}
+
+impl<'a> BitDecomposer<'a> {
+    fn new(data: &'a Vec<Vec<F8b>>) -> Self {
+        BitDecomposer {
+            data,
+            outer_index: 0,
+            inner_index: 0,
+            bit_index: 0,
+        }
+    }
+
+    fn next_position(&mut self) {
+        if self.bit_index == 7 {
+            self.bit_index = 0;
+            if self.outer_index == self.data.len() - 1 {
+                self.outer_index = 0;
+                self.inner_index += 1;
+            } else {
+                self.outer_index += 1;
+            }
+        } else {
+            self.bit_index += 1;
+        }
+    }
+
+    fn is_out_of_range(&self) -> bool {
+        self.inner_index >= self.data[0].len()
+    }
+}
+
+impl<'a> Iterator for BitDecomposer<'a> {
+    type Item = F2;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_out_of_range() {
+            return None;
+        }
+
+        let b = if self.data[self.outer_index][self.inner_index].get_bit(self.bit_index) == 1u8 {
+            F2::ONE
+        } else {
+            F2::ZERO
+        };
+        self.next_position();
+        Some(b)
+    }
+}
+
+fn decompose_bits<'a>(data: &'a Vec<Vec<F8b>>) -> BitDecomposer<'a> {
+    BitDecomposer::new(data)
+}
+
+fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
+    let mut idx = 0;
+    let mut b = 0u8;
+    let mut out = vec![];
+
+    for bit in bits.iter() {
+        b |= (if *bit == F2::ZERO { 0 } else { 1 }) << idx;
+        if idx == 7 {
+            idx = 0;
+            out.push(b);
+            b = 0u8; // reset
+        } else {
+            idx += 1;
+        }
+    }
+    if idx != 0 {
+        out.push(b);
+    }
+    out
+}
+
+fn f128b_to_f2(v: &[F128b]) -> Vec<F2> {
+    let mut out: Vec<F2> = vec![];
+
+    for f in v.iter() {
+        let bools: Vec<_> = f
+            .bit_decomposition()
+            .as_slice()
+            .iter()
+            .map(|b| if *b { F2::ONE } else { F2::ZERO })
+            .collect();
+        out.extend_from_slice(&bools);
+    }
+    out
+}
+
+type U_HASH = Vec<F2>;
+
+type Signature = (Corrections, U_HASH, Vec<Pdecom>, Chall3, IV);
 
 /// Adaptation of FAEST Sign function adapted from Fig. 8.2
 pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
@@ -536,11 +680,32 @@ pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
     let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
 
     // line 7-8
-    let u_tilda = vole_hash(
+    let u_tilda = simply_vole_hash(
         &chall1,
-        &u[0..l + SECURITY_PARAM],
-        &u[l + SECURITY_PARAM..l + 2 * SECURITY_PARAM + B],
+        u[0..l + SECURITY_PARAM].into_iter().map(|b| *b),
+        l + SECURITY_PARAM,
+        u[l + SECURITY_PARAM..l + 2 * SECURITY_PARAM + B]
+            .into_iter()
+            .map(|b| *b),
+        SECURITY_PARAM + B,
     );
+    let v_bits = decompose_bits(&v);
+    let v_bits2 = decompose_bits(&v);
+    println!("COMBIEN  {}", decompose_bits(&v).into_iter().count());
+    println!("COMBIEN2 {}", (l + 2 * SECURITY_PARAM + B) * SECURITY_PARAM);
+
+    let v_tilda = simply_vole_hash(
+        &chall1,
+        v_bits.take((l + SECURITY_PARAM) * SECURITY_PARAM),
+        (l + SECURITY_PARAM) * SECURITY_PARAM,
+        v_bits2.skip((l + SECURITY_PARAM) * SECURITY_PARAM),
+        (SECURITY_PARAM + B) * SECURITY_PARAM,
+    );
+
+    println!("LEN: {}", v_tilda.len());
+
+    let h_v = h1(&bits_to_u8_many(&v_tilda));
+    println!("h_v {:?}", h_v);
 
     // TODO: lines 9-12
 
@@ -549,17 +714,17 @@ pub fn sign(sk: Vec<u8>, pk: Vec<u8>, l: usize) -> Signature {
 
     // Line 18
     let chall3 = compute_chall_3(&chall2 /*TODO: add more */);
-
+    println!("P chall3:{:?}", chall3);
     // lines 20-22
     let pdecom = vole_open(&chall3, decom);
 
-    (corr, pdecom, chall3, iv)
+    (corr, u_tilda, pdecom, chall3, iv)
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
 pub fn verify(pk: Vec<u8>, sig: Signature, l: usize) -> bool {
     // line 1
-    let (corr, pdecom, chall3, iv) = sig;
+    let (corr, u_tilda, pdecom, chall3, iv) = sig;
 
     // line 2
     let mu: H1 = h1(&pk);
@@ -577,6 +742,32 @@ pub fn verify(pk: Vec<u8>, sig: Signature, l: usize) -> bool {
         corr,
         l_hat(l), /* TODO: unsure about this value*/
     );
+
+    println!("V chall3:{:?}", chall3);
+    let t = f128b_to_f2(&q_f128b);
+    let q_tilda = simply_vole_hash(
+        &chall1,
+        t.iter()
+            .take((l + SECURITY_PARAM) * SECURITY_PARAM)
+            .map(|b| *b),
+        (l + SECURITY_PARAM) * SECURITY_PARAM,
+        t.iter()
+            .skip((l + SECURITY_PARAM) * SECURITY_PARAM)
+            .map(|b| *b),
+        (SECURITY_PARAM + B) * SECURITY_PARAM,
+    );
+
+    let big_d = recompose_d(&chall3, &u_tilda);
+    //let big_d_bits = f128b_to_f2(&big_d);
+    let q_xor_d: Vec<F2> = q_tilda
+        .iter()
+        .zip(big_d.iter())
+        .map(|(a, b)| a + b)
+        .collect();
+    println!("LEN: {}", q_xor_d.len());
+
+    let h_v = h1(&bits_to_u8_many(&q_xor_d));
+    println!("h_q {:?}", h_v);
 
     // TODO: line 15
     // TODO: line 16
@@ -596,9 +787,10 @@ mod test {
     use vectoreyes::U8x16;
 
     use super::{
-        bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3, compute_r_iv,
-        convert_to_vole_prover, convert_to_vole_verifier, h1, sign, verify, vole_commit, vole_hash,
-        vole_recompose_q, vole_reconstruct, Chall3, B, H1,
+        bitwise_compose, bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3,
+        compute_r_iv, convert_to_vole_prover, convert_to_vole_verifier, decompose_bits, h1, sign,
+        simply_vole_hash, to_field_f128_and_pad, verify, vole_commit, vole_recompose_q,
+        vole_reconstruct, Chall3, B, H1,
     };
     use crate::all_but_one_vc::IV;
     use crate::all_but_one_vc::{commit, open, Seed};
@@ -674,7 +866,8 @@ mod test {
         }
         let mut v_f128b: Vec<F128b> = Vec::with_capacity(how_many);
         for pos in 0..how_many {
-            v_f128b.push(F8b::form_superfield(&vs[pos].into()));
+            let val = bitwise_compose(&vs[pos]);
+            v_f128b.push(val);
         }
 
         let (h_ver, q) = vole_reconstruct(&chall3, pdecom, iv, how_many);
@@ -691,12 +884,30 @@ mod test {
             let delta_f8b: F8b = bools_to_u8(&delta_i).into();
             big_delta[tau] = delta_f8b;
         }
-        let big_delta_f128b: F128b = F8b::form_superfield(&big_delta.into());
+        let big_delta_f128b = bitwise_compose(&big_delta);
+        //let big_delta_f128b: F128b = F8b::form_superfield(&big_delta.into());
 
         for pos in 0..how_many {
             //assert_eq!(v_f128b[pos], q_f128b[pos]);
             assert_eq!(v_f128b[pos] + u[pos] * big_delta_f128b, q_f128b[pos]);
         }
+    }
+
+    #[test]
+    fn test_padding_of_to_field_f128_and_pad() {
+        let mut v = vec![F2::ZERO; 1000];
+        let t = to_field_f128_and_pad(v.into_iter(), 1000);
+        assert_eq!(t.len(), 1000 / 128 + 1);
+
+        let mut v = vec![F2::ZERO; 128];
+        let t = to_field_f128_and_pad(v.into_iter(), 128);
+        assert_eq!(t.len(), 1);
+
+        let mut v = vec![F2::ZERO; 129];
+        let t = to_field_f128_and_pad(v.into_iter(), 129);
+        assert_eq!(t.len(), 2);
+
+        // TODO: Could generate random values and decompose the generated F128b and check the equivalence
     }
 
     // Test that [`vole_hash`] returns 0 when all the inputs are 0.
@@ -707,7 +918,13 @@ mod test {
         const HOW_MANY: usize = 1000;
         let x0 = [F2::ZERO; HOW_MANY + SECURITY_PARAM];
         let x1 = [F2::ZERO; SECURITY_PARAM + B];
-        let v = vole_hash(&seeds, &x0, &x1);
+        let v = simply_vole_hash(
+            &seeds,
+            x0.into_iter(),
+            HOW_MANY + SECURITY_PARAM,
+            x1.into_iter(),
+            SECURITY_PARAM + B,
+        );
         for b in v.iter() {
             assert_eq!(*b, F2::ZERO);
         }
@@ -719,15 +936,35 @@ mod test {
 
         const HOW_MANY: usize = 1000;
         let x0 = [F2::ZERO; HOW_MANY + SECURITY_PARAM];
-        let mut x1 = [F2::ZERO; SECURITY_PARAM + 16];
+        let mut x1 = [F2::ZERO; SECURITY_PARAM + B];
         let pos = 13;
         x1[pos] = F2::ONE;
-        let v = vole_hash(&seeds, &x0, &x1);
+        let v = simply_vole_hash(
+            &seeds,
+            x0.into_iter(),
+            HOW_MANY + SECURITY_PARAM,
+            x1.into_iter(),
+            SECURITY_PARAM + B,
+        );
         for (i, b) in v.iter().enumerate() {
             if i == pos {
                 assert_eq!(*b, F2::ONE);
             } else {
                 assert_eq!(*b, F2::ZERO);
+            }
+        }
+    }
+
+    #[test]
+    fn test_bit_decomposer() {
+        let v: Vec<Vec<F8b>> = vec![vec![0u8.into(), 128u8.into()], vec![0u8.into(), 5.into()]];
+        let indices = [2 * 8 + 7, 3 * 8, 3 * 8 + 2];
+
+        for (i, b) in decompose_bits(&v).into_iter().enumerate() {
+            if i == indices[0] || i == indices[1] || i == indices[2] {
+                assert_eq!(b, F2::ONE);
+            } else {
+                assert_eq!(b, F2::ZERO);
             }
         }
     }
@@ -740,5 +977,18 @@ mod test {
         let sig = sign(sk, pk.clone(), how_many);
         let b = verify(pk, sig, how_many);
         assert!(b);
+    }
+
+    #[test]
+    fn test_form() {
+        let v = [27u8; 16];
+        let t: F128b = F128b::from_bytes(&v.into()).unwrap();
+        assert_eq!(t.to_bytes()[0], 27u8);
+        assert_eq!(t.to_bytes()[1], 27u8);
+
+        let v = 43u8;
+        let v_f8b: F8b = F8b::from(v);
+        let v_back: u8 = v_f8b.to_bytes()[0];
+        assert_eq!(v_back, 43u8);
     }
 }
