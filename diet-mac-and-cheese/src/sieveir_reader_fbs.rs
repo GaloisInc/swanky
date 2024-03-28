@@ -1,5 +1,12 @@
 /*!
-SIEVE IR reader in flatbuffers format.
+Tools to read SIEVE IR from flatbuffers, in particular to stream large circuits.
+
+This module provides types to work with circuit inputs (public instances and
+private witnesses) and relations given in the SIEVE IR flatbuffer format.
+
+When dealing with very large circuits, this module should be preferred over
+[`crate::sieveir_reader_text`], since it streams relations rather than loading
+them entirely into memory (the exception being functions).
 */
 use crate::sieveir_phase2::sieve_ir_generated::sieve_ir::{self as g};
 use crate::{
@@ -67,7 +74,7 @@ fn read_size_prefix_in_vec(stream: &mut impl Read, buffer: &mut Vec<u8>) -> Resu
 /// # Panics
 ///
 /// May panic from flatbuffer error.
-pub fn read_public_inputs_bytes(bytes: &[u8], instances: &mut VecDeque<Number>) -> Number {
+fn read_public_inputs_bytes(bytes: &[u8], instances: &mut VecDeque<Number>) -> Number {
     let root = g::size_prefixed_root_as_root(bytes);
 
     if root.is_err() {
@@ -121,7 +128,7 @@ pub fn read_public_inputs(path: &PathBuf, instances: &mut VecDeque<Number>) -> N
 /// # Panics
 ///
 /// May panic from flatbuffer error.
-pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Number>) -> Number {
+fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Number>) -> Number {
     let root = g::size_prefixed_root_as_root(bytes);
 
     if root.is_err() {
@@ -152,6 +159,10 @@ pub fn read_private_inputs_bytes(bytes: &[u8], witnesses: &mut VecDeque<Number>)
     bigint_from_bytes(type_field.bytes())
 }
 
+/// SIEVE IR inputs (public instances or private witnesses) from flatbuffers.
+///
+/// Together with [`BufRelation`], provides a streaming interface to SIEVE IR
+/// circuits expressed as flatbuffers.
 pub struct InputFlatbuffers {
     buffer_file: BufReader<File>,
     buffer_mem: Vec<u8>,
@@ -161,6 +172,7 @@ pub struct InputFlatbuffers {
 }
 
 impl InputFlatbuffers {
+    /// Create an `InputFlatbuffers` for private witness inputs.
     pub fn new_private_inputs(path: &PathBuf) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         let buffer_file = BufReader::new(file);
@@ -177,6 +189,7 @@ impl InputFlatbuffers {
         Ok(private_inputs)
     }
 
+    /// Create an `InputFlatbuffers` for public instance inputs.
     pub fn new_public_inputs(path: &PathBuf) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         let buffer_file = BufReader::new(file);
@@ -207,7 +220,7 @@ impl InputFlatbuffers {
         }
     }
 
-    /// Load more instances or witnesses in the internal queue.
+    /// Load more instances or witnesses into the internal queue.
     fn load_more_in_queue(&mut self) -> Result<Option<()>> {
         let msg = read_size_prefix_in_vec(&mut self.buffer_file, &mut self.buffer_mem)?;
         match msg {
@@ -283,16 +296,31 @@ pub fn read_private_inputs(path: &PathBuf, witnesses: &mut VecDeque<Number>) -> 
     field_res.expect("Could not determine field modulus")
 }
 
-/// A Buffered Relation, analogous to `BufReader`.
+/// A buffered SIEVE IR relation.
+///
+/// This provides an interface similar to [`BufReader`] to stream SIEVE IR
+/// flatbuffer relations from disk.
 pub struct BufRelation {
+    /// The [`TypeStore`] for this relation.
+    ///
+    /// In most cases, `TypeStore::try_from` should be used in conjunction with
+    /// [`read_types`] to compute this field.
     pub type_store: TypeStore,
+
+    /// The [`FunStore`] for this relation, which will be built as
+    /// [`Self::read_next`] is called.
     pub fun_store: FunStore,
+
+    /// The current batch of gates to be evaluated.
     pub gates: Vec<GateM>,
     buffer_file: BufReader<File>,
     buffer_bytes: Vec<u8>,
 }
 
 impl BufRelation {
+    /// Create a new `BufRelation` given a [`TypeStore`].
+    ///
+    /// This method returns an error if `path` is not a file.
     pub fn new(path: &PathBuf, type_store: &TypeStore) -> Result<Self> {
         let md = std::fs::metadata(path).unwrap();
 
@@ -312,6 +340,11 @@ impl BufRelation {
         }
     }
 
+    /// Advance the stream, accumulating functions / gates as appropriate.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if there is an error reading the relation buffer.
     pub fn read_next(&mut self) -> Option<()> {
         let msg = read_size_prefix_in_vec(&mut self.buffer_file, &mut self.buffer_bytes);
         match msg {
@@ -469,7 +502,7 @@ fn flatbuffer_gate_to_gate(the_gate: g::Gate, fun_store: &FunStore) -> GateM {
 /// # Panics
 ///
 /// May panic with io error or flatbuffer error.
-pub fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<()> {
+fn read_relation_and_functions_bytes_accu(rel: &mut BufRelation) -> Option<()> {
     // Checked version
     /*
     let v = g::size_prefixed_root_as_root_with_opts(
