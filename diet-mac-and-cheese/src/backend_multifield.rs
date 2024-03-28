@@ -1528,6 +1528,17 @@ impl<
         ))
     }
 
+    /// Load the necessary backends for a (single-threaded) `EvaluatorCirc`.
+    ///
+    /// Using the `EvaluatorCirc`'s [`TypeStore`], prepare an appropriate set of
+    /// backend evaluators to handle incoming relations. In most cases,
+    /// `lpn_size` should be the same as what was passed to [`Self::new`].
+    ///
+    /// This method should be preferred over [`Self::load_backend`], which
+    /// requires explicit use of [`std::any::TypeId`].
+    ///
+    /// For plaintext evaluation, use [`Self::load_backends_plaintext`]. For
+    /// multithreaded evaluation, use [`Self::load_backends_multithreaded`].
     pub fn load_backends(&mut self, channel: &mut C, lpn_size: LpnSize) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
@@ -1708,6 +1719,19 @@ impl<
         Ok(())
     }
 
+    /// Load a backend for a (single-threaded) `EvaluatorCirc`.
+    ///
+    /// **CAUTION!** This method should be used with care, as it requires the
+    /// use of [`std::any::TypeId`] to associate SIEVE IR type IDs with Rust
+    /// types. If possible, [`Self::load_backends`] should be preferred over
+    /// this method. If you must use this method, consider using
+    /// [`crate::modulus_to_type_id`].
+    ///
+    /// For `EvaluatorCirc` created with [`Self::new_plaintext`], see
+    /// [`Self::load_backend_plaintext`].
+    ///
+    /// DMC does not currently support client loading of individual backends
+    /// when multithreading - use [`Self::load_backends_multithreaded`] instead.
     pub fn load_backend(
         &mut self,
         channel: &mut C,
@@ -1773,6 +1797,14 @@ impl<
         }
     }
 
+    /// Load the necessary backends for a (plaintext) `EvaluatorCirc`.
+    ///
+    /// Analogous to [`Self::load_backends`] for `EvaluatorCirc`s that have been
+    /// created with [`Self::new_plaintext`].
+    ///
+    /// For single-threaded zero-knowledge loading, use [`Self::load_backends`].
+    /// For multithreaded zero-knowedge loading, use
+    /// [`Self::load_backends_multithreaded`].
     pub fn load_backends_plaintext(&mut self) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
@@ -1801,6 +1833,12 @@ impl<
         Ok(())
     }
 
+    /// Load a backend for a (plaintext) `EvaluatorCirc`.
+    ///
+    /// Analogous to [`Self::load_backend`] for `EvaluatorCirc`s that have been
+    /// created with [`Self::new_plaintext`].
+    ///
+    /// For `EvaluatorCirc` created with [`Self::new`], see [`Self::load_backend`].
     pub fn load_backend_plaintext(&mut self, field: std::any::TypeId, idx: usize) -> Result<()> {
         // Loading the backends in order
         let back: Box<dyn EvaluatorT<P>>;
@@ -2030,7 +2068,14 @@ impl<
         }
     }
 
-    /// Load several backends with different fields by going over its internal type store.
+    /// Load the necessary backends for a (multithreaded) `EvaluatorCirc`.
+    ///
+    /// Analogous to [`Self::load_backends`] for `EvaluatorCirc`s that have been
+    /// created with [`Self::new_multithreaded`].
+    ///
+    /// For single-threaded zero-knowledge loading, use [`Self::load_backends`].
+    /// For single-threaded plaintext loading, use
+    ///[`Self::load_backends_plaintext`].
     pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         &mut self,
         channel: &mut C,
@@ -2072,6 +2117,14 @@ impl<
         Ok(handles)
     }
 
+    /// Finalize all evaluation backends loaded by this `EvaluatorCirc`.
+    ///
+    /// This method only needs to be called if using
+    /// [`Self::evaluate_gates_with_inputs`]; other evaluation methods take care
+    /// of finalization.
+    ///
+    /// **CAUTION!** `finish` is different than [`Self::terminate`], which must
+    /// be called to cleanly reset the `EvaluatorCirc`'s sVOLE functionalities!
     pub fn finish(&mut self) -> Result<()> {
         for i in 0..self.eval.len() {
             self.eval[i].finalize()?;
@@ -2079,6 +2132,12 @@ impl<
         Ok(())
     }
 
+    /// Evaluate a relation, given as a slice of [`GateM`].
+    ///
+    /// This method assumes that the `EvaluatorCirc` has been created with
+    ///
+    ///
+    /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_gates(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
         self.evaluate_gates_passed(gates, fun_store)?;
         self.finish()
@@ -2091,7 +2150,14 @@ impl<
         Ok(())
     }
 
-    // This is an almost copy of `eval_gate` for Cybernetica
+    /// Evaluate a relation, given as a slice of [`GateM`].
+    ///
+    /// This is almost the same as `evaluate_gates`, except it uses `CircInputs`
+    /// provided by the caller rather than that owned by the `EvaluatorCirc` (to
+    /// allow for dynamic updates).
+    ///
+    /// **CAUTION!* Does **not** call [`Self::finish`]! Make sure to do so, else
+    /// the protocols will continue waiting to execute additional steps.
     pub fn evaluate_gates_with_inputs(
         &mut self,
         gates: &[GateM],
@@ -2104,7 +2170,9 @@ impl<
         Ok(())
     }
 
-    /// Evaluate a relation provided as a path.
+    /// Evaluate a relation,  given as a path to a SIEVE IR flatbuffer file.
+    ///
+    /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_relation(&mut self, path: &PathBuf) -> Result<()> {
         let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
@@ -2122,7 +2190,9 @@ impl<
         self.finish()
     }
 
-    // Evaluate a relation provided as text.
+    /// Evaluate a relation, provided as a text relation via `T: Read + Seek`.
+    ///
+    /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
         let rel = RelationReader::new(rel)?;
 
@@ -2429,7 +2499,7 @@ impl<
 
     /// Terminate the evaluator.
     ///
-    /// This functions sends stop signals to all the registered svole functionalities.
+    /// This functions sends stop signals to all the registered sVOLE functionalities.
     pub fn terminate(&mut self) -> Result<()> {
         for e in self.multithreaded_voles.iter_mut() {
             info!("Sending stop signal");
