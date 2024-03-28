@@ -226,6 +226,12 @@ impl IsSubFieldOf<F128b> for F8b {
     }
 }
 
+impl F8b {
+    pub fn get_bit(&self, i: u8) -> u8 {
+        self.0 >> i & 1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::iter::zip;
