@@ -28,9 +28,14 @@ use crate::{
 use self::verifier_traverser::VerifierTraverser;
 
 mod prover_preparer;
+mod prover_preparer2;
 mod prover_traverser;
+mod prover_traverser2;
 mod transcript;
 mod verifier_traverser;
+
+pub use prover_preparer2::ProverPreparer2;
+pub use prover_traverser2::ProverTraverser2;
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]

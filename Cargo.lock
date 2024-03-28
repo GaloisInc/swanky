@@ -2156,6 +2156,7 @@ name = "schmivitz"
 version = "0.5.0"
 dependencies = [
  "blake3",
+ "diet-mac-and-cheese",
  "eyre",
  "mac-n-cheese-sieve-parser",
  "merlin",

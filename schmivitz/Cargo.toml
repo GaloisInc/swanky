@@ -23,6 +23,7 @@ version.workspace = true
 blake3.workspace = true
 eyre.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
+diet-mac-and-cheese.workspace = true
 merlin.workspace = true
 proptest.workspace = true
 rand.workspace = true
