@@ -39,6 +39,7 @@ pub struct SvoleAtomic<P: Party, V, T: Copy> {
 }
 
 impl<P: Party, V, T: Copy + Default> SvoleAtomic<P, V, T> {
+    /// Create a fresh `SvoleAtomic` with an uninitialized `delta` value.
     pub fn create() -> Self {
         Self {
             voles: Arc::new(Mutex::new(PartyEither::default())),
@@ -48,6 +49,11 @@ impl<P: Party, V, T: Copy + Default> SvoleAtomic<P, V, T> {
         }
     }
 
+    /// Set the `delta` for this `SvoleAtomic`.
+    ///
+    /// This should only be called by verifiers.
+    /// Dev note: Should we try to enforce this with an
+    /// `ev: WhichParty<P, Verifier>` parameter?
     pub fn set_delta(&mut self, delta: T) {
         *self.delta.lock().unwrap() = Some(delta);
     }
@@ -254,6 +260,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     }
 }
 
+/// (See the documentation for [`SvoleAtomic`] for additional detail.)
+///
+/// A synchronizing structure for `SvoleAtomic`s, that draws sVOLEs from
+/// atomic sVOLEs on threads in a round-robin fashion.
 pub struct SvoleAtomicRoundRobin<P: Party, V, T: Copy> {
     svoles: Vec<SvoleAtomic<P, V, T>>,
     current: Rc<RefCell<usize>>,
