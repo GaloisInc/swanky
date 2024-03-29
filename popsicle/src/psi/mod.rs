@@ -1,3 +1,4 @@
+pub mod circuit_psi;
 pub mod kmprt;
 pub mod psty;
 pub mod psty_payload;
