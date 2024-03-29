@@ -1,6 +1,15 @@
-//! This module contains types pertaining to the internal representation of the
-//! SIEVE Circuit IR.
+/*!
+In-memory representations of SIEVE IR resources.
 
+This module provides types for the expression of circuits in the SIEVE IR
+format. Typically, values of these types will be returned by one of the parsers
+in [`crate::sieveir_reader_fbs`] or [`crate::sieveir_reader_text`] - but they
+may be manually constructed when using DMC as a library / circuits are generated
+by other means.
+
+ **NOTE:** If you manually construct values, you're responsible for checking for
+validity (e.g. wires are SSA) as defined by the SIEVE IR specification!
+*/
 use crate::{
     fields::{extension_field_to_type_id, modulus_to_type_id, SieveIrDeserialize},
     plugins::{Plugin, PluginExecution, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
@@ -15,57 +24,115 @@ use std::{
 };
 use swanky_field::FiniteField;
 
-/// The wire index.
-pub type WireId = u64;
-/// A count of the number of wires.
-pub type WireCount = u64;
-/// The type index.
+/// A SIEVE IR wire identifier.
 ///
-/// This is a value `< 256` that is associated with a specific Circuit IR
-/// [`@type`](`TypeSpecification`).
+/// In a circuit, `WireId`s are scoped to a type. That is, for each [`TypeId`]
+/// defined in a circuit relation, the full range `0` to `u64::MAX` is available
+/// for `WireId` values.
+pub type WireId = u64;
+
+/// A count of the number of wires in a range.
+///
+/// **CAUTION!** Technically, it is possible in SIEVE IR to express circuits
+/// using the full range of wires in a single range. This means that this type
+/// is insufficient at the upper bound, since a range containing wires numbered
+/// `0` to `u64::MAX` contains `u64::MAX + 1` total wires. Since this is an
+/// unlikely edge case, we don't bother worrying about it for any real circuits.
+pub type WireCount = u64;
+
+/// A SIEVE IR type identifier.
+///
+/// SIEVE IR supports up to 256 type declarations in a single circuit.
 pub type TypeId = u8;
-/// An inclusive range of [`WireId`]s.
+
+/// An _inclusive_ range of [`WireId`]s.
 pub type WireRange = (WireId, WireId);
 
-/// The conversion gate representation. The first [`TypeId`]-[`WireRange`]
-/// pairing denotes the _output_ of the conversion, and the second pairing
-/// denotes the _input_ of the conversion.
+/// A SIEVE IR conversion gate.
+///
+/// The first [`TypeId`]-[`WireRange`] pairing denotes the _output_ of the
+/// conversion, and the second pairing denotes the _input_ to the conversion.
 pub type ConvGate = (TypeId, WireRange, TypeId, WireRange);
-/// The call gate representation. The [`FunId`] denotes a unique id associated with a function,
-/// the first [`Vec`] denotes the _output_ wires, and the second [`Vec`] denotes the
+
+/// A SIEVE IR call gate.
+///
+/// The [`FunId`] denotes a unique ID associated with a function name by a
+/// [`FunStore`] - use [`FunStore::name_to_fun_id`] to get the ID associated
+/// with a particular function name.
+///
+/// The first [`Vec`] denotes the _output_ wires, and the second [`Vec`] denotes the
 /// _input_ wires.
 pub type CallGate = (FunId, Vec<WireRange>, Vec<WireRange>);
 
-/// The internal circuit representation gate types.
+/// A 'core' SIEVE IR gate.
 ///
 /// Most gates take a [`TypeId`] as their first argument, which denotes the
-/// Circuit IR type associated with the given gate. In addition, the [`WireId`]
-/// ordering for gates is generally: `<out> <in> ...`; that is, the first
-/// [`WireId`] denotes the _output_ of the gate.
-// This enum should fit in 32 bytes.
-// Using `Box<Number>` for this reason.
+/// evaluation context for the gate. In addition, the [`WireId`] ordering for
+/// gates is generally: `<out> <in> ...`; that is, the first [`WireId`] denotes
+/// denotes the _output_ of the gate.
+///
+/// When constructing sequences of `GateM` for evaluation, take care to follow
+/// the validity requirements as defined by SIEVE IR. Most importantly:
+///
+/// - Circuits are topologically ordered; wires must be defined before use in
+///   a given scope
+/// - Wires may only be assigned exactly once (SSA)
+/// - Ranges of wires must be part of the same allocation for use as inputs and
+///   outputs (and naturally, ranges must be of the right/expected size)
+/// - Delete gates may not 'split' an allocation into smaller pieces
+///
+/// **NOTE:** To optimize cache performance, we require that `GateM` values fit
+/// in 32 bytes or fewer; we use [`Box`] strategically to achieve this storage
+/// property.
 #[derive(Clone, Debug)]
 pub enum GateM {
-    /// Store the given element in [`WireId`].
+    /// Write the value to the given `WireId`.
     Constant(TypeId, WireId, Box<Number>),
-    /// Assert that the element in [`WireId`] is zero.
+
+    /// Assert that the element on [`WireId`] is zero.
     AssertZero(TypeId, WireId),
+
+    /// Copy ranges of wires.
     Copy(TypeId, WireRange, Box<Vec<WireRange>>),
-    /// Adds the elements in the latter two [`WireId`]s together, storing the
-    /// result in the first [`WireId`].
+
+    /// Add the values on two `WireId`, storing the result.
     Add(TypeId, WireId, WireId, WireId),
+
+    /// Subtract the values on two `WireId`, storing the result.
     Sub(TypeId, WireId, WireId, WireId),
+
+    /// Multiply the values on two `WireId`, storing the result.
     Mul(TypeId, WireId, WireId, WireId),
+
+    /// Add a constant to the value on a `WireId`, storing the result.
     AddConstant(TypeId, WireId, WireId, Box<Number>),
+
+    /// Multiply the value on a `WireId` by a constant, storing the result.
     MulConstant(TypeId, WireId, WireId, Box<Number>),
+
+    /// Get public instances from the scope's queue, storing to the `WireRange`.
     Instance(TypeId, WireRange),
+
+    /// Get private witnesses from the scope's queue, storing to the
+    /// `WireRange`.
     Witness(TypeId, WireRange),
-    /// Does field conversion.
+
+    /// Convert values in one field to values in another.
     Conv(Box<ConvGate>),
+
+    /// Allocate a new, uninitialized range of wires.
     New(TypeId, WireId, WireId),
+
+    /// Delete/free a range of wires.
     Delete(TypeId, WireId, WireId),
+
+    /// Call a function.
     Call(Box<CallGate>),
+
+    /// Get a random challenge value, storing the result.
     Challenge(TypeId, WireId),
+
+    /// An informational comment.
     Comment(String),
 }
 
@@ -127,33 +194,40 @@ impl GateM {
     }
 }
 
-/// Specification for Circuit IR types.
+/// A SIEVE IR type specification.
 ///
-/// This corresponds to the `@type` specifier. A type can either be a `Field` or
-/// a `Plugin`.
+/// This corresponds to the `@type` specifier in concrete SIEVE IR syntax.
+/// DMC currently supports field types and a limited set of types defined by
+/// plugins.
 #[derive(Clone, Debug)]
 pub enum TypeSpecification {
-    /// A field, stored as a [`TypeId`](std::any::TypeId).
+    /// A field, given as a [`TypeId`](std::any::TypeId).
+    ///
+    /// Consider using [`crate::modulus_to_type_id`] to construct these values.
     Field(std::any::TypeId),
-    /// A plugin type.
+
+    /// A plugin-defined type.
+    ///
+    /// DMC currently only supports RAM types as defined in the RAM plugin
+    /// specification for `TypeSpecification::Plugin`.
     Plugin(PluginType),
 }
 
-/// A mapping from [`TypeId`]s to their [`TypeSpecification`]s.
+/// A SIEVE IR type environment.
 ///
-/// This mapping contains all the types used in the circuit, accessible by their
-/// [`TypeId`].
+/// This contains all the types used in the circuit, accessible by their
+/// SIEVE IR [`TypeId`].
 #[derive(Clone, Default)]
 pub struct TypeStore(BTreeMap<TypeId, TypeSpecification>);
 
 impl TypeStore {
     /// Insert a [`TypeId`]-[`TypeSpecification`] pair into the [`TypeStore`].
-    pub(crate) fn insert(&mut self, key: TypeId, value: TypeSpecification) {
+    pub fn insert(&mut self, key: TypeId, value: TypeSpecification) {
         self.0.insert(key, value);
     }
 
-    /// Get the [`TypeSpecification`] associated with the given [`TypeId`].
-    pub(crate) fn get(&self, key: &TypeId) -> Result<&TypeSpecification> {
+    /// Get the [`TypeSpecification`] associated with a [`TypeId`].
+    pub fn get(&self, key: &TypeId) -> Result<&TypeSpecification> {
         self.0
             .get(key)
             .ok_or_else(|| eyre!("Type ID {key} not found in `TypeStore`"))
@@ -633,7 +707,7 @@ pub struct FunStore(
     // The internal representation maintains two mappings, one from names to `FunId` using a `BTreeMap`,
     // and another one associating a [`FunId`] to the [`FuncDecl`] using a vector indexed by [`FunId`].
     BTreeMap<String, FunId>,
-    Vec<(String, FuncDecl)>,
+    Vec<FuncDecl>,
 );
 
 impl FunStore {
@@ -651,7 +725,7 @@ impl FunStore {
             .try_into()
             .expect("Function store length greater than 2^32 - 1");
         self.0.insert(name.clone(), fun_id);
-        self.1.push((name, func));
+        self.1.push(func);
         Ok(fun_id)
     }
 
@@ -662,7 +736,7 @@ impl FunStore {
             "Missing function id {} in func store",
             fun_id
         );
-        Ok(&self.1[fun_id as usize].1)
+        Ok(&self.1[fun_id as usize])
     }
 
     /// Get function associated with a given name.
@@ -677,16 +751,6 @@ impl FunStore {
             .get(name)
             .copied()
             .ok_or_else(|| eyre!("Missing function {name}"))
-    }
-
-    /// Get the name associated with a `FunId`.
-    pub fn id_to_name(&self, fun_id: FunId) -> Result<&String> {
-        ensure!(
-            (fun_id as usize) < self.1.len(),
-            "No function name asociated to function id {}",
-            fun_id
-        );
-        Ok(&self.1[fun_id as usize].0)
     }
 }
 
@@ -763,7 +827,7 @@ impl<'a, F: FiniteField + SieveIrDeserialize> Iterator for TapeF<'a, F> {
     }
 }
 
-/// Contains an instance tape and a witness tape.
+/// A [`TapeT`] of instances (and a [`TapeT`] of witnesses) for a single field.
 pub struct FieldInputs {
     ins: Box<dyn TapeT>,
     wit: Box<dyn TapeT>,
@@ -801,7 +865,10 @@ impl FieldInputs {
     }
 }
 
-/// Inputs associated with a circuit.
+/// Public instance and private witness inputs to a circuit.
+///
+/// Effectively, this is a mapping from [`TypeId`] to [`FieldInputs`] to managed
+/// these values in circuits utilizing more than one field type.
 #[derive(Default)]
 pub struct CircInputs {
     field: Vec<FieldInputs>,
@@ -809,6 +876,11 @@ pub struct CircInputs {
 
 // TODO: reconsider the interface for this: we could use .get()
 impl CircInputs {
+    /// Get the [`FieldInputs`] associated with a [`TypeId`].
+    ///
+    /// **CAUTION!** `TypeId`s should be assigned to type declarations in order
+    /// and starting from 0. This interface **does not** enforce this, and will
+    /// happily grow the internal representation to support larger `TypeId`s!
     #[inline]
     pub fn get(&mut self, type_id: usize) -> &mut FieldInputs {
         self.adjust_type_idx(type_id);
@@ -822,50 +894,58 @@ impl CircInputs {
         }
     }
 
-    /// Set instances from a dynamic tape implementing [`TapeT`].
+    /// Set the instances for a [`TypeId`] from a concrete [`TapeT`].
+    ///
+    /// **CAUTION!** See the note on [`Self::get`].
     pub fn set_instances(&mut self, type_id: usize, instances: Box<dyn TapeT>) {
         self.adjust_type_idx(type_id);
         self.field[type_id].ins = instances;
     }
 
-    /// Set witnesses from a dynamic tape implementing [`TapeT`].
+    /// Set the witnesses for a [`TypeId`] from a concrete [`TapeT`].
+    ///
+    /// *CAUTION!** See the note on [`Self::get`].
     pub fn set_witnesses(&mut self, type_id: usize, witnesses: Box<dyn TapeT>) {
         self.adjust_type_idx(type_id);
         self.field[type_id].wit = witnesses;
     }
 
-    /// Ingest instance.
+    /// Ingest an instance into a [`TypeId`]'s instance queue.
     pub fn ingest_instance(&mut self, type_id: usize, instance: Number) {
         self.get(type_id).ins().ingest(instance);
     }
 
-    /// Ingest witness.
+    /// Ingest a witness into a [`TypeId`]'s witness queue.
     pub fn ingest_witness(&mut self, type_id: usize, witness: Number) {
         self.get(type_id).wit().ingest(witness);
     }
 
-    /// Ingest instances.
+    /// Ingest instances into a [`TypeId`]'s instance queue.
     pub fn ingest_instances(&mut self, type_id: usize, instances: VecDeque<Number>) {
         self.get(type_id).ins().ingest_many(instances);
     }
 
-    /// Ingest witnesses.
+    /// Ingest witnesses into a [`TypeId`]'s witness queue.
     pub fn ingest_witnesses(&mut self, type_id: usize, witnesses: VecDeque<Number>) {
         self.get(type_id).wit().ingest_many(witnesses);
     }
 
+    /// Pop a single instance from a [`TypeId`]'s instance queue.
     pub fn pop_instance(&mut self, type_id: usize) -> Option<Number> {
         self.get(type_id).ins().pop()
     }
 
+    /// Pop a given number of instances from a [`TypeId`]'s instance queue.
     pub fn pop_instances(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
         self.get(type_id).ins().pop_many(num)
     }
 
+    /// Pop a single witness from a [`TypeId`]'s witness queue.
     pub fn pop_witness(&mut self, type_id: usize) -> Option<Number> {
         self.get(type_id).wit().pop()
     }
 
+    /// Pop a given number of witnesses from a [`TypeId`]'s witness queue.
     pub fn pop_witnesses(&mut self, type_id: usize, num: u64) -> Option<Vec<Number>> {
         self.get(type_id).wit().pop_many(num)
     }

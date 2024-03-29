@@ -1,5 +1,12 @@
-//! SIEVE IR reader in text format.
+/*!
+Tools to read SIEVE IR from text files.
 
+This module provides types to work with circuit inputs (public instances and
+private witnesses) and relations given in the SIEVE IR text format.
+
+DMC does _not_ stream text circuits in the same way as flatbuffers, so beware
+of the extra memory cost from storing the 'main' relation gates!
+*/
 use crate::circuit_ir::TapeT;
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
 use eyre::{bail, Result};
@@ -15,12 +22,17 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
 
+/// SIEVE IR inputs (public instances or private witnesses) from text.
+///
+/// Together with [`TextRelation`], provides an interface to SIEVE IR circuits
+/// expressed as text.
 pub struct InputText {
     reader: ValueStreamReader<File>,
     queue: VecDeque<Number>,
 }
 
 impl InputText {
+    /// Create an `InputText` for private witness inputs.
     pub fn new_private_inputs(path: &Path) -> Result<Self> {
         let reader = ValueStreamReader::open(ValueStreamKind::Private, path)?;
 
@@ -32,6 +44,7 @@ impl InputText {
         Ok(private_inputs)
     }
 
+    /// Create an `InputText` for public instance inputs.
     pub fn new_public_inputs(path: &Path) -> Result<Self> {
         let reader = ValueStreamReader::open(ValueStreamKind::Public, path)?;
 
@@ -58,7 +71,7 @@ impl InputText {
         }
     }
 
-    /// Load more instances or witnesses in the internal queue
+    /// Load more instances or witnesses into the internal queue
     fn load_more_in_queue(&mut self) -> Result<Option<()>> {
         for i in 0..(1 << 16) {
             if let Some(v) = self.reader.next()? {
@@ -90,15 +103,33 @@ impl TapeT for InputText {
     }
 }
 
+/// A SIEVE IR text relation.
+///
+/// This is analogous in its use to [`crate::sieveir_reader_fbs::BufRelation`],
+/// but does not provide the same streaming/buffered benefits.
 #[derive(Default)]
-pub(crate) struct TextRelation {
-    pub(crate) type_store: TypeStore,
-    pub(crate) fun_store: FunStore,
-    pub(crate) gates: Vec<GateM>,
+pub struct TextRelation {
+    /// The [`TypeStore`] for this relation.
+    ///
+    /// In most cases, `TypeStore::try_from` should be used in conjunction with
+    /// a `RelationReader` from the generic Mac'n'Cheese SIEVE parser (another
+    /// Swanky crate) to compute this field.
+    pub type_store: TypeStore,
+
+    /// The [`FunStore`] for this relation, which like `type_store`, will in
+    /// most cases come from the `RelationReader` used to parse the text.
+    pub fun_store: FunStore,
+
+    /// The gates to be evaluated. Note this is _all_ of the relation's gates!
+    pub gates: Vec<GateM>,
 }
 
 impl TextRelation {
-    pub(crate) fn new(type_store: TypeStore, fun_store: FunStore) -> Self {
+    /// Create a new `TextRelation` given a [`TypeStore`] and [`FunStore`].
+    ///
+    /// The implementations of [`FunctionBodyVisitor`] and [`RelationVisitor`]
+    /// populate `gates` when `read` is called on the `TextRelation`.
+    pub fn new(type_store: TypeStore, fun_store: FunStore) -> Self {
         Self {
             type_store,
             fun_store,

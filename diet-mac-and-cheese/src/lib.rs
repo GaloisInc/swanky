@@ -1,23 +1,29 @@
+#![deny(missing_docs)]
 /*!
+A 'diet' implementation of the Mac'n'Cheese interactive ZKP protocol.
 
-`diet_mac_and_cheese` provides a diet/light implementation of the Mac'n'Cheese protocol.
+Diet Mac'n'Cheese (DMC) can be used a both an application and a library. See the
+`README` (and CLI help text) for information regarding the configuration and
+running of the prover and verifier applications.
 
-The library provides structures to operate a prover `DietMacAndCheeseProver` or a verifier `DietMacAndCheeseVerifier`
-with an interface to initialize and execute the protocol at a gate-by-gate level.
-Gates operates on input values that can be either public or private.
-When a gate takes on public values it produces a public value, and when a gate is provided private values
-then it produces a private value.
-Public and private values are ingested using the pair of functions `input_public()`/`input_private()`
-and they return public/private values whose type is exposed to to the user as `ValueProver` and `ValueVerifier`.
+At a high level, DMC provides the following:
 
-The `DietMacAndCheeseProver`/`DietMacAndCheeseVerfier` are almost identical at a high-level and differ
-solely on the `input_private()` function. Also the API satisfies the following invariant:
-if any function call returns an error then any subsequent gate function call
-will directly return an error.
-*/
+- In-memory representations of SIEVE IR (the circuit format) resources
+- A frontend to parse SIEVE IR from flatbuffers
+- A frontend to parse SIEVE IR from text
+- Party-generic and multithreaded implementations of sVOLE
+- A party-generic circuit evaluation interface
+
+There is an example of using DMC as a library in the crate's `examples`
+directory; this shows off everything but the SIEVE IR parsers. Additional detail
+can be found in the module documentation for each component.
+ */
+
 mod backend_multifield;
 pub use backend_multifield::EvaluatorCirc;
 pub mod circuit_ir;
+mod fields;
+pub use fields::modulus_to_type_id;
 pub mod sieveir_reader_fbs;
 pub mod sieveir_reader_text;
 pub mod svole_thread;
@@ -29,7 +35,6 @@ mod backend_extfield;
 mod backend_trait;
 mod dora;
 mod edabits;
-mod fields;
 mod gadgets;
 mod homcom;
 mod mac;
@@ -46,17 +51,19 @@ use ocelot::svole::{
 use serde::Deserialize;
 use std::fmt::Display;
 
-/// Size of LPN parameters
+/// The size of LPN parameters to use for sVOLE.
 ///
-/// This parameter is available to the user to indicate, at a high-level, the size of the LPN parameters
-/// without specifiying exactly their values.
-/// It has three possible values small, medium and large.
+/// At a high-level, these parameters describe the number of values to generate
+/// during the setup and extend phases of the sVOLE protocol.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LpnSize {
+    /// Small LPN parameter set
     Small,
+    /// Medium LPN parameter set
     #[default]
     Medium,
+    /// Large LPN parameter set
     Large,
 }
 

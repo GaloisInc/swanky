@@ -1,5 +1,3 @@
-//! Diet Mac'n'Cheese backends supporting SIEVE IR0+ with multiple fields.
-
 use crate::backend_extfield::DietMacAndCheeseExtField;
 use crate::circuit_ir::ConvGate;
 use crate::circuit_ir::{
@@ -1299,7 +1297,29 @@ where
 
 // V) Evaluator for multiple fields
 
-/// Evaluator for Circuit IR (previously known as SIEVE IR0+)
+/// A SIEVE IR circuit evaluator.
+///
+/// `EvaluatorCirc` provides everything needed to execute a zero-knowledge
+/// proof described by SIEVE IR, provided either on disk via text or flatbuffers
+/// or as in-memory resources as defined by [`crate::circuit_ir`]. A plaintext
+/// evaluation mode (with limited functionality) is available.
+///
+/// A full example of using `EvaluatorCirc` as a library can be found in the
+/// crate's `examples` directory. Briefly, the process is:
+///
+/// 1. Create an `EvaluatorCirc` (using the appropriate `new_*` method for your
+///    situation)
+/// 2. Call the corresponding `load_backends_*` method
+/// 3. Evaluate a relation
+///    - The [`crate::sieveir_reader_fbs`] and [`crate::sieveir_reader_text`]
+///      modules can read SIEVE IR resources from disk (to provide the types,
+///      function definitions, and gates)
+///    - The module [`crate::circuit_ir`] can otherwise be used to construct
+///      SIEVE IR resources. **Caution!** `EvaluatorCirc` expects all resources
+///      to be syntactically valid and resource valid as defined by the SIEVE IR
+///      specification. It is an unchecked runtime error to invoke
+///      `EvaluatorCirc` methods on invalid SIEVE IR resources
+/// 4. Call [`Self::terminate`] to stop and reset  any sVOLE functionality
 pub struct EvaluatorCirc<
     P: Party,
     // See use of phantom for details on `C`
@@ -1336,6 +1356,21 @@ impl<
         SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static,
     > EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
 {
+    /// Initialize a new (single-threaded) `EvaluatorCirc`.
+    ///
+    /// This requires an [`AbstractChannel`] and an [`AesRng`] to initialize the
+    /// homomorphic commitment scheme for [`F2`] and its extension field
+    /// [`F40b`]. This is suboptimal; ideally, these protocols would only start
+    /// in circuits where they are strictly required (i.e., Boolean circuits or
+    /// circuits where field conversion is used).
+    ///
+    /// The [`CircInputs`] paramater are instance and witness values as defined
+    /// by the SIEVE IR; the [`TypeStore`] is the type environment as defined by
+    /// the relation's header. The [`LpnSize`] configures the sVOLE protocol,
+    /// and `no_batching`, if `true`, disables conversion check batching.
+    ///
+    /// For plaintext evaluation, see [`Self::new_plaintext`]. For multithreaded
+    /// evaluation, see [`Self::new_multithreaded`].
     pub fn new(
         channel: &mut C,
         mut rng: AesRng,
@@ -1375,6 +1410,15 @@ impl<
         })
     }
 
+    /// Initialize a new (plaintext) `EvaluatorCirc`.
+    ///
+    /// An alternative constructor, specifically curated for plaintext SIEVE IR
+    /// evaluation (in particular: sVOLE initialization and instance/witness
+    /// values are not required).
+    ///
+    /// For single-threaded zero-knowledge evaluation, use [`Self::new`]. For
+    /// multithreaded zero-knowledge evaluation, use
+    /// [`Self::new_multithreaded`].
     pub fn new_plaintext(inputs: CircInputs, type_store: TypeStore) -> Result<Self> {
         Ok(EvaluatorCirc {
             inputs,
@@ -1390,10 +1434,15 @@ impl<
         })
     }
 
-    /// Create a new multithreaded evaluator.
+    /// Initialize a new (multithreaded) `EvaluatorCirc`.
     ///
-    /// It initializes the F2 voles in separate threads as well as
-    /// the corresponding lifted F40b full field voles.
+    /// sVOLE tends to be where most time is spent during evaluation. To improve
+    /// performance, `new_multithreaded` is provided as an alternative to
+    /// [`Self::new`], the primary difference being that the F2 and F40b VOLEs
+    /// are handled on (potentially many) separate threads.
+    ///
+    /// The returned `JoinHandle`s should, after [`Self::terminate`] is
+    /// called, be `join`ed.
     pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         channels_vole: &mut I,
         threads_per_field: usize,
@@ -1479,6 +1528,17 @@ impl<
         ))
     }
 
+    /// Load the necessary backends for a (single-threaded) `EvaluatorCirc`.
+    ///
+    /// Using the `EvaluatorCirc`'s [`TypeStore`], prepare an appropriate set of
+    /// backend evaluators to handle incoming relations. In most cases,
+    /// `lpn_size` should be the same as what was passed to [`Self::new`].
+    ///
+    /// This method should be preferred over [`Self::load_backend`], which
+    /// requires explicit use of [`std::any::TypeId`].
+    ///
+    /// For plaintext evaluation, use [`Self::load_backends_plaintext`]. For
+    /// multithreaded evaluation, use [`Self::load_backends_multithreaded`].
     pub fn load_backends(&mut self, channel: &mut C, lpn_size: LpnSize) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
@@ -1659,6 +1719,19 @@ impl<
         Ok(())
     }
 
+    /// Load a backend for a (single-threaded) `EvaluatorCirc`.
+    ///
+    /// **CAUTION!** This method should be used with care, as it requires the
+    /// use of [`std::any::TypeId`] to associate SIEVE IR type IDs with Rust
+    /// types. If possible, [`Self::load_backends`] should be preferred over
+    /// this method. If you must use this method, consider using
+    /// [`crate::modulus_to_type_id`].
+    ///
+    /// For `EvaluatorCirc` created with [`Self::new_plaintext`], see
+    /// [`Self::load_backend_plaintext`].
+    ///
+    /// DMC does not currently support client loading of individual backends
+    /// when multithreading - use [`Self::load_backends_multithreaded`] instead.
     pub fn load_backend(
         &mut self,
         channel: &mut C,
@@ -1724,6 +1797,14 @@ impl<
         }
     }
 
+    /// Load the necessary backends for a (plaintext) `EvaluatorCirc`.
+    ///
+    /// Analogous to [`Self::load_backends`] for `EvaluatorCirc`s that have been
+    /// created with [`Self::new_plaintext`].
+    ///
+    /// For single-threaded zero-knowledge loading, use [`Self::load_backends`].
+    /// For multithreaded zero-knowedge loading, use
+    /// [`Self::load_backends_multithreaded`].
     pub fn load_backends_plaintext(&mut self) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
@@ -1752,6 +1833,12 @@ impl<
         Ok(())
     }
 
+    /// Load a backend for a (plaintext) `EvaluatorCirc`.
+    ///
+    /// Analogous to [`Self::load_backend`] for `EvaluatorCirc`s that have been
+    /// created with [`Self::new_plaintext`].
+    ///
+    /// For `EvaluatorCirc` created with [`Self::new`], see [`Self::load_backend`].
     pub fn load_backend_plaintext(&mut self, field: std::any::TypeId, idx: usize) -> Result<()> {
         // Loading the backends in order
         let back: Box<dyn EvaluatorT<P>>;
@@ -1981,7 +2068,14 @@ impl<
         }
     }
 
-    /// Load several backends with different fields by going over its internal type store.
+    /// Load the necessary backends for a (multithreaded) `EvaluatorCirc`.
+    ///
+    /// Analogous to [`Self::load_backends`] for `EvaluatorCirc`s that have been
+    /// created with [`Self::new_multithreaded`].
+    ///
+    /// For single-threaded zero-knowledge loading, use [`Self::load_backends`].
+    /// For single-threaded plaintext loading, use
+    ///[`Self::load_backends_plaintext`].
     pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
         &mut self,
         channel: &mut C,
@@ -2023,6 +2117,14 @@ impl<
         Ok(handles)
     }
 
+    /// Finalize all evaluation backends loaded by this `EvaluatorCirc`.
+    ///
+    /// This method only needs to be called if using
+    /// [`Self::evaluate_gates_with_inputs`]; other evaluation methods take care
+    /// of finalization.
+    ///
+    /// **CAUTION!** `finish` is different than [`Self::terminate`], which must
+    /// be called to cleanly reset the `EvaluatorCirc`'s sVOLE functionalities!
     pub fn finish(&mut self) -> Result<()> {
         for i in 0..self.eval.len() {
             self.eval[i].finalize()?;
@@ -2030,6 +2132,12 @@ impl<
         Ok(())
     }
 
+    /// Evaluate a relation, given as a slice of [`GateM`].
+    ///
+    /// This method assumes that the `EvaluatorCirc` has been created with
+    /// a `TypeStore`, `FunStore`, and `CircInputs`  consistent with the gates.
+    ///
+    /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_gates(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
         self.evaluate_gates_passed(gates, fun_store)?;
         self.finish()
@@ -2042,7 +2150,14 @@ impl<
         Ok(())
     }
 
-    // This is an almost copy of `eval_gate` for Cybernetica
+    /// Evaluate a relation, given as a slice of [`GateM`].
+    ///
+    /// This is almost the same as `evaluate_gates`, except it uses `CircInputs`
+    /// provided by the caller rather than that owned by the `EvaluatorCirc` (to
+    /// allow for dynamic updates).
+    ///
+    /// **CAUTION!* Does **not** call [`Self::finish`]! Make sure to do so, else
+    /// the protocols will continue waiting to execute additional steps.
     pub fn evaluate_gates_with_inputs(
         &mut self,
         gates: &[GateM],
@@ -2055,7 +2170,9 @@ impl<
         Ok(())
     }
 
-    /// Evaluate a relation provided as a path.
+    /// Evaluate a relation,  given as a path to a SIEVE IR flatbuffer file.
+    ///
+    /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_relation(&mut self, path: &PathBuf) -> Result<()> {
         let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
@@ -2073,7 +2190,9 @@ impl<
         self.finish()
     }
 
-    // Evaluate a relation provided as text.
+    /// Evaluate a relation, provided as a text relation via `T: Read + Seek`.
+    ///
+    /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
         let rel = RelationReader::new(rel)?;
 
@@ -2380,7 +2499,7 @@ impl<
 
     /// Terminate the evaluator.
     ///
-    /// This functions sends stop signals to all the registered svole functionalities.
+    /// This functions sends stop signals to all the registered sVOLE functionalities.
     pub fn terminate(&mut self) -> Result<()> {
         for e in self.multithreaded_voles.iter_mut() {
             info!("Sending stop signal");

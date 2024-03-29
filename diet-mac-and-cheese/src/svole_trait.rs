@@ -72,6 +72,11 @@ pub(crate) fn field_name<F: FiniteField>() -> &'static str {
     type_name::<F>().split("::").last().unwrap()
 }
 
+/// A single-threaded, party-generic sVOLE functionality.
+///
+/// See [`crate::svole_thread::SvoleAtomic`] and
+/// [`crate::svole_thread::SvoleAtomicRoundRobin`] for multithreading-ready
+/// alternatives.
 pub struct Svole<P: Party, V, T: FiniteField>(
     PartyEither<P, RcRefCell<Sender<T>>, RcRefCell<Receiver<T>>>,
     PhantomData<V>,
