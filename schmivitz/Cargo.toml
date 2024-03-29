@@ -22,6 +22,8 @@ version.workspace = true
 [dependencies]
 blake3.workspace = true
 eyre.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 diet-mac-and-cheese.workspace = true
 merlin.workspace = true

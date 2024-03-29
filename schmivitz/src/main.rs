@@ -1,28 +1,13 @@
+use schmivitz::circuit::run_prover;
+use schmivitz::convert_to_vole::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec, sign, verify};
+use schmivitz::parameters::REPETITION_PARAM;
 use std::env;
 use std::path::PathBuf;
-
-use diet_mac_and_cheese::sieveir_reader_fbs::{read_types, InputFlatbuffers};
-use eyre::{bail, Result};
-use schmivitz::circuit::{run_prover, RelationStreamer};
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
-
-use rand::{thread_rng, Rng, RngCore};
-use schmivitz::all_but_one_vc::IV;
-use schmivitz::all_but_one_vc::{commit, open, Seed};
-use schmivitz::convert_to_vole::{
-    bitwise_f128b_from_f8b, bools_to_u8, chal_dec, sign, verify, vole_commit, vole_open,
-    vole_recompose_q, vole_reconstruct, Chall3,
-};
-use schmivitz::parameters::REPETITION_PARAM;
-use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::F2;
+use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F8b};
-use swanky_serialization::CanonicalSerialize;
-
-use schmivitz::proof::ProverPreparer2;
 
 fn test1() {
-    let how_many = 1_000_000;
+    let how_many = 10_000_000;
     let t = std::time::Instant::now();
     let sk = vec![1u8];
     let pk = vec![1u8];
@@ -87,6 +72,13 @@ fn grit() {
 }
 
 fn main() {
+    // if log-level `RUST_LOG` not already set, then set to info
+    match env::var("RUST_LOG") {
+        Ok(val) => println!("loglvl: {}", val),
+        Err(_) => env::set_var("RUST_LOG", "info"),
+    };
+
+    pretty_env_logger::init_timed();
     //grit()
     test1();
 }

@@ -15,6 +15,8 @@ use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
+use std::sync::mpsc::channel;
+use std::thread;
 
 pub(crate) struct PRG {
     aes0: Aes128EncryptOnly,
@@ -156,6 +158,7 @@ fn h3(inp: &[u8]) -> H3 {
     out
 }
 
+#[inline(never)]
 fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
     assert!(seeds.len() == 256);
     let mut u_res = vec![F2::ZERO; l];
@@ -216,6 +219,7 @@ fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<
 pub type Corrections = Vec<Vec<F2>>;
 
 /// Figure 5.4
+#[inline(never)]
 pub fn vole_commit(
     r: IV,
     iv: IV,
@@ -226,14 +230,48 @@ pub fn vole_commit(
     let mut v = Vec::with_capacity(REPETITION_PARAM);
     let mut decom = Vec::with_capacity(REPETITION_PARAM);
     let mut com = Vec::with_capacity(REPETITION_PARAM);
+
+    /* // Without multithreading
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
         let (u_i, v_i) = convert_to_vole_prover(&seeds, iv, l);
+        let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
+        com.push(com_i);
+        decom.push(decom_i);
+        u.push(u_i);
+    }
+    */
+
+    // With multithreading
+    let mut txs = Vec::with_capacity(REPETITION_PARAM);
+    let mut rxs = Vec::with_capacity(REPETITION_PARAM);
+    for _ in 0..REPETITION_PARAM {
+        let (tx, rx) = channel();
+        txs.push(tx);
+        rxs.push(rx);
+    }
+    let mut handles = Vec::new();
+
+    for i in 0..REPETITION_PARAM {
+        let tx = txs[i].clone();
+        let prg_seeds_i = prg_seeds[i];
+        let handle = thread::spawn(move || {
+            let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
+            let (u_i, v_i) = convert_to_vole_prover(&seeds, iv, l);
+
+            tx.send((com_i, decom_i, u_i, v_i));
+        });
+        handles.push(handle);
+    }
+
+    for i in 0..REPETITION_PARAM {
+        let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
         com.push(com_i);
         decom.push(decom_i);
         u.push(u_i);
         v.push(v_i);
     }
+    // End multithreading
 
     // let's compute the corrections
     let u_0 = u[0].clone(); // TODO: opt transmute here
@@ -283,6 +321,7 @@ pub fn chal_dec(buf: &[u8], i: usize) -> Vec<bool> {
 }
 
 /// Figure 5.5 in FAEST spec v1.1
+#[inline(never)]
 pub fn vole_reconstruct(
     chal: &[u8], // bytes from fiat-shamir challenge
     pdecom: Vec<Pdecom>,
@@ -293,6 +332,17 @@ pub fn vole_reconstruct(
     assert_eq!(chal.len(), REPETITION_PARAM);
     let mut qs = Vec::with_capacity(REPETITION_PARAM);
     let mut com = Vec::with_capacity(REPETITION_PARAM);
+
+    // With multithreading
+    let mut txs = Vec::with_capacity(REPETITION_PARAM);
+    let mut rxs = Vec::with_capacity(REPETITION_PARAM);
+    for _ in 0..REPETITION_PARAM {
+        let (tx, rx) = channel();
+        txs.push(tx);
+        rxs.push(rx);
+    }
+    let mut handles = Vec::new();
+
     for i in 0..REPETITION_PARAM {
         let delta = chal_dec(&chal, i);
         let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
@@ -310,11 +360,19 @@ pub fn vole_reconstruct(
             }
         }
 
-        let q_i = convert_to_vole_verifier(&seeds_shifted, iv, l, bools_to_u8(&delta));
+        let tx = txs[i].clone();
+        let handle = thread::spawn(move || {
+            let q_i = convert_to_vole_verifier(&seeds_shifted, iv, l, bools_to_u8(&delta));
+            tx.send(q_i).unwrap();
+        });
+        handles.push(handle);
 
-        //let tmp: [F8b; 16];
-        //tmp.copy_from_slice(&q_i);
-        //qs.push(F8b::form_superfield(&tmp.into()));
+        // without multithreading
+        // qs.push(q_i);
+    }
+
+    for i in 0..REPETITION_PARAM {
+        let q_i = rxs[i].recv().unwrap();
         qs.push(q_i);
     }
 
@@ -334,6 +392,7 @@ pub fn bitwise_f128b_from_f8b(v: &[F8b; REPETITION_PARAM]) -> F128b {
 }
 
 /// Lines 7-14 of Figure 8.3
+#[inline(never)]
 pub fn vole_recompose_q(
     q: Vec<Vec<F8b>>,
     chall3: &Chall3,
@@ -376,6 +435,7 @@ pub fn vole_recompose_q(
     q_128b
 }
 
+#[inline(never)]
 fn recompose_d(chall3: &Chall3, u_tilda: &[F2]) -> Vec<F2> {
     assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
     let how_many = u_tilda.len();
@@ -498,6 +558,7 @@ fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128
     out
 }
 
+#[inline(never)]
 fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     seed: &[u8],
     x0: I1,
@@ -643,7 +704,7 @@ fn vec_f128b_to_f2(v: &[F128b]) -> Vec<F2> {
     let mut out: Vec<F2> = vec![];
     let len = v.len();
 
-    for j in 0..128 {
+    for j in 0..SECURITY_PARAM {
         for k in 0..len {
             // TODO: that's super inefficient
             let bools: Vec<_> = v[k]
@@ -664,6 +725,7 @@ type U_HASH = Vec<F2>;
 type Signature = (Corrections, U_HASH, Vec<Pdecom>, Chall3, IV);
 
 /// Adaptation of FAEST Sign function adapted from Fig. 8.2
+#[inline(never)]
 pub fn sign(
     sk: Vec<u8>,
     pk: Vec<u8>,
@@ -682,7 +744,9 @@ pub fn sign(
     let (r, iv) = compute_r_iv(&sk, &mu, &rho);
 
     // lines 4-5
+    let t = std::time::Instant::now();
     let (h, decom, corr, u, v) = vole_commit(r, iv, l_hat(l));
+    log::info!("vole_commit running time: {:?}", t.elapsed());
 
     // lines 6
     let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
@@ -690,16 +754,19 @@ pub fn sign(
     // line 7-8
 
     println!("P chall1:{:?}", chall1);
+    let t = std::time::Instant::now();
     let u_tilda = simply_vole_hash(
         &chall1,
-        u[0..l + SECURITY_PARAM].into_iter().map(|b| *b),
+        u[0..l + SECURITY_PARAM].iter().map(|b| *b),
         l + SECURITY_PARAM,
         u[l + SECURITY_PARAM..l + 2 * SECURITY_PARAM + B]
-            .into_iter()
+            .iter()
             .map(|b| *b),
         SECURITY_PARAM + B,
     );
+    log::info!("simply_vole_hash(u) running time: {:?}", t.elapsed());
 
+    let t = std::time::Instant::now();
     let mut v_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
     let v_bits: Vec<F2> = decompose_bits(&v).into_iter().collect();
     assert_eq!(v_bits.len(), (l_hat(l) * SECURITY_PARAM));
@@ -716,6 +783,7 @@ pub fn sign(
         );
         v_tilda.extend(newt);
     }
+    log::info!("simply_vole_hash(V) running time: {:?}", t.elapsed());
     // println!("q_tilda {:?}", v_tilda);
 
     println!("LEN: {}", v_tilda.len());
@@ -732,7 +800,10 @@ pub fn sign(
     let chall3 = compute_chall_3(&chall2 /*TODO: add more */);
     println!("P chall3:{:?}", chall3);
     // lines 20-22
+
+    let t = std::time::Instant::now();
     let pdecom = vole_open(&chall3, decom);
+    log::info!("vole_open running time: {:?}", t.elapsed());
 
     ((corr, u_tilda, pdecom, chall3, iv), u, v)
 }
@@ -754,26 +825,28 @@ pub fn verify(
     let mu: H1 = h1(&pk);
 
     // lines 3-4
+    let t = std::time::Instant::now();
     let (h, q) = vole_reconstruct(&chall3, pdecom, iv, l_hat(l));
+    log::info!("vole_reconstruct running time: {:?}", t.elapsed());
 
     // line 5
     let chall1 = compute_chall_1(&mu, &h, &corr, &iv);
 
     // lines 6-14
+    let t = std::time::Instant::now();
     let q_f128b = vole_recompose_q(
         q,
         &chall3,
         corr,
         l_hat(l), /* TODO: unsure about this value*/
     );
+    log::info!("recompose_q running time: {:?}", t.elapsed());
 
     let q_bits = vec_f128b_to_f2(&q_f128b);
     //println!("q_bits {:?}", t);
 
     println!("V chall1:{:?}", chall1);
-
-    println!("V T{:?}", q_bits.iter().take(100).collect::<Vec<_>>());
-
+    let t = std::time::Instant::now();
     let mut q_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
     let split = l + SECURITY_PARAM; // split between x0 and x1
     let step = l_hat(l);
@@ -788,15 +861,21 @@ pub fn verify(
         );
         q_tilda.extend(newt);
     }
+    log::info!("simply_vole_hash(Q) running time: {:?}", t.elapsed());
     //println!("q_tilda {:?}", q_tilda);
 
+    let t = std::time::Instant::now();
     let big_d = recompose_d(&chall3, &u_tilda);
+    log::info!("recompose_d running time: {:?}", t.elapsed());
     //let big_d_bits = f128b_to_f2(&big_d);
+
+    let t = std::time::Instant::now();
     let q_xor_d: Vec<F2> = q_tilda
         .iter()
         .zip(big_d.iter())
         .map(|(a, b)| *a + *b)
         .collect();
+    log::info!("Q + D running time: {:?}", t.elapsed());
     println!("LEN: {}", q_xor_d.len());
 
     let h_v = h1(&bits_to_u8_many(&q_xor_d));
