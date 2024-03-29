@@ -842,7 +842,9 @@ pub fn verify(
     );
     log::info!("recompose_q running time: {:?}", t.elapsed());
 
+    let t = std::time::Instant::now();
     let q_bits = vec_f128b_to_f2(&q_f128b);
+    log::info!("vec_f128b_to_f2 running time: {:?}", t.elapsed());
     //println!("q_bits {:?}", t);
 
     println!("V chall1:{:?}", chall1);
