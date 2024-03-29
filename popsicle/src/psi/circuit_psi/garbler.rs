@@ -13,7 +13,7 @@ where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
-    /// Creates a PsiGarbler with a dedicated channel and rng
+    /// Creates a PsiGarbler from a dedicated channel and rng
     pub fn new(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         Self: Sized,
@@ -26,6 +26,8 @@ where
         })
     }
 }
+
+impl<C, RNG> SemiHonest for PsiGarbler<C, RNG> {}
 
 impl<C, RNG> CircuitPsi<C, RNG> for PsiGarbler<C, RNG>
 where

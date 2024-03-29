@@ -27,6 +27,8 @@ where
     }
 }
 
+impl<C, RNG> SemiHonest for PsiEvaluator<C, RNG> {}
+
 impl<C, RNG> CircuitPsi<C, RNG> for PsiEvaluator<C, RNG>
 where
     C: AbstractChannel + Clone,
