@@ -2135,7 +2135,7 @@ impl<
     /// Evaluate a relation, given as a slice of [`GateM`].
     ///
     /// This method assumes that the `EvaluatorCirc` has been created with
-    ///
+    /// a `TypeStore`, `FunStore`, and `CircInputs`  consistent with the gates.
     ///
     /// Calls [`Self::finish`] after evaluation is complete.
     pub fn evaluate_gates(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
