@@ -2,8 +2,11 @@
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 use crate::errors::Error;
 use fancy_garbling::BinaryBundle;
-use rand::{CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
+
+pub mod evaluator;
+pub mod garbler;
 
 /// A trait which describes the parties participating in the circuit
 /// PSI protocol along with their functionality.
@@ -13,7 +16,7 @@ use scuttlebutt::{AbstractChannel, Block, Block512};
 pub trait CircuitPsi<C, RNG>
 where
     C: AbstractChannel,
-    RNG: RngCore + CryptoRng + SeedableRng<Seed = Block>,
+    RNG: RngCore + CryptoRng + SeedableRng<Seed = Block> + Rng,
 {
     type Item; //
     type F; // implements FancyBinary (i.e. Garbler or Evaluator)
