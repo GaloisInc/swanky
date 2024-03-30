@@ -5,6 +5,7 @@ use fancy_garbling::BinaryBundle;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
 
+pub mod circuits;
 pub mod evaluator;
 pub mod garbler;
 

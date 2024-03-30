@@ -1,4 +1,7 @@
-use crate::{errors::Error, psi::circuit_psi::*};
+use crate::{
+    errors::Error,
+    psi::circuit_psi::{circuits::*, *},
+};
 use fancy_garbling::{twopac::semihonest::Garbler, AllWire};
 use ocelot::ot::AlszSender as OtSender;
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
@@ -72,7 +75,11 @@ where
         let (set, sender_payloads, receiver_payloads) =
             bundle_inputs(&mut self.gb, &circuit_inputs)?;
         // (3)
-        let intersection_bit_vector = intersect(&mut self.gb, &circuit_inputs)?;
+        let intersection_bit_vector = fancy_intersection_bit_vector(
+            &mut self.gb,
+            &circuit_inputs.sender_set_elements,
+            &circuit_inputs.receiver_set_elements,
+        )?;
         // (4)
         circuit(
             &mut self.gb,
