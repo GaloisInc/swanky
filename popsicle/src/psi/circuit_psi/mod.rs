@@ -8,6 +8,20 @@ use scuttlebutt::{AbstractChannel, Block, Block512};
 pub mod evaluator;
 pub mod garbler;
 
+/// Encoded Garbled Circuit PsiInputs
+pub struct CircuitInputs<F> {
+    pub(crate) sender_set_elements: Vec<F>,
+    pub(crate) receiver_set_elements: Vec<F>,
+    // In psty, the sender's payload's are masked
+    // or alternatively one-time padded
+    pub(crate) sender_payloads_masked: Option<Vec<F>>,
+    pub(crate) receiver_payloads: Option<Vec<F>>,
+    // The receiver gets the correct masks/one time pads
+    // when they share the same element with the sender
+    // and otherwise receive a random mask
+    pub(crate) masks: Option<Vec<F>>,
+}
+
 /// A trait which describes the parties participating in the circuit
 /// PSI protocol along with their functionality.
 ///
