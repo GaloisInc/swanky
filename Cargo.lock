@@ -2155,6 +2155,7 @@ dependencies = [
 name = "schmivitz"
 version = "0.5.0"
 dependencies = [
+ "aes",
  "blake3",
  "diet-mac-and-cheese",
  "eyre",
