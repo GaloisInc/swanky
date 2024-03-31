@@ -168,8 +168,8 @@ fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b
     for seed in seeds.iter() {
         let prg = PRG::new(*seed, iv);
         let v = prg.prg(l);
+        let i_f8b: F8b = i.into();
         for (j, r) in v.iter().enumerate() {
-            let i_f8b: F8b = i.into();
             u_res[j] += r;
             v_res[j] += *r * i_f8b;
         }
@@ -202,9 +202,9 @@ fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<
         if j != delta as usize {
             let prg = PRG::new(*seed, iv);
             let v = prg.prg(l);
+            let i_f8b: F8b = i.into();
+            let delta_f8b: F8b = delta.into();
             for (j, r) in v.iter().enumerate() {
-                let delta_f8b: F8b = delta.into();
-                let i_f8b: F8b = i.into();
                 v_res[j] += *r * (delta_f8b - i_f8b);
             }
         } else {
@@ -259,7 +259,7 @@ pub fn vole_commit(
             let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
             let (u_i, v_i) = convert_to_vole_prover(&seeds, iv, l);
 
-            tx.send((com_i, decom_i, u_i, v_i));
+            tx.send((com_i, decom_i, u_i, v_i)).unwrap();
         });
         handles.push(handle);
     }
@@ -462,6 +462,7 @@ fn l_hat(l: usize) -> usize {
     l + B + 2 * SECURITY_PARAM
 }
 
+#[inline(never)]
 fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
     // Corrections are a vector containing tau vectors of long size
     let how_many = corr[0].len();
@@ -527,6 +528,7 @@ fn compute_chall_3(chall2: &Chall2 /* TODO remaining parameters*/) -> Chall3 {
 
 const B: usize = 16;
 
+#[inline(never)]
 fn to_field_f128_and_pad<I: Iterator<Item = F2>>(x: I, x_len: usize) -> Vec<F128b> {
     let floor = x_len / 128;
     let how_many = floor + if (x_len - (floor) * 128) != 0 { 1 } else { 0 };
@@ -700,23 +702,24 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
     out
 }
 
-fn vec_f128b_to_f2(v: &[F128b]) -> Vec<F2> {
-    let mut out: Vec<F2> = vec![];
-    let len = v.len();
+// convert the list of `F128b` values in column-major vectors of `F2``
+#[inline(never)]
+fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
+    let how_many = v.len();
+    let mut out: Vec<Vec<F2>> = Vec::with_capacity(SECURITY_PARAM);
 
-    for j in 0..SECURITY_PARAM {
-        for k in 0..len {
-            // TODO: that's super inefficient
-            let bools: Vec<_> = v[k]
-                .bit_decomposition()
-                .as_slice()
-                .iter()
-                .map(|b| if *b { F2::ONE } else { F2::ZERO })
-                .collect();
-            out.push(bools[j]);
+    for i in 0..SECURITY_PARAM {
+        out.push(Vec::with_capacity(how_many));
+    }
+
+    for k in 0..how_many {
+        let f128b = v[k].bit_decomposition();
+        for (i, b) in f128b.iter().enumerate() {
+            out[i].push(if *b { F2::ONE } else { F2::ZERO });
         }
     }
-    assert_eq!(out.len(), v.len() * 128);
+
+    assert_eq!(out.len(), SECURITY_PARAM);
     out
 }
 
@@ -809,6 +812,7 @@ pub fn sign(
 }
 
 /// Adpation of FAEST Verify function Fig. 8.3
+#[inline(never)]
 pub fn verify(
     pk: Vec<u8>,
     sig: Signature,
@@ -850,15 +854,12 @@ pub fn verify(
     println!("V chall1:{:?}", chall1);
     let t = std::time::Instant::now();
     let mut q_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
-    let split = l + SECURITY_PARAM; // split between x0 and x1
-    let step = l_hat(l);
     for i in 0..SECURITY_PARAM {
-        let start = step * i;
         let newt = simply_vole_hash(
             &chall1,
-            q_bits[start..start + split].iter().map(|b| *b),
+            q_bits[i][0..l + SECURITY_PARAM].iter().map(|b| *b),
             l + SECURITY_PARAM,
-            q_bits[start + split..start + step].iter().map(|b| *b),
+            q_bits[i][l + SECURITY_PARAM..l_hat(l)].iter().map(|b| *b),
             SECURITY_PARAM + B,
         );
         q_tilda.extend(newt);
@@ -1194,12 +1195,8 @@ mod test {
             F128b::from_bytes(&part2.into()).unwrap(),
         ]);
 
-        for (i, b) in t.iter().enumerate() {
-            if i == 0 || i == 3 || i == (8 + 2) * 2 + 1 {
-                assert_eq!(*b, F2::ONE);
-            } else {
-                assert_eq!(*b, F2::ZERO);
-            }
-        }
+        assert_eq!(t[0][0], F2::ONE);
+        assert_eq!(t[1][1], F2::ONE);
+        assert_eq!(t[10][1], F2::ONE);
     }
 }
