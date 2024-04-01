@@ -1,11 +1,15 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
-use crate::{errors::Error, psi::circuit_psi::circuits::*};
+use crate::{
+    errors::Error,
+    psi::circuit_psi::{base_psi::*, circuits::*},
+};
 use fancy_garbling::{AllWire, BinaryBundle, Fancy, FancyBinary, FancyReveal};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block, Block512};
 use std::fmt::Debug;
 
+pub mod base_psi;
 pub mod circuits;
 pub mod evaluator;
 pub mod garbler;
