@@ -11,6 +11,10 @@ use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 pub struct PsiEvaluator<C, RNG> {
     /// The actual evaluator being called during the garbled circuit
     pub ev: Evaluator<C, RNG, OtReceiver, AllWire>,
+    /// The evaluator's dedicated channel
+    pub channel: C,
+    /// The evaluator's dedicated rng
+    pub rng: RNG,
 }
 
 impl<C, RNG> PsiEvaluator<C, RNG>
@@ -19,15 +23,17 @@ where
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
     /// Creates a PsiEvaluator from a dedicated channel and rng
-    pub fn new(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    pub fn new(channel: &mut C, seed: RNG::Seed) -> Result<Self, Error>
     where
         Self: Sized,
     {
         Ok(PsiEvaluator {
             ev: Evaluator::<C, RNG, OtReceiver, AllWire>::new(
                 channel.clone(),
-                RNG::from_seed(rng.gen()),
+                RNG::from_seed(seed),
             )?,
+            channel: channel.clone(),
+            rng: RNG::from_seed(seed),
         })
     }
 }
@@ -55,8 +61,6 @@ where
         &mut self,
         set: &[Vec<u8>],
         payloads: Option<&[Block512]>,
-        channel: &mut C,
-        rng: &mut RNG,
         circuit: &mut Ckt,
     ) -> Result<CktOut, Error>
     where
@@ -72,7 +76,13 @@ where
         ) -> Result<CktOut, Error>,
     {
         // (1)
-        let circuit_inputs = P::base_psi(&mut self.ev, set, payloads, channel, rng)?;
+        let circuit_inputs = P::base_psi(
+            &mut self.ev,
+            set,
+            payloads,
+            &mut self.channel,
+            &mut self.rng,
+        )?;
         // (2)
         let (set, sender_payloads, receiver_payloads) =
             bundle_inputs(&mut self.ev, &circuit_inputs)?;

@@ -13,11 +13,12 @@ pub mod base_psi;
 pub mod circuits;
 pub mod evaluator;
 pub mod garbler;
+pub mod utils;
 
-// Byte representation of a set element
+/// Byte representation of a set element
 pub const ELEMENT_SIZE: usize = 8;
 
-// Byte representation of a payload value
+/// Byte representation of a payload value
 pub const PAYLOAD_SIZE: usize = 8;
 
 /// Encoded Garbled Circuit PsiInputs
@@ -84,8 +85,10 @@ where
     C: AbstractChannel,
     RNG: RngCore + CryptoRng + SeedableRng<Seed = Block> + Rng,
 {
-    type Item; //
-    type F; // implements FancyBinary (i.e. Garbler or Evaluator)
+    /// The type of wires associated with f
+    type Item;
+    /// Implements FancyBinary (i.e. Garbler or Evaluator)
+    type F;
 
     /// Computes the Circuit PSI on the parties inputs.
     ///
@@ -107,8 +110,6 @@ where
         &mut self,
         set: &[Vec<u8>],
         payloads: Option<&[Block512]>,
-        channel: &mut C,
-        rng: &mut RNG,
         circuit: &mut Ckt,
     ) -> Result<CktOut, Error>
     where

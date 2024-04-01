@@ -10,6 +10,10 @@ use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 pub struct PsiGarbler<C, RNG> {
     /// The actual garbler being called during the garbled circuit
     pub gb: Garbler<C, RNG, OtSender, AllWire>,
+    /// The garbler's dedicated channel
+    pub channel: C,
+    /// The garbler's dedicated rng
+    pub rng: RNG,
 }
 
 impl<C, RNG> PsiGarbler<C, RNG>
@@ -18,15 +22,14 @@ where
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
     /// Creates a PsiGarbler from a dedicated channel and rng
-    pub fn new(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    pub fn new(channel: &mut C, seed: RNG::Seed) -> Result<Self, Error>
     where
         Self: Sized,
     {
         Ok(PsiGarbler {
-            gb: Garbler::<C, RNG, OtSender, AllWire>::new(
-                channel.clone(),
-                RNG::from_seed(rng.gen()),
-            )?,
+            gb: Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(seed))?,
+            channel: channel.clone(),
+            rng: RNG::from_seed(seed),
         })
     }
 }
@@ -54,8 +57,6 @@ where
         &mut self,
         set: &[Vec<u8>],
         payloads: Option<&[Block512]>,
-        channel: &mut C,
-        rng: &mut RNG,
         circuit: &mut Ckt,
     ) -> Result<CktOut, Error>
     where
@@ -71,7 +72,13 @@ where
         ) -> Result<CktOut, Error>,
     {
         // (1)
-        let circuit_inputs = P::base_psi(&mut self.gb, set, payloads, channel, rng)?;
+        let circuit_inputs = P::base_psi(
+            &mut self.gb,
+            set,
+            payloads,
+            &mut self.channel,
+            &mut self.rng,
+        )?;
         // (2)
         let (set, sender_payloads, receiver_payloads) =
             bundle_inputs(&mut self.gb, &circuit_inputs)?;
