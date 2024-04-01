@@ -8,7 +8,10 @@ use std::fmt::Debug;
 // place any item in a cuckoo bin
 const NHASHES: usize = 3;
 
-/// The OpprfSender which implement BasePsi
+/// The `OpprfReceiver` which implement BasePsi
+pub mod receiver;
+
+/// The `OpprfSender` which implement BasePsi
 pub mod sender;
 
 /// A trait which describes the party's behavior in circuit psi
