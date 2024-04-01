@@ -44,3 +44,20 @@ where
         .map(|x_chunk| BinaryBundle::new(x_chunk.to_vec()))
         .collect()
 }
+
+/// Obliviously unmasks data by subtracting each mask from each element
+pub fn fancy_unmask<F>(
+    f: &mut F,
+    elements: &[BinaryBundle<F::Item>],
+    masks: &[BinaryBundle<F::Item>],
+) -> Result<Vec<BinaryBundle<F::Item>>, F::Error>
+where
+    F: FancyReveal + Fancy + FancyBinary,
+{
+    let mut res = Vec::new();
+
+    for i in 0..elements.len() {
+        res.push(f.bin_xor(&elements[i], &masks[i])?);
+    }
+    Ok(res)
+}
