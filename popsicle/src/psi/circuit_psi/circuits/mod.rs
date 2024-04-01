@@ -33,3 +33,14 @@ where
         })
         .collect()
 }
+
+/// Fancy function that turns a slice of binary wires into a vector of BinaryBundle
+/// by grouping wires together according to the size of the element being bundled.
+pub fn wires_to_bundle<F>(x: &[F::Item], size: usize) -> Vec<BinaryBundle<F::Item>>
+where
+    F: FancyReveal + Fancy + FancyBinary,
+{
+    x.chunks(size)
+        .map(|x_chunk| BinaryBundle::new(x_chunk.to_vec()))
+        .collect()
+}
