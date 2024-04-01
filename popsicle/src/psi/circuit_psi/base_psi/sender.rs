@@ -170,16 +170,13 @@ impl BasePsi for OpprfSender {
         E: Debug,
         Error: From<E>,
     {
-        // First encode the ids
-        let my_input_bits =
-            encode_binary(&self.state.as_ref().unwrap().opprf_set_out, ELEMENT_SIZE);
-        // Then specify the moduli of the wires
-        let mods_bits = vec![2; my_input_bits.len()];
+        let sender_set_elements = bin_encode_many_block512(
+            gc_party,
+            &self.state.as_ref().unwrap().opprf_set_out,
+            ELEMENT_SIZE,
+        )?;
 
-        // Then send own encoded inputs
-        let sender_set_elements = gc_party.encode_many(&my_input_bits, &mods_bits)?;
-        // And receive other party's encoded inputs
-        let receiver_set_elements = gc_party.receive_many(&mods_bits)?;
+        let receiver_set_elements = bin_receive_many_block512(gc_party, sender_set_elements.len())?;
 
         let mut result = CircuitInputs {
             sender_set_elements,
@@ -191,13 +188,13 @@ impl BasePsi for OpprfSender {
 
         // If payloads exist, then encode them
         if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_out {
-            let my_payload_bits = encode_binary(&p, PAYLOAD_SIZE);
-            let mods_bits = vec![2; my_payload_bits.len()];
-
             let sender_payloads_masked: Vec<F::Item> =
-                gc_party.encode_many(&my_payload_bits, &mods_bits)?;
-            let receiver_payloads: Vec<F::Item> = gc_party.receive_many(&mods_bits)?;
-            let masks: Vec<F::Item> = gc_party.receive_many(&mods_bits)?;
+                bin_encode_many_block512(gc_party, &p, PAYLOAD_SIZE)?;
+            let receiver_payloads: Vec<F::Item> =
+                bin_receive_many_block512(gc_party, sender_payloads_masked.len())?;
+
+            let masks: Vec<F::Item> =
+                bin_receive_many_block512(gc_party, sender_payloads_masked.len())?;
 
             result.sender_payloads_masked = Some(sender_payloads_masked);
             result.receiver_payloads = Some(receiver_payloads);

@@ -142,17 +142,24 @@ impl BasePsi for OpprfReceiver {
         E: Debug,
         Error: From<E>,
     {
-        let my_input_bits = encode_binary(
-            &self.state.as_ref().unwrap().opprf_set_out.as_ref().unwrap(),
-            ELEMENT_SIZE,
-        );
-        let mods_bits = vec![2; my_input_bits.len()];
+        // We compute the number of wires that the receivers should
+        // expect from the sender by taking the size of an element in
+        // bytes, turning it into bits, and then multiplying it by the
+        // number of elements the parties are intersecting.
+        // Note that PSTY expects parties to have the same set sizes.
+        let elements_binary_len =
+            ELEMENT_SIZE * 8 * self.state.as_ref().unwrap().opprf_set_in.len();
 
         // First receive encoded inputs from the `OpprfSender`
-        let sender_set_elements: Vec<F::Item> = gc_party.receive_many(&mods_bits)?;
+        let sender_set_elements: Vec<F::Item> =
+            bin_receive_many_block512(gc_party, elements_binary_len)?;
+
         // Then send encoded inputs
-        let receiver_set_elements: Vec<F::Item> =
-            gc_party.encode_many(&my_input_bits, &mods_bits)?;
+        let receiver_set_elements: Vec<F::Item> = bin_encode_many_block512(
+            gc_party,
+            &self.state.as_ref().unwrap().opprf_set_out.as_ref().unwrap(),
+            ELEMENT_SIZE,
+        )?;
 
         let mut result = CircuitInputs {
             sender_set_elements,
@@ -163,7 +170,37 @@ impl BasePsi for OpprfReceiver {
         };
         // If payloads exist, then encode them
         if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_in {
-            let my_opprf_output = encode_binary(
+            // We compute the number of wires that the receivers should
+            // expect from the sender by taking the size of a payload in
+            // bytes, turning it into bits, and then multiplying it by the
+            // number of elements the parties are intersecting.
+            // Note that PSTY expects parties to have the same set sizes.
+            let payloads_binary_len = PAYLOAD_SIZE
+                * 8
+                * self
+                    .state
+                    .as_ref()
+                    .unwrap()
+                    .opprf_payloads_in
+                    .as_ref()
+                    .unwrap()
+                    .len();
+
+            let sender_payloads: Vec<F::Item> =
+                bin_receive_many_block512(gc_party, payloads_binary_len)?;
+            let receiver_payloads: Vec<F::Item> = bin_encode_many_block512(
+                gc_party,
+                &self
+                    .state
+                    .as_ref()
+                    .unwrap()
+                    .opprf_payloads_in
+                    .as_ref()
+                    .unwrap(),
+                PAYLOAD_SIZE,
+            )?;
+            let masks: Vec<F::Item> = bin_encode_many_block512(
+                gc_party,
                 &self
                     .state
                     .as_ref()
@@ -172,14 +209,7 @@ impl BasePsi for OpprfReceiver {
                     .as_ref()
                     .unwrap(),
                 PAYLOAD_SIZE,
-            );
-            let my_payload_bits = encode_binary(&p, PAYLOAD_SIZE);
-            let mods_bits = vec![2; my_payload_bits.len()];
-
-            let sender_payloads: Vec<F::Item> = gc_party.receive_many(&mods_bits)?;
-            let receiver_payloads: Vec<F::Item> =
-                gc_party.encode_many(&my_payload_bits, &mods_bits)?;
-            let masks: Vec<F::Item> = gc_party.encode_many(&my_opprf_output, &mods_bits)?;
+            )?;
 
             result.sender_payloads_masked = Some(sender_payloads);
             result.receiver_payloads = Some(receiver_payloads);

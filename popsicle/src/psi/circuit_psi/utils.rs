@@ -1,9 +1,11 @@
 //! Various utils for PSTY
-use crate::cuckoo::CuckooItem;
-use fancy_garbling::util;
+use crate::{cuckoo::CuckooItem, errors::Error};
+use fancy_garbling::{util, AllWire, FancyInput};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{Block, Block512};
+
+use std::fmt::Debug;
 
 pub fn binary_to_u128(bin: Vec<u16>) -> u128 {
     let mut acc: u128 = 0;
@@ -155,4 +157,35 @@ pub fn flatten_bins_payloads(
                 .map(move |(item, p)| (item, *p))
         })
         .collect_vec()
+}
+
+/// A wrapper function that encodes `Block512` as garbled
+/// circuit inputs
+pub fn bin_encode_many_block512<F, E>(
+    gc_party: &mut F,
+    values: &[Block512],
+    size: usize,
+) -> Result<Vec<F::Item>, E>
+where
+    F: FancyInput<Item = AllWire, Error = E>,
+    E: Debug,
+    Error: From<E>,
+{
+    let bits = encode_binary(values, size);
+    // Then specify the moduli of the wires
+    let moduli = vec![2; bits.len()];
+    gc_party.encode_many(&bits, &moduli)
+}
+
+/// A wrapper function that encodes `Block512` as garbled
+/// circuit inputs
+pub fn bin_receive_many_block512<F, E>(gc_party: &mut F, size: usize) -> Result<Vec<F::Item>, E>
+where
+    F: FancyInput<Item = AllWire, Error = E>,
+    E: Debug,
+    Error: From<E>,
+{
+    // Specify the moduli of the wires
+    let moduli = vec![2; size];
+    gc_party.receive_many(&moduli)
 }
