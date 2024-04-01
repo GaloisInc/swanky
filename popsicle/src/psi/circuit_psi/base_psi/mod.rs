@@ -29,7 +29,7 @@ pub mod sender;
 /// performed in the garbled circuit with no a-priori pre-processing computation).
 pub trait BasePsi {
     /// Initializes the BasePsi party
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, payload_exists: bool) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, payload_existence: bool) -> Result<Self, Error>
     where
         Self: Sized,
         C: AbstractChannel,
