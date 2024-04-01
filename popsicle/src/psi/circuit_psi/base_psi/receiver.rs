@@ -81,7 +81,7 @@ impl BasePsi for OpprfReceiver {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
-        let mut hashed_inputs = utils::compress_and_hash_inputs(set, self.key);
+        let mut hashed_inputs = compress_and_hash_inputs(set, self.key);
 
         // refresh the key until the cuckoo hash is not full
         let cuckoo = loop {
@@ -89,7 +89,7 @@ impl BasePsi for OpprfReceiver {
                 Ok(res) => break res,
                 Err(_e) => {
                     self.key = rng.gen();
-                    hashed_inputs = utils::compress_and_hash_inputs(set, self.key);
+                    hashed_inputs = compress_and_hash_inputs(set, self.key);
                 }
             }
         };
@@ -99,11 +99,11 @@ impl BasePsi for OpprfReceiver {
         channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
         channel.flush()?;
 
-        let opprf_set_in = utils::cuckoo_place_ids(&cuckoo.items, rng);
+        let opprf_set_in = cuckoo_place_ids(&cuckoo.items, rng);
 
         let mut opprf_payloads_in = None;
         if let Some(p) = payloads {
-            opprf_payloads_in = Some(utils::cuckoo_place_payloads(&cuckoo.items, p, rng));
+            opprf_payloads_in = Some(cuckoo_place_payloads(&cuckoo.items, p, rng));
         }
         self.state = Some(ReceiverState {
             opprf_set_in,
@@ -142,7 +142,7 @@ impl BasePsi for OpprfReceiver {
         E: Debug,
         Error: From<E>,
     {
-        let my_input_bits = util::encode_binary(
+        let my_input_bits = encode_binary(
             &self.state.as_ref().unwrap().opprf_set_out.as_ref().unwrap(),
             ELEMENT_SIZE,
         );
@@ -163,7 +163,7 @@ impl BasePsi for OpprfReceiver {
         };
         // If payloads exist, then encode them
         if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_in {
-            let my_opprf_output = utils::encode_binary(
+            let my_opprf_output = encode_binary(
                 &self
                     .state
                     .as_ref()
@@ -173,7 +173,7 @@ impl BasePsi for OpprfReceiver {
                     .unwrap(),
                 PAYLOAD_SIZE,
             );
-            let my_payload_bits = utils::encode_binary(&p, PAYLOAD_SIZE);
+            let my_payload_bits = encode_binary(&p, PAYLOAD_SIZE);
             let mods_bits = vec![2; my_payload_bits.len()];
 
             let sender_payloads: Vec<F::Item> = gc_party.receive_many(&mods_bits)?;

@@ -1,5 +1,5 @@
 use crate::{
-    circuit_psi::{base_psi::*, *},
+    circuit_psi::{base_psi::*, utils::*, *},
     cuckoo::CuckooHash,
     utils,
 };
@@ -145,7 +145,7 @@ impl BasePsi for OpprfSender {
     {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs
-        let opprf_program = utils::flatten_bin_tags(
+        let opprf_program = flatten_bin_tags(
             &self.state.as_ref().unwrap().opprf_set_in,
             &self.state.as_ref().unwrap().opprf_set_out,
         );
@@ -155,7 +155,7 @@ impl BasePsi for OpprfSender {
         if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_in {
             if let Some(opprfp) = self.opprf_payload.as_mut() {
                 let points_data =
-                    utils::flatten_bins_payloads(&self.state.as_ref().unwrap().opprf_set_in, &p);
+                    flatten_bins_payloads(&self.state.as_ref().unwrap().opprf_set_in, &p);
                 opprfp.send(channel, &points_data, self.nbins.unwrap(), rng)?;
             }
         }
@@ -172,7 +172,7 @@ impl BasePsi for OpprfSender {
     {
         // First encode the ids
         let my_input_bits =
-            utils::encode_binary(&self.state.as_ref().unwrap().opprf_set_out, ELEMENT_SIZE);
+            encode_binary(&self.state.as_ref().unwrap().opprf_set_out, ELEMENT_SIZE);
         // Then specify the moduli of the wires
         let mods_bits = vec![2; my_input_bits.len()];
 
@@ -191,7 +191,7 @@ impl BasePsi for OpprfSender {
 
         // If payloads exist, then encode them
         if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_out {
-            let my_payload_bits = utils::encode_binary(&p, PAYLOAD_SIZE);
+            let my_payload_bits = encode_binary(&p, PAYLOAD_SIZE);
             let mods_bits = vec![2; my_payload_bits.len()];
 
             let sender_payloads_masked: Vec<F::Item> =
