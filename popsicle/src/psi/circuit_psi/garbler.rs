@@ -55,8 +55,8 @@ where
     /// (4) Computes the user defined circuit on the parties' inputs.
     fn circuit_psi_psty<P, Ckt, CktOut>(
         &mut self,
-        set: &[Vec<u8>],
-        payloads: Option<&[Block512]>,
+        set: &[Element],
+        payloads: Option<&[Payload]>,
         circuit: &mut Ckt,
     ) -> Result<CktOut, Error>
     where

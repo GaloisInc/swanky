@@ -15,6 +15,11 @@ pub mod evaluator;
 pub mod garbler;
 pub mod utils;
 
+/// The type of set elements to be used
+pub type Element = Vec<u8>;
+
+/// The type of payloads to be used
+pub type Payload = Block512;
 /// Byte representation of a set element
 pub const ELEMENT_SIZE: usize = 8;
 
@@ -108,8 +113,8 @@ where
     /// CktOut: The type of the output of the circuit.
     fn circuit_psi_psty<P, Ckt, CktOut>(
         &mut self,
-        set: &[Vec<u8>],
-        payloads: Option<&[Block512]>,
+        set: &[Element],
+        payloads: Option<&[Payload]>,
         circuit: &mut Ckt,
     ) -> Result<CktOut, Error>
     where

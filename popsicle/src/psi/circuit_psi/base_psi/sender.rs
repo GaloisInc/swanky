@@ -68,8 +68,8 @@ impl BasePsi for OpprfSender {
     /// Hash the data using simple hashing
     fn hash_data<C, RNG>(
         &mut self,
-        set: &[Vec<u8>],
-        payloads: Option<&[Block512]>,
+        set: &[Element],
+        payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>

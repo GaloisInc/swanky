@@ -72,8 +72,8 @@ impl BasePsi for OpprfReceiver {
     /// Hash the data using cuckoo hashing
     fn hash_data<C, RNG>(
         &mut self,
-        set: &[Vec<u8>],
-        payloads: Option<&[Block512]>,
+        set: &[Element],
+        payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
