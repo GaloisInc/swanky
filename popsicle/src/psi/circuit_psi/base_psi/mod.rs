@@ -4,6 +4,13 @@ use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block512};
 use std::fmt::Debug;
 
+// The number of hash functions that will be used to attempt to
+// place any item in a cuckoo bin
+const NHASHES: usize = 3;
+
+/// The OpprfSender which implement BasePsi
+pub mod sender;
+
 /// A trait which describes the party's behavior in circuit psi
 /// prior to calling the actual garbled circuit. The BasePsi could
 /// be thought of as a pre-processing stage for efficiency purposes.
