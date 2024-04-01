@@ -1,3 +1,4 @@
+//! Various fancy circuits
 use itertools::Itertools;
 
 use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};

@@ -7,6 +7,9 @@ use scuttlebutt::{Block, Block512};
 
 use std::fmt::Debug;
 
+/// Turn a vector of bits represented as u16 into a decimal
+/// value represented as a u128.
+/// We represent bits as u16 in accordance with fancy's representation
 pub fn binary_to_u128(bin: Vec<u16>) -> u128 {
     let mut acc: u128 = 0;
     for (i, s) in bin.into_iter().enumerate() {

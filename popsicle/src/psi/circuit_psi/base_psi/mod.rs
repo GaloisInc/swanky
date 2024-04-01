@@ -1,3 +1,5 @@
+//! The base psi computation that pre-processes the party's
+//! inputs prior to calling the circuit in the circuit psi
 use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{AllWire, FancyInput};
 use rand::{CryptoRng, RngCore, SeedableRng};

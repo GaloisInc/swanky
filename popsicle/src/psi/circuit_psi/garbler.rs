@@ -1,3 +1,4 @@
+//! Defining the Garbler's behavior in Circuit Psi according to [PSTY19]
 use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
@@ -7,7 +8,7 @@ use ocelot::ot::AlszSender as OtSender;
 use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 /// A struct defining the Garbling party in Circuit Psi
 pub struct PsiGarbler<C, RNG> {
-    // The actual garbler being called during the garbled circuit
+    /// The actual garbler being called during the garbled circuit
     pub gb: Garbler<C, RNG, OtSender, AllWire>,
 }
 

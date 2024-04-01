@@ -1,3 +1,4 @@
+//! Defining the Evaluator's behavior in Circuit Psi according to [PSTY19]
 use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
@@ -8,7 +9,7 @@ use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 
 /// A struct defining the Evaluating party in Circuit Psi
 pub struct PsiEvaluator<C, RNG> {
-    // The actual evaluator being called during the garbled circuit
+    /// The actual evaluator being called during the garbled circuit
     pub ev: Evaluator<C, RNG, OtReceiver, AllWire>,
 }
 
