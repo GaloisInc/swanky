@@ -4,6 +4,7 @@ Cli utilities.
 */
 use clap::Parser;
 use diet_mac_and_cheese::LpnSize;
+use eyre::Result;
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -64,7 +65,7 @@ impl Default for Config {
 impl Config {
     /// Construct a new [`Config`] from a TOML file. Any missing fields are
     /// initialized using the `Default` instance.
-    pub fn from_toml_file(toml_file: &PathBuf) -> eyre::Result<Self> {
+    pub fn from_toml_file(toml_file: &PathBuf) -> Result<Self> {
         let mut res = Config::default();
 
         let toml_contents: Config = toml::from_str(&std::fs::read_to_string(toml_file)?)?;
