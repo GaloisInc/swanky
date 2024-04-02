@@ -1,7 +1,7 @@
 //! Multithreading Svole.
 
 use crate::svole_trait::{field_name, SvoleStopSignal, SvoleT};
-use eyre::{ensure, Result};
+use eyre::{bail, ensure, Result};
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
@@ -295,7 +295,7 @@ where
     if let Some(c) = channels.next() {
         Ok(c)
     } else {
-        eyre::bail!("not enough channels available")
+        bail!("not enough channels available")
     }
 }
 
