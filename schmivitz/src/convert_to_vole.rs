@@ -1,15 +1,16 @@
 /*! */
-use eyre::{bail, Result};
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
-
 use crate::all_but_one_vc::IV;
 use crate::all_but_one_vc::{commit, open, reconstruct, Com, Decom, Pdecom, Seed};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
+use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
+use aes::Aes128;
+use eyre::{bail, Result};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
+use vectoreyes::{SimdBase, U8x16};
 
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
@@ -19,14 +20,15 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 pub(crate) struct PRG {
-    aes0: Aes128EncryptOnly,
+    aes0: Aes128,
     counter: u128,
 }
 
 impl PRG {
     /// Create a PRG from an an initialization vector `iv`.
     fn new(seed: IV, iv: IV) -> Self {
-        let aes0 = Aes128EncryptOnly::new_with_key(seed);
+        let key: GenericArray<u8, _> = GenericArray::from(seed.as_array());
+        let aes0 = Aes128::new(&key);
 
         let bytes = iv.to_bytes();
         let mut counter = 0;
@@ -43,36 +45,48 @@ impl PRG {
     /// Function that returns a pseudo-random vector of F2 values
     fn prg(mut self, l: usize) -> Vec<F2> {
         let mut res = Vec::with_capacity(l);
+
         let mut remaining: i64 = l.try_into().unwrap();
 
+        const BLOCKS: usize = 16;
+        let block = GenericArray::from([0u8; 16]);
+        let mut blocks = [block; BLOCKS];
         while remaining > 0 {
-            let t = self.aes0.encrypt(self.counter.to_le_bytes().into());
-            self.incr();
+            // encrypt blocks in place
+            for i in 0..BLOCKS {
+                blocks[i] = GenericArray::from(self.counter.to_le_bytes());
+                self.incr();
+            }
+            self.aes0.encrypt_blocks(&mut blocks);
 
-            let v = t.to_bytes();
+            for i in 0..BLOCKS {
+                for u in blocks[i].iter() {
+                    for i in 0..8u8 {
+                        if remaining <= 0 {
+                            return res;
+                        }
 
-            for u in v.iter() {
-                for i in 0..8 {
-                    if remaining <= 0 {
-                        return res;
+                        res.push(((u >> i & 1 as u8) == 1).into());
+                        remaining -= 1;
                     }
-
-                    res.push(((u >> i & 1 as u8) == 1).into());
-                    remaining -= 1;
                 }
             }
         }
+
         res
     }
     /// Pseudo-random generate seeds to initialize other prgs
     fn generate_prg_seeds(mut self, repetition_param: usize) -> Vec<Seed> {
         let mut res = vec![];
 
+        let mut block = GenericArray::from([0u8; 16]);
+
         for i in 0..repetition_param {
-            let t = self.aes0.encrypt(self.counter.to_le_bytes().into());
+            block = GenericArray::from(self.counter.to_le_bytes());
+            self.aes0.encrypt_block(&mut block);
             self.incr();
 
-            res.push(t);
+            res.push(U8x16::from_array(block.into()));
         }
         res
     }
