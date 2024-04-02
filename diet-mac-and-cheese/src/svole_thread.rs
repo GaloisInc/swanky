@@ -1,7 +1,7 @@
 //! Multithreading Svole.
 
 use crate::svole_trait::{field_name, SvoleStopSignal, SvoleT};
-use eyre::{bail, ensure, Result};
+use eyre::{ensure, eyre, Result};
 use log::{debug, info};
 use ocelot::svole::{LpnParams, Receiver, Sender};
 use scuttlebutt::field::IsSubFieldOf;
@@ -292,11 +292,9 @@ fn get_channel<C2: AbstractChannel + Clone + 'static + Send, I>(channels: &mut I
 where
     I: Iterator<Item = C2>,
 {
-    if let Some(c) = channels.next() {
-        Ok(c)
-    } else {
-        bail!("not enough channels available")
-    }
+    channels
+        .next()
+        .ok_or_else(|| eyre!("not enough channels available"))
 }
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField + Copy + Default + Debug>
