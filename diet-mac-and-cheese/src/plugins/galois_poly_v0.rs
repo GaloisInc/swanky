@@ -3,7 +3,7 @@ use crate::circuit_ir::{
     first_unused_wire_id, FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore,
     WireCount,
 };
-use eyre::{bail, ensure, eyre, Result};
+use eyre::{bail, ensure, Result};
 use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_field_binary::{F128b, F63b, F2};
 use swanky_field_f61p::F61p;
@@ -26,7 +26,7 @@ impl Plugin for GaloisPolyV0 {
         } else if operation == "shift_eq" {
             Self::shift_eq_body(params, output_counts, input_counts, type_store)
         } else {
-            return Err(eyre!("{}: Invalid operation: {operation}", Self::NAME));
+            bail!("{}: Invalid operation: {operation}", Self::NAME)
         }
     }
 }

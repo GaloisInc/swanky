@@ -2,7 +2,7 @@ use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     FunStore, FunctionBody, GateM, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount,
 };
-use eyre::{eyre, Result};
+use eyre::{bail, eyre, Result};
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -134,7 +134,7 @@ impl Plugin for DisjunctionV0 {
                 // this could also hold a default (for a default clause for the switch)
                 assert_eq!(mode, "strict");
             }
-            _ => return Err(eyre!("{}: Invalid mode", Self::NAME,)),
+            _ => bail!("{}: Invalid mode", Self::NAME,),
         }
 
         // retrieve function and guard pairs from parameters
@@ -143,13 +143,13 @@ impl Plugin for DisjunctionV0 {
             // check guard type
             let guard = match guard {
                 PluginTypeArg::Number(num) => num,
-                _ => return Err(eyre!("guard must be a number")),
+                _ => bail!("guard must be a number"),
             };
             // check function type
             if let Some(PluginTypeArg::String(name)) = params.next() {
                 functions.push((guard, name))
             } else {
-                return Err(eyre!("function name missing"));
+                bail!("function name missing")
             }
         }
 
@@ -160,7 +160,7 @@ impl Plugin for DisjunctionV0 {
             let gates: &[GateM] = match fun_decl.body() {
                 FunctionBody::Gates(gates) => gates.gates(),
                 FunctionBody::Plugin(_) => {
-                    return Err(eyre!("a clause is a plugin, not supported"));
+                    bail!("a clause is a plugin, not supported")
                 }
             };
             clauses.push(ClauseGuard {
