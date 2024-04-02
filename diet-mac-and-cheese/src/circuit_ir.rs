@@ -247,9 +247,11 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
         types: Vec<mac_n_cheese_sieve_parser::Type>,
     ) -> std::result::Result<Self, Self::Error> {
         debug!("Converting Circuit IR types to `TypeStore`");
-        if types.len() > 256 {
-            return Err(eyre!("Too many types specified: {} > 256", types.len()));
-        }
+        ensure!(
+            types.len() <= 256,
+            "Too many types specified: {} > 256",
+            types.len(),
+        );
         let mut store = TypeStore::default();
         for (i, ty) in types.into_iter().enumerate() {
             let spec = match ty {
@@ -293,9 +295,11 @@ impl TryFrom<Vec<Number>> for TypeStore {
 
     fn try_from(fields: Vec<Number>) -> std::result::Result<Self, Self::Error> {
         debug!("Converting vector of fields to `TypeStore`");
-        if fields.len() > 256 {
-            return Err(eyre!("Too many types specified: {} > 256", fields.len()));
-        }
+        ensure!(
+            fields.len() <= 256,
+            "Too many types specified: {} > 256",
+            fields.len(),
+        );
         let mut store = TypeStore::default();
         for (i, field) in fields.into_iter().enumerate() {
             let spec = TypeSpecification::Field(modulus_to_type_id(field)?);

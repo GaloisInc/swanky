@@ -1,4 +1,4 @@
-use eyre::{eyre, Result};
+use eyre::{ensure, Result};
 
 use scuttlebutt::{field::FiniteField, AbstractChannel};
 use swanky_field::IsSubFieldOf;
@@ -42,13 +42,8 @@ impl<B: BackendT> ComittedAcc<B> {
     /// for an honest prover this junk will be zero, however it is
     /// not required to enforce this for soundness.
     pub fn verify(&self, backend: &mut B, r1cs: &R1CS<B::FieldElement>) -> Result<()> {
-        if self.wit.len() < r1cs.dim() {
-            return Err(eyre!("witness dimension too small"));
-        }
-
-        if self.err.len() < r1cs.rows() {
-            return Err(eyre!("error dimension to small"));
-        }
+        ensure!(self.wit.len() >= r1cs.dim(), "witness dimension too small");
+        ensure!(self.err.len() >= r1cs.rows(), "error dimension too small");
 
         let u = &self.wit[0];
 
