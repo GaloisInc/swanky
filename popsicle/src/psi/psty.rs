@@ -324,11 +324,11 @@ impl ReceiverState {
             .outputs(&result.wires())?
             .expect("evaluator should produce outputs");
 
-        let mut cardinality: u128 = 0;
+        let mut cardinality = 0;
         for (i, s) in cardinality_outs.into_iter().enumerate() {
-            cardinality += (s as u128) << i;
+            cardinality += (s as usize) << i;
         }
-        Ok(cardinality as usize)
+        Ok(cardinality)
     }
 
     /// Send encrypted payloads to the Receiver, who can only decrypt a payload if they
