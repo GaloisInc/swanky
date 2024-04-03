@@ -208,8 +208,10 @@ impl<E> EdabitsMap<E> {
     }
 
     fn push_elem(&mut self, bit_width: usize, e: E) {
-        self.0.entry(bit_width).or_default();
-        self.0.get_mut(&bit_width).as_mut().unwrap().push(e);
+        self.0
+            .entry(bit_width)
+            .and_modify(|v| v.push(e))
+            .or_default();
     }
 
     fn get_edabits(&mut self, bit_width: usize) -> Option<&mut Vec<E>> {
