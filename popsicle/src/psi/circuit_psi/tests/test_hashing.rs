@@ -19,6 +19,7 @@ mod tests {
     const ELEMENT_MAX: u128 = u64::MAX as u128;
     const PAYLOAD_MAX: u128 = 100000;
 
+    // Run the base psi up to hashing
     fn psty_up_to_hashing(
         set: &[Vec<u8>],
         payloads: &[Block512],
@@ -118,6 +119,7 @@ mod tests {
 
     proptest! {
          #[test]
+         // Test that the OpprfSender produced no errors
         fn test_psty_simple_hashing_sender_succeeded(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
@@ -125,12 +127,13 @@ mod tests {
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
             let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
-            assert!(
+            prop_assert!(
                 !result_hash_sender.is_err(),
                 "PSTY Simple Hashing failed on the Sender side"
             );
         }
         #[test]
+        // Test that the OpprfReceiver produced no errors
         fn test_psty_cuckoo_hashing_receiver_succeeded(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
@@ -138,7 +141,7 @@ mod tests {
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
             let (_, _, _, result_hash_receiver) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
-            assert!(
+            prop_assert!(
                 !result_hash_receiver.is_err(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
             );
@@ -189,7 +192,7 @@ mod tests {
             let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
             let (intersection_payloads_sx, _, payloads_len) =
                 psty_check_hashing_payloads(sender, receiver, payloads);
-            assert!(
+            prop_assert!(
                 intersection_payloads_sx == payloads_len,
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
@@ -208,7 +211,7 @@ mod tests {
             let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
             let (_, intersection_payloads_rx, payloads_len) =
                 psty_check_hashing_payloads(sender, receiver, payloads);
-            assert!(
+            prop_assert!(
                 intersection_payloads_rx == payloads_len,
                 "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
