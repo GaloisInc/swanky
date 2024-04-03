@@ -9,7 +9,7 @@ mod tests {
         *,
     };
 
-    use std::thread;
+    use std::{collections::HashSet, thread};
 
     use proptest::prelude::*;
     use scuttlebutt::{AesRng, Block512};
@@ -51,6 +51,46 @@ mod tests {
             (sender, receiver, result_hash_sender, result_hash_receiver)
         })
     }
+
+    // Check that hashing preserves the original payloads by intersecting the party's hash outputs
+    // with the original payloads. The idea is that if the intersection cardinality in both cases is
+    // equal to the original payload cardinality, then the hash outputs includes that set
+    fn psty_check_hashing_payloads(
+        sender: OpprfSender,
+        receiver: OpprfReceiver,
+        payloads: Vec<Block512>,
+    ) -> (usize, usize, usize) {
+        let payloads_hash: HashSet<Block512> = HashSet::from_iter(payloads);
+        let receiver_payloads: HashSet<Block512> = HashSet::from_iter(
+            receiver
+                .state
+                .unwrap()
+                .opprf_payloads_in
+                .into_iter()
+                .flatten(),
+        );
+
+        let sender = sender.state.unwrap();
+        let sender_masked_payloads: Vec<Vec<Block512>> = sender.opprf_payloads_in.unwrap();
+        let sender_masks: Vec<Block512> = sender.opprf_payloads_out.unwrap();
+
+        // Payloads get masked by the sender to keep them hidden.
+        // We need to unmask them to check that everything is fine.
+        let mut sender_payloads: HashSet<Block512> = HashSet::new();
+        for i in 0..sender_masks.len() {
+            for j in 0..sender_masked_payloads[i].len() {
+                sender_payloads.insert(sender_masked_payloads[i][j] ^ sender_masks[i]);
+            }
+        }
+
+        let intersection_sender = sender_payloads.intersection(&payloads_hash).count();
+        let intersection_receiver = receiver_payloads.intersection(&payloads_hash).count();
+        (
+            intersection_sender,
+            intersection_receiver,
+            payloads_hash.len(),
+        )
+    }
     proptest! {
          #[test]
         fn test_psty_simple_hashing_sender_succeeded(
@@ -76,6 +116,44 @@ mod tests {
             assert!(
                 !result_hash_receiver.is_err(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
+            );
+        }
+        #[test]
+        // Test that Simple Hashing preserved the original payloads
+        fn test_psty_simple_hashing_sender_payloads_preserved(
+            seed_sx in any::<u64>(),
+            seed_rx in any::<u64>(),
+            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
+        ){
+
+            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
+            let (intersection_payloads_sx, _, payloads_len) =
+                psty_check_hashing_payloads(sender, receiver, payloads);
+            assert!(
+                intersection_payloads_sx == payloads_len,
+                "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
+                payloads_len,
+                intersection_payloads_sx
+            );
+        }
+        #[test]
+        // Test that Cuckoo Hashing preserved the original payloads
+        fn test_psty_cuckoo_hashing_receiver_payloads_preserved(
+            seed_sx in any::<u64>(),
+            seed_rx in any::<u64>(),
+            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
+        ){
+
+            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
+            let (_, intersection_payloads_rx, payloads_len) =
+                psty_check_hashing_payloads(sender, receiver, payloads);
+            assert!(
+                intersection_payloads_rx == payloads_len,
+                "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
+                payloads_len,
+                intersection_payloads_rx
             );
         }
     }
