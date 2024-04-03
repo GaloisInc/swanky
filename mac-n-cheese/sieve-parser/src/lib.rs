@@ -23,7 +23,19 @@ pub enum PluginTypeArg {
 impl PluginTypeArg {
     pub fn from_str(s: &str) -> eyre::Result<Self> {
         if s.starts_with("0x") || s.starts_with("0X") {
-            Ok(PluginTypeArg::Number(Number::from_be_hex(&s[2..])))
+            let mut out = Number::default();
+            for &byte in s[2..].as_bytes() {
+                out = Option::<_>::from(out.checked_mul(&Number::from_u8(16)))
+                    .context("number too big")?;
+                let digit = if byte <= b'9' {
+                    byte - b'0'
+                } else {
+                    byte.to_ascii_lowercase() - b'a' + 10
+                };
+                out = Option::<_>::from(out.checked_add(&Number::from_u8(digit)))
+                    .context("number too big")?;
+            }
+            Ok(PluginTypeArg::Number(out))
         } else if s.starts_with("0o") || s.starts_with("0O") {
             todo!()
         } else if s.chars().all(|c| c.is_numeric()) {
