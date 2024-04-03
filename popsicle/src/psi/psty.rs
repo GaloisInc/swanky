@@ -167,7 +167,7 @@ impl SenderState {
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut gb, &x, &y)?;
-        gb.outputs(&result.wires().to_vec())?;
+        gb.outputs(result.wires())?;
         Ok(())
     }
 
@@ -321,7 +321,7 @@ impl ReceiverState {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut ev, &x, &y)?;
         let cardinality_outs = ev
-            .outputs(&result.wires().to_vec())?
+            .outputs(&result.wires())?
             .expect("evaluator should produce outputs");
 
         let mut cardinality: u128 = 0;
