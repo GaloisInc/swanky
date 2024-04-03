@@ -13,6 +13,7 @@ pub mod base_psi;
 pub mod circuits;
 pub mod evaluator;
 pub mod garbler;
+pub mod tests;
 pub mod utils;
 
 /// The type of set elements to be used
