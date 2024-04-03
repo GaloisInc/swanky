@@ -157,11 +157,16 @@ where
                 }
             }
             WhichParty::Verifier(ev) => {
-                for elem in iter::empty().chain(addr.iter().copied()).chain(
-                    dmc.fcom
-                        .input_verifier(ev, &mut self.ch, &mut dmc.rng, stored_size)
-                        .unwrap(),
-                ) {
+                for elem in
+                    iter::empty()
+                        .chain(addr.iter().copied())
+                        .chain(dmc.fcom.input_verifier(
+                            ev,
+                            &mut self.ch,
+                            &mut dmc.rng,
+                            stored_size,
+                        )?)
+                {
                     flat.push(elem);
                 }
             }

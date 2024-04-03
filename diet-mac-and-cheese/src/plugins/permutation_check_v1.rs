@@ -155,7 +155,7 @@ impl Plugin for PermutationCheckV1 {
         );
         let ntuples = nwires / tuple_size;
 
-        let field_type_id = match type_store.get(&type_id).unwrap() {
+        let field_type_id = match type_store.get(&type_id)? {
             TypeSpecification::Field(f) => *f,
             _ => {
                 bail!("Plugin does not support plugin types");

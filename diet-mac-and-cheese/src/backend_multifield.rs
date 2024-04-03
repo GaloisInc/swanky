@@ -1207,7 +1207,7 @@ where
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
-                let mut v = Vec::with_capacity((end + 1 - start).try_into().unwrap());
+                let mut v = Vec::with_capacity((end + 1 - start).try_into()?);
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {:?}", in_wire);
