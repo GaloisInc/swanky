@@ -1,5 +1,4 @@
 //! Testing the hashing phase in Base Psi
-//! Testing the hashing phase in Base Psi
 #[cfg(test)]
 mod tests {
     use crate::errors::Error;

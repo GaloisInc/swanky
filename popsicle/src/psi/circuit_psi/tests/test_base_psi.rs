@@ -1,3 +1,4 @@
+//! Testing the Base Psi protocol
 #[cfg(test)]
 mod tests {
     use crate::errors::Error;
