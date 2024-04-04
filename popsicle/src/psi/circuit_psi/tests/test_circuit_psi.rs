@@ -64,7 +64,7 @@ mod tests {
                 )
                 .unwrap() as usize;
             let cardinality_in_clear = cardinality_in_clear(set_a, set_b);
-                assert!(
+                prop_assert!(
                     cardinality == cardinality_in_clear,
                     "The PSI Cardinality is wrong! The result was {} and should be {}",
                     cardinality,
@@ -94,7 +94,7 @@ mod tests {
               )
               .unwrap();
 
-            assert!(
+            prop_assert!(
                 sum == sum_in_clear,
                 "The PSI Payload Sum is wrong! The result was {} and should be {}",
                 sum,

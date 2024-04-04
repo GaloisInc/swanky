@@ -74,7 +74,7 @@ mod tests {
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
             let (result_sender, _) = psty_base_psi(&set, &payloads, seed_sx, seed_rx);
-            assert!(
+            prop_assert!(
                 !result_sender.is_err(),
                 "PSTY's Base Psi failed on the sender side"
             );
@@ -88,7 +88,7 @@ mod tests {
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
             let (_, result_receiver) = psty_base_psi(&set, &payloads, seed_sx, seed_rx);
-            assert!(
+            prop_assert!(
                 !result_receiver.is_err(),
                 "PSTY's Base Psi failed on the receiver side"
             );

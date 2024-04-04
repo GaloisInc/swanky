@@ -142,7 +142,7 @@ mod tests {
             let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, seed_rx);
             let (intersection_size_sx , _) = psty_check_opprf_set(sender, receiver, &set);
 
-            assert!(
+            prop_assert!(
             intersection_size_sx
                     == SET_SIZE,
                 "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_sx, SET_SIZE
@@ -159,7 +159,7 @@ mod tests {
             let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, seed_rx);
             let (_ , intersection_size_rx) = psty_check_opprf_set(sender, receiver, &set);
 
-            assert!(
+            prop_assert!(
             intersection_size_rx
                     == SET_SIZE,
                 "PSTY OpprfReceiver did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_rx, SET_SIZE
@@ -175,7 +175,7 @@ mod tests {
 
             let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, seed_rx);
             let (intersection_sender, _, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            assert!(
+            prop_assert!(
                 intersection_sender == payloads_len,
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
@@ -192,7 +192,7 @@ mod tests {
 
             let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, seed_rx);
             let (_, intersection_receiver, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            assert!(
+            prop_assert!(
                 intersection_receiver == payloads_len,
                 "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
