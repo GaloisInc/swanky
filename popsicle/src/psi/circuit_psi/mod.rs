@@ -29,16 +29,19 @@ pub const PAYLOAD_SIZE: usize = 8;
 
 /// Encoded Garbled Circuit PsiInputs
 pub struct CircuitInputs<F> {
-    pub(crate) sender_set_elements: Vec<F>,
-    pub(crate) receiver_set_elements: Vec<F>,
-    // In psty, the sender's payload's are masked
-    // or alternatively one-time padded
-    pub(crate) sender_payloads_masked: Option<Vec<F>>,
-    pub(crate) receiver_payloads: Option<Vec<F>>,
-    // The receiver gets the correct masks/one time pads
-    // when they share the same element with the sender
-    // and otherwise receive a random mask
-    pub(crate) masks: Option<Vec<F>>,
+    /// The sender set elements wires
+    pub sender_set_elements: Vec<F>,
+    /// The receiver set elements wires
+    pub receiver_set_elements: Vec<F>,
+    /// In psty, the sender's payload's are masked
+    /// or alternatively one-time padded
+    pub sender_payloads_masked: Vec<F>,
+    /// The receiver payloads wires
+    pub receiver_payloads: Vec<F>,
+    /// The receiver gets the correct masks/one time pads
+    /// when they share the same element with the sender
+    /// and otherwise receive a random mask
+    pub masks: Vec<F>,
 }
 
 /// A function that takes a `CircuitInputs`` (created by a BasePsi) and groups the wires of
@@ -67,14 +70,14 @@ where
 
     let mut sender_payloads = None;
     let mut receiver_payloads = None;
-    if let Some(p) = &circuit_inputs.sender_payloads_masked.as_ref() {
+    if !&circuit_inputs.sender_payloads_masked.is_empty() {
         sender_payloads = Some(fancy_unmask(
             f,
-            &wires_to_bundle::<F>(p, PAYLOAD_SIZE * 8),
-            &wires_to_bundle::<F>(&circuit_inputs.masks.as_ref().unwrap(), PAYLOAD_SIZE * 8),
+            &wires_to_bundle::<F>(&circuit_inputs.sender_payloads_masked, PAYLOAD_SIZE * 8),
+            &wires_to_bundle::<F>(&circuit_inputs.masks, PAYLOAD_SIZE * 8),
         )?);
         receiver_payloads = Some(wires_to_bundle::<F>(
-            circuit_inputs.receiver_payloads.as_ref().unwrap(),
+            &circuit_inputs.receiver_payloads,
             PAYLOAD_SIZE * 8,
         ));
     }

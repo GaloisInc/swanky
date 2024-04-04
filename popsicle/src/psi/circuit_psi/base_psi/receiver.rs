@@ -11,10 +11,14 @@ use scuttlebutt::{Block, Block512};
 /// A receiver here refers to the party which queries the OPPRF in this
 /// computation.
 pub struct OpprfReceiver {
-    pub(crate) key: Block,
-    pub(crate) opprf_set: KmprtReceiver,
-    pub(crate) opprf_payload: KmprtReceiver,
-    pub(crate) state: ReceiverState,
+    /// The hashing key
+    pub key: Block,
+    /// The opprf for set elements
+    pub opprf_set: KmprtReceiver,
+    /// The opprf for payloads
+    pub opprf_payload: KmprtReceiver,
+    /// The opprf queries and outputs
+    pub state: ReceiverState,
 }
 
 /// A strut defining the `OpprfReceiver`'s State
@@ -31,10 +35,14 @@ pub struct OpprfReceiver {
 /// from one another.
 #[derive(Default)]
 pub struct ReceiverState {
-    pub(crate) opprf_set_in: Vec<Block>,
-    pub(crate) opprf_set_out: Vec<Block512>,
-    pub(crate) opprf_payloads_in: Vec<Block512>,
-    pub(crate) opprf_payloads_out: Vec<Block512>,
+    /// The opprf query for sets
+    pub opprf_set_in: Vec<Block>,
+    /// The opprf output for sets
+    pub opprf_set_out: Vec<Block512>,
+    /// The opprf query for payloads
+    pub opprf_payloads_in: Vec<Block512>,
+    /// The opprf output for payloads
+    pub opprf_payloads_out: Vec<Block512>,
 }
 
 impl BasePsi for OpprfReceiver {
@@ -157,9 +165,9 @@ impl BasePsi for OpprfReceiver {
         let mut result = CircuitInputs {
             sender_set_elements,
             receiver_set_elements,
-            sender_payloads_masked: None,
-            receiver_payloads: None,
-            masks: None,
+            sender_payloads_masked: vec![],
+            receiver_payloads: vec![],
+            masks: vec![],
         };
         // If payloads exist, then encode them
         if !&self.state.opprf_payloads_in.is_empty() {
@@ -177,9 +185,9 @@ impl BasePsi for OpprfReceiver {
             let masks: Vec<F::Item> =
                 bin_encode_many_block512(gc_party, &self.state.opprf_payloads_out, PAYLOAD_SIZE)?;
 
-            result.sender_payloads_masked = Some(sender_payloads);
-            result.receiver_payloads = Some(receiver_payloads);
-            result.masks = Some(masks);
+            result.sender_payloads_masked = sender_payloads;
+            result.receiver_payloads = receiver_payloads;
+            result.masks = masks;
         }
 
         Ok(result)

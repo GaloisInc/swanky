@@ -11,11 +11,16 @@ use scuttlebutt::{Block, Block512};
 /// A sender here refers to the party which programs the OPPRF in this
 /// computation.
 pub struct OpprfSender {
-    pub(crate) key: Block,
-    pub(crate) nbins: Option<usize>,
-    pub(crate) opprf_set: KmprtSender,
-    pub(crate) opprf_payload: KmprtSender,
-    pub(crate) state: SenderState,
+    /// The hashing key
+    pub key: Block,
+    /// The number of hashing bins
+    pub nbins: Option<usize>,
+    /// The opprf for set elements
+    pub opprf_set: KmprtSender,
+    /// The opprf for payloads
+    pub opprf_payload: KmprtSender,
+    /// The opprf programming
+    pub state: SenderState,
 }
 
 /// A strut defining the `OpprfSender`'s State
@@ -31,10 +36,14 @@ pub struct OpprfSender {
 /// it returns a value that is sampled uniformly random.
 #[derive(Default)]
 pub struct SenderState {
-    pub(crate) opprf_set_in: Vec<Vec<Block>>,
-    pub(crate) opprf_set_out: Vec<Block512>,
-    pub(crate) opprf_payloads_in: Vec<Vec<Block512>>,
-    pub(crate) opprf_payloads_out: Vec<Block512>,
+    /// The opprf programmed inputs for the set elements
+    pub opprf_set_in: Vec<Vec<Block>>,
+    /// The opprf programmed output for the set elements
+    pub opprf_set_out: Vec<Block512>,
+    /// The opprf programmed inputs for the payloads
+    pub opprf_payloads_in: Vec<Vec<Block512>>,
+    /// The opprf programmed outputs for the payloads
+    pub opprf_payloads_out: Vec<Block512>,
 }
 
 impl BasePsi for OpprfSender {
@@ -168,9 +177,9 @@ impl BasePsi for OpprfSender {
         let mut result = CircuitInputs {
             sender_set_elements,
             receiver_set_elements,
-            sender_payloads_masked: None,
-            receiver_payloads: None,
-            masks: None,
+            sender_payloads_masked: vec![],
+            receiver_payloads: vec![],
+            masks: vec![],
         };
 
         // If payloads exist, then encode them
@@ -183,9 +192,9 @@ impl BasePsi for OpprfSender {
             let masks: Vec<F::Item> =
                 bin_receive_many_block512(gc_party, sender_payloads_masked.len())?;
 
-            result.sender_payloads_masked = Some(sender_payloads_masked);
-            result.receiver_payloads = Some(receiver_payloads);
-            result.masks = Some(masks);
+            result.sender_payloads_masked = sender_payloads_masked;
+            result.receiver_payloads = receiver_payloads;
+            result.masks = masks;
         }
 
         Ok(result)
