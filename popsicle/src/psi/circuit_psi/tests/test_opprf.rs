@@ -32,16 +32,16 @@ mod tests {
             let result_sender = s.spawn(|| {
                 let mut rng = AesRng::seed_from_u64(seed_sx);
                 let mut channel = setup(sender);
-                let mut sender = OpprfSender::init(&mut channel, &mut rng, true).unwrap();
-                let _ = sender.hash_data(set, Some(payloads), &mut channel, &mut rng);
+                let mut sender = OpprfSender::init(&mut channel, &mut rng).unwrap();
+                let _ = sender.hash_data(set, payloads, &mut channel, &mut rng);
                 let result_opprf_sender = sender.opprf_exchange(&mut channel, &mut rng);
 
                 (sender, result_opprf_sender)
             });
             let mut rng = AesRng::seed_from_u64(seed_rx);
             let mut channel = setup(receiver);
-            let mut receiver = OpprfReceiver::init(&mut channel, &mut rng, true).unwrap();
-            let _ = receiver.hash_data(set, Some(payloads), &mut channel, &mut rng);
+            let mut receiver = OpprfReceiver::init(&mut channel, &mut rng).unwrap();
+            let _ = receiver.hash_data(set, payloads, &mut channel, &mut rng);
             let result_opprf_receiver = receiver.opprf_exchange(&mut channel, &mut rng);
 
             let (sender, result_opprf_sender) = result_sender.join().unwrap();
@@ -57,10 +57,8 @@ mod tests {
         set: &[Vec<u8>],
     ) -> (usize, usize) {
         let set_hash: HashSet<Block512> = HashSet::from_iter(u8_vec_block512(set, ELEMENT_SIZE));
-        let sender_table: HashSet<Block512> =
-            HashSet::from_iter(sender.state.unwrap().opprf_set_out);
-        let receiver_table: HashSet<Block512> =
-            HashSet::from_iter(receiver.state.unwrap().opprf_set_out.unwrap());
+        let sender_table: HashSet<Block512> = HashSet::from_iter(sender.state.opprf_set_out);
+        let receiver_table: HashSet<Block512> = HashSet::from_iter(receiver.state.opprf_set_out);
 
         let intersection_size_sx = set_hash.intersection(&sender_table).count();
         let intersection_size_rx = set_hash.intersection(&receiver_table).count();
@@ -76,12 +74,10 @@ mod tests {
     ) -> (usize, usize, usize) {
         let payloads_hash: HashSet<Block512> = HashSet::from_iter(payloads);
 
-        let receiver = receiver.state.unwrap();
-        let receiver_payloads: HashSet<Block512> =
-            HashSet::from_iter(receiver.opprf_payloads_in.into_iter().flatten());
-        let receiver_masks: Vec<Block512> = receiver.opprf_payloads_out.unwrap();
-        let sender_masked_payloads: Vec<Block512> =
-            sender.state.unwrap().opprf_payloads_out.unwrap();
+        let receiver = receiver.state;
+        let receiver_payloads: HashSet<Block512> = HashSet::from_iter(receiver.opprf_payloads_in);
+        let receiver_masks: Vec<Block512> = receiver.opprf_payloads_out;
+        let sender_masked_payloads: Vec<Block512> = sender.state.opprf_payloads_out;
 
         // Payloads get masked by the sender to keep them hidden.
         // We need to unmask them to check that everything is fine.

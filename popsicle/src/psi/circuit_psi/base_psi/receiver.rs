@@ -13,8 +13,8 @@ use scuttlebutt::{Block, Block512};
 pub struct OpprfReceiver {
     pub(crate) key: Block,
     pub(crate) opprf_set: KmprtReceiver,
-    pub(crate) opprf_payload: Option<KmprtReceiver>,
-    pub(crate) state: Option<ReceiverState>,
+    pub(crate) opprf_payload: KmprtReceiver,
+    pub(crate) state: ReceiverState,
 }
 
 /// A strut defining the `OpprfReceiver`'s State
@@ -29,11 +29,12 @@ pub struct OpprfReceiver {
 /// it returns a value that is sampled uniformly random. The OPPRF
 /// guarantees that all its outputs, programmed or random, are indistinguishable
 /// from one another.
+#[derive(Default)]
 pub struct ReceiverState {
     pub(crate) opprf_set_in: Vec<Block>,
-    pub(crate) opprf_set_out: Option<Vec<Block512>>,
-    pub(crate) opprf_payloads_in: Option<Vec<Block512>>,
-    pub(crate) opprf_payloads_out: Option<Vec<Block512>>,
+    pub(crate) opprf_set_out: Vec<Block512>,
+    pub(crate) opprf_payloads_in: Vec<Block512>,
+    pub(crate) opprf_payloads_out: Vec<Block512>,
 }
 
 impl BasePsi for OpprfReceiver {
@@ -41,7 +42,7 @@ impl BasePsi for OpprfReceiver {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, payload_existence: bool) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
@@ -56,24 +57,21 @@ impl BasePsi for OpprfReceiver {
         let opprf_set = KmprtReceiver::init(channel, rng)?;
         channel.flush()?;
 
-        let mut opprf_payload = None;
-        if payload_existence {
-            opprf_payload = Some(KmprtReceiver::init(channel, rng)?);
-            channel.flush()?;
-        }
+        let opprf_payload = KmprtReceiver::init(channel, rng)?;
+        channel.flush()?;
 
         Ok(Self {
             key,
             opprf_set,
             opprf_payload,
-            state: None,
+            state: Default::default(),
         })
     }
     /// Hash the data using cuckoo hashing
     fn hash_data<C, RNG>(
         &mut self,
         set: &[Element],
-        payloads: Option<&[Payload]>,
+        payloads: &[Payload],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -101,16 +99,16 @@ impl BasePsi for OpprfReceiver {
 
         let opprf_set_in = cuckoo_place_ids(&cuckoo.items, rng);
 
-        let mut opprf_payloads_in = None;
-        if let Some(p) = payloads {
-            opprf_payloads_in = Some(cuckoo_place_payloads(&cuckoo.items, p, rng));
+        let mut opprf_payloads_in = vec![];
+        if !payloads.is_empty() {
+            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads, rng);
         }
-        self.state = Some(ReceiverState {
+        self.state = ReceiverState {
             opprf_set_in,
-            opprf_set_out: None,
+            opprf_set_out: vec![],
             opprf_payloads_in,
-            opprf_payloads_out: None,
-        });
+            opprf_payloads_out: vec![],
+        };
         Ok(())
     }
 
@@ -122,14 +120,13 @@ impl BasePsi for OpprfReceiver {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed
         // output as the sender, otherwise, they receive a random value.
-        self.state.as_mut().unwrap().opprf_set_out = Some(self.opprf_set.receive(
-            channel,
-            &self.state.as_ref().unwrap().opprf_set_in,
-            rng,
-        )?);
-        if let Some(opprf_p) = self.opprf_payload.as_mut() {
-            self.state.as_mut().unwrap().opprf_payloads_out =
-                Some(opprf_p.receive(channel, &self.state.as_ref().unwrap().opprf_set_in, rng)?);
+        self.state.opprf_set_out =
+            self.opprf_set
+                .receive(channel, &self.state.opprf_set_in, rng)?;
+        if !self.state.opprf_payloads_in.is_empty() {
+            self.state.opprf_payloads_out =
+                self.opprf_payload
+                    .receive(channel, &self.state.opprf_set_in, rng)?;
         }
         Ok(())
     }
@@ -147,19 +144,15 @@ impl BasePsi for OpprfReceiver {
         // bytes, turning it into bits, and then multiplying it by the
         // number of elements the parties are intersecting.
         // Note that PSTY expects parties to have the same set sizes.
-        let elements_binary_len =
-            ELEMENT_SIZE * 8 * self.state.as_ref().unwrap().opprf_set_in.len();
+        let elements_binary_len = ELEMENT_SIZE * 8 * self.state.opprf_set_in.len();
 
         // First receive encoded inputs from the `OpprfSender`
         let sender_set_elements: Vec<F::Item> =
             bin_receive_many_block512(gc_party, elements_binary_len)?;
 
         // Then send encoded inputs
-        let receiver_set_elements: Vec<F::Item> = bin_encode_many_block512(
-            gc_party,
-            &self.state.as_ref().unwrap().opprf_set_out.as_ref().unwrap(),
-            ELEMENT_SIZE,
-        )?;
+        let receiver_set_elements: Vec<F::Item> =
+            bin_encode_many_block512(gc_party, &self.state.opprf_set_out, ELEMENT_SIZE)?;
 
         let mut result = CircuitInputs {
             sender_set_elements,
@@ -169,38 +162,20 @@ impl BasePsi for OpprfReceiver {
             masks: None,
         };
         // If payloads exist, then encode them
-        if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_in {
+        if !&self.state.opprf_payloads_in.is_empty() {
             // We compute the number of wires that the receivers should
             // expect from the sender by taking the size of a payload in
             // bytes, turning it into bits, and then multiplying it by the
             // number of elements the parties are intersecting.
             // Note that PSTY expects parties to have the same set sizes.
-            let payloads_binary_len = PAYLOAD_SIZE
-                * 8
-                * self
-                    .state
-                    .as_ref()
-                    .unwrap()
-                    .opprf_payloads_in
-                    .as_ref()
-                    .unwrap()
-                    .len();
+            let payloads_binary_len = PAYLOAD_SIZE * 8 * self.state.opprf_payloads_in.len();
 
             let sender_payloads: Vec<F::Item> =
                 bin_receive_many_block512(gc_party, payloads_binary_len)?;
             let receiver_payloads: Vec<F::Item> =
-                bin_encode_many_block512(gc_party, p, PAYLOAD_SIZE)?;
-            let masks: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
-                &self
-                    .state
-                    .as_ref()
-                    .unwrap()
-                    .opprf_payloads_out
-                    .as_ref()
-                    .unwrap(),
-                PAYLOAD_SIZE,
-            )?;
+                bin_encode_many_block512(gc_party, &self.state.opprf_payloads_in, PAYLOAD_SIZE)?;
+            let masks: Vec<F::Item> =
+                bin_encode_many_block512(gc_party, &self.state.opprf_payloads_out, PAYLOAD_SIZE)?;
 
             result.sender_payloads_masked = Some(sender_payloads);
             result.receiver_payloads = Some(receiver_payloads);

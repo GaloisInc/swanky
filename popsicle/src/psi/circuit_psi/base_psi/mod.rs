@@ -29,7 +29,7 @@ pub mod sender;
 /// performed in the garbled circuit with no a-priori pre-processing computation).
 pub trait BasePsi {
     /// Initializes the BasePsi party
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, payload_existence: bool) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         Self: Sized,
         C: AbstractChannel,
@@ -40,7 +40,7 @@ pub trait BasePsi {
     fn hash_data<C, RNG>(
         &mut self,
         set: &[Vec<u8>],
-        payloads: Option<&[Block512]>,
+        payloads: &[Block512],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -72,7 +72,7 @@ pub trait BasePsi {
     fn base_psi<F, E, C, RNG>(
         gc_party: &mut F,
         set: &[Vec<u8>],
-        payloads: Option<&[Block512]>,
+        payloads: &[Block512],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<CircuitInputs<F::Item>, Error>
@@ -84,11 +84,7 @@ pub trait BasePsi {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
-        let mut payload_existence = false;
-        if let Some(_) = payloads {
-            payload_existence = true;
-        }
-        let mut party = Self::init(channel, rng, payload_existence)?;
+        let mut party = Self::init(channel, rng)?;
         party.hash_data(set, payloads, channel, rng)?;
 
         channel.flush()?;

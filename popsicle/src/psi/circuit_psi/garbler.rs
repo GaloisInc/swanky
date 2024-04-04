@@ -56,7 +56,7 @@ where
     fn circuit_psi_psty<P, Ckt, CktOut>(
         &mut self,
         set: &[Element],
-        payloads: Option<&[Payload]>,
+        payloads: &[Payload],
         circuit: &mut Ckt,
     ) -> Result<CktOut, Error>
     where

@@ -14,8 +14,8 @@ pub struct OpprfSender {
     pub(crate) key: Block,
     pub(crate) nbins: Option<usize>,
     pub(crate) opprf_set: KmprtSender,
-    pub(crate) opprf_payload: Option<KmprtSender>,
-    pub(crate) state: Option<SenderState>,
+    pub(crate) opprf_payload: KmprtSender,
+    pub(crate) state: SenderState,
 }
 
 /// A strut defining the `OpprfSender`'s State
@@ -29,11 +29,12 @@ pub struct OpprfSender {
 /// When the OPPRF is called on a programmed input, it returns a
 /// programmed output. When the OPPRF is called on any other value,
 /// it returns a value that is sampled uniformly random.
+#[derive(Default)]
 pub struct SenderState {
     pub(crate) opprf_set_in: Vec<Vec<Block>>,
     pub(crate) opprf_set_out: Vec<Block512>,
-    pub(crate) opprf_payloads_in: Option<Vec<Vec<Block512>>>,
-    pub(crate) opprf_payloads_out: Option<Vec<Block512>>,
+    pub(crate) opprf_payloads_in: Vec<Vec<Block512>>,
+    pub(crate) opprf_payloads_out: Vec<Block512>,
 }
 
 impl BasePsi for OpprfSender {
@@ -41,7 +42,7 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, payload_existence: bool) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
@@ -51,25 +52,21 @@ impl BasePsi for OpprfSender {
         // to the same outputs.
         let key = channel.read_block()?;
         let opprf_set = KmprtSender::init(channel, rng)?;
-
-        let mut opprf_payload = None;
-        if payload_existence {
-            opprf_payload = Some(KmprtSender::init(channel, rng)?);
-        }
+        let opprf_payload = KmprtSender::init(channel, rng)?;
 
         Ok(Self {
             key,
             nbins: None,
             opprf_set,
             opprf_payload,
-            state: None,
+            state: Default::default(),
         })
     }
     /// Hash the data using simple hashing
     fn hash_data<C, RNG>(
         &mut self,
         set: &[Element],
-        payloads: Option<&[Payload]>,
+        payloads: &[Payload],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -92,11 +89,11 @@ impl BasePsi for OpprfSender {
         let mut opprf_set_in = vec![Vec::new(); nbins];
         let opprf_set_out = (0..nbins).map(|_| rng.gen::<Block512>()).collect();
 
-        let mut opprf_payloads_in = None;
-        let mut opprf_payloads_out: Option<Vec<Block512>> = None;
-        if let Some(_) = payloads {
-            opprf_payloads_in = Some(vec![Vec::new(); nbins]);
-            opprf_payloads_out = Some((0..nbins).map(|_| rng.gen::<Block512>()).collect());
+        let mut opprf_payloads_in = vec![];
+        let mut opprf_payloads_out = vec![];
+        if !payloads.is_empty() {
+            opprf_payloads_in = vec![Vec::new(); nbins];
+            opprf_payloads_out = (0..nbins).map(|_| rng.gen::<Block512>()).collect();
         }
 
         for (i, x) in hashes.iter().enumerate() {
@@ -107,14 +104,11 @@ impl BasePsi for OpprfSender {
                 // Then place the item in that bin while keeping track
                 // of the index of the hash function used in the process
                 opprf_set_in[bin].push(*x ^ Block::from(h as u128));
-                if let Some(ps) = payloads {
-                    let t = opprf_payloads_out.as_ref().unwrap();
-                    if let Some(p) = opprf_payloads_in.as_mut() {
-                        // The payload values are masked before being sent out
-                        // and placed in the same bin index as the element they
-                        // are associated with.
-                        p[bin].push(ps[i] ^ t[bin]);
-                    }
+                if !payloads.is_empty() {
+                    // The payload values are masked before being sent out
+                    // and placed in the same bin index as the element they
+                    // are associated with.
+                    opprf_payloads_in[bin].push(payloads[i] ^ opprf_payloads_out[bin]);
                 }
                 bins.push(bin);
             }
@@ -122,18 +116,18 @@ impl BasePsi for OpprfSender {
             // table2[j] & payload[j]. This avoid possible leakage
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
                 opprf_set_in[bins[0]].push(rng.gen());
-                if let Some(p) = opprf_payloads_in.as_mut() {
-                    p[bins[0]].push(rng.gen());
+                if !payloads.is_empty() {
+                    opprf_payloads_in[bins[0]].push(rng.gen());
                 }
             }
         }
 
-        self.state = Some(SenderState {
+        self.state = SenderState {
             opprf_set_in,
             opprf_set_out,
             opprf_payloads_in,
             opprf_payloads_out,
-        });
+        };
 
         Ok(())
     }
@@ -145,19 +139,15 @@ impl BasePsi for OpprfSender {
     {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs
-        let opprf_program = flatten_bin_tags(
-            &self.state.as_ref().unwrap().opprf_set_in,
-            &self.state.as_ref().unwrap().opprf_set_out,
-        );
+        let opprf_program = flatten_bin_tags(&self.state.opprf_set_in, &self.state.opprf_set_out);
         self.opprf_set
             .send(channel, &opprf_program, self.nbins.unwrap(), rng)?;
 
-        if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_in {
-            if let Some(opprfp) = self.opprf_payload.as_mut() {
-                let points_data =
-                    flatten_bins_payloads(&self.state.as_ref().unwrap().opprf_set_in, &p);
-                opprfp.send(channel, &points_data, self.nbins.unwrap(), rng)?;
-            }
+        if !&self.state.opprf_payloads_in.is_empty() {
+            let points_data =
+                flatten_bins_payloads(&self.state.opprf_set_in, &self.state.opprf_payloads_in);
+            self.opprf_payload
+                .send(channel, &points_data, self.nbins.unwrap(), rng)?;
         }
         Ok(())
     }
@@ -170,11 +160,8 @@ impl BasePsi for OpprfSender {
         E: Debug,
         Error: From<E>,
     {
-        let sender_set_elements = bin_encode_many_block512(
-            gc_party,
-            &self.state.as_ref().unwrap().opprf_set_out,
-            ELEMENT_SIZE,
-        )?;
+        let sender_set_elements =
+            bin_encode_many_block512(gc_party, &self.state.opprf_set_out, ELEMENT_SIZE)?;
 
         let receiver_set_elements = bin_receive_many_block512(gc_party, sender_set_elements.len())?;
 
@@ -187,9 +174,9 @@ impl BasePsi for OpprfSender {
         };
 
         // If payloads exist, then encode them
-        if let Some(p) = &self.state.as_ref().unwrap().opprf_payloads_out {
+        if !&self.state.opprf_payloads_out.is_empty() {
             let sender_payloads_masked: Vec<F::Item> =
-                bin_encode_many_block512(gc_party, &p, PAYLOAD_SIZE)?;
+                bin_encode_many_block512(gc_party, &self.state.opprf_payloads_out, PAYLOAD_SIZE)?;
             let receiver_payloads: Vec<F::Item> =
                 bin_receive_many_block512(gc_party, sender_payloads_masked.len())?;
 

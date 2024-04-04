@@ -32,17 +32,15 @@ mod tests {
             let result_sender = s.spawn(|| {
                 let mut rng = AesRng::seed_from_u64(seed_sx);
                 let mut channel = setup(sender);
-                let mut sender = OpprfSender::init(&mut channel, &mut rng, true).unwrap();
-                let result_hash_sender =
-                    sender.hash_data(set, Some(payloads), &mut channel, &mut rng);
+                let mut sender = OpprfSender::init(&mut channel, &mut rng).unwrap();
+                let result_hash_sender = sender.hash_data(set, payloads, &mut channel, &mut rng);
                 (sender, result_hash_sender)
             });
             let mut rng = AesRng::seed_from_u64(seed_rx);
             let mut channel = setup(receiver);
 
-            let mut receiver = OpprfReceiver::init(&mut channel, &mut rng, true).unwrap();
-            let result_hash_receiver =
-                receiver.hash_data(set, Some(payloads), &mut channel, &mut rng);
+            let mut receiver = OpprfReceiver::init(&mut channel, &mut rng).unwrap();
+            let result_hash_receiver = receiver.hash_data(set, payloads, &mut channel, &mut rng);
             let (sender, result_hash_sender) = result_sender.join().unwrap();
             (sender, receiver, result_hash_sender, result_hash_receiver)
         })
@@ -57,18 +55,12 @@ mod tests {
         payloads: Vec<Block512>,
     ) -> (usize, usize, usize) {
         let payloads_hash: HashSet<Block512> = HashSet::from_iter(payloads);
-        let receiver_payloads: HashSet<Block512> = HashSet::from_iter(
-            receiver
-                .state
-                .unwrap()
-                .opprf_payloads_in
-                .into_iter()
-                .flatten(),
-        );
+        let receiver_payloads: HashSet<Block512> =
+            HashSet::from_iter(receiver.state.opprf_payloads_in);
 
-        let sender = sender.state.unwrap();
-        let sender_masked_payloads: Vec<Vec<Block512>> = sender.opprf_payloads_in.unwrap();
-        let sender_masks: Vec<Block512> = sender.opprf_payloads_out.unwrap();
+        let sender = sender.state;
+        let sender_masked_payloads: Vec<Vec<Block512>> = sender.opprf_payloads_in;
+        let sender_masks: Vec<Block512> = sender.opprf_payloads_out;
 
         // Payloads get masked by the sender to keep them hidden.
         // We need to unmask them to check that everything is fine.
@@ -129,14 +121,13 @@ mod tests {
             let sender_table: HashSet<Block> = HashSet::from_iter(
             sender
                 .state
-                .unwrap()
                 .opprf_set_in
                 .into_iter()
                 .flatten()
                 .collect::<Vec<Block>>(),
             );
             let receiver_table: HashSet<Block> =
-                HashSet::from_iter(receiver.state.unwrap().opprf_set_in);
+                HashSet::from_iter(receiver.state.opprf_set_in);
 
             let intersection = sender_table.intersection(&receiver_table).count();
             prop_assert!(

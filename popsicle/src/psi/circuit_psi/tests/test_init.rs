@@ -19,11 +19,11 @@ mod tests {
                 std::thread::spawn(move || {
                     let mut rng = AesRng::seed_from_u64(seed_sx);
                     let mut channel = setup(sender);
-                    let _ = OpprfSender::init(&mut channel, &mut rng, true);
+                    let _ = OpprfSender::init(&mut channel, &mut rng);
                 });
                 let mut rng = AesRng::seed_from_u64(seed_rx);
                 let mut channel = setup(receiver);
-                let receiver = OpprfReceiver::init(&mut channel, &mut rng, true);
+                let receiver = OpprfReceiver::init(&mut channel, &mut rng);
 
                 prop_assert!(
                     !receiver.is_err(),
@@ -39,12 +39,12 @@ mod tests {
                     let mut rng = AesRng::seed_from_u64(seed_sx);
                     let mut channel = setup(sender);
 
-                   OpprfSender::init(&mut channel, &mut rng, true)
+                   OpprfSender::init(&mut channel, &mut rng)
 
                 });
                 let mut rng = AesRng::seed_from_u64(seed_rx);
                 let mut channel = setup(receiver);
-                let _ = OpprfReceiver::init(&mut channel, &mut rng, true);
+                let _ = OpprfReceiver::init(&mut channel, &mut rng);
 
                  prop_assert!(
                     !sender.join().unwrap().is_err(),

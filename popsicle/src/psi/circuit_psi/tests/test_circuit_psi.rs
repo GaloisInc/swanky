@@ -54,8 +54,8 @@ mod tests {
                 let cardinality = run_psty_u128::<_, _>(
                     &set_a,
                     &set_b,
-                    None,
-                    None,
+                    &[],
+                    &[],
                     seed_sx,
                     seed_rx,
                     &mut fancy_cardinality::<Ev, _>(),
@@ -85,8 +85,8 @@ mod tests {
           let sum = run_psty_u128::<_, _>(
                   &set,
                   &set,
-                  Some(&int_vec_block512(payloads_a, PAYLOAD_SIZE)),
-                  Some(&int_vec_block512(payloads_b, PAYLOAD_SIZE)),
+                  &int_vec_block512(payloads_a, PAYLOAD_SIZE),
+                  &int_vec_block512(payloads_b, PAYLOAD_SIZE),
                   seed_sx,
                   seed_rx,
                   &mut fancy_payload_sum::<Ev, _>(),

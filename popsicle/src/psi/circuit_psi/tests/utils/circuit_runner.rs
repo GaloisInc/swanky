@@ -24,8 +24,8 @@ use std::{os::unix::net::UnixStream, thread};
 pub fn run_psty_u128<CktEv, CktGb>(
     set_a: &[Vec<u8>],
     set_b: &[Vec<u8>],
-    payloads_a: Option<&[Block512]>,
-    payloads_b: Option<&[Block512]>,
+    payloads_a: &[Block512],
+    payloads_b: &[Block512],
     seed_sx: u128,
     seed_rx: u128,
     circuit_ev: &mut CktEv,
