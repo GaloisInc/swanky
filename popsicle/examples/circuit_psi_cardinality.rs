@@ -42,7 +42,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
     thread::scope(|s| {
         let _ = s.spawn(|| {
             let mut rng = AesRng::new();
-            let mut channel = setup(sender);
+            let mut channel = setup_channel(sender);
             let mut gb = PsiGarbler::new(&mut channel, rng.gen::<Block>()).unwrap();
 
             let res = gb
@@ -54,7 +54,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             gb.gb.outputs(res.wires()).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut channel = setup(receiver);
+        let mut channel = setup_channel(receiver);
         let mut ev = PsiEvaluator::new(&mut channel, rng.gen::<Block>()).unwrap();
 
         let res = ev

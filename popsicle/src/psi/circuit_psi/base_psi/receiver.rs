@@ -101,7 +101,6 @@ impl BasePsi for OpprfReceiver {
         };
 
         channel.write_block(&self.key)?;
-        channel.flush()?;
         channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
         channel.flush()?;
 

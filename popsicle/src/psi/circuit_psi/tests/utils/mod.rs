@@ -16,7 +16,7 @@ pub mod circuit_runner;
 pub mod type_aliases;
 
 /// Turns a Unixstream into a scuttlebutt channel
-pub fn setup(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
+pub fn setup_channel(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
     let reader = BufReader::new(stream.try_clone().unwrap());
     let writer = BufWriter::new(stream);
     let channel = Channel::new(reader, writer);
@@ -52,21 +52,21 @@ pub fn arbitrary_payloads_block125(
             .map(|value| {
                 let value_bytes = value.to_le_bytes();
                 let mut value_block512 = [0u8; 64];
-                value_block512[0..16].clone_from_slice(&value_bytes[..16]);
+                value_block512[0..16].copy_from_slice(&value_bytes[..16]);
                 Block512::from(value_block512)
             })
             .collect()
     })
 }
 
-/// Create a vector of Block512, from a vector of u64s
+/// Create a vector of Block512, from a vector of U128
 pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
     values
         .into_iter()
         .map(|item| {
             let value_bytes = item.to_le_bytes();
             let mut res_block = [0_u8; 64];
-            res_block[0..size].clone_from_slice(&value_bytes[..size]);
+            res_block[0..size].copy_from_slice(&value_bytes[..size]);
             Block512::from(res_block)
         })
         .collect()
@@ -79,7 +79,7 @@ pub fn u8_vec_block(values: &[Vec<u8>], size: usize) -> Vec<Block> {
         .into_iter()
         .map(|item| {
             let mut res_block = [0_u8; 16];
-            res_block[0..size].clone_from_slice(&item[..size]);
+            res_block[0..size].copy_from_slice(&item[..size]);
             Block::from(res_block)
         })
         .collect()
@@ -92,7 +92,7 @@ pub fn u8_vec_block512(values: &[Vec<u8>], size: usize) -> Vec<Block512> {
         .into_iter()
         .map(|item| {
             let mut res_bytes = [0_u8; 16];
-            res_bytes[0..size].clone_from_slice(&item[..size]);
+            res_bytes[0..size].copy_from_slice(&item[..size]);
             Block512::from([
                 Block::from(res_bytes),
                 Block::from(0),

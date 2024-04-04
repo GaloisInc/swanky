@@ -3,7 +3,7 @@
 mod tests {
 
     use crate::{
-        circuit_psi::tests::utils::setup,
+        circuit_psi::tests::utils::setup_channel,
         psi::circuit_psi::base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
     };
     use rand::SeedableRng;
@@ -18,11 +18,11 @@ mod tests {
 
                 std::thread::spawn(move || {
                     let mut rng = AesRng::seed_from_u64(seed_sx);
-                    let mut channel = setup(sender);
+                    let mut channel = setup_channel(sender);
                     let _ = OpprfSender::init(&mut channel, &mut rng);
                 });
                 let mut rng = AesRng::seed_from_u64(seed_rx);
-                let mut channel = setup(receiver);
+                let mut channel = setup_channel(receiver);
                 let receiver = OpprfReceiver::init(&mut channel, &mut rng);
 
                 prop_assert!(
@@ -37,13 +37,13 @@ mod tests {
 
                 let sender = std::thread::spawn(move || {
                     let mut rng = AesRng::seed_from_u64(seed_sx);
-                    let mut channel = setup(sender);
+                    let mut channel = setup_channel(sender);
 
                    OpprfSender::init(&mut channel, &mut rng)
 
                 });
                 let mut rng = AesRng::seed_from_u64(seed_rx);
-                let mut channel = setup(receiver);
+                let mut channel = setup_channel(receiver);
                 let _ = OpprfReceiver::init(&mut channel, &mut rng);
 
                  prop_assert!(

@@ -31,13 +31,13 @@ mod tests {
         thread::scope(|s| {
             let result_sender = s.spawn(|| {
                 let mut rng = AesRng::seed_from_u64(seed_sx);
-                let mut channel = setup(sender);
+                let mut channel = setup_channel(sender);
                 let mut sender = OpprfSender::init(&mut channel, &mut rng).unwrap();
                 let result_hash_sender = sender.hash_data(set, payloads, &mut channel, &mut rng);
                 (sender, result_hash_sender)
             });
             let mut rng = AesRng::seed_from_u64(seed_rx);
-            let mut channel = setup(receiver);
+            let mut channel = setup_channel(receiver);
 
             let mut receiver = OpprfReceiver::init(&mut channel, &mut rng).unwrap();
             let result_hash_receiver = receiver.hash_data(set, payloads, &mut channel, &mut rng);

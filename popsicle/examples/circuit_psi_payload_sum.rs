@@ -51,7 +51,7 @@ pub fn psty_payload_sum(
     thread::scope(|s| {
         let _ = s.spawn(|| {
             let mut rng = AesRng::new();
-            let mut channel = setup(sender);
+            let mut channel = setup_channel(sender);
             let mut gb = PsiGarbler::new(&mut channel, rng.gen::<Block>()).unwrap();
 
             let res = gb
@@ -64,7 +64,7 @@ pub fn psty_payload_sum(
             gb.gb.outputs(res.wires()).unwrap();
         });
         let mut rng = AesRng::new();
-        let mut channel = setup(receiver);
+        let mut channel = setup_channel(receiver);
         let mut ev = PsiEvaluator::new(&mut channel, rng.gen::<Block>()).unwrap();
 
         let res = ev

@@ -106,7 +106,7 @@ mod tests {
         )
         .unwrap() as usize;
         assert!(
-            cardinality == (SET_SIZE - 1),
+            cardinality == 0,
             "The PSI Cardinality on disjoint sets is wrong! The result was {} and should be {}",
             cardinality,
             0

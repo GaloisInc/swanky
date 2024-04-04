@@ -53,7 +53,7 @@ where
     let (sender, receiver) = UnixStream::pair().unwrap();
     thread::scope(|s| {
         let _ = s.spawn(|| {
-            let mut channel = setup(sender);
+            let mut channel = setup_channel(sender);
             let mut gb = PsiGarbler::new(&mut channel, Block::from(seed_sx)).unwrap();
 
             let res = gb
@@ -61,7 +61,7 @@ where
                 .unwrap();
             gb.gb.outputs(res.wires()).unwrap();
         });
-        let mut channel = setup(receiver);
+        let mut channel = setup_channel(receiver);
         let mut ev = PsiEvaluator::new(&mut channel, Block::from(seed_rx)).unwrap();
 
         let res = ev
@@ -103,7 +103,7 @@ where
     let (sender, receiver) = UnixStream::pair().unwrap();
     thread::scope(|s| {
         let _ = s.spawn(|| {
-            let mut channel = setup(sender);
+            let mut channel = setup_channel(sender);
             let mut gb = PsiGarbler::new(&mut channel, Block::from(seed_sx)).unwrap();
 
             let res = gb
@@ -111,7 +111,7 @@ where
                 .unwrap();
             gb.gb.outputs(res.wires()).unwrap();
         });
-        let mut channel = setup(receiver);
+        let mut channel = setup_channel(receiver);
         let mut ev = PsiEvaluator::new(&mut channel, Block::from(seed_rx)).unwrap();
 
         let res = ev

@@ -21,10 +21,9 @@ pub type Element = Vec<u8>;
 
 /// The type of payloads to be used
 pub type Payload = Block512;
-/// Byte representation of a set element
+/// The number of bytes representing a set element.
 pub const ELEMENT_SIZE: usize = 8;
-
-/// Byte representation of a payload value
+/// The number of bytes representing a payload value.
 pub const PAYLOAD_SIZE: usize = 8;
 
 /// Encoded Garbled Circuit PsiInputs

@@ -37,7 +37,7 @@ mod tests {
         thread::scope(|s| {
             let result_sender = s.spawn(|| {
                 let mut rng = AesRng::seed_from_u64(seed_sx);
-                let mut channel = setup(sender);
+                let mut channel = setup_channel(sender);
                 let mut gb = Garbler::<
                     Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
                     AesRng,
@@ -48,7 +48,7 @@ mod tests {
                 OpprfSender::base_psi(&mut gb, &set, &payloads, &mut channel, &mut rng)
             });
             let mut rng = AesRng::seed_from_u64(seed_rx);
-            let mut channel = setup(receiver);
+            let mut channel = setup_channel(receiver);
             let mut ev = Evaluator::<
                 Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
                 AesRng,
