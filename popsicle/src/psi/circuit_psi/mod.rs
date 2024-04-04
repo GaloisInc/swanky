@@ -92,9 +92,9 @@ where
     RNG: RngCore + CryptoRng + SeedableRng<Seed = Block> + Rng,
 {
     /// The type of wires associated with f
-    type Item;
+    type Wire;
     /// Implements FancyBinary (i.e. Garbler or Evaluator)
-    type F;
+    type F: FancyBinary;
 
     /// Computes the Circuit PSI on the parties inputs.
     ///
@@ -138,10 +138,10 @@ where
         RNG: RngCore + CryptoRng + SeedableRng,
         Ckt: FnMut(
             &mut Self::F,  //
-            &[Self::Item], // bit vector where a bit indicates the presence/abscence of
+            &[Self::Wire], // bit vector where a bit indicates the presence/abscence of
             //  a set element in the intersection
-            &[BinaryBundle<Self::Item>], // bits that parties are intersecting on
-            Option<Vec<BinaryBundle<Self::Item>>>, // party A's payload
-            Option<Vec<BinaryBundle<Self::Item>>>, // party B's payload
+            &[BinaryBundle<Self::Wire>], // bits that parties are intersecting on
+            Option<Vec<BinaryBundle<Self::Wire>>>, // party A's payload
+            Option<Vec<BinaryBundle<Self::Wire>>>, // party B's payload
         ) -> Result<CktOut, Error>;
 }

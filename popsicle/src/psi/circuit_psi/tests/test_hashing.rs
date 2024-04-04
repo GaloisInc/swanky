@@ -90,7 +90,7 @@ mod tests {
     proptest! {
          #[test]
          // Test that the OpprfSender produced no errors
-        fn test_psty_simple_hashing_sender_succeeded(
+        fn test_psty_hashing_simple_sender_succeeded(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
@@ -104,7 +104,7 @@ mod tests {
         }
         #[test]
         // Test that the OpprfReceiver produced no errors
-        fn test_psty_cuckoo_hashing_receiver_succeeded(
+        fn test_psty_hashing_cuckoo_receiver_succeeded(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
@@ -147,7 +147,7 @@ mod tests {
         }
         #[test]
         // Test that Simple Hashing preserved the original payloads
-        fn test_psty_simple_hashing_sender_payloads_preserved(
+        fn test_psty_hashing_simple_sender_payloads_preserved(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
@@ -166,7 +166,7 @@ mod tests {
         }
         #[test]
         // Test that Cuckoo Hashing preserved the original payloads
-        fn test_psty_cuckoo_hashing_receiver_payloads_preserved(
+        fn test_psty_hashing_cuckoo_receiver_payloads_preserved(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),

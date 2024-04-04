@@ -12,7 +12,7 @@ mod tests {
     use std::collections::HashSet;
 
     // Computes the cardinality of the intersection in the clear
-    pub fn cardinality_in_clear(set_a: Vec<Vec<u8>>, set_b: Vec<Vec<u8>>) -> usize {
+    pub fn cardinality_in_clear(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> usize {
         let set_a: HashSet<Block> = HashSet::from_iter(u8_vec_block(&set_a, ELEMENT_SIZE));
         let set_b: HashSet<Block> = HashSet::from_iter(u8_vec_block(&set_b, ELEMENT_SIZE));
 
@@ -43,7 +43,7 @@ mod tests {
     proptest! {
             #[test]
             // Test the fancy cardinality of the intersection circuit
-            fn test_psty_cardinality(
+            fn test_psty_circuit_cardinality(
                 seed_sx in any::<u128>(),
                 seed_rx in any::<u128>(),
                 set_a in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
@@ -62,7 +62,7 @@ mod tests {
                     &mut fancy_cardinality::<Gb, _>(),
                 )
                 .unwrap() as usize;
-            let cardinality_in_clear = cardinality_in_clear(set_a, set_b);
+            let cardinality_in_clear = cardinality_in_clear(&set_a, &set_b);
                 prop_assert!(
                     cardinality == cardinality_in_clear,
                     "The PSI Cardinality is wrong! The result was {} and should be {}",
@@ -73,7 +73,7 @@ mod tests {
         #[test]
         // Test the fancy payload sum circuit, where if an intersection happens
         // then the associated payloads are aggregated
-         fn test_psty_payload_sum(
+         fn test_psty_circuit_payload_sum(
                 seed_sx in any::<u128>(),
                 seed_rx in any::<u128>(),
                 set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),

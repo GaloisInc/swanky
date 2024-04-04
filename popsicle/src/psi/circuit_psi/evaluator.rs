@@ -1,4 +1,4 @@
-//! Defining the Evaluator's behavior in Circuit Psi according to [PSTY19]
+//! Defining the Evaluator's behavior in Circuit Psi according to PSTY19
 use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
@@ -45,8 +45,8 @@ where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
-    type Item = AllWire;
-    type F = Evaluator<C, RNG, OtReceiver, Self::Item>;
+    type Wire = AllWire;
+    type F = Evaluator<C, RNG, OtReceiver, Self::Wire>;
     /// Computes the Circuit PSI on the evaluator's inputs.
     ///
     /// (1) Call the Base Psi to create the circuit's input.
@@ -69,10 +69,10 @@ where
         RNG: RngCore + CryptoRng + SeedableRng,
         Ckt: FnMut(
             &mut Self::F,
-            &[Self::Item],
-            &[BinaryBundle<Self::Item>],
-            Option<Vec<BinaryBundle<Self::Item>>>,
-            Option<Vec<BinaryBundle<Self::Item>>>,
+            &[Self::Wire],
+            &[BinaryBundle<Self::Wire>],
+            Option<Vec<BinaryBundle<Self::Wire>>>,
+            Option<Vec<BinaryBundle<Self::Wire>>>,
         ) -> Result<CktOut, Error>,
     {
         // (1)

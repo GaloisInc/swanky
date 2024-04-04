@@ -23,7 +23,7 @@ pub mod sender;
 /// The `BasePsi`'s primary function is to manipulate each party's input
 /// in order to make the eventual computation in the garbled circuit
 /// and specifically the garbled intersection more efficient.
-/// For example in [PSTY19], the BasePsi allows the parties to only perform a
+/// For example in PSTY19, the BasePsi allows the parties to only perform a
 /// linear number of secure comparisons to find the intersection instead of
 /// quadratically many (i.e. the number of comparisons needed if everything was
 /// performed in the garbled circuit with no a-priori pre-processing computation).

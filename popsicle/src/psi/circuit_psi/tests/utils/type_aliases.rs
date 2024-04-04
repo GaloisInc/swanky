@@ -21,22 +21,22 @@ pub type RNG = AesRng;
 pub type Ev = <PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::F;
 /// The type of evaluator's payload wires
 pub type EvPayloadType =
-    Option<Vec<BinaryBundle<<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Item>>>;
+    Option<Vec<BinaryBundle<<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Wire>>>;
 /// The type of evaluator's set wires
-pub type EvSetType<'a> = &'a [BinaryBundle<<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Item>];
+pub type EvSetType<'a> = &'a [BinaryBundle<<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Wire>];
 /// The type of evaluator's intersection bit wires
-pub type EvIntersectBitVecType<'a> = &'a [<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Item];
+pub type EvIntersectBitVecType<'a> = &'a [<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Wire];
 /// The type of evaluator's output wires
-pub type EvCktOut = BinaryBundle<<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Item>;
+pub type EvCktOut = BinaryBundle<<PsiEvaluator<C, RNG> as CircuitPsi<C, RNG>>::Wire>;
 
 /// The type of garbler used in the tests
 pub type Gb = <PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::F;
 /// The type of garbler's payload wires
 pub type GbPayloadType =
-    Option<Vec<BinaryBundle<<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Item>>>;
+    Option<Vec<BinaryBundle<<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Wire>>>;
 /// The type of garbler's set wires
-pub type GbSetType<'a> = &'a [BinaryBundle<<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Item>];
+pub type GbSetType<'a> = &'a [BinaryBundle<<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Wire>];
 /// The type of garbler's intersection bit wires
-pub type GbIntersectBitVecType<'a> = &'a [<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Item];
+pub type GbIntersectBitVecType<'a> = &'a [<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Wire];
 /// The type of garbler's output wires
-pub type GbCktOut = BinaryBundle<<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Item>;
+pub type GbCktOut = BinaryBundle<<PsiGarbler<C, RNG> as CircuitPsi<C, RNG>>::Wire>;
