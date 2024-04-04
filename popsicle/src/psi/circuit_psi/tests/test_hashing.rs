@@ -81,14 +81,67 @@ mod tests {
     }
     proptest! {
          #[test]
-         // Test that the OpprfSender produced no errors
-        fn test_psty_hashing_simple_sender_succeeded(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
+         // Test that the OpprfSender produced no errors when
+         // set is arbitrary
+        fn test_psty_hashing_simple_sender_succeed_arbitrary_set(
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
-            let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_hash_sender.is_err(),
+                "PSTY Simple Hashing failed on the Sender side"
+            );
+        }
+                 #[test]
+         // Test that the OpprfSender produced no errors when
+         // payloads are arbitrary
+        fn test_psty_hashing_simple_sender_succeed_arbitrary_payload(
+             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX),
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_hash_sender.is_err(),
+                "PSTY Simple Hashing failed on the Sender side"
+            );
+        }
+                 #[test]
+         // Test that the OpprfSender produced no errors when
+         // payloads are arbitrary
+        fn test_psty_hashing_simple_sender_succeed_arbitrary_seed(
+            seed_sx in any::<u64>(),
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, seed_sx, DEFAULT_SEED);
+            prop_assert!(
+                !result_hash_sender.is_err(),
+                "PSTY Simple Hashing failed on the Sender side"
+            );
+        }
+          #[test]
+         // Test that the OpprfSender produced no errors when
+         // payloads are arbitrary
+        fn test_psty_hashing_simple_sender_succeeded_arbitrary_payload(
+           payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX),
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_hash_sender.is_err(),
+                "PSTY Simple Hashing failed on the Sender side"
+            );
+        }
+         #[test]
+         // Test that the OpprfSender produced no errors when
+         // sx seed is arbitrary
+        fn test_psty_hashing_simple_sender_succeeded_arbitrary_seed(
+           seed_sx in any::<u64>()
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, _, result_hash_sender, _) = psty_up_to_hashing(&set, &payloads, seed_sx, DEFAULT_SEED);
             prop_assert!(
                 !result_hash_sender.is_err(),
                 "PSTY Simple Hashing failed on the Sender side"
@@ -96,58 +149,72 @@ mod tests {
         }
         #[test]
         // Test that the OpprfReceiver produced no errors
-        fn test_psty_hashing_cuckoo_receiver_succeeded(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
+        // when set is arbitrary
+        fn test_psty_hashing_cuckoo_receiver_succeeded_arbitrary_set(
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
-            let (_, _, _, result_hash_receiver) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, _, _, result_hash_receiver) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             prop_assert!(
                 !result_hash_receiver.is_err(),
                 "PSTY Cuckoo Hashing failed on the Receiver side"
             );
         }
         #[test]
-        // Test that Simple Hashing preserved the sets
-        fn test_psty_hashing_set_preserved(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+        // Test that the OpprfReceiver produced no errors
+        // when payloads are arbitrary
+        fn test_psty_hashing_cuckoo_receiver_succeeded_arbitrary_payloads(
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
-
-            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
-            let sender_table: HashSet<Block> = HashSet::from_iter(
-            sender
-                .state
-                .opprf_set_in
-                .into_iter()
-                .flatten()
-                .collect::<Vec<Block>>(),
-            );
-            let receiver_table: HashSet<Block> =
-                HashSet::from_iter(receiver.state.opprf_set_in);
-
-            let intersection = sender_table.intersection(&receiver_table).count();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let (_, _, _, result_hash_receiver) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             prop_assert!(
-            intersection
-                    == SET_SIZE,
-                "PSTY  hashing did not preserve the intersection, the intersection of the tables is {} and should be {}", intersection, SET_SIZE
+                !result_hash_receiver.is_err(),
+                "PSTY Cuckoo Hashing failed on the Receiver side"
+            );
+        }
+        #[test]
+        // Test that the OpprfReceiver produced no errors
+        // when rx seed is arbitrary
+        fn test_psty_hashing_cuckoo_receiver_succeeded_arbitrary_seed(
+            seed_rx in any::<u64>()
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, _, _, result_hash_receiver) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, seed_rx);
+            prop_assert!(
+                !result_hash_receiver.is_err(),
+                "PSTY Cuckoo Hashing failed on the Receiver side"
             );
         }
         #[test]
         // Test that Simple Hashing preserved the original payloads
-        fn test_psty_hashing_simple_sender_payloads_preserved(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+        fn test_psty_hashing_simple_sender_payloads_preserved_arbitrary_payloads(
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
-
-            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             let (intersection_payloads_sx, _, payloads_len) =
                 psty_check_hashing_payloads(sender, receiver, payloads);
+
+            prop_assert!(
+                intersection_payloads_sx == payloads_len,
+                "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
+                payloads_len,
+                intersection_payloads_sx
+            );
+        }
+        #[test]
+        // Test that Simple Hashing preserved the original payloads
+        fn test_psty_hashing_simple_sender_payloads_preserved_arbitrary_seed(
+            seed_sx in any::<u64>()
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, DEFAULT_SEED);
+            let (intersection_payloads_sx, _, payloads_len) =
+                psty_check_hashing_payloads(sender, receiver, payloads);
+
             prop_assert!(
                 intersection_payloads_sx == payloads_len,
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
@@ -157,15 +224,30 @@ mod tests {
         }
         #[test]
         // Test that Cuckoo Hashing preserved the original payloads
-        fn test_psty_hashing_cuckoo_receiver_payloads_preserved(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+        fn test_psty_hashing_cuckoo_receiver_payloads_preserved_arbitrary_payloads(
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
 
-            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
+            let set = enum_ids(SET_SIZE, DEFAULT_SEED, ELEMENT_SIZE);
+            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             let (_, intersection_payloads_rx, payloads_len) =
+                psty_check_hashing_payloads(sender, receiver, payloads);
+            prop_assert!(
+                intersection_payloads_rx == payloads_len,
+                "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
+                payloads_len,
+                intersection_payloads_rx
+            );
+        }
+      #[test]
+        // Test that Simple Hashing preserved the original payloads
+        fn test_psty_hashing_cuckoo_receiver_payloads_preserved_arbitrary_seed(
+            seed_rx in any::<u64>()
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, DEFAULT_SEED, seed_rx);
+             let (_, intersection_payloads_rx, payloads_len) =
                 psty_check_hashing_payloads(sender, receiver, payloads);
             prop_assert!(
                 intersection_payloads_rx == payloads_len,

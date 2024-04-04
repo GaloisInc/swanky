@@ -8,7 +8,6 @@ mod tests {
         },
         *,
     };
-    use proptest::prelude::*;
     use scuttlebutt::AesRng;
     use std::collections::HashSet;
 
@@ -70,7 +69,7 @@ mod tests {
         let mut rng = AesRng::new();
 
         let set_a = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-        let mut set_b = enum_ids(SET_SIZE, 1, ELEMENT_SIZE);
+        let set_b = enum_ids(SET_SIZE, 1, ELEMENT_SIZE);
 
         let cardinality = run_psty_no_payloads_u128::<_, _>(
             &set_a,
@@ -95,7 +94,7 @@ mod tests {
         let mut rng = AesRng::new();
 
         let set_a = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-        let mut set_b = enum_ids(SET_SIZE, SET_SIZE as u64, ELEMENT_SIZE);
+        let set_b = enum_ids(SET_SIZE, SET_SIZE as u64, ELEMENT_SIZE);
 
         let cardinality = run_psty_no_payloads_u128::<_, _>(
             &set_a,

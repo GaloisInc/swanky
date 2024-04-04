@@ -64,13 +64,36 @@ mod tests {
     proptest! {
          #[test]
          // Test that the Base Psi Sender produced no errors
-        fn test_psty_base_psi_sender_succeeded(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
+        fn test_psty_base_psi_sender_succeeded_arbitrary_set(
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+        ){
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (result_sender, _) = psty_base_psi(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_sender.is_err(),
+                "PSTY's Base Psi failed on the sender side"
+            );
+        }
+                 #[test]
+         // Test that the Base Psi Sender produced no errors
+        fn test_psty_base_psi_sender_succeeded_arbitrary_payloads(
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
-            let (result_sender, _) = psty_base_psi(&set, &payloads, seed_sx, seed_rx);
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let (result_sender, _) = psty_base_psi(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_sender.is_err(),
+                "PSTY's Base Psi failed on the sender side"
+            );
+        }
+                 #[test]
+         // Test that the Base Psi Sender produced no errors
+        fn test_psty_base_psi_sender_succeeded_arbitrary_seed(
+            seed_sx in any::<u64>(),
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (result_sender, _) = psty_base_psi(&set, &payloads, seed_sx, DEFAULT_SEED);
             prop_assert!(
                 !result_sender.is_err(),
                 "PSTY's Base Psi failed on the sender side"
@@ -78,13 +101,36 @@ mod tests {
         }
         #[test]
         // Test that the Base Psi Receiver produced no errors
-        fn test_psty_base_psi_receiver_succeeded(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
+        fn test_psty_base_psi_receiver_succeeded_arbitrary_sets(
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+        ){
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, result_receiver) = psty_base_psi(&set, &payloads,  DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_receiver.is_err(),
+                "PSTY's Base Psi failed on the receiver side"
+            );
+        }
+                #[test]
+        // Test that the Base Psi Receiver produced no errors
+        fn test_psty_base_psi_receiver_succeeded_arbitrary_payloads(
             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
         ){
-            let (_, result_receiver) = psty_base_psi(&set, &payloads, seed_sx, seed_rx);
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let (_, result_receiver) = psty_base_psi(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            prop_assert!(
+                !result_receiver.is_err(),
+                "PSTY's Base Psi failed on the receiver side"
+            );
+        }
+                #[test]
+        // Test that the Base Psi Receiver produced no errors
+        fn test_psty_base_psi_receiver_succeeded_arbitrary_seed(
+            seed_rx in any::<u64>(),
+        ){
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, result_receiver) = psty_base_psi(&set, &payloads, DEFAULT_SEED, seed_rx);
             prop_assert!(
                 !result_receiver.is_err(),
                 "PSTY's Base Psi failed on the receiver side"

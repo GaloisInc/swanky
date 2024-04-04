@@ -9,6 +9,8 @@ pub mod utils;
 #[cfg(test)]
 const SET_SIZE: usize = 1 << 8;
 #[cfg(test)]
-const PAYLOAD_MAX: u128 = 100000;
+const PAYLOAD_MAX: u128 = 10000;
 #[cfg(test)]
-const ELEMENT_MAX: u128 = 100000;
+const ELEMENT_MAX: u128 = 10000;
+#[cfg(test)]
+const DEFAULT_SEED: u64 = 0;

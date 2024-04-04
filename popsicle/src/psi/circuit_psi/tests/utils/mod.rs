@@ -102,3 +102,28 @@ pub fn u8_vec_block512(values: &[Vec<u8>], size: usize) -> Vec<Block512> {
         })
         .collect()
 }
+
+#[cfg(test)]
+/// Enumarate ids for testing purposes
+pub fn enum_ids(n: usize, starting_position: u64, id_size: usize) -> Vec<Vec<u8>> {
+    let vec: Vec<u64> = (starting_position..(n as u64 + starting_position)).collect();
+    let mut ids = Vec::with_capacity(n);
+    for i in 0..n {
+        let v: Vec<u8> = vec[i].to_le_bytes().iter().take(id_size).cloned().collect();
+        ids.push(v);
+    }
+    ids
+}
+
+#[cfg(test)]
+use rand::{CryptoRng, Rng};
+#[cfg(test)]
+pub fn rand_u128_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u128, rng: &mut RNG) -> Vec<u128> {
+    (0..n).map(|_| rng.gen::<u128>() % modulus).collect()
+}
+#[cfg(test)]
+pub fn rand_u8_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u128, rng: &mut RNG) -> Vec<Vec<u8>> {
+    (0..n)
+        .map(|_| (rng.gen::<u128>() % modulus).to_le_bytes().to_vec())
+        .collect()
+}
