@@ -1,4 +1,4 @@
-//! Helper functions that setsup and runs psty on circuits that return a u128
+//! Helper functions that setsup and runs psty on ANY circuit that return a u128
 #[cfg(test)]
 use crate::{
     errors::Error,
@@ -6,7 +6,8 @@ use crate::{
         base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
         evaluator::PsiEvaluator,
         garbler::PsiGarbler,
-        tests::utils::*,
+        tests::utils::{type_aliases::*, *},
+        utils::*,
         CircuitPsi,
     },
 };
@@ -15,7 +16,7 @@ use fancy_garbling::Fancy;
 #[cfg(test)]
 use rand::{CryptoRng, RngCore, SeedableRng};
 #[cfg(test)]
-use scuttlebutt::{AesRng, Block, Block512};
+use scuttlebutt::{Block, Block512};
 #[cfg(test)]
 use std::{os::unix::net::UnixStream, thread};
 
@@ -23,8 +24,8 @@ use std::{os::unix::net::UnixStream, thread};
 pub fn run_psty_u128<CktEv, CktGb>(
     set: &[Vec<u8>],
     payloads: Option<&[Block512]>,
-    seed_sx: u64,
-    seed_rx: u64,
+    seed_sx: u128,
+    seed_rx: u128,
     circuit_ev: &mut CktEv,
     circuit_gb: &mut CktGb,
 ) -> Result<u128, Error>
@@ -50,33 +51,19 @@ where
     let (sender, receiver) = UnixStream::pair().unwrap();
     thread::scope(|s| {
         let _ = s.spawn(|| {
-            let mut rng = AesRng::seed_from_u64(seed_sx);
             let mut channel = setup(sender);
-            let mut gb = PsiGarbler::new(&mut channel, &mut rng).unwrap();
+            let mut gb = PsiGarbler::new(&mut channel, Block::from(seed_sx)).unwrap();
 
             let res = gb
-                .circuit_psi_psty::<OpprfSender, _, _>(
-                    set,
-                    payloads,
-                    &mut channel,
-                    &mut rng,
-                    circuit_gb,
-                )
+                .circuit_psi_psty::<OpprfSender, _, _>(set, payloads, circuit_gb)
                 .unwrap();
             gb.gb.outputs(res.wires()).unwrap();
         });
-        let mut rng = AesRng::seed_from_u64(seed_rx);
         let mut channel = setup(receiver);
-        let mut ev = PsiEvaluator::new(&mut channel, &mut rng).unwrap();
+        let mut ev = PsiEvaluator::new(&mut channel, Block::from(seed_rx)).unwrap();
 
         let res = ev
-            .circuit_psi_psty::<OpprfReceiver, _, _>(
-                set,
-                payloads,
-                &mut channel,
-                &mut rng,
-                circuit_ev,
-            )
+            .circuit_psi_psty::<OpprfReceiver, _, _>(set, payloads, circuit_ev)
             .unwrap();
         let res_out = ev
             .ev

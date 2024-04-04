@@ -12,6 +12,9 @@ use std::{
 #[cfg(test)]
 use proptest::{collection, strategy::Strategy};
 
+pub mod circuit_runner;
+pub mod type_aliases;
+
 #[cfg(test)]
 /// Turns a Unixstream into a scuttlebutt channel
 pub fn setup(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
