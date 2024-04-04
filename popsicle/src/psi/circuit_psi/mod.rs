@@ -56,8 +56,8 @@ fn bundle_inputs<F, E>(
 ) -> Result<
     (
         Vec<BinaryBundle<<F as Fancy>::Item>>, // bits that parties are intersecting on
-        Option<Vec<BinaryBundle<<F as Fancy>::Item>>>,
-        Option<Vec<BinaryBundle<<F as Fancy>::Item>>>,
+        Vec<BinaryBundle<<F as Fancy>::Item>>,
+        Vec<BinaryBundle<<F as Fancy>::Item>>,
     ),
     Error,
 >
@@ -68,18 +68,16 @@ where
 {
     let set = wires_to_bundle::<F>(&circuit_inputs.sender_set_elements, ELEMENT_SIZE * 8);
 
-    let mut sender_payloads = None;
-    let mut receiver_payloads = None;
+    let mut sender_payloads = vec![];
+    let mut receiver_payloads = vec![];
     if !&circuit_inputs.sender_payloads_masked.is_empty() {
-        sender_payloads = Some(fancy_unmask(
+        sender_payloads = fancy_unmask(
             f,
             &wires_to_bundle::<F>(&circuit_inputs.sender_payloads_masked, PAYLOAD_SIZE * 8),
             &wires_to_bundle::<F>(&circuit_inputs.masks, PAYLOAD_SIZE * 8),
-        )?);
-        receiver_payloads = Some(wires_to_bundle::<F>(
-            &circuit_inputs.receiver_payloads,
-            PAYLOAD_SIZE * 8,
-        ));
+        )?;
+        receiver_payloads =
+            wires_to_bundle::<F>(&circuit_inputs.receiver_payloads, PAYLOAD_SIZE * 8);
     }
     Ok((set, sender_payloads, receiver_payloads))
 }
@@ -144,7 +142,29 @@ where
             &[Self::Wire], // bit vector where a bit indicates the presence/abscence of
             //  a set element in the intersection
             &[BinaryBundle<Self::Wire>], // bits that parties are intersecting on
-            Option<Vec<BinaryBundle<Self::Wire>>>, // party A's payload
-            Option<Vec<BinaryBundle<Self::Wire>>>, // party B's payload
+            Vec<BinaryBundle<Self::Wire>>, // party A's payload
+            Vec<BinaryBundle<Self::Wire>>, // party B's payload
+        ) -> Result<CktOut, Error>;
+    /// Computes the Circuit PSI on the parties set elements.
+    /// This function is specifically for the case where users do
+    /// not need payloads.
+    fn circuit_psi_psty_no_payloads<P, Ckt, CktOut>(
+        &mut self,
+        set: &[Element],
+        circuit: &mut Ckt,
+    ) -> Result<CktOut, Error>
+    where
+        P: BasePsi, // Before computing a circuit on the intersection
+        // a base psi protocol is called to:
+        // (1) prepare the intersection so that set elements may remain hidden
+        // (2) prepare the payloads associated with the intersection
+        //     so that they may remain hidden throughout the protocol
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng,
+        Ckt: FnMut(
+            &mut Self::F,  //
+            &[Self::Wire], // bit vector where a bit indicates the presence/abscence of
+            //  a set element in the intersection
+            &[BinaryBundle<Self::Wire>], // bits that parties are intersecting on
         ) -> Result<CktOut, Error>;
 }

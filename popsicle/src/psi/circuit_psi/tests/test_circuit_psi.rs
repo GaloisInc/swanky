@@ -51,11 +51,9 @@ mod tests {
             )
             {
 
-                let cardinality = run_psty_u128::<_, _>(
+                let cardinality = run_psty_no_payloads_u128::<_, _>(
                     &set_a,
                     &set_b,
-                    &[],
-                    &[],
                     seed_sx,
                     seed_rx,
                     &mut fancy_cardinality::<Ev, _>(),

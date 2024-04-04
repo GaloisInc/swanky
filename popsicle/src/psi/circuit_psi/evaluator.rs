@@ -71,8 +71,8 @@ where
             &mut Self::F,
             &[Self::Wire],
             &[BinaryBundle<Self::Wire>],
-            Option<Vec<BinaryBundle<Self::Wire>>>,
-            Option<Vec<BinaryBundle<Self::Wire>>>,
+            Vec<BinaryBundle<Self::Wire>>,
+            Vec<BinaryBundle<Self::Wire>>,
         ) -> Result<CktOut, Error>,
     {
         // (1)
@@ -100,5 +100,43 @@ where
             sender_payloads,
             receiver_payloads,
         )
+    }
+    /// Computes the Circuit PSI on set elements with no payloads.
+    ///
+    /// (1) Call the Base Psi to create the circuit's input.
+    /// The Base Psi effectively constructs the intersection in a hidden form
+    /// that only the garbled circuit can read and operate on.
+    /// (2) Turns the circuit inputs into bundles that are easier to operate on in swanky's
+    /// fancy garbling.
+    /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
+    /// vector which indicates the presence or abscence of a set element.
+    /// (4) Computes the user defined circuit on the parties' inputs.
+    fn circuit_psi_psty_no_payloads<P, Ckt, CktOut>(
+        &mut self,
+        set: &[Element],
+        circuit: &mut Ckt,
+    ) -> Result<CktOut, Error>
+    where
+        P: BasePsi,
+        C: AbstractChannel,
+        RNG: RngCore + CryptoRng + SeedableRng,
+        Ckt: FnMut(
+            &mut Self::F,
+            &[Self::Wire],
+            &[BinaryBundle<Self::Wire>],
+        ) -> Result<CktOut, Error>,
+    {
+        // (1)
+        let circuit_inputs = P::base_psi(&mut self.ev, set, &[], &mut self.channel, &mut self.rng)?;
+        // (2)
+        let (set, _, _) = bundle_inputs(&mut self.ev, &circuit_inputs)?;
+        // (3)
+        let intersection_bit_vector = fancy_intersection_bit_vector(
+            &mut self.ev,
+            &circuit_inputs.sender_set_elements,
+            &circuit_inputs.receiver_set_elements,
+        )?;
+        // (4)
+        circuit(&mut self.ev, &intersection_bit_vector, &set)
     }
 }
