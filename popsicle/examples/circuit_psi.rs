@@ -15,7 +15,7 @@ use scuttlebutt::{AesRng, Block, Block512};
 use std::{fmt::Debug, os::unix::net::UnixStream, thread};
 const SET_SIZE: usize = 1 << 8;
 
-pub fn fancy_silly_example<F, E>() -> impl FnMut(
+pub fn fancy_payload_sum<F, E>() -> impl FnMut(
     &mut F,
     &[<F as Fancy>::Item],
     &[BinaryBundle<<F as Fancy>::Item>],
@@ -27,7 +27,7 @@ where
     E: Debug,
     Error: From<E>,
 {
-    |f, intersect_bitvec, set, payload_a, payload_b| {
+    |f, intersect_bitvec, _, payload_a, payload_b| {
         let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
         let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
 
@@ -36,7 +36,6 @@ where
             let mux_b = f.bin_multiplex(bit, &zero, &payload_b.as_ref().unwrap()[i])?;
             let mul = f.bin_addition_no_carry(&mux_a, &mux_b)?;
             acc = f.bin_addition_no_carry(&acc, &mul)?;
-            acc = f.bin_addition_no_carry(&acc, &set[i])?;
         }
         Ok(acc)
     }
@@ -59,7 +58,7 @@ pub fn psty_payload_sum(
                 .circuit_psi_psty::<OpprfSender, _, _>(
                     set_a,
                     Some(payload_a),
-                    &mut fancy_silly_example::<Gb, _>(),
+                    &mut fancy_payload_sum::<Gb, _>(),
                 )
                 .unwrap();
             gb.gb.outputs(res.wires()).unwrap();
@@ -72,7 +71,7 @@ pub fn psty_payload_sum(
             .circuit_psi_psty::<OpprfReceiver, _, _>(
                 set_b,
                 Some(payload_b),
-                &mut fancy_silly_example::<Ev, _>(),
+                &mut fancy_payload_sum::<Ev, _>(),
             )
             .unwrap();
         let res_out = ev
