@@ -1,7 +1,8 @@
 //! Various fancy circuits
-use itertools::Itertools;
-
+use crate::{circuit_psi::*, errors::Error};
 use fancy_garbling::{BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};
+use itertools::Itertools;
+use std::fmt::Debug;
 
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
@@ -61,4 +62,29 @@ where
         res.push(f.bin_xor(&elements[i], &masks[i])?);
     }
     Ok(res)
+}
+
+/// Fancy function which computes the cardinality of the intersection
+pub fn fancy_cardinality<F, E>() -> impl FnMut(
+    &mut F,
+    &[<F as Fancy>::Item],
+    &[BinaryBundle<<F as Fancy>::Item>],
+    Option<Vec<BinaryBundle<<F as Fancy>::Item>>>,
+    Option<Vec<BinaryBundle<<F as Fancy>::Item>>>,
+) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
+where
+    F: FancyBinary + FancyReveal + Fancy<Item = AllWire, Error = E>,
+    E: Debug,
+    Error: From<E>,
+{
+    |f, intersect_bitvec, _, _, _| {
+        let mut acc = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
+        let one = f.bin_constant_bundle(1, ELEMENT_SIZE * 8)?;
+        let zero = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
+        for bit in intersect_bitvec {
+            let mux = f.bin_multiplex(bit, &zero, &one)?;
+            acc = f.bin_addition_no_carry(&acc, &mux)?;
+        }
+        Ok(acc)
+    }
 }
