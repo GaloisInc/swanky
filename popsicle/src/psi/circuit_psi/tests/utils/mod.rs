@@ -72,7 +72,7 @@ pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
 }
 
 #[cfg(test)]
-/// Create a vector of Block512, from a vector of u64s
+/// Create a vector of Block, from a vector of vectors of u8
 pub fn u8_vec_block(values: &[Vec<u8>], size: usize) -> Vec<Block> {
     values
         .into_iter()
@@ -80,6 +80,24 @@ pub fn u8_vec_block(values: &[Vec<u8>], size: usize) -> Vec<Block> {
             let mut res_block = [0_u8; 16];
             res_block[0..size].clone_from_slice(&item[..size]);
             Block::from(res_block)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+/// Create a vector of Block512, from a vector of vectors of u8
+pub fn u8_vec_block512(values: &[Vec<u8>], size: usize) -> Vec<Block512> {
+    values
+        .into_iter()
+        .map(|item| {
+            let mut res_bytes = [0_u8; 16];
+            res_bytes[0..size].clone_from_slice(&item[..size]);
+            Block512::from([
+                Block::from(res_bytes),
+                Block::from(0),
+                Block::from(0),
+                Block::from(0),
+            ])
         })
         .collect()
 }

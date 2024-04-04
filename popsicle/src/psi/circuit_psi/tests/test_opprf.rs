@@ -116,7 +116,7 @@ mod tests {
                 "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_sx, SET_SIZE
             );
         }
-                #[test]
+        #[test]
         fn test_psty_opprf_receiver_set_preserved(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
@@ -131,6 +131,23 @@ mod tests {
             intersection_size_rx
                     == SET_SIZE,
                 "PSTY OpprfReceiver did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_rx, SET_SIZE
+            );
+        }
+        #[test]
+        fn test_psty_opprf_sender_payloads_preserved(
+            seed_sx in any::<u64>(),
+            seed_rx in any::<u64>(),
+            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
+        ){
+
+            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, seed_rx);
+            let (intersection_sender, _, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
+                intersection_sender == payloads_len,
+                "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
+                payloads_len,
+                intersection_sender
             );
         }
     }
