@@ -4,7 +4,7 @@ mod tests {
     use crate::errors::Error;
     use crate::psi::circuit_psi::{
         base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
-        tests::utils::*,
+        tests::{utils::*, *},
         *,
     };
     use fancy_garbling::{
@@ -21,10 +21,7 @@ mod tests {
         os::unix::net::UnixStream,
         thread,
     };
-    const SET_SIZE: usize = 1 << 8;
 
-    const ELEMENT_MAX: u128 = u64::MAX as u128;
-    const PAYLOAD_MAX: u128 = 100000;
     // Run Base Psi
     fn psty_base_psi(
         set: &[Vec<u8>],

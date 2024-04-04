@@ -2,15 +2,14 @@
 #[cfg(test)]
 mod tests {
     use crate::psi::circuit_psi::{
-        tests::utils::{circuit_runner::*, type_aliases::*, *},
+        tests::{
+            utils::{circuit_runner::*, type_aliases::*, *},
+            *,
+        },
         *,
     };
     use proptest::prelude::*;
     use std::collections::HashSet;
-
-    const SET_SIZE: usize = 1 << 8;
-    const PAYLOAD_MAX: u128 = 100000;
-    const ELEMENT_MAX: u128 = u64::MAX as u128;
 
     // Computes the cardinality of the intersection in the clear
     pub fn cardinality_in_clear(set_a: Vec<Vec<u8>>, set_b: Vec<Vec<u8>>) -> usize {

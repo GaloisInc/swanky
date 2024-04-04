@@ -4,7 +4,7 @@ mod tests {
     use crate::errors::Error;
     use crate::psi::circuit_psi::{
         base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
-        tests::utils::*,
+        tests::{utils::*, *},
         *,
     };
 
@@ -13,10 +13,6 @@ mod tests {
     use proptest::prelude::*;
     use scuttlebutt::{AesRng, Block512};
     use std::os::unix::net::UnixStream;
-    const SET_SIZE: usize = 1 << 8;
-
-    const ELEMENT_MAX: u128 = u64::MAX as u128;
-    const PAYLOAD_MAX: u128 = 100000;
 
     // Run the base psi up to hashing
     fn psty_up_to_hashing(
