@@ -70,6 +70,38 @@ mod tests {
         let intersection_size_rx = set_hash.intersection(&receiver_table).count();
         (intersection_size_sx, intersection_size_rx)
     }
+    // Check that the opprf preserves the original payloads by intersecting the party's opprf outputs
+    // with the original payload vector. The idea is that if the intersection cardinality in both cases is
+    // equal to the original payloads vector cardinality, then the opprf outputs includes that payloads
+    fn psty_check_opprf_payload(
+        sender: OpprfSender,
+        receiver: OpprfReceiver,
+        payloads: Vec<Block512>,
+    ) -> (usize, usize, usize) {
+        let payloads_hash: HashSet<Block512> = HashSet::from_iter(payloads);
+
+        let receiver = receiver.state.unwrap();
+        let receiver_payloads: HashSet<Block512> =
+            HashSet::from_iter(receiver.opprf_payloads_in.into_iter().flatten());
+        let receiver_masks: Vec<Block512> = receiver.opprf_payloads_out.unwrap();
+        let sender_masked_payloads: Vec<Block512> =
+            sender.state.unwrap().opprf_payloads_out.unwrap();
+
+        // Payloads get masked by the sender to keep them hidden.
+        // We need to unmask them to check that everything is fine.
+        let mut sender_payloads: HashSet<Block512> = HashSet::new();
+        for i in 0..receiver_masks.len() {
+            sender_payloads.insert(sender_masked_payloads[i] ^ receiver_masks[i]);
+        }
+
+        let intersection_sender = sender_payloads.intersection(&payloads_hash).count();
+        let intersection_receiver = receiver_payloads.intersection(&payloads_hash).count();
+        (
+            intersection_sender,
+            intersection_receiver,
+            payloads_hash.len(),
+        )
+    }
     proptest! {
         #[test]
         fn test_psty_opprf_sender_succeeded(
@@ -148,6 +180,23 @@ mod tests {
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
                 intersection_sender
+            );
+        }
+        #[test]
+        fn test_psty_opprf_receiver_payloads_preserved(
+            seed_sx in any::<u64>(),
+            seed_rx in any::<u64>(),
+            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
+            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
+        ){
+
+            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, seed_rx);
+            let (_, intersection_receiver, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
+                intersection_receiver == payloads_len,
+                "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
+                payloads_len,
+                intersection_receiver
             );
         }
     }
