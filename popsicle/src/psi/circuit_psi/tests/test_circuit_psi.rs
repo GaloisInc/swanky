@@ -1,8 +1,9 @@
+//! Testing Circuit Psi on various circuits
 #[cfg(test)]
 mod tests {
     use crate::psi::circuit_psi::{
         base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
-        tests::utils::*,
+        tests::utils::{circuit_runner::*, *},
         *,
     };
     use proptest::prelude::*;
