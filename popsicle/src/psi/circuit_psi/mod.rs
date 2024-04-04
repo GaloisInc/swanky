@@ -100,18 +100,28 @@ where
     ///
     /// self: The parties' internal state.
     /// set: The parties' set elements that we perform the intersection
-    ///      operation on.
+    ///      operation on (see example below).
     /// payloads: The payloads associated with elements of the intersection
     ///           (e.g. incomes associated with id's that we are intersecting
     ///             on).
     ///           Payloads are optional, and this function allows computing
-    ///           on set elements alone.
+    ///           on set elements alone (see example below).
     /// channel: The channel that the party uses to communicate with the other
     ///          during the Circuit Psi protocol.
     /// rng: The dedicated rng that the party can use.
     /// circuit: The circuit that the party wishes to perform on the intersection
     ///          and optionally its associated payloads.
     /// CktOut: The type of the output of the circuit.
+    ///
+    /// example:
+    /// ---------------------------------------
+    // primary key (`set`) | data (`payloads`)
+    // ---------------------------------------
+    // 0                   | ("GOOG", $22)
+    // 1                   | ("AMZN", $47)
+    // 2                   | ("META", $92)
+    // ...
+
     fn circuit_psi_psty<P, Ckt, CktOut>(
         &mut self,
         set: &[Element],

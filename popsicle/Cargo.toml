@@ -46,3 +46,6 @@ name = "psty"
 
 [[example]]
 name = "psty-payload"
+
+[[example]]
+name = "circuit_psi"
