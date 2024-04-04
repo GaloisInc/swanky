@@ -22,8 +22,10 @@ use std::{os::unix::net::UnixStream, thread};
 
 #[cfg(test)]
 pub fn run_psty_u128<CktEv, CktGb>(
-    set: &[Vec<u8>],
-    payloads: Option<&[Block512]>,
+    set_a: &[Vec<u8>],
+    set_b: &[Vec<u8>],
+    payloads_a: Option<&[Block512]>,
+    payloads_b: Option<&[Block512]>,
     seed_sx: u128,
     seed_rx: u128,
     circuit_ev: &mut CktEv,
@@ -55,7 +57,7 @@ where
             let mut gb = PsiGarbler::new(&mut channel, Block::from(seed_sx)).unwrap();
 
             let res = gb
-                .circuit_psi_psty::<OpprfSender, _, _>(set, payloads, circuit_gb)
+                .circuit_psi_psty::<OpprfSender, _, _>(set_a, payloads_a, circuit_gb)
                 .unwrap();
             gb.gb.outputs(res.wires()).unwrap();
         });
@@ -63,7 +65,7 @@ where
         let mut ev = PsiEvaluator::new(&mut channel, Block::from(seed_rx)).unwrap();
 
         let res = ev
-            .circuit_psi_psty::<OpprfReceiver, _, _>(set, payloads, circuit_ev)
+            .circuit_psi_psty::<OpprfReceiver, _, _>(set_b, payloads_b, circuit_ev)
             .unwrap();
         let res_out = ev
             .ev
