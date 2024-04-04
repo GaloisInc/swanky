@@ -87,31 +87,6 @@ mod tests {
             payloads_hash.len(),
         )
     }
-    // Check that hashing preserves the original set by intersecting the party's hash outputs
-    // with the original set. The idea is that if the intersection cardinality in both cases is
-    // equal to the original set cardinality, then the hash outputs includes that set
-    fn psty_check_hashing_set(
-        sender: OpprfSender,
-        receiver: OpprfReceiver,
-        set: &[Vec<u8>],
-    ) -> (usize, usize) {
-        let set_hash: HashSet<Block> = HashSet::from_iter(u8_vec_block(set, ELEMENT_SIZE));
-        let sender_table: Vec<Block> = sender
-            .state
-            .unwrap()
-            .opprf_set_in
-            .into_iter()
-            .flatten()
-            .collect();
-        let sender_table: HashSet<Block> = HashSet::from_iter(sender_table);
-        let receiver_table: HashSet<Block> =
-            HashSet::from_iter(receiver.state.unwrap().opprf_set_in);
-
-        let intersection_size_sx = set_hash.intersection(&sender_table).count();
-        let intersection_size_rx = set_hash.intersection(&receiver_table).count();
-        (intersection_size_sx, intersection_size_rx)
-    }
-
     proptest! {
          #[test]
          // Test that the OpprfSender produced no errors
@@ -143,7 +118,7 @@ mod tests {
         }
         #[test]
         // Test that Simple Hashing preserved the sets
-        fn test_psty_simple_hashing_sender_set_preserved(
+        fn test_psty_hashing_set_preserved(
             seed_sx in any::<u64>(),
             seed_rx in any::<u64>(),
             set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
@@ -151,28 +126,23 @@ mod tests {
         ){
 
             let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
-            let (intersection_size_sx, _) = psty_check_hashing_set(sender, receiver, &set);
-            prop_assert!(
-            intersection_size_sx
-                    == SET_SIZE,
-                "PSTY simple hashing did not preserve input set on the sender side, the intersection of the tables is {} and should be {}", intersection_size_sx, SET_SIZE
+            let sender_table: HashSet<Block> = HashSet::from_iter(
+            sender
+                .state
+                .unwrap()
+                .opprf_set_in
+                .into_iter()
+                .flatten()
+                .collect::<Vec<Block>>(),
             );
-        }
-        #[test]
-        // Test that Cuckoo Hashing preserved the sets
-        fn test_psty_cuckoo_hashing_receiver_set_preserved(
-            seed_sx in any::<u64>(),
-            seed_rx in any::<u64>(),
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
-        ){
+            let receiver_table: HashSet<Block> =
+                HashSet::from_iter(receiver.state.unwrap().opprf_set_in);
 
-            let (sender, receiver, _, _) = psty_up_to_hashing(&set, &payloads, seed_sx, seed_rx);
-            let (_, intersection_size_rx) = psty_check_hashing_set(sender, receiver, &set);
+            let intersection = sender_table.intersection(&receiver_table).count();
             prop_assert!(
-            intersection_size_rx
+            intersection
                     == SET_SIZE,
-                "PSTY cuckoo hashing did not preserve input set on the receiver side, the intersection of the tables is {} and should be {}", intersection_size_rx, SET_SIZE
+                "PSTY  hashing did not preserve the intersection, the intersection of the tables is {} and should be {}", intersection, SET_SIZE
             );
         }
         #[test]

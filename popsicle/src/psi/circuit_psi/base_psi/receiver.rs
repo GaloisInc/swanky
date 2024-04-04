@@ -188,17 +188,8 @@ impl BasePsi for OpprfReceiver {
 
             let sender_payloads: Vec<F::Item> =
                 bin_receive_many_block512(gc_party, payloads_binary_len)?;
-            let receiver_payloads: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
-                &self
-                    .state
-                    .as_ref()
-                    .unwrap()
-                    .opprf_payloads_in
-                    .as_ref()
-                    .unwrap(),
-                PAYLOAD_SIZE,
-            )?;
+            let receiver_payloads: Vec<F::Item> =
+                bin_encode_many_block512(gc_party, p, PAYLOAD_SIZE)?;
             let masks: Vec<F::Item> = bin_encode_many_block512(
                 gc_party,
                 &self

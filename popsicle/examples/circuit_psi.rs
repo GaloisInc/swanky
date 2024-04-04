@@ -1,7 +1,6 @@
 use popsicle::{
     circuit_psi::{
         base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
-        circuits::*,
         tests::utils::{type_aliases::*, *},
         utils::binary_to_u128,
         *,
@@ -32,7 +31,7 @@ where
         let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
         let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
 
-        for (i, bit) in intersect_bitvec.into_iter().enumerate() {
+        for (i, bit) in intersect_bitvec.iter().enumerate() {
             let mux_a = f.bin_multiplex(bit, &zero, &payload_a.as_ref().unwrap()[i])?;
             let mux_b = f.bin_multiplex(bit, &zero, &payload_b.as_ref().unwrap()[i])?;
             let mul = f.bin_addition_no_carry(&mux_a, &mux_b)?;
@@ -78,7 +77,7 @@ pub fn psty_payload_sum(
             .unwrap();
         let res_out = ev
             .ev
-            .outputs(&res.wires().to_vec())
+            .outputs(res.wires())
             .unwrap()
             .expect("evaluator should produce outputs");
         binary_to_u128(res_out)
