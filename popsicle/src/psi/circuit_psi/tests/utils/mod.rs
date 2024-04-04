@@ -1,9 +1,9 @@
 //! Various utility functionalities for tests
 
 #[cfg(test)]
-use scuttlebutt::{Block, Block512, Channel};
+use scuttlebutt::Block;
+use scuttlebutt::{Block512, Channel};
 
-#[cfg(test)]
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -15,7 +15,6 @@ use proptest::{collection, strategy::Strategy};
 pub mod circuit_runner;
 pub mod type_aliases;
 
-#[cfg(test)]
 /// Turns a Unixstream into a scuttlebutt channel
 pub fn setup(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
     let reader = BufReader::new(stream.try_clone().unwrap());
@@ -60,7 +59,6 @@ pub fn arbitrary_payloads_block125(
     })
 }
 
-#[cfg(test)]
 /// Create a vector of Block512, from a vector of u64s
 pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
     values

@@ -5,7 +5,7 @@ use crate::{
 };
 use fancy_garbling::{twopac::semihonest::Evaluator, AllWire};
 use ocelot::ot::AlszReceiver as OtReceiver;
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// A struct defining the Evaluating party in Circuit Psi
 pub struct PsiEvaluator<C, RNG> {

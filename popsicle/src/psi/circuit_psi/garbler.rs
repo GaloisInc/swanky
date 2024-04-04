@@ -5,7 +5,7 @@ use crate::{
 };
 use fancy_garbling::{twopac::semihonest::Garbler, AllWire};
 use ocelot::ot::AlszSender as OtSender;
-use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 /// A struct defining the Garbling party in Circuit Psi
 pub struct PsiGarbler<C, RNG> {
     /// The actual garbler being called during the garbled circuit

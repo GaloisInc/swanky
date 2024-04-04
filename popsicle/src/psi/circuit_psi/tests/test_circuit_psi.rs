@@ -70,6 +70,7 @@ mod tests {
                     SET_SIZE
                 );
         }
+        #[test]
         // Test the fancy payload sum circuit, where if an intersection happens
         // then the associated payloads are aggregated
          fn test_psty_payload_sum(
