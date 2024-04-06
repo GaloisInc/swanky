@@ -65,53 +65,47 @@ where
 }
 
 /// Fancy function which computes the cardinality of the intersection
-pub fn fancy_cardinality<F, E>() -> impl FnMut(
-    &mut F,
-    &[<F as Fancy>::Item],
-    &[BinaryBundle<<F as Fancy>::Item>],
+pub fn fancy_cardinality<F, E>(
+    f: &mut F,
+    intersect_bitvec: &[<F as Fancy>::Item],
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = AllWire, Error = E>,
+    F: FancyBinary + Fancy<Item = AllWire, Error = E>,
     E: Debug,
     Error: From<E>,
 {
-    |f, intersect_bitvec, _| {
-        let mut acc = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
-        let one = f.bin_constant_bundle(1, ELEMENT_SIZE * 8)?;
-        let zero = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
-        for bit in intersect_bitvec {
-            let mux = f.bin_multiplex(bit, &zero, &one)?;
-            acc = f.bin_addition_no_carry(&acc, &mux)?;
-        }
-        Ok(acc)
+    let mut acc = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
+    let one = f.bin_constant_bundle(1, ELEMENT_SIZE * 8)?;
+    let zero = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
+    for bit in intersect_bitvec {
+        let mux = f.bin_multiplex(bit, &zero, &one)?;
+        acc = f.bin_addition_no_carry(&acc, &mux)?;
     }
+    Ok(acc)
 }
 
 /// Fancy function which computes the payload sum of the intersection
 /// where associated payloads with elements of the intersection are summed
 /// together and returned
-pub fn fancy_payload_sum<F, E>() -> impl FnMut(
-    &mut F,
-    &[<F as Fancy>::Item],
-    &[BinaryBundle<<F as Fancy>::Item>],
-    Vec<BinaryBundle<<F as Fancy>::Item>>,
-    Vec<BinaryBundle<<F as Fancy>::Item>>,
+pub fn fancy_payload_sum<F, E>(
+    f: &mut F,
+    intersect_bitvec: &[<F as Fancy>::Item],
+    payload_a: &[BinaryBundle<<F as Fancy>::Item>],
+    payload_b: &[BinaryBundle<<F as Fancy>::Item>],
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = AllWire, Error = E>,
+    F: FancyBinary + Fancy<Item = AllWire, Error = E>,
     E: Debug,
     Error: From<E>,
 {
-    |f, intersect_bitvec, _, payload_a, payload_b| {
-        let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?; // multiplication extends the representation of the number
-        let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
+    let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?; // multiplication extends the representation of the number
+    let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
 
-        for (i, bit) in intersect_bitvec.into_iter().enumerate() {
-            let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i])?;
-            let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i])?;
-            let mul = f.bin_addition_no_carry(&mux_a, &mux_b)?;
-            acc = f.bin_addition_no_carry(&acc, &mul)?;
-        }
-        Ok(acc)
+    for (i, bit) in intersect_bitvec.into_iter().enumerate() {
+        let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i])?;
+        let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i])?;
+        let mul = f.bin_addition_no_carry(&mux_a, &mux_b)?;
+        acc = f.bin_addition_no_carry(&acc, &mul)?;
     }
+    Ok(acc)
 }

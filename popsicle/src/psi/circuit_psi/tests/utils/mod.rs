@@ -12,9 +12,6 @@ use std::{
 #[cfg(test)]
 use proptest::{collection, strategy::Strategy};
 
-pub mod circuit_runner;
-pub mod type_aliases;
-
 /// Turns a Unixstream into a scuttlebutt channel
 pub fn setup_channel(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
     let reader = BufReader::new(stream.try_clone().unwrap());

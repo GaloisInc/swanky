@@ -14,6 +14,10 @@ pub struct PsiGarbler<C, RNG> {
     pub channel: C,
     /// The garbler's dedicated rng
     pub rng: RNG,
+    /// The set and intersection bit vector
+    pub intersection: PrivateIntersection<AllWire>,
+    /// The unmasked payloads
+    pub payloads: PrivateIntersectionPayloads<AllWire>,
 }
 
 impl<C, RNG> PsiGarbler<C, RNG>
@@ -30,13 +34,15 @@ where
             gb: Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(seed))?,
             channel: channel.clone(),
             rng: RNG::from_seed(seed),
+            intersection: Default::default(),
+            payloads: Default::default(),
         })
     }
 }
 
 impl<C, RNG> SemiHonest for PsiGarbler<C, RNG> {}
 
-impl<C, RNG> CircuitPsi<C, RNG> for PsiGarbler<C, RNG>
+impl<C, RNG> CircuitPsi for PsiGarbler<C, RNG>
 where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
@@ -53,26 +59,13 @@ where
     /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
     /// vector which indicates the presence or abscence of a set element.
     /// (4) Computes the user defined circuit on the parties' inputs.
-    fn circuit_psi_psty<P, Ckt, CktOut>(
-        &mut self,
-        set: &[Element],
-        payloads: &[Payload],
-        circuit: &mut Ckt,
-    ) -> Result<CktOut, Error>
+    fn intersect<Party>(&mut self, set: &[Element], payloads: &[Payload]) -> Result<(), Error>
     where
-        P: BasePsi,
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng,
-        Ckt: FnMut(
-            &mut Self::F,
-            &[Self::Wire],
-            &[BinaryBundle<Self::Wire>],
-            Vec<BinaryBundle<Self::Wire>>,
-            Vec<BinaryBundle<Self::Wire>>,
-        ) -> Result<CktOut, Error>,
+        Party: BasePsi,
+        Self: Sized,
     {
         // (1)
-        let circuit_inputs = P::base_psi(
+        let circuit_inputs = Party::base_psi(
             &mut self.gb,
             set,
             payloads,
@@ -80,59 +73,18 @@ where
             &mut self.rng,
         )?;
         // (2)
-        let (set, sender_payloads, receiver_payloads) =
-            bundle_inputs(&mut self.gb, &circuit_inputs)?;
+        self.intersection.set = bundle_set::<Self::F, _>(&circuit_inputs)?;
+        (
+            self.payloads.sender_payloads,
+            self.payloads.receiver_payloads,
+        ) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
+
         // (3)
-        let intersection_bit_vector = fancy_intersection_bit_vector(
+        self.intersection.existence_bit_vector = fancy_intersection_bit_vector(
             &mut self.gb,
             &circuit_inputs.sender_set_elements,
             &circuit_inputs.receiver_set_elements,
         )?;
-        // (4)
-        circuit(
-            &mut self.gb,
-            &intersection_bit_vector,
-            &set,
-            sender_payloads,
-            receiver_payloads,
-        )
-    }
-    /// Computes the Circuit PSI on set elements with no payloads.
-    ///
-    /// (1) Call the Base Psi to create the circuit's input.
-    /// The Base Psi effectively constructs the intersection in a hidden form
-    /// that only the garbled circuit can read and operate on.
-    /// (2) Turns the circuit inputs into bundles that are easier to operate on in swanky's
-    /// fancy garbling.
-    /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
-    /// vector which indicates the presence or abscence of a set element.
-    /// (4) Computes the user defined circuit on the parties' inputs.
-    fn circuit_psi_psty_no_payloads<P, Ckt, CktOut>(
-        &mut self,
-        set: &[Element],
-        circuit: &mut Ckt,
-    ) -> Result<CktOut, Error>
-    where
-        P: BasePsi,
-        C: AbstractChannel,
-        RNG: RngCore + CryptoRng + SeedableRng,
-        Ckt: FnMut(
-            &mut Self::F,
-            &[Self::Wire],
-            &[BinaryBundle<Self::Wire>],
-        ) -> Result<CktOut, Error>,
-    {
-        // (1)
-        let circuit_inputs = P::base_psi(&mut self.gb, set, &[], &mut self.channel, &mut self.rng)?;
-        // (2)
-        let (set, _, _) = bundle_inputs(&mut self.gb, &circuit_inputs)?;
-        // (3)
-        let intersection_bit_vector = fancy_intersection_bit_vector(
-            &mut self.gb,
-            &circuit_inputs.sender_set_elements,
-            &circuit_inputs.receiver_set_elements,
-        )?;
-        // (4)
-        circuit(&mut self.gb, &intersection_bit_vector, &set)
+        Ok(())
     }
 }

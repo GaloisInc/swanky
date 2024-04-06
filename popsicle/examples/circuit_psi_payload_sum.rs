@@ -1,45 +1,16 @@
-use popsicle::{
-    circuit_psi::{
-        base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
-        tests::utils::{type_aliases::*, *},
-        utils::binary_to_u128,
-        *,
-        {evaluator::PsiEvaluator, garbler::PsiGarbler, CircuitPsi},
-    },
-    errors::Error,
+use popsicle::circuit_psi::{
+    base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
+    circuits::*,
+    tests::utils::*,
+    *,
+    {evaluator::PsiEvaluator, garbler::PsiGarbler, CircuitPsi},
 };
 
-use fancy_garbling::{AllWire, BinaryBundle, BinaryGadgets, Fancy, FancyBinary, FancyReveal};
+use fancy_garbling::Fancy;
 use rand::Rng;
 use scuttlebutt::{AesRng, Block, Block512};
-use std::{fmt::Debug, os::unix::net::UnixStream, thread};
+use std::{os::unix::net::UnixStream, thread};
 const SET_SIZE: usize = 1 << 8;
-
-pub fn fancy_payload_sum<F, E>() -> impl FnMut(
-    &mut F,
-    &[<F as Fancy>::Item],
-    &[BinaryBundle<<F as Fancy>::Item>],
-    Vec<BinaryBundle<<F as Fancy>::Item>>,
-    Vec<BinaryBundle<<F as Fancy>::Item>>,
-) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
-where
-    F: FancyBinary + FancyReveal + Fancy<Item = AllWire, Error = E>,
-    E: Debug,
-    Error: From<E>,
-{
-    |f, intersect_bitvec, _, payload_a, payload_b| {
-        let mut acc = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
-        let zero = f.bin_constant_bundle(0, PAYLOAD_SIZE * 8)?;
-
-        for (i, bit) in intersect_bitvec.iter().enumerate() {
-            let mux_a = f.bin_multiplex(bit, &zero, &payload_a[i])?;
-            let mux_b = f.bin_multiplex(bit, &zero, &payload_b[i])?;
-            let mul = f.bin_addition_no_carry(&mux_a, &mux_b)?;
-            acc = f.bin_addition_no_carry(&acc, &mul)?;
-        }
-        Ok(acc)
-    }
-}
 
 pub fn psty_payload_sum(
     set_a: &[Vec<u8>],
@@ -52,34 +23,38 @@ pub fn psty_payload_sum(
         let _ = s.spawn(|| {
             let mut rng = AesRng::new();
             let mut channel = setup_channel(sender);
-            let mut gb = PsiGarbler::new(&mut channel, rng.gen::<Block>()).unwrap();
+            let mut gb_psi: _ =
+                PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
 
-            let res = gb
-                .circuit_psi_psty::<OpprfSender, _, _>(
-                    set_a,
-                    payload_a,
-                    &mut fancy_payload_sum::<Gb, _>(),
-                )
-                .unwrap();
-            gb.gb.outputs(res.wires()).unwrap();
+            gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
+            let res = fancy_payload_sum(
+                &mut gb_psi.gb,
+                &gb_psi.intersection.existence_bit_vector,
+                &gb_psi.payloads.sender_payloads,
+                &gb_psi.payloads.receiver_payloads,
+            )
+            .unwrap();
+            gb_psi.gb.outputs(res.wires()).unwrap();
         });
         let mut rng = AesRng::new();
         let mut channel = setup_channel(receiver);
-        let mut ev = PsiEvaluator::new(&mut channel, rng.gen::<Block>()).unwrap();
 
-        let res = ev
-            .circuit_psi_psty::<OpprfReceiver, _, _>(
-                set_b,
-                payload_b,
-                &mut fancy_payload_sum::<Ev, _>(),
-            )
-            .unwrap();
-        let res_out = ev
+        let mut ev_psi =
+            PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
+        ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
+        let res = fancy_payload_sum(
+            &mut ev_psi.ev,
+            &ev_psi.intersection.existence_bit_vector,
+            &ev_psi.payloads.sender_payloads,
+            &ev_psi.payloads.receiver_payloads,
+        )
+        .unwrap();
+        let res_out = ev_psi
             .ev
-            .outputs(res.wires())
+            .outputs(&res.wires().to_vec())
             .unwrap()
             .expect("evaluator should produce outputs");
-        binary_to_u128(res_out)
+        utils::binary_to_u128(res_out)
     })
 }
 

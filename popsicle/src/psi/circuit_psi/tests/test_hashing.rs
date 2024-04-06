@@ -8,8 +8,7 @@ mod tests {
         *,
     };
     use scuttlebutt::{AesRng, Block512};
-    use std::os::unix::net::UnixStream;
-    use std::{collections::HashSet, thread};
+    use std::{collections::HashSet, os::unix::net::UnixStream, thread};
 
     // Run the base psi up to hashing
     fn psty_up_to_hashing(
