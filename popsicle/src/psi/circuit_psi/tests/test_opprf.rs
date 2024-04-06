@@ -8,10 +8,8 @@ mod tests {
         *,
     };
 
-    use std::thread;
-
-    use proptest::prelude::*;
     use scuttlebutt::{AesRng, Block512};
+    use std::thread;
     use std::{collections::HashSet, os::unix::net::UnixStream};
 
     // Run the base psi up to the opprf exchange
@@ -94,222 +92,265 @@ mod tests {
             payloads_hash.len(),
         )
     }
-    proptest! {
-        #[test]
-        fn test_psty_opprf_sender_succeeded_arbitrary_set(
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-        ){
 
+    #[test]
+    fn test_psty_opprf_sender_succeeded_arbitrary_set() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (_, _, result_opprf_sender, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            prop_assert!(
+            let (_, _, result_opprf_sender, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            assert!(
                 !result_opprf_sender.is_err(),
                 "PSTY OPPRF failed on the sender side for arbitrary sets"
             );
         }
-        #[test]
-        fn test_psty_opprf_sender_succeeded_arbitrary_payload(
-             payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX),
-        ){
-
-           let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-            let (_, _, result_opprf_sender, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            prop_assert!(
+    }
+    #[test]
+    fn test_psty_opprf_sender_succeeded_arbitrary_payload() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads =
+                int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
+            let (_, _, result_opprf_sender, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            assert!(
                 !result_opprf_sender.is_err(),
                 "PSTY OPPRF failed on the sender side for arbitrary payloads"
             );
         }
-        #[test]
-        fn test_psty_opprf_sender_succeeded_arbitrary_seed(
-             seed_sx in any::<u64>()
-        ){
-
+    }
+    #[test]
+    fn test_psty_opprf_sender_succeeded_arbitrary_seed() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (_, _, result_opprf_sender, _) = psty_up_to_opprf(&set, &payloads, seed_sx, DEFAULT_SEED);
-            prop_assert!(
+            let payloads =
+                int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
+            let (_, _, result_opprf_sender, _) =
+                psty_up_to_opprf(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            assert!(
                 !result_opprf_sender.is_err(),
                 "PSTY OPPRF failed on the sender side for arbitrary sender seeds"
             );
         }
-        #[test]
-        fn test_psty_opprf_receiver_succeeded_arbitrary_set(
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_receiver_succeeded_arbitrary_set() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (_, _, _, result_opprf_receiver) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            prop_assert!(
+            let (_, _, _, result_opprf_receiver) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            assert!(
                 !result_opprf_receiver.is_err(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
             );
         }
-        #[test]
-        fn test_psty_opprf_receiver_succeeded_arbitrary_payloads(
-            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX),
-        ){
-
+    }
+    #[test]
+    fn test_psty_opprf_receiver_succeeded_arbitrary_payloads() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-            let (_, _, _, result_opprf_receiver) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            prop_assert!(
+            let payloads =
+                int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
+            let (_, _, _, result_opprf_receiver) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            assert!(
                 !result_opprf_receiver.is_err(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
             );
         }
-        #[test]
-        fn test_psty_opprf_receiver_succeeded_arbitrary_seed(
-            seed_rx in any::<u64>()
-        ){
-
+    }
+    #[test]
+    fn test_psty_opprf_receiver_succeeded_arbitrary_seed() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (_, _, _, result_opprf_receiver) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, seed_rx);
-            prop_assert!(
+            let (_, _, _, result_opprf_receiver) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.gen());
+            assert!(
                 !result_opprf_receiver.is_err(),
                 "PSTY OPPRF failed on the receiver side for arbitrary set"
             );
         }
-        #[test]
-        fn test_psty_opprf_sender_set_preserved_arbitrary_set(
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-        ){
-
+    }
+    #[test]
+    fn test_psty_opprf_sender_set_preserved_arbitrary_set() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            let (intersection_size_sx , _) = psty_check_opprf_set(sender, receiver, &set);
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            let (intersection_size_sx, _) = psty_check_opprf_set(sender, receiver, &set);
 
-            prop_assert!(
+            assert!(
             intersection_size_sx
                     == SET_SIZE,
                 "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_sx, SET_SIZE
             );
         }
-                #[test]
-        fn test_psty_opprf_sender_set_preserved_arbitrary_seed(
-            seed_sx in any::<u64>()
-        ){
-
+    }
+    #[test]
+    fn test_psty_opprf_sender_set_preserved_arbitrary_seed() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, DEFAULT_SEED);
-            let (intersection_size_sx , _) = psty_check_opprf_set(sender, receiver, &set);
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            let (intersection_size_sx, _) = psty_check_opprf_set(sender, receiver, &set);
 
-            prop_assert!(
+            assert!(
             intersection_size_sx
                     == SET_SIZE,
                 "PSTY OpprfSender did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_sx, SET_SIZE
             );
         }
-        #[test]
-        fn test_psty_opprf_receiver_set_preserved_arbitrary_set(
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_receiver_set_preserved_arbitrary_set() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            let (_ , intersection_size_rx) = psty_check_opprf_set(sender, receiver, &set);
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            let (_, intersection_size_rx) = psty_check_opprf_set(sender, receiver, &set);
 
-            prop_assert!(
+            assert!(
             intersection_size_rx
                     == SET_SIZE,
                 "PSTY OpprfReceiver did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_rx, SET_SIZE
             );
         }
-                #[test]
-        fn test_psty_opprf_receiver_set_preserved_arbitrary_seed(
-            seed_rx in any::<u64>()
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_receiver_set_preserved_arbitrary_seed() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, seed_rx);
-            let (_ , intersection_size_rx) = psty_check_opprf_set(sender, receiver, &set);
+            let payloads =
+                int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.gen());
+            let (_, intersection_size_rx) = psty_check_opprf_set(sender, receiver, &set);
 
-            prop_assert!(
+            assert!(
             intersection_size_rx
                     == SET_SIZE,
                 "PSTY OpprfReceiver did not preserve the original set, the intersection of the tables is {} and should be {}", intersection_size_rx, SET_SIZE
             );
         }
-        #[test]
-        fn test_psty_opprf_sender_payloads_preserved_arbitrary_set(
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_sender_payloads_preserved_arbitrary_set() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            let (intersection_sender, _, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            prop_assert!(
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            let (intersection_sender, _, payloads_len) =
+                psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
                 intersection_sender == payloads_len,
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
                 intersection_sender
             );
         }
-        #[test]
-        fn test_psty_opprf_sender_payloads_preserved_arbitrary_payloads(
-            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_sender_payloads_preserved_arbitrary_payloads() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            let (intersection_sender, _, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            prop_assert!(
+            let payloads =
+                int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            let (intersection_sender, _, payloads_len) =
+                psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
                 intersection_sender == payloads_len,
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
                 intersection_sender
             );
         }
-        #[test]
-        fn test_psty_opprf_sender_payloads_preserved_arbitrary_seed(
-            seed_sx in any::<u64>()
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_sender_payloads_preserved_arbitrary_seed() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, seed_sx, DEFAULT_SEED);
-            let (intersection_sender, _, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            prop_assert!(
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            let (intersection_sender, _, payloads_len) =
+                psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
                 intersection_sender == payloads_len,
                 "PSTY: Error in sender's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
                 intersection_sender
             );
         }
-         #[test]
-        fn test_psty_opprf_receiver_payloads_preserved_arbitrary_set(
-            set in arbitrary_unique_sets(SET_SIZE, ELEMENT_MAX),
-        ){
-
+    }
+    #[test]
+    fn test_psty_opprf_receiver_payloads_preserved_arbitrary_set() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            let (_, intersection_receiver, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            prop_assert!(
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            let (_, intersection_receiver, payloads_len) =
+                psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
                 intersection_receiver == payloads_len,
                 "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
                 intersection_receiver
             );
         }
-        #[test]
-        fn test_psty_opprf_receiver_payloads_preserved_arbitrary_payloads(
-            payloads in arbitrary_payloads_block125(SET_SIZE, PAYLOAD_MAX)
-        ){
-
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
-            let (_, intersection_receiver, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            prop_assert!(
+    }
+    #[test]
+    fn test_psty_opprf_receiver_payloads_preserved_arbitrary_payloads() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
+            let (_, intersection_receiver, payloads_len) =
+                psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
                 intersection_receiver == payloads_len,
                 "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,
                 intersection_receiver
             );
         }
-        #[test]
-        fn test_psty_opprf_receiver_payloads_preserved_arbitrary_seed(
-             seed_rx in any::<u64>()
-        ){
+    }
+    #[test]
+    fn test_psty_opprf_receiver_payloads_preserved_arbitrary_seed() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
             let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
-            let (sender, receiver, _, _) = psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, seed_rx);
-            let (_, intersection_receiver, payloads_len) = psty_check_opprf_payload(sender, receiver, payloads);
-            prop_assert!(
+            let (sender, receiver, _, _) =
+                psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.gen());
+            let (_, intersection_receiver, payloads_len) =
+                psty_check_opprf_payload(sender, receiver, payloads);
+            assert!(
                 intersection_receiver == payloads_len,
                 "PSTY: Error in receiver's payloads hashing table : Expected to find {} payloads, found {}",
                 payloads_len,

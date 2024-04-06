@@ -14,3 +14,5 @@ const PAYLOAD_MAX: u128 = 10000;
 const ELEMENT_MAX: u128 = 10000;
 #[cfg(test)]
 const DEFAULT_SEED: u64 = 0;
+#[cfg(test)]
+const TEST_TRIALS: usize = 100;

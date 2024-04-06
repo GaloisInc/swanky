@@ -3,53 +3,51 @@
 mod tests {
 
     use crate::{
-        circuit_psi::tests::utils::setup_channel,
+        circuit_psi::tests::{utils::setup_channel, *},
         psi::circuit_psi::base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
     };
-    use rand::SeedableRng;
     use scuttlebutt::AesRng;
-
-    use proptest::prelude::*;
     use std::os::unix::net::UnixStream;
-    proptest! {
-            #[test]
-            fn test_psty_init_receiver_succeeded(seed_sx in any::<u64>(), seed_rx in any::<u64>()){
-                let (sender, receiver) = UnixStream::pair().unwrap();
 
-                std::thread::spawn(move || {
-                    let mut rng = AesRng::seed_from_u64(seed_sx);
-                    let mut channel = setup_channel(sender);
-                    let _ = OpprfSender::init(&mut channel, &mut rng);
-                });
-                let mut rng = AesRng::seed_from_u64(seed_rx);
-                let mut channel = setup_channel(receiver);
-                let receiver = OpprfReceiver::init(&mut channel, &mut rng);
+    #[test]
+    fn test_psty_init_receiver_succeeded() {
+        for _ in 0..TEST_TRIALS {
+            let (sender, receiver) = UnixStream::pair().unwrap();
 
-                prop_assert!(
-                    !receiver.is_err(),
-                    "PSTY Initialization failed on the receiver side"
-                );
+            std::thread::spawn(move || {
+                let mut rng = AesRng::new();
+                let mut channel = setup_channel(sender);
+                let _ = OpprfSender::init(&mut channel, &mut rng);
+            });
+            let mut rng = AesRng::new();
+            let mut channel = setup_channel(receiver);
+            let receiver = OpprfReceiver::init(&mut channel, &mut rng);
 
+            assert!(
+                !receiver.is_err(),
+                "PSTY Initialization failed on the receiver side"
+            );
         }
-        #[test]
-         fn test_psty_init_sender_succeeded(seed_sx in any::<u64>(), seed_rx in any::<u64>()){
-                let (sender, receiver) = UnixStream::pair().unwrap();
+    }
+    #[test]
+    fn test_psty_init_sender_succeeded() {
+        for _ in 0..TEST_TRIALS {
+            let (sender, receiver) = UnixStream::pair().unwrap();
 
-                let sender = std::thread::spawn(move || {
-                    let mut rng = AesRng::seed_from_u64(seed_sx);
-                    let mut channel = setup_channel(sender);
+            let sender = std::thread::spawn(move || {
+                let mut rng = AesRng::new();
+                let mut channel = setup_channel(sender);
 
-                   OpprfSender::init(&mut channel, &mut rng)
+                OpprfSender::init(&mut channel, &mut rng)
+            });
+            let mut rng = AesRng::new();
+            let mut channel = setup_channel(receiver);
+            let _ = OpprfReceiver::init(&mut channel, &mut rng);
 
-                });
-                let mut rng = AesRng::seed_from_u64(seed_rx);
-                let mut channel = setup_channel(receiver);
-                let _ = OpprfReceiver::init(&mut channel, &mut rng);
-
-                 prop_assert!(
-                    !sender.join().unwrap().is_err(),
-                    "PSTY Initialization failed on the sender side"
-                );
+            assert!(
+                !sender.join().unwrap().is_err(),
+                "PSTY Initialization failed on the sender side"
+            );
         }
     }
 }
