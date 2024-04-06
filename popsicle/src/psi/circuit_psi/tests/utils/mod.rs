@@ -4,6 +4,8 @@
 use scuttlebutt::Block;
 use scuttlebutt::{Block512, Channel};
 
+#[cfg(test)]
+use std::collections::HashSet;
 use std::{
     io::{BufReader, BufWriter},
     os::unix::net::UnixStream,
@@ -122,5 +124,27 @@ pub fn rand_u128_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u128, rng: &mut RN
 pub fn rand_u8_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u128, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n)
         .map(|_| (rng.gen::<u128>() % modulus).to_le_bytes().to_vec())
+        .collect()
+}
+
+#[cfg(test)]
+pub fn rand_u8_vec_unique<RNG: CryptoRng + Rng>(
+    n: usize,
+    modulus: u128,
+    rng: &mut RNG,
+) -> Vec<Vec<u8>> {
+    let mut unique = HashSet::new();
+    for _ in 0..n {
+        loop {
+            let el = rng.gen::<u128>() % modulus;
+            if !unique.contains(&el) {
+                unique.insert(el);
+                break;
+            }
+        }
+    }
+    unique
+        .into_iter()
+        .map(|value| value.to_le_bytes().to_vec())
         .collect()
 }
