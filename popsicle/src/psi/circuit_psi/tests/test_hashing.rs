@@ -288,4 +288,83 @@ mod tests {
             );
         }
     }
+    #[test]
+    // Test that the Sender's payload and set hash tables have the same size
+    fn test_psty_hashing_sizes_simple_sender_payload_set_same() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            assert!(
+                sender.state.opprf_payloads_in.len() == sender.state.opprf_set_in.len(),
+                "PSTY Simple Hashing: the payloads and sets hash tables have different sizes, payloads: {}, set: {}",
+                sender.state.opprf_payloads_in.len(), sender.state.opprf_set_in.len(),
+            );
+        }
+    }
+    #[test]
+    // Test that the Sender's payload and set hash tables have the same size
+    fn test_psty_hashing_sizes_simple_sender_payload_in_out_same() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            assert!(
+                sender.state.opprf_payloads_in.len() == sender.state.opprf_payloads_out.len(),
+                "PSTY Simple Hashing: the payloads and payload mask tables have different sizes, payloads {}, masks {} ",
+sender.state.opprf_payloads_in.len(), sender.state.opprf_payloads_out.len(),
+            );
+        }
+    }
+    #[test]
+    // Test that the Sender's payload and set hash tables have the same size
+    fn test_psty_hashing_sizes_simple_sender_set_in_out_same() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, _, _, _) = psty_up_to_hashing(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            assert!(
+                sender.state.opprf_set_in.len() == sender.state.opprf_set_out.len(),
+                "PSTY Simple Hashing: the set and set programs tables have different sizes, set in {} set out {}",
+                sender.state.opprf_set_in.len(), sender.state.opprf_set_out.len(),
+            );
+        }
+    }
+    #[test]
+    // Test that the Sender's payload and set hash tables have the same size
+    fn test_psty_hashing_sizes_receiver_cuckoo_payload_in_out_same() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (_, receiver, _, _) = psty_up_to_hashing(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            assert!(
+                receiver.state.opprf_payloads_in.len() == receiver.state.opprf_set_in.len(),
+                "PSTY Cuckoo Hashing: the payloads and sets hash tables have different sizes, payloads: {}, set {}",
+                receiver.state.opprf_payloads_in.len(),
+                receiver.state.opprf_set_in.len(),
+            );
+        }
+    }
+    #[test]
+    // Test that the Sender's payload and set hash tables have the same size
+    fn test_psty_hashing_sizes_sender_receiver_set_tables_same() {
+        for _ in 0..TEST_TRIALS {
+            let mut rng = AesRng::new();
+            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
+            let (sender, receiver, _, _) =
+                psty_up_to_hashing(&set, &payloads, rng.gen(), DEFAULT_SEED);
+            assert!(
+                sender.state.opprf_set_in.len() == receiver.state.opprf_set_in.len(),
+                "PSTY Hashing: the sender and receicver have differently sized set hashing tables, sender: {}, receiver: {}",
+                sender.state.opprf_set_in.len(),
+                receiver.state.opprf_set_in.len(),
+
+            );
+        }
+    }
 }
