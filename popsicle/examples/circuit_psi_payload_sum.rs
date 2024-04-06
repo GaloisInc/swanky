@@ -23,7 +23,7 @@ pub fn psty_payload_sum(
         let _ = s.spawn(|| {
             let mut rng = AesRng::new();
             let mut channel = setup_channel(sender);
-            let mut gb_psi: _ =
+            let mut gb_psi =
                 PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
 
             gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
@@ -51,7 +51,7 @@ pub fn psty_payload_sum(
         .unwrap();
         let res_out = ev_psi
             .ev
-            .outputs(&res.wires().to_vec())
+            .outputs(res.wires())
             .unwrap()
             .expect("evaluator should produce outputs");
         utils::binary_to_u128(res_out)
