@@ -66,7 +66,7 @@ mod tests {
     fn test_psty_base_psi_sender_succeeded_arbitrary_set() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
+            let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (result_sender, _) = psty_base_psi(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
@@ -109,7 +109,7 @@ mod tests {
     fn test_psty_base_psi_receiver_succeeded_arbitrary_sets() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = rand_u8_vec(SET_SIZE, ELEMENT_MAX, &mut rng);
+            let set = rand_u8_vec_unique(SET_SIZE, ELEMENT_MAX, &mut rng);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, result_receiver) = psty_base_psi(&set, &payloads, DEFAULT_SEED, DEFAULT_SEED);
             assert!(
