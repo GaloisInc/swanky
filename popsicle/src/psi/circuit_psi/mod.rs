@@ -134,7 +134,7 @@ pub trait CircuitPsi {
     /// Implements FancyBinary (i.e. Garbler or Evaluator)
     type F: FancyBinary;
 
-    /// Computes the Circuit PSI on the parties inputs.
+    /// Computes the Circuit PSI on the parties' inputs.
     ///
     /// self: The parties' internal state.
     /// set: The parties' set elements that we perform the intersection

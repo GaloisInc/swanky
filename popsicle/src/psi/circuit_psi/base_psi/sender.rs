@@ -61,9 +61,9 @@ impl BasePsi for OpprfSender {
         // to the same outputs.
         let key = channel.read_block()?;
         let opprf_set = KmprtSender::init(channel, rng)?;
-        let opprf_payload = None;
+        let mut opprf_payload = None;
         if has_payload {
-            let opprf_payload = Some(KmprtSender::init(channel, rng)?);
+            opprf_payload = Some(KmprtSender::init(channel, rng)?);
         }
 
         Ok(Self {

@@ -23,7 +23,6 @@ pub fn fancy_intersection_bit_vector<F>(
 where
     F: FancyReveal + Fancy + FancyBinary,
 {
-    assert_eq!(sender_inputs.len(), receiver_inputs.len());
     sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
