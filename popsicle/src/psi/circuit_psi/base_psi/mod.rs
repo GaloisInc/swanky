@@ -29,7 +29,7 @@ pub mod sender;
 /// performed in the garbled circuit with no a-priori pre-processing computation).
 pub trait BasePsi {
     /// Initializes the BasePsi party
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
     where
         Self: Sized,
         C: AbstractChannel,
@@ -84,7 +84,11 @@ pub trait BasePsi {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
-        let mut party = Self::init(channel, rng)?;
+        let mut has_payloads = false;
+        if !payloads.is_empty() {
+            has_payloads = true;
+        }
+        let mut party = Self::init(channel, rng, has_payloads)?;
         party.hash_data(set, payloads, channel, rng)?;
 
         channel.flush()?;

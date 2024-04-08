@@ -17,11 +17,11 @@ mod tests {
             std::thread::spawn(move || {
                 let mut rng = AesRng::new();
                 let mut channel = setup_channel(sender);
-                let _ = OpprfSender::init(&mut channel, &mut rng);
+                let _ = OpprfSender::init(&mut channel, &mut rng, true);
             });
             let mut rng = AesRng::new();
             let mut channel = setup_channel(receiver);
-            let receiver = OpprfReceiver::init(&mut channel, &mut rng);
+            let receiver = OpprfReceiver::init(&mut channel, &mut rng, true);
 
             assert!(
                 !receiver.is_err(),
@@ -38,11 +38,11 @@ mod tests {
                 let mut rng = AesRng::new();
                 let mut channel = setup_channel(sender);
 
-                OpprfSender::init(&mut channel, &mut rng)
+                OpprfSender::init(&mut channel, &mut rng, true)
             });
             let mut rng = AesRng::new();
             let mut channel = setup_channel(receiver);
-            let _ = OpprfReceiver::init(&mut channel, &mut rng);
+            let _ = OpprfReceiver::init(&mut channel, &mut rng, true);
 
             assert!(
                 !sender.join().unwrap().is_err(),

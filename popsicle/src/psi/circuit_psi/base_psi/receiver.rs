@@ -16,7 +16,7 @@ pub struct OpprfReceiver {
     /// The opprf for set elements
     pub opprf_set: KmprtReceiver,
     /// The opprf for payloads
-    pub opprf_payload: KmprtReceiver,
+    pub opprf_payload: Option<KmprtReceiver>,
     /// The opprf queries and outputs
     pub state: ReceiverState,
 }
@@ -50,7 +50,7 @@ impl BasePsi for OpprfReceiver {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
@@ -65,8 +65,11 @@ impl BasePsi for OpprfReceiver {
         let opprf_set = KmprtReceiver::init(channel, rng)?;
         channel.flush()?;
 
-        let opprf_payload = KmprtReceiver::init(channel, rng)?;
-        channel.flush()?;
+        let mut opprf_payload = None;
+        if has_payload {
+            opprf_payload = Some(KmprtReceiver::init(channel, rng)?);
+            channel.flush()?;
+        }
 
         Ok(Self {
             key,
@@ -131,9 +134,11 @@ impl BasePsi for OpprfReceiver {
             self.opprf_set
                 .receive(channel, &self.state.opprf_set_in, rng)?;
         if !self.state.opprf_payloads_in.is_empty() {
-            self.state.opprf_payloads_out =
-                self.opprf_payload
-                    .receive(channel, &self.state.opprf_set_in, rng)?;
+            self.state.opprf_payloads_out = self.opprf_payload.as_mut().unwrap().receive(
+                channel,
+                &self.state.opprf_set_in,
+                rng,
+            )?;
         }
         Ok(())
     }

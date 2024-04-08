@@ -18,7 +18,7 @@ pub struct OpprfSender {
     /// The opprf for set elements
     pub opprf_set: KmprtSender,
     /// The opprf for payloads
-    pub opprf_payload: KmprtSender,
+    pub opprf_payload: Option<KmprtSender>,
     /// The opprf programming
     pub state: SenderState,
 }
@@ -51,7 +51,7 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG, has_payload: bool) -> Result<Self, Error>
     where
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
@@ -61,7 +61,10 @@ impl BasePsi for OpprfSender {
         // to the same outputs.
         let key = channel.read_block()?;
         let opprf_set = KmprtSender::init(channel, rng)?;
-        let opprf_payload = KmprtSender::init(channel, rng)?;
+        let opprf_payload = None;
+        if has_payload {
+            let opprf_payload = Some(KmprtSender::init(channel, rng)?);
+        }
 
         Ok(Self {
             key,
@@ -148,15 +151,19 @@ impl BasePsi for OpprfSender {
     {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs
+
         let opprf_program = flatten_bin_tags(&self.state.opprf_set_in, &self.state.opprf_set_out);
         self.opprf_set
             .send(channel, &opprf_program, self.nbins.unwrap(), rng)?;
-
         if !&self.state.opprf_payloads_in.is_empty() {
             let points_data =
                 flatten_bins_payloads(&self.state.opprf_set_in, &self.state.opprf_payloads_in);
-            self.opprf_payload
-                .send(channel, &points_data, self.nbins.unwrap(), rng)?;
+            self.opprf_payload.as_mut().unwrap().send(
+                channel,
+                &points_data,
+                self.nbins.unwrap(),
+                rng,
+            )?;
         }
         Ok(())
     }
