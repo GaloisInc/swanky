@@ -144,12 +144,6 @@ pub trait CircuitPsi {
     ///             on).
     ///           Payloads are optional, and this function allows computing
     ///           on set elements alone (see example below).
-    /// channel: The channel that the party uses to communicate with the other
-    ///          during the Circuit Psi protocol.
-    /// rng: The dedicated rng that the party can use.
-    /// circuit: The circuit that the party wishes to perform on the intersection
-    ///          and optionally its associated payloads.
-    /// CktOut: The type of the output of the circuit.
     ///
     /// example:
     /// ---------------------------------------

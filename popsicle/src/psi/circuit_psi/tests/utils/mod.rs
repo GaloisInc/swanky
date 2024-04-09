@@ -2,25 +2,14 @@
 
 #[cfg(test)]
 use scuttlebutt::Block;
-use scuttlebutt::{Block512, Channel};
+#[cfg(test)]
+use scuttlebutt::Block512;
 
 #[cfg(test)]
 use std::collections::HashSet;
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-};
 
 #[cfg(test)]
 use proptest::{collection, strategy::Strategy};
-
-/// Turns a Unixstream into a scuttlebutt channel
-pub fn setup_channel(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
-    let reader = BufReader::new(stream.try_clone().unwrap());
-    let writer = BufWriter::new(stream);
-    let channel = Channel::new(reader, writer);
-    channel
-}
 
 #[cfg(test)]
 /// Create a proptest strategy that creates sets of elements represented as vectors of bytes.
@@ -56,19 +45,6 @@ pub fn arbitrary_payloads_block125(
             })
             .collect()
     })
-}
-
-/// Create a vector of Block512, from a vector of U128
-pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
-    values
-        .into_iter()
-        .map(|item| {
-            let value_bytes = item.to_le_bytes();
-            let mut res_block = [0_u8; 64];
-            res_block[0..size].copy_from_slice(&value_bytes[..size]);
-            Block512::from(res_block)
-        })
-        .collect()
 }
 
 #[cfg(test)]

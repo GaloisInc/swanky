@@ -1,7 +1,7 @@
 use popsicle::circuit_psi::{
     base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
     circuits::*,
-    tests::utils::*,
+    utils::*,
     *,
     {evaluator::PsiEvaluator, garbler::PsiGarbler, CircuitPsi},
 };
@@ -54,7 +54,7 @@ pub fn psty_payload_sum(
             .outputs(res.wires())
             .unwrap()
             .expect("evaluator should produce outputs");
-        utils::binary_to_u128(res_out)
+        binary_to_u128(res_out)
     })
 }
 
