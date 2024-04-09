@@ -25,7 +25,7 @@ aes-gcm.workspace = true
 fancy-garbling = { workspace = true, features = ["serde"]}
 serde          = { workspace = true, features = ["derive"]}
 serde_json     = { workspace = true}
-
+proptest = { workspace = true}
 [dev-dependencies]
 criterion.workspace = true
 
@@ -46,3 +46,9 @@ name = "psty"
 
 [[example]]
 name = "psty-payload"
+
+[[example]]
+name = "circuit_psi_cardinality"
+
+[[example]]
+name = "circuit_psi_payload_sum"

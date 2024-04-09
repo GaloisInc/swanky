@@ -1,5 +1,6 @@
-/// Errors produced by the private set intersection protocols.
+//! Errors produced by the private set intersection protocols.
 #[derive(Debug)]
+/// Errors produced by the private set intersection protocols.
 pub enum Error {
     /// Coin tossing failed.
     CoinTossError(scuttlebutt::cointoss::Error),
