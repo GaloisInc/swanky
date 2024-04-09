@@ -5,6 +5,7 @@ mod tests {
     use crate::psi::circuit_psi::{
         base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
         tests::{utils::*, *},
+        utils::*,
         *,
     };
 

@@ -3,9 +3,13 @@ use crate::{cuckoo::CuckooItem, errors::Error};
 use fancy_garbling::{util, AllWire, FancyInput};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
-use scuttlebutt::{Block, Block512};
+use scuttlebutt::{Block, Block512, Channel};
 
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    io::{BufReader, BufWriter},
+    os::unix::net::UnixStream,
+};
 
 /// Turn a vector of bits represented as u16 into a decimal
 /// value represented as a u128.
@@ -191,4 +195,12 @@ where
     // Specify the moduli of the wires
     let moduli = vec![2; size];
     gc_party.receive_many(&moduli)
+}
+
+/// Turns a Unixstream into a scuttlebutt channel
+pub fn setup_channel(stream: UnixStream) -> Channel<BufReader<UnixStream>, BufWriter<UnixStream>> {
+    let reader = BufReader::new(stream.try_clone().unwrap());
+    let writer = BufWriter::new(stream);
+    let channel = Channel::new(reader, writer);
+    channel
 }

@@ -6,7 +6,9 @@ mod tests {
         evaluator::PsiEvaluator,
         garbler::PsiGarbler,
         tests::{utils::*, *},
-        utils, *,
+        utils,
+        utils::*,
+        *,
     };
     use scuttlebutt::{AesRng, Block};
     use std::{collections::HashSet, os::unix::net::UnixStream, thread};

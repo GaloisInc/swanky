@@ -2,9 +2,10 @@
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        circuit_psi::tests::{utils::setup_channel, *},
-        psi::circuit_psi::base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
+    use crate::psi::circuit_psi::{
+        base_psi::{receiver::OpprfReceiver, sender::OpprfSender, BasePsi},
+        tests::*,
+        utils::*,
     };
     use scuttlebutt::AesRng;
     use std::os::unix::net::UnixStream;

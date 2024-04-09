@@ -1,8 +1,7 @@
 use popsicle::circuit_psi::{
     base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
     circuits::*,
-    tests::utils::*,
-    *,
+    utils::*,
     {evaluator::PsiEvaluator, garbler::PsiGarbler, CircuitPsi},
 };
 
@@ -38,7 +37,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             .outputs(res.wires())
             .unwrap()
             .expect("evaluator should produce outputs");
-        utils::binary_to_u128(res_out)
+        binary_to_u128(res_out)
     })
 }
 pub fn main() {
