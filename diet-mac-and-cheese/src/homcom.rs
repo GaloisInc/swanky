@@ -50,14 +50,23 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         })
     }
 
-    /// Reset the state.
-    fn reset(&mut self) {
+    /// Reset the state. Generates a new chi value.
+    fn reset<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<()> {
+        let chi = Self::chi(channel, rng)?;
+
         self.triples = Default::default();
         self.sum_a0 = ProverPrivateCopy::new(T::ZERO);
         self.sum_a1 = ProverPrivateCopy::new(T::ZERO);
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
+        self.chi = chi;
         self.chi_power = self.chi;
         self.count = 0;
+
+        Ok(())
     }
 
     pub(crate) fn accumulate<V: IsSubFieldOf<T>>(
@@ -90,6 +99,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         &mut self,
         mask: Mac<P, T, T>,
         channel: &mut C,
+        rng: &mut AesRng,
         delta: VerifierPrivateCopy<P, T>,
     ) -> Result<usize> {
         match P::WHICH {
@@ -102,7 +112,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 channel.flush()?;
 
                 let c = self.count;
-                self.reset();
+                self.reset(channel, rng)?;
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
@@ -112,10 +122,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
                     let c = self.count;
-                    self.reset();
+                    self.reset(channel, rng)?;
                     Ok(c)
                 } else {
-                    self.reset();
+                    self.reset(channel, rng)?;
                     bail!("QuickSilver multiplication check failed.")
                 }
             }
@@ -694,7 +704,7 @@ where
         }
         let mask = Mac::lift(&macs);
 
-        state.finalize(mask, channel, self.delta)
+        state.finalize(mask, channel, rng, self.delta)
     }
 }
 
