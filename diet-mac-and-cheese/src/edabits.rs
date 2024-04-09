@@ -259,7 +259,7 @@ impl<
         };
 
         // loop on the m bits over the batch of n addition
-        let mut mult_check_state = MultCheckState::<P, F40b>::init(channel, rng)?;
+        let mut mult_check_state = MultCheckState::<P, F2, F40b>::init(channel, rng)?;
         let mut aux_batch = Vec::with_capacity(num);
         let mut and_res_batch = ProverPrivate::new(Vec::with_capacity(num));
         let mut z_batch = vec![Vec::with_capacity(m); num];

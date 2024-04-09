@@ -139,7 +139,7 @@ pub struct DietMacAndCheese<
     pub(crate) fcom: FCom<P, V, T, SVOLE>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    mult_check_state: MultCheckState<P, T>,
+    mult_check_state: MultCheckState<P, V, T>,
     zero_check_state: ZeroCheckState<P, T>,
     no_batching: bool,
     monitor: Monitor<V, T>,

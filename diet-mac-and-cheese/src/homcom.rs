@@ -13,10 +13,16 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use swanky_party::either::PartyEither;
-use swanky_party::private::{ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy};
+use swanky_party::private::{
+    ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy,
+};
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
-pub struct MultCheckState<P: Party, T: Copy> {
+// Size of batches for multiplication / assert-zero
+const BATCH_SIZE: usize = 3_000_000;
+
+pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
+    triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
     sum_a0: ProverPrivateCopy<P, T>,
     sum_a1: ProverPrivateCopy<P, T>,
     sum_b: VerifierPrivateCopy<P, T>,
@@ -25,7 +31,7 @@ pub struct MultCheckState<P: Party, T: Copy> {
     count: usize,
 }
 
-impl<P: Party, T: FiniteField> MultCheckState<P, T> {
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     /// Initialize the state.
     pub(crate) fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
@@ -34,6 +40,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         let chi = Self::chi(channel, rng)?;
 
         Ok(Self {
+            triples: Default::default(),
             sum_a0: ProverPrivateCopy::new(T::ZERO),
             sum_a1: ProverPrivateCopy::new(T::ZERO),
             sum_b: VerifierPrivateCopy::new(T::ZERO),
@@ -45,6 +52,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
 
     /// Reset the state.
     fn reset(&mut self) {
+        self.triples = Default::default();
         self.sum_a0 = ProverPrivateCopy::new(T::ZERO);
         self.sum_a1 = ProverPrivateCopy::new(T::ZERO);
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
@@ -138,7 +146,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
     }
 }
 
-impl<P: Party, T: Copy> Drop for MultCheckState<P, T> {
+impl<P: Party, V: Copy, T: Copy> Drop for MultCheckState<P, V, T> {
     fn drop(&mut self) {
         if self.count != 0 {
             warn!(
@@ -676,7 +684,7 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        state: &mut MultCheckState<P, T>,
+        state: &mut MultCheckState<P, V, T>,
     ) -> Result<usize> {
         debug!("FCom: quicksilver_finalize");
 
