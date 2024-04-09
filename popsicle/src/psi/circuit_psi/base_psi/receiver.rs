@@ -147,7 +147,7 @@ impl BasePsi for OpprfReceiver {
         gc_party: &mut F,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
-        F: FancyInput<Item = AllWire, Error = E>,
+        F: FancyInput<Item = WireMod2, Error = E>,
         E: Debug,
         Error: From<E>,
     {

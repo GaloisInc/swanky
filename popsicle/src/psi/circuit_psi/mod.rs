@@ -4,7 +4,7 @@ use crate::{
     errors::Error,
     psi::circuit_psi::{base_psi::*, circuits::*},
 };
-use fancy_garbling::{AllWire, BinaryBundle, Fancy, FancyBinary, FancyReveal};
+use fancy_garbling::{BinaryBundle, Fancy, FancyBinary, FancyReveal, WireMod2};
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::Block512;
 use std::fmt::Debug;
@@ -95,7 +95,7 @@ fn bundle_payloads<F, E>(
     Error,
 >
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = AllWire, Error = E>,
+    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {
@@ -114,7 +114,7 @@ fn bundle_set<F, E>(
     circuit_inputs: &CircuitInputs<F::Item>,
 ) -> Result<Vec<BinaryBundle<<F as Fancy>::Item>>, Error>
 where
-    F: FancyBinary + FancyReveal + Fancy<Item = AllWire, Error = E>,
+    F: FancyBinary + FancyReveal + Fancy<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {
@@ -129,8 +129,6 @@ where
 /// This trait is implemented by the two parties participating
 /// in the protocol,i.e the CircuitPsi Garbler and the Evaluator.
 pub trait CircuitPsi {
-    /// The type of wires associated with f
-    type Wire;
     /// Implements FancyBinary (i.e. Garbler or Evaluator)
     type F: FancyBinary;
 

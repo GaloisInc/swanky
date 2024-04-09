@@ -69,7 +69,7 @@ pub fn fancy_cardinality<F, E>(
     intersect_bitvec: &[<F as Fancy>::Item],
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
-    F: FancyBinary + Fancy<Item = AllWire, Error = E>,
+    F: FancyBinary + Fancy<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {
@@ -93,7 +93,7 @@ pub fn fancy_payload_sum<F, E>(
     payload_b: &[BinaryBundle<<F as Fancy>::Item>],
 ) -> Result<BinaryBundle<<F as Fancy>::Item>, Error>
 where
-    F: FancyBinary + Fancy<Item = AllWire, Error = E>,
+    F: FancyBinary + Fancy<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {

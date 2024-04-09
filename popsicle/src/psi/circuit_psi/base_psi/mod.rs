@@ -1,7 +1,7 @@
 //! The base psi computation that pre-processes the party's
 //! inputs prior to calling the circuit in the circuit psi
 use crate::{circuit_psi::*, errors::Error};
-use fancy_garbling::{AllWire, FancyInput};
+use fancy_garbling::{FancyInput, WireMod2};
 use rand::{CryptoRng, RngCore, SeedableRng};
 use scuttlebutt::{AbstractChannel, Block512};
 use std::fmt::Debug;
@@ -64,7 +64,7 @@ pub trait BasePsi {
         gc_party: &mut F,
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
-        F: FancyInput<Item = AllWire, Error = E>,
+        F: FancyInput<Item = WireMod2, Error = E>,
         E: Debug,
         Error: From<E>;
     /// A wrapper that calls the different pieces of the BasePsi in order
@@ -78,7 +78,7 @@ pub trait BasePsi {
     ) -> Result<CircuitInputs<F::Item>, Error>
     where
         Self: Sized,
-        F: FancyInput<Item = AllWire, Error = E>,
+        F: FancyInput<Item = WireMod2, Error = E>,
         E: Debug,
         Error: From<E>,
         C: AbstractChannel,

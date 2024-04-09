@@ -10,7 +10,7 @@ mod tests {
     };
     use fancy_garbling::{
         twopac::semihonest::{Evaluator, Garbler},
-        AllWire,
+        WireMod2,
     };
 
     use ocelot::{ot::AlszReceiver as OtReceiver, ot::AlszSender as OtSender};
@@ -29,8 +29,8 @@ mod tests {
         seed_sx: u64,
         seed_rx: u64,
     ) -> (
-        Result<CircuitInputs<AllWire>, Error>,
-        Result<CircuitInputs<AllWire>, Error>,
+        Result<CircuitInputs<WireMod2>, Error>,
+        Result<CircuitInputs<WireMod2>, Error>,
     ) {
         let (sender, receiver) = UnixStream::pair().unwrap();
 
@@ -42,7 +42,7 @@ mod tests {
                     Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
                     AesRng,
                     OtSender,
-                    AllWire,
+                    WireMod2,
                 >::new(channel.clone(), rng.clone())
                 .unwrap();
                 OpprfSender::base_psi(&mut gb, &set, &payloads, &mut channel, &mut rng)
@@ -53,7 +53,7 @@ mod tests {
                 Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
                 AesRng,
                 OtReceiver,
-                AllWire,
+                WireMod2,
             >::new(channel.clone(), rng.clone())
             .unwrap();
             let result_receiver =
