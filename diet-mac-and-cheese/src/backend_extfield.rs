@@ -257,7 +257,7 @@ impl<
                 let mut resolver: ProverPrivate<P, HashMap<F40b, _>> = ProverPrivate::default();
                 if let WhichParty::Prover(ev) = P::WHICH {
                     for (i, guard) in disj.guards().enumerate() {
-                        let guard = F40b::from_number(guard).unwrap();
+                        let guard = F40b::from_number(guard)?;
                         resolver.as_mut().into_inner(ev).insert(guard, i);
                     }
                 }

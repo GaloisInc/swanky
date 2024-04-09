@@ -370,7 +370,7 @@ impl Plugin for MuxV0 {
             i = (i + 1) % branch_shape.len();
         }
 
-        let field_type_id = match type_store.get(&type_id).unwrap() {
+        let field_type_id = match type_store.get(&type_id)? {
             TypeSpecification::Field(f) => *f,
             _ => {
                 bail!("Mux plugin does not support plugin types");
@@ -378,7 +378,7 @@ impl Plugin for MuxV0 {
         };
         Ok(PluginExecution::Mux(MuxVersion::MuxVerV0(MuxV0::new(
             type_id,
-            cond_num_wire.try_into().unwrap(),
+            cond_num_wire.try_into()?,
             selector_range,
             branch_shape,
             is_permissive,

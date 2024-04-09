@@ -462,7 +462,7 @@ fn run_plaintext(args: &Cli) -> Result<()> {
     let relation_path = args.relation.clone();
     match args.witness {
         None => {
-            eyre::bail!("Plaintext evaluation requires a witness to be provided.");
+            bail!("Plaintext evaluation requires a witness to be provided.")
         }
         Some(_) => {
             // Prover mode

@@ -208,8 +208,10 @@ impl<E> EdabitsMap<E> {
     }
 
     fn push_elem(&mut self, bit_width: usize, e: E) {
-        self.0.entry(bit_width).or_default();
-        self.0.get_mut(&bit_width).as_mut().unwrap().push(e);
+        self.0
+            .entry(bit_width)
+            .and_modify(|v| v.push(e))
+            .or_default();
     }
 
     fn get_edabits(&mut self, bit_width: usize) -> Option<&mut Vec<E>> {
@@ -1205,7 +1207,7 @@ where
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
-                let mut v = Vec::with_capacity((end + 1 - start).try_into().unwrap());
+                let mut v = Vec::with_capacity((end + 1 - start).try_into()?);
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {:?}", in_wire);
