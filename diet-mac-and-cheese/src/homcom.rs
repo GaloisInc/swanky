@@ -31,19 +31,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         channel: &mut C,
         rng: &mut AesRng,
     ) -> Result<Self> {
-        let chi = match P::WHICH {
-            WhichParty::Prover(_) => {
-                channel.flush()?;
-                channel.read_serializable()?
-            }
-            WhichParty::Verifier(_) => {
-                let chi = T::random(rng);
-                channel.write_serializable::<T>(&chi)?;
-                channel.flush()?;
-
-                chi
-            }
-        };
+        let chi = Self::chi(channel, rng)?;
 
         Ok(Self {
             sum_a0: ProverPrivateCopy::new(T::ZERO),
@@ -129,6 +117,24 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
     /// Return the number of checks accumulated.
     pub(crate) fn count(&self) -> usize {
         self.count
+    }
+
+    fn chi<C: AbstractChannel + Clone>(channel: &mut C, rng: &mut AesRng) -> Result<T> {
+        let chi = match P::WHICH {
+            WhichParty::Prover(_) => {
+                channel.flush()?;
+                channel.read_serializable()?
+            }
+            WhichParty::Verifier(_) => {
+                let chi = T::random(rng);
+                channel.write_serializable::<T>(&chi)?;
+                channel.flush()?;
+
+                chi
+            }
+        };
+
+        Ok(chi)
     }
 }
 
