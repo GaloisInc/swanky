@@ -3,21 +3,21 @@ use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
 };
-use fancy_garbling::{twopac::semihonest::Garbler, AllWire};
+use fancy_garbling::{twopac::semihonest::Garbler, WireMod2};
 use ocelot::ot::AlszSender as OtSender;
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 /// A struct defining the Garbling party in Circuit Psi
 pub struct PsiGarbler<C, RNG> {
     /// The actual garbler being called during the garbled circuit
-    pub gb: Garbler<C, RNG, OtSender, AllWire>,
+    pub gb: Garbler<C, RNG, OtSender, WireMod2>,
     /// The garbler's dedicated channel
     pub channel: C,
     /// The garbler's dedicated rng
     pub rng: RNG,
     /// The set and intersection bit vector
-    pub intersection: PrivateIntersection<AllWire>,
+    pub intersection: PrivateIntersection<WireMod2>,
     /// The unmasked payloads
-    pub payloads: PrivateIntersectionPayloads<AllWire>,
+    pub payloads: PrivateIntersectionPayloads<WireMod2>,
 }
 
 impl<C, RNG> PsiGarbler<C, RNG>
@@ -31,7 +31,7 @@ where
         Self: Sized,
     {
         Ok(PsiGarbler {
-            gb: Garbler::<C, RNG, OtSender, AllWire>::new(channel.clone(), RNG::from_seed(seed))?,
+            gb: Garbler::<C, RNG, OtSender, WireMod2>::new(channel.clone(), RNG::from_seed(seed))?,
             channel: channel.clone(),
             rng: RNG::from_seed(seed),
             intersection: Default::default(),
@@ -47,8 +47,7 @@ where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
-    type Wire = AllWire;
-    type F = Garbler<C, RNG, OtSender, Self::Wire>;
+    type F = Garbler<C, RNG, OtSender, WireMod2>;
     /// Computes the Circuit PSI on the garbler's inputs.
     ///
     /// (1) Call the Base Psi to create the circuit's input.

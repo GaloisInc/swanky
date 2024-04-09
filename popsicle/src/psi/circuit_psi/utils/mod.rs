@@ -1,6 +1,6 @@
 //! Various utils for PSTY
 use crate::{cuckoo::CuckooItem, errors::Error};
-use fancy_garbling::{util, AllWire, FancyInput};
+use fancy_garbling::{util, FancyInput, WireMod2};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use scuttlebutt::{Block, Block512, Channel};
@@ -174,7 +174,7 @@ pub fn bin_encode_many_block512<F, E>(
     size: usize,
 ) -> Result<Vec<F::Item>, E>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
+    F: FancyInput<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {
@@ -188,7 +188,7 @@ where
 /// circuit inputs
 pub fn bin_receive_many_block512<F, E>(gc_party: &mut F, size: usize) -> Result<Vec<F::Item>, E>
 where
-    F: FancyInput<Item = AllWire, Error = E>,
+    F: FancyInput<Item = WireMod2, Error = E>,
     E: Debug,
     Error: From<E>,
 {

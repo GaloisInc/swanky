@@ -3,22 +3,22 @@ use crate::{
     errors::Error,
     psi::circuit_psi::{circuits::*, *},
 };
-use fancy_garbling::{twopac::semihonest::Evaluator, AllWire};
+use fancy_garbling::{twopac::semihonest::Evaluator, WireMod2};
 use ocelot::ot::AlszReceiver as OtReceiver;
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
 
 /// A struct defining the Evaluating party in Circuit Psi
 pub struct PsiEvaluator<C, RNG> {
     /// The actual evaluator being called during the garbled circuit
-    pub ev: Evaluator<C, RNG, OtReceiver, AllWire>,
+    pub ev: Evaluator<C, RNG, OtReceiver, WireMod2>,
     /// The evaluator's dedicated channel
     pub channel: C,
     /// The evaluator's dedicated rng
     pub rng: RNG,
     /// The set and intersection bit vector
-    pub intersection: PrivateIntersection<AllWire>,
+    pub intersection: PrivateIntersection<WireMod2>,
     /// The unmasked payloads
-    pub payloads: PrivateIntersectionPayloads<AllWire>,
+    pub payloads: PrivateIntersectionPayloads<WireMod2>,
 }
 
 impl<C, RNG> PsiEvaluator<C, RNG>
@@ -32,7 +32,7 @@ where
         Self: Sized,
     {
         Ok(PsiEvaluator {
-            ev: Evaluator::<C, RNG, OtReceiver, AllWire>::new(
+            ev: Evaluator::<C, RNG, OtReceiver, WireMod2>::new(
                 channel.clone(),
                 RNG::from_seed(seed),
             )?,
@@ -51,8 +51,7 @@ where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
 {
-    type Wire = AllWire;
-    type F = Evaluator<C, RNG, OtReceiver, Self::Wire>;
+    type F = Evaluator<C, RNG, OtReceiver, WireMod2>;
     /// Computes the Circuit PSI on the evaluator's inputs.
     ///
     /// (1) Call the Base Psi to create the circuit's input.
