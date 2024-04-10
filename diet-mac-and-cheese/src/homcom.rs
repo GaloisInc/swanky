@@ -24,7 +24,7 @@ const BATCH_SIZE: usize = 3_000_000;
 pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
     triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
     sum_b: VerifierPrivateCopy<P, T>,
-    chi_power: T,
+    chi_power: VerifierPrivateCopy<P, T>,
     chi: T,
     count: usize,
 }
@@ -40,7 +40,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         Ok(Self {
             triples: Default::default(),
             sum_b: VerifierPrivateCopy::new(T::ZERO),
-            chi_power: chi,
+            chi_power: VerifierPrivateCopy::new(chi),
             chi,
             count: 0,
         })
@@ -57,7 +57,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         self.triples = Default::default();
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
         self.chi = chi;
-        self.chi_power = self.chi;
+        self.chi_power = VerifierPrivateCopy::new(self.chi);
         self.count = 0;
 
         Ok(())
@@ -78,11 +78,11 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
             WhichParty::Verifier(ev) => {
                 let (x, y, z) = triple;
                 let b = x.mac() * y.mac() + delta.into_inner(ev) * z.mac();
-                *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power;
+                *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power.into_inner(ev);
+                *self.chi_power.as_mut().into_inner(ev) *= self.chi;
             }
         }
 
-        self.chi_power *= self.chi;
         self.count += 1;
 
         // Finalize if we've hit the batch limit
