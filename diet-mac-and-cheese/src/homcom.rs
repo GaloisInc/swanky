@@ -23,8 +23,6 @@ const BATCH_SIZE: usize = 3_000_000;
 
 pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
     triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
-    sum_a0: ProverPrivateCopy<P, T>,
-    sum_a1: ProverPrivateCopy<P, T>,
     sum_b: VerifierPrivateCopy<P, T>,
     chi_power: T,
     chi: T,
@@ -41,8 +39,6 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
 
         Ok(Self {
             triples: Default::default(),
-            sum_a0: ProverPrivateCopy::new(T::ZERO),
-            sum_a1: ProverPrivateCopy::new(T::ZERO),
             sum_b: VerifierPrivateCopy::new(T::ZERO),
             chi_power: chi,
             chi,
@@ -59,8 +55,6 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         let chi = Self::chi(channel, rng)?;
 
         self.triples = Default::default();
-        self.sum_a0 = ProverPrivateCopy::new(T::ZERO);
-        self.sum_a1 = ProverPrivateCopy::new(T::ZERO);
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
         self.chi = chi;
         self.chi_power = self.chi;
