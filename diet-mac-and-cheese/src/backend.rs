@@ -401,8 +401,13 @@ where
             WhichParty::Verifier(ev) => self.input(ProverPrivateCopy::empty(ev))?,
         };
 
-        self.mult_check_state
-            .accumulate(&(*a, *b, out), self.fcom.get_delta());
+        self.mult_check_state.accumulate(
+            &(*a, *b, out),
+            self.fcom.gen_mask(&mut self.channel, &mut self.rng)?,
+            &mut self.channel,
+            &mut self.rng,
+            self.fcom.get_delta(),
+        );
 
         Ok(out)
     }

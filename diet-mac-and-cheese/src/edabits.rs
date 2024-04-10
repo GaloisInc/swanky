@@ -348,6 +348,9 @@ impl<
                                 and2,
                                 Mac::new(ProverPrivateCopy::new(and_res), and_res_mac),
                             ),
+                            self.fcom_f2.gen_mask(channel, rng)?,
+                            channel,
+                            rng,
                             self.fcom_f2.get_delta(),
                         );
 
@@ -361,6 +364,9 @@ impl<
                         let and_res_mac = and_res_mac_batch.as_ref().verifier_into(ev)[n];
                         mult_check_state.accumulate(
                             &(and1_mac, and2_mac, and_res_mac),
+                            self.fcom_f2.gen_mask(channel, rng)?,
+                            channel,
+                            rng,
                             self.fcom_f2.get_delta(),
                         );
 

@@ -69,23 +69,20 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         Ok(())
     }
 
-    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(
+    pub(crate) fn accumulate<C: AbstractChannel + Clone>(
         &mut self,
-        triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
+        &triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
+        mask: Mac<P, T, T>,
+        channel: &mut C,
+        rng: &mut AesRng,
         delta: VerifierPrivateCopy<P, T>,
     ) {
-        let (x, y, z) = triple;
-
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                let a0 = x.mac() * y.mac();
-                let a1 = y.value().into_inner(ev) * x.mac() + x.value().into_inner(ev) * y.mac()
-                    - z.mac();
-
-                *self.sum_a0.as_mut().into_inner(ev) += a0 * self.chi_power;
-                *self.sum_a1.as_mut().into_inner(ev) += a1 * self.chi_power;
+                self.triples.as_mut().into_inner(ev).push(triple);
             }
             WhichParty::Verifier(ev) => {
+                let (x, y, z) = triple;
                 let b = x.mac() * y.mac() + delta.into_inner(ev) * z.mac();
                 *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power;
             }
