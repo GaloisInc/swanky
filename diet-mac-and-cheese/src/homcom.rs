@@ -90,6 +90,12 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
 
         self.chi_power *= self.chi;
         self.count += 1;
+
+        // Finalize if we've hit the batch limit
+        if self.count >= BATCH_SIZE {
+            // ok() let's us run this for its effect and ignore the return value
+            self.finalize(mask, channel, rng, delta).ok();
+        }
     }
 
     pub(crate) fn finalize<C: AbstractChannel + Clone>(
@@ -101,8 +107,25 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     ) -> Result<usize> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                let u = self.sum_a0.into_inner(ev) + mask.mac();
-                let v = self.sum_a1.into_inner(ev) + mask.value().into_inner(ev);
+                let mut sum_a0 = T::ZERO;
+                let mut sum_a1 = T::ZERO;
+
+                let mut chi_power = self.chi;
+
+                for &(x, y, z) in self.triples.as_ref().into_inner(ev) {
+                    let a0 = x.mac() * y.mac();
+                    let a1 = y.value().into_inner(ev) * x.mac()
+                        + x.value().into_inner(ev) * y.mac()
+                        - z.mac();
+
+                    sum_a0 += a0 * chi_power;
+                    sum_a1 += a1 * chi_power;
+
+                    chi_power *= self.chi;
+                }
+
+                let u = sum_a0 + mask.mac();
+                let v = sum_a1 + mask.value().into_inner(ev);
 
                 channel.write_serializable(&u)?;
                 channel.write_serializable(&v)?;
