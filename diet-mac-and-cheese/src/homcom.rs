@@ -698,13 +698,20 @@ where
     ) -> Result<usize> {
         debug!("FCom: quicksilver_finalize");
 
+        state.finalize(self.gen_mask(channel, rng)?, channel, rng, self.delta)
+    }
+
+    /// Generate a random mask MAC over the tag field.
+    pub fn gen_mask<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<Mac<P, T, T>> {
         let mut macs = GenericArray::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
             *mac = self.random(channel, rng)?;
         }
-        let mask = Mac::lift(&macs);
-
-        state.finalize(mask, channel, rng, self.delta)
+        Ok(Mac::lift(&macs))
     }
 }
 
