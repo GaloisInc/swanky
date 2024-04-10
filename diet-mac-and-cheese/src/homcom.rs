@@ -25,39 +25,30 @@ pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
     triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
     sum_b: VerifierPrivateCopy<P, T>,
     chi_power: VerifierPrivateCopy<P, T>,
-    chi: T,
+    chi: VerifierPrivateCopy<P, T>,
     count: usize,
 }
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     /// Initialize the state.
-    pub(crate) fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<Self> {
-        let chi = Self::chi(channel, rng)?;
+    pub(crate) fn init(rng: &mut AesRng) -> Result<Self> {
+        let chi = VerifierPrivateCopy::new(T::random(rng));
 
         Ok(Self {
             triples: Default::default(),
             sum_b: VerifierPrivateCopy::new(T::ZERO),
-            chi_power: VerifierPrivateCopy::new(chi),
+            chi_power: chi,
             chi,
             count: 0,
         })
     }
 
-    /// Reset the state. Generates a new chi value.
-    fn reset<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<()> {
-        let chi = Self::chi(channel, rng)?;
-
+    /// Reset the state. Generates a new chi value (without communication).
+    fn reset(&mut self, rng: &mut AesRng) -> Result<()> {
         self.triples = Default::default();
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
-        self.chi = chi;
-        self.chi_power = VerifierPrivateCopy::new(self.chi);
+        self.chi = VerifierPrivateCopy::new(T::random(rng));
+        self.chi_power = self.chi;
         self.count = 0;
 
         Ok(())
@@ -79,7 +70,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 let (x, y, z) = triple;
                 let b = x.mac() * y.mac() + delta.into_inner(ev) * z.mac();
                 *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power.into_inner(ev);
-                *self.chi_power.as_mut().into_inner(ev) *= self.chi;
+                *self.chi_power.as_mut().into_inner(ev) *= self.chi.into_inner(ev);
             }
         }
 
@@ -101,11 +92,12 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     ) -> Result<usize> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
+                channel.flush()?;
+                let chi = channel.read_serializable()?;
+                let mut chi_power = chi;
+
                 let mut sum_a0 = T::ZERO;
                 let mut sum_a1 = T::ZERO;
-
-                let mut chi_power = self.chi;
-
                 for &(x, y, z) in self.triples.as_ref().into_inner(ev) {
                     let a0 = x.mac() * y.mac();
                     let a1 = y.value().into_inner(ev) * x.mac()
@@ -115,7 +107,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                     sum_a0 += a0 * chi_power;
                     sum_a1 += a1 * chi_power;
 
-                    chi_power *= self.chi;
+                    chi_power *= chi;
                 }
 
                 let u = sum_a0 + mask.mac();
@@ -126,20 +118,23 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 channel.flush()?;
 
                 let c = self.count;
-                self.reset(channel, rng)?;
+                self.reset(rng)?;
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
+                channel.write_serializable::<T>(&self.chi.into_inner(ev))?;
+                channel.flush()?;
+
                 let u = channel.read_serializable::<T>()?;
                 let v = channel.read_serializable::<T>()?;
 
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
                     let c = self.count;
-                    self.reset(channel, rng)?;
+                    self.reset(rng)?;
                     Ok(c)
                 } else {
-                    self.reset(channel, rng)?;
+                    self.reset(rng)?;
                     bail!("QuickSilver multiplication check failed.")
                 }
             }
@@ -149,24 +144,6 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     /// Return the number of checks accumulated.
     pub(crate) fn count(&self) -> usize {
         self.count
-    }
-
-    fn chi<C: AbstractChannel + Clone>(channel: &mut C, rng: &mut AesRng) -> Result<T> {
-        let chi = match P::WHICH {
-            WhichParty::Prover(_) => {
-                channel.flush()?;
-                channel.read_serializable()?
-            }
-            WhichParty::Verifier(_) => {
-                let chi = T::random(rng);
-                channel.write_serializable::<T>(&chi)?;
-                channel.flush()?;
-
-                chi
-            }
-        };
-
-        Ok(chi)
     }
 }
 

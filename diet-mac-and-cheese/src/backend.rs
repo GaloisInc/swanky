@@ -163,7 +163,7 @@ where
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let mult_check_state = MultCheckState::init(&mut rng)?;
         let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             fcom: FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?,
@@ -183,7 +183,7 @@ where
         fcom: &FCom<P, V, T, SVOLE>,
         no_batching: bool,
     ) -> Result<Self> {
-        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let mult_check_state = MultCheckState::init(&mut rng)?;
         let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             fcom: fcom.duplicate()?,
@@ -205,7 +205,7 @@ where
         no_batching: bool,
         delta: T,
     ) -> Result<Self> {
-        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let mult_check_state = MultCheckState::init(&mut rng)?;
         let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             fcom: FCom::init_with_delta(channel, &mut rng, lpn_setup, lpn_extend, delta)?,
