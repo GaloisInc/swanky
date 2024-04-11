@@ -1,6 +1,6 @@
 //! Field switching functionality based on protocol with Edabits.
 
-use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
+use crate::homcom::{FCom, MultCheckState, ZeroCheckState, BATCH_SIZE};
 use crate::mac::Mac;
 use crate::svole_trait::{field_name, SvoleT};
 use eyre::{bail, ensure, eyre, Result};
@@ -348,11 +348,17 @@ impl<
                                 and2,
                                 Mac::new(ProverPrivateCopy::new(and_res), and_res_mac),
                             ),
-                            self.fcom_f2.gen_mask(channel, rng)?,
-                            channel,
-                            rng,
                             self.fcom_f2.get_delta(),
                         );
+
+                        if mult_check_state.count() >= BATCH_SIZE {
+                            mult_check_state.finalize(
+                                self.fcom_f2.gen_mask(channel, rng)?,
+                                channel,
+                                rng,
+                                self.fcom_f2.get_delta(),
+                            )?;
+                        }
 
                         let ci_mac = ci_mac_batch.as_ref().into_inner(ev)[n];
                         let c_mac = ci_mac + and_res_mac;
@@ -364,11 +370,17 @@ impl<
                         let and_res_mac = and_res_mac_batch.as_ref().verifier_into(ev)[n];
                         mult_check_state.accumulate(
                             &(and1_mac, and2_mac, and_res_mac),
-                            self.fcom_f2.gen_mask(channel, rng)?,
-                            channel,
-                            rng,
                             self.fcom_f2.get_delta(),
                         );
+
+                        if mult_check_state.count() >= BATCH_SIZE {
+                            mult_check_state.finalize(
+                                self.fcom_f2.gen_mask(channel, rng)?,
+                                channel,
+                                rng,
+                                self.fcom_f2.get_delta(),
+                            )?;
+                        }
 
                         let ci = ci_batch.as_ref().verifier_into(ev)[n];
                         let c_mac = ci + and_res_mac;

@@ -54,12 +54,9 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         Ok(())
     }
 
-    pub(crate) fn accumulate<C: AbstractChannel + Clone>(
+    pub(crate) fn accumulate(
         &mut self,
         &triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
-        mask: Mac<P, T, T>,
-        channel: &mut C,
-        rng: &mut AesRng,
         delta: VerifierPrivateCopy<P, T>,
     ) {
         match P::WHICH {
@@ -75,12 +72,6 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         }
 
         self.count += 1;
-
-        // Finalize if we've hit the batch limit
-        if self.count >= BATCH_SIZE {
-            // ok() let's us run this for its effect and ignore the return value
-            self.finalize(mask, channel, rng, delta).ok();
-        }
     }
 
     pub(crate) fn finalize<C: AbstractChannel + Clone>(

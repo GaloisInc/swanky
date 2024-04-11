@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::backend_trait::BackendT;
-use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
+use crate::homcom::{FCom, MultCheckState, ZeroCheckState, BATCH_SIZE};
 use crate::mac::Mac;
 use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
@@ -401,13 +401,17 @@ where
             WhichParty::Verifier(ev) => self.input(ProverPrivateCopy::empty(ev))?,
         };
 
-        self.mult_check_state.accumulate(
-            &(*a, *b, out),
-            self.fcom.gen_mask(&mut self.channel, &mut self.rng)?,
-            &mut self.channel,
-            &mut self.rng,
-            self.fcom.get_delta(),
-        );
+        self.mult_check_state
+            .accumulate(&(*a, *b, out), self.fcom.get_delta());
+
+        if self.mult_check_state.count() >= BATCH_SIZE {
+            self.mult_check_state.finalize(
+                self.fcom.gen_mask(&mut self.channel, &mut self.rng)?,
+                &mut self.channel,
+                &mut self.rng,
+                self.fcom.get_delta(),
+            )?;
+        }
 
         Ok(out)
     }
