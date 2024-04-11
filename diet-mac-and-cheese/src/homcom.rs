@@ -44,10 +44,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     }
 
     /// Reset the state. Generates a new chi value (without communication).
-    fn reset(&mut self, rng: &mut AesRng) -> Result<()> {
+    fn reset(&mut self, rng: VerifierPrivate<P, &mut AesRng>) -> Result<()> {
         self.triples = Default::default();
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
-        self.chi = VerifierPrivateCopy::new(T::random(rng));
+        self.chi = rng.map(|rng| T::random(rng)).into();
         self.chi_power = self.chi;
         self.count = 0;
 
@@ -109,7 +109,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 channel.flush()?;
 
                 let c = self.count;
-                self.reset(rng)?;
+                self.reset(VerifierPrivate::empty(ev))?;
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
@@ -122,10 +122,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
                     let c = self.count;
-                    self.reset(rng)?;
+                    self.reset(VerifierPrivate::new(rng))?;
                     Ok(c)
                 } else {
-                    self.reset(rng)?;
+                    self.reset(VerifierPrivate::new(rng))?;
                     bail!("QuickSilver multiplication check failed.")
                 }
             }
