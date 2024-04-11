@@ -19,7 +19,7 @@ use swanky_party::private::{
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
 // Size of batches for multiplication / assert-zero
-const BATCH_SIZE: usize = 3_000_000;
+pub const BATCH_SIZE: usize = 3_000_000;
 
 pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
     triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
