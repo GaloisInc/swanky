@@ -1,6 +1,6 @@
 //! Field switching functionality based on protocol with Edabits.
 
-use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
+use crate::homcom::{FCom, MultCheckState, ZeroCheckState, BATCH_SIZE};
 use crate::mac::Mac;
 use crate::svole_trait::{field_name, SvoleT};
 use eyre::{bail, ensure, eyre, Result};
@@ -259,7 +259,7 @@ impl<
         };
 
         // loop on the m bits over the batch of n addition
-        let mut mult_check_state = MultCheckState::<P, F40b>::init(channel, rng)?;
+        let mut mult_check_state = MultCheckState::<P, F2, F40b>::init(rng)?;
         let mut aux_batch = Vec::with_capacity(num);
         let mut and_res_batch = ProverPrivate::new(Vec::with_capacity(num));
         let mut z_batch = vec![Vec::with_capacity(m); num];
@@ -351,6 +351,15 @@ impl<
                             self.fcom_f2.get_delta(),
                         );
 
+                        if mult_check_state.count() >= BATCH_SIZE {
+                            mult_check_state.finalize(
+                                self.fcom_f2.gen_mask(channel, rng)?,
+                                channel,
+                                rng,
+                                self.fcom_f2.get_delta(),
+                            )?;
+                        }
+
                         let ci_mac = ci_mac_batch.as_ref().into_inner(ev)[n];
                         let c_mac = ci_mac + and_res_mac;
 
@@ -363,6 +372,15 @@ impl<
                             &(and1_mac, and2_mac, and_res_mac),
                             self.fcom_f2.get_delta(),
                         );
+
+                        if mult_check_state.count() >= BATCH_SIZE {
+                            mult_check_state.finalize(
+                                self.fcom_f2.gen_mask(channel, rng)?,
+                                channel,
+                                rng,
+                                self.fcom_f2.get_delta(),
+                            )?;
+                        }
 
                         let ci = ci_batch.as_ref().verifier_into(ev)[n];
                         let c_mac = ci + and_res_mac;

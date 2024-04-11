@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::backend_trait::BackendT;
-use crate::homcom::{FCom, MultCheckState, ZeroCheckState};
+use crate::homcom::{FCom, MultCheckState, ZeroCheckState, BATCH_SIZE};
 use crate::mac::Mac;
 use crate::svole_trait::field_name;
 use crate::svole_trait::SvoleT;
@@ -139,7 +139,7 @@ pub struct DietMacAndCheese<
     pub(crate) fcom: FCom<P, V, T, SVOLE>,
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
-    mult_check_state: MultCheckState<P, T>,
+    mult_check_state: MultCheckState<P, V, T>,
     zero_check_state: ZeroCheckState<P, T>,
     no_batching: bool,
     monitor: Monitor<V, T>,
@@ -163,7 +163,7 @@ where
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let mult_check_state = MultCheckState::init(&mut rng)?;
         let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             fcom: FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?,
@@ -183,7 +183,7 @@ where
         fcom: &FCom<P, V, T, SVOLE>,
         no_batching: bool,
     ) -> Result<Self> {
-        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let mult_check_state = MultCheckState::init(&mut rng)?;
         let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             fcom: fcom.duplicate()?,
@@ -205,7 +205,7 @@ where
         no_batching: bool,
         delta: T,
     ) -> Result<Self> {
-        let mult_check_state = MultCheckState::init(channel, &mut rng)?;
+        let mult_check_state = MultCheckState::init(&mut rng)?;
         let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
         Ok(Self {
             fcom: FCom::init_with_delta(channel, &mut rng, lpn_setup, lpn_extend, delta)?,
@@ -403,6 +403,15 @@ where
 
         self.mult_check_state
             .accumulate(&(*a, *b, out), self.fcom.get_delta());
+
+        if self.mult_check_state.count() >= BATCH_SIZE {
+            self.mult_check_state.finalize(
+                self.fcom.gen_mask(&mut self.channel, &mut self.rng)?,
+                &mut self.channel,
+                &mut self.rng,
+                self.fcom.get_delta(),
+            )?;
+        }
 
         Ok(out)
     }

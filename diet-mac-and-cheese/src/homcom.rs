@@ -13,41 +13,29 @@ use rand::{Rng, SeedableRng};
 use scuttlebutt::field::{DegreeModulo, IsSubFieldOf};
 use scuttlebutt::{field::FiniteField, AbstractChannel, AesRng, Block};
 use swanky_party::either::PartyEither;
-use swanky_party::private::{ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy};
+use swanky_party::private::{
+    ProverPrivate, ProverPrivateCopy, VerifierPrivate, VerifierPrivateCopy,
+};
 use swanky_party::{IsParty, Party, Prover, Verifier, WhichParty};
 
-pub struct MultCheckState<P: Party, T: Copy> {
-    sum_a0: ProverPrivateCopy<P, T>,
-    sum_a1: ProverPrivateCopy<P, T>,
+// Size of batches for multiplication / assert-zero
+pub const BATCH_SIZE: usize = 3_000_000;
+
+pub struct MultCheckState<P: Party, V: Copy, T: Copy> {
+    triples: ProverPrivate<P, Vec<(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)>>,
     sum_b: VerifierPrivateCopy<P, T>,
-    chi_power: T,
-    chi: T,
+    chi_power: VerifierPrivateCopy<P, T>,
+    chi: VerifierPrivateCopy<P, T>,
     count: usize,
 }
 
-impl<P: Party, T: FiniteField> MultCheckState<P, T> {
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
     /// Initialize the state.
-    pub(crate) fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<Self> {
-        let chi = match P::WHICH {
-            WhichParty::Prover(_) => {
-                channel.flush()?;
-                channel.read_serializable()?
-            }
-            WhichParty::Verifier(_) => {
-                let chi = T::random(rng);
-                channel.write_serializable::<T>(&chi)?;
-                channel.flush()?;
-
-                chi
-            }
-        };
+    pub(crate) fn init(rng: &mut AesRng) -> Result<Self> {
+        let chi = VerifierPrivateCopy::new(T::random(rng));
 
         Ok(Self {
-            sum_a0: ProverPrivateCopy::new(T::ZERO),
-            sum_a1: ProverPrivateCopy::new(T::ZERO),
+            triples: Default::default(),
             sum_b: VerifierPrivateCopy::new(T::ZERO),
             chi_power: chi,
             chi,
@@ -55,38 +43,34 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         })
     }
 
-    /// Reset the state.
-    fn reset(&mut self) {
-        self.sum_a0 = ProverPrivateCopy::new(T::ZERO);
-        self.sum_a1 = ProverPrivateCopy::new(T::ZERO);
+    /// Reset the state. Generates a new chi value (without communication).
+    fn reset(&mut self, rng: VerifierPrivate<P, &mut AesRng>) -> Result<()> {
+        self.triples = Default::default();
         self.sum_b = VerifierPrivateCopy::new(T::ZERO);
+        self.chi = rng.map(|rng| T::random(rng)).into();
         self.chi_power = self.chi;
         self.count = 0;
+
+        Ok(())
     }
 
-    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(
+    pub(crate) fn accumulate(
         &mut self,
-        triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
+        &triple: &(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>),
         delta: VerifierPrivateCopy<P, T>,
     ) {
-        let (x, y, z) = triple;
-
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                let a0 = x.mac() * y.mac();
-                let a1 = y.value().into_inner(ev) * x.mac() + x.value().into_inner(ev) * y.mac()
-                    - z.mac();
-
-                *self.sum_a0.as_mut().into_inner(ev) += a0 * self.chi_power;
-                *self.sum_a1.as_mut().into_inner(ev) += a1 * self.chi_power;
+                self.triples.as_mut().into_inner(ev).push(triple);
             }
             WhichParty::Verifier(ev) => {
+                let (x, y, z) = triple;
                 let b = x.mac() * y.mac() + delta.into_inner(ev) * z.mac();
-                *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power;
+                *self.sum_b.as_mut().into_inner(ev) += b * self.chi_power.into_inner(ev);
+                *self.chi_power.as_mut().into_inner(ev) *= self.chi.into_inner(ev);
             }
         }
 
-        self.chi_power *= self.chi;
         self.count += 1;
     }
 
@@ -94,32 +78,54 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
         &mut self,
         mask: Mac<P, T, T>,
         channel: &mut C,
+        rng: &mut AesRng,
         delta: VerifierPrivateCopy<P, T>,
     ) -> Result<usize> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
-                let u = self.sum_a0.into_inner(ev) + mask.mac();
-                let v = self.sum_a1.into_inner(ev) + mask.value().into_inner(ev);
+                channel.flush()?;
+                let chi = channel.read_serializable()?;
+                let mut chi_power = chi;
+
+                let mut sum_a0 = T::ZERO;
+                let mut sum_a1 = T::ZERO;
+                for &(x, y, z) in self.triples.as_ref().into_inner(ev) {
+                    let a0 = x.mac() * y.mac();
+                    let a1 = y.value().into_inner(ev) * x.mac()
+                        + x.value().into_inner(ev) * y.mac()
+                        - z.mac();
+
+                    sum_a0 += a0 * chi_power;
+                    sum_a1 += a1 * chi_power;
+
+                    chi_power *= chi;
+                }
+
+                let u = sum_a0 + mask.mac();
+                let v = sum_a1 + mask.value().into_inner(ev);
 
                 channel.write_serializable(&u)?;
                 channel.write_serializable(&v)?;
                 channel.flush()?;
 
                 let c = self.count;
-                self.reset();
+                self.reset(VerifierPrivate::empty(ev))?;
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
+                channel.write_serializable::<T>(&self.chi.into_inner(ev))?;
+                channel.flush()?;
+
                 let u = channel.read_serializable::<T>()?;
                 let v = channel.read_serializable::<T>()?;
 
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
                     let c = self.count;
-                    self.reset();
+                    self.reset(VerifierPrivate::new(rng))?;
                     Ok(c)
                 } else {
-                    self.reset();
+                    self.reset(VerifierPrivate::new(rng))?;
                     bail!("QuickSilver multiplication check failed.")
                 }
             }
@@ -132,7 +138,7 @@ impl<P: Party, T: FiniteField> MultCheckState<P, T> {
     }
 }
 
-impl<P: Party, T: Copy> Drop for MultCheckState<P, T> {
+impl<P: Party, V: Copy, T: Copy> Drop for MultCheckState<P, V, T> {
     fn drop(&mut self) {
         if self.count != 0 {
             warn!(
@@ -670,17 +676,24 @@ where
         &mut self,
         channel: &mut C,
         rng: &mut AesRng,
-        state: &mut MultCheckState<P, T>,
+        state: &mut MultCheckState<P, V, T>,
     ) -> Result<usize> {
         debug!("FCom: quicksilver_finalize");
 
+        state.finalize(self.gen_mask(channel, rng)?, channel, rng, self.delta)
+    }
+
+    /// Generate a random mask MAC over the tag field.
+    pub fn gen_mask<C: AbstractChannel + Clone>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut AesRng,
+    ) -> Result<Mac<P, T, T>> {
         let mut macs = GenericArray::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
             *mac = self.random(channel, rng)?;
         }
-        let mask = Mac::lift(&macs);
-
-        state.finalize(mask, channel, self.delta)
+        Ok(Mac::lift(&macs))
     }
 }
 
