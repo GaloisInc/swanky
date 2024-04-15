@@ -25,7 +25,7 @@ pub(crate) struct PRG {
 }
 
 impl PRG {
-    /// Create a PRG from an an initialization vector `iv`.
+    /// Create a PRG from a `seed` and an initialization vector `iv`.
     fn new(seed: IV, iv: IV) -> Self {
         let key: GenericArray<u8, _> = GenericArray::from(seed.as_array());
         let aes0 = Aes128::new(&key);
@@ -92,7 +92,7 @@ impl PRG {
     }
 }
 
-fn h1_core(inp: &[u8], out: &mut [u8]) {
+fn h1_internal(inp: &[u8], out: &mut [u8]) {
     assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
     let mut hasher = sha3::Shake128::default();
     hasher.update(inp);
@@ -109,7 +109,7 @@ pub type H1 = [u8; (SECURITY_PARAM / 8) * 2];
 /// It is called at the beginning of the protocol on both sides.
 fn h1(inp: &[u8]) -> H1 {
     let mut out = H1::default();
-    h1_core(inp, &mut out);
+    h1_internal(inp, &mut out);
     out
 }
 
@@ -822,6 +822,7 @@ pub fn sign(
     );
     log::info!("simply_vole_hash(u) running time: {:?}", t.elapsed());
 
+    // line 9
     let t = std::time::Instant::now();
     let mut v_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
     let v_bits: Vec<F2> = decompose_bits(&v).into_iter().collect();
@@ -844,10 +845,11 @@ pub fn sign(
 
     println!("LEN: {}", v_tilda.len());
 
+    // line 10
     let h_v = h1(&bits_to_u8_many(&v_tilda));
     println!("h_v {:?}", h_v);
 
-    // TODO: lines 9-12
+    // TODO: lines 11-12
 
     // line 13
     let chall2 = compute_chall_2(&chall1 /*TODO: add more */);
@@ -955,9 +957,9 @@ mod test {
 
     use super::{
         bitwise_f128b_from_f8b, bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3,
-        compute_r_iv, convert_to_vole_prover, convert_to_vole_verifier, decompose_bits, h1, l_hat,
-        sign, simply_vole_hash, to_field_f128_and_pad, vec_f128b_to_f2, verify, vole_commit,
-        vole_recompose_q, vole_reconstruct, B, H1,
+        compute_r_iv, convert_to_vole_prover, convert_to_vole_verifier, convert_to_vole_xor,
+        decompose_bits, h1, l_hat, sign, simply_vole_hash, to_field_f128_and_pad, vec_f128b_to_f2,
+        verify, vole_commit, vole_recompose_q, vole_reconstruct, B, H1,
     };
     use crate::convert_to_vole::{chal_dec, vole_open};
     use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
