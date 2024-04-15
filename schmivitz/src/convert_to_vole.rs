@@ -172,6 +172,45 @@ fn h3(inp: &[u8]) -> H3 {
     out
 }
 
+/// This is a first attempt to write ConvertToVole using Xor as in the FAEST spec.
+/// But it is not equal to `convert_to_vole_prover`, maybe because this function is using the
+/// `F8b` multiplication instead of pure bit manipulations.
+fn convert_to_vole_xor(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Vec<F2>, Vec<F8b>) {
+    assert!(seeds.len() == 256);
+    let mut u_res = vec![F2::ZERO; l];
+    let mut v_res = vec![F8b::ZERO; l];
+
+    let mut prgs = vec![];
+    prgs.push(vec![F2::ZERO; l]);
+    for x in 1..256 {
+        let prg = PRG::new(seeds[x], iv);
+        let v = prg.prg(l);
+        prgs.push(v);
+    }
+    for pos in 0..l {
+        let mut r = [[F2::ZERO; 256]; 9];
+        let mut v = [F2::ZERO; 8];
+        for x in 0..256 {
+            r[0][x] = prgs[x][pos];
+        }
+        for j in 0..8 {
+            //8 = log(256)
+
+            let mut i_bound = 128;
+            for i in 0..i_bound {
+                let i2 = 2 * i;
+                let i2_plus_1 = i2 + 1;
+                v[j] = v[j] + r[j][i2_plus_1];
+                r[j + 1][i] = r[j][i2] + r[j][i2_plus_1];
+            }
+            i_bound /= 2;
+        }
+        u_res[pos] = r[8][0];
+        v_res[pos] = bools_to_u8(&v.map(|b| b.into())).into();
+    }
+    (u_res, v_res)
+}
+
 #[inline(never)]
 fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
     assert!(seeds.len() == 256);
@@ -945,6 +984,11 @@ mod test {
         let delta = 3u8;
         let how_many = 10;
         let (u, vs) = convert_to_vole_prover(&seeds, iv, how_many);
+
+        /* This test was to test the correspondance between the two functions */
+        //let (u_xor, v_xor) = convert_to_vole_xor(&seeds, iv, how_many, true);
+        //assert_eq!(u_xor, u);
+        //assert_eq!(v_xor, vs);
 
         let mut seeds_verifier = [U8x16::default(); 256];
         for i in 0..256 {
