@@ -22,8 +22,11 @@ We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
 For convenience we abbreviate "all-but-one vector commitment" to "1-VC".
 */
 #![allow(dead_code)]
+use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
+use aes::Aes128;
 use eyre::{bail, Result};
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
+use swanky_serialization::CanonicalSerialize;
+use vectoreyes::{SimdBase, U8x16};
 
 // The following types are instrumental in the 4 functions
 // [`commit()`]/[`open()`]/ [`reconstruct()`]/[`verify()`].
@@ -44,30 +47,45 @@ pub type Seed = U8x16;
 /// Therefore its interface is specialized to this with the [`PRG::encrypt_double()`] function.
 #[allow(clippy::upper_case_acronyms)]
 pub(crate) struct PRG {
-    aes0: Aes128EncryptOnly,
-    aes1: Aes128EncryptOnly,
+    aes0: Aes128,
+    counter: u128,
 }
 
 impl PRG {
     /// Create a PRG from an an initialization vector `iv`.
-    fn new_with_iv(iv: IV) -> Self {
-        // TODO: This implementation here is similar to how things are done in mac-n-cheese/.../vole.rs
-        // But [`Aes128EncryptOnly`] implements AES-ECB, and the FAEST spec uses AES-CTR that turns a
-        // block-cipher into a stream cipher, and use this as the PRG.
-        let seed = Aes128EncryptOnly::new_with_key(iv);
+    fn new(seed: IV, iv: IV) -> Self {
+        let key: GenericArray<u8, _> = GenericArray::from(seed.as_array());
+        let aes0 = Aes128::new(&key);
 
-        let aes0 = Aes128EncryptOnly::new_with_key(seed.encrypt([255; 16].into()));
-        let aes1 = Aes128EncryptOnly::new_with_key(seed.encrypt([254; 16].into()));
+        let bytes = iv.to_bytes();
+        let mut counter = 0;
+        for b in bytes {
+            counter = (counter << 8) + (b as u128);
+        }
+        Self { aes0, counter }
+    }
 
-        Self { aes0, aes1 }
+    fn incr(&mut self) {
+        self.counter += 1;
     }
 
     /// Function that returns two random keys from one input key.
     /// There has no associated decrypt function, it is used for its PRG properties.
     /// This function corresponds to `PRG.encrypt` in the spec.
-    fn encrypt_double(&self, k: Key) -> (Key, Key) {
-        let k1 = self.aes0.encrypt(k);
-        let k2 = self.aes1.encrypt(k);
+    fn encrypt_double(&mut self) -> (Key, Key) {
+        const BLOCKS: usize = 2;
+        let block = GenericArray::from([0u8; 16]);
+        let mut blocks = [block; BLOCKS];
+
+        // encrypt blocks in place
+        for i in 0..BLOCKS {
+            blocks[i] = GenericArray::from(self.counter.to_le_bytes());
+            self.incr();
+        }
+        self.aes0.encrypt_blocks(&mut blocks);
+
+        let k1 = U8x16::from_array(blocks[0].into());
+        let k2 = U8x16::from_array(blocks[1].into());
         (k1, k2)
     }
 }
@@ -178,7 +196,7 @@ pub(crate) type Pdecom = (Vec<Key>, Com);
 /// This function is not present in the FAEST spec but it is a code fragment identified in
 /// both VC.commmit and VC.reconstruct that can be factorized.
 /// This function is used in [`commit()`] and [`reconstruct`].
-fn tree(prg: &PRG, iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
+fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
     let n = 1 << depth;
 
     let mut ks = Keys(vec![Key::default(); 2 * n - 1]);
@@ -188,7 +206,8 @@ fn tree(prg: &PRG, iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) 
     for d in 1..depth + 1 {
         let n_previous_level = 1 << (d - 1);
         for j in 0..n_previous_level {
-            let (t1, t2) = prg.encrypt_double(ks.get(d - 1, j));
+            let mut prg = PRG::new(ks.get(d - 1, j), iv);
+            let (t1, t2) = prg.encrypt_double();
             ks.set(d, j * 2, t1);
             ks.set(d, j * 2 + 1, t2);
         }
@@ -212,8 +231,7 @@ fn tree(prg: &PRG, iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) 
 /// This also produces the the full decommitment information that a prover can later use to
 /// [`open()`] the commitment and the full set of [`Seed`]s.
 pub fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
-    let prg = PRG::new_with_iv(iv);
-    let (ks, seeds, coms) = tree(&prg, iv, r, depth);
+    let (ks, seeds, coms) = tree(iv, r, depth);
 
     // compute the h
     let h = h1(&coms);
@@ -275,7 +293,6 @@ pub fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
 /// an initial vector `iv`. The seeds are used later in the VOLE-it-HEAD protocol to generate VOLEs.
 /// This function is used by the verifier after receiving the [`Pdecom`] from the prover.
 pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed>) {
-    let prg = PRG::new_with_iv(iv);
     assert_eq!(
         pdecom.0.len(),
         j.len(),
@@ -292,7 +309,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
     let mut pos = 0;
     for (i, (b, k)) in std::iter::zip(j.iter().rev(), cop).enumerate() {
         let how_many = 1 << (d - i - 1);
-        let (_keys, seeds_subtree, coms_subtree) = tree(&prg, iv, k, d - i - 1);
+        let (_keys, seeds_subtree, coms_subtree) = tree(iv, k, d - i - 1);
         let copy_start = if *b { pos } else { pos + how_many };
 
         // if the boolean is one then the hidden seed in on the left,
