@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 use schmivitz::circuit::run_prover;
 use schmivitz::convert_to_vole::{bitwise_f128b_from_f8b, bools_to_u8, chal_dec, sign, verify};
 use schmivitz::parameters::REPETITION_PARAM;

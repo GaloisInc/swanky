@@ -30,13 +30,13 @@ impl Iterator for RelationStreamer {
         if self.i < self.rel.gates.len() {
             let g = self.rel.gates[self.i].clone();
             self.i += 1;
-            return Some(g);
+            Some(g)
         } else {
             self.i = 0;
             if let Some(_) = self.rel.read_next() {
-                return self.next();
+                self.next()
             } else {
-                return None;
+                None
             }
         }
     }

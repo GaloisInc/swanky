@@ -1,16 +1,14 @@
 /*! */
-use crate::all_but_one_vc::IV;
-use crate::all_but_one_vc::{commit, open, reconstruct, Com, Decom, Pdecom, Seed};
+#![allow(clippy::needless_range_loop)]
+use crate::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
+use crate::crypto_primitives::{Com, Seed, IV, PRG};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
-use aes::cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit};
-use aes::Aes128;
 use eyre::{bail, Result};
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F128b;
 use swanky_field_binary::F8b;
 use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
-use vectoreyes::{SimdBase, U8x16};
 
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
@@ -18,79 +16,6 @@ use sha3::{
 };
 use std::sync::mpsc::channel;
 use std::thread;
-
-pub(crate) struct PRG {
-    aes0: Aes128,
-    counter: u128,
-}
-
-impl PRG {
-    /// Create a PRG from a `seed` and an initialization vector `iv`.
-    fn new(seed: IV, iv: IV) -> Self {
-        let key: GenericArray<u8, _> = GenericArray::from(seed.as_array());
-        let aes0 = Aes128::new(&key);
-
-        let bytes = iv.to_bytes();
-        let mut counter = 0;
-        for b in bytes {
-            counter = (counter << 8) + (b as u128);
-        }
-        Self { aes0, counter }
-    }
-
-    fn incr(&mut self) {
-        self.counter += 1;
-    }
-
-    /// Function that returns a pseudo-random vector of F2 values
-    fn prg(mut self, l: usize) -> Vec<F2> {
-        let mut res = Vec::with_capacity(l);
-
-        let mut remaining: i64 = l.try_into().unwrap();
-
-        const BLOCKS: usize = 16;
-        let block = GenericArray::from([0u8; 16]);
-        let mut blocks = [block; BLOCKS];
-        while remaining > 0 {
-            // encrypt blocks in place
-            for i in 0..BLOCKS {
-                blocks[i] = GenericArray::from(self.counter.to_le_bytes());
-                self.incr();
-            }
-            self.aes0.encrypt_blocks(&mut blocks);
-
-            for i in 0..BLOCKS {
-                for u in blocks[i].iter() {
-                    for i in 0..8u8 {
-                        if remaining <= 0 {
-                            return res;
-                        }
-
-                        res.push(((u >> i & 1 as u8) == 1).into());
-                        remaining -= 1;
-                    }
-                }
-            }
-        }
-
-        res
-    }
-    /// Pseudo-random generate seeds to initialize other prgs
-    fn generate_prg_seeds(mut self, repetition_param: usize) -> Vec<Seed> {
-        let mut res = vec![];
-
-        let mut block = GenericArray::from([0u8; 16]);
-
-        for i in 0..repetition_param {
-            block = GenericArray::from(self.counter.to_le_bytes());
-            self.aes0.encrypt_block(&mut block);
-            self.incr();
-
-            res.push(U8x16::from_array(block.into()));
-        }
-        res
-    }
-}
 
 fn h1_internal(inp: &[u8], out: &mut [u8]) {
     assert_eq!(out.len(), (SECURITY_PARAM / 8) * 2);
@@ -261,7 +186,7 @@ fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<
                 v_res[j] += *r * (delta_f8b - i_f8b);
             }
         } else {
-            assert_eq!(*seed, U8x16::default());
+            assert_eq!(*seed, Seed::default());
         }
         i = i.wrapping_add(1);
     }
@@ -350,7 +275,7 @@ pub fn vole_commit(
 pub fn vole_open(chal: &[u8], decom: Vec<Decom>) -> Vec<Pdecom> {
     let mut pdecom = Vec::with_capacity(REPETITION_PARAM);
     for i in 0..REPETITION_PARAM {
-        let delta_i = chal_dec(&chal, i);
+        let delta_i = chal_dec(chal, i);
         let pdecom_i = open(&decom[i], delta_i);
         pdecom.push(pdecom_i);
     }
@@ -402,7 +327,7 @@ pub fn vole_reconstruct(
         com.push(com_i);
 
         // let's recompose the seeds and
-        let mut seeds_shifted = vec![U8x16::default(); 256];
+        let mut seeds_shifted = vec![Seed::default(); 256];
         let delta_u8 = bools_to_u8(&delta);
         //println!("delta_u8 {}", delta_u8);
         let mut c = 0;
@@ -539,7 +464,7 @@ fn corrections_to_bytes(corr: &Corrections) -> Vec<u8> {
     out
 }
 
-fn compute_r_iv(sk: &[u8], mu: &H1, rho: &[u8]) -> (U8x16, U8x16) {
+fn compute_r_iv(sk: &[u8], mu: &H1, rho: &[u8]) -> (Seed, IV) {
     let mut h3_inp = vec![];
     h3_inp.extend(sk);
     h3_inp.extend(mu);
@@ -547,12 +472,10 @@ fn compute_r_iv(sk: &[u8], mu: &H1, rho: &[u8]) -> (U8x16, U8x16) {
     let r_iv: H3 = h3(&h3_inp);
 
     // splitting r_iv into r and iv
-    let mut r_part: [u8; 16] = [0u8; SECURITY_PARAM / 8];
-    r_part.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
-    let r = U8x16::from_bytes((&r_part).into()).unwrap();
-    let mut iv_part: [u8; 16] = [0u8; 128 / 8];
-    iv_part.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
-    let iv = U8x16::from_bytes(&iv_part.into()).unwrap();
+    let mut r: [u8; 16] = [0u8; SECURITY_PARAM / 8];
+    r.copy_from_slice(&r_iv[0..SECURITY_PARAM / 8]);
+    let mut iv: [u8; 16] = [0u8; 128 / 8];
+    iv.copy_from_slice(&r_iv[SECURITY_PARAM / 8..(SECURITY_PARAM + 128) / 8]);
     (r, iv)
 }
 
@@ -560,8 +483,8 @@ fn compute_chall_1(mu: &H1, h_com: &Com, corr: &Corrections, iv: &IV) -> Chall1 
     let mut inp = vec![];
     inp.extend(mu);
     // TODO: add `h``
-    inp.extend(corrections_to_bytes(&corr));
-    inp.extend(iv.to_bytes());
+    inp.extend(corrections_to_bytes(corr));
+    inp.extend(iv);
     h_chall1(&inp)
 }
 
@@ -671,7 +594,7 @@ fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     all_bits.truncate(x1_len);
     all_bits
         .iter()
-        .zip(x1.into_iter())
+        .zip(x1)
         .map(|(b1, b2)| (if *b1 { F2::ONE } else { F2::ZERO }) + b2)
         .collect()
 }
@@ -730,7 +653,7 @@ impl<'a> Iterator for BitDecomposer<'a> {
     }
 }
 
-fn decompose_bits<'a>(data: &'a Vec<Vec<F8b>>) -> BitDecomposer<'a> {
+fn decompose_bits(data: &Vec<Vec<F8b>>) -> BitDecomposer<'_> {
     BitDecomposer::new(data)
 }
 
@@ -761,7 +684,7 @@ fn vec_f128b_to_f2(v: &[F128b]) -> Vec<Vec<F2>> {
     let how_many = v.len();
     let mut out: Vec<Vec<F2>> = Vec::with_capacity(SECURITY_PARAM);
 
-    for i in 0..SECURITY_PARAM {
+    for _ in 0..SECURITY_PARAM {
         out.push(Vec::with_capacity(how_many));
     }
 
@@ -813,11 +736,11 @@ pub fn sign(
     let t = std::time::Instant::now();
     let u_tilda = simply_vole_hash(
         &chall1,
-        u[0..l + SECURITY_PARAM].iter().map(|b| *b),
+        u[0..l + SECURITY_PARAM].iter().copied(),
         l + SECURITY_PARAM,
         u[l + SECURITY_PARAM..l + 2 * SECURITY_PARAM + B]
             .iter()
-            .map(|b| *b),
+            .copied(),
         SECURITY_PARAM + B,
     );
     log::info!("simply_vole_hash(u) running time: {:?}", t.elapsed());
@@ -825,7 +748,7 @@ pub fn sign(
     // line 9
     let t = std::time::Instant::now();
     let mut v_tilda: Vec<F2> = Vec::with_capacity((l + SECURITY_PARAM) * SECURITY_PARAM);
-    let v_bits: Vec<F2> = decompose_bits(&v).into_iter().collect();
+    let v_bits: Vec<F2> = decompose_bits(&v).collect();
     assert_eq!(v_bits.len(), (l_hat(l) * SECURITY_PARAM));
     let split = l + SECURITY_PARAM; // split between x0 and x1
     let step = l_hat(l);
@@ -833,9 +756,9 @@ pub fn sign(
         let start = step * i;
         let newt = simply_vole_hash(
             &chall1,
-            v_bits[start..start + split].iter().map(|b| *b),
+            v_bits[start..start + split].iter().copied(),
             l + SECURITY_PARAM,
-            v_bits[start + split..start + step].iter().map(|b| *b),
+            v_bits[start + split..start + step].iter().copied(),
             SECURITY_PARAM + B,
         );
         v_tilda.extend(newt);
@@ -912,9 +835,9 @@ pub fn verify(
     for i in 0..SECURITY_PARAM {
         let newt = simply_vole_hash(
             &chall1,
-            q_bits[i][0..l + SECURITY_PARAM].iter().map(|b| *b),
+            q_bits[i][0..l + SECURITY_PARAM].iter().copied(),
             l + SECURITY_PARAM,
-            q_bits[i][l + SECURITY_PARAM..l_hat(l)].iter().map(|b| *b),
+            q_bits[i][l + SECURITY_PARAM..l_hat(l)].iter().copied(),
             SECURITY_PARAM + B,
         );
         q_tilda.extend(newt);
@@ -948,7 +871,7 @@ pub fn verify(
     // Line 20
     let chall3_prime = compute_chall_3(&chall2 /*TODO: add more */);
 
-    return (chall3_prime == chall3, q_f128b, chall3);
+    (chall3_prime == chall3, q_f128b, chall3)
 }
 
 #[cfg(test)]
@@ -962,37 +885,38 @@ mod test {
         verify, vole_commit, vole_recompose_q, vole_reconstruct, B, H1,
     };
     use crate::convert_to_vole::{chal_dec, vole_open};
+    use crate::crypto_primitives::Seed;
     use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
     use rand::{thread_rng, RngCore};
-    use swanky_field::FiniteRing;
+    use swanky_field::{FiniteField, FiniteRing};
     use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;
 
     #[test]
     fn test_convert_to_vole() {
-        let mut seeds = vec![];
+        let mut seeds: Vec<Seed> = vec![];
         let rng = &mut thread_rng();
 
         let mut arr = [0u8; 16];
         for _ in 0..256 {
             rng.try_fill_bytes(&mut arr).unwrap();
-            seeds.push(U8x16::from_bytes(&arr.into()).unwrap());
+            seeds.push(arr);
         }
 
         rng.try_fill_bytes(&mut arr).unwrap();
-        let iv = U8x16::from_bytes(&arr.into()).unwrap();
+        let iv = arr;
 
         let delta = 3u8;
         let how_many = 10;
-        let (u, vs) = convert_to_vole_prover(&seeds, iv, how_many);
+        let (u, vs) = convert_to_vole_prover(seeds.as_slice(), iv, how_many);
 
         /* This test was to test the correspondance between the two functions */
         //let (u_xor, v_xor) = convert_to_vole_xor(&seeds, iv, how_many, true);
         //assert_eq!(u_xor, u);
         //assert_eq!(v_xor, vs);
 
-        let mut seeds_verifier = [U8x16::default(); 256];
+        let mut seeds_verifier = [Seed::default(); 256];
         for i in 0..256 {
             if i != (delta as usize) {
                 seeds_verifier[i] = seeds[i];

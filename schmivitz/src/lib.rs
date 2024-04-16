@@ -19,6 +19,7 @@
 pub mod all_but_one_vc;
 pub mod circuit;
 pub mod convert_to_vole;
+pub mod crypto_primitives;
 pub mod parameters;
 pub mod proof;
 mod vole;
