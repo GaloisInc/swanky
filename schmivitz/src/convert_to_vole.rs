@@ -106,11 +106,14 @@ fn convert_to_vole_xor(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Ve
     let mut v_res = vec![F8b::ZERO; l];
 
     let mut prgs = vec![];
-    prgs.push(vec![F2::ZERO; l]);
-    for x in 1..256 {
-        let prg = PRG::new(seeds[x], iv);
-        let v = prg.prg(l);
-        prgs.push(v);
+    for (idx, seed) in seeds.iter().enumerate() {
+        if idx == 0 && !is_prover {
+            prgs.push(vec![F2::ZERO; l]);
+        } else {
+            let prg = PRG::new(*seed, iv);
+            let v = prg.prg(l);
+            prgs.push(v);
+        }
     }
     for pos in 0..l {
         let mut r = [[F2::ZERO; 256]; 9];
@@ -118,14 +121,13 @@ fn convert_to_vole_xor(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Ve
         for x in 0..256 {
             r[0][x] = prgs[x][pos];
         }
+        let mut i_bound = 128;
         for j in 0..8 {
             //8 = log(256)
-
-            let mut i_bound = 128;
             for i in 0..i_bound {
                 let i2 = 2 * i;
                 let i2_plus_1 = i2 + 1;
-                v[j] = v[j] + r[j][i2_plus_1];
+                v[j] += r[j][i2_plus_1];
                 r[j + 1][i] = r[j][i2] + r[j][i2_plus_1];
             }
             i_bound /= 2;
@@ -166,6 +168,24 @@ pub fn bools_to_u8(d: &[bool]) -> u8 {
     }
 
     r
+}
+
+fn convert_to_vole_verifier_xor(delta: &[bool], seeds: &[Seed], iv: IV, l: usize) -> Vec<F8b> {
+    // let's recompose the seeds and
+    let mut seeds_shifted = vec![Seed::default(); 256];
+    let delta_u8 = bools_to_u8(&delta);
+    let mut i = 0u8;
+
+    for _ in 0u32..256 {
+        let idx: u8 = i ^ delta_u8;
+        if i != 0 {
+            seeds_shifted[i as usize] = seeds[(idx) as usize];
+        }
+        i = i.wrapping_add(1);
+    }
+
+    let (_, v) = convert_to_vole_xor(&seeds_shifted, iv, l, false);
+    v
 }
 
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
@@ -912,9 +932,9 @@ mod test {
         let (u, vs) = convert_to_vole_prover(seeds.as_slice(), iv, how_many);
 
         /* This test was to test the correspondance between the two functions */
-        //let (u_xor, v_xor) = convert_to_vole_xor(&seeds, iv, how_many, true);
-        //assert_eq!(u_xor, u);
-        //assert_eq!(v_xor, vs);
+        let (u_xor, v_xor) = convert_to_vole_xor(&seeds, iv, how_many, true);
+        assert_eq!(u_xor, u);
+        assert_eq!(v_xor, vs);
 
         let mut seeds_verifier = [Seed::default(); 256];
         for i in 0..256 {
@@ -923,6 +943,13 @@ mod test {
             }
         }
         let qs = convert_to_vole_verifier(&seeds_verifier, iv, how_many, delta);
+
+        /* This test was to test the correspondance between the two functions */
+        let delta_f8b: F8b = delta.into();
+        let delta_bool: Vec<bool> = delta_f8b.bit_decomposition().iter().copied().collect();
+        let qs_xor =
+            super::convert_to_vole_verifier_xor(delta_bool.as_slice(), &seeds, iv, how_many);
+        assert_eq!(qs, qs_xor);
 
         println!("Minus one {:?}", -(F8b::ONE));
         for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
