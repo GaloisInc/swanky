@@ -48,7 +48,8 @@ fn test1() {
     assert!(b);
 }
 
-fn grit() {
+#[allow(dead_code)]
+fn run_circuit() {
     let args: Vec<String> = env::args().collect();
 
     // Check that two arguments are provided

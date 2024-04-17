@@ -1,12 +1,10 @@
-use std::{collections::HashMap, fs::File, path::Path};
-
+#![allow(dead_code)]
 use diet_mac_and_cheese::circuit_ir::{GateM, TapeT};
 use eyre::{bail, eyre};
 use mac_n_cheese_sieve_parser::{
-    text_parser::ValueStreamReader, ConversionSemantics, FunctionBodyVisitor, Identifier, Number,
-    RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
-    ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    ConversionSemantics, Identifier, Number, TypeId, TypedWireRange, WireId, WireRange,
 };
+use std::collections::HashMap;
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
 
@@ -186,8 +184,11 @@ impl<I: TapeT, C: Iterator<Item = GateM>> ProverPreparer2<I, C> {
             Add(ty, dst, left, right) => {
                 self.add(ty, dst, left, right)?;
             }
+            Mul(ty, dst, left, right) => {
+                self.mul(ty, dst, left, right)?;
+            }
             _ => {
-                panic!("fuck");
+                panic!("missing cases");
             }
         }
         Ok(())

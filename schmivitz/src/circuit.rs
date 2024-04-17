@@ -33,7 +33,7 @@ impl Iterator for RelationStreamer {
             Some(g)
         } else {
             self.i = 0;
-            if let Some(_) = self.rel.read_next() {
+            if self.rel.read_next().is_some() {
                 self.next()
             } else {
                 None
@@ -49,8 +49,6 @@ pub fn run_prover(private_inputs: PathBuf, relation: PathBuf) -> eyre::Result<()
     let private_inputs = InputFlatbuffers::new_private_inputs(&private_inputs).unwrap();
     let mut prep = ProverPreparer2::new(private_inputs, circ).unwrap();
     prep.compute()?;
-
-    let count = prep.count();
 
     eyre::Ok(())
 }

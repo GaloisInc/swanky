@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
+#![allow(dead_code)]
 use eyre::{bail, eyre, Result};
 use mac_n_cheese_sieve_parser::{
-    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
-    TypeId, TypedCount, TypedWireRange, WireId, WireRange,
+    ConversionSemantics, Identifier, Number, TypeId, TypedWireRange, WireId, WireRange,
 };
+use std::collections::HashMap;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F2};
 
