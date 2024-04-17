@@ -26,15 +26,14 @@ diet-mac-and-cheese.workspace = true
 eyre.workspace = true
 log.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
-pretty_env_logger.workspace = true
 merlin.workspace = true
+pretty_env_logger.workspace = true
 proptest.workspace = true
 rand.workspace = true
 sha3.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
-vectoreyes.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

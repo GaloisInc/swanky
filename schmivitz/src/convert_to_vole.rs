@@ -950,8 +950,6 @@ pub fn verify(
 
 #[cfg(test)]
 mod test {
-    use vectoreyes::U8x16;
-
     use super::{
         bitwise_f128b_from_f8b, bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3,
         compute_r_iv, convert_to_vole, convert_to_vole_prover_naive,
@@ -963,7 +961,7 @@ mod test {
     use crate::crypto_primitives::Seed;
     use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
     use rand::{thread_rng, RngCore};
-    use swanky_field::{FiniteField, FiniteRing};
+    use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_field_binary::{F128b, F8b};
     use swanky_serialization::CanonicalSerialize;

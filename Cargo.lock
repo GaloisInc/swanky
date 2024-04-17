@@ -2170,7 +2170,6 @@ dependencies = [
  "swanky-field-binary",
  "swanky-serialization",
  "tempfile",
- "vectoreyes",
 ]
 
 [[package]]
