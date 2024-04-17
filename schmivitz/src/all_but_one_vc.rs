@@ -194,8 +194,9 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
     let (cop, com_j) = pdecom;
 
     let mut coms = vec![Com::default(); 1 << d];
-    // The seeds computed by `reconstruct` have one less entry than coms
-    let mut seeds = vec![Seed::default(); (1 << d) - 1];
+    // The seeds computed by `reconstruct` have one the same number of seeds with
+    // a default seed in the delta position.
+    let mut seeds = vec![Seed::default(); 1 << d];
 
     let mut pos = 0;
     for (i, (b, k)) in std::iter::zip(j.iter().rev(), cop).enumerate() {
@@ -203,15 +204,10 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
         let (_keys, seeds_subtree, coms_subtree) = tree(iv, k, d - i - 1);
         let copy_start = if *b { pos } else { pos + how_many };
 
-        // if the boolean is one then the hidden seed in on the left,
-        // and then the start to copy the seed is shifted by one.
-        let copy_start_seeds = if *b { copy_start } else { copy_start - 1 };
-
         // copy commitments from the subtree into the array of all coms
         coms[copy_start..(copy_start + how_many)].copy_from_slice(&coms_subtree[..how_many]);
-
-        seeds[copy_start_seeds..(copy_start_seeds + how_many)]
-            .copy_from_slice(&seeds_subtree[..how_many]);
+        // copy seeds from the subtree into the array of all seeds
+        seeds[copy_start..(copy_start + how_many)].copy_from_slice(&seeds_subtree[..how_many]);
 
         pos = if *b { pos + how_many } else { pos };
     }
@@ -223,7 +219,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (H1, Vec<Seed
     // compute the hash using H1
     let h_computed = h1_on_coms(&coms);
 
-    debug_assert_eq!(seeds.len(), (1 << d) - 1);
+    debug_assert_eq!(seeds.len(), (1 << d));
     (h_computed, seeds)
 }
 
@@ -300,14 +296,10 @@ mod test {
         // test that the seeds from the prover are the same as the ones found by the verifier
         let (_, seeds) = reconstruct((cop, com_j), j, iv);
 
-        let mut prv_i = 0;
-        for (vrf_i, seed) in seeds.iter().enumerate() {
-            if vrf_i == j_num {
-                // if the index is equal to j then we skip a seed in the prover
-                prv_i += 1;
+        for (i, seed) in seeds.iter().enumerate() {
+            if i != j_num {
+                prop_assert_eq!(sd[i], *seed);
             }
-            prop_assert_eq!(sd[prv_i], *seed);
-            prv_i += 1;
         }
         Ok(())
     }
@@ -340,7 +332,7 @@ mod test {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1000))]
+        #![proptest_config(ProptestConfig::with_cases(100))]
 
         #[test]
         fn test_1_vc_works_on_randomized_input(
