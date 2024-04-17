@@ -97,49 +97,102 @@ fn h3(inp: &[u8]) -> H3 {
     out
 }
 
-/// This is a first attempt to write ConvertToVole using Xor as in the FAEST spec.
-/// But it is not equal to `convert_to_vole_prover`, maybe because this function is using the
-/// `F8b` multiplication instead of pure bit manipulations.
-fn convert_to_vole_xor(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Vec<F2>, Vec<F8b>) {
+// Implementation of ConvertToVOLE as in the FAEST spec. It differs from the naive
+// algorithm by using only xor operations.
+fn convert_to_vole(seeds: &[Seed], iv: IV, l: usize, is_prover: bool) -> (Vec<F2>, Vec<F8b>) {
+    // even if one seed can be bottom, it expects 256 of them.
     assert!(seeds.len() == 256);
-    let mut u_res = vec![F2::ZERO; l];
-    let mut v_res = vec![F8b::ZERO; l];
+    let mut u_res = Vec::with_capacity(l);
+    let mut v_res = Vec::with_capacity(l);
 
-    let mut prgs = vec![];
+    // u64 packs 64 bits/booleans.
+    let mut prgs: Vec<Vec<u64>> = vec![];
     for (idx, seed) in seeds.iter().enumerate() {
         if idx == 0 && !is_prover {
-            prgs.push(vec![F2::ZERO; l]);
+            prgs.push(vec![0u64; (l / 64) + 1]);
         } else {
             let prg = PRG::new(*seed, iv);
-            let v = prg.prg(l);
+            let v = prg.prg_compact(l);
             prgs.push(v);
         }
     }
-    for pos in 0..l {
-        let mut r = [[F2::ZERO; 256]; 9];
-        let mut v = [F2::ZERO; 8];
+
+    // `r` is only the last 2 layers of the original structure from the spec.
+    // Only 2 layers are used using a swap operation in the loop.
+    // Again, u64 to do 64 boolean/bit operations at once.
+    let mut r = [[0_u64; 256]; 2];
+    let mut remaining = l;
+    for pos in 0..(l / 64) + 1 {
+        // possibly more but does not matter for performance.
+
+        let mut v = [0_u64; 8];
         for x in 0..256 {
             r[0][x] = prgs[x][pos];
         }
         let mut i_bound = 128;
         for j in 0..8 {
-            //8 = log(256)
+            // 8 = log(256)
             for i in 0..i_bound {
                 let i2 = 2 * i;
                 let i2_plus_1 = i2 + 1;
-                v[j] += r[j][i2_plus_1];
-                r[j + 1][i] = r[j][i2] + r[j][i2_plus_1];
+                v[j] ^= r[0][i2_plus_1];
+                r[1][i] = r[0][i2] ^ r[0][i2_plus_1];
+            }
+
+            // swap the top-level to the lower level
+            for i in 0..i_bound {
+                r[0][i] = r[1][i];
             }
             i_bound /= 2;
         }
-        u_res[pos] = r[8][0];
-        v_res[pos] = bools_to_u8(&v.map(|b| b.into())).into();
+
+        let u = r[0][0];
+        // if there are more than 64 then we dont have to check how
+        // many are remaining for the next 64 steps.
+        if remaining >= 64 {
+            for i in 0..64 {
+                u_res.push(((u >> i & 1_u64) == 1).into());
+                let mut x = 0u8;
+                x |= (v[0] >> i & 1) as u8;
+                x |= ((v[1] >> i & 1) as u8) << 1;
+                x |= ((v[2] >> i & 1) as u8) << 2;
+                x |= ((v[3] >> i & 1) as u8) << 3;
+                x |= ((v[4] >> i & 1) as u8) << 4;
+                x |= ((v[5] >> i & 1) as u8) << 5;
+                x |= ((v[6] >> i & 1) as u8) << 6;
+                x |= ((v[7] >> i & 1) as u8) << 7;
+                v_res.push(x.into());
+            }
+            remaining -= 64;
+        } else {
+            // otherwise let's check one by one
+            for i in 0..64 {
+                u_res.push(((u >> i & 1_u64) == 1).into());
+                let mut x = 0u8;
+                x |= (v[0] >> i & 1) as u8;
+                x |= ((v[1] >> i & 1) as u8) << 1;
+                x |= ((v[2] >> i & 1) as u8) << 2;
+                x |= ((v[3] >> i & 1) as u8) << 3;
+                x |= ((v[4] >> i & 1) as u8) << 4;
+                x |= ((v[5] >> i & 1) as u8) << 5;
+                x |= ((v[6] >> i & 1) as u8) << 6;
+                x |= ((v[7] >> i & 1) as u8) << 7;
+                v_res.push(x.into());
+
+                remaining -= 1;
+                if remaining == 0 {
+                    debug_assert_eq!(u_res.len(), l);
+                    return (u_res, v_res);
+                }
+            }
+        }
     }
+    debug_assert_eq!(u_res.len(), l);
     (u_res, v_res)
 }
 
-#[inline(never)]
-fn convert_to_vole_prover(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
+#[cfg(test)]
+fn convert_to_vole_prover_naive(seeds: &[Seed], iv: IV, l: usize) -> (Vec<F2>, Vec<F8b>) {
     assert!(seeds.len() == 256);
     let mut u_res = vec![F2::ZERO; l];
     let mut v_res = vec![F8b::ZERO; l];
@@ -170,26 +223,27 @@ pub fn bools_to_u8(d: &[bool]) -> u8 {
     r
 }
 
-fn convert_to_vole_verifier_xor(delta: &[bool], seeds: &[Seed], iv: IV, l: usize) -> Vec<F8b> {
-    // let's recompose the seeds and
-    let mut seeds_shifted = vec![Seed::default(); 256];
-    let delta_u8 = bools_to_u8(&delta);
+// The verifier permutes the seeds and calls `convert_to_vole`.
+fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
+    // let's permutate the seeds according to delta, with the permutation
+    // i -> i xor delta
+    let mut seeds_permuted = vec![Seed::default(); 256];
     let mut i = 0u8;
-
     for _ in 0u32..256 {
-        let idx: u8 = i ^ delta_u8;
+        let idx: u8 = i ^ delta;
         if i != 0 {
-            seeds_shifted[i as usize] = seeds[(idx) as usize];
+            seeds_permuted[i as usize] = seeds[(idx) as usize];
         }
         i = i.wrapping_add(1);
     }
 
-    let (_, v) = convert_to_vole_xor(&seeds_shifted, iv, l, false);
+    let (_, v) = convert_to_vole(&seeds_permuted, iv, l, false);
     v
 }
 
 // NOTE: the return type is different than ConvertToVOLE in the paper, where is should be a Vec<Vec<F2>>
-fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
+#[cfg(test)]
+fn convert_to_vole_verifier_naive(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<F8b> {
     assert_eq!(seeds.len(), 256);
     let mut v_res = vec![F8b::ZERO; l];
 
@@ -213,7 +267,7 @@ fn convert_to_vole_verifier(seeds: &[Seed], iv: IV, l: usize, delta: u8) -> Vec<
 
     v_res
 }
-///
+/// Type for corrections
 pub type Corrections = Vec<Vec<F2>>;
 
 /// Figure 5.4
@@ -229,14 +283,15 @@ pub fn vole_commit(
     let mut decom = Vec::with_capacity(REPETITION_PARAM);
     let mut com = Vec::with_capacity(REPETITION_PARAM);
 
-    /* // Without multithreading
+    // Without multithreading
+    /*
     for i in 0..REPETITION_PARAM {
         let (com_i, decom_i, seeds) = commit(prg_seeds[i], iv, 8);
-        let (u_i, v_i) = convert_to_vole_prover(&seeds, iv, l);
-        let (com_i, decom_i, u_i, v_i) = rxs[i].recv().unwrap();
+        let (u_i, v_i) = convert_to_vole_xor(&seeds, iv, l, true);
         com.push(com_i);
         decom.push(decom_i);
         u.push(u_i);
+        v.push(v_i)
     }
     */
 
@@ -255,7 +310,7 @@ pub fn vole_commit(
         let prg_seeds_i = prg_seeds[i];
         let handle = thread::spawn(move || {
             let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, 8);
-            let (u_i, v_i) = convert_to_vole_prover(&seeds, iv, l);
+            let (u_i, v_i) = convert_to_vole(&seeds, iv, l, true);
 
             tx.send((com_i, decom_i, u_i, v_i)).unwrap();
         });
@@ -331,7 +386,18 @@ pub fn vole_reconstruct(
     let mut qs = Vec::with_capacity(REPETITION_PARAM);
     let mut com = Vec::with_capacity(REPETITION_PARAM);
 
-    // With multithreading
+    // Without multithreading:
+    /*
+    for i in 0..REPETITION_PARAM {
+        let delta = chal_dec(chal, i);
+        let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
+        com.push(com_i);
+        let q_i = convert_to_vole_verifier(&seeds, iv, l, bools_to_u8(&delta));
+        qs.push(q_i);
+    }
+    */
+
+    // With multithreading:
     let mut txs = Vec::with_capacity(REPETITION_PARAM);
     let mut rxs = Vec::with_capacity(REPETITION_PARAM);
     for _ in 0..REPETITION_PARAM {
@@ -342,37 +408,24 @@ pub fn vole_reconstruct(
     let mut handles = Vec::new();
 
     for i in 0..REPETITION_PARAM {
-        let delta = chal_dec(&chal, i);
+        let delta = chal_dec(chal, i);
         let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
         com.push(com_i);
-
-        // let's recompose the seeds and
-        let mut seeds_shifted = vec![Seed::default(); 256];
-        let delta_u8 = bools_to_u8(&delta);
-        //println!("delta_u8 {}", delta_u8);
-        let mut c = 0;
-        for i in 0..256 {
-            if i != delta_u8 as usize {
-                seeds_shifted[i] = seeds[c];
-                c += 1;
-            }
-        }
+        assert_eq!(seeds.len(), 256);
 
         let tx = txs[i].clone();
         let handle = thread::spawn(move || {
-            let q_i = convert_to_vole_verifier(&seeds_shifted, iv, l, bools_to_u8(&delta));
+            let q_i = convert_to_vole_verifier(&seeds, iv, l, bools_to_u8(&delta));
             tx.send(q_i).unwrap();
         });
         handles.push(handle);
-
-        // without multithreading
-        // qs.push(q_i);
     }
 
     for i in 0..REPETITION_PARAM {
         let q_i = rxs[i].recv().unwrap();
         qs.push(q_i);
     }
+    // End multithreading
 
     (
         com[0], // TODO H1 all of them
@@ -598,7 +651,8 @@ fn simply_vole_hash<I1: Iterator<Item = F2>, I2: Iterator<Item = F2>>(
     for i in 0..how_many {
         h0 += s0_power * x0_vec[i];
         h1 += s1_power * x0_vec[i];
-        s0_power *= s0; // TODO: should I do the power in reverse order?? as in the spec
+        s0_power *= s0; // TODO: should I do the power in reverse order?? as in the spec.
+                        // The answer was that it does not matter.
         s1_power *= s1;
     }
     let h2 = r0 * h0 + r1 * h1;
@@ -900,9 +954,10 @@ mod test {
 
     use super::{
         bitwise_f128b_from_f8b, bools_to_u8, compute_chall_1, compute_chall_2, compute_chall_3,
-        compute_r_iv, convert_to_vole_prover, convert_to_vole_verifier, convert_to_vole_xor,
-        decompose_bits, h1, l_hat, sign, simply_vole_hash, to_field_f128_and_pad, vec_f128b_to_f2,
-        verify, vole_commit, vole_recompose_q, vole_reconstruct, B, H1,
+        compute_r_iv, convert_to_vole, convert_to_vole_prover_naive,
+        convert_to_vole_verifier_naive, decompose_bits, h1, l_hat, sign, simply_vole_hash,
+        to_field_f128_and_pad, vec_f128b_to_f2, verify, vole_commit, vole_recompose_q,
+        vole_reconstruct, B, H1,
     };
     use crate::convert_to_vole::{chal_dec, vole_open};
     use crate::crypto_primitives::Seed;
@@ -928,11 +983,11 @@ mod test {
         let iv = arr;
 
         let delta = 3u8;
-        let how_many = 10;
-        let (u, vs) = convert_to_vole_prover(seeds.as_slice(), iv, how_many);
+        let how_many = 1027;
+        let (u, vs) = convert_to_vole_prover_naive(seeds.as_slice(), iv, how_many);
 
-        /* This test was to test the correspondance between the two functions */
-        let (u_xor, v_xor) = convert_to_vole_xor(&seeds, iv, how_many, true);
+        /* This test checks the equivalence between convert_to_vole and its naive version */
+        let (u_xor, v_xor) = convert_to_vole(&seeds, iv, how_many, true);
         assert_eq!(u_xor, u);
         assert_eq!(v_xor, vs);
 
@@ -942,13 +997,10 @@ mod test {
                 seeds_verifier[i] = seeds[i];
             }
         }
-        let qs = convert_to_vole_verifier(&seeds_verifier, iv, how_many, delta);
+        let qs = convert_to_vole_verifier_naive(&seeds_verifier, iv, how_many, delta);
 
         /* This test was to test the correspondance between the two functions */
-        let delta_f8b: F8b = delta.into();
-        let delta_bool: Vec<bool> = delta_f8b.bit_decomposition().iter().copied().collect();
-        let qs_xor =
-            super::convert_to_vole_verifier_xor(delta_bool.as_slice(), &seeds, iv, how_many);
+        let qs_xor = super::convert_to_vole_verifier(&seeds, iv, how_many, delta);
         assert_eq!(qs, qs_xor);
 
         println!("Minus one {:?}", -(F8b::ONE));

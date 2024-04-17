@@ -6,6 +6,7 @@ use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
+#[cfg(test)]
 use swanky_field_binary::F2;
 
 /// Initialization Vector.
@@ -70,7 +71,8 @@ impl PRG {
     }
 
     /// Function that returns a pseudo-random vector of F2 values
-    pub fn prg(mut self, l: usize) -> Vec<F2> {
+    #[cfg(test)]
+    pub(crate) fn prg(mut self, l: usize) -> Vec<F2> {
         let mut res = Vec::with_capacity(l);
 
         let mut remaining: i64 = l.try_into().unwrap();
@@ -97,6 +99,55 @@ impl PRG {
                         res.push(((u >> i & 1_u8) == 1).into());
                         remaining -= 1;
                     }
+                }
+            }
+        }
+
+        res
+    }
+
+    /// Function that returns a pseudo-random vector of bits
+    ///
+    /// The bits are packed into `u64`. If the last `u64` has a capacity to contain more
+    /// bits than requested with `l` then the user of this function is in charge to ignore
+    /// the bits.
+    pub fn prg_compact(mut self, l: usize) -> Vec<u64> {
+        let mut res = Vec::with_capacity(l / 64 + 1);
+
+        // using i64 to allow for negative numbers
+        let mut remaining: i64 = l.try_into().unwrap();
+
+        const BLOCKS: usize = 16;
+        let block = GenericArray::from([0u8; 16]);
+        let mut blocks = [block; BLOCKS];
+        while remaining > 0 {
+            // encrypt blocks in place
+            for block in blocks.iter_mut() {
+                *block = GenericArray::from(self.counter_to_bytes());
+                self.incr();
+            }
+            self.aes0.encrypt_blocks(&mut blocks);
+
+            // moving blocks to u64 values and pushing them into the vector.
+            for block in blocks.iter() {
+                let mut t: [u8; 8] = Default::default();
+
+                // Move 64 bits
+                t.clone_from_slice(&block[0..8]);
+                let u1 = u64::from_le_bytes(t);
+                res.push(u1);
+                remaining -= 64;
+                if remaining <= 0 {
+                    return res;
+                }
+
+                // Move another 64 bits
+                t.clone_from_slice(&block[8..16]);
+                let u1 = u64::from_le_bytes(t);
+                res.push(u1);
+                remaining -= 64;
+                if remaining <= 0 {
+                    return res;
                 }
             }
         }
