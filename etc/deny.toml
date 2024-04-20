@@ -158,8 +158,7 @@ exceptions = [
 # adding a clarification entry for it allows you to manually specify the
 # licensing information
 [[licenses.clarify]]
-name = "ring"
-version = "*"
+crate = "ring"
 expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
@@ -216,7 +215,7 @@ deny = [
 # Each entry the name of a crate and a version range. If version is
 # not specified, all versions will be matched.
 #[[bans.features]]
-#name = "reqwest"
+#crate = "reqwest"
 # Features to not allow
 #deny = ["json"]
 # Features to allow
