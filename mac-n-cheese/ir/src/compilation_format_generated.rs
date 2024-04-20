@@ -1,4 +1,4 @@
-// CACHE KEY b0fba544f2f23e45758804bce250e7cd01560bdba67a7635ea73590c5a7394b4
+// CACHE KEY 66b5000fbc2fc3b1395c26edf10e8e0728b5fbe4e8f137234236ab6a39caa96b
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(clippy::all)]
 #![allow(unused_imports)]
@@ -1024,8 +1024,8 @@ impl<'a> TaskPrototype<'a> {
     TaskPrototype { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args TaskPrototypeArgs<'args>
   ) -> flatbuffers::WIPOffset<TaskPrototype<'bldr>> {
     let mut builder = TaskPrototypeBuilder::new(_fbb);
@@ -1144,11 +1144,11 @@ impl<'a> Default for TaskPrototypeArgs<'a> {
   }
 }
 
-pub struct TaskPrototypeBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct TaskPrototypeBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> TaskPrototypeBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> TaskPrototypeBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_kind_encoding(&mut self, kind_encoding: u16) {
     self.fbb_.push_slot::<u16>(TaskPrototype::VT_KIND_ENCODING, kind_encoding, 0);
@@ -1182,7 +1182,7 @@ impl<'a: 'b, 'b> TaskPrototypeBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(TaskPrototype::VT_NAME, name);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> TaskPrototypeBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> TaskPrototypeBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     TaskPrototypeBuilder {
       fbb_: _fbb,
@@ -1239,8 +1239,8 @@ impl<'a> MultiArrayTaskInput<'a> {
     MultiArrayTaskInput { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args MultiArrayTaskInputArgs<'args>
   ) -> flatbuffers::WIPOffset<MultiArrayTaskInput<'bldr>> {
     let mut builder = MultiArrayTaskInputBuilder::new(_fbb);
@@ -1293,11 +1293,11 @@ impl<'a> Default for MultiArrayTaskInputArgs<'a> {
   }
 }
 
-pub struct MultiArrayTaskInputBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct MultiArrayTaskInputBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> MultiArrayTaskInputBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> MultiArrayTaskInputBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_ty(&mut self, ty: &Type) {
     self.fbb_.push_slot_always::<&Type>(MultiArrayTaskInput::VT_TY, ty);
@@ -1307,7 +1307,7 @@ impl<'a: 'b, 'b> MultiArrayTaskInputBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(MultiArrayTaskInput::VT_INPUTS, inputs);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> MultiArrayTaskInputBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> MultiArrayTaskInputBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     MultiArrayTaskInputBuilder {
       fbb_: _fbb,
@@ -1359,8 +1359,8 @@ impl<'a> Task<'a> {
     Task { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args TaskArgs<'args>
   ) -> flatbuffers::WIPOffset<Task<'bldr>> {
     let mut builder = TaskBuilder::new(_fbb);
@@ -1457,11 +1457,11 @@ impl<'a> Default for TaskArgs<'a> {
   }
 }
 
-pub struct TaskBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct TaskBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> TaskBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> TaskBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_prototype_id(&mut self, prototype_id: u32) {
     self.fbb_.push_slot::<u32>(Task::VT_PROTOTYPE_ID, prototype_id, 0);
@@ -1487,7 +1487,7 @@ impl<'a: 'b, 'b> TaskBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Task::VT_NAME, name);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> TaskBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> TaskBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     TaskBuilder {
       fbb_: _fbb,
@@ -1540,8 +1540,8 @@ impl<'a> AllocationSize<'a> {
     AllocationSize { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args AllocationSizeArgs<'args>
   ) -> flatbuffers::WIPOffset<AllocationSize<'bldr>> {
     let mut builder = AllocationSizeBuilder::new(_fbb);
@@ -1594,11 +1594,11 @@ impl<'a> Default for AllocationSizeArgs<'a> {
   }
 }
 
-pub struct AllocationSizeBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct AllocationSizeBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> AllocationSizeBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AllocationSizeBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_type_(&mut self, type_: &Type) {
     self.fbb_.push_slot_always::<&Type>(AllocationSize::VT_TYPE_, type_);
@@ -1608,7 +1608,7 @@ impl<'a: 'b, 'b> AllocationSizeBuilder<'a, 'b> {
     self.fbb_.push_slot::<u32>(AllocationSize::VT_COUNT, count, 0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> AllocationSizeBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> AllocationSizeBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     AllocationSizeBuilder {
       fbb_: _fbb,
@@ -1659,8 +1659,8 @@ impl<'a> Manifest<'a> {
     Manifest { _tab: table }
   }
   #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
     args: &'args ManifestArgs<'args>
   ) -> flatbuffers::WIPOffset<Manifest<'bldr>> {
     let mut builder = ManifestBuilder::new(_fbb);
@@ -1769,11 +1769,11 @@ impl<'a> Default for ManifestArgs<'a> {
   }
 }
 
-pub struct ManifestBuilder<'a: 'b, 'b> {
-  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub struct ManifestBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> ManifestBuilder<'a, 'b> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ManifestBuilder<'a, 'b, A> {
   #[inline]
   pub fn add_tasks(&mut self, tasks: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<Task<'b >>>>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Manifest::VT_TASKS, tasks);
@@ -1803,7 +1803,7 @@ impl<'a: 'b, 'b> ManifestBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Manifest::VT_TASK_KINDS_USED, task_kinds_used);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ManifestBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> ManifestBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     ManifestBuilder {
       fbb_: _fbb,
@@ -1898,13 +1898,13 @@ pub unsafe fn size_prefixed_root_as_manifest_unchecked(buf: &[u8]) -> Manifest {
   flatbuffers::size_prefixed_root_unchecked::<Manifest>(buf)
 }
 #[inline]
-pub fn finish_manifest_buffer<'a, 'b>(
-    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+pub fn finish_manifest_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(
+    fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     root: flatbuffers::WIPOffset<Manifest<'a>>) {
   fbb.finish(root, None);
 }
 
 #[inline]
-pub fn finish_size_prefixed_manifest_buffer<'a, 'b>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<Manifest<'a>>) {
+pub fn finish_size_prefixed_manifest_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>, root: flatbuffers::WIPOffset<Manifest<'a>>) {
   fbb.finish_size_prefixed(root, None);
 }
