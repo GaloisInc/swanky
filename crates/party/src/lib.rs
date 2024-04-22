@@ -1,5 +1,4 @@
 #![deny(missing_docs)]
-#![deny(missing_docs)]
 //! Support for types indexed by a _party_.
 //!
 //! The aim of this crate is code de-duplication in the context of multi-party

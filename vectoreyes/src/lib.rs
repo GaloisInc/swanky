@@ -1,5 +1,4 @@
 #![deny(missing_docs)]
-#![deny(missing_docs)]
 //! VectorEyes is a (almost entirely) safe wrapper library around vectorized operations.
 //!
 //! # Backends
