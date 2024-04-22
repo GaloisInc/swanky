@@ -4,6 +4,7 @@
 //! need to perform network communication for testing, see the [`local`] module.
 
 #![deny(missing_docs)]
+#![deny(missing_docs)]
 
 use std::io::{Read, Write};
 

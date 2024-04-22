@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![deny(missing_docs)]
 /*!
 A 'diet' implementation of the Mac'n'Cheese interactive ZKP protocol.
 

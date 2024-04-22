@@ -15,6 +15,7 @@
 //!
 
 #![deny(missing_docs)]
+#![deny(missing_docs)]
 
 mod all_but_one_vc;
 pub mod parameters;
