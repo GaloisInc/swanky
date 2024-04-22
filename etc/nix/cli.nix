@@ -32,6 +32,16 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
     niv
     nix
     nixpkgs-fmt
-    tree-sitter-grammars.tree-sitter-rust
+    (tree-sitter-grammars.tree-sitter-rust.overrideAttrs (drv: rec {
+      name = "tree-sitter-rust-grammar-${version}";
+      version = "0.21.0";
+
+      src = pkgs.fetchFromGitHub {
+        owner = "tree-sitter";
+        repo = "tree-sitter-rust";
+        rev = "v${version}";
+        sha256 = "sha256-qf63WCizR8Xa1mUOc+yaKzCWHJZ/perxyxDuN5CQYS4=";
+      };
+    }))
   ];
 }

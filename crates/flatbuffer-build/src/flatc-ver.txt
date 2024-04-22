@@ -1,1 +1,1 @@
-flatc version 23.5.26
+flatc version 24.3.25
