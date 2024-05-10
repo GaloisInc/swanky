@@ -150,14 +150,15 @@ impl<P: Party, V: Copy, T: Copy> Drop for MultCheckState<P, V, T> {
 }
 
 /// State to accumulate check zero.
-pub struct ZeroCheckState<P: Party, T: Copy> {
+pub struct ZeroCheckState<P: Party, V: Copy, T: Copy> {
+    wires: ProverPrivate<P, Vec<Mac<P, V, T>>>,
     rng: AesRng,
     key_chi: T,
     count: usize,
     b: ProverPrivateCopy<P, bool>,
 }
 
-impl<P: Party, T: Copy> Drop for ZeroCheckState<P, T> {
+impl<P: Party, V: Copy, T: Copy> Drop for ZeroCheckState<P, V, T> {
     fn drop(&mut self) {
         if self.count != 0 {
             warn!(
@@ -168,7 +169,7 @@ impl<P: Party, T: Copy> Drop for ZeroCheckState<P, T> {
     }
 }
 
-impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
     /// Initialize the state.
     pub(crate) fn init<C: AbstractChannel + Clone>(
         channel: &mut C,
@@ -187,6 +188,7 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
         let rng = AesRng::from_seed(seed);
 
         Ok(Self {
+            wires: Default::default(),
             rng,
             key_chi: T::ZERO,
             count: 0,
@@ -202,7 +204,7 @@ impl<P: Party, T: FiniteField> ZeroCheckState<P, T> {
         self.b = ProverPrivateCopy::new(true);
     }
 
-    pub(crate) fn accumulate<V: IsSubFieldOf<T>>(&mut self, mac: &Mac<P, V, T>) -> Result<()> {
+    pub(crate) fn accumulate(&mut self, mac: &Mac<P, V, T>) -> Result<()> {
         let chi = T::random(&mut self.rng);
 
         match P::WHICH {

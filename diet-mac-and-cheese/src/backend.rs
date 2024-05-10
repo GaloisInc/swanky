@@ -140,7 +140,7 @@ pub struct DietMacAndCheese<
     pub(crate) channel: C,
     pub(crate) rng: AesRng,
     mult_check_state: MultCheckState<P, V, T>,
-    zero_check_state: ZeroCheckState<P, T>,
+    zero_check_state: ZeroCheckState<P, V, T>,
     no_batching: bool,
     monitor: Monitor<V, T>,
 }
