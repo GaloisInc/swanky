@@ -154,7 +154,7 @@ pub struct ZeroCheckState<P: Party, V: Copy, T: Copy>(Vec<Mac<P, V, T>>);
 
 impl<P: Party, V: Copy, T: Copy> Drop for ZeroCheckState<P, V, T> {
     fn drop(&mut self) {
-        if self.0.len() != 0 {
+        if !self.0.is_empty() {
             warn!(
                 "State for check_zero dropped before check finished. Count: {}",
                 self.0.len()
