@@ -940,7 +940,7 @@ impl<
             WhichParty::Verifier(_) => self.fcom_f2.open(channel, &ei_mac_batch, ei_batch)?,
         }
 
-        let mut check_zero_state = ZeroCheckState::init(channel, rng)?;
+        let mut check_zero_state = ZeroCheckState::init()?;
         for i in 0..n {
             let sum = match P::WHICH {
                 WhichParty::Prover(ev) => convert_bits_to_field_mac::<_, FE>(
@@ -953,9 +953,12 @@ impl<
             };
             check_zero_state
                 .accumulate(&self.fcom_fe.affine_add_cst(-sum, e_prime_mac_batch[i]))?;
+            if check_zero_state.count() >= BATCH_SIZE {
+                check_zero_state.finalize(channel, rng)?;
+            }
         }
 
-        check_zero_state.finalize(channel)?;
+        check_zero_state.finalize(channel, rng)?;
         Ok(())
     }
 

@@ -164,7 +164,7 @@ where
         no_batching: bool,
     ) -> Result<Self> {
         let mult_check_state = MultCheckState::init(&mut rng)?;
-        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init()?;
         Ok(Self {
             fcom: FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?,
             channel: channel.clone(),
@@ -184,7 +184,7 @@ where
         no_batching: bool,
     ) -> Result<Self> {
         let mult_check_state = MultCheckState::init(&mut rng)?;
-        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init()?;
         Ok(Self {
             fcom: fcom.duplicate()?,
             channel: channel.clone(),
@@ -206,7 +206,7 @@ where
         delta: T,
     ) -> Result<Self> {
         let mult_check_state = MultCheckState::init(&mut rng)?;
-        let zero_check_state = ZeroCheckState::init(channel, &mut rng)?;
+        let zero_check_state = ZeroCheckState::init()?;
         Ok(Self {
             fcom: FCom::init_with_delta(channel, &mut rng, lpn_setup, lpn_extend, delta)?,
             channel: channel.clone(),
@@ -276,7 +276,9 @@ where
 
     fn do_check_zero(&mut self) -> Result<usize> {
         self.channel.flush()?;
-        let count = self.zero_check_state.finalize(&mut self.channel)?;
+        let count = self
+            .zero_check_state
+            .finalize(&mut self.channel, &mut self.rng)?;
         self.monitor.incr_zk_check_zero(count);
         Ok(count)
     }

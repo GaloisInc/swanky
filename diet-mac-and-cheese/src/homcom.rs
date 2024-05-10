@@ -150,20 +150,14 @@ impl<P: Party, V: Copy, T: Copy> Drop for MultCheckState<P, V, T> {
 }
 
 /// State to accumulate check zero.
-pub struct ZeroCheckState<P: Party, V: Copy, T: Copy> {
-    wires: ProverPrivate<P, Vec<Mac<P, V, T>>>,
-    rng: AesRng,
-    key_chi: T,
-    count: usize,
-    b: ProverPrivateCopy<P, bool>,
-}
+pub struct ZeroCheckState<P: Party, V: Copy, T: Copy>(Vec<Mac<P, V, T>>);
 
 impl<P: Party, V: Copy, T: Copy> Drop for ZeroCheckState<P, V, T> {
     fn drop(&mut self) {
-        if self.count != 0 {
+        if self.0.len() != 0 {
             warn!(
                 "State for check_zero dropped before check finished. Count: {}",
-                self.count
+                self.0.len()
             );
         }
     }
@@ -171,79 +165,65 @@ impl<P: Party, V: Copy, T: Copy> Drop for ZeroCheckState<P, V, T> {
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
     /// Initialize the state.
-    pub(crate) fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
-        rng: &mut AesRng,
-    ) -> Result<Self> {
-        let seed = match P::WHICH {
-            WhichParty::Prover(_) => channel.read_block()?,
-            WhichParty::Verifier(_) => {
-                let seed = rng.gen::<Block>();
-                channel.write_block(&seed)?;
-                channel.flush()?;
-                seed
-            }
-        };
-
-        let rng = AesRng::from_seed(seed);
-
-        Ok(Self {
-            wires: Default::default(),
-            rng,
-            key_chi: T::ZERO,
-            count: 0,
-            b: ProverPrivateCopy::new(true),
-        })
+    pub(crate) fn init() -> Result<Self> {
+        Ok(Self(vec![]))
     }
 
     /// Reset the state.
     fn reset(&mut self) {
-        // After reset, we assume the internal rng is still synchronized between the prover and the verifier.
-        self.key_chi = T::ZERO;
-        self.count = 0;
-        self.b = ProverPrivateCopy::new(true);
+        self.0.clear();
     }
 
-    pub(crate) fn accumulate(&mut self, mac: &Mac<P, V, T>) -> Result<()> {
-        let chi = T::random(&mut self.rng);
-
-        match P::WHICH {
-            WhichParty::Prover(ev) => {
-                self.key_chi += chi * mac.mac();
-
-                let b = mac.value().into_inner(ev) == V::ZERO;
-                if !b {
-                    warn!("accumulating a value that's not zero");
-                }
-
-                *self.b.as_mut().into_inner(ev) &= b;
-            }
-            WhichParty::Verifier(_) => self.key_chi += chi * mac.mac(),
-        }
-
-        self.count += 1;
+    pub(crate) fn accumulate(&mut self, &mac: &Mac<P, V, T>) -> Result<()> {
+        self.0.push(mac);
         Ok(())
     }
 
     pub(crate) fn finalize<C: AbstractChannel + Clone>(
         &mut self,
         channel: &mut C,
+        rng: &mut AesRng,
     ) -> Result<usize> {
-        let b = match P::WHICH {
-            WhichParty::Prover(ev) => {
-                channel.write_serializable(&self.key_chi)?;
-                channel.flush()?;
-
-                self.b.into_inner(ev)
+        let mut rng = match P::WHICH {
+            WhichParty::Prover(_) => {
+                let seed = channel.read_block()?;
+                AesRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
-                let m = channel.read_serializable::<T>()?;
-
-                self.key_chi == m
+                let seed = rng.gen::<Block>();
+                channel.write_block(&seed)?;
+                channel.flush()?;
+                AesRng::from_seed(seed)
             }
         };
 
-        let count = self.count;
+        let b = match P::WHICH {
+            WhichParty::Prover(ev) => {
+                let mut m = T::ZERO;
+                let mut b = true;
+                for mac in self.0.iter() {
+                    b &= mac.value().into_inner(ev) == V::ZERO;
+                    let chi = T::random(&mut rng);
+                    m += chi * mac.mac();
+                }
+                channel.write_serializable::<T>(&m)?;
+                channel.flush()?;
+
+                b
+            }
+            WhichParty::Verifier(_) => {
+                let mut key_chi = T::ZERO;
+                for mac in self.0.iter() {
+                    let chi = T::random(&mut rng);
+                    key_chi += chi * mac.mac();
+                }
+                let m = channel.read_serializable::<T>()?;
+
+                key_chi == m
+            }
+        };
+
+        let count = self.0.len();
         self.reset();
         ensure!(b, "check zero failed");
         Ok(count)
@@ -251,7 +231,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
 
     /// Return the number of checks accumulated.
     pub(crate) fn count(&self) -> usize {
-        self.count
+        self.0.len()
     }
 }
 
