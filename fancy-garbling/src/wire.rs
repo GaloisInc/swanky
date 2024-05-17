@@ -1023,7 +1023,10 @@ mod tests {
         let mut rng = thread_rng();
 
         for _ in 0..16 {
-            let q: u16 = rng.gen();
+            let mut q: u16 = rng.gen();
+            while q < 2 {
+                q = rng.gen();
+            }
             let w = WireModQ::rand(&mut rng, q);
             let serialized = serde_json::to_string(&w).unwrap();
 
@@ -1036,7 +1039,10 @@ mod tests {
     #[test]
     fn test_serialize_bad_modQ_mod() {
         let mut rng = thread_rng();
-        let q: u16 = rng.gen();
+        let mut q: u16 = rng.gen();
+        while q < 2 {
+            q = rng.gen();
+        }
 
         let mut w = WireModQ::rand(&mut rng, q);
 
