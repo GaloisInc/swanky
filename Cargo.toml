@@ -33,7 +33,7 @@ authors = ["swanky authors <swanky@galois.com>"]
 license = "MIT"
 edition = "2021"
 publish = false
-version = "0.5.0"
+version = "0.6.0"
 
 [workspace.lints.clippy]
 type_complexity = "allow"
