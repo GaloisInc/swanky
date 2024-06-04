@@ -123,51 +123,10 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
         "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
         "CARGO_INCREMENTAL": "0",
         "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
-        "CC": str(ROOT / "etc/ci/wrappers/cc.sh"),
-        "CXX": str(ROOT / "etc/ci/wrappers/cxx.sh"),
         "CARGO_HOME": str(cache_dir / "cargo-home"),
         "SWANKY_CACHE_DIR": str(cache_dir),
     }
     cache_dir.mkdir(exist_ok=True, parents=True)
-    for entry in shlex.split((ROOT / "etc/ci/sccache_disk_proxy/env.sh").read_text()):
-        if entry == "export":
-            continue
-        k, v = entry.split("=")
-        extra_env[k] = v
-    os.environ.update(extra_env)
-    # Start sccache!
-    sccache_cache_dir = cache_dir / "sccache"
-    sccache_cache_dir.mkdir(exist_ok=True, parents=True)
-    # When this process exits, stdin will be closed, and it'll clean up the subprocess.
-    # This only happens once, so we're not gonna worry about a zombie.
-    with tempfile.TemporaryDirectory() as tmp_str:
-        tmp = Path(tmp_str)
-        # sccache signals readyness by writing some bytes to a unix domain socket.
-        sccache_ready_path = tmp / "rdy"
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sccache_ready_sock:
-            sccache_ready_sock.bind(str(sccache_ready_path))
-            sccache_ready_sock.listen(1)
-            sccache_server = subprocess.Popen(
-                [
-                    str(ROOT / "etc/ci/sccache_disk_proxy/spawn_sccache.sh"),
-                    str(sccache_cache_dir),
-                    str(sccache_ready_path),
-                ],
-                stdin=subprocess.PIPE,
-            )
-            assert sccache_server.stdin is not None
-            # Closing stdin will shut everything down (see sccache_disk_proxy/shell.nix)
-            ctx.call_on_close(sccache_server.stdin.close)
-            rich.print("Waiting for sccache to start...")
-            conn, _ = sccache_ready_sock.accept()
-            try:
-                # Read all the bytes that sccache wants to give in its readyness message
-                while True:
-                    if not conn.recv(1024):
-                        break
-            finally:
-                conn.close()
-            rich.print("sccache started!")
     ctx.invoke(lint)
     if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
         raise click.ClickException("Pytest failed")

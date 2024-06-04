@@ -28,7 +28,6 @@ in
       py.tree-sitter
       py.pytest
     ]))
-    sccache
     cacert
     niv
     nix

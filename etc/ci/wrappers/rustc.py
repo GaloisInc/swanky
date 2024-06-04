@@ -30,5 +30,4 @@ if len(rs_files_in_args) > 0:
 # Use lld as the linker.
 args += ["-Clinker=clang", "-Clinker-flavor=gcc", "-Clink-arg=-fuse-ld=lld"]
 
-# Execute sccache to cache the output of rustc
-os.execvp("sccache", ["sccache"] + args)
+os.execvp(args[0], args)
