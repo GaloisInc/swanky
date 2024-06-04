@@ -13,7 +13,7 @@ in (mkShell.override { stdenv = llvmPackages_16.stdenv; }) {
     cargo-depgraph
     llvmPackages_16.bintools
     git
-    (python311.withPackages (py: [
+    (python312.withPackages (py: [
       py.black
       py.cbor2
       py.click
