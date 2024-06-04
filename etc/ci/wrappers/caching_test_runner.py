@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import IO, Optional
 from uuid import uuid4
 
-import cbor2  # type: ignore
+import cbor2
 
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
