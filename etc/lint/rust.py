@@ -1,3 +1,5 @@
+import ctypes
+import functools
 import itertools
 import os
 import subprocess
@@ -12,7 +14,7 @@ import rich.panel
 import rich.syntax
 import rich.text
 import toml
-import tree_sitter  # type: ignore
+import tree_sitter
 
 from etc import ROOT
 from etc.lint import LintResult
@@ -226,16 +228,20 @@ _MISSING_DOCS_QUERY = """
 """
 
 
-def _tree_sitter_rust_grammar() -> Path:
-    out = []
+@functools.cache
+def _tree_sitter_rust_language() -> tree_sitter.Language:
+    so_paths = []
     for entry in os.environ["buildInputs"].split():
         if "tree-sitter-rust-grammar" in entry:
-            out.append(entry)
-    if len(out) != 1:
+            so_paths.append(entry)
+    if len(so_paths) != 1:
         raise Exception(
-            f"Unexpected tree sitter rust grammar candidate list {repr(out)}"
+            f"Unexpected tree sitter rust grammar candidate list {repr(so_paths)}"
         )
-    return Path(out[0])
+    lib = ctypes.cdll.LoadLibrary(os.path.join(so_paths[0], "parser"))
+    getter_function = lib.tree_sitter_rust
+    getter_function.restype = ctypes.c_void_p
+    return tree_sitter.Language(getter_function(), "rust")
 
 
 _MISSING_DOCS_QUERY_OBJ: Optional["tree_sitter.Query"] = None
@@ -249,7 +255,7 @@ def _contains_deny_missing_docs(code: bytes) -> bool:
     global _MISSING_DOCS_PARSER
     with _MISSING_DOCS_QUERY_LOCK:
         if _MISSING_DOCS_QUERY_OBJ is None:
-            lang = tree_sitter.Language(_tree_sitter_rust_grammar() / "parser", "rust")
+            lang = _tree_sitter_rust_language()
             _MISSING_DOCS_PARSER = tree_sitter.Parser()
             _MISSING_DOCS_PARSER.set_language(lang)
             _MISSING_DOCS_QUERY_OBJ = lang.query(_MISSING_DOCS_QUERY)
