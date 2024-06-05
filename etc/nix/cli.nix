@@ -1,7 +1,5 @@
 with import ./pkgs.nix { };
-let
-  isLinux = !builtins.isNull (builtins.match "^.*linux$" system);
-  swankyLlvm = llvmPackages_18;
+let swankyLlvm = llvmPackages_18;
 in
 (mkShell.override { stdenv = swankyLlvm.stdenv; }) {
   shellHook = ''
