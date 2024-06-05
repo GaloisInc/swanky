@@ -16,7 +16,6 @@ pub mod channel;
 pub mod cointoss;
 pub mod commitment;
 mod hash_aes;
-mod rand_aes;
 pub use swanky_serialization as serialization;
 pub mod utils;
 
@@ -43,8 +42,8 @@ pub use crate::{
     block512::Block512,
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
-    rand_aes::{vectorized::UniformIntegersUnderBound, AesRng},
 };
+pub use swanky_aes_rng::{AesRng, UniformIntegersUnderBound};
 
 #[cfg(unix)]
 pub use crate::channel::{

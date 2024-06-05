@@ -23,6 +23,7 @@
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`scuttlebutt`**: A library of useful multi-party computation utilities
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
+- **`swanky-aes-rng`**: A random number generator based on AES-CTR.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
 - **`swanky-field-binary`**: Binary finite (extension) fields
