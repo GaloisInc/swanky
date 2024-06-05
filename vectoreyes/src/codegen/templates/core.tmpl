@@ -367,6 +367,14 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
         }
     }
 
+    impl rand::distributions::Distribution<{{ty}}> for rand::distributions::Standard {
+        fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> {{ty}} {
+            let mut out = {{ty}}::ZERO;
+            rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+            out
+        }
+    }
+
     {% include "impl/serde.tmpl" %}
     {% include "impl/binops.tmpl" %}
     {% include "impl/const.tmpl" %}

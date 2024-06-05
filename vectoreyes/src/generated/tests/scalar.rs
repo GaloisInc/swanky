@@ -67,6 +67,13 @@ impl subtle::ConditionallySelectable for I8x16 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I8x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I8x16 {
+        let mut out = I8x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for I8x16 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -907,6 +914,13 @@ impl subtle::ConditionallySelectable for I8x32 {
             *out = <i8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I8x32> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I8x32 {
+        let mut out = I8x32::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for I8x32 {
@@ -2133,6 +2147,13 @@ impl subtle::ConditionallySelectable for I16x8 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I16x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I16x8 {
+        let mut out = I16x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for I16x8 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2820,6 +2841,13 @@ impl subtle::ConditionallySelectable for I16x16 {
             *out = <i16 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I16x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I16x16 {
+        let mut out = I16x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for I16x16 {
@@ -3737,6 +3765,13 @@ impl subtle::ConditionallySelectable for I32x4 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I32x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I32x4 {
+        let mut out = I32x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for I32x4 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -4405,6 +4440,13 @@ impl subtle::ConditionallySelectable for I32x8 {
             *out = <i32 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I32x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I32x8 {
+        let mut out = I32x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for I32x8 {
@@ -5182,6 +5224,13 @@ impl subtle::ConditionallySelectable for I64x2 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<I64x2> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I64x2 {
+        let mut out = I64x2::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for I64x2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -5725,6 +5774,13 @@ impl subtle::ConditionallySelectable for I64x4 {
             *out = <i64 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<I64x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> I64x4 {
+        let mut out = I64x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for I64x4 {
@@ -6460,6 +6516,13 @@ impl subtle::ConditionallySelectable for U8x16 {
             *out = <u8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U8x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U8x16 {
+        let mut out = U8x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for U8x16 {
@@ -7292,6 +7355,13 @@ impl subtle::ConditionallySelectable for U8x32 {
             *out = <u8 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U8x32> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U8x32 {
+        let mut out = U8x32::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for U8x32 {
@@ -8508,6 +8578,13 @@ impl subtle::ConditionallySelectable for U16x8 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<U16x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U16x8 {
+        let mut out = U16x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for U16x8 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -9185,6 +9262,13 @@ impl subtle::ConditionallySelectable for U16x16 {
             *out = <u16 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U16x16> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U16x16 {
+        let mut out = U16x16::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for U16x16 {
@@ -10092,6 +10176,13 @@ impl subtle::ConditionallySelectable for U32x4 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<U32x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U32x4 {
+        let mut out = U32x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for U32x4 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -10750,6 +10841,13 @@ impl subtle::ConditionallySelectable for U32x8 {
             *out = <u32 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U32x8> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U32x8 {
+        let mut out = U32x8::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for U32x8 {
@@ -11517,6 +11615,13 @@ impl subtle::ConditionallySelectable for U64x2 {
         Self::from(out)
     }
 }
+impl rand::distributions::Distribution<U64x2> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U64x2 {
+        let mut out = U64x2::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
+    }
+}
 impl serde::Serialize for U64x2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -12050,6 +12155,13 @@ impl subtle::ConditionallySelectable for U64x4 {
             *out = <u64 as subtle::ConditionallySelectable>::conditional_select(a, b, choice);
         }
         Self::from(out)
+    }
+}
+impl rand::distributions::Distribution<U64x4> for rand::distributions::Standard {
+    fn sample<R: rand::prelude::Rng + ?Sized>(&self, rng: &mut R) -> U64x4 {
+        let mut out = U64x4::ZERO;
+        rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
+        out
     }
 }
 impl serde::Serialize for U64x4 {
