@@ -26,12 +26,12 @@ pub fn psty_payload_sum(
             let mut gb_psi =
                 PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
 
-            gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
+            let intersection_results = gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
             let res = fancy_payload_sum(
                 &mut gb_psi.gb,
-                &gb_psi.intersection.existence_bit_vector,
-                &gb_psi.payloads.sender_payloads,
-                &gb_psi.payloads.receiver_payloads,
+                &intersection_results.intersection.existence_bit_vector,
+                &intersection_results.payloads.sender_payloads,
+                &intersection_results.payloads.receiver_payloads,
             )
             .unwrap();
             gb_psi.gb.outputs(res.wires()).unwrap();
@@ -41,12 +41,12 @@ pub fn psty_payload_sum(
 
         let mut ev_psi =
             PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
-        ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
+        let intersection_results = ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
         let res = fancy_payload_sum(
             &mut ev_psi.ev,
-            &ev_psi.intersection.existence_bit_vector,
-            &ev_psi.payloads.sender_payloads,
-            &ev_psi.payloads.receiver_payloads,
+            &intersection_results.intersection.existence_bit_vector,
+            &intersection_results.payloads.sender_payloads,
+            &intersection_results.payloads.receiver_payloads,
         )
         .unwrap();
         let res_out = ev_psi

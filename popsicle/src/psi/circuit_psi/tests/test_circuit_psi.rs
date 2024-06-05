@@ -56,18 +56,23 @@ mod tests {
                 let mut gb_psi: _ =
                     PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
 
-                gb_psi.intersect::<OpprfSender>(set_a, &[]).unwrap();
-                let res =
-                    fancy_cardinality(&mut gb_psi.gb, &gb_psi.intersection.existence_bit_vector)
-                        .unwrap();
+                let intersection_results = gb_psi.intersect::<OpprfSender>(set_a, &[]).unwrap();
+                let res = fancy_cardinality(
+                    &mut gb_psi.gb,
+                    &intersection_results.intersection.existence_bit_vector,
+                )
+                .unwrap();
                 gb_psi.gb.outputs(res.wires()).unwrap();
             });
             let mut channel = setup_channel(receiver);
 
             let mut ev_psi =
                 PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
-            ev_psi.intersect::<OpprfReceiver>(set_b, &[]).unwrap();
-            let res = fancy_cardinality(&mut ev_psi.ev, &ev_psi.intersection.existence_bit_vector)?;
+            let intersection_results = ev_psi.intersect::<OpprfReceiver>(set_b, &[]).unwrap();
+            let res = fancy_cardinality(
+                &mut ev_psi.ev,
+                &intersection_results.intersection.existence_bit_vector,
+            )?;
             let res_out = ev_psi
                 .ev
                 .outputs(&res.wires().to_vec())
@@ -92,12 +97,13 @@ mod tests {
                 let mut gb_psi: _ =
                     PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
 
-                gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
+                let intersection_results =
+                    gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
                 let res = fancy_payload_sum(
                     &mut gb_psi.gb,
-                    &gb_psi.intersection.existence_bit_vector,
-                    &gb_psi.payloads.sender_payloads,
-                    &gb_psi.payloads.receiver_payloads,
+                    &intersection_results.intersection.existence_bit_vector,
+                    &intersection_results.payloads.sender_payloads,
+                    &intersection_results.payloads.receiver_payloads,
                 )
                 .unwrap();
                 gb_psi.gb.outputs(res.wires()).unwrap();
@@ -106,12 +112,12 @@ mod tests {
 
             let mut ev_psi =
                 PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
-            ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
+            let intersection_results = ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
             let res = fancy_payload_sum(
                 &mut ev_psi.ev,
-                &ev_psi.intersection.existence_bit_vector,
-                &ev_psi.payloads.sender_payloads,
-                &ev_psi.payloads.receiver_payloads,
+                &intersection_results.intersection.existence_bit_vector,
+                &intersection_results.payloads.sender_payloads,
+                &intersection_results.payloads.receiver_payloads,
             )
             .unwrap();
             let res_out = ev_psi

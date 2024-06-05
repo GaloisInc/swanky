@@ -14,10 +14,6 @@ pub struct PsiGarbler<C, RNG> {
     pub channel: C,
     /// The garbler's dedicated rng
     pub rng: RNG,
-    /// The set and intersection bit vector
-    pub intersection: PrivateIntersection<WireMod2>,
-    /// The unmasked payloads
-    pub payloads: PrivateIntersectionPayloads<WireMod2>,
 }
 
 impl<C, RNG> PsiGarbler<C, RNG>
@@ -34,8 +30,6 @@ where
             gb: Garbler::<C, RNG, OtSender, WireMod2>::new(channel.clone(), RNG::from_seed(seed))?,
             channel: channel.clone(),
             rng: RNG::from_seed(seed),
-            intersection: Default::default(),
-            payloads: Default::default(),
         })
     }
 }
@@ -58,7 +52,11 @@ where
     /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
     /// vector which indicates the presence or abscence of a set element.
     /// (4) Computes the user defined circuit on the parties' inputs.
-    fn intersect<Party>(&mut self, set: &[Element], payloads: &[Payload]) -> Result<(), Error>
+    fn intersect<Party>(
+        &mut self,
+        set: &[Element],
+        payloads: &[Payload],
+    ) -> Result<Intersection, Error>
     where
         Party: BasePsi,
         Self: Sized,
@@ -72,18 +70,25 @@ where
             &mut self.rng,
         )?;
         // (2)
-        self.intersection.set = bundle_set::<Self::F, _>(&circuit_inputs)?;
-        (
-            self.payloads.sender_payloads,
-            self.payloads.receiver_payloads,
-        ) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
+        let set = bundle_set::<Self::F, _>(&circuit_inputs)?;
+        let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
 
         // (3)
-        self.intersection.existence_bit_vector = fancy_intersection_bit_vector(
+        let existence_bit_vector = fancy_intersection_bit_vector(
             &mut self.gb,
             &circuit_inputs.sender_set_elements,
             &circuit_inputs.receiver_set_elements,
         )?;
-        Ok(())
+        let intersection_results = Intersection {
+            intersection: PrivateIntersection {
+                existence_bit_vector,
+                set,
+            },
+            payloads: PrivateIntersectionPayloads {
+                sender_payloads,
+                receiver_payloads,
+            },
+        };
+        Ok(intersection_results)
     }
 }

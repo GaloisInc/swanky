@@ -78,6 +78,16 @@ impl<F> Default for PrivateIntersection<F> {
     }
 }
 
+/// A struct defining the intersection results, i.e. the bit vector
+/// that shows whether a set element is in the intersection and the
+/// unmasked payloads in Circuit Psi
+pub struct Intersection {
+    /// The set and intersection bit vector
+    pub intersection: PrivateIntersection<WireMod2>,
+    /// The unmasked payloads
+    pub payloads: PrivateIntersectionPayloads<WireMod2>,
+}
+
 /// A function that takes a `CircuitInputs`` (created by a BasePsi) and groups the wires of
 /// its different parts into `BinaryBundle` for ease of use in a fancy garbled circuit.
 ///
@@ -152,7 +162,11 @@ pub trait CircuitPsi {
     // 2                   | ("META", $92)
     // ...
 
-    fn intersect<Party>(&mut self, set: &[Element], payloads: &[Payload]) -> Result<(), Error>
+    fn intersect<Party>(
+        &mut self,
+        set: &[Element],
+        payloads: &[Payload],
+    ) -> Result<Intersection, Error>
     where
         Party: BasePsi,
         Self: Sized;
