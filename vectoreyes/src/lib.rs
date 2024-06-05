@@ -174,6 +174,8 @@ pub trait SimdBase:
     + Shr<Self, Output = Self>
     + subtle::ConstantTimeEq
     + subtle::ConditionallySelectable
+    + AsRef<[Self::Scalar]>
+    + AsMut<[Self::Scalar]>
 {
     /// The number of elements of this vector.
     ///

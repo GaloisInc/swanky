@@ -375,6 +375,20 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
         }
     }
 
+    impl AsRef<[{{ty.ty}}]> for {{ty}} {
+        fn as_ref(&self) -> &[{{ty.ty}}] {
+            let arr: &{{ty.array}} = bytemuck::cast_ref(self);
+            arr
+        }
+    }
+
+    impl AsMut<[{{ty.ty}}]> for {{ty}} {
+        fn as_mut(&mut self) -> &mut [{{ty.ty}}] {
+            let arr: &mut {{ty.array}} = bytemuck::cast_mut(self);
+            arr
+        }
+    }
+
     {% include "impl/serde.tmpl" %}
     {% include "impl/binops.tmpl" %}
     {% include "impl/const.tmpl" %}

@@ -74,6 +74,18 @@ impl rand::distributions::Distribution<I8x16> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[i8]> for I8x16 {
+    fn as_ref(&self) -> &[i8] {
+        let arr: &[i8; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i8]> for I8x16 {
+    fn as_mut(&mut self) -> &mut [i8] {
+        let arr: &mut [i8; 16] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I8x16 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -921,6 +933,18 @@ impl rand::distributions::Distribution<I8x32> for rand::distributions::Standard 
         let mut out = I8x32::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[i8]> for I8x32 {
+    fn as_ref(&self) -> &[i8] {
+        let arr: &[i8; 32] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i8]> for I8x32 {
+    fn as_mut(&mut self) -> &mut [i8] {
+        let arr: &mut [i8; 32] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I8x32 {
@@ -2154,6 +2178,18 @@ impl rand::distributions::Distribution<I16x8> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[i16]> for I16x8 {
+    fn as_ref(&self) -> &[i16] {
+        let arr: &[i16; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i16]> for I16x8 {
+    fn as_mut(&mut self) -> &mut [i16] {
+        let arr: &mut [i16; 8] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I16x8 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2848,6 +2884,18 @@ impl rand::distributions::Distribution<I16x16> for rand::distributions::Standard
         let mut out = I16x16::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[i16]> for I16x16 {
+    fn as_ref(&self) -> &[i16] {
+        let arr: &[i16; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i16]> for I16x16 {
+    fn as_mut(&mut self) -> &mut [i16] {
+        let arr: &mut [i16; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I16x16 {
@@ -3772,6 +3820,18 @@ impl rand::distributions::Distribution<I32x4> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[i32]> for I32x4 {
+    fn as_ref(&self) -> &[i32] {
+        let arr: &[i32; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i32]> for I32x4 {
+    fn as_mut(&mut self) -> &mut [i32] {
+        let arr: &mut [i32; 4] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I32x4 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -4447,6 +4507,18 @@ impl rand::distributions::Distribution<I32x8> for rand::distributions::Standard 
         let mut out = I32x8::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[i32]> for I32x8 {
+    fn as_ref(&self) -> &[i32] {
+        let arr: &[i32; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i32]> for I32x8 {
+    fn as_mut(&mut self) -> &mut [i32] {
+        let arr: &mut [i32; 8] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I32x8 {
@@ -5231,6 +5303,18 @@ impl rand::distributions::Distribution<I64x2> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[i64]> for I64x2 {
+    fn as_ref(&self) -> &[i64] {
+        let arr: &[i64; 2] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i64]> for I64x2 {
+    fn as_mut(&mut self) -> &mut [i64] {
+        let arr: &mut [i64; 2] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for I64x2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -5781,6 +5865,18 @@ impl rand::distributions::Distribution<I64x4> for rand::distributions::Standard 
         let mut out = I64x4::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[i64]> for I64x4 {
+    fn as_ref(&self) -> &[i64] {
+        let arr: &[i64; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[i64]> for I64x4 {
+    fn as_mut(&mut self) -> &mut [i64] {
+        let arr: &mut [i64; 4] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for I64x4 {
@@ -6523,6 +6619,18 @@ impl rand::distributions::Distribution<U8x16> for rand::distributions::Standard 
         let mut out = U8x16::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[u8]> for U8x16 {
+    fn as_ref(&self) -> &[u8] {
+        let arr: &[u8; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u8]> for U8x16 {
+    fn as_mut(&mut self) -> &mut [u8] {
+        let arr: &mut [u8; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U8x16 {
@@ -7362,6 +7470,18 @@ impl rand::distributions::Distribution<U8x32> for rand::distributions::Standard 
         let mut out = U8x32::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[u8]> for U8x32 {
+    fn as_ref(&self) -> &[u8] {
+        let arr: &[u8; 32] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u8]> for U8x32 {
+    fn as_mut(&mut self) -> &mut [u8] {
+        let arr: &mut [u8; 32] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U8x32 {
@@ -8585,6 +8705,18 @@ impl rand::distributions::Distribution<U16x8> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[u16]> for U16x8 {
+    fn as_ref(&self) -> &[u16] {
+        let arr: &[u16; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u16]> for U16x8 {
+    fn as_mut(&mut self) -> &mut [u16] {
+        let arr: &mut [u16; 8] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for U16x8 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -9269,6 +9401,18 @@ impl rand::distributions::Distribution<U16x16> for rand::distributions::Standard
         let mut out = U16x16::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[u16]> for U16x16 {
+    fn as_ref(&self) -> &[u16] {
+        let arr: &[u16; 16] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u16]> for U16x16 {
+    fn as_mut(&mut self) -> &mut [u16] {
+        let arr: &mut [u16; 16] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U16x16 {
@@ -10183,6 +10327,18 @@ impl rand::distributions::Distribution<U32x4> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[u32]> for U32x4 {
+    fn as_ref(&self) -> &[u32] {
+        let arr: &[u32; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u32]> for U32x4 {
+    fn as_mut(&mut self) -> &mut [u32] {
+        let arr: &mut [u32; 4] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for U32x4 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -10848,6 +11004,18 @@ impl rand::distributions::Distribution<U32x8> for rand::distributions::Standard 
         let mut out = U32x8::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[u32]> for U32x8 {
+    fn as_ref(&self) -> &[u32] {
+        let arr: &[u32; 8] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u32]> for U32x8 {
+    fn as_mut(&mut self) -> &mut [u32] {
+        let arr: &mut [u32; 8] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U32x8 {
@@ -11622,6 +11790,18 @@ impl rand::distributions::Distribution<U64x2> for rand::distributions::Standard 
         out
     }
 }
+impl AsRef<[u64]> for U64x2 {
+    fn as_ref(&self) -> &[u64] {
+        let arr: &[u64; 2] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u64]> for U64x2 {
+    fn as_mut(&mut self) -> &mut [u64] {
+        let arr: &mut [u64; 2] = bytemuck::cast_mut(self);
+        arr
+    }
+}
 impl serde::Serialize for U64x2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -12162,6 +12342,18 @@ impl rand::distributions::Distribution<U64x4> for rand::distributions::Standard 
         let mut out = U64x4::ZERO;
         rng.fill_bytes(bytemuck::bytes_of_mut(&mut out));
         out
+    }
+}
+impl AsRef<[u64]> for U64x4 {
+    fn as_ref(&self) -> &[u64] {
+        let arr: &[u64; 4] = bytemuck::cast_ref(self);
+        arr
+    }
+}
+impl AsMut<[u64]> for U64x4 {
+    fn as_mut(&mut self) -> &mut [u64] {
+        let arr: &mut [u64; 4] = bytemuck::cast_mut(self);
+        arr
     }
 }
 impl serde::Serialize for U64x4 {
