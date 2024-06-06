@@ -5,8 +5,10 @@
 
 //! Scuttlebutt provides many utility functions for cryptographic applications.
 
+/// This is a legacy alias for `U8x16`
+pub type Block = vectoreyes::U8x16;
+
 mod aes;
-mod block;
 mod block512;
 pub mod bloomfilter;
 /// Module for encapsulating communication channels for `swanky`.
@@ -38,7 +40,6 @@ pub use crate::{
         aes128::{Aes128, FIXED_KEY_AES128},
         aes256::Aes256,
     },
-    block::Block,
     block512::Block512,
     channel::{AbstractChannel, Channel, HashChannel, SymChannel, SyncChannel, TrackChannel},
     hash_aes::{AesHash, AES_HASH},
