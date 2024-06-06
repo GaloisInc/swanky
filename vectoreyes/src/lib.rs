@@ -446,6 +446,8 @@ pub trait AesBlockCipherDecrypt: AesBlockCipher {
 }
 
 pub mod array_utils;
+mod utils;
+
 // We want to allow `which_lane * 0 + 0` expressions.
 // These also allow for simpler generated code. For example, sometimes we have code which looks
 // like:
