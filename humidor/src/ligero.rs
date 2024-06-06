@@ -1390,7 +1390,7 @@ pub mod noninteractive {
         hash.update(other_commit);
 
         let digest = hash.finalize();
-        let seed = Block::try_from_slice(&digest[0..16]).unwrap();
+        let seed = Block::from(<[u8; 16]>::try_from(&digest[0..16]).unwrap());
 
         (
             Round1::new(
@@ -1436,7 +1436,7 @@ pub mod noninteractive {
             .for_each(|f| hash.update(&f.to_bytes()));
 
         let digest = hash.finalize();
-        let seed = Block::try_from_slice(&digest[0..16]).unwrap();
+        let seed = Block::from(<[u8; 16]>::try_from(&digest[0..16]).unwrap());
 
         Round3::new(params, &mut AesRng::from_seed(seed))
     }

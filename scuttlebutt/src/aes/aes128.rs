@@ -12,12 +12,12 @@ impl Aes128 {
     /// Create a new `Aes128` object, using `key` as the AES key.
     #[inline]
     pub fn new(key: Block) -> Self {
-        Aes128(Aes128EncryptOnly::new_with_key(key.0.into()))
+        Aes128(Aes128EncryptOnly::new_with_key(key))
     }
     /// Encrypt a block, outputting the ciphertext.
     #[inline(always)]
     pub fn encrypt(&self, m: Block) -> Block {
-        Block(self.0.encrypt(m.0.into()).into())
+        self.0.encrypt(m)
     }
     /// Encrypt up to 32 blocks at a time, outputting the ciphertexts.
     #[inline(always)]

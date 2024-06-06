@@ -5,7 +5,10 @@ use fancy_garbling_base_conversion as base_conversion;
 use rand::{CryptoRng, Rng, RngCore};
 use scuttlebutt::{Block, AES_HASH};
 use subtle::ConditionallySelectable;
-use vectoreyes::array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize};
+use vectoreyes::{
+    array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
+    SimdBase,
+};
 
 #[cfg(feature = "serde")]
 use crate::errors::{ModQDeserializationError, WireDeserializationError};
@@ -438,7 +441,7 @@ impl WireLabel for WireMod2 {
             panic!("[WireMod2::rand_delta] Expected modulo 2. Got {}", q);
         }
         let mut w = Self::rand(rng, q);
-        w.val = w.val.set_lsb();
+        w.val |= Block::set_lo(1);
         w
     }
 
@@ -453,7 +456,8 @@ impl WireLabel for WireMod2 {
     }
 
     fn color(&self) -> u16 {
-        self.val.lsb() as u16
+        // This extracts the least-significant bit of the U8x16.
+        (self.val.extract::<0>() & 1) as u16
     }
 
     fn plus_eq<'a>(&'a mut self, other: &Self) -> &'a mut Self {

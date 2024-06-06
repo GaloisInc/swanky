@@ -61,7 +61,7 @@ impl AlszSender {
         let seeds = ot.receive(channel, &s_bit_vec, rng)?;
         let rngs = seeds
             .into_iter()
-            .map(|seed| Aes128EncryptOnly::new_with_key(seed.0))
+            .map(|seed| Aes128EncryptOnly::new_with_key(seed))
             .collect();
         Ok(AlszSender { s, rngs })
     }
@@ -140,8 +140,8 @@ impl AlszReceiver {
                 .into_iter()
                 .map(|(a, b)| {
                     (
-                        Aes128EncryptOnly::new_with_key(a.0),
-                        Aes128EncryptOnly::new_with_key(b.0),
+                        Aes128EncryptOnly::new_with_key(a),
+                        Aes128EncryptOnly::new_with_key(b),
                     )
                 })
                 .collect(),
@@ -335,11 +335,11 @@ impl KosSenderStage2 {
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
             rng.fill_bytes(chi.as_mut());
-            let tmp = q.clmul(chi);
-            check = crate::utils::xor_two_blocks(&check, &tmp);
+            let [lo, hi] = q.carryless_mul_wide(chi);
+            check = crate::utils::xor_two_blocks(&check, &(lo, hi));
         }
-        let tmp = x.clmul(self.ot_s);
-        let check = crate::utils::xor_two_blocks(&check, &tmp);
+        let [lo, hi] = x.carryless_mul_wide(self.ot_s);
+        let check = crate::utils::xor_two_blocks(&check, &(lo, hi));
         if check != (t0, t1) {
             return Err(Error::Other(
                 "KosSenderStage2 consistency check failed".to_string(),
@@ -487,8 +487,8 @@ impl KosReceiverStage2 {
             let tj = Block::from(tj);
             rng.fill_bytes(chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
-            let tmp = tj.clmul(chi);
-            t = crate::utils::xor_two_blocks(&t, &tmp);
+            let [lo, hi] = tj.carryless_mul_wide(chi);
+            t = crate::utils::xor_two_blocks(&t, &(lo, hi));
         }
         let outgoing_blocks = [self.our_seed, x, t.0, t.1];
         debug_assert_eq!(outgoing.len(), outgoing_blocks.len() * 16);

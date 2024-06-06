@@ -55,8 +55,8 @@ impl OtSender for Sender {
             .map(|i| {
                 let r = channel.read_pt()?;
                 let yr = self.y * r;
-                let k0 = Block::hash_pt(self.counter + i as u128, &yr);
-                let k1 = Block::hash_pt(self.counter + i as u128, &(yr - ys));
+                let k0 = super::hash_pt(self.counter + i as u128, &yr);
+                let k1 = super::hash_pt(self.counter + i as u128, &(yr - ys));
                 Ok((k0, k1))
             })
             .collect::<Result<Vec<(Block, Block)>, Error>>()?;
@@ -112,7 +112,7 @@ impl OtReceiver for Receiver {
                 let c = if *b { one } else { zero };
                 let r = c + &x * RISTRETTO_BASEPOINT_TABLE;
                 channel.write_pt(&r)?;
-                Ok(Block::hash_pt(self.counter + i as u128, &(&x * &self.s)))
+                Ok(super::hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
             .collect::<Result<Vec<Block>, Error>>()?;
         channel.flush()?;

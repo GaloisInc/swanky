@@ -209,8 +209,10 @@ impl Receiver {
                     let val = inputs[item.input_index].clone();
                     let key = &output.as_ref()[masksize..masksize + 16];
                     let payload_bytes = scuttlebutt::utils::xor(ct.as_ref(), key);
-                    let payload =
-                        Block::try_from_slice(&payload_bytes).expect("it is exactly 16 bytes long");
+                    let payload = Block::from(
+                        <[u8; 16]>::try_from(payload_bytes.as_slice())
+                            .expect("it is exactly 16 bytes long"),
+                    );
                     intersection.insert(val, payload);
                 }
             }
