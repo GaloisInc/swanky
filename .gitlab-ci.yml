@@ -1,7 +1,14 @@
-default:
+normal-test:
   tags: [docker-nix]
   image: "bitnami/git:2.42.0-debian-11-r20"
   interruptible: true
+  variables:
+    GIT_STRATEGY: fetch
+    NIX_REMOTE: daemon
+    TMPDIR: /tmp
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
   before_script:
     - mkdir -p -m 0755 /nix/var/log/nix/drvs
     - mkdir -p -m 0755 /nix/var/nix/gcroots
@@ -13,23 +20,21 @@ default:
     - mkdir -p -m 0755 /nix/var/nix/profiles/per-user/root
     - export NIX_PATH="nixpkgs=$PWD/etc/nix/pkgs.nix"
     - export PATH="/nix/var/nix/profiles/default/bin/:$PATH"
-
-variables:
-  GIT_STRATEGY: fetch
-  NIX_REMOTE: daemon
-  TMPDIR: /tmp
-
-normal-test:
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: on_success
   script:
     - ./etc/ci/swanky_releasing_check.sh
     - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ quick
 
 nightly-test:
+  image: debian:trixie
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
+  interruptible: true
+  tags: [linux]
+  timeout: 4h
+  variables:
+    TMPDIR: /tmp
   script:
+    - apt-get update && apt-get install -y nix
+    - mkdir -p /var/lib/swanky-sccache/
     - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ nightly
