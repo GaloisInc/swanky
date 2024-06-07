@@ -55,10 +55,6 @@ name = "aes256"
 harness = false
 
 [[bench]]
-name = "block"
-harness = false
-
-[[bench]]
 name = "block512"
 harness = false
 
