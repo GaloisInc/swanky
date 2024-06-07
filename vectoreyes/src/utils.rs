@@ -43,7 +43,7 @@ impl U8x16 {
         fn lower_bits_made_upper(a: U64x2) -> U64x2 {
             U64x2::from(U8x16::from(a).shift_bytes_left::<8>())
         }
-        // See algorithm 2 on page 12 of https://is.gd/tOd246
+        // See algorithm 2 on page 12 of https://web.archive.org/web/20191130175212/https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/carry-less-multiplication-instruction-in-gcm-mode-paper.pdf
         let a: U64x2 = bytemuck::cast(self);
         let b: U64x2 = bytemuck::cast(b);
         let c = a.carryless_mul::<true, true>(b);
