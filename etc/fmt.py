@@ -18,8 +18,8 @@ def fmt(check: bool) -> None:
     """Reformat Rust and Python code in Swanky."""
     commands = [
         ["cargo", "fmt"] + (["--", "--check"] if check else []),
-        ["black", "."] + (["--check"] if check else []),
-        ["isort", "--profile", "black", "."] + (["--check"] if check else []),
+        ["black", ".", "swanky"] + (["--check"] if check else []),
+        ["isort", "--profile", "black", ".", "swanky"] + (["--check"] if check else []),
         ["nixpkgs-fmt", "."] + (["--check"] if check else []),
     ]
     failures = []
