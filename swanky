@@ -1,26 +1,136 @@
-#!/usr/bin/env nix-shell
-#!nix-shell --pure --keep NIX_REMOTE --keep NIX_PATH --keep TMPDIR --pure -i python3 ./etc/nix/cli.nix
-# This is the launcher script for some utilities which can be helpful for developing Swanky.
-# It depends on Nix (https://nixos.org/download), but the use of this script isn't required to
-# develop Swanky
+#!/usr/bin/env python3
+# This file runs BOTH in the HOST's python and in the nix environment.
 
-if __name__ == '__main__':
-    import logging
+if __name__ == "__main__":
+    import os
 
-    import rich.traceback
-    from rich.logging import RichHandler
-    import rich_click.patch
+    # If SWANKY_NIX_CACHE_KEY then we're running inside the nix environment.
+    if "SWANKY_NIX_CACHE_KEY" in os.environ:
+        import logging
 
-    rich.traceback.install(show_locals=True)
+        import rich.traceback
+        import rich_click.patch
+        from rich.logging import RichHandler
 
-    logging.basicConfig(
-        level="NOTSET",
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True)],
-    )
-    
-    rich_click.patch.patch()
-    
-    from etc.main import main
-    main()
+        rich.traceback.install(show_locals=True)
+
+        logging.basicConfig(
+            level="NOTSET",
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(rich_tracebacks=True)],
+        )
+
+        rich_click.patch.patch()
+
+        from etc.main import main
+
+        main()
+    else:
+        # We're running on the HOST machine. Only use the python standard library, and avoid using
+        # newer python features to allow for maximum compatiblity.
+        import json
+        import shutil
+        import subprocess
+        import sys
+        from base64 import urlsafe_b64encode
+        from hashlib import blake2b
+        from pathlib import Path
+        from uuid import uuid4
+
+        # Environment variables that should be passed into the nix environment.
+        KEEP_ENVS = {
+            "PWD",
+            "TMPDIR",
+            "HOME",
+            "USER",
+            "DISPLAY",
+            "NIX_REMOTE",
+            "NIX_PATH",
+        }
+
+        ROOT = Path(__file__).parent.resolve()
+        # Step one: construct a cache key by hashing the files in etc/nix and rust-toolchain
+        hashes = []
+
+        def hash_file(path: Path) -> None:
+            hash = blake2b()
+            with path.open("rb") as fp:
+                while True:
+                    # 16KB is the recommended buffer size for the blake hash function so as to
+                    # allow for enough room for SIMD.
+                    BUF_SIZE = 1024 * 16
+                    buf = fp.read(BUF_SIZE)
+                    if buf == b"":
+                        break
+                    hash.update(buf)
+            hashes.append("%s=%s" % (path, hash.hexdigest()))
+
+        for root_str, dirs, files in os.walk(str(ROOT / "etc" / "nix")):
+            root = Path(root_str)
+            for name in files:
+                hash_file(root / name)
+        hash_file(ROOT / "rust-toolchain")
+        # Sort the hashes, since file system traversal is non-deterministic.
+        hashes.sort()
+        # Compute a cache key based on the combined hashes.
+        nix_hash = urlsafe_b64encode(
+            blake2b("\n".join(hashes).encode("utf-8")).digest()
+        ).decode("ascii")[0:32]
+        # The env_cache is a JSON dictionary storing the environment variables set by nix-shell.
+        env_cache = ROOT / "target" / "nix-env-cache" / nix_hash
+        if not env_cache.exists():
+            env_cache.parent.mkdir(parents=True, exist_ok=True)
+            # First, we setup a GC root for nix, so that it won't try to garbage collect the
+            # swanky nix environment while we're running it.
+            subprocess.check_call(
+                [
+                    "nix-build",
+                    str(ROOT / "etc" / "nix" / "cli.nix"),
+                    "-A",
+                    "inputDerivation",
+                    "-o",
+                    # We append a UUID here to make sure that concurrent runs of this launcher won't
+                    # trample on each other.
+                    str(env_cache.with_suffix(".gc-root-" + str(uuid4()))),
+                ]
+            )
+            env = dict()
+            # env --null is a command which emits b'\0' seperated KEY=VALUE pairs.
+            for entry in subprocess.check_output(
+                [
+                    "nix-shell",
+                    "--pure",
+                    str(ROOT / "etc" / "nix" / "cli.nix"),
+                    "--run",
+                    "exec env --null",
+                ]
+            ).split(b"\x00"):
+                if len(entry) == 0:
+                    continue
+                equals = entry.index(b"=")
+                key = entry[0:equals].decode("utf-8")
+                if key in KEEP_ENVS:
+                    continue
+                env[key] = entry[equals + 1 :].decode("utf-8")
+            # Write the JSON to a temporary file and then rename to atomically write the env cache.
+            tmp = env_cache.parent / ("tmp.%s" % uuid4())
+            tmp.write_text(json.dumps(env))
+            tmp.rename(env_cache)
+        else:
+            # Now we load the env cache from disk.
+            env = json.loads(env_cache.read_text())
+        # Load the env vars from this process's environment that we want to keep.
+        for k in KEEP_ENVS:
+            if k in os.environ:
+                env[k] = os.environ[k]
+        # Set the SWANKY_NIX_CACHE_KEY based on the hash that we've just computed. This signals
+        # this file that we're already in the nix environment. It also will be consumed by the
+        # inner program as part of its cache key.
+        env["SWANKY_NIX_CACHE_KEY"] = nix_hash
+        env_exe = shutil.which("env")
+        if env_exe is None:
+            # This is part of the POSIX spec and should be on all unix systems.
+            raise Exception("'env' not found in PATH")
+        # Now, re-exec this script inside the nix environment.
+        os.execvpe(env_exe, [env_exe, "python3", __file__] + sys.argv[1:], env)

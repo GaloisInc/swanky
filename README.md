@@ -81,7 +81,7 @@ LTO in your release builds (`lto = true` in your `Cargo.toml` file).
 
 To compile Swanky, you should install and use Rust via [rustup](https://rustup.rs/). The swanky repo will direct rustup to use the correct version of Rust.
 
-The `./swanky` tool automates some tasks in the codebase. For example, `./swanky lint` will run the Swanky linting checks. In order to use this tool, you need to [install the Nix package manager](https://nixos.org/download).
+The `./swanky` tool automates some tasks in the codebase. For example, `./swanky lint` will run the Swanky linting checks. In order to use this tool, you need to [install the Nix package manager](https://nixos.org/download). You'll also need a python3 installation (no packages other than the standard library are required).
 
 # Citing `swanky`
 
