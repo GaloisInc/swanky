@@ -1,6 +1,6 @@
 normal-test:
   tags: [docker-nix]
-  image: "bitnami/git:2.42.0-debian-11-r20"
+  image: "python:3.12-bullseye"
   interruptible: true
   variables:
     GIT_STRATEGY: fetch
@@ -35,6 +35,6 @@ nightly-test:
   variables:
     TMPDIR: /tmp
   script:
-    - apt-get update && apt-get install -y nix
+    - apt-get update && apt-get install -y nix python3
     - mkdir -p /var/lib/swanky-sccache/
     - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ nightly

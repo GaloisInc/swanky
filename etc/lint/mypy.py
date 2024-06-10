@@ -11,7 +11,12 @@ def mypy(ctx: click.Context) -> LintResult:
 
     This _only_ typechecks ./swanky and friends. It doesn't typecheck any other python code.
     """
-    if subprocess.call(["mypy", "--config-file=etc/mypy.ini", "etc"], cwd=ROOT) == 0:
+    if (
+        subprocess.call(
+            ["mypy", "--config-file=etc/mypy.ini", "etc", "swanky"], cwd=ROOT
+        )
+        == 0
+    ):
         return LintResult.SUCCESS
     else:
         return LintResult.FAILURE

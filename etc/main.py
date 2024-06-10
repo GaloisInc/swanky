@@ -15,22 +15,8 @@ def main(
     ctx: click.Context,
 ) -> None:
     ctx.obj = dict()
-    drv_path = (
-        subprocess.check_output(
-            ["nix-instantiate", "--no-gc-warning", str(ROOT / "etc/nix/cli.nix")]
-        )
-        .decode("ascii")
-        .strip()
-    )
-    nix_cache_key = (
-        base64.urlsafe_b64encode(
-            sha256(
-                drv_path.encode("ascii") + b"\n" + Path(drv_path).read_bytes()
-            ).digest()
-        )
-        .decode("ascii")
-        .replace("=", "")
-    )  # strip off the padding
+    # Set in launcher script
+    nix_cache_key = os.environ["SWANKY_NIX_CACHE_KEY"]
 
     # Set up CARGO_TARGET_DIR to make sure that we don't corrupt the standard target/ dir with
     # output compiled from the Nix compilers.
