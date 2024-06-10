@@ -7,7 +7,7 @@ use crate::{
 use ocelot::oprf::KmprtSender;
 use scuttlebutt::{Block, Block512};
 
-/// A strut defining the sender in the base circuit PSI computation.
+/// A struct defining the sender in the base circuit PSI computation.
 /// A sender here refers to the party which programs the OPPRF in this
 /// computation.
 pub struct OpprfSender {

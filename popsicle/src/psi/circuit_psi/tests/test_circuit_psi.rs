@@ -2,9 +2,8 @@
 #[cfg(test)]
 mod tests {
     use crate::psi::circuit_psi::{
-        base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
-        evaluator::PsiEvaluator,
-        garbler::PsiGarbler,
+        evaluator::OpprfPsiEvaluator,
+        garbler::OpprfPsiGarbler,
         tests::{utils::*, *},
         utils,
         utils::*,
@@ -54,9 +53,9 @@ mod tests {
             let _ = s.spawn(|| {
                 let mut channel = setup_channel(sender);
                 let mut gb_psi: _ =
-                    PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
 
-                let intersection_results = gb_psi.intersect::<OpprfSender>(set_a, &[]).unwrap();
+                let intersection_results = gb_psi.intersect(set_a, &[]).unwrap();
                 let res = fancy_cardinality(
                     &mut gb_psi.gb,
                     &intersection_results.intersection.existence_bit_vector,
@@ -67,8 +66,8 @@ mod tests {
             let mut channel = setup_channel(receiver);
 
             let mut ev_psi =
-                PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
-            let intersection_results = ev_psi.intersect::<OpprfReceiver>(set_b, &[]).unwrap();
+                OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
+            let intersection_results = ev_psi.intersect(set_b, &[]).unwrap();
             let res = fancy_cardinality(
                 &mut ev_psi.ev,
                 &intersection_results.intersection.existence_bit_vector,
@@ -95,10 +94,9 @@ mod tests {
             let _ = s.spawn(|| {
                 let mut channel = setup_channel(sender);
                 let mut gb_psi: _ =
-                    PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(seed_sx)).unwrap();
 
-                let intersection_results =
-                    gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
+                let intersection_results = gb_psi.intersect(set_a, payload_a).unwrap();
                 let res = fancy_payload_sum(
                     &mut gb_psi.gb,
                     &intersection_results.intersection.existence_bit_vector,
@@ -111,8 +109,8 @@ mod tests {
             let mut channel = setup_channel(receiver);
 
             let mut ev_psi =
-                PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
-            let intersection_results = ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
+                OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(seed_rx)).unwrap();
+            let intersection_results = ev_psi.intersect(set_b, payload_b).unwrap();
             let res = fancy_payload_sum(
                 &mut ev_psi.ev,
                 &intersection_results.intersection.existence_bit_vector,
