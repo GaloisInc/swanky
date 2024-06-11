@@ -65,12 +65,7 @@ where
     /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
     /// vector which indicates the presence or abscence of a set element.
     /// (4) Computes the user defined circuit on the parties' inputs.
-    fn intersect(
-        &mut self,
-        set: &[Element],
-        payloads: &[Payload],
-    ) -> Result<Intersection, Error>
-    {
+    fn intersect(&mut self, set: &[Element], payloads: &[Payload]) -> Result<Intersection, Error> {
         // (1)
         let circuit_inputs = B::base_psi(
             &mut self.ev,

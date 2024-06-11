@@ -159,10 +159,5 @@ pub trait CircuitPsi {
     // 2                   | ("META", $92)
     // ...
 
-    fn intersect(
-        &mut self,
-        set: &[Element],
-        payloads: &[Payload],
-    ) -> Result<Intersection, Error>;
+    fn intersect(&mut self, set: &[Element], payloads: &[Payload]) -> Result<Intersection, Error>;
 }
-

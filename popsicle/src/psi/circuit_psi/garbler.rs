@@ -22,7 +22,7 @@ pub struct PsiGarbler<C, RNG, B> {
     /// The garbler's dedicated rng
     pub rng: RNG,
     /// A witness for the Base PSI protocol
-    _base_psi: PhantomData<B>
+    _base_psi: PhantomData<B>,
 }
 
 impl<C, RNG, B> PsiGarbler<C, RNG, B>
@@ -62,12 +62,7 @@ where
     /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
     /// vector which indicates the presence or abscence of a set element.
     /// (4) Computes the user defined circuit on the parties' inputs.
-    fn intersect(
-        &mut self,
-        set: &[Element],
-        payloads: &[Payload],
-    ) -> Result<Intersection, Error>
-    {
+    fn intersect(&mut self, set: &[Element], payloads: &[Payload]) -> Result<Intersection, Error> {
         // (1)
         let circuit_inputs = B::base_psi(
             &mut self.gb,
