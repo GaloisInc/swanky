@@ -1,9 +1,6 @@
 use popsicle::circuit_psi::{
-    base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
-    circuits::*,
-    utils::*,
-    *,
-    {evaluator::PsiEvaluator, garbler::PsiGarbler, CircuitPsi},
+    circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*, CircuitPsi,
+    PAYLOAD_SIZE,
 };
 
 use fancy_garbling::Fancy;
@@ -24,9 +21,10 @@ pub fn psty_payload_sum(
             let mut rng = AesRng::new();
             let mut channel = setup_channel(sender);
             let mut gb_psi =
-                PsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
+                OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
+                    .unwrap();
 
-            let intersection_results = gb_psi.intersect::<OpprfSender>(set_a, payload_a).unwrap();
+            let intersection_results = gb_psi.intersect(set_a, payload_a).unwrap();
             let res = fancy_payload_sum(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
@@ -40,8 +38,9 @@ pub fn psty_payload_sum(
         let mut channel = setup_channel(receiver);
 
         let mut ev_psi =
-            PsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>())).unwrap();
-        let intersection_results = ev_psi.intersect::<OpprfReceiver>(set_b, payload_b).unwrap();
+            OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
+                .unwrap();
+        let intersection_results = ev_psi.intersect(set_b, payload_b).unwrap();
         let res = fancy_payload_sum(
             &mut ev_psi.ev,
             &intersection_results.intersection.existence_bit_vector,

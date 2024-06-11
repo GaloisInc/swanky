@@ -139,9 +139,6 @@ where
 /// This trait is implemented by the two parties participating
 /// in the protocol,i.e the CircuitPsi Garbler and the Evaluator.
 pub trait CircuitPsi {
-    /// Implements FancyBinary (i.e. Garbler or Evaluator)
-    type F: FancyBinary;
-
     /// Computes the Circuit PSI on the parties' inputs.
     ///
     /// self: The parties' internal state.
@@ -162,12 +159,5 @@ pub trait CircuitPsi {
     // 2                   | ("META", $92)
     // ...
 
-    fn intersect<Party>(
-        &mut self,
-        set: &[Element],
-        payloads: &[Payload],
-    ) -> Result<Intersection, Error>
-    where
-        Party: BasePsi,
-        Self: Sized;
+    fn intersect(&mut self, set: &[Element], payloads: &[Payload]) -> Result<Intersection, Error>;
 }

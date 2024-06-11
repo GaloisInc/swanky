@@ -6,18 +6,26 @@ use crate::{
 use fancy_garbling::{twopac::semihonest::Evaluator, WireMod2};
 use ocelot::ot::AlszReceiver as OtReceiver;
 use scuttlebutt::{AbstractChannel, Block, SemiHonest};
+use std::marker::PhantomData;
+
+use self::receiver::OpprfReceiver;
+
+/// An Evaluating party for Circuit PSI that uses OPPRF Base PSI
+pub type OpprfPsiEvaluator<C, RNG> = PsiEvaluator<C, RNG, OpprfReceiver>;
 
 /// A struct defining the Evaluating party in Circuit Psi
-pub struct PsiEvaluator<C, RNG> {
+pub struct PsiEvaluator<C, RNG, B> {
     /// The actual evaluator being called during the garbled circuit
     pub ev: Evaluator<C, RNG, OtReceiver, WireMod2>,
     /// The evaluator's dedicated channel
     pub channel: C,
     /// The evaluator's dedicated rng
     pub rng: RNG,
+    /// A witness for the Base PSI protocol
+    _base_psi: PhantomData<B>,
 }
 
-impl<C, RNG> PsiEvaluator<C, RNG>
+impl<C, RNG, B> PsiEvaluator<C, RNG, B>
 where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
@@ -34,18 +42,19 @@ where
             )?,
             channel: channel.clone(),
             rng: RNG::from_seed(seed),
+            _base_psi: PhantomData,
         })
     }
 }
 
-impl<C, RNG> SemiHonest for PsiEvaluator<C, RNG> {}
+impl<C, RNG, B> SemiHonest for PsiEvaluator<C, RNG, B> {}
 
-impl<C, RNG> CircuitPsi for PsiEvaluator<C, RNG>
+impl<C, RNG, B> CircuitPsi for PsiEvaluator<C, RNG, B>
 where
     C: AbstractChannel + Clone,
     RNG: RngCore + CryptoRng + Rng + SeedableRng<Seed = Block>,
+    B: BasePsi,
 {
-    type F = Evaluator<C, RNG, OtReceiver, WireMod2>;
     /// Computes the Circuit PSI on the evaluator's inputs.
     ///
     /// (1) Call the Base Psi to create the circuit's input.
@@ -56,17 +65,9 @@ where
     /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
     /// vector which indicates the presence or abscence of a set element.
     /// (4) Computes the user defined circuit on the parties' inputs.
-    fn intersect<Party>(
-        &mut self,
-        set: &[Element],
-        payloads: &[Payload],
-    ) -> Result<Intersection, Error>
-    where
-        Party: BasePsi,
-        Self: Sized,
-    {
+    fn intersect(&mut self, set: &[Element], payloads: &[Payload]) -> Result<Intersection, Error> {
         // (1)
-        let circuit_inputs = Party::base_psi(
+        let circuit_inputs = B::base_psi(
             &mut self.ev,
             set,
             payloads,
@@ -74,7 +75,7 @@ where
             &mut self.rng,
         )?;
         // (2)
-        let set = bundle_set::<Self::F, _>(&circuit_inputs)?;
+        let set = bundle_set::<Evaluator<C, RNG, OtReceiver, WireMod2>, _>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.ev, &circuit_inputs)?;
 
         // (3)
