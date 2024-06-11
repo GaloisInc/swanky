@@ -21,6 +21,10 @@ from uuid import uuid4
 
 import cbor2
 
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+
+from etc.ci.xattr_hash import cached_hash
+
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
 TEST_RESULTS.mkdir(exist_ok=True, parents=True)
