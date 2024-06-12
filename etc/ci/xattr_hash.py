@@ -7,6 +7,9 @@ from typing import List
 import cbor2
 from xattr import getxattr, setxattr  # type: ignore
 
+_ATTR_KEY = "user.caching_test_runner_hash_cache"
+
+
 def _stat_data(path: Path) -> List[int]:
     """Return a key which should change if path ever changes."""
     # Based on https://apenwarr.ca/log/20181113
@@ -20,6 +23,7 @@ def _stat_data(path: Path) -> List[int]:
         stat.st_gid,
     ]
 
+
 def cached_hash(exe: Path) -> bytes:
     """
     Some of our test executables, especially with debug symbols, can be in the
@@ -29,9 +33,8 @@ def cached_hash(exe: Path) -> bytes:
     hash.
     """
     stat_data = _stat_data(exe)
-    attr = "user.caching_test_runner_hash_cache"
     try:
-        raw_data = getxattr(exe, attr)
+        raw_data = getxattr(exe, _ATTR_KEY)
     except:
         raw_data = None
     if raw_data is not None:
@@ -40,5 +43,12 @@ def cached_hash(exe: Path) -> bytes:
             assert isinstance(cbor_hash, bytes)
             return cbor_hash
     out = sha256(exe.read_bytes()).digest()
-    setxattr(exe, attr, cbor2.dumps((out, stat_data)))
+    set_cached_hash(path, out)
     return out
+
+
+def set_cached_hash(path: Path, hash: bytes) -> None:
+    """
+    Populate the hash cache for path by saying that sha256(path)=hash
+    """
+    setxattr(path, _ATTR_KEY, cbor2.dumps((hash, _stat_data(path))))
