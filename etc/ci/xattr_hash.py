@@ -38,11 +38,20 @@ def cached_hash(exe: Path) -> bytes:
     except:
         raw_data = None
     if raw_data is not None:
+        # The xattr format is [blake2b hash, stat_data]
         cbor_hash, read_stat_data = cbor2.loads(raw_data)
         if read_stat_data == stat_data:
             assert isinstance(cbor_hash, bytes)
             return cbor_hash
-    out = sha256(exe.read_bytes()).digest()
+    hash = sha256()
+    with path.open("rb") as f:
+        while True:
+            # This is the recommended buffer size for blake hash functions.
+            buf = f.read(16 * 1024)
+            if len(buf) == 0:
+                break
+            hash.update(buf)
+    out = hash.digest()
     set_cached_hash(path, out)
     return out
 
