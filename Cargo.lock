@@ -2793,6 +2793,7 @@ dependencies = [
  "lazy_static",
  "num-traits",
  "proptest",
+ "rand",
  "serde",
  "serde_json",
  "subtle",

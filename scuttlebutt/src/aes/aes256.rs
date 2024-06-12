@@ -15,7 +15,7 @@ impl Aes256 {
     /// Encrypt a block, outputting the ciphertext.
     #[inline(always)]
     pub fn encrypt(&self, m: Block) -> Block {
-        Block(self.0.encrypt(m.0.into()).into())
+        self.0.encrypt(m).into()
     }
     /// Encrypt eight blocks at a time, outputting the ciphertexts.
     #[inline(always)]

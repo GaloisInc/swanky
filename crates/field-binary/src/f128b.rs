@@ -9,7 +9,7 @@ use swanky_serialization::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use vectoreyes::{U64x2, U8x16};
+use vectoreyes::U8x16;
 
 /// An element of the finite field $\textsf{GF}(2^{128})$ reduced over $x^{128} + x^7 + x^2 + x + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
@@ -42,10 +42,6 @@ impl<'a> SubAssign<&'a F128b> for F128b {
 }
 
 mod multiply {
-    use vectoreyes::SimdBase8;
-
-    use super::*;
-
     // TODO: this implements a simple algorithm that works. There are faster algorithms.
     // Maybe we'll implement one, one day...
 
@@ -56,39 +52,6 @@ mod multiply {
     // See: https://crypto.stanford.edu/RealWorldCrypto/slides/gueron.pdf
     // See: https://blog.quarkslab.com/reversing-a-finite-field-multiplication-optimization.html
     // See: https://tools.ietf.org/html/rfc8452
-
-    #[inline(always)]
-    fn upper_bits_made_lower(a: U64x2) -> U64x2 {
-        U64x2::from(U8x16::from(a).shift_bytes_right::<8>())
-    }
-
-    #[inline(always)]
-    fn lower_bits_made_upper(a: U64x2) -> U64x2 {
-        U64x2::from(U8x16::from(a).shift_bytes_left::<8>())
-    }
-
-    #[inline(always)]
-    pub(crate) fn mul_wide(a: u128, b: u128) -> (u128, u128) {
-        // The constants determine
-        // which 64-bit half of lhs and rhs we want to use for this carry-less multiplication.
-        // See https://www.felixcloutier.com/x86/pclmulqdq#tbl-4-13 and
-        // algorithm 2 on page 12 of https://is.gd/tOd246
-        let a: U64x2 = bytemuck::cast(a);
-        let b: U64x2 = bytemuck::cast(b);
-        let c = a.carryless_mul::<true, true>(b);
-        let d = a.carryless_mul::<false, false>(b);
-        // CLMUL(lower bits of a ^ upper bits of a, lower bits of b ^ upper bits of b)
-        let e = (a ^ upper_bits_made_lower(a))
-            .carryless_mul::<false, false>(b ^ upper_bits_made_lower(b));
-        let product_upper_half =
-            c ^ upper_bits_made_lower(c) ^ upper_bits_made_lower(d) ^ upper_bits_made_lower(e);
-        let product_lower_half =
-            d ^ lower_bits_made_upper(d) ^ lower_bits_made_upper(c) ^ lower_bits_made_upper(e);
-        (
-            bytemuck::cast(product_upper_half),
-            bytemuck::cast(product_lower_half),
-        )
-    }
 
     #[inline(always)]
     pub(crate) fn reduce(upper: u128, lower: u128) -> u128 {
@@ -119,9 +82,10 @@ mod multiply {
 
     #[cfg(test)]
     mod test {
-        use super::*;
+        use crate::{F128b, F2};
         use proptest::prelude::*;
-        use swanky_field::polynomial::Polynomial;
+        use swanky_field::{polynomial::Polynomial, FiniteField};
+        use vectoreyes::U8x16;
 
         fn poly_from_upper_and_lower_128(upper: u128, lower: u128) -> Polynomial<F2> {
             let mut out = Polynomial {
@@ -152,7 +116,9 @@ mod multiply {
             fn unreduced_multiply(a in any::<u128>(), b in any::<u128>()) {
                 let a_poly = poly_from_128(a);
                 let b_poly = poly_from_128(b);
-                let (upper, lower) = mul_wide(a, b);
+                let [lower, upper] = U8x16::from(a).carryless_mul_wide(U8x16::from(b));
+                let lower: u128 = bytemuck::cast(lower);
+                let upper: u128 = bytemuck::cast(upper);
                 let mut product = a_poly;
                 product *= &b_poly;
                 assert_eq!(
@@ -182,7 +148,7 @@ mod multiply {
             #[test]
             fn reduction(upper in any::<u128>(), lower in any::<u128>()) {
                 let poly = poly_from_upper_and_lower_128(upper, lower);
-                let reduced = reduce(upper, lower);
+                let reduced = super::reduce(upper, lower);
                 let (poly_quotient, poly_reduced) = poly.divmod(&F128b::polynomial_modulus());
                 assert_div_mod(&poly, &poly_quotient, &poly_reduced);
                 assert_eq!(poly_from_128(reduced), poly_reduced);
@@ -194,7 +160,9 @@ mod multiply {
 impl<'a> MulAssign<&'a F128b> for F128b {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a F128b) {
-        let (upper, lower) = multiply::mul_wide(self.0, rhs.0);
+        let [lower, upper] = U8x16::from(self.0).carryless_mul_wide(U8x16::from(rhs.0));
+        let lower: u128 = bytemuck::cast(lower);
+        let upper: u128 = bytemuck::cast(upper);
         self.0 = multiply::reduce(upper, lower);
     }
 }

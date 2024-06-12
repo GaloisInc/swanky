@@ -50,14 +50,14 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let q: [u8; 16] = q.try_into().unwrap();
             let q = Block::from(q);
             rng.fill_bytes(chi.as_mut());
-            let tmp = q.clmul(chi);
-            check = utils::xor_two_blocks(&check, &tmp);
+            let [lo, hi] = q.carryless_mul_wide(chi);
+            check = utils::xor_two_blocks(&check, &(lo, hi));
         }
         let x = channel.read_block()?;
         let t0 = channel.read_block()?;
         let t1 = channel.read_block()?;
-        let tmp = x.clmul(self.ot.s_);
-        let check = utils::xor_two_blocks(&check, &tmp);
+        let [lo, hi] = x.carryless_mul_wide(self.ot.s_);
+        let check = utils::xor_two_blocks(&check, &(lo, hi));
         if check != (t0, t1) {
             return Err(Error::from(std::io::Error::new(
                 ErrorKind::InvalidData,
@@ -196,8 +196,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             let tj = Block::from(tj);
             rng.fill_bytes(chi.as_mut());
             x ^= if xj { chi } else { Block::default() };
-            let tmp = tj.clmul(chi);
-            t = utils::xor_two_blocks(&t, &tmp);
+            let [lo, hi] = tj.carryless_mul_wide(chi);
+            t = utils::xor_two_blocks(&t, &(lo, hi));
         }
         channel.write_block(&x)?;
         channel.write_block(&t.0)?;

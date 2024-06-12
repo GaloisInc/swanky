@@ -99,8 +99,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
         let seeds = scuttlebutt::cointoss::send(channel, &[seed0, seed1])?;
-        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0].0);
-        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1].0);
+        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
+        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
             pows,
             ot,
@@ -256,8 +256,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let seed0 = rng.gen::<Block>();
         let seed1 = rng.gen::<Block>();
         let seeds = scuttlebutt::cointoss::receive(channel, &[seed0, seed1])?;
-        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0].0);
-        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1].0);
+        let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
+        let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
             pows,
             delta,
@@ -289,7 +289,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
-            let seed = rng.gen::<Block>().0;
+            let seed = rng.gen::<Block>();
             self.ggm_temporary_storage
                 .resize(ggm_temporary_storage_size(nbits), U8x16::default());
             ggm(

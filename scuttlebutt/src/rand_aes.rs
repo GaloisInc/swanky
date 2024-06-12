@@ -136,7 +136,7 @@ impl SeedableRng for AesRngCore {
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
         AesRngCore {
-            aes: Aes128EncryptOnly::new_with_key(seed.0),
+            aes: Aes128EncryptOnly::new_with_key(seed),
             counter: 0,
         }
     }

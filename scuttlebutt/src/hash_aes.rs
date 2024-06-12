@@ -4,7 +4,7 @@
 use crate::{Aes128, Block, FIXED_KEY_AES128};
 use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
-    SimdBase8, U8x16,
+    SimdBase8,
 };
 
 /// AES-based correlation-robust hash function.
@@ -44,8 +44,7 @@ impl AesHash {
     /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
     #[inline]
     pub fn ccr_hash(&self, i: Block, x: Block) -> Block {
-        let x = U8x16::from(x.0);
-        self.cr_hash(i, Block::from(x.shift_bytes_right::<8>() ^ x))
+        self.cr_hash(i, x.shift_bytes_right::<8>() ^ x)
     }
 
     /// Tweakable circular correlation robust hash function (cf.

@@ -202,12 +202,11 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     {
         // Check that all input points are unique.
         debug_assert_eq!(
-            {
-                let mut points = points.iter().map(|(x, _)| *x).collect::<Vec<Block>>();
-                points.sort();
-                points.dedup();
-                points.len()
-            },
+            points
+                .iter()
+                .map(|(x, _)| *x)
+                .collect::<std::collections::HashSet<Block>>()
+                .len(),
             points.len()
         );
 

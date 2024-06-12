@@ -19,8 +19,14 @@ pub mod kos_delta;
 pub mod naor_pinkas;
 
 use crate::errors::Error;
+use curve25519_dalek::RistrettoPoint;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::AbstractChannel;
+use scuttlebutt::{AbstractChannel, Block};
+
+pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
+    let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
+    Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+}
 
 /// Instantiation of the Chou-Orlandi OT sender.
 pub type ChouOrlandiSender = chou_orlandi::Sender;

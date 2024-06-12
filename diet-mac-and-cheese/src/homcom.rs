@@ -537,7 +537,7 @@ where
             }
         }
 
-        let seed = Block::try_from_slice(&hasher.finalize().as_bytes()[0..16]).unwrap();
+        let seed = Block::from(<[u8; 16]>::try_from(&hasher.finalize().as_bytes()[0..16]).unwrap());
         let mut rng = AesRng::from_seed(seed);
 
         match P::WHICH {
