@@ -27,6 +27,7 @@ in
       py.types-toml
       py.tree-sitter
       py.pytest
+      py.xattr
     ]))
     cacert
     niv

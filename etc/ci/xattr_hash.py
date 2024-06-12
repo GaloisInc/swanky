@@ -4,22 +4,8 @@ from hashlib import sha256
 from pathlib import Path
 
 import cbor2
+from xattr import getxattr, setxattr  # type: ignore
 
-
-# os.getxattr and os.setxattr only exist on Linux. These stubs exist so that this file can
-# typecheck on macOS, even if it's not supposed to run on the mac.
-def getxattr(path: Path, attr: str) -> bytes:
-    if sys.platform == "linux":
-        return os.getxattr(path, attr)
-    else:
-        assert False
-
-
-def setxattr(path: Path, attr: str, value: bytes) -> None:
-    if sys.platform == "linux":
-        os.setxattr(path, attr, value)
-    else:
-        assert False
 
 
 def cached_hash(exe: Path) -> bytes:
