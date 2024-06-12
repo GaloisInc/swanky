@@ -19,7 +19,17 @@ def fmt(check: bool) -> None:
     commands = [
         ["cargo", "fmt"] + (["--", "--check"] if check else []),
         ["black", ".", "swanky"] + (["--check"] if check else []),
-        ["isort", "--profile", "black", ".", "swanky"] + (["--check"] if check else []),
+        [
+            "isort",
+            "--skip-gitignore",
+            "--skip",
+            "target",
+            "--profile",
+            "black",
+            ".",
+            "swanky",
+        ]
+        + (["--check"] if check else []),
         ["nixpkgs-fmt", "."] + (["--check"] if check else []),
     ]
     failures = []
