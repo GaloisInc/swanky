@@ -13,7 +13,15 @@ def mypy(ctx: click.Context) -> LintResult:
     """
     if (
         subprocess.call(
-            ["mypy", "--config-file=etc/mypy.ini", "etc", "swanky"], cwd=ROOT
+            [
+                "mypy",
+                "--config-file=etc/mypy.ini",
+                "--cache-dir",
+                "target/mypy",
+                "etc",
+                "swanky",
+            ],
+            cwd=ROOT,
         )
         == 0
     ):
