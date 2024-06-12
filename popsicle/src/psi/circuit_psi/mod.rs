@@ -139,7 +139,7 @@ where
 /// This trait is implemented by the two parties participating
 /// in the protocol,i.e the CircuitPsi Garbler and the Evaluator.
 pub trait CircuitPsi {
-    /// Computes the Circuit PSI on the parties' inputs.
+    /// Computes the Circuit PSI on the parties' inputs (with payloads).
     ///
     /// self: The parties' internal state.
     /// set: The parties' set elements that we perform the intersection
@@ -158,6 +158,11 @@ pub trait CircuitPsi {
     // 1                   | ("AMZN", $47)
     // 2                   | ("META", $92)
     // ...
-
-    fn intersect(&mut self, set: &[Element], payloads: &[Payload]) -> Result<Intersection, Error>;
+    fn intersect_with_payloads(
+        &mut self,
+        set: &[Element],
+        payloads: &[Payload],
+    ) -> Result<Intersection, Error>;
+    /// Computes the Circuit PSI on the parties' inputs with no payloads.
+    fn intersect(&mut self, set: &[Element]) -> Result<Intersection, Error>;
 }

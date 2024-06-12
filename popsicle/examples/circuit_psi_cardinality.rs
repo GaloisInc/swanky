@@ -18,7 +18,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
                 OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
                     .unwrap();
 
-            let intersection_results = gb_psi.intersect(set_a, &[]).unwrap();
+            let intersection_results = gb_psi.intersect(set_a).unwrap();
             let res = fancy_cardinality(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
@@ -31,7 +31,7 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
         let mut ev_psi =
             OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
                 .unwrap();
-        let intersection_results = ev_psi.intersect(set_b, &[]).unwrap();
+        let intersection_results = ev_psi.intersect(set_b).unwrap();
         let res = fancy_cardinality(
             &mut ev_psi.ev,
             &intersection_results.intersection.existence_bit_vector,
