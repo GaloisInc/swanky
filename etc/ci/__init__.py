@@ -104,6 +104,10 @@ def test_rust(
     else:
         run(["cargo", "test", "--workspace", "--verbose"] + features_args)
 
+def non_rust_tests(ctx: click.Context) -> None:
+    ctx.invoke(lint)
+    if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
+        raise click.ClickException("Pytest failed")
 
 @click.group()
 @click.option(
@@ -117,7 +121,7 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
     """Commands used by CI system (you probably don't want to invoke them manually)"""
     # Set up the environment for cach
     cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
-    extra_env = {
+    os.envioron.update({
         "RUST_BACKTRACE": "1",
         "PROPTEST_CASES": "256",
         "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
@@ -125,11 +129,9 @@ def ci(ctx: click.Context, cache_dir: Path) -> None:
         "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
         "CARGO_HOME": str(cache_dir / "cargo-home"),
         "SWANKY_CACHE_DIR": str(cache_dir),
-    }
+    })
     cache_dir.mkdir(exist_ok=True, parents=True)
-    ctx.invoke(lint)
-    if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
-        raise click.ClickException("Pytest failed")
+    non_rust_tests(ctx)
 
 
 @ci.command()
