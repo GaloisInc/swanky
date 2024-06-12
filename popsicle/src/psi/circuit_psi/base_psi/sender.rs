@@ -78,7 +78,7 @@ impl BasePsi for OpprfSender {
     fn hash_data<C, RNG>(
         &mut self,
         set: &[Element],
-        payloads: &[Payload],
+        payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -103,7 +103,7 @@ impl BasePsi for OpprfSender {
 
         let mut opprf_payloads_in = vec![];
         let mut opprf_payloads_out = vec![];
-        if !payloads.is_empty() {
+        if payloads.is_some() {
             opprf_payloads_in = vec![Vec::new(); nbins];
             opprf_payloads_out = (0..nbins).map(|_| rng.gen::<Block512>()).collect();
         }
@@ -116,11 +116,11 @@ impl BasePsi for OpprfSender {
                 // Then place the item in that bin while keeping track
                 // of the index of the hash function used in the process
                 opprf_set_in[bin].push(*x ^ Block::from(h as u128));
-                if !payloads.is_empty() {
+                if payloads.is_some() {
                     // The payload values are masked before being sent out
                     // and placed in the same bin index as the element they
                     // are associated with.
-                    opprf_payloads_in[bin].push(payloads[i] ^ opprf_payloads_out[bin]);
+                    opprf_payloads_in[bin].push(payloads.unwrap()[i] ^ opprf_payloads_out[bin]);
                 }
                 bins.push(bin);
             }
@@ -128,7 +128,7 @@ impl BasePsi for OpprfSender {
             // table2[j] & payload[j]. This avoid possible leakage
             if bins.iter().skip(1).all(|&x| x == bins[0]) {
                 opprf_set_in[bins[0]].push(rng.gen());
-                if !payloads.is_empty() {
+                if payloads.is_some() {
                     opprf_payloads_in[bins[0]].push(rng.gen());
                 }
             }

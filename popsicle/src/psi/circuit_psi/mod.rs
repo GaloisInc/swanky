@@ -161,7 +161,7 @@ pub trait CircuitPsi {
     fn intersect_with_payloads(
         &mut self,
         set: &[Element],
-        payloads: &[Payload],
+        payloads: Option<&[Payload]>,
     ) -> Result<Intersection, Error>;
     /// Computes the Circuit PSI on the parties' inputs with no payloads.
     fn intersect(&mut self, set: &[Element]) -> Result<Intersection, Error>;

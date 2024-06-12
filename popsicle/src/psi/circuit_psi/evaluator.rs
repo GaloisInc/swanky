@@ -57,6 +57,8 @@ where
 {
     /// Computes the Circuit PSI on the evaluator's inputs.
     ///
+    /// (0) Check that the set of primary keys has the same size as the set of payloads
+    /// if the latter is not empty.
     /// (1) Call the Base Psi to create the circuit's input.
     /// The Base Psi effectively constructs the intersection in a hidden form
     /// that only the garbled circuit can read and operate on.
@@ -68,8 +70,15 @@ where
     fn intersect_with_payloads(
         &mut self,
         set: &[Element],
-        payloads: &[Payload],
+        payloads: Option<&[Payload]>,
     ) -> Result<Intersection, Error> {
+        // (0)
+        if payloads.is_some() && set.len() != payloads.unwrap().len() {
+            return Err(Error::PayloadSetNotComplete {
+                npayloads: payloads.unwrap().len(),
+                nelements: set.len(),
+            });
+        }
         // (1)
         let circuit_inputs = B::base_psi(
             &mut self.ev,
@@ -102,6 +111,6 @@ where
         Ok(intersection_results)
     }
     fn intersect(&mut self, set: &[Element]) -> Result<Intersection, Error> {
-        self.intersect_with_payloads(set, &[])
+        self.intersect_with_payloads(set, None)
     }
 }

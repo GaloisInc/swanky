@@ -45,7 +45,7 @@ mod tests {
                     WireMod2,
                 >::new(channel.clone(), rng.clone())
                 .unwrap();
-                OpprfSender::base_psi(&mut gb, &set, &payloads, &mut channel, &mut rng)
+                OpprfSender::base_psi(&mut gb, &set, Some(&payloads), &mut channel, &mut rng)
             });
             let mut rng = AesRng::seed_from_u64(seed_rx);
             let mut channel = setup_channel(receiver);
@@ -57,7 +57,7 @@ mod tests {
             >::new(channel.clone(), rng.clone())
             .unwrap();
             let result_receiver =
-                OpprfReceiver::base_psi(&mut ev, &set, &payloads, &mut channel, &mut rng);
+                OpprfReceiver::base_psi(&mut ev, &set, Some(&payloads), &mut channel, &mut rng);
             (result_sender.join().unwrap(), result_receiver)
         })
     }

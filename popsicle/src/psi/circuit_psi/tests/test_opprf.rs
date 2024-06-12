@@ -32,7 +32,7 @@ mod tests {
                 let mut rng = AesRng::seed_from_u64(seed_sx);
                 let mut channel = setup_channel(sender);
                 let mut sender = OpprfSender::init(&mut channel, &mut rng, true).unwrap();
-                let _ = sender.hash_data(set, payloads, &mut channel, &mut rng);
+                let _ = sender.hash_data(set, Some(payloads), &mut channel, &mut rng);
                 let result_opprf_sender = sender.opprf_exchange(&mut channel, &mut rng);
 
                 (sender, result_opprf_sender)
@@ -40,7 +40,7 @@ mod tests {
             let mut rng = AesRng::seed_from_u64(seed_rx);
             let mut channel = setup_channel(receiver);
             let mut receiver = OpprfReceiver::init(&mut channel, &mut rng, true).unwrap();
-            let _ = receiver.hash_data(set, payloads, &mut channel, &mut rng);
+            let _ = receiver.hash_data(set, Some(payloads), &mut channel, &mut rng);
             let result_opprf_receiver = receiver.opprf_exchange(&mut channel, &mut rng);
 
             let (sender, result_opprf_sender) = result_sender.join().unwrap();

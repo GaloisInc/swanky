@@ -82,7 +82,7 @@ impl BasePsi for OpprfReceiver {
     fn hash_data<C, RNG>(
         &mut self,
         set: &[Element],
-        payloads: &[Payload],
+        payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -110,8 +110,8 @@ impl BasePsi for OpprfReceiver {
         let opprf_set_in = cuckoo_place_ids(&cuckoo.items, rng);
 
         let mut opprf_payloads_in = vec![];
-        if !payloads.is_empty() {
-            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads, rng);
+        if payloads.is_some() {
+            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads.unwrap(), rng);
         }
         self.state = ReceiverState {
             opprf_set_in,
