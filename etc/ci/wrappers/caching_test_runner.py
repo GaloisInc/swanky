@@ -21,11 +21,9 @@ from uuid import uuid4
 
 import cbor2
 
-# Because this file gets invoked as a command, we need to patch the python path so we can import
-# modules.
 sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 
-from etc.ci.xattr_hash import cached_hash
+from etc.ci.xattr_hash import cached_blake2b
 
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
@@ -35,7 +33,8 @@ exe = Path(sys.argv[1])
 args = sys.argv[2:]
 assert exe.exists()
 
-exe_hash = cached_hash(exe)
+
+exe_hash = cached_blake2b(exe)
 
 test_output = (
     TEST_RESULTS
