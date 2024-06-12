@@ -62,42 +62,43 @@ where
     /// (2) Turns the circuit inputs into bundles that are easier to operate on in swanky's
     /// fancy garbling.
     /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
-    /// vector which indicates the presence or abscence of a set element.
+    /// vector which indicates the presence or abscence of a primary key.
     /// (4) Computes the user defined circuit on the parties' inputs.
     fn intersect_with_payloads(
         &mut self,
-        set: &[Element],
+        primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
     ) -> Result<Intersection, Error> {
         // (0)
-        if payloads.is_some() && set.len() != payloads.unwrap().len() {
+        if payloads.is_some() && primary_keys.len() != payloads.unwrap().len() {
             return Err(Error::PayloadSetNotComplete {
                 npayloads: payloads.unwrap().len(),
-                nelements: set.len(),
+                nprimarykeys: primary_keys.len(),
             });
         }
         // (1)
         let circuit_inputs = B::base_psi(
             &mut self.gb,
-            set,
+            primary_keys,
             payloads,
             &mut self.channel,
             &mut self.rng,
         )?;
         // (2)
-        let set = bundle_set::<Garbler<C, RNG, OtSender, WireMod2>, _>(&circuit_inputs)?;
+        let primary_keys =
+            bundle_primary_keys::<Garbler<C, RNG, OtSender, WireMod2>, _>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) = bundle_payloads(&mut self.gb, &circuit_inputs)?;
 
         // (3)
         let existence_bit_vector = fancy_intersection_bit_vector(
             &mut self.gb,
-            &circuit_inputs.sender_set_elements,
-            &circuit_inputs.receiver_set_elements,
+            &circuit_inputs.sender_primary_keys,
+            &circuit_inputs.receiver_primary_keys,
         )?;
         let intersection_results = Intersection {
             intersection: PrivateIntersection {
                 existence_bit_vector,
-                set,
+                primary_keys,
             },
             payloads: PrivateIntersectionPayloads {
                 sender_payloads,
@@ -106,7 +107,7 @@ where
         };
         Ok(intersection_results)
     }
-    fn intersect(&mut self, set: &[Element]) -> Result<Intersection, Error> {
-        self.intersect_with_payloads(set, None)
+    fn intersect(&mut self, primary_keys: &[PrimaryKey]) -> Result<Intersection, Error> {
+        self.intersect_with_payloads(primary_keys, None)
     }
 }

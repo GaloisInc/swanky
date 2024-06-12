@@ -51,8 +51,10 @@ mod tests {
     // with the original set. The idea is that if the intersection cardinality in both cases is
     // equal to the original set cardinality, then the hash outputs includes that set
     fn psty_check_opprf_set(sender: OpprfSender, receiver: OpprfReceiver) -> usize {
-        let sender_table: HashSet<Block512> = HashSet::from_iter(sender.state.opprf_set_out);
-        let receiver_table: HashSet<Block512> = HashSet::from_iter(receiver.state.opprf_set_out);
+        let sender_table: HashSet<Block512> =
+            HashSet::from_iter(sender.state.opprf_primary_keys_out);
+        let receiver_table: HashSet<Block512> =
+            HashSet::from_iter(receiver.state.opprf_primary_keys_out);
 
         receiver_table.intersection(&sender_table).count()
     }
@@ -105,7 +107,7 @@ mod tests {
     fn test_psty_opprf_sender_succeeded_arbitrary_payload() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (_, _, result_opprf_sender, _) =
@@ -120,7 +122,7 @@ mod tests {
     fn test_psty_opprf_sender_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (_, _, result_opprf_sender, _) =
@@ -149,7 +151,7 @@ mod tests {
     fn test_psty_opprf_receiver_succeeded_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (_, _, _, result_opprf_receiver) =
@@ -164,7 +166,7 @@ mod tests {
     fn test_psty_opprf_receiver_succeeded_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (_, _, _, result_opprf_receiver) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.gen());
@@ -195,7 +197,7 @@ mod tests {
     fn test_psty_opprf_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
                 psty_up_to_opprf(&set, &payloads, rng.gen(), DEFAULT_SEED);
@@ -212,7 +214,7 @@ mod tests {
     fn test_psty_opprf_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -248,7 +250,7 @@ mod tests {
     fn test_psty_opprf_sender_payloads_preserved_arbitrary_payloads() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads =
                 int_vec_block512(rand_u128_vec(SET_SIZE, PAYLOAD_MAX, &mut rng), PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
@@ -267,7 +269,7 @@ mod tests {
     fn test_psty_opprf_sender_payloads_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
                 psty_up_to_opprf(&set, &payloads, rng.gen(), DEFAULT_SEED);
@@ -321,7 +323,7 @@ mod tests {
     fn test_psty_opprf_receiver_payloads_preserved_arbitrary_seed() {
         for _ in 0..TEST_TRIALS {
             let mut rng = AesRng::new();
-            let set = enum_ids(SET_SIZE, 0, ELEMENT_SIZE);
+            let set = enum_ids(SET_SIZE, 0, PRIMARY_KEY_SIZE);
             let payloads = int_vec_block512(vec![1u128; SET_SIZE], PAYLOAD_SIZE);
             let (sender, receiver, _, _) =
                 psty_up_to_opprf(&set, &payloads, DEFAULT_SEED, rng.gen());

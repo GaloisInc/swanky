@@ -39,7 +39,7 @@ pub trait BasePsi {
     /// This allows them to agree on an ordering of their inputs.
     fn hash_data<C, RNG>(
         &mut self,
-        set: &[Element],
+        primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
@@ -71,7 +71,7 @@ pub trait BasePsi {
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
     fn base_psi<F, E, C, RNG>(
         gc_party: &mut F,
-        set: &[Element],
+        primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
@@ -87,7 +87,7 @@ pub trait BasePsi {
         let has_payloads = payloads.is_some();
 
         let mut party = Self::init(channel, rng, has_payloads)?;
-        party.hash_data(set, payloads, channel, rng)?;
+        party.hash_data(primary_keys, payloads, channel, rng)?;
 
         channel.flush()?;
         party.opprf_exchange(channel, rng)?;

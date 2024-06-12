@@ -27,12 +27,12 @@ pub enum Error {
     AESGCMError(aes_gcm::Error),
     /// An error occurred in the underlying 2PC protocol.
     TwopacError(fancy_garbling::errors::TwopacError),
-    /// The set of payloads is not equal to the set of elements.
+    /// The set of payloads is not equal to the set of keys.
     PayloadSetNotComplete {
         /// length of the set of payloads
         npayloads: usize,
-        /// length of the set of elements
-        nelements: usize,
+        /// length of the set of primary keys
+        nprimarykeys: usize,
     },
 }
 
@@ -92,11 +92,11 @@ impl std::fmt::Display for Error {
             Error::TwopacError(e) => write!(f, "2PC protocol error: {}", e),
             Error::PayloadSetNotComplete {
                 npayloads,
-                nelements,
+                nprimarykeys,
             } => write!(
                 f,
-                "The number of payloads is not equal to the number of elements ({} != {})!",
-                npayloads, nelements
+                "The set of payloads (len: {}) is not equal to the set of primary keys (len: {})!",
+                npayloads, nprimarykeys
             ),
         }
     }
