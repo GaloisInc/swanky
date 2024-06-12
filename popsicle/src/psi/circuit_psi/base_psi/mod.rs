@@ -71,8 +71,8 @@ pub trait BasePsi {
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
     fn base_psi<F, E, C, RNG>(
         gc_party: &mut F,
-        set: &[Vec<u8>],
-        payloads: &[Block512],
+        set: &[Element],
+        payloads: &[Payload],
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<CircuitInputs<F::Item>, Error>
