@@ -22,7 +22,7 @@ normal-test:
     - export PATH="/nix/var/nix/profiles/default/bin/:$PATH"
   script:
     - ./etc/ci/swanky_releasing_check.sh
-    - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ quick
+    - ./swanky ci quick --cache-dir /var/lib/swanky-sccache/
 
 nightly-test:
   image: debian:trixie
@@ -36,5 +36,4 @@ nightly-test:
     TMPDIR: /tmp
   script:
     - apt-get update && apt-get install -y nix python3
-    - mkdir -p /var/lib/swanky-sccache/
-    - ./swanky ci --cache-dir=/var/lib/swanky-sccache/ nightly
+    - ./swanky ci nightly

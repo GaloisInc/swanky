@@ -104,12 +104,38 @@ def test_rust(
     else:
         run(["cargo", "test", "--workspace", "--verbose"] + features_args)
 
+
 def non_rust_tests(ctx: click.Context) -> None:
     ctx.invoke(lint)
     if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
         raise click.ClickException("Pytest failed")
 
+
 @click.group()
+def ci() -> None:
+    """Commands used by CI system (you probably don't want to invoke them manually)"""
+    os.environ.update(
+        {
+            "RUST_BACKTRACE": "1",
+            "PROPTEST_CASES": "256",
+            "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
+            "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
+        }
+    )
+
+
+@ci.command()
+@click.pass_context
+def nightly(ctx: click.Context) -> None:
+    """Run the nightly CI tests"""
+    os.environ["CARGO_INCREMENTAL"] = "0"
+    non_rust_tests(ctx)
+    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
+    test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
+    test_rust(ctx, features=["serde"], force_haswell=True, cache_test_output=False)
+
+
+@ci.command()
 @click.option(
     "--cache-dir",
     help="[Usually for CI use] path to cache Swanky artifacts",
@@ -117,34 +143,16 @@ def non_rust_tests(ctx: click.Context) -> None:
     required=True,
 )
 @click.pass_context
-def ci(ctx: click.Context, cache_dir: Path) -> None:
-    """Commands used by CI system (you probably don't want to invoke them manually)"""
-    # Set up the environment for cach
-    cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
-    os.envioron.update({
-        "RUST_BACKTRACE": "1",
-        "PROPTEST_CASES": "256",
-        "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
-        "CARGO_INCREMENTAL": "0",
-        "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
-        "CARGO_HOME": str(cache_dir / "cargo-home"),
-        "SWANKY_CACHE_DIR": str(cache_dir),
-    })
-    cache_dir.mkdir(exist_ok=True, parents=True)
-    non_rust_tests(ctx)
-
-
-@ci.command()
-@click.pass_context
-def nightly(ctx: click.Context) -> None:
-    """Run the nightly CI tests"""
-    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
-    test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
-    test_rust(ctx, features=["serde"], force_haswell=True, cache_test_output=False)
-
-
-@ci.command()
-@click.pass_context
-def quick(ctx: click.Context) -> None:
+def quick(ctx: click.Context, cache_dir: Path) -> None:
     """Run the quick (non-nightly) CI tests"""
+    cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
+    cache_dir.mkdir(exist_ok=True, parents=True)
+    os.environ.update(
+        {
+            "CARGO_HOME": str(cache_dir / "cargo-home"),
+            "SWANKY_CACHE_DIR": str(cache_dir),
+            "CARGO_INCREMENTAL": "1",
+        }
+    )
+    non_rust_tests(ctx)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
