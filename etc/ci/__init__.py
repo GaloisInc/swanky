@@ -68,7 +68,7 @@ def test_rust(
             raise click.ClickException("Command failed: " + " ".join(cmd))
 
     run(
-        ["cargo", "clippy", "--workspace", "--all-targets"]
+        ["cargo", "clippy", "--workspace", "--all-targets", "--verbose"]
         + features_args
         + ["--", "-Dwarnings"]
     )
