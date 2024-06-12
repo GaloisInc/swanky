@@ -14,6 +14,7 @@ import rich.panel
 import rich.syntax
 
 from etc import NIX_CACHE_KEY, ROOT
+from etc.ci.target_dir_cache import pack_target_dir, unpack_target_dir
 from etc.lint.cmd import lint
 
 
@@ -154,5 +155,9 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
             "CARGO_INCREMENTAL": "1",
         }
     )
-    non_rust_tests(ctx)
-    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
+    try:
+        unpack_target_dir(cache_dir)
+        non_rust_tests(ctx)
+        test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
+    finally:
+        pack_target_dir(cache_dir)
