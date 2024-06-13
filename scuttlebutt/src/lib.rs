@@ -9,7 +9,6 @@
 pub type Block = vectoreyes::U8x16;
 
 mod block512;
-pub mod bloomfilter;
 /// Module for encapsulating communication channels for `swanky`.
 pub mod channel;
 pub mod cointoss;
