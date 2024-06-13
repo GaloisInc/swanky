@@ -1,4 +1,5 @@
-use scuttlebutt::{Aes128, Block};
+use scuttlebutt::Block;
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 #[derive(Clone, Debug)]
 pub struct Item {
@@ -40,8 +41,8 @@ impl CuckooHash {
 
         let hashkeys = hashkeys
             .iter()
-            .map(|k| Aes128::new(*k))
-            .collect::<Vec<Aes128>>();
+            .map(|k| Aes128EncryptOnly::new_with_key(*k))
+            .collect::<Vec<Aes128EncryptOnly>>();
         // Fill table with `inputs`
 
         for (j, input) in inputs.iter().enumerate() {
@@ -57,7 +58,7 @@ impl CuckooHash {
 
     fn _hash(
         &mut self,
-        hashkeys: &[Aes128],
+        hashkeys: &[Aes128EncryptOnly],
         entry: Block,
         index: usize,
         h: usize,
@@ -89,7 +90,12 @@ impl CuckooHash {
         Some((entry, index))
     }
 
-    fn hash(&mut self, hashkeys: &[Aes128], entry: Block, index: usize) -> Result<(), Error> {
+    fn hash(
+        &mut self,
+        hashkeys: &[Aes128EncryptOnly],
+        entry: Block,
+        index: usize,
+    ) -> Result<(), Error> {
         // Try to place in the first `m₁` bins.
         match self._hash(hashkeys, entry, index, self.hs.0, 0, self.ms.0, 0) {
             None => Ok(()),

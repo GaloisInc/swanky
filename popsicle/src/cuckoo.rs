@@ -7,8 +7,9 @@
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use crate::Error;
-use scuttlebutt::{Aes128, Block};
+use scuttlebutt::Block;
 use std::fmt::Debug;
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 #[derive(Clone, Debug)]
 pub(crate) struct CuckooItem {
@@ -122,7 +123,7 @@ impl CuckooHash {
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
     pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
-        let aes = Aes128::new(hash);
+        let aes = Aes128EncryptOnly::new_with_key(hash);
         let h = aes.encrypt(Block::from(hidx as u128));
         (u128::from(h) % (nbins as u128)) as usize
     }
