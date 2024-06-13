@@ -48,14 +48,6 @@ bincode.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
 [[bench]]
-name = "aes128"
-harness = false
-
-[[bench]]
-name = "aes256"
-harness = false
-
-[[bench]]
 name = "block512"
 harness = false
 
