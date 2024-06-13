@@ -1,6 +1,8 @@
 import os
 import platform
 import subprocess
+from base64 import urlsafe_b64encode
+from hashlib import blake2b
 from pathlib import Path
 from typing import Callable, Dict, List
 
@@ -142,7 +144,18 @@ def nightly(ctx: click.Context) -> None:
 @click.pass_context
 def quick(ctx: click.Context, cache_dir: Path) -> None:
     """Run the quick (non-nightly) CI tests"""
-    cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
+    cache_dir = (
+        cache_dir
+        / urlsafe_b64encode(
+            blake2b(
+                (
+                    ctx.obj[NIX_CACHE_KEY]
+                    + "\n"
+                    + (ROOT / "etc" / "ci" / "wrappers" / "rustc.py").read_text()
+                ).encode("utf-8")
+            ).digest()
+        ).decode("ascii")[0:32]
+    )
     cache_dir.mkdir(exist_ok=True, parents=True)
     os.environ.update(
         {
