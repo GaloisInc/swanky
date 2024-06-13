@@ -52,10 +52,6 @@ name = "block512"
 harness = false
 
 [[bench]]
-name = "commitment"
-harness = false
-
-[[bench]]
 name = "hash_aes"
 harness = false
 

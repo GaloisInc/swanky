@@ -13,7 +13,6 @@ pub mod bloomfilter;
 /// Module for encapsulating communication channels for `swanky`.
 pub mod channel;
 pub mod cointoss;
-pub mod commitment;
 mod hash_aes;
 pub use swanky_serialization as serialization;
 pub mod utils;

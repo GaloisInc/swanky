@@ -14,7 +14,6 @@ use rand::{
     CryptoRng, Rng, SeedableRng,
 };
 use scuttlebutt::{
-    commitment::{Commitment, ShaCommitment},
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
     utils::unpack_bits,
@@ -53,9 +52,7 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, E
     channel.read_bytes(&mut seed)?;
     let y = channel.read_serializable::<FE>()?;
 
-    let mut commit = ShaCommitment::new(seed);
-    commit.input(&y.to_bytes());
-    if commit.finish() == com {
+    if blake3::keyed_hash(&seed, &y.to_bytes()) == com {
         Ok(x == y)
     } else {
         Err(Error::InvalidOpening)
@@ -70,11 +67,9 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     y: FE,
 ) -> Result<bool, Error> {
     let seed = rng.gen::<[u8; 32]>();
-    let mut h = ShaCommitment::new(seed);
-    h.input(&y.to_bytes());
-    let com = h.finish();
+    let com = blake3::keyed_hash(&seed, &y.to_bytes());
 
-    channel.write_bytes(&com)?;
+    channel.write_bytes(com.as_bytes())?;
     channel.flush()?;
 
     let x = channel.read_serializable::<FE>()?;
