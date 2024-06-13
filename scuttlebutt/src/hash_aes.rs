@@ -3,7 +3,7 @@
 
 use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
-    Aes128EncryptOnly, AesBlockCipher, SimdBase8,
+    Aes128EncryptOnly, AesBlockCipher,
 };
 
 use crate::Block;
@@ -36,16 +36,6 @@ impl AesHash {
     #[inline]
     pub fn cr_hash(&self, _i: Block, x: Block) -> Block {
         self.aes.encrypt(x) ^ x
-    }
-
-    /// Circular correlation-robust hash function (cf.
-    /// <https://eprint.iacr.org/2019/074>, §7.3).
-    ///
-    /// The function computes `H(σ(x))`, where `H` is a correlation-robust hash
-    /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
-    #[inline]
-    pub fn ccr_hash(&self, i: Block, x: Block) -> Block {
-        self.cr_hash(i, x.shift_bytes_right::<8>() ^ x)
     }
 
     /// Tweakable circular correlation robust hash function (cf.
