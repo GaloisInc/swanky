@@ -13,6 +13,7 @@ in
     cargo-edit
     cargo-depgraph
     swankyLlvm.bintools
+    mold
     git
     (python312.withPackages (py: [
       py.black

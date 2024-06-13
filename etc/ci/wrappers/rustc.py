@@ -27,7 +27,11 @@ if len(rs_files_in_args) > 0:
         # only deny warnings for swanky code
         args += ["--deny", "warnings"]
 
-# Use lld as the linker.
-args += ["-Clinker=clang", "-Clinker-flavor=gcc", "-Clink-arg=-fuse-ld=lld"]
+# Use lld as the linker for non-linux and mold as the linker for linux.
+if sys.platform == "linux":
+    linker = "mold"
+else:
+    linker = "lld"
+args += ["-Clinker=clang", "-Clinker-flavor=gcc", "-Clink-arg=-fuse-ld=" + linker]
 
 os.execvp(args[0], args)
