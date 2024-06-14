@@ -1,7 +1,6 @@
 import os
 from hashlib import blake2b
 from pathlib import Path
-from typing import List
 
 import cbor2
 from xattr import getxattr, setxattr  # type: ignore
@@ -9,7 +8,7 @@ from xattr import getxattr, setxattr  # type: ignore
 _ATTR_KEY = "user.swanky_blake2b_hash_cache_v1"
 
 
-def _stat_data(path: Path) -> List[int]:
+def _stat_data(path: Path) -> list[int]:
     """Return a key which should change if path ever changes."""
     # Based on https://apenwarr.ca/log/20181113
     stat = path.stat()

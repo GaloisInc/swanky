@@ -2,9 +2,9 @@ import os
 import platform
 import subprocess
 from base64 import urlsafe_b64encode
+from collections.abc import Callable
 from hashlib import blake2b
 from pathlib import Path
-from typing import Callable, Dict, List
 
 import click
 import rich
@@ -18,7 +18,7 @@ from etc.lint.cmd import lint
 
 def test_rust(
     ctx: click.Context,
-    features: List[str],
+    features: list[str],
     force_haswell: bool,
     cache_test_output: bool,
 ) -> None:
@@ -59,7 +59,7 @@ def test_rust(
         )
         env |= {"RUSTFLAGS": flags, "RUSTDOCFLAGS": flags}
 
-    def run(cmd: List[str], extra_env: Dict[str, str] = dict()) -> None:
+    def run(cmd: list[str], extra_env: dict[str, str] = dict()) -> None:
         "Run cmd with env|extra_env as the environment, with nice error reporting"
         if (
             subprocess.call(

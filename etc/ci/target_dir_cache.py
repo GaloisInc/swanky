@@ -9,9 +9,10 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable, Iterable
 from functools import partial
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, TypedDict, TypeVar, cast
+from typing import Optional, TypedDict, TypeVar, cast
 from uuid import uuid4
 
 import cbor2
@@ -53,7 +54,7 @@ def _parallel_for(f: Callable[[_T], None], lst: Iterable[_T]) -> None:
         thread.join()
 
 
-def _parallel_map(f: Callable[[_T], _U], lst: Iterable[_T]) -> List[_U]:
+def _parallel_map(f: Callable[[_T], _U], lst: Iterable[_T]) -> list[_U]:
     """
     Perform a parallel map. Order is not preserved.
     """
@@ -99,8 +100,8 @@ class _TargetManifest(TypedDict):
     outputs is a list of fingerprints of the target directory
     """
 
-    inputs: List[_FileInfo]
-    outputs: List[_FileInfo]
+    inputs: list[_FileInfo]
+    outputs: list[_FileInfo]
 
 
 def _file_info(path: Path, root: Path) -> _FileInfo:
