@@ -119,6 +119,7 @@ def ci() -> None:
             "PROPTEST_CASES": "256",
             "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
             "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
+            "CARGO_INCREMENTAL": "0",
         }
     )
 
@@ -127,7 +128,6 @@ def ci() -> None:
 @click.pass_context
 def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
-    os.environ["CARGO_INCREMENTAL"] = "0"
     non_rust_tests(ctx)
     test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
     test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
@@ -161,7 +161,6 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
         {
             "CARGO_HOME": str(cache_dir / "cargo-home"),
             "SWANKY_CACHE_DIR": str(cache_dir),
-            "CARGO_INCREMENTAL": "1",
         }
     )
     try:
