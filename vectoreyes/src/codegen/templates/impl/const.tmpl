@@ -24,7 +24,7 @@ impl {{ty}} {
     {% endcall %}
     {% call(avx2i) avx2() %}
         {{ty}}(unsafe {
-            std::mem::transmute(array)
+            std::mem::transmute::<{{ty.array}}, {{ty}}Internal>(array)
         })
     {% endcall %}
     {% endcall %}
