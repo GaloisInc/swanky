@@ -64,6 +64,8 @@ def upgrade_deps(post_rust_upgrade: bool = False) -> None:
         # advantage of the new versions.
         sys.stdout.flush()
         sys.stderr.flush()
+        # Force ./swanky to use the new nix environment.
+        del os.environ["SWANKY_NIX_CACHE_KEY"]
         os.execv(
             ROOT / "swanky",
             [str(ROOT / "swanky"), "upgrade-deps", "--post-rust-upgrade"],
