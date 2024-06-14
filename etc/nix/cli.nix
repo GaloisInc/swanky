@@ -13,6 +13,7 @@ in
     cargo-edit
     cargo-depgraph
     swankyLlvm.bintools
+    mold
     git
     (python312.withPackages (py: [
       py.black
@@ -27,8 +28,8 @@ in
       py.types-toml
       py.tree-sitter
       py.pytest
+      py.xattr
     ]))
-    sccache
     cacert
     niv
     nix

@@ -1,12 +1,10 @@
-import json
 import os
 import platform
-import shlex
-import socket
 import subprocess
-import tempfile
+from base64 import urlsafe_b64encode
+from collections.abc import Callable
+from hashlib import blake2b
 from pathlib import Path
-from typing import Callable, Dict, List
 
 import click
 import rich
@@ -14,12 +12,13 @@ import rich.panel
 import rich.syntax
 
 from etc import NIX_CACHE_KEY, ROOT
+from etc.ci.target_dir_cache import pack_target_dir, unpack_target_dir
 from etc.lint.cmd import lint
 
 
 def test_rust(
     ctx: click.Context,
-    features: List[str],
+    features: list[str],
     force_haswell: bool,
     cache_test_output: bool,
 ) -> None:
@@ -60,7 +59,7 @@ def test_rust(
         )
         env |= {"RUSTFLAGS": flags, "RUSTDOCFLAGS": flags}
 
-    def run(cmd: List[str], extra_env: Dict[str, str] = dict()) -> None:
+    def run(cmd: list[str], extra_env: dict[str, str] = dict()) -> None:
         "Run cmd with env|extra_env as the environment, with nice error reporting"
         if (
             subprocess.call(
@@ -71,7 +70,7 @@ def test_rust(
             raise click.ClickException("Command failed: " + " ".join(cmd))
 
     run(
-        ["cargo", "clippy", "--workspace", "--all-targets"]
+        ["cargo", "clippy", "--workspace", "--all-targets", "--verbose"]
         + features_args
         + ["--", "-Dwarnings"]
     )
@@ -105,7 +104,37 @@ def test_rust(
         run(["cargo", "test", "--workspace", "--verbose"] + features_args)
 
 
+def non_rust_tests(ctx: click.Context) -> None:
+    ctx.invoke(lint)
+    if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
+        raise click.ClickException("Pytest failed")
+
+
 @click.group()
+def ci() -> None:
+    """Commands used by CI system (you probably don't want to invoke them manually)"""
+    os.environ.update(
+        {
+            "RUST_BACKTRACE": "1",
+            "PROPTEST_CASES": "256",
+            "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
+            "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
+            "CARGO_INCREMENTAL": "0",
+        }
+    )
+
+
+@ci.command()
+@click.pass_context
+def nightly(ctx: click.Context) -> None:
+    """Run the nightly CI tests"""
+    non_rust_tests(ctx)
+    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
+    test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
+    test_rust(ctx, features=["serde"], force_haswell=True, cache_test_output=False)
+
+
+@ci.command()
 @click.option(
     "--cache-dir",
     help="[Usually for CI use] path to cache Swanky artifacts",
@@ -113,77 +142,30 @@ def test_rust(
     required=True,
 )
 @click.pass_context
-def ci(ctx: click.Context, cache_dir: Path) -> None:
-    """Commands used by CI system (you probably don't want to invoke them manually)"""
-    # Set up the environment for cach
-    cache_dir = cache_dir / ctx.obj[NIX_CACHE_KEY]
-    extra_env = {
-        "RUST_BACKTRACE": "1",
-        "PROPTEST_CASES": "256",
-        "SWANKY_FLATBUFFER_DO_NOT_GENERATE": "1",
-        "CARGO_INCREMENTAL": "0",
-        "RUSTC_WRAPPER": str(ROOT / "etc/ci/wrappers/rustc.py"),
-        "CC": str(ROOT / "etc/ci/wrappers/cc.sh"),
-        "CXX": str(ROOT / "etc/ci/wrappers/cxx.sh"),
-        "CARGO_HOME": str(cache_dir / "cargo-home"),
-        "SWANKY_CACHE_DIR": str(cache_dir),
-    }
-    cache_dir.mkdir(exist_ok=True, parents=True)
-    for entry in shlex.split((ROOT / "etc/ci/sccache_disk_proxy/env.sh").read_text()):
-        if entry == "export":
-            continue
-        k, v = entry.split("=")
-        extra_env[k] = v
-    os.environ.update(extra_env)
-    # Start sccache!
-    sccache_cache_dir = cache_dir / "sccache"
-    sccache_cache_dir.mkdir(exist_ok=True, parents=True)
-    # When this process exits, stdin will be closed, and it'll clean up the subprocess.
-    # This only happens once, so we're not gonna worry about a zombie.
-    with tempfile.TemporaryDirectory() as tmp_str:
-        tmp = Path(tmp_str)
-        # sccache signals readyness by writing some bytes to a unix domain socket.
-        sccache_ready_path = tmp / "rdy"
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sccache_ready_sock:
-            sccache_ready_sock.bind(str(sccache_ready_path))
-            sccache_ready_sock.listen(1)
-            sccache_server = subprocess.Popen(
-                [
-                    str(ROOT / "etc/ci/sccache_disk_proxy/spawn_sccache.sh"),
-                    str(sccache_cache_dir),
-                    str(sccache_ready_path),
-                ],
-                stdin=subprocess.PIPE,
-            )
-            assert sccache_server.stdin is not None
-            # Closing stdin will shut everything down (see sccache_disk_proxy/shell.nix)
-            ctx.call_on_close(sccache_server.stdin.close)
-            rich.print("Waiting for sccache to start...")
-            conn, _ = sccache_ready_sock.accept()
-            try:
-                # Read all the bytes that sccache wants to give in its readyness message
-                while True:
-                    if not conn.recv(1024):
-                        break
-            finally:
-                conn.close()
-            rich.print("sccache started!")
-    ctx.invoke(lint)
-    if subprocess.call(["pytest"], stdin=subprocess.DEVNULL, cwd=ROOT) != 0:
-        raise click.ClickException("Pytest failed")
-
-
-@ci.command()
-@click.pass_context
-def nightly(ctx: click.Context) -> None:
-    """Run the nightly CI tests"""
-    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
-    test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
-    test_rust(ctx, features=["serde"], force_haswell=True, cache_test_output=False)
-
-
-@ci.command()
-@click.pass_context
-def quick(ctx: click.Context) -> None:
+def quick(ctx: click.Context, cache_dir: Path) -> None:
     """Run the quick (non-nightly) CI tests"""
-    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
+    cache_dir = (
+        cache_dir
+        / urlsafe_b64encode(
+            blake2b(
+                (
+                    ctx.obj[NIX_CACHE_KEY]
+                    + "\n"
+                    + (ROOT / "etc" / "ci" / "wrappers" / "rustc.py").read_text()
+                ).encode("utf-8")
+            ).digest()
+        ).decode("ascii")[0:32]
+    )
+    cache_dir.mkdir(exist_ok=True, parents=True)
+    os.environ.update(
+        {
+            "CARGO_HOME": str(cache_dir / "cargo-home"),
+            "SWANKY_CACHE_DIR": str(cache_dir),
+        }
+    )
+    try:
+        unpack_target_dir(cache_dir)
+        non_rust_tests(ctx)
+        test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
+    finally:
+        pack_target_dir(cache_dir)

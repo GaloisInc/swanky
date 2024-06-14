@@ -21,6 +21,10 @@ from uuid import uuid4
 
 import cbor2
 
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+
+from etc.ci.xattr_hash import cached_blake2b
+
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
 TEST_RESULTS.mkdir(exist_ok=True, parents=True)
@@ -30,55 +34,7 @@ args = sys.argv[2:]
 assert exe.exists()
 
 
-# os.getxattr and os.setxattr only exist on Linux. These stubs exist so that this file can
-# typecheck on macOS, even if it's not supposed to run on the mac.
-def getxattr(path: Path, attr: str) -> bytes:
-    if sys.platform == "linux":
-        return os.getxattr(path, attr)
-    else:
-        assert False
-
-
-def setxattr(path: Path, attr: str, value: bytes) -> None:
-    if sys.platform == "linux":
-        os.setxattr(path, attr, value)
-    else:
-        assert False
-
-
-def cached_hash(exe: Path) -> bytes:
-    """
-    Some of our test executables, especially with debug symbols, can be in the
-    hundreds of megabytes. Constantly re-reading and hashing them can be slow.
-    To avoid this, we set an xattr attribute on the binary with a cache of its
-    hash. We use https://apenwarr.ca/log/20181113 to set the cache key for the
-    hash.
-    """
-    stat = exe.stat()
-    stat_data = [
-        stat.st_mtime,
-        stat.st_size,
-        stat.st_ino,
-        stat.st_mode,
-        stat.st_uid,
-        stat.st_gid,
-    ]
-    attr = "user.caching_test_runner_hash_cache"
-    try:
-        raw_data = getxattr(exe, attr)
-    except:
-        raw_data = None
-    if raw_data is not None:
-        cbor_hash, read_stat_data = cbor2.loads(raw_data)
-        if read_stat_data == stat_data:
-            assert isinstance(cbor_hash, bytes)
-            return cbor_hash
-    out = sha256(exe.read_bytes()).digest()
-    setxattr(exe, attr, cbor2.dumps((out, stat_data)))
-    return out
-
-
-exe_hash = cached_hash(exe)
+exe_hash = cached_blake2b(exe)
 
 test_output = (
     TEST_RESULTS
