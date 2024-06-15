@@ -184,3 +184,7 @@ pub trait EvenArrayAdjacentPairs: ArrayAdjacentPairs {
     /// ```
     fn pair_adjacent(self) -> Self::AdjacentPairs;
 }
+
+mod impls {
+    include!(concat!(env!("OUT_DIR"), "/array_utils_impls.rs"));
+}

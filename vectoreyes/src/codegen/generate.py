@@ -166,5 +166,4 @@ def generate():
             env.get_template("tests/vector.tmpl").render(ty=ty),
         )
     write_rust("tests.rs", env.get_template("tests.tmpl").render())
-    write_rust("array_impls.rs", env.get_template("array_impls.tmpl").render())
     return out

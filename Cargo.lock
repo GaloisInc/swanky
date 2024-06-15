@@ -1757,6 +1757,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.2.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f12335488a2f3b0a83b14edad48dca9879ce89b2edd10e80237e4e852dd645e"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.66",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2718,11 +2728,15 @@ dependencies = [
  "bytemuck",
  "lazy_static",
  "num-traits",
+ "prettyplease",
+ "proc-macro2",
  "proptest",
+ "quote",
  "rand",
  "serde",
  "serde_json",
  "subtle",
+ "syn 2.0.66",
 ]
 
 [[package]]

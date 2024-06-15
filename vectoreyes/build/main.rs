@@ -1,5 +1,7 @@
 use std::process::Command;
 
+mod array_utils_impls;
+
 fn main() {
     println!("cargo:rerun-if-changed=build/main.rs");
     if std::env::var("CARGO_CFG_VECTOREYES_TARGET_CPU_NATIVE").is_ok() {
@@ -30,4 +32,5 @@ fn main() {
         }
         println!("cargo:rustc-cfg=vectoreyes_target_cpu={:?}", target_cpu);
     }
+    array_utils_impls::generate();
 }
