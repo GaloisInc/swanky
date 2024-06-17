@@ -11,7 +11,7 @@ const HASH_SIZE: usize = 8;
 
 /// Fancy function to compute the intersection of two sets
 /// and return a bit vector indicating the presence or abscence of
-/// elements.
+/// set elements.
 /// The sender and receiver slices are assumed to be of the same size
 /// and ordered in such a way that if elements are shared between them
 /// then they will be in the same position.
@@ -73,9 +73,9 @@ where
     E: Debug,
     Error: From<E>,
 {
-    let mut acc = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
-    let one = f.bin_constant_bundle(1, ELEMENT_SIZE * 8)?;
-    let zero = f.bin_constant_bundle(0, ELEMENT_SIZE * 8)?;
+    let mut acc = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8)?;
+    let one = f.bin_constant_bundle(1, PRIMARY_KEY_SIZE * 8)?;
+    let zero = f.bin_constant_bundle(0, PRIMARY_KEY_SIZE * 8)?;
     for bit in intersect_bitvec {
         let mux = f.bin_multiplex(bit, &zero, &one)?;
         acc = f.bin_addition_no_carry(&acc, &mux)?;

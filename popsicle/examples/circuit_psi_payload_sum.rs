@@ -24,7 +24,9 @@ pub fn psty_payload_sum(
                 OpprfPsiGarbler::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
                     .unwrap();
 
-            let intersection_results = gb_psi.intersect_with_payloads(set_a, payload_a).unwrap();
+            let intersection_results = gb_psi
+                .intersect_with_payloads(set_a, Some(payload_a))
+                .unwrap();
             let res = fancy_payload_sum(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
@@ -40,7 +42,9 @@ pub fn psty_payload_sum(
         let mut ev_psi =
             OpprfPsiEvaluator::<_, AesRng>::new(&mut channel, Block::from(rng.gen::<u128>()))
                 .unwrap();
-        let intersection_results = ev_psi.intersect_with_payloads(set_b, payload_b).unwrap();
+        let intersection_results = ev_psi
+            .intersect_with_payloads(set_b, Some(payload_b))
+            .unwrap();
         let res = fancy_payload_sum(
             &mut ev_psi.ev,
             &intersection_results.intersection.existence_bit_vector,

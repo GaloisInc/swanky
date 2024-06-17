@@ -13,8 +13,8 @@ use scuttlebutt::{Block, Block512};
 pub struct OpprfReceiver {
     /// The hashing key
     pub key: Block,
-    /// The opprf for set elements
-    pub opprf_set: KmprtReceiver,
+    /// The opprf for primary keys
+    pub opprf_primary_keys: KmprtReceiver,
     /// The opprf for payloads
     pub opprf_payload: Option<KmprtReceiver>,
     /// The opprf queries and outputs
@@ -25,8 +25,8 @@ pub struct OpprfReceiver {
 ///
 /// Specifically, the `ReceiverState` describes how the OPPRF is
 /// queried by the `OpprfReceiver` and what output they receiver:
-/// - `opprf_set_in` and `opprf_payloads_in` input queries to the OPPRF.
-/// - `opprf_set_out` and `opprf_payloads_out` are the results of
+/// - `opprf_primary_keys_in` and `opprf_payloads_in` input queries to the OPPRF.
+/// - `opprf_primary_keys_out` and `opprf_payloads_out` are the results of
 /// the OPPRF on those respective queries.
 /// When the OPPRF is called on a programmed input, it returns a
 /// programmed output. When the OPPRF is called on any other value,
@@ -35,10 +35,10 @@ pub struct OpprfReceiver {
 /// from one another.
 #[derive(Default)]
 pub struct ReceiverState {
-    /// The opprf query for sets
-    pub opprf_set_in: Vec<Block>,
-    /// The opprf output for sets
-    pub opprf_set_out: Vec<Block512>,
+    /// The opprf query for primary keys
+    pub opprf_primary_keys_in: Vec<Block>,
+    /// The opprf output for primary keys
+    pub opprf_primary_keys_out: Vec<Block512>,
     /// The opprf query for payloads
     pub opprf_payloads_in: Vec<Block512>,
     /// The opprf output for payloads
@@ -62,7 +62,7 @@ impl BasePsi for OpprfReceiver {
         channel.write_block(&key)?;
         channel.flush()?;
 
-        let opprf_set = KmprtReceiver::init(channel, rng)?;
+        let opprf_primary_keys = KmprtReceiver::init(channel, rng)?;
         channel.flush()?;
 
         let mut opprf_payload = None;
@@ -73,7 +73,7 @@ impl BasePsi for OpprfReceiver {
 
         Ok(Self {
             key,
-            opprf_set,
+            opprf_primary_keys,
             opprf_payload,
             state: Default::default(),
         })
@@ -81,8 +81,8 @@ impl BasePsi for OpprfReceiver {
     /// Hash the data using cuckoo hashing
     fn hash_data<C, RNG>(
         &mut self,
-        set: &[Element],
-        payloads: &[Payload],
+        primary_keys: &[PrimaryKey],
+        payloads: Option<&[Payload]>,
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<(), Error>
@@ -90,7 +90,7 @@ impl BasePsi for OpprfReceiver {
         C: AbstractChannel,
         RNG: RngCore + CryptoRng + SeedableRng,
     {
-        let mut hashed_inputs = compress_and_hash_inputs(set, self.key);
+        let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
 
         // refresh the key until the cuckoo hash is not full
         let cuckoo = loop {
@@ -98,7 +98,7 @@ impl BasePsi for OpprfReceiver {
                 Ok(res) => break res,
                 Err(_e) => {
                     self.key = rng.gen();
-                    hashed_inputs = compress_and_hash_inputs(set, self.key);
+                    hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
                 }
             }
         };
@@ -107,15 +107,15 @@ impl BasePsi for OpprfReceiver {
         channel.write_usize(cuckoo.nbins)?; // The number of bins is sent out to the sender
         channel.flush()?;
 
-        let opprf_set_in = cuckoo_place_ids(&cuckoo.items, rng);
+        let opprf_primary_keys_in = cuckoo_place_ids(&cuckoo.items, rng);
 
         let mut opprf_payloads_in = vec![];
-        if !payloads.is_empty() {
-            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads, rng);
+        if payloads.is_some() {
+            opprf_payloads_in = cuckoo_place_payloads(&cuckoo.items, payloads.unwrap(), rng);
         }
         self.state = ReceiverState {
-            opprf_set_in,
-            opprf_set_out: vec![],
+            opprf_primary_keys_in,
+            opprf_primary_keys_out: vec![],
             opprf_payloads_in,
             opprf_payloads_out: vec![],
         };
@@ -130,13 +130,13 @@ impl BasePsi for OpprfReceiver {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed
         // output as the sender, otherwise, they receive a random value.
-        self.state.opprf_set_out =
-            self.opprf_set
-                .receive(channel, &self.state.opprf_set_in, rng)?;
+        self.state.opprf_primary_keys_out =
+            self.opprf_primary_keys
+                .receive(channel, &self.state.opprf_primary_keys_in, rng)?;
         if !self.state.opprf_payloads_in.is_empty() {
             self.state.opprf_payloads_out = self.opprf_payload.as_mut().unwrap().receive(
                 channel,
-                &self.state.opprf_set_in,
+                &self.state.opprf_primary_keys_in,
                 rng,
             )?;
         }
@@ -154,21 +154,24 @@ impl BasePsi for OpprfReceiver {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in
         // bytes, turning it into bits, and then multiplying it by the
-        // number of elements the parties are intersecting.
+        // number of primary keys the parties are intersecting.
         // Note that PSTY expects parties to have the same set sizes.
-        let elements_binary_len = ELEMENT_SIZE * 8 * self.state.opprf_set_in.len();
+        let primary_keys_binary_len = PRIMARY_KEY_SIZE * 8 * self.state.opprf_primary_keys_in.len();
 
         // First receive encoded inputs from the `OpprfSender`
-        let sender_set_elements: Vec<F::Item> =
-            bin_receive_many_block512(gc_party, elements_binary_len)?;
+        let sender_primary_keys: Vec<F::Item> =
+            bin_receive_many_block512(gc_party, primary_keys_binary_len)?;
 
         // Then send encoded inputs
-        let receiver_set_elements: Vec<F::Item> =
-            bin_encode_many_block512(gc_party, &self.state.opprf_set_out, ELEMENT_SIZE)?;
+        let receiver_primary_keys: Vec<F::Item> = bin_encode_many_block512(
+            gc_party,
+            &self.state.opprf_primary_keys_out,
+            PRIMARY_KEY_SIZE,
+        )?;
 
         let mut result = CircuitInputs {
-            sender_set_elements,
-            receiver_set_elements,
+            sender_primary_keys,
+            receiver_primary_keys,
             sender_payloads_masked: vec![],
             receiver_payloads: vec![],
             masks: vec![],
@@ -178,7 +181,7 @@ impl BasePsi for OpprfReceiver {
             // We compute the number of wires that the receivers should
             // expect from the sender by taking the size of a payload in
             // bytes, turning it into bits, and then multiplying it by the
-            // number of elements the parties are intersecting.
+            // number of primary keys the parties are intersecting.
             // Note that PSTY expects parties to have the same set sizes.
             let payloads_binary_len = PAYLOAD_SIZE * 8 * self.state.opprf_payloads_in.len();
 
