@@ -175,29 +175,6 @@ impl Sub for I8x16 {
         select_impl_block! { scalar { I8x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm_sub_epi8 (self.0, rhs.0)) } }
     }
 }
-impl I8x16 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I8x16 =\n     I8x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i8, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i8; 16]) -> I8x16 {
-        select_impl_block! { scalar { I8x16(array) } avx2 { I8x16(unsafe { std::mem::transmute::<[i8; 16], I8x16Internal>(array) }) } }
-    }
-}
-impl From<[i8; 16]> for I8x16 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i8; 16]) -> I8x16 {
-        select_impl_block! { scalar { I8x16(array) } avx2 { I8x16(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<I8x16> for [i8; 16] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I8x16) -> [i8; 16] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i8; 16] = [0; 16]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I16x8> for I8x16 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I16x8\nas little endian bits of I8x16."]
     #[inline(always)]
@@ -592,29 +569,6 @@ impl Sub for I8x32 {
     #[inline(always)]
     fn sub(self, rhs: I8x32) -> I8x32 {
         select_impl_block! { scalar { I8x32::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), self.as_array()[16].wrapping_sub(rhs.as_array()[16]), self.as_array()[17].wrapping_sub(rhs.as_array()[17]), self.as_array()[18].wrapping_sub(rhs.as_array()[18]), self.as_array()[19].wrapping_sub(rhs.as_array()[19]), self.as_array()[20].wrapping_sub(rhs.as_array()[20]), self.as_array()[21].wrapping_sub(rhs.as_array()[21]), self.as_array()[22].wrapping_sub(rhs.as_array()[22]), self.as_array()[23].wrapping_sub(rhs.as_array()[23]), self.as_array()[24].wrapping_sub(rhs.as_array()[24]), self.as_array()[25].wrapping_sub(rhs.as_array()[25]), self.as_array()[26].wrapping_sub(rhs.as_array()[26]), self.as_array()[27].wrapping_sub(rhs.as_array()[27]), self.as_array()[28].wrapping_sub(rhs.as_array()[28]), self.as_array()[29].wrapping_sub(rhs.as_array()[29]), self.as_array()[30].wrapping_sub(rhs.as_array()[30]), self.as_array()[31].wrapping_sub(rhs.as_array()[31]), ]) } avx2 { Self( avx2::_mm256_sub_epi8 (self.0, rhs.0)) } }
-    }
-}
-impl I8x32 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I8x32 =\n     I8x32::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i8, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i8; 32]) -> I8x32 {
-        select_impl_block! { scalar { I8x32(array) } avx2 { I8x32(unsafe { std::mem::transmute::<[i8; 32], I8x32Internal>(array) }) } }
-    }
-}
-impl From<[i8; 32]> for I8x32 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i8; 32]) -> I8x32 {
-        select_impl_block! { scalar { I8x32(array) } avx2 { I8x32(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<I8x32> for [i8; 32] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I8x32) -> [i8; 32] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i8; 32] = [0; 32]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I16x16> for I8x32 {
@@ -1036,29 +990,6 @@ impl Sub for I16x8 {
         select_impl_block! { scalar { I16x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm_sub_epi16 (self.0, rhs.0)) } }
     }
 }
-impl I16x8 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I16x8 =\n     I16x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i16, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i16; 8]) -> I16x8 {
-        select_impl_block! { scalar { I16x8(array) } avx2 { I16x8(unsafe { std::mem::transmute::<[i16; 8], I16x8Internal>(array) }) } }
-    }
-}
-impl From<[i16; 8]> for I16x8 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i16; 8]) -> I16x8 {
-        select_impl_block! { scalar { I16x8(array) } avx2 { I16x8(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<I16x8> for [i16; 8] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I16x8) -> [i16; 8] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i16; 8] = [0; 8]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for I16x8 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I16x8."]
     #[inline(always)]
@@ -1473,29 +1404,6 @@ impl Sub for I16x16 {
     #[inline(always)]
     fn sub(self, rhs: I16x16) -> I16x16 {
         select_impl_block! { scalar { I16x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm256_sub_epi16 (self.0, rhs.0)) } }
-    }
-}
-impl I16x16 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I16x16 =\n     I16x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i16, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i16; 16]) -> I16x16 {
-        select_impl_block! { scalar { I16x16(array) } avx2 { I16x16(unsafe { std::mem::transmute::<[i16; 16], I16x16Internal>(array) }) } }
-    }
-}
-impl From<[i16; 16]> for I16x16 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i16; 16]) -> I16x16 {
-        select_impl_block! { scalar { I16x16(array) } avx2 { I16x16(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<I16x16> for [i16; 16] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I16x16) -> [i16; 16] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i16; 16] = [0; 16]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for I16x16 {
@@ -1927,29 +1835,6 @@ impl Sub for I32x4 {
         select_impl_block! { scalar { I32x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm_sub_epi32 (self.0, rhs.0)) } }
     }
 }
-impl I32x4 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I32x4 =\n     I32x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i32, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i32; 4]) -> I32x4 {
-        select_impl_block! { scalar { I32x4(array) } avx2 { I32x4(unsafe { std::mem::transmute::<[i32; 4], I32x4Internal>(array) }) } }
-    }
-}
-impl From<[i32; 4]> for I32x4 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i32; 4]) -> I32x4 {
-        select_impl_block! { scalar { I32x4(array) } avx2 { I32x4(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<I32x4> for [i32; 4] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I32x4) -> [i32; 4] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i32; 4] = [0; 4]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for I32x4 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I32x4."]
     #[inline(always)]
@@ -2379,29 +2264,6 @@ impl Sub for I32x8 {
     #[inline(always)]
     fn sub(self, rhs: I32x8) -> I32x8 {
         select_impl_block! { scalar { I32x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm256_sub_epi32 (self.0, rhs.0)) } }
-    }
-}
-impl I32x8 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I32x8 =\n     I32x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i32, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i32; 8]) -> I32x8 {
-        select_impl_block! { scalar { I32x8(array) } avx2 { I32x8(unsafe { std::mem::transmute::<[i32; 8], I32x8Internal>(array) }) } }
-    }
-}
-impl From<[i32; 8]> for I32x8 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i32; 8]) -> I32x8 {
-        select_impl_block! { scalar { I32x8(array) } avx2 { I32x8(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<I32x8> for [i32; 8] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I32x8) -> [i32; 8] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i32; 8] = [0; 8]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for I32x8 {
@@ -2849,29 +2711,6 @@ impl Sub for I64x2 {
         select_impl_block! { scalar { I64x2::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), ]) } avx2 { Self( avx2::_mm_sub_epi64 (self.0, rhs.0)) } }
     }
 }
-impl I64x2 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I64x2 =\n     I64x2::from_array([0, 1]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i64, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i64; 2]) -> I64x2 {
-        select_impl_block! { scalar { I64x2(array) } avx2 { I64x2(unsafe { std::mem::transmute::<[i64; 2], I64x2Internal>(array) }) } }
-    }
-}
-impl From<[i64; 2]> for I64x2 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i64; 2]) -> I64x2 {
-        select_impl_block! { scalar { I64x2(array) } avx2 { I64x2(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<I64x2> for [i64; 2] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I64x2) -> [i64; 2] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i64; 2] = [0; 2]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for I64x2 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I64x2."]
     #[inline(always)]
@@ -3284,29 +3123,6 @@ impl Sub for I64x4 {
     #[inline(always)]
     fn sub(self, rhs: I64x4) -> I64x4 {
         select_impl_block! { scalar { I64x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm256_sub_epi64 (self.0, rhs.0)) } }
-    }
-}
-impl I64x4 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: I64x4 =\n     I64x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as i64, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [i64; 4]) -> I64x4 {
-        select_impl_block! { scalar { I64x4(array) } avx2 { I64x4(unsafe { std::mem::transmute::<[i64; 4], I64x4Internal>(array) }) } }
-    }
-}
-impl From<[i64; 4]> for I64x4 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [i64; 4]) -> I64x4 {
-        select_impl_block! { scalar { I64x4(array) } avx2 { I64x4(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<I64x4> for [i64; 4] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: I64x4) -> [i64; 4] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [i64; 4] = [0; 4]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for I64x4 {
@@ -3783,29 +3599,6 @@ impl Sub for U8x16 {
         select_impl_block! { scalar { U8x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm_sub_epi8 (self.0, rhs.0)) } }
     }
 }
-impl U8x16 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U8x16 =\n     U8x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u8, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u8; 16]) -> U8x16 {
-        select_impl_block! { scalar { U8x16(array) } avx2 { U8x16(unsafe { std::mem::transmute::<[u8; 16], U8x16Internal>(array) }) } }
-    }
-}
-impl From<[u8; 16]> for U8x16 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u8; 16]) -> U8x16 {
-        select_impl_block! { scalar { U8x16(array) } avx2 { U8x16(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<U8x16> for [u8; 16] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U8x16) -> [u8; 16] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u8; 16] = [0; 16]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for U8x16 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U8x16."]
     #[inline(always)]
@@ -4201,29 +3994,6 @@ impl Sub for U8x32 {
     #[inline(always)]
     fn sub(self, rhs: U8x32) -> U8x32 {
         select_impl_block! { scalar { U8x32::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), self.as_array()[16].wrapping_sub(rhs.as_array()[16]), self.as_array()[17].wrapping_sub(rhs.as_array()[17]), self.as_array()[18].wrapping_sub(rhs.as_array()[18]), self.as_array()[19].wrapping_sub(rhs.as_array()[19]), self.as_array()[20].wrapping_sub(rhs.as_array()[20]), self.as_array()[21].wrapping_sub(rhs.as_array()[21]), self.as_array()[22].wrapping_sub(rhs.as_array()[22]), self.as_array()[23].wrapping_sub(rhs.as_array()[23]), self.as_array()[24].wrapping_sub(rhs.as_array()[24]), self.as_array()[25].wrapping_sub(rhs.as_array()[25]), self.as_array()[26].wrapping_sub(rhs.as_array()[26]), self.as_array()[27].wrapping_sub(rhs.as_array()[27]), self.as_array()[28].wrapping_sub(rhs.as_array()[28]), self.as_array()[29].wrapping_sub(rhs.as_array()[29]), self.as_array()[30].wrapping_sub(rhs.as_array()[30]), self.as_array()[31].wrapping_sub(rhs.as_array()[31]), ]) } avx2 { Self( avx2::_mm256_sub_epi8 (self.0, rhs.0)) } }
-    }
-}
-impl U8x32 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U8x32 =\n     U8x32::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u8, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u8; 32]) -> U8x32 {
-        select_impl_block! { scalar { U8x32(array) } avx2 { U8x32(unsafe { std::mem::transmute::<[u8; 32], U8x32Internal>(array) }) } }
-    }
-}
-impl From<[u8; 32]> for U8x32 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u8; 32]) -> U8x32 {
-        select_impl_block! { scalar { U8x32(array) } avx2 { U8x32(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<U8x32> for [u8; 32] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U8x32) -> [u8; 32] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u8; 32] = [0; 32]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for U8x32 {
@@ -4646,29 +4416,6 @@ impl Sub for U16x8 {
         select_impl_block! { scalar { U16x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm_sub_epi16 (self.0, rhs.0)) } }
     }
 }
-impl U16x8 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U16x8 =\n     U16x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u16, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u16; 8]) -> U16x8 {
-        select_impl_block! { scalar { U16x8(array) } avx2 { U16x8(unsafe { std::mem::transmute::<[u16; 8], U16x8Internal>(array) }) } }
-    }
-}
-impl From<[u16; 8]> for U16x8 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u16; 8]) -> U16x8 {
-        select_impl_block! { scalar { U16x8(array) } avx2 { U16x8(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<U16x8> for [u16; 8] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U16x8) -> [u16; 8] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u16; 8] = [0; 8]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for U16x8 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U16x8."]
     #[inline(always)]
@@ -5084,29 +4831,6 @@ impl Sub for U16x16 {
     #[inline(always)]
     fn sub(self, rhs: U16x16) -> U16x16 {
         select_impl_block! { scalar { U16x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm256_sub_epi16 (self.0, rhs.0)) } }
-    }
-}
-impl U16x16 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U16x16 =\n     U16x16::from_array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u16, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u16; 16]) -> U16x16 {
-        select_impl_block! { scalar { U16x16(array) } avx2 { U16x16(unsafe { std::mem::transmute::<[u16; 16], U16x16Internal>(array) }) } }
-    }
-}
-impl From<[u16; 16]> for U16x16 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u16; 16]) -> U16x16 {
-        select_impl_block! { scalar { U16x16(array) } avx2 { U16x16(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<U16x16> for [u16; 16] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U16x16) -> [u16; 16] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u16; 16] = [0; 16]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for U16x16 {
@@ -5539,29 +5263,6 @@ impl Sub for U32x4 {
         select_impl_block! { scalar { U32x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm_sub_epi32 (self.0, rhs.0)) } }
     }
 }
-impl U32x4 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U32x4 =\n     U32x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u32, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u32; 4]) -> U32x4 {
-        select_impl_block! { scalar { U32x4(array) } avx2 { U32x4(unsafe { std::mem::transmute::<[u32; 4], U32x4Internal>(array) }) } }
-    }
-}
-impl From<[u32; 4]> for U32x4 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u32; 4]) -> U32x4 {
-        select_impl_block! { scalar { U32x4(array) } avx2 { U32x4(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<U32x4> for [u32; 4] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U32x4) -> [u32; 4] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u32; 4] = [0; 4]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for U32x4 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U32x4."]
     #[inline(always)]
@@ -5992,29 +5693,6 @@ impl Sub for U32x8 {
     #[inline(always)]
     fn sub(self, rhs: U32x8) -> U32x8 {
         select_impl_block! { scalar { U32x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm256_sub_epi32 (self.0, rhs.0)) } }
-    }
-}
-impl U32x8 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U32x8 =\n     U32x8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u32, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u32; 8]) -> U32x8 {
-        select_impl_block! { scalar { U32x8(array) } avx2 { U32x8(unsafe { std::mem::transmute::<[u32; 8], U32x8Internal>(array) }) } }
-    }
-}
-impl From<[u32; 8]> for U32x8 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u32; 8]) -> U32x8 {
-        select_impl_block! { scalar { U32x8(array) } avx2 { U32x8(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<U32x8> for [u32; 8] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U32x8) -> [u32; 8] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u32; 8] = [0; 8]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for U32x8 {
@@ -6463,29 +6141,6 @@ impl Sub for U64x2 {
         select_impl_block! { scalar { U64x2::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), ]) } avx2 { Self( avx2::_mm_sub_epi64 (self.0, rhs.0)) } }
     }
 }
-impl U64x2 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U64x2 =\n     U64x2::from_array([0, 1]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u64, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u64; 2]) -> U64x2 {
-        select_impl_block! { scalar { U64x2(array) } avx2 { U64x2(unsafe { std::mem::transmute::<[u64; 2], U64x2Internal>(array) }) } }
-    }
-}
-impl From<[u64; 2]> for U64x2 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_loadu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_loadu_si128)\n\n\n * `MOVDQU xmm, m128`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u64; 2]) -> U64x2 {
-        select_impl_block! { scalar { U64x2(array) } avx2 { U64x2(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_loadu_si128 (array.as_ptr() as *const ::std::arch::x86_64::__m128i) }) } }
-    }
-}
-impl From<U64x2> for [u64; 2] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm_storeu_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_storeu_si128)\n\n\n * `MOVDQU m128, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U64x2) -> [u64; 2] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u64; 2] = [0; 2]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm_storeu_si128 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m128i, vector.0) } out } }
-    }
-}
 impl From<I8x16> for U64x2 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U64x2."]
     #[inline(always)]
@@ -6899,29 +6554,6 @@ impl Sub for U64x4 {
     #[inline(always)]
     fn sub(self, rhs: U64x4) -> U64x4 {
         select_impl_block! { scalar { U64x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm256_sub_epi64 (self.0, rhs.0)) } }
-    }
-}
-impl U64x4 {
-    #[doc = " Create a vector from an array.\n\n Unlike the `From` trait function, the `from_array` function is `const`.\n # Example\n ```\n # use vectoreyes::*;\n const MY_EXTREMELY_FUN_VALUE: U64x4 =\n     U64x4::from_array([0, 1, 2, 3]);\n for (i, value) in MY_EXTREMELY_FUN_VALUE.as_array().iter().copied().enumerate() {\n     assert_eq!(i as u64, value);\n }\n ```\n\n # Avx2"]
-    #[inline(always)]
-    pub const fn from_array(array: [u64; 4]) -> U64x4 {
-        select_impl_block! { scalar { U64x4(array) } avx2 { U64x4(unsafe { std::mem::transmute::<[u64; 4], U64x4Internal>(array) }) } }
-    }
-}
-impl From<[u64; 4]> for U64x4 {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_loadu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_loadu_si256)\n\n\n * `VMOVDQU ymm, m256`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(array: [u64; 4]) -> U64x4 {
-        select_impl_block! { scalar { U64x4(array) } avx2 { U64x4(unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_loadu_si256 (array.as_ptr() as *const ::std::arch::x86_64::__m256i) }) } }
-    }
-}
-impl From<U64x4> for [u64; 4] {
-    #[doc = "\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_storeu_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_storeu_si256)\n\n\n * `VMOVDQU m256, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn from(vector: U64x4) -> [u64; 4] {
-        select_impl_block! { scalar { vector.0 } avx2 { let mut out: [u64; 4] = [0; 4]; unsafe { // SAFETY: the pointer doesn't need to be aligned. It's the right size.
-        avx2::_mm256_storeu_si256 (out.as_mut_ptr() as *mut ::std::arch::x86_64::__m256i, vector.0) } out } }
     }
 }
 impl From<I8x32> for U64x4 {
@@ -7510,7 +7142,7 @@ unsafe { constify_imm!(::std::arch::x86_64::_mm256_extract_epi16 => (a, @@ [0..1
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_extract_epi32 => (a, @@ [0..8] index as i32)) } } #[inline(always)] pub(super) fn _mm256_extract_epi64<const index: usize>( a: ::std::arch::x86_64::__m256i, ) -> i64 { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_extract_epi64 => (a, @@ [0..4] index as i32)) } } #[inline(always)] pub(super) fn _mm256_extract_epi8<const index: usize>( a: ::std::arch::x86_64::__m256i, ) -> i32 { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_extract_epi8 => (a, @@ [0..32] index as i32)) } } #[inline(always)] pub(super) fn _mm256_extracti128_si256<const imm8: usize>( a: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { constify_imm!(::std::arch::x86_64::_mm256_extracti128_si256 => (a, @@ [0..2] imm8 as i32)) } } #[inline(always)] pub(super) unsafe fn _mm256_i32gather_epi32<const scale: usize>( base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_i32gather_epi32 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_i32gather_epi64<const scale: usize>( base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_i32gather_epi64 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_i64gather_epi32<const scale: usize>( base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm256_i64gather_epi32 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_i64gather_epi64<const scale: usize>( base_addr: *const i64, vindex: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_i64gather_epi64 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_loadu_si256( mem_addr: *const ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { ::std::arch::x86_64::_mm256_loadu_si256(mem_addr) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i32gather_epi32<const scale: usize>( src: ::std::arch::x86_64::__m256i, base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, mask: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_mask_i32gather_epi32 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i32gather_epi64<const scale: usize>( src: ::std::arch::x86_64::__m256i, base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, mask: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_mask_i32gather_epi64 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i64gather_epi32<const scale: usize>( src: ::std::arch::x86_64::__m128i, base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, mask: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm256_mask_i64gather_epi32 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i64gather_epi64<const scale: usize>( src: ::std::arch::x86_64::__m256i, base_addr: *const i64, vindex: ::std::arch::x86_64::__m256i, mask: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_mask_i64gather_epi64 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) fn _mm256_max_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { constify_imm!(::std::arch::x86_64::_mm256_extracti128_si256 => (a, @@ [0..2] imm8 as i32)) } } #[inline(always)] pub(super) unsafe fn _mm256_i32gather_epi32<const scale: usize>( base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_i32gather_epi32 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_i32gather_epi64<const scale: usize>( base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_i32gather_epi64 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_i64gather_epi32<const scale: usize>( base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm256_i64gather_epi32 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_i64gather_epi64<const scale: usize>( base_addr: *const i64, vindex: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_i64gather_epi64 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i32gather_epi32<const scale: usize>( src: ::std::arch::x86_64::__m256i, base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, mask: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_mask_i32gather_epi32 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i32gather_epi64<const scale: usize>( src: ::std::arch::x86_64::__m256i, base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, mask: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_mask_i32gather_epi64 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i64gather_epi32<const scale: usize>( src: ::std::arch::x86_64::__m128i, base_addr: *const i32, vindex: ::std::arch::x86_64::__m256i, mask: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm256_mask_i64gather_epi32 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm256_mask_i64gather_epi64<const scale: usize>( src: ::std::arch::x86_64::__m256i, base_addr: *const i64, vindex: ::std::arch::x86_64::__m256i, mask: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { constify_imm!(::std::arch::x86_64::_mm256_mask_i64gather_epi64 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) fn _mm256_max_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_max_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_max_epi32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_max_epi32(a, b) } } #[inline(always)] pub(super) fn _mm256_max_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_max_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_max_epu16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7563,7 +7195,7 @@ unsafe { constify_imm!(::std::arch::x86_64::_mm256_srli_epi32 => (a, @@ [0..256]
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_srli_epi64 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm256_srli_si256<const imm8: usize>( a: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_srli_si256 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm256_srlv_epi32( a: ::std::arch::x86_64::__m256i, count: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_srlv_epi32(a, count) } } #[inline(always)] pub(super) fn _mm256_srlv_epi64( a: ::std::arch::x86_64::__m256i, count: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_srlv_epi64(a, count) } } #[inline(always)] pub(super) unsafe fn _mm256_storeu_si256( mem_addr: *mut ::std::arch::x86_64::__m256i, a: ::std::arch::x86_64::__m256i, ) { ::std::arch::x86_64::_mm256_storeu_si256(mem_addr, a) } #[inline(always)] pub(super) fn _mm256_sub_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm256_srlv_epi64(a, count) } } #[inline(always)] pub(super) fn _mm256_sub_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_sub_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_sub_epi32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_sub_epi32(a, b) } } #[inline(always)] pub(super) fn _mm256_sub_epi64( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_sub_epi64(a, b) } } #[inline(always)] pub(super) fn _mm256_sub_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7629,7 +7261,7 @@ unsafe { ::std::arch::x86_64::_mm_cvtepu8_epi64(a) } } #[inline(always)] pub(sup
 unsafe { constify_imm!(::std::arch::x86_64::_mm_extract_epi16 => (a, @@ [0..8] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_extract_epi32<const imm8: usize>( a: ::std::arch::x86_64::__m128i, ) -> i32 { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm_extract_epi32 => (a, @@ [0..4] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_extract_epi64<const imm8: usize>( a: ::std::arch::x86_64::__m128i, ) -> i64 { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm_extract_epi64 => (a, @@ [0..2] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_extract_epi8<const imm8: usize>( a: ::std::arch::x86_64::__m128i, ) -> i32 { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { constify_imm!(::std::arch::x86_64::_mm_extract_epi8 => (a, @@ [0..16] imm8 as i32)) } } #[inline(always)] pub(super) unsafe fn _mm_i32gather_epi32<const scale: usize>( base_addr: *const i32, vindex: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_i32gather_epi32 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm_i64gather_epi64<const scale: usize>( base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_i64gather_epi64 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm_loadu_si128( mem_addr: *const ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { ::std::arch::x86_64::_mm_loadu_si128(mem_addr) } #[inline(always)] pub(super) unsafe fn _mm_mask_i32gather_epi32<const scale: usize>( src: ::std::arch::x86_64::__m128i, base_addr: *const i32, vindex: ::std::arch::x86_64::__m128i, mask: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_mask_i32gather_epi32 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm_mask_i64gather_epi64<const scale: usize>( src: ::std::arch::x86_64::__m128i, base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, mask: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_mask_i64gather_epi64 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) fn _mm_max_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { constify_imm!(::std::arch::x86_64::_mm_extract_epi8 => (a, @@ [0..16] imm8 as i32)) } } #[inline(always)] pub(super) unsafe fn _mm_i32gather_epi32<const scale: usize>( base_addr: *const i32, vindex: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_i32gather_epi32 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm_i64gather_epi64<const scale: usize>( base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_i64gather_epi64 => (base_addr, vindex, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm_mask_i32gather_epi32<const scale: usize>( src: ::std::arch::x86_64::__m128i, base_addr: *const i32, vindex: ::std::arch::x86_64::__m128i, mask: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_mask_i32gather_epi32 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) unsafe fn _mm_mask_i64gather_epi64<const scale: usize>( src: ::std::arch::x86_64::__m128i, base_addr: *const i64, vindex: ::std::arch::x86_64::__m128i, mask: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { constify_imm!(::std::arch::x86_64::_mm_mask_i64gather_epi64 => (src, base_addr, vindex, mask, @@ [[1, 2, 4, 8]] scale as i32)) } #[inline(always)] pub(super) fn _mm_max_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_max_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_max_epi32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_max_epi32(a, b) } } #[inline(always)] pub(super) fn _mm_max_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_max_epi8(a, b) } } #[inline(always)] pub(super) fn _mm_max_epu16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7680,7 +7312,7 @@ unsafe { constify_imm!(::std::arch::x86_64::_mm_srli_epi32 => (a, @@ [0..256] im
 unsafe { constify_imm!(::std::arch::x86_64::_mm_srli_epi64 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_srli_si128<const imm8: usize>( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm_srli_si128 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_srlv_epi32( a: ::std::arch::x86_64::__m128i, count: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_srlv_epi32(a, count) } } #[inline(always)] pub(super) fn _mm_srlv_epi64( a: ::std::arch::x86_64::__m128i, count: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_srlv_epi64(a, count) } } #[inline(always)] pub(super) unsafe fn _mm_storeu_si128( mem_addr: *mut ::std::arch::x86_64::__m128i, a: ::std::arch::x86_64::__m128i, ) { ::std::arch::x86_64::_mm_storeu_si128(mem_addr, a) } #[inline(always)] pub(super) fn _mm_sub_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm_srlv_epi64(a, count) } } #[inline(always)] pub(super) fn _mm_sub_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_sub_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_sub_epi32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_sub_epi32(a, b) } } #[inline(always)] pub(super) fn _mm_sub_epi64( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_sub_epi64(a, b) } } #[inline(always)] pub(super) fn _mm_sub_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.

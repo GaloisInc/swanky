@@ -1,3 +1,4 @@
+{% if force_scalar_for_test %}
 impl From<{{ty.array}}> for {{ty}} {
     {% call(scalar, avx2) fn("from", {"array": ty.array}, returns=ty, doc_scalar_equiv=False) %}
     {% call scalar() %}
@@ -27,6 +28,7 @@ impl From<{{ty}}> for {{ ty.array }} {
     {% endcall %}
     {% endcall %}
 }
+{% endif %}
 
 {% for ty2 in ty.can_cast_from %}
 impl From<{{ty2}}> for {{ty}} {
