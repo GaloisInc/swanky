@@ -28,7 +28,12 @@ fn main() {
         let last_whitespace = native_line.rfind(' ').expect("there is some whitespace");
         // The last two characters are ")."
         let target_cpu = &native_line[last_whitespace + 1..native_line.len() - 2];
-        if !lines.any(|line| line.trim() == target_cpu) {
+        if !lines.any(|line| {
+            line.split_ascii_whitespace()
+                .next()
+                .unwrap_or_default()
+                .contains(target_cpu)
+        }) {
             panic!("target_cpu {:?} doesn't seem to be valid", target_cpu);
         }
         println!("cargo:rustc-cfg=vectoreyes_target_cpu={:?}", target_cpu);
