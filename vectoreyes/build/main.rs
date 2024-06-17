@@ -34,4 +34,5 @@ fn main() {
         println!("cargo:rustc-cfg=vectoreyes_target_cpu={:?}", target_cpu);
     }
     array_utils_impls::generate();
+    backend::generate();
 }

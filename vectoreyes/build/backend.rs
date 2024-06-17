@@ -5,7 +5,10 @@ use types::VectorType;
 
 mod avx2;
 mod cfg;
+mod generate;
 mod types;
+pub use generate::*;
+
 /// A vector backend for vectoreyes
 ///
 /// The default implementations of methods in this trait implement the scalar backend. As a result,
