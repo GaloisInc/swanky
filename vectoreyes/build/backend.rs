@@ -7,6 +7,7 @@ mod avx2;
 mod cfg;
 mod code_block;
 mod generate;
+mod neon;
 mod types;
 pub use generate::*;
 

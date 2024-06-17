@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, TokenStreamExt};
 
+use super::neon::neon_backend;
 use super::types::VectorType;
 use super::{avx2::avx2_backend, cfg::Cfg, Scalar, VectorBackend};
 
@@ -26,7 +27,11 @@ impl Backends {
 }
 
 pub fn generate() {
-    let backends = [avx2_backend(), Box::new(Scalar)];
+    let backends = [
+        avx2_backend(),
+        neon_backend(),
+        Box::new(Scalar),
+    ];
     let mut previous_success = Cfg::false_();
     // Because backends have overlapping cfgs, we go through them and come up with a new cfg which
     // says that we pick the _first_ valid backend. We then store that list in the Backends struct.
