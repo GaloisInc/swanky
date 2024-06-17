@@ -1,6 +1,7 @@
 use std::process::Command;
 
 mod array_utils_impls;
+mod backend;
 
 fn main() {
     println!("cargo:rerun-if-changed=build/main.rs");
