@@ -3,6 +3,7 @@ use proc_macro2::TokenStream;
 
 use types::VectorType;
 
+mod avx2;
 mod cfg;
 mod types;
 /// A vector backend for vectoreyes
