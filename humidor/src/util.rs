@@ -1,9 +1,6 @@
 //! Utility functions for Ligero
 
 use ndarray::{Array1, ArrayView1};
-use num_traits::identities::Zero;
-use std::cmp::Eq;
-use std::fmt::Debug;
 
 use scuttlebutt::field::FiniteField;
 #[cfg(test)]
@@ -22,29 +19,6 @@ pub fn arb_test_field() -> BoxedStrategy<TestField> {
     any::<u128>()
         .prop_map(|seed| TestField::from_uniform_bytes(&seed.to_le_bytes()))
         .boxed()
-}
-
-/// Trait for collections that allow taking `n` initial elements while ensuring
-/// that only zero-elements are dropped from the end.
-trait TakeNZ
-where
-    Self: Sized,
-{
-    fn take_nz(self, n: usize) -> std::iter::Take<Self>;
-}
-
-impl<I: Zero + Eq + Debug, L> TakeNZ for L
-where
-    L: Iterator<Item = I> + Clone,
-{
-    #[inline]
-    /// Take initial `n` elements, while ensuring (in debug builds) that the
-    /// remaining elements are zeros.
-    fn take_nz(self, n: usize) -> std::iter::Take<Self> {
-        debug_assert!(self.clone().skip(n).all(|x| x.is_zero()));
-
-        self.take(n)
-    }
 }
 
 /// Given polynomials `p` with `deg(p) < n` and `q` with `deg(q) < m`, return

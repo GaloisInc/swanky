@@ -2,6 +2,7 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List
 
@@ -25,14 +26,25 @@ def upgrade_deps(post_rust_upgrade: bool = False) -> None:
     # TODO: when we support autogenerating flatbuffers from the CLI, automatically do so when we
     # upgrade the flatbuffers dependency.
 
-    def cmd(args: List[str], cwd: Path = ROOT) -> None:
+    def cmd(
+        args: List[str], cwd: Path = ROOT, env: dict[str, str] | None = None
+    ) -> None:
         cmd_name = " ".join(shlex.quote(arg) for arg in args)
         rich.get_console().rule(cmd_name)
-        if subprocess.call(args, cwd=cwd) != 0:
+        if subprocess.call(args, cwd=cwd, env=env) != 0:
             raise click.ClickException(f"{cmd_name} failed")
 
     if not post_rust_upgrade:
-        cmd(["niv", "update"], cwd=ROOT / "etc")
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            if sys.platform == "darwin":
+                # On macOS, niv wants to be able to call the security command to get TLS root certs
+                (tmp / "security").symlink_to("/usr/bin/security")
+            cmd(
+                ["niv", "update"],
+                cwd=ROOT / "etc",
+                env=os.environ | {"PATH": str(tmp) + os.pathsep + os.environ["PATH"]},
+            )
         latest_rust = (
             subprocess.check_output(
                 [
@@ -52,6 +64,8 @@ def upgrade_deps(post_rust_upgrade: bool = False) -> None:
         # advantage of the new versions.
         sys.stdout.flush()
         sys.stderr.flush()
+        # Force ./swanky to use the new nix environment.
+        del os.environ["SWANKY_NIX_CACHE_KEY"]
         os.execv(
             ROOT / "swanky",
             [str(ROOT / "swanky"), "upgrade-deps", "--post-rust-upgrade"],

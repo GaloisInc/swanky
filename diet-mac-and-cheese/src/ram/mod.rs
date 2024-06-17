@@ -54,9 +54,6 @@ pub trait MemorySpace<V> {
     /// The size (in number of `V`) of values.
     fn value_size(&self) -> usize;
 
-    /// The total capacity of the RAM.
-    fn size(&self) -> usize;
-
     /// Return an iterator over all addresses.
     fn enumerate(&self) -> Self::Enum;
 }
@@ -105,10 +102,6 @@ impl<F: FiniteField> MemorySpace<F> for Arithmetic<F> {
 
     fn value_size(&self) -> usize {
         1
-    }
-
-    fn size(&self) -> usize {
-        self.size
     }
 
     fn enumerate(&self) -> Self::Enum {
@@ -302,10 +295,6 @@ impl MemorySpace<F2> for Boolean {
 
     fn value_size(&self) -> usize {
         self.value_size
-    }
-
-    fn size(&self) -> usize {
-        self.ram_size
     }
 
     fn enumerate(&self) -> Self::Enum {
