@@ -1,7 +1,7 @@
 use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=build/main.rs");
     if std::env::var("CARGO_CFG_VECTOREYES_TARGET_CPU_NATIVE").is_ok() {
         let output = Command::new(std::env::var("RUSTC").expect("RUSTC env var"))
             .arg("-C")
