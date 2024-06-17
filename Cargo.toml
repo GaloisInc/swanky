@@ -101,6 +101,7 @@ bumpalo-herd = "0.1.2"
 bytemuck = { version = "1.16.0", features = [
   "min_const_generics",
   "extern_crate_alloc",
+  "aarch64_simd",
 ] }
 bytes = "1.6.0"
 cc = "1.0.99"
