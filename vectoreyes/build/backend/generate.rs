@@ -102,12 +102,14 @@ fn conversions(ty: VectorType, out: &mut TokenStream) {
     };
     out.append_all(quote! {
         impl From<[#ty_of; #ty_count]> for #ty {
+            #[inline(always)]
             fn from(arr: [#ty_of; #ty_count]) -> #ty {
                 bytemuck::cast(arr)
             }
         }
 
         impl From<#ty> for [#ty_of; #ty_count] {
+            #[inline(always)]
             fn from(arr: #ty) -> [#ty_of; #ty_count] {
                 bytemuck::cast(arr)
             }
@@ -119,6 +121,7 @@ fn conversions(ty: VectorType, out: &mut TokenStream) {
             /// Unlike the `From` trait function, the `from_array` function is `const`.
             /// # Example
             #example
+            #[inline(always)]
             pub const fn from_array(arr: [#ty_of; #ty_count]) -> Self {
                 unsafe {
                     // SAFETY: #ty and [#ty_of; #ty_count] are both plain-old-data of the same
