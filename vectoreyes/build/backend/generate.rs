@@ -7,6 +7,7 @@ use quote::{format_ident, quote, TokenStreamExt};
 use super::code_block::CodeBlock;
 use super::neon::neon_backend;
 use super::types::VectorType;
+use super::utils::index_literals;
 use super::{avx2::avx2_backend, cfg::Cfg, Scalar, VectorBackend};
 
 struct Backends {
@@ -87,7 +88,7 @@ fn implementation(backends: &Backends) -> TokenStream {
 fn conversions(ty: VectorType, out: &mut TokenStream) {
     let ty_of = ty.of();
     let ty_count = ty.count();
-    let example_elements: Vec<_> = (0..ty_count).map(Literal::usize_unsuffixed).collect();
+    let example_elements = index_literals(ty.count());
     let example = CodeBlock {
         hidden_prefix: quote! { use vectoreyes::*; },
         body: quote! {

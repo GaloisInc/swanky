@@ -9,6 +9,7 @@ mod code_block;
 mod generate;
 mod neon;
 mod types;
+mod utils;
 pub use generate::*;
 
 /// A vector backend for vectoreyes
