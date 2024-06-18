@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::path::PathBuf;
 
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, TokenStreamExt};
 use syn::Ident;
 
@@ -10,6 +10,7 @@ use super::neon::neon_backend;
 use super::types::VectorType;
 use super::utils::index_literals;
 use super::{avx2::avx2_backend, cfg::Cfg, Scalar, VectorBackend};
+use super::{Docs, PairwiseOperator};
 
 struct Backends {
     backends_with_cfg: Vec<(Box<dyn VectorBackend>, Cfg)>,
@@ -119,6 +120,7 @@ fn implementation(backends: &Backends) -> TokenStream {
     });
     for ty in VectorType::all() {
         conversions(ty, &mut out);
+        binops(backends, ty, &mut out);
     }
     out
 }
@@ -226,3 +228,35 @@ fn standard_fn(
     }
 }
 
+fn binops(backends: &Backends, ty: VectorType, out: &mut TokenStream) {
+    use PairwiseOperator::*;
+    let mut binop = |name: &str, desc: &str, op: PairwiseOperator| {
+        let trait_ = format_ident!("{name}");
+        let trait_assign = format_ident!("{name}Assign");
+        let trait_method = format_ident!("{}", name.to_lowercase());
+        let trait_assign_method = format_ident!("{}_assign", name.to_lowercase());
+        let body = standard_fn(
+            backends,
+            &format!("Perform a pairwise {desc}"),
+            quote! { fn #trait_method(self, rhs: #ty) -> #ty },
+            &|bknd| bknd.pairwise(ty, op, &quote! { self }, &quote! { rhs }),
+        );
+        out.append_all(quote! {
+            impl std::ops::#trait_ for #ty {
+                type Output = #ty;
+                #body
+            }
+            impl std::ops::#trait_assign for #ty {
+                #[inline(always)]
+                fn #trait_assign_method(&mut self, other: #ty) {
+                    *self = std::ops::#trait_::#trait_method(*self, other);
+                }
+            }
+        });
+    };
+    binop("Add", "`wrapping_add`", WrappingAdd);
+    binop("Sub", "`wrapping_sub`", WrappingSub);
+    binop("BitOr", "bitwise or", Or);
+    binop("BitXor", "bitwise xor", Xor);
+    binop("BitAnd", "bitwise and", And);
+}

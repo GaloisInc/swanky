@@ -105,76 +105,6 @@ impl<'de> serde::Deserialize<'de> for I8x16 {
         <[i8; 16]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for I8x16 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # {\n I8x16::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n     self.as_array()[8] ^ rhs.as_array()[8],\n     self.as_array()[9] ^ rhs.as_array()[9],\n     self.as_array()[10] ^ rhs.as_array()[10],\n     self.as_array()[11] ^ rhs.as_array()[11],\n     self.as_array()[12] ^ rhs.as_array()[12],\n     self.as_array()[13] ^ rhs.as_array()[13],\n     self.as_array()[14] ^ rhs.as_array()[14],\n     self.as_array()[15] ^ rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I8x16) -> I8x16 {
-        select_impl_block! { scalar { I8x16::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], self.as_array()[8] ^ rhs.as_array()[8], self.as_array()[9] ^ rhs.as_array()[9], self.as_array()[10] ^ rhs.as_array()[10], self.as_array()[11] ^ rhs.as_array()[11], self.as_array()[12] ^ rhs.as_array()[12], self.as_array()[13] ^ rhs.as_array()[13], self.as_array()[14] ^ rhs.as_array()[14], self.as_array()[15] ^ rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I8x16 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # {\n I8x16::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n     self.as_array()[8] | rhs.as_array()[8],\n     self.as_array()[9] | rhs.as_array()[9],\n     self.as_array()[10] | rhs.as_array()[10],\n     self.as_array()[11] | rhs.as_array()[11],\n     self.as_array()[12] | rhs.as_array()[12],\n     self.as_array()[13] | rhs.as_array()[13],\n     self.as_array()[14] | rhs.as_array()[14],\n     self.as_array()[15] | rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I8x16) -> I8x16 {
-        select_impl_block! { scalar { I8x16::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], self.as_array()[8] | rhs.as_array()[8], self.as_array()[9] | rhs.as_array()[9], self.as_array()[10] | rhs.as_array()[10], self.as_array()[11] | rhs.as_array()[11], self.as_array()[12] | rhs.as_array()[12], self.as_array()[13] | rhs.as_array()[13], self.as_array()[14] | rhs.as_array()[14], self.as_array()[15] | rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I8x16 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # {\n I8x16::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n     self.as_array()[8] & rhs.as_array()[8],\n     self.as_array()[9] & rhs.as_array()[9],\n     self.as_array()[10] & rhs.as_array()[10],\n     self.as_array()[11] & rhs.as_array()[11],\n     self.as_array()[12] & rhs.as_array()[12],\n     self.as_array()[13] & rhs.as_array()[13],\n     self.as_array()[14] & rhs.as_array()[14],\n     self.as_array()[15] & rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I8x16) -> I8x16 {
-        select_impl_block! { scalar { I8x16::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], self.as_array()[8] & rhs.as_array()[8], self.as_array()[9] & rhs.as_array()[9], self.as_array()[10] & rhs.as_array()[10], self.as_array()[11] & rhs.as_array()[11], self.as_array()[12] & rhs.as_array()[12], self.as_array()[13] & rhs.as_array()[13], self.as_array()[14] & rhs.as_array()[14], self.as_array()[15] & rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I8x16 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # {\n I8x16::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_add(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_add(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_add(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_add(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_add(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_add(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_add(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_add(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi8)\n\n\n * `PADDB xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I8x16) -> I8x16 {
-        select_impl_block! { scalar { I8x16::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), self.as_array()[8].wrapping_add(rhs.as_array()[8]), self.as_array()[9].wrapping_add(rhs.as_array()[9]), self.as_array()[10].wrapping_add(rhs.as_array()[10]), self.as_array()[11].wrapping_add(rhs.as_array()[11]), self.as_array()[12].wrapping_add(rhs.as_array()[12]), self.as_array()[13].wrapping_add(rhs.as_array()[13]), self.as_array()[14].wrapping_add(rhs.as_array()[14]), self.as_array()[15].wrapping_add(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm_add_epi8 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I8x16 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # ;}\n # impl SomeTraitForDoc for I8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x16  ,\n # )  -> I8x16\n # {\n I8x16::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_sub(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_sub(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_sub(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_sub(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_sub(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_sub(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_sub(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_sub(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi8)\n\n\n * `PSUBB xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I8x16) -> I8x16 {
-        select_impl_block! { scalar { I8x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm_sub_epi8 (self.0, rhs.0)) } }
-    }
-}
 impl From<I16x8> for I8x16 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I16x8\nas little endian bits of I8x16."]
     #[inline(always)]
@@ -499,76 +429,6 @@ impl<'de> serde::Deserialize<'de> for I8x32 {
         D: serde::Deserializer<'de>,
     {
         <[i8; 32]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for I8x32 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # {\n I8x32::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n     self.as_array()[8] ^ rhs.as_array()[8],\n     self.as_array()[9] ^ rhs.as_array()[9],\n     self.as_array()[10] ^ rhs.as_array()[10],\n     self.as_array()[11] ^ rhs.as_array()[11],\n     self.as_array()[12] ^ rhs.as_array()[12],\n     self.as_array()[13] ^ rhs.as_array()[13],\n     self.as_array()[14] ^ rhs.as_array()[14],\n     self.as_array()[15] ^ rhs.as_array()[15],\n     self.as_array()[16] ^ rhs.as_array()[16],\n     self.as_array()[17] ^ rhs.as_array()[17],\n     self.as_array()[18] ^ rhs.as_array()[18],\n     self.as_array()[19] ^ rhs.as_array()[19],\n     self.as_array()[20] ^ rhs.as_array()[20],\n     self.as_array()[21] ^ rhs.as_array()[21],\n     self.as_array()[22] ^ rhs.as_array()[22],\n     self.as_array()[23] ^ rhs.as_array()[23],\n     self.as_array()[24] ^ rhs.as_array()[24],\n     self.as_array()[25] ^ rhs.as_array()[25],\n     self.as_array()[26] ^ rhs.as_array()[26],\n     self.as_array()[27] ^ rhs.as_array()[27],\n     self.as_array()[28] ^ rhs.as_array()[28],\n     self.as_array()[29] ^ rhs.as_array()[29],\n     self.as_array()[30] ^ rhs.as_array()[30],\n     self.as_array()[31] ^ rhs.as_array()[31],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I8x32) -> I8x32 {
-        select_impl_block! { scalar { I8x32::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], self.as_array()[8] ^ rhs.as_array()[8], self.as_array()[9] ^ rhs.as_array()[9], self.as_array()[10] ^ rhs.as_array()[10], self.as_array()[11] ^ rhs.as_array()[11], self.as_array()[12] ^ rhs.as_array()[12], self.as_array()[13] ^ rhs.as_array()[13], self.as_array()[14] ^ rhs.as_array()[14], self.as_array()[15] ^ rhs.as_array()[15], self.as_array()[16] ^ rhs.as_array()[16], self.as_array()[17] ^ rhs.as_array()[17], self.as_array()[18] ^ rhs.as_array()[18], self.as_array()[19] ^ rhs.as_array()[19], self.as_array()[20] ^ rhs.as_array()[20], self.as_array()[21] ^ rhs.as_array()[21], self.as_array()[22] ^ rhs.as_array()[22], self.as_array()[23] ^ rhs.as_array()[23], self.as_array()[24] ^ rhs.as_array()[24], self.as_array()[25] ^ rhs.as_array()[25], self.as_array()[26] ^ rhs.as_array()[26], self.as_array()[27] ^ rhs.as_array()[27], self.as_array()[28] ^ rhs.as_array()[28], self.as_array()[29] ^ rhs.as_array()[29], self.as_array()[30] ^ rhs.as_array()[30], self.as_array()[31] ^ rhs.as_array()[31], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I8x32 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # {\n I8x32::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n     self.as_array()[8] | rhs.as_array()[8],\n     self.as_array()[9] | rhs.as_array()[9],\n     self.as_array()[10] | rhs.as_array()[10],\n     self.as_array()[11] | rhs.as_array()[11],\n     self.as_array()[12] | rhs.as_array()[12],\n     self.as_array()[13] | rhs.as_array()[13],\n     self.as_array()[14] | rhs.as_array()[14],\n     self.as_array()[15] | rhs.as_array()[15],\n     self.as_array()[16] | rhs.as_array()[16],\n     self.as_array()[17] | rhs.as_array()[17],\n     self.as_array()[18] | rhs.as_array()[18],\n     self.as_array()[19] | rhs.as_array()[19],\n     self.as_array()[20] | rhs.as_array()[20],\n     self.as_array()[21] | rhs.as_array()[21],\n     self.as_array()[22] | rhs.as_array()[22],\n     self.as_array()[23] | rhs.as_array()[23],\n     self.as_array()[24] | rhs.as_array()[24],\n     self.as_array()[25] | rhs.as_array()[25],\n     self.as_array()[26] | rhs.as_array()[26],\n     self.as_array()[27] | rhs.as_array()[27],\n     self.as_array()[28] | rhs.as_array()[28],\n     self.as_array()[29] | rhs.as_array()[29],\n     self.as_array()[30] | rhs.as_array()[30],\n     self.as_array()[31] | rhs.as_array()[31],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I8x32) -> I8x32 {
-        select_impl_block! { scalar { I8x32::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], self.as_array()[8] | rhs.as_array()[8], self.as_array()[9] | rhs.as_array()[9], self.as_array()[10] | rhs.as_array()[10], self.as_array()[11] | rhs.as_array()[11], self.as_array()[12] | rhs.as_array()[12], self.as_array()[13] | rhs.as_array()[13], self.as_array()[14] | rhs.as_array()[14], self.as_array()[15] | rhs.as_array()[15], self.as_array()[16] | rhs.as_array()[16], self.as_array()[17] | rhs.as_array()[17], self.as_array()[18] | rhs.as_array()[18], self.as_array()[19] | rhs.as_array()[19], self.as_array()[20] | rhs.as_array()[20], self.as_array()[21] | rhs.as_array()[21], self.as_array()[22] | rhs.as_array()[22], self.as_array()[23] | rhs.as_array()[23], self.as_array()[24] | rhs.as_array()[24], self.as_array()[25] | rhs.as_array()[25], self.as_array()[26] | rhs.as_array()[26], self.as_array()[27] | rhs.as_array()[27], self.as_array()[28] | rhs.as_array()[28], self.as_array()[29] | rhs.as_array()[29], self.as_array()[30] | rhs.as_array()[30], self.as_array()[31] | rhs.as_array()[31], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I8x32 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # {\n I8x32::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n     self.as_array()[8] & rhs.as_array()[8],\n     self.as_array()[9] & rhs.as_array()[9],\n     self.as_array()[10] & rhs.as_array()[10],\n     self.as_array()[11] & rhs.as_array()[11],\n     self.as_array()[12] & rhs.as_array()[12],\n     self.as_array()[13] & rhs.as_array()[13],\n     self.as_array()[14] & rhs.as_array()[14],\n     self.as_array()[15] & rhs.as_array()[15],\n     self.as_array()[16] & rhs.as_array()[16],\n     self.as_array()[17] & rhs.as_array()[17],\n     self.as_array()[18] & rhs.as_array()[18],\n     self.as_array()[19] & rhs.as_array()[19],\n     self.as_array()[20] & rhs.as_array()[20],\n     self.as_array()[21] & rhs.as_array()[21],\n     self.as_array()[22] & rhs.as_array()[22],\n     self.as_array()[23] & rhs.as_array()[23],\n     self.as_array()[24] & rhs.as_array()[24],\n     self.as_array()[25] & rhs.as_array()[25],\n     self.as_array()[26] & rhs.as_array()[26],\n     self.as_array()[27] & rhs.as_array()[27],\n     self.as_array()[28] & rhs.as_array()[28],\n     self.as_array()[29] & rhs.as_array()[29],\n     self.as_array()[30] & rhs.as_array()[30],\n     self.as_array()[31] & rhs.as_array()[31],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I8x32) -> I8x32 {
-        select_impl_block! { scalar { I8x32::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], self.as_array()[8] & rhs.as_array()[8], self.as_array()[9] & rhs.as_array()[9], self.as_array()[10] & rhs.as_array()[10], self.as_array()[11] & rhs.as_array()[11], self.as_array()[12] & rhs.as_array()[12], self.as_array()[13] & rhs.as_array()[13], self.as_array()[14] & rhs.as_array()[14], self.as_array()[15] & rhs.as_array()[15], self.as_array()[16] & rhs.as_array()[16], self.as_array()[17] & rhs.as_array()[17], self.as_array()[18] & rhs.as_array()[18], self.as_array()[19] & rhs.as_array()[19], self.as_array()[20] & rhs.as_array()[20], self.as_array()[21] & rhs.as_array()[21], self.as_array()[22] & rhs.as_array()[22], self.as_array()[23] & rhs.as_array()[23], self.as_array()[24] & rhs.as_array()[24], self.as_array()[25] & rhs.as_array()[25], self.as_array()[26] & rhs.as_array()[26], self.as_array()[27] & rhs.as_array()[27], self.as_array()[28] & rhs.as_array()[28], self.as_array()[29] & rhs.as_array()[29], self.as_array()[30] & rhs.as_array()[30], self.as_array()[31] & rhs.as_array()[31], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I8x32 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # {\n I8x32::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_add(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_add(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_add(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_add(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_add(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_add(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_add(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_add(rhs.as_array()[15]),\n     self.as_array()[16].wrapping_add(rhs.as_array()[16]),\n     self.as_array()[17].wrapping_add(rhs.as_array()[17]),\n     self.as_array()[18].wrapping_add(rhs.as_array()[18]),\n     self.as_array()[19].wrapping_add(rhs.as_array()[19]),\n     self.as_array()[20].wrapping_add(rhs.as_array()[20]),\n     self.as_array()[21].wrapping_add(rhs.as_array()[21]),\n     self.as_array()[22].wrapping_add(rhs.as_array()[22]),\n     self.as_array()[23].wrapping_add(rhs.as_array()[23]),\n     self.as_array()[24].wrapping_add(rhs.as_array()[24]),\n     self.as_array()[25].wrapping_add(rhs.as_array()[25]),\n     self.as_array()[26].wrapping_add(rhs.as_array()[26]),\n     self.as_array()[27].wrapping_add(rhs.as_array()[27]),\n     self.as_array()[28].wrapping_add(rhs.as_array()[28]),\n     self.as_array()[29].wrapping_add(rhs.as_array()[29]),\n     self.as_array()[30].wrapping_add(rhs.as_array()[30]),\n     self.as_array()[31].wrapping_add(rhs.as_array()[31]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi8)\n\n\n * `VPADDB ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I8x32) -> I8x32 {
-        select_impl_block! { scalar { I8x32::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), self.as_array()[8].wrapping_add(rhs.as_array()[8]), self.as_array()[9].wrapping_add(rhs.as_array()[9]), self.as_array()[10].wrapping_add(rhs.as_array()[10]), self.as_array()[11].wrapping_add(rhs.as_array()[11]), self.as_array()[12].wrapping_add(rhs.as_array()[12]), self.as_array()[13].wrapping_add(rhs.as_array()[13]), self.as_array()[14].wrapping_add(rhs.as_array()[14]), self.as_array()[15].wrapping_add(rhs.as_array()[15]), self.as_array()[16].wrapping_add(rhs.as_array()[16]), self.as_array()[17].wrapping_add(rhs.as_array()[17]), self.as_array()[18].wrapping_add(rhs.as_array()[18]), self.as_array()[19].wrapping_add(rhs.as_array()[19]), self.as_array()[20].wrapping_add(rhs.as_array()[20]), self.as_array()[21].wrapping_add(rhs.as_array()[21]), self.as_array()[22].wrapping_add(rhs.as_array()[22]), self.as_array()[23].wrapping_add(rhs.as_array()[23]), self.as_array()[24].wrapping_add(rhs.as_array()[24]), self.as_array()[25].wrapping_add(rhs.as_array()[25]), self.as_array()[26].wrapping_add(rhs.as_array()[26]), self.as_array()[27].wrapping_add(rhs.as_array()[27]), self.as_array()[28].wrapping_add(rhs.as_array()[28]), self.as_array()[29].wrapping_add(rhs.as_array()[29]), self.as_array()[30].wrapping_add(rhs.as_array()[30]), self.as_array()[31].wrapping_add(rhs.as_array()[31]), ]) } avx2 { Self( avx2::_mm256_add_epi8 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I8x32 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # ;}\n # impl SomeTraitForDoc for I8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I8x32  ,\n # )  -> I8x32\n # {\n I8x32::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_sub(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_sub(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_sub(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_sub(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_sub(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_sub(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_sub(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_sub(rhs.as_array()[15]),\n     self.as_array()[16].wrapping_sub(rhs.as_array()[16]),\n     self.as_array()[17].wrapping_sub(rhs.as_array()[17]),\n     self.as_array()[18].wrapping_sub(rhs.as_array()[18]),\n     self.as_array()[19].wrapping_sub(rhs.as_array()[19]),\n     self.as_array()[20].wrapping_sub(rhs.as_array()[20]),\n     self.as_array()[21].wrapping_sub(rhs.as_array()[21]),\n     self.as_array()[22].wrapping_sub(rhs.as_array()[22]),\n     self.as_array()[23].wrapping_sub(rhs.as_array()[23]),\n     self.as_array()[24].wrapping_sub(rhs.as_array()[24]),\n     self.as_array()[25].wrapping_sub(rhs.as_array()[25]),\n     self.as_array()[26].wrapping_sub(rhs.as_array()[26]),\n     self.as_array()[27].wrapping_sub(rhs.as_array()[27]),\n     self.as_array()[28].wrapping_sub(rhs.as_array()[28]),\n     self.as_array()[29].wrapping_sub(rhs.as_array()[29]),\n     self.as_array()[30].wrapping_sub(rhs.as_array()[30]),\n     self.as_array()[31].wrapping_sub(rhs.as_array()[31]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi8)\n\n\n * `VPSUBB ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I8x32) -> I8x32 {
-        select_impl_block! { scalar { I8x32::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), self.as_array()[16].wrapping_sub(rhs.as_array()[16]), self.as_array()[17].wrapping_sub(rhs.as_array()[17]), self.as_array()[18].wrapping_sub(rhs.as_array()[18]), self.as_array()[19].wrapping_sub(rhs.as_array()[19]), self.as_array()[20].wrapping_sub(rhs.as_array()[20]), self.as_array()[21].wrapping_sub(rhs.as_array()[21]), self.as_array()[22].wrapping_sub(rhs.as_array()[22]), self.as_array()[23].wrapping_sub(rhs.as_array()[23]), self.as_array()[24].wrapping_sub(rhs.as_array()[24]), self.as_array()[25].wrapping_sub(rhs.as_array()[25]), self.as_array()[26].wrapping_sub(rhs.as_array()[26]), self.as_array()[27].wrapping_sub(rhs.as_array()[27]), self.as_array()[28].wrapping_sub(rhs.as_array()[28]), self.as_array()[29].wrapping_sub(rhs.as_array()[29]), self.as_array()[30].wrapping_sub(rhs.as_array()[30]), self.as_array()[31].wrapping_sub(rhs.as_array()[31]), ]) } avx2 { Self( avx2::_mm256_sub_epi8 (self.0, rhs.0)) } }
     }
 }
 impl From<I16x16> for I8x32 {
@@ -920,76 +780,6 @@ impl<'de> serde::Deserialize<'de> for I16x8 {
         <[i16; 8]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for I16x8 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I16x8) -> I16x8 {
-        select_impl_block! { scalar { I16x8::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I16x8 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I16x8) -> I16x8 {
-        select_impl_block! { scalar { I16x8::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I16x8 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I16x8) -> I16x8 {
-        select_impl_block! { scalar { I16x8::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I16x8 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi16)\n\n\n * `PADDW xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I16x8) -> I16x8 {
-        select_impl_block! { scalar { I16x8::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm_add_epi16 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I16x8 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # ;}\n # impl SomeTraitForDoc for I16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x8  ,\n # )  -> I16x8\n # {\n I16x8::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi16)\n\n\n * `PSUBW xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I16x8) -> I16x8 {
-        select_impl_block! { scalar { I16x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm_sub_epi16 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for I16x8 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I16x8."]
     #[inline(always)]
@@ -1334,76 +1124,6 @@ impl<'de> serde::Deserialize<'de> for I16x16 {
         D: serde::Deserializer<'de>,
     {
         <[i16; 16]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for I16x16 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n     self.as_array()[8] ^ rhs.as_array()[8],\n     self.as_array()[9] ^ rhs.as_array()[9],\n     self.as_array()[10] ^ rhs.as_array()[10],\n     self.as_array()[11] ^ rhs.as_array()[11],\n     self.as_array()[12] ^ rhs.as_array()[12],\n     self.as_array()[13] ^ rhs.as_array()[13],\n     self.as_array()[14] ^ rhs.as_array()[14],\n     self.as_array()[15] ^ rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I16x16) -> I16x16 {
-        select_impl_block! { scalar { I16x16::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], self.as_array()[8] ^ rhs.as_array()[8], self.as_array()[9] ^ rhs.as_array()[9], self.as_array()[10] ^ rhs.as_array()[10], self.as_array()[11] ^ rhs.as_array()[11], self.as_array()[12] ^ rhs.as_array()[12], self.as_array()[13] ^ rhs.as_array()[13], self.as_array()[14] ^ rhs.as_array()[14], self.as_array()[15] ^ rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I16x16 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n     self.as_array()[8] | rhs.as_array()[8],\n     self.as_array()[9] | rhs.as_array()[9],\n     self.as_array()[10] | rhs.as_array()[10],\n     self.as_array()[11] | rhs.as_array()[11],\n     self.as_array()[12] | rhs.as_array()[12],\n     self.as_array()[13] | rhs.as_array()[13],\n     self.as_array()[14] | rhs.as_array()[14],\n     self.as_array()[15] | rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I16x16) -> I16x16 {
-        select_impl_block! { scalar { I16x16::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], self.as_array()[8] | rhs.as_array()[8], self.as_array()[9] | rhs.as_array()[9], self.as_array()[10] | rhs.as_array()[10], self.as_array()[11] | rhs.as_array()[11], self.as_array()[12] | rhs.as_array()[12], self.as_array()[13] | rhs.as_array()[13], self.as_array()[14] | rhs.as_array()[14], self.as_array()[15] | rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I16x16 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n     self.as_array()[8] & rhs.as_array()[8],\n     self.as_array()[9] & rhs.as_array()[9],\n     self.as_array()[10] & rhs.as_array()[10],\n     self.as_array()[11] & rhs.as_array()[11],\n     self.as_array()[12] & rhs.as_array()[12],\n     self.as_array()[13] & rhs.as_array()[13],\n     self.as_array()[14] & rhs.as_array()[14],\n     self.as_array()[15] & rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I16x16) -> I16x16 {
-        select_impl_block! { scalar { I16x16::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], self.as_array()[8] & rhs.as_array()[8], self.as_array()[9] & rhs.as_array()[9], self.as_array()[10] & rhs.as_array()[10], self.as_array()[11] & rhs.as_array()[11], self.as_array()[12] & rhs.as_array()[12], self.as_array()[13] & rhs.as_array()[13], self.as_array()[14] & rhs.as_array()[14], self.as_array()[15] & rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I16x16 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_add(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_add(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_add(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_add(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_add(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_add(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_add(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_add(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi16)\n\n\n * `VPADDW ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I16x16) -> I16x16 {
-        select_impl_block! { scalar { I16x16::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), self.as_array()[8].wrapping_add(rhs.as_array()[8]), self.as_array()[9].wrapping_add(rhs.as_array()[9]), self.as_array()[10].wrapping_add(rhs.as_array()[10]), self.as_array()[11].wrapping_add(rhs.as_array()[11]), self.as_array()[12].wrapping_add(rhs.as_array()[12]), self.as_array()[13].wrapping_add(rhs.as_array()[13]), self.as_array()[14].wrapping_add(rhs.as_array()[14]), self.as_array()[15].wrapping_add(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm256_add_epi16 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I16x16 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # ;}\n # impl SomeTraitForDoc for I16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I16x16  ,\n # )  -> I16x16\n # {\n I16x16::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_sub(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_sub(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_sub(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_sub(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_sub(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_sub(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_sub(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_sub(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi16)\n\n\n * `VPSUBW ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I16x16) -> I16x16 {
-        select_impl_block! { scalar { I16x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm256_sub_epi16 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for I16x16 {
@@ -1765,76 +1485,6 @@ impl<'de> serde::Deserialize<'de> for I32x4 {
         <[i32; 4]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for I32x4 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # {\n I32x4::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I32x4) -> I32x4 {
-        select_impl_block! { scalar { I32x4::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I32x4 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # {\n I32x4::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I32x4) -> I32x4 {
-        select_impl_block! { scalar { I32x4::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I32x4 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # {\n I32x4::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I32x4) -> I32x4 {
-        select_impl_block! { scalar { I32x4::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I32x4 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # {\n I32x4::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi32)\n\n\n * `PADDD xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I32x4) -> I32x4 {
-        select_impl_block! { scalar { I32x4::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm_add_epi32 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I32x4 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # ;}\n # impl SomeTraitForDoc for I32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x4  ,\n # )  -> I32x4\n # {\n I32x4::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi32)\n\n\n * `PSUBD xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I32x4) -> I32x4 {
-        select_impl_block! { scalar { I32x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm_sub_epi32 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for I32x4 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I32x4."]
     #[inline(always)]
@@ -2194,76 +1844,6 @@ impl<'de> serde::Deserialize<'de> for I32x8 {
         D: serde::Deserializer<'de>,
     {
         <[i32; 8]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for I32x8 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # {\n I32x8::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I32x8) -> I32x8 {
-        select_impl_block! { scalar { I32x8::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I32x8 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # {\n I32x8::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I32x8) -> I32x8 {
-        select_impl_block! { scalar { I32x8::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I32x8 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # {\n I32x8::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I32x8) -> I32x8 {
-        select_impl_block! { scalar { I32x8::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I32x8 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # {\n I32x8::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi32)\n\n\n * `VPADDD ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I32x8) -> I32x8 {
-        select_impl_block! { scalar { I32x8::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm256_add_epi32 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I32x8 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # ;}\n # impl SomeTraitForDoc for I32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I32x8  ,\n # )  -> I32x8\n # {\n I32x8::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi32)\n\n\n * `VPSUBD ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I32x8) -> I32x8 {
-        select_impl_block! { scalar { I32x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm256_sub_epi32 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for I32x8 {
@@ -2641,76 +2221,6 @@ impl<'de> serde::Deserialize<'de> for I64x2 {
         <[i64; 2]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for I64x2 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # {\n I64x2::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I64x2) -> I64x2 {
-        select_impl_block! { scalar { I64x2::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I64x2 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # {\n I64x2::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I64x2) -> I64x2 {
-        select_impl_block! { scalar { I64x2::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I64x2 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # {\n I64x2::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I64x2) -> I64x2 {
-        select_impl_block! { scalar { I64x2::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I64x2 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # {\n I64x2::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi64)\n\n\n * `PADDQ xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I64x2) -> I64x2 {
-        select_impl_block! { scalar { I64x2::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), ]) } avx2 { Self( avx2::_mm_add_epi64 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I64x2 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # ;}\n # impl SomeTraitForDoc for I64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x2  ,\n # )  -> I64x2\n # {\n I64x2::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi64)\n\n\n * `PSUBQ xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I64x2) -> I64x2 {
-        select_impl_block! { scalar { I64x2::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), ]) } avx2 { Self( avx2::_mm_sub_epi64 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for I64x2 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I64x2."]
     #[inline(always)]
@@ -3053,76 +2563,6 @@ impl<'de> serde::Deserialize<'de> for I64x4 {
         D: serde::Deserializer<'de>,
     {
         <[i64; 4]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for I64x4 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for I64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # {\n I64x4::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: I64x4) -> I64x4 {
-        select_impl_block! { scalar { I64x4::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for I64x4 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for I64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # {\n I64x4::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: I64x4) -> I64x4 {
-        select_impl_block! { scalar { I64x4::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for I64x4 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for I64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # {\n I64x4::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: I64x4) -> I64x4 {
-        select_impl_block! { scalar { I64x4::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for I64x4 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for I64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # {\n I64x4::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi64)\n\n\n * `VPADDQ ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: I64x4) -> I64x4 {
-        select_impl_block! { scalar { I64x4::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm256_add_epi64 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for I64x4 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for I64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # ;}\n # impl SomeTraitForDoc for I64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : I64x4  ,\n # )  -> I64x4\n # {\n I64x4::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi64)\n\n\n * `VPSUBQ ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: I64x4) -> I64x4 {
-        select_impl_block! { scalar { I64x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm256_sub_epi64 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for I64x4 {
@@ -3529,76 +2969,6 @@ impl<'de> serde::Deserialize<'de> for U8x16 {
         <[u8; 16]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for U8x16 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # {\n U8x16::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n     self.as_array()[8] ^ rhs.as_array()[8],\n     self.as_array()[9] ^ rhs.as_array()[9],\n     self.as_array()[10] ^ rhs.as_array()[10],\n     self.as_array()[11] ^ rhs.as_array()[11],\n     self.as_array()[12] ^ rhs.as_array()[12],\n     self.as_array()[13] ^ rhs.as_array()[13],\n     self.as_array()[14] ^ rhs.as_array()[14],\n     self.as_array()[15] ^ rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U8x16) -> U8x16 {
-        select_impl_block! { scalar { U8x16::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], self.as_array()[8] ^ rhs.as_array()[8], self.as_array()[9] ^ rhs.as_array()[9], self.as_array()[10] ^ rhs.as_array()[10], self.as_array()[11] ^ rhs.as_array()[11], self.as_array()[12] ^ rhs.as_array()[12], self.as_array()[13] ^ rhs.as_array()[13], self.as_array()[14] ^ rhs.as_array()[14], self.as_array()[15] ^ rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U8x16 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # {\n U8x16::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n     self.as_array()[8] | rhs.as_array()[8],\n     self.as_array()[9] | rhs.as_array()[9],\n     self.as_array()[10] | rhs.as_array()[10],\n     self.as_array()[11] | rhs.as_array()[11],\n     self.as_array()[12] | rhs.as_array()[12],\n     self.as_array()[13] | rhs.as_array()[13],\n     self.as_array()[14] | rhs.as_array()[14],\n     self.as_array()[15] | rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U8x16) -> U8x16 {
-        select_impl_block! { scalar { U8x16::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], self.as_array()[8] | rhs.as_array()[8], self.as_array()[9] | rhs.as_array()[9], self.as_array()[10] | rhs.as_array()[10], self.as_array()[11] | rhs.as_array()[11], self.as_array()[12] | rhs.as_array()[12], self.as_array()[13] | rhs.as_array()[13], self.as_array()[14] | rhs.as_array()[14], self.as_array()[15] | rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U8x16 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # {\n U8x16::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n     self.as_array()[8] & rhs.as_array()[8],\n     self.as_array()[9] & rhs.as_array()[9],\n     self.as_array()[10] & rhs.as_array()[10],\n     self.as_array()[11] & rhs.as_array()[11],\n     self.as_array()[12] & rhs.as_array()[12],\n     self.as_array()[13] & rhs.as_array()[13],\n     self.as_array()[14] & rhs.as_array()[14],\n     self.as_array()[15] & rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U8x16) -> U8x16 {
-        select_impl_block! { scalar { U8x16::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], self.as_array()[8] & rhs.as_array()[8], self.as_array()[9] & rhs.as_array()[9], self.as_array()[10] & rhs.as_array()[10], self.as_array()[11] & rhs.as_array()[11], self.as_array()[12] & rhs.as_array()[12], self.as_array()[13] & rhs.as_array()[13], self.as_array()[14] & rhs.as_array()[14], self.as_array()[15] & rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U8x16 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # {\n U8x16::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_add(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_add(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_add(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_add(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_add(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_add(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_add(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_add(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi8)\n\n\n * `PADDB xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U8x16) -> U8x16 {
-        select_impl_block! { scalar { U8x16::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), self.as_array()[8].wrapping_add(rhs.as_array()[8]), self.as_array()[9].wrapping_add(rhs.as_array()[9]), self.as_array()[10].wrapping_add(rhs.as_array()[10]), self.as_array()[11].wrapping_add(rhs.as_array()[11]), self.as_array()[12].wrapping_add(rhs.as_array()[12]), self.as_array()[13].wrapping_add(rhs.as_array()[13]), self.as_array()[14].wrapping_add(rhs.as_array()[14]), self.as_array()[15].wrapping_add(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm_add_epi8 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U8x16 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U8x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # ;}\n # impl SomeTraitForDoc for U8x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x16  ,\n # )  -> U8x16\n # {\n U8x16::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_sub(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_sub(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_sub(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_sub(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_sub(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_sub(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_sub(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_sub(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi8)\n\n\n * `PSUBB xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U8x16) -> U8x16 {
-        select_impl_block! { scalar { U8x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm_sub_epi8 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for U8x16 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U8x16."]
     #[inline(always)]
@@ -3924,76 +3294,6 @@ impl<'de> serde::Deserialize<'de> for U8x32 {
         D: serde::Deserializer<'de>,
     {
         <[u8; 32]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for U8x32 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # {\n U8x32::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n     self.as_array()[8] ^ rhs.as_array()[8],\n     self.as_array()[9] ^ rhs.as_array()[9],\n     self.as_array()[10] ^ rhs.as_array()[10],\n     self.as_array()[11] ^ rhs.as_array()[11],\n     self.as_array()[12] ^ rhs.as_array()[12],\n     self.as_array()[13] ^ rhs.as_array()[13],\n     self.as_array()[14] ^ rhs.as_array()[14],\n     self.as_array()[15] ^ rhs.as_array()[15],\n     self.as_array()[16] ^ rhs.as_array()[16],\n     self.as_array()[17] ^ rhs.as_array()[17],\n     self.as_array()[18] ^ rhs.as_array()[18],\n     self.as_array()[19] ^ rhs.as_array()[19],\n     self.as_array()[20] ^ rhs.as_array()[20],\n     self.as_array()[21] ^ rhs.as_array()[21],\n     self.as_array()[22] ^ rhs.as_array()[22],\n     self.as_array()[23] ^ rhs.as_array()[23],\n     self.as_array()[24] ^ rhs.as_array()[24],\n     self.as_array()[25] ^ rhs.as_array()[25],\n     self.as_array()[26] ^ rhs.as_array()[26],\n     self.as_array()[27] ^ rhs.as_array()[27],\n     self.as_array()[28] ^ rhs.as_array()[28],\n     self.as_array()[29] ^ rhs.as_array()[29],\n     self.as_array()[30] ^ rhs.as_array()[30],\n     self.as_array()[31] ^ rhs.as_array()[31],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U8x32) -> U8x32 {
-        select_impl_block! { scalar { U8x32::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], self.as_array()[8] ^ rhs.as_array()[8], self.as_array()[9] ^ rhs.as_array()[9], self.as_array()[10] ^ rhs.as_array()[10], self.as_array()[11] ^ rhs.as_array()[11], self.as_array()[12] ^ rhs.as_array()[12], self.as_array()[13] ^ rhs.as_array()[13], self.as_array()[14] ^ rhs.as_array()[14], self.as_array()[15] ^ rhs.as_array()[15], self.as_array()[16] ^ rhs.as_array()[16], self.as_array()[17] ^ rhs.as_array()[17], self.as_array()[18] ^ rhs.as_array()[18], self.as_array()[19] ^ rhs.as_array()[19], self.as_array()[20] ^ rhs.as_array()[20], self.as_array()[21] ^ rhs.as_array()[21], self.as_array()[22] ^ rhs.as_array()[22], self.as_array()[23] ^ rhs.as_array()[23], self.as_array()[24] ^ rhs.as_array()[24], self.as_array()[25] ^ rhs.as_array()[25], self.as_array()[26] ^ rhs.as_array()[26], self.as_array()[27] ^ rhs.as_array()[27], self.as_array()[28] ^ rhs.as_array()[28], self.as_array()[29] ^ rhs.as_array()[29], self.as_array()[30] ^ rhs.as_array()[30], self.as_array()[31] ^ rhs.as_array()[31], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U8x32 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # {\n U8x32::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n     self.as_array()[8] | rhs.as_array()[8],\n     self.as_array()[9] | rhs.as_array()[9],\n     self.as_array()[10] | rhs.as_array()[10],\n     self.as_array()[11] | rhs.as_array()[11],\n     self.as_array()[12] | rhs.as_array()[12],\n     self.as_array()[13] | rhs.as_array()[13],\n     self.as_array()[14] | rhs.as_array()[14],\n     self.as_array()[15] | rhs.as_array()[15],\n     self.as_array()[16] | rhs.as_array()[16],\n     self.as_array()[17] | rhs.as_array()[17],\n     self.as_array()[18] | rhs.as_array()[18],\n     self.as_array()[19] | rhs.as_array()[19],\n     self.as_array()[20] | rhs.as_array()[20],\n     self.as_array()[21] | rhs.as_array()[21],\n     self.as_array()[22] | rhs.as_array()[22],\n     self.as_array()[23] | rhs.as_array()[23],\n     self.as_array()[24] | rhs.as_array()[24],\n     self.as_array()[25] | rhs.as_array()[25],\n     self.as_array()[26] | rhs.as_array()[26],\n     self.as_array()[27] | rhs.as_array()[27],\n     self.as_array()[28] | rhs.as_array()[28],\n     self.as_array()[29] | rhs.as_array()[29],\n     self.as_array()[30] | rhs.as_array()[30],\n     self.as_array()[31] | rhs.as_array()[31],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U8x32) -> U8x32 {
-        select_impl_block! { scalar { U8x32::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], self.as_array()[8] | rhs.as_array()[8], self.as_array()[9] | rhs.as_array()[9], self.as_array()[10] | rhs.as_array()[10], self.as_array()[11] | rhs.as_array()[11], self.as_array()[12] | rhs.as_array()[12], self.as_array()[13] | rhs.as_array()[13], self.as_array()[14] | rhs.as_array()[14], self.as_array()[15] | rhs.as_array()[15], self.as_array()[16] | rhs.as_array()[16], self.as_array()[17] | rhs.as_array()[17], self.as_array()[18] | rhs.as_array()[18], self.as_array()[19] | rhs.as_array()[19], self.as_array()[20] | rhs.as_array()[20], self.as_array()[21] | rhs.as_array()[21], self.as_array()[22] | rhs.as_array()[22], self.as_array()[23] | rhs.as_array()[23], self.as_array()[24] | rhs.as_array()[24], self.as_array()[25] | rhs.as_array()[25], self.as_array()[26] | rhs.as_array()[26], self.as_array()[27] | rhs.as_array()[27], self.as_array()[28] | rhs.as_array()[28], self.as_array()[29] | rhs.as_array()[29], self.as_array()[30] | rhs.as_array()[30], self.as_array()[31] | rhs.as_array()[31], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U8x32 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # {\n U8x32::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n     self.as_array()[8] & rhs.as_array()[8],\n     self.as_array()[9] & rhs.as_array()[9],\n     self.as_array()[10] & rhs.as_array()[10],\n     self.as_array()[11] & rhs.as_array()[11],\n     self.as_array()[12] & rhs.as_array()[12],\n     self.as_array()[13] & rhs.as_array()[13],\n     self.as_array()[14] & rhs.as_array()[14],\n     self.as_array()[15] & rhs.as_array()[15],\n     self.as_array()[16] & rhs.as_array()[16],\n     self.as_array()[17] & rhs.as_array()[17],\n     self.as_array()[18] & rhs.as_array()[18],\n     self.as_array()[19] & rhs.as_array()[19],\n     self.as_array()[20] & rhs.as_array()[20],\n     self.as_array()[21] & rhs.as_array()[21],\n     self.as_array()[22] & rhs.as_array()[22],\n     self.as_array()[23] & rhs.as_array()[23],\n     self.as_array()[24] & rhs.as_array()[24],\n     self.as_array()[25] & rhs.as_array()[25],\n     self.as_array()[26] & rhs.as_array()[26],\n     self.as_array()[27] & rhs.as_array()[27],\n     self.as_array()[28] & rhs.as_array()[28],\n     self.as_array()[29] & rhs.as_array()[29],\n     self.as_array()[30] & rhs.as_array()[30],\n     self.as_array()[31] & rhs.as_array()[31],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U8x32) -> U8x32 {
-        select_impl_block! { scalar { U8x32::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], self.as_array()[8] & rhs.as_array()[8], self.as_array()[9] & rhs.as_array()[9], self.as_array()[10] & rhs.as_array()[10], self.as_array()[11] & rhs.as_array()[11], self.as_array()[12] & rhs.as_array()[12], self.as_array()[13] & rhs.as_array()[13], self.as_array()[14] & rhs.as_array()[14], self.as_array()[15] & rhs.as_array()[15], self.as_array()[16] & rhs.as_array()[16], self.as_array()[17] & rhs.as_array()[17], self.as_array()[18] & rhs.as_array()[18], self.as_array()[19] & rhs.as_array()[19], self.as_array()[20] & rhs.as_array()[20], self.as_array()[21] & rhs.as_array()[21], self.as_array()[22] & rhs.as_array()[22], self.as_array()[23] & rhs.as_array()[23], self.as_array()[24] & rhs.as_array()[24], self.as_array()[25] & rhs.as_array()[25], self.as_array()[26] & rhs.as_array()[26], self.as_array()[27] & rhs.as_array()[27], self.as_array()[28] & rhs.as_array()[28], self.as_array()[29] & rhs.as_array()[29], self.as_array()[30] & rhs.as_array()[30], self.as_array()[31] & rhs.as_array()[31], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U8x32 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # {\n U8x32::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_add(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_add(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_add(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_add(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_add(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_add(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_add(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_add(rhs.as_array()[15]),\n     self.as_array()[16].wrapping_add(rhs.as_array()[16]),\n     self.as_array()[17].wrapping_add(rhs.as_array()[17]),\n     self.as_array()[18].wrapping_add(rhs.as_array()[18]),\n     self.as_array()[19].wrapping_add(rhs.as_array()[19]),\n     self.as_array()[20].wrapping_add(rhs.as_array()[20]),\n     self.as_array()[21].wrapping_add(rhs.as_array()[21]),\n     self.as_array()[22].wrapping_add(rhs.as_array()[22]),\n     self.as_array()[23].wrapping_add(rhs.as_array()[23]),\n     self.as_array()[24].wrapping_add(rhs.as_array()[24]),\n     self.as_array()[25].wrapping_add(rhs.as_array()[25]),\n     self.as_array()[26].wrapping_add(rhs.as_array()[26]),\n     self.as_array()[27].wrapping_add(rhs.as_array()[27]),\n     self.as_array()[28].wrapping_add(rhs.as_array()[28]),\n     self.as_array()[29].wrapping_add(rhs.as_array()[29]),\n     self.as_array()[30].wrapping_add(rhs.as_array()[30]),\n     self.as_array()[31].wrapping_add(rhs.as_array()[31]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi8)\n\n\n * `VPADDB ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U8x32) -> U8x32 {
-        select_impl_block! { scalar { U8x32::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), self.as_array()[8].wrapping_add(rhs.as_array()[8]), self.as_array()[9].wrapping_add(rhs.as_array()[9]), self.as_array()[10].wrapping_add(rhs.as_array()[10]), self.as_array()[11].wrapping_add(rhs.as_array()[11]), self.as_array()[12].wrapping_add(rhs.as_array()[12]), self.as_array()[13].wrapping_add(rhs.as_array()[13]), self.as_array()[14].wrapping_add(rhs.as_array()[14]), self.as_array()[15].wrapping_add(rhs.as_array()[15]), self.as_array()[16].wrapping_add(rhs.as_array()[16]), self.as_array()[17].wrapping_add(rhs.as_array()[17]), self.as_array()[18].wrapping_add(rhs.as_array()[18]), self.as_array()[19].wrapping_add(rhs.as_array()[19]), self.as_array()[20].wrapping_add(rhs.as_array()[20]), self.as_array()[21].wrapping_add(rhs.as_array()[21]), self.as_array()[22].wrapping_add(rhs.as_array()[22]), self.as_array()[23].wrapping_add(rhs.as_array()[23]), self.as_array()[24].wrapping_add(rhs.as_array()[24]), self.as_array()[25].wrapping_add(rhs.as_array()[25]), self.as_array()[26].wrapping_add(rhs.as_array()[26]), self.as_array()[27].wrapping_add(rhs.as_array()[27]), self.as_array()[28].wrapping_add(rhs.as_array()[28]), self.as_array()[29].wrapping_add(rhs.as_array()[29]), self.as_array()[30].wrapping_add(rhs.as_array()[30]), self.as_array()[31].wrapping_add(rhs.as_array()[31]), ]) } avx2 { Self( avx2::_mm256_add_epi8 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U8x32 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U8x32 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # ;}\n # impl SomeTraitForDoc for U8x32 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U8x32  ,\n # )  -> U8x32\n # {\n U8x32::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_sub(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_sub(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_sub(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_sub(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_sub(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_sub(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_sub(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_sub(rhs.as_array()[15]),\n     self.as_array()[16].wrapping_sub(rhs.as_array()[16]),\n     self.as_array()[17].wrapping_sub(rhs.as_array()[17]),\n     self.as_array()[18].wrapping_sub(rhs.as_array()[18]),\n     self.as_array()[19].wrapping_sub(rhs.as_array()[19]),\n     self.as_array()[20].wrapping_sub(rhs.as_array()[20]),\n     self.as_array()[21].wrapping_sub(rhs.as_array()[21]),\n     self.as_array()[22].wrapping_sub(rhs.as_array()[22]),\n     self.as_array()[23].wrapping_sub(rhs.as_array()[23]),\n     self.as_array()[24].wrapping_sub(rhs.as_array()[24]),\n     self.as_array()[25].wrapping_sub(rhs.as_array()[25]),\n     self.as_array()[26].wrapping_sub(rhs.as_array()[26]),\n     self.as_array()[27].wrapping_sub(rhs.as_array()[27]),\n     self.as_array()[28].wrapping_sub(rhs.as_array()[28]),\n     self.as_array()[29].wrapping_sub(rhs.as_array()[29]),\n     self.as_array()[30].wrapping_sub(rhs.as_array()[30]),\n     self.as_array()[31].wrapping_sub(rhs.as_array()[31]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi8`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi8)\n\n\n * `VPSUBB ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U8x32) -> U8x32 {
-        select_impl_block! { scalar { U8x32::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), self.as_array()[16].wrapping_sub(rhs.as_array()[16]), self.as_array()[17].wrapping_sub(rhs.as_array()[17]), self.as_array()[18].wrapping_sub(rhs.as_array()[18]), self.as_array()[19].wrapping_sub(rhs.as_array()[19]), self.as_array()[20].wrapping_sub(rhs.as_array()[20]), self.as_array()[21].wrapping_sub(rhs.as_array()[21]), self.as_array()[22].wrapping_sub(rhs.as_array()[22]), self.as_array()[23].wrapping_sub(rhs.as_array()[23]), self.as_array()[24].wrapping_sub(rhs.as_array()[24]), self.as_array()[25].wrapping_sub(rhs.as_array()[25]), self.as_array()[26].wrapping_sub(rhs.as_array()[26]), self.as_array()[27].wrapping_sub(rhs.as_array()[27]), self.as_array()[28].wrapping_sub(rhs.as_array()[28]), self.as_array()[29].wrapping_sub(rhs.as_array()[29]), self.as_array()[30].wrapping_sub(rhs.as_array()[30]), self.as_array()[31].wrapping_sub(rhs.as_array()[31]), ]) } avx2 { Self( avx2::_mm256_sub_epi8 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for U8x32 {
@@ -4346,76 +3646,6 @@ impl<'de> serde::Deserialize<'de> for U16x8 {
         <[u16; 8]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for U16x8 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U16x8) -> U16x8 {
-        select_impl_block! { scalar { U16x8::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U16x8 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U16x8) -> U16x8 {
-        select_impl_block! { scalar { U16x8::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U16x8 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U16x8) -> U16x8 {
-        select_impl_block! { scalar { U16x8::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U16x8 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi16)\n\n\n * `PADDW xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U16x8) -> U16x8 {
-        select_impl_block! { scalar { U16x8::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm_add_epi16 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U16x8 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U16x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # ;}\n # impl SomeTraitForDoc for U16x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x8  ,\n # )  -> U16x8\n # {\n U16x8::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi16)\n\n\n * `PSUBW xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U16x8) -> U16x8 {
-        select_impl_block! { scalar { U16x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm_sub_epi16 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for U16x8 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U16x8."]
     #[inline(always)]
@@ -4761,76 +3991,6 @@ impl<'de> serde::Deserialize<'de> for U16x16 {
         D: serde::Deserializer<'de>,
     {
         <[u16; 16]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for U16x16 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n     self.as_array()[8] ^ rhs.as_array()[8],\n     self.as_array()[9] ^ rhs.as_array()[9],\n     self.as_array()[10] ^ rhs.as_array()[10],\n     self.as_array()[11] ^ rhs.as_array()[11],\n     self.as_array()[12] ^ rhs.as_array()[12],\n     self.as_array()[13] ^ rhs.as_array()[13],\n     self.as_array()[14] ^ rhs.as_array()[14],\n     self.as_array()[15] ^ rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U16x16) -> U16x16 {
-        select_impl_block! { scalar { U16x16::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], self.as_array()[8] ^ rhs.as_array()[8], self.as_array()[9] ^ rhs.as_array()[9], self.as_array()[10] ^ rhs.as_array()[10], self.as_array()[11] ^ rhs.as_array()[11], self.as_array()[12] ^ rhs.as_array()[12], self.as_array()[13] ^ rhs.as_array()[13], self.as_array()[14] ^ rhs.as_array()[14], self.as_array()[15] ^ rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U16x16 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n     self.as_array()[8] | rhs.as_array()[8],\n     self.as_array()[9] | rhs.as_array()[9],\n     self.as_array()[10] | rhs.as_array()[10],\n     self.as_array()[11] | rhs.as_array()[11],\n     self.as_array()[12] | rhs.as_array()[12],\n     self.as_array()[13] | rhs.as_array()[13],\n     self.as_array()[14] | rhs.as_array()[14],\n     self.as_array()[15] | rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U16x16) -> U16x16 {
-        select_impl_block! { scalar { U16x16::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], self.as_array()[8] | rhs.as_array()[8], self.as_array()[9] | rhs.as_array()[9], self.as_array()[10] | rhs.as_array()[10], self.as_array()[11] | rhs.as_array()[11], self.as_array()[12] | rhs.as_array()[12], self.as_array()[13] | rhs.as_array()[13], self.as_array()[14] | rhs.as_array()[14], self.as_array()[15] | rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U16x16 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n     self.as_array()[8] & rhs.as_array()[8],\n     self.as_array()[9] & rhs.as_array()[9],\n     self.as_array()[10] & rhs.as_array()[10],\n     self.as_array()[11] & rhs.as_array()[11],\n     self.as_array()[12] & rhs.as_array()[12],\n     self.as_array()[13] & rhs.as_array()[13],\n     self.as_array()[14] & rhs.as_array()[14],\n     self.as_array()[15] & rhs.as_array()[15],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U16x16) -> U16x16 {
-        select_impl_block! { scalar { U16x16::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], self.as_array()[8] & rhs.as_array()[8], self.as_array()[9] & rhs.as_array()[9], self.as_array()[10] & rhs.as_array()[10], self.as_array()[11] & rhs.as_array()[11], self.as_array()[12] & rhs.as_array()[12], self.as_array()[13] & rhs.as_array()[13], self.as_array()[14] & rhs.as_array()[14], self.as_array()[15] & rhs.as_array()[15], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U16x16 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_add(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_add(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_add(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_add(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_add(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_add(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_add(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_add(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi16)\n\n\n * `VPADDW ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U16x16) -> U16x16 {
-        select_impl_block! { scalar { U16x16::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), self.as_array()[8].wrapping_add(rhs.as_array()[8]), self.as_array()[9].wrapping_add(rhs.as_array()[9]), self.as_array()[10].wrapping_add(rhs.as_array()[10]), self.as_array()[11].wrapping_add(rhs.as_array()[11]), self.as_array()[12].wrapping_add(rhs.as_array()[12]), self.as_array()[13].wrapping_add(rhs.as_array()[13]), self.as_array()[14].wrapping_add(rhs.as_array()[14]), self.as_array()[15].wrapping_add(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm256_add_epi16 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U16x16 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U16x16 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # ;}\n # impl SomeTraitForDoc for U16x16 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U16x16  ,\n # )  -> U16x16\n # {\n U16x16::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n     self.as_array()[8].wrapping_sub(rhs.as_array()[8]),\n     self.as_array()[9].wrapping_sub(rhs.as_array()[9]),\n     self.as_array()[10].wrapping_sub(rhs.as_array()[10]),\n     self.as_array()[11].wrapping_sub(rhs.as_array()[11]),\n     self.as_array()[12].wrapping_sub(rhs.as_array()[12]),\n     self.as_array()[13].wrapping_sub(rhs.as_array()[13]),\n     self.as_array()[14].wrapping_sub(rhs.as_array()[14]),\n     self.as_array()[15].wrapping_sub(rhs.as_array()[15]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi16`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi16)\n\n\n * `VPSUBW ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U16x16) -> U16x16 {
-        select_impl_block! { scalar { U16x16::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), self.as_array()[8].wrapping_sub(rhs.as_array()[8]), self.as_array()[9].wrapping_sub(rhs.as_array()[9]), self.as_array()[10].wrapping_sub(rhs.as_array()[10]), self.as_array()[11].wrapping_sub(rhs.as_array()[11]), self.as_array()[12].wrapping_sub(rhs.as_array()[12]), self.as_array()[13].wrapping_sub(rhs.as_array()[13]), self.as_array()[14].wrapping_sub(rhs.as_array()[14]), self.as_array()[15].wrapping_sub(rhs.as_array()[15]), ]) } avx2 { Self( avx2::_mm256_sub_epi16 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for U16x16 {
@@ -5193,76 +4353,6 @@ impl<'de> serde::Deserialize<'de> for U32x4 {
         <[u32; 4]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for U32x4 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # {\n U32x4::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U32x4) -> U32x4 {
-        select_impl_block! { scalar { U32x4::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U32x4 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # {\n U32x4::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U32x4) -> U32x4 {
-        select_impl_block! { scalar { U32x4::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U32x4 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # {\n U32x4::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U32x4) -> U32x4 {
-        select_impl_block! { scalar { U32x4::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U32x4 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # {\n U32x4::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi32)\n\n\n * `PADDD xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U32x4) -> U32x4 {
-        select_impl_block! { scalar { U32x4::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm_add_epi32 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U32x4 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U32x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # ;}\n # impl SomeTraitForDoc for U32x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x4  ,\n # )  -> U32x4\n # {\n U32x4::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi32)\n\n\n * `PSUBD xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U32x4) -> U32x4 {
-        select_impl_block! { scalar { U32x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm_sub_epi32 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for U32x4 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U32x4."]
     #[inline(always)]
@@ -5623,76 +4713,6 @@ impl<'de> serde::Deserialize<'de> for U32x8 {
         D: serde::Deserializer<'de>,
     {
         <[u32; 8]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for U32x8 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # {\n U32x8::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n     self.as_array()[4] ^ rhs.as_array()[4],\n     self.as_array()[5] ^ rhs.as_array()[5],\n     self.as_array()[6] ^ rhs.as_array()[6],\n     self.as_array()[7] ^ rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U32x8) -> U32x8 {
-        select_impl_block! { scalar { U32x8::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], self.as_array()[4] ^ rhs.as_array()[4], self.as_array()[5] ^ rhs.as_array()[5], self.as_array()[6] ^ rhs.as_array()[6], self.as_array()[7] ^ rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U32x8 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # {\n U32x8::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n     self.as_array()[4] | rhs.as_array()[4],\n     self.as_array()[5] | rhs.as_array()[5],\n     self.as_array()[6] | rhs.as_array()[6],\n     self.as_array()[7] | rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U32x8) -> U32x8 {
-        select_impl_block! { scalar { U32x8::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], self.as_array()[4] | rhs.as_array()[4], self.as_array()[5] | rhs.as_array()[5], self.as_array()[6] | rhs.as_array()[6], self.as_array()[7] | rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U32x8 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # {\n U32x8::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n     self.as_array()[4] & rhs.as_array()[4],\n     self.as_array()[5] & rhs.as_array()[5],\n     self.as_array()[6] & rhs.as_array()[6],\n     self.as_array()[7] & rhs.as_array()[7],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U32x8) -> U32x8 {
-        select_impl_block! { scalar { U32x8::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], self.as_array()[4] & rhs.as_array()[4], self.as_array()[5] & rhs.as_array()[5], self.as_array()[6] & rhs.as_array()[6], self.as_array()[7] & rhs.as_array()[7], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U32x8 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # {\n U32x8::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_add(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_add(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_add(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_add(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi32)\n\n\n * `VPADDD ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U32x8) -> U32x8 {
-        select_impl_block! { scalar { U32x8::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), self.as_array()[4].wrapping_add(rhs.as_array()[4]), self.as_array()[5].wrapping_add(rhs.as_array()[5]), self.as_array()[6].wrapping_add(rhs.as_array()[6]), self.as_array()[7].wrapping_add(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm256_add_epi32 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U32x8 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U32x8 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # ;}\n # impl SomeTraitForDoc for U32x8 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U32x8  ,\n # )  -> U32x8\n # {\n U32x8::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n     self.as_array()[4].wrapping_sub(rhs.as_array()[4]),\n     self.as_array()[5].wrapping_sub(rhs.as_array()[5]),\n     self.as_array()[6].wrapping_sub(rhs.as_array()[6]),\n     self.as_array()[7].wrapping_sub(rhs.as_array()[7]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi32`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi32)\n\n\n * `VPSUBD ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U32x8) -> U32x8 {
-        select_impl_block! { scalar { U32x8::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), self.as_array()[4].wrapping_sub(rhs.as_array()[4]), self.as_array()[5].wrapping_sub(rhs.as_array()[5]), self.as_array()[6].wrapping_sub(rhs.as_array()[6]), self.as_array()[7].wrapping_sub(rhs.as_array()[7]), ]) } avx2 { Self( avx2::_mm256_sub_epi32 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for U32x8 {
@@ -6071,76 +5091,6 @@ impl<'de> serde::Deserialize<'de> for U64x2 {
         <[u64; 2]>::deserialize(deserializer).map(Self::from_array)
     }
 }
-impl BitXorAssign for U64x2 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # {\n U64x2::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_xor_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_xor_si128)\n\n\n * `PXOR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U64x2) -> U64x2 {
-        select_impl_block! { scalar { U64x2::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], ]) } avx2 { Self( avx2::_mm_xor_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U64x2 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # {\n U64x2::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_or_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_or_si128)\n\n\n * `POR xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U64x2) -> U64x2 {
-        select_impl_block! { scalar { U64x2::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], ]) } avx2 { Self( avx2::_mm_or_si128 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U64x2 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # {\n U64x2::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_and_si128`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_and_si128)\n\n\n * `PAND xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U64x2) -> U64x2 {
-        select_impl_block! { scalar { U64x2::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], ]) } avx2 { Self( avx2::_mm_and_si128 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U64x2 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # {\n U64x2::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_add_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_add_epi64)\n\n\n * `PADDQ xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U64x2) -> U64x2 {
-        select_impl_block! { scalar { U64x2::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), ]) } avx2 { Self( avx2::_mm_add_epi64 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U64x2 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U64x2 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # ;}\n # impl SomeTraitForDoc for U64x2 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x2  ,\n # )  -> U64x2\n # {\n U64x2::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm_sub_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_sub_epi64)\n\n\n * `PSUBQ xmm, xmm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U64x2) -> U64x2 {
-        select_impl_block! { scalar { U64x2::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), ]) } avx2 { Self( avx2::_mm_sub_epi64 (self.0, rhs.0)) } }
-    }
-}
 impl From<I8x16> for U64x2 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U64x2."]
     #[inline(always)]
@@ -6484,76 +5434,6 @@ impl<'de> serde::Deserialize<'de> for U64x4 {
         D: serde::Deserializer<'de>,
     {
         <[u64; 4]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
-impl BitXorAssign for U64x4 {
-    #[inline(always)]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
-    }
-}
-impl BitXor for U64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # {\n U64x4::from([\n     self.as_array()[0] ^ rhs.as_array()[0],\n     self.as_array()[1] ^ rhs.as_array()[1],\n     self.as_array()[2] ^ rhs.as_array()[2],\n     self.as_array()[3] ^ rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_xor_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_xor_si256)\n\n\n * `VPXOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitxor(self, rhs: U64x4) -> U64x4 {
-        select_impl_block! { scalar { U64x4::from([ self.as_array()[0] ^ rhs.as_array()[0], self.as_array()[1] ^ rhs.as_array()[1], self.as_array()[2] ^ rhs.as_array()[2], self.as_array()[3] ^ rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm256_xor_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitOrAssign for U64x4 {
-    #[inline(always)]
-    fn bitor_assign(&mut self, rhs: Self) {
-        *self = self.bitor(rhs);
-    }
-}
-impl BitOr for U64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # {\n U64x4::from([\n     self.as_array()[0] | rhs.as_array()[0],\n     self.as_array()[1] | rhs.as_array()[1],\n     self.as_array()[2] | rhs.as_array()[2],\n     self.as_array()[3] | rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_or_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_or_si256)\n\n\n * `VPOR ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitor(self, rhs: U64x4) -> U64x4 {
-        select_impl_block! { scalar { U64x4::from([ self.as_array()[0] | rhs.as_array()[0], self.as_array()[1] | rhs.as_array()[1], self.as_array()[2] | rhs.as_array()[2], self.as_array()[3] | rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm256_or_si256 (self.0, rhs.0)) } }
-    }
-}
-impl BitAndAssign for U64x4 {
-    #[inline(always)]
-    fn bitand_assign(&mut self, rhs: Self) {
-        *self = self.bitand(rhs);
-    }
-}
-impl BitAnd for U64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # {\n U64x4::from([\n     self.as_array()[0] & rhs.as_array()[0],\n     self.as_array()[1] & rhs.as_array()[1],\n     self.as_array()[2] & rhs.as_array()[2],\n     self.as_array()[3] & rhs.as_array()[3],\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_and_si256`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_and_si256)\n\n\n * `VPAND ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn bitand(self, rhs: U64x4) -> U64x4 {
-        select_impl_block! { scalar { U64x4::from([ self.as_array()[0] & rhs.as_array()[0], self.as_array()[1] & rhs.as_array()[1], self.as_array()[2] & rhs.as_array()[2], self.as_array()[3] & rhs.as_array()[3], ]) } avx2 { Self( avx2::_mm256_and_si256 (self.0, rhs.0)) } }
-    }
-}
-impl AddAssign for U64x4 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.add(rhs);
-    }
-}
-impl Add for U64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # {\n U64x4::from([\n     self.as_array()[0].wrapping_add(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_add(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_add(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_add(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_add_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_add_epi64)\n\n\n * `VPADDQ ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn add(self, rhs: U64x4) -> U64x4 {
-        select_impl_block! { scalar { U64x4::from([ self.as_array()[0].wrapping_add(rhs.as_array()[0]), self.as_array()[1].wrapping_add(rhs.as_array()[1]), self.as_array()[2].wrapping_add(rhs.as_array()[2]), self.as_array()[3].wrapping_add(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm256_add_epi64 (self.0, rhs.0)) } }
-    }
-}
-impl SubAssign for U64x4 {
-    #[inline(always)]
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.sub(rhs);
-    }
-}
-impl Sub for U64x4 {
-    type Output = Self;
-    #[doc = "\n # Scalar Equivalent:\n ```\n # use vectoreyes::*;\n # trait SomeTraitForDoc {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # ;}\n # impl SomeTraitForDoc for U64x4 {\n # fn the_doc_function\n # (\n #         self  ,\n #         rhs  : U64x4  ,\n # )  -> U64x4\n # {\n U64x4::from([\n     self.as_array()[0].wrapping_sub(rhs.as_array()[0]),\n     self.as_array()[1].wrapping_sub(rhs.as_array()[1]),\n     self.as_array()[2].wrapping_sub(rhs.as_array()[2]),\n     self.as_array()[3].wrapping_sub(rhs.as_array()[3]),\n ])\n # }\n # }\n ```\n # Avx2\n <ul>\n <li>\n\n [**`_mm256_sub_epi64`**](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm256_sub_epi64)\n\n\n * `VPSUBQ ymm, ymm, ymm`\n </li>\n </ul>"]
-    #[inline(always)]
-    fn sub(self, rhs: U64x4) -> U64x4 {
-        select_impl_block! { scalar { U64x4::from([ self.as_array()[0].wrapping_sub(rhs.as_array()[0]), self.as_array()[1].wrapping_sub(rhs.as_array()[1]), self.as_array()[2].wrapping_sub(rhs.as_array()[2]), self.as_array()[3].wrapping_sub(rhs.as_array()[3]), ]) } avx2 { Self( avx2::_mm256_sub_epi64 (self.0, rhs.0)) } }
     }
 }
 impl From<I8x32> for U64x4 {
@@ -7102,16 +5982,11 @@ impl crate::AesBlockCipher for Aes256EncryptOnly {
     }
 } // Implement the intrinsics
 select_impl! { scalar { // Scalar has no intrinsics
-} avx2 { mod avx2 { #![allow(non_upper_case_globals, non_snake_case)] #[inline(always)] pub(super) fn _mm256_add_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_add_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_add_epi32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_add_epi32(a, b) } } #[inline(always)] pub(super) fn _mm256_add_epi64( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_add_epi64(a, b) } } #[inline(always)] pub(super) fn _mm256_add_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_add_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_adds_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+} avx2 { mod avx2 { #![allow(non_upper_case_globals, non_snake_case)] #[inline(always)] pub(super) fn _mm256_adds_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_adds_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_adds_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_adds_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_adds_epu16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_adds_epu16(a, b) } } #[inline(always)] pub(super) fn _mm256_adds_epu8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_adds_epu8(a, b) } } #[inline(always)] pub(super) fn _mm256_and_si256( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_and_si256(a, b) } } #[inline(always)] pub(super) fn _mm256_andnot_si256( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm256_adds_epu8(a, b) } } #[inline(always)] pub(super) fn _mm256_andnot_si256( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_andnot_si256(a, b) } } #[inline(always)] pub(super) fn _mm256_blend_epi32<const B7: bool, const B6: bool, const B5: bool, const B4: bool, const B3: bool, const B2: bool, const B1: bool, const B0: bool>( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_blend_epi32 => (a, b, @@ [0..256] (((B0 as u8) << 0) | ((B1 as u8) << 1) | ((B2 as u8) << 2) | ((B3 as u8) << 3) | ((B4 as u8) << 4) | ((B5 as u8) << 5) | ((B6 as u8) << 6) | ((B7 as u8) << 7)) as i32 as i32)) } } #[inline(always)] pub(super) fn _mm256_broadcastb_epi8( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_broadcastb_epi8(a) } } #[inline(always)] pub(super) fn _mm256_broadcastd_epi32( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7157,8 +6032,7 @@ unsafe { ::std::arch::x86_64::_mm256_min_epu32(a, b) } } #[inline(always)] pub(s
 unsafe { ::std::arch::x86_64::_mm256_min_epu8(a, b) } } #[inline(always)] pub(super) fn _mm256_movemask_epi8( a: ::std::arch::x86_64::__m256i, ) -> i32 { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_movemask_epi8(a) } } #[inline(always)] pub(super) fn _mm256_mul_epi32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_mul_epi32(a, b) } } #[inline(always)] pub(super) fn _mm256_mul_epu32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_mul_epu32(a, b) } } #[inline(always)] pub(super) fn _mm256_or_si256( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_or_si256(a, b) } } #[inline(always)] pub(super) fn _mm256_permute4x64_epi64<const I3: usize, const I2: usize, const I1: usize, const I0: usize>( a: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm256_mul_epu32(a, b) } } #[inline(always)] pub(super) fn _mm256_permute4x64_epi64<const I3: usize, const I2: usize, const I1: usize, const I0: usize>( a: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_permute4x64_epi64 => (a, @@ [0..256] ((I3 << 6) | (I2 << 4) | (I1 << 2) | I0) as i32 as i32)) } } #[inline(always)] pub(super) fn _mm256_set1_epi16( a: i16, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_set1_epi16(a) } } #[inline(always)] pub(super) fn _mm256_set1_epi32( a: i32, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_set1_epi32(a) } } #[inline(always)] pub(super) fn _mm256_set1_epi64x( a: i64, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7195,11 +6069,7 @@ unsafe { constify_imm!(::std::arch::x86_64::_mm256_srli_epi32 => (a, @@ [0..256]
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_srli_epi64 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm256_srli_si256<const imm8: usize>( a: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm256_srli_si256 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm256_srlv_epi32( a: ::std::arch::x86_64::__m256i, count: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_srlv_epi32(a, count) } } #[inline(always)] pub(super) fn _mm256_srlv_epi64( a: ::std::arch::x86_64::__m256i, count: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_srlv_epi64(a, count) } } #[inline(always)] pub(super) fn _mm256_sub_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_sub_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_sub_epi32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_sub_epi32(a, b) } } #[inline(always)] pub(super) fn _mm256_sub_epi64( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_sub_epi64(a, b) } } #[inline(always)] pub(super) fn _mm256_sub_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_sub_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_subs_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm256_srlv_epi64(a, count) } } #[inline(always)] pub(super) fn _mm256_subs_epi16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_subs_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_subs_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_subs_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_subs_epu16( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_subs_epu16(a, b) } } #[inline(always)] pub(super) fn _mm256_subs_epu8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7212,13 +6082,8 @@ unsafe { ::std::arch::x86_64::_mm256_unpackhi_epi8(a, b) } } #[inline(always)] p
 unsafe { ::std::arch::x86_64::_mm256_unpacklo_epi16(a, b) } } #[inline(always)] pub(super) fn _mm256_unpacklo_epi32( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_unpacklo_epi32(a, b) } } #[inline(always)] pub(super) fn _mm256_unpacklo_epi64( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm256_unpacklo_epi64(a, b) } } #[inline(always)] pub(super) fn _mm256_unpacklo_epi8( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_unpacklo_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_xor_si256( a: ::std::arch::x86_64::__m256i, b: ::std::arch::x86_64::__m256i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_xor_si256(a, b) } } #[inline(always)] pub(super) fn _mm256_zextsi128_si256( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm256_zextsi128_si256(a) } } #[inline(always)] pub(super) fn _mm_add_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_add_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_add_epi32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_add_epi32(a, b) } } #[inline(always)] pub(super) fn _mm_add_epi64( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_add_epi64(a, b) } } #[inline(always)] pub(super) fn _mm_add_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_add_epi8(a, b) } } #[inline(always)] pub(super) fn _mm_adds_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm256_unpacklo_epi8(a, b) } } #[inline(always)] pub(super) fn _mm256_zextsi128_si256( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m256i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm256_zextsi128_si256(a) } } #[inline(always)] pub(super) fn _mm_adds_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_adds_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_adds_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_adds_epi8(a, b) } } #[inline(always)] pub(super) fn _mm_adds_epu16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_adds_epu16(a, b) } } #[inline(always)] pub(super) fn _mm_adds_epu8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7228,8 +6093,7 @@ unsafe { ::std::arch::x86_64::_mm_aesdeclast_si128(a, RoundKey) } } #[inline(alw
 unsafe { ::std::arch::x86_64::_mm_aesenc_si128(a, RoundKey) } } #[inline(always)] pub(super) fn _mm_aesenclast_si128( a: ::std::arch::x86_64::__m128i, RoundKey: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_aesenclast_si128(a, RoundKey) } } #[inline(always)] pub(super) fn _mm_aesimc_si128( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_aesimc_si128(a) } } #[inline(always)] pub(super) fn _mm_aeskeygenassist_si128<const imm8: usize>( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { constify_imm!(::std::arch::x86_64::_mm_aeskeygenassist_si128 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_and_si128( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_and_si128(a, b) } } #[inline(always)] pub(super) fn _mm_andnot_si128( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { constify_imm!(::std::arch::x86_64::_mm_aeskeygenassist_si128 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_andnot_si128( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_andnot_si128(a, b) } } #[inline(always)] pub(super) fn _mm_blend_epi16<const B7: bool, const B6: bool, const B5: bool, const B4: bool, const B3: bool, const B2: bool, const B1: bool, const B0: bool>( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm_blend_epi16 => (a, b, @@ [0..256] (((B0 as u8) << 0) | ((B1 as u8) << 1) | ((B2 as u8) << 2) | ((B3 as u8) << 3) | ((B4 as u8) << 4) | ((B5 as u8) << 5) | ((B6 as u8) << 6) | ((B7 as u8) << 7)) as i32 as i32)) } } #[inline(always)] pub(super) fn _mm_blend_epi32<const B3: bool, const B2: bool, const B1: bool, const B0: bool>( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm_blend_epi32 => (a, b, @@ [0..16] (((B0 as u8) << 0) | ((B1 as u8) << 1) | ((B2 as u8) << 2) | ((B3 as u8) << 3)) as i32 as i32)) } } #[inline(always)] pub(super) fn _mm_broadcastb_epi8( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7276,8 +6140,7 @@ unsafe { ::std::arch::x86_64::_mm_min_epu32(a, b) } } #[inline(always)] pub(supe
 unsafe { ::std::arch::x86_64::_mm_min_epu8(a, b) } } #[inline(always)] pub(super) fn _mm_movemask_epi8( a: ::std::arch::x86_64::__m128i, ) -> i32 { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_movemask_epi8(a) } } #[inline(always)] pub(super) fn _mm_mul_epi32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_mul_epi32(a, b) } } #[inline(always)] pub(super) fn _mm_mul_epu32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_mul_epu32(a, b) } } #[inline(always)] pub(super) fn _mm_or_si128( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_or_si128(a, b) } } #[inline(always)] pub(super) fn _mm_set1_epi16( a: i16, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm_mul_epu32(a, b) } } #[inline(always)] pub(super) fn _mm_set1_epi16( a: i16, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_set1_epi16(a) } } #[inline(always)] pub(super) fn _mm_set1_epi32( a: i32, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_set1_epi32(a) } } #[inline(always)] pub(super) fn _mm_set1_epi64x( a: i64, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_set1_epi64x(a) } } #[inline(always)] pub(super) fn _mm_set1_epi8( a: i8, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7312,11 +6175,7 @@ unsafe { constify_imm!(::std::arch::x86_64::_mm_srli_epi32 => (a, @@ [0..256] im
 unsafe { constify_imm!(::std::arch::x86_64::_mm_srli_epi64 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_srli_si128<const imm8: usize>( a: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { constify_imm!(::std::arch::x86_64::_mm_srli_si128 => (a, @@ [0..256] imm8 as i32)) } } #[inline(always)] pub(super) fn _mm_srlv_epi32( a: ::std::arch::x86_64::__m128i, count: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_srlv_epi32(a, count) } } #[inline(always)] pub(super) fn _mm_srlv_epi64( a: ::std::arch::x86_64::__m128i, count: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_srlv_epi64(a, count) } } #[inline(always)] pub(super) fn _mm_sub_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_sub_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_sub_epi32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_sub_epi32(a, b) } } #[inline(always)] pub(super) fn _mm_sub_epi64( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_sub_epi64(a, b) } } #[inline(always)] pub(super) fn _mm_sub_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_sub_epi8(a, b) } } #[inline(always)] pub(super) fn _mm_subs_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
+unsafe { ::std::arch::x86_64::_mm_srlv_epi64(a, count) } } #[inline(always)] pub(super) fn _mm_subs_epi16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_subs_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_subs_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_subs_epi8(a, b) } } #[inline(always)] pub(super) fn _mm_subs_epu16( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_subs_epu16(a, b) } } #[inline(always)] pub(super) fn _mm_subs_epu8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
@@ -7329,8 +6188,7 @@ unsafe { ::std::arch::x86_64::_mm_unpackhi_epi8(a, b) } } #[inline(always)] pub(
 unsafe { ::std::arch::x86_64::_mm_unpacklo_epi16(a, b) } } #[inline(always)] pub(super) fn _mm_unpacklo_epi32( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_unpacklo_epi32(a, b) } } #[inline(always)] pub(super) fn _mm_unpacklo_epi64( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
 unsafe { ::std::arch::x86_64::_mm_unpacklo_epi64(a, b) } } #[inline(always)] pub(super) fn _mm_unpacklo_epi8( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_unpacklo_epi8(a, b) } } #[inline(always)] pub(super) fn _mm_xor_si128( a: ::std::arch::x86_64::__m128i, b: ::std::arch::x86_64::__m128i, ) -> ::std::arch::x86_64::__m128i { // SAFETY: we've verified that the required CPU flags are available.
-unsafe { ::std::arch::x86_64::_mm_xor_si128(a, b) } } } } }
+unsafe { ::std::arch::x86_64::_mm_unpacklo_epi8(a, b) } } } } }
 impl crate::HasVector<16> for i8 {
     type Vector = I8x16;
 }

@@ -1,6 +1,7 @@
 use cfg::Cfg;
 use proc_macro2::TokenStream;
 
+use quote::{quote, ToTokens};
 use types::VectorType;
 
 mod avx2;
@@ -11,11 +12,22 @@ mod neon;
 mod types;
 mod utils;
 pub use generate::*;
+use utils::index_literals;
+
 /// Markdown formatted documentation which will be added to the documentation of wrapper functions.
 ///
 /// For example, the AVX2 pairwise addition function for U32x4 might note that it uses the `PADD`
 /// instruction.
 type Docs = String;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PairwiseOperator {
+    WrappingAdd,
+    WrappingSub,
+    Xor,
+    Or,
+    And,
+}
 
 /// A vector backend for vectoreyes
 ///
@@ -28,6 +40,40 @@ pub trait VectorBackend {
     /// What's the internal type/representation for vector `ty`?
     fn vector_contents(&self, ty: VectorType) -> TokenStream {
         ty.array()
+    }
+
+    fn pairwise(
+        &self,
+        ty: VectorType,
+        op: PairwiseOperator,
+        lhs: &dyn ToTokens,
+        rhs: &dyn ToTokens,
+    ) -> (TokenStream, Docs) {
+        let idx = index_literals(ty.count());
+        let fn_body = |fn_name: TokenStream| {
+            quote! {
+                #ty::from([#(
+                    #lhs.as_array()[#idx].#fn_name(#rhs.as_array()[#idx]),
+                )*])
+            }
+        };
+        let op_body = |op: TokenStream| {
+            quote! {
+                #ty::from([#(
+                    #lhs.as_array()[#idx] #op #rhs.as_array()[#idx],
+                )*])
+            }
+        };
+        (
+            match op {
+                PairwiseOperator::WrappingAdd => fn_body(quote! {wrapping_add}),
+                PairwiseOperator::WrappingSub => fn_body(quote! {wrapping_sub}),
+                PairwiseOperator::Xor => op_body(quote! { ^ }),
+                PairwiseOperator::Or => op_body(quote! { | }),
+                PairwiseOperator::And => op_body(quote! { & }),
+            },
+            String::new(),
+        )
     }
 }
 
