@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use proc_macro2::{Literal, TokenStream};
 use quote::{format_ident, quote, TokenStreamExt};
+use syn::Ident;
 
 use super::code_block::CodeBlock;
 use super::neon::neon_backend;
@@ -15,7 +16,18 @@ struct Backends {
 }
 impl Backends {
     /// Go through each backend and prepend `#[cfg(...)]` to the output for each backend.
-    fn visit(&self, visit: &mut dyn FnMut(&dyn VectorBackend) -> TokenStream) -> TokenStream {
+    ///
+    /// This function should be avoided since it could cause issues if visit returns too many
+    /// tokens. For example if `visit` returned:
+    ///
+    /// ```ignore
+    /// #[cfg(...)]
+    /// let a = thing;
+    /// let b = a;
+    /// ```
+    /// then only the `let a =` statement would be conditional, even though the intent was for the
+    /// full statement to be conditional.
+    fn visit_raw(&self, visit: &mut dyn FnMut(&dyn VectorBackend) -> TokenStream) -> TokenStream {
         let mut out = TokenStream::new();
         for (backend, cfg) in self.backends_with_cfg.iter() {
             let body = visit(backend.deref());
@@ -25,6 +37,36 @@ impl Backends {
             });
         }
         out
+    }
+
+    /// Define a module named `name` whose body is defined by `visit`.
+    ///
+    /// Prefer using `block`, instead, to ensure the public API doesn't change between backends.
+    fn define_module(
+        &self,
+        name: Ident,
+        visit: &mut dyn FnMut(&dyn VectorBackend) -> TokenStream,
+    ) -> TokenStream {
+        self.visit_raw(&mut |backend| {
+            let body = visit(backend);
+            quote! {
+                mod #name {
+                    #body
+                }
+            }
+        })
+    }
+
+    /// Return a block whose value is defined by `visit`.
+    fn block(&self, visit: &mut dyn FnMut(&dyn VectorBackend) -> TokenStream) -> TokenStream {
+        self.visit_raw(&mut |backend| {
+            let body = visit(backend);
+            quote! {
+                {
+                     #body
+                }
+            }
+        })
     }
 }
 
@@ -60,7 +102,7 @@ pub fn generate() {
 
 fn implementation(backends: &Backends) -> TokenStream {
     let mut out = TokenStream::new();
-    let internals = backends.visit(&mut |backend| {
+    let internals = backends.define_module(format_ident!("internals"), &mut |backend| {
         let mut out = TokenStream::new();
         for ty in VectorType::all() {
             let internal_ty = format_ident!("{ty}Internal");
@@ -69,11 +111,7 @@ fn implementation(backends: &Backends) -> TokenStream {
                 pub(super) type #internal_ty = #vector_contents;
             });
         }
-        quote! {
-            mod internals {
-                #out
-            }
-        }
+        out
     });
     out.append_all(quote! {
         #internals
