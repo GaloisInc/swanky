@@ -1,18 +1,19 @@
-use scuttlebutt::{Aes128, Block};
+use scuttlebutt::Block;
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub struct PseudorandomCode {
-    cipher1: Aes128,
-    cipher2: Aes128,
-    cipher3: Aes128,
-    cipher4: Aes128,
+    cipher1: Aes128EncryptOnly,
+    cipher2: Aes128EncryptOnly,
+    cipher3: Aes128EncryptOnly,
+    cipher4: Aes128EncryptOnly,
 }
 
 impl PseudorandomCode {
     pub fn new(k1: Block, k2: Block, k3: Block, k4: Block) -> Self {
-        let cipher1 = Aes128::new(k1);
-        let cipher2 = Aes128::new(k2);
-        let cipher3 = Aes128::new(k3);
-        let cipher4 = Aes128::new(k4);
+        let cipher1 = Aes128EncryptOnly::new_with_key(k1);
+        let cipher2 = Aes128EncryptOnly::new_with_key(k2);
+        let cipher3 = Aes128EncryptOnly::new_with_key(k3);
+        let cipher4 = Aes128EncryptOnly::new_with_key(k4);
         Self {
             cipher1,
             cipher2,

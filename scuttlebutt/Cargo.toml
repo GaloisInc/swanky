@@ -36,6 +36,7 @@ swanky-field-binary.workspace = true
 swanky-field-fft.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-channel.workspace = true
+swanky-aes-rng.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
@@ -47,19 +48,7 @@ bincode.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
 [[bench]]
-name = "aes128"
-harness = false
-
-[[bench]]
-name = "aes256"
-harness = false
-
-[[bench]]
 name = "block512"
-harness = false
-
-[[bench]]
-name = "commitment"
 harness = false
 
 [[bench]]

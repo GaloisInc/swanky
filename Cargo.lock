@@ -1737,6 +1737,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2113,6 +2114,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "subtle",
+ "swanky-aes-rng",
  "swanky-channel",
  "swanky-field",
  "swanky-field-binary",
@@ -2301,6 +2303,17 @@ name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
+
+[[package]]
+name = "swanky-aes-rng"
+version = "0.6.0"
+dependencies = [
+ "bytemuck",
+ "proptest",
+ "rand",
+ "rand_core",
+ "vectoreyes",
+]
 
 [[package]]
 name = "swanky-channel"

@@ -134,7 +134,6 @@ impl UniformIntegersUnderBound {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Block;
     use proptest::prelude::*;
     use rand_core::SeedableRng;
 
@@ -147,9 +146,9 @@ mod tests {
             seed in any::<[u8; 16]>(),
             bound in 1..=500_000_u32,
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = AesRng::from_seed(seed.into());
             let dist = UniformIntegersUnderBound::new(bound);
-            for x in dist.sample(&mut rng).iter().copied() {
+            for x in dist.sample(&mut rng).iter() {
                 for y in x.as_array().iter().copied() {
                     prop_assert!(y < bound);
                 }
@@ -163,7 +162,7 @@ mod tests {
             seed in any::<[u8; 16]>(),
             bound in 1..=500_000_u32,
         ) {
-            let mut rng = AesRng::from_seed(Block::from(seed));
+            let mut rng = AesRng::from_seed(seed.into());
             let dist = UniformIntegersUnderBound::new(bound);
             let out = dist.sample_20(&mut rng);
             for (i,x) in out.iter().copied().enumerate() {

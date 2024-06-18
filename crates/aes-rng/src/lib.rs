@@ -1,6 +1,7 @@
+#![deny(missing_docs)]
+
 //! Fixed-key AES random number generator.
 
-use crate::Block;
 use rand::{CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_core::block::{BlockRng64, BlockRngCore};
 use vectoreyes::{
@@ -8,7 +9,8 @@ use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, SimdBase, U64x2, U8x16,
 };
 
-pub mod vectorized;
+mod vectorized;
+pub use vectorized::UniformIntegersUnderBound;
 
 /// Implementation of a random number generator based on fixed-key AES.
 ///
@@ -56,14 +58,14 @@ impl AesRng {
     /// `rand::random`.
     #[inline]
     pub fn new() -> Self {
-        let seed = rand::random::<Block>();
+        let seed: U8x16 = rand::random();
         AesRng::from_seed(seed)
     }
 
     /// Create a new RNG using a random seed from this one.
     #[inline]
     pub fn fork(&mut self) -> Self {
-        let seed = self.gen::<Block>();
+        let seed = self.gen::<U8x16>();
         AesRng::from_seed(seed)
     }
 
@@ -131,7 +133,7 @@ impl BlockRngCore for AesRngCore {
 }
 
 impl SeedableRng for AesRngCore {
-    type Seed = Block;
+    type Seed = U8x16;
 
     #[inline]
     fn from_seed(seed: Self::Seed) -> Self {
@@ -159,8 +161,8 @@ mod tests {
     #[test]
     fn test_generate() {
         let mut rng = AesRng::new();
-        let a = rng.gen::<[Block; 8]>();
-        let b = rng.gen::<[Block; 8]>();
+        let a = rng.gen::<[U8x16; 8]>();
+        let b = rng.gen::<[U8x16; 8]>();
         assert_ne!(a, b);
     }
 }

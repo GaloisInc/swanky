@@ -1,0 +1,21 @@
+[package]
+name = "swanky-aes-rng"
+description = "A random number generator based on AES-CTR."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+vectoreyes.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+bytemuck.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+

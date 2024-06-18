@@ -1,30 +1,31 @@
 //! Implementations of correlation-robust hash functions (and their variants)
 //! based on fixed-key AES.
 
-use crate::{Aes128, Block, FIXED_KEY_AES128};
 use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
-    SimdBase8,
+    Aes128EncryptOnly, AesBlockCipher,
 };
+
+use crate::Block;
 
 /// AES-based correlation-robust hash function.
 ///
 /// This hash function supports the correlation-robust variants given in
 /// <https://eprint.iacr.org/2019/074>.
 pub struct AesHash {
-    aes: Aes128,
+    aes: Aes128EncryptOnly,
 }
 
 /// `AesHash` with a fixed key.
 pub const AES_HASH: AesHash = AesHash {
-    aes: FIXED_KEY_AES128,
+    aes: Aes128EncryptOnly::FIXED_KEY,
 };
 
 impl AesHash {
     /// Initialize the hash function using `key`.
     #[inline]
     pub fn new(key: Block) -> Self {
-        let aes = Aes128::new(key);
+        let aes = Aes128EncryptOnly::new_with_key(key);
         AesHash { aes }
     }
 
@@ -35,16 +36,6 @@ impl AesHash {
     #[inline]
     pub fn cr_hash(&self, _i: Block, x: Block) -> Block {
         self.aes.encrypt(x) ^ x
-    }
-
-    /// Circular correlation-robust hash function (cf.
-    /// <https://eprint.iacr.org/2019/074>, §7.3).
-    ///
-    /// The function computes `H(σ(x))`, where `H` is a correlation-robust hash
-    /// function and `σ(x₀ || x₁) = (x₀ ⊕ x₁) || x₁`.
-    #[inline]
-    pub fn ccr_hash(&self, i: Block, x: Block) -> Block {
-        self.cr_hash(i, x.shift_bytes_right::<8>() ^ x)
     }
 
     /// Tweakable circular correlation robust hash function (cf.
@@ -64,12 +55,12 @@ impl AesHash {
     where
         ArrayUnrolledOps: UnrollableArraySize<Q>,
     {
-        let y = self.aes.encrypt_blocks(xs);
+        let y = self.aes.encrypt_many(xs);
         let t = y.array_map(
             #[inline(always)]
             |x| x ^ i,
         );
-        let z = self.aes.encrypt_blocks(t);
+        let z = self.aes.encrypt_many(t);
         y.array_zip(z).array_map(
             #[inline(always)]
             |(a, b)| a ^ b,

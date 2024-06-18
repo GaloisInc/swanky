@@ -26,6 +26,7 @@ fancy-garbling = { workspace = true, features = ["serde"]}
 serde          = { workspace = true, features = ["derive"]}
 serde_json     = { workspace = true}
 proptest = { workspace = true}
+vectoreyes.workspace = true
 [dev-dependencies]
 criterion.workspace = true
 

@@ -6,8 +6,9 @@ use crate::{
     oprf::{Receiver as OprfReceiver, Sender as OprfSender},
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Aes128, Block, Block512, SemiHonest};
+use scuttlebutt::{AbstractChannel, Block, Block512, SemiHonest};
 use std::collections::HashSet;
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 mod cuckoo;
 
@@ -24,28 +25,28 @@ const N_TABLE_LOOPS: usize = 128;
 // the Davies-Meyer-esque single-block-length compression function
 // under-the-hood, and we pre-key `k`.
 #[inline(always)]
-fn hash_input_keyed(k: &Aes128, x: Block, range: usize) -> usize {
+fn hash_input_keyed(k: &Aes128EncryptOnly, x: Block, range: usize) -> usize {
     let h = k.encrypt(x) ^ x;
     (u128::from(h) % (range as u128)) as usize
 }
 
 // Hash `y` with key `k`, producing a result in the range `[0..range-1]`.
 fn hash_output(k: Block, y: Block512, range: usize) -> usize {
-    let aes = Aes128::new(k);
+    let aes = Aes128EncryptOnly::new_with_key(k);
     hash_output_keyed(&aes, y, range)
 }
 
 // Hash `y` with pre-keyed `k`. Uses a Davies-Meyer-esque hash function.
 //
 // XXX: can we remove this re-keying? It'll speed things up a bunch.
-fn hash_output_keyed(k: &Aes128, y: Block512, range: usize) -> usize {
+fn hash_output_keyed(k: &Aes128EncryptOnly, y: Block512, range: usize) -> usize {
     let ys: [Block; 4] = y.into();
     let h = k.encrypt(ys[0]) ^ ys[0];
-    let k = Aes128::new(h);
+    let k = Aes128EncryptOnly::new_with_key(h);
     let h = k.encrypt(ys[1]) ^ ys[1];
-    let k = Aes128::new(h);
+    let k = Aes128EncryptOnly::new_with_key(h);
     let h = k.encrypt(ys[2]) ^ ys[2];
-    let k = Aes128::new(h);
+    let k = Aes128EncryptOnly::new_with_key(h);
     let h = k.encrypt(ys[3]) ^ ys[3];
     (u128::from(h) % (range as u128)) as usize
 }
@@ -135,7 +136,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
             let h = channel.read_block()?;
-            let aes = Aes128::new(h);
+            let aes = Aes128EncryptOnly::new_with_key(h);
             hashkeys.push(aes);
         }
 
@@ -213,7 +214,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         assert!(points.len() <= npoints);
 
         let mut v = rng.gen::<Block>();
-        let mut aes = Aes128::new(v);
+        let mut aes = Aes128EncryptOnly::new_with_key(v);
         let mut map = HashSet::with_capacity(points.len());
         // Store compute `y`s and `h`s for later use.
         let mut ys = vec![Block512::default(); points.len()];
@@ -243,7 +244,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                 }
                 // Try again.
                 v = rng.gen::<Block>();
-                aes = Aes128::new(v);
+                aes = Aes128EncryptOnly::new_with_key(v);
                 map.clear();
             }
             if map.len() == points.len() {
@@ -478,7 +479,7 @@ mod benchmarks {
     fn bench_hash_output_keyed(b: &mut Bencher) {
         let k = black_box(rand::random::<Block>());
         let x = black_box(rand::random::<Block512>());
-        let aes = Aes128::new(k);
+        let aes = Aes128EncryptOnly::new(k);
         let range = 15;
         b.iter(|| super::hash_output_keyed(&aes, x, range));
     }
@@ -487,7 +488,7 @@ mod benchmarks {
     fn bench_hash_input_keyed(b: &mut Bencher) {
         let k = black_box(rand::random::<Block>());
         let x = black_box(rand::random::<Block>());
-        let aes = Aes128::new(k);
+        let aes = Aes128EncryptOnly::new(k);
         let range = 15;
         b.iter(|| super::hash_input_keyed(&aes, x, range));
     }

@@ -11,14 +11,15 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{
     field::{Degree, FiniteField as FF},
     ring::FiniteRing,
-    AbstractChannel, Aes128, Block, Malicious,
+    AbstractChannel, Block, Malicious,
 };
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
-    aes_objs: Vec<(Aes128, Aes128)>,
+    aes_objs: Vec<(Aes128EncryptOnly, Aes128EncryptOnly)>,
     pows: Powers<FE>,
     twos: Vec<FE>,
     nbits: usize,
@@ -29,7 +30,7 @@ pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: GenericArray<bool, FE::NumberOfBitsInBitDecomposition>,
-    aes_objs: Vec<Aes128>,
+    aes_objs: Vec<Aes128EncryptOnly>,
     pows: Powers<FE>,
     twos: Vec<FE>,
     nbits: usize,
@@ -39,8 +40,8 @@ pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
 pub(super) type CopeeSender<FE> = Sender<KosSender, FE>;
 pub(super) type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
 
-// Uses `Aes128` as a pseudo-random function.
-fn prf<FE: FF>(aes: &Aes128, pt: Block) -> FE::PrimeField {
+// Uses `Aes128EncryptOnly` as a pseudo-random function.
+fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: Block) -> FE::PrimeField {
     let seed = aes.encrypt(pt);
     FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(seed))
 }
@@ -55,9 +56,14 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let r = Degree::<FE>::USIZE;
         let keys = ot.send_random(channel, nbits * r, &mut rng)?;
-        let aes_objs: Vec<(Aes128, Aes128)> = keys
+        let aes_objs: Vec<(Aes128EncryptOnly, Aes128EncryptOnly)> = keys
             .iter()
-            .map(|(k0, k1)| (Aes128::new(*k0), Aes128::new(*k1)))
+            .map(|(k0, k1)| {
+                (
+                    Aes128EncryptOnly::new_with_key(*k0),
+                    Aes128EncryptOnly::new_with_key(*k1),
+                )
+            })
             .collect();
         let mut acc = FE::ONE;
         let two = FE::ONE + FE::ONE;
@@ -117,7 +123,10 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             acc *= two;
         }
         let keys = ot.receive_random(channel, &choices, &mut rng)?;
-        let aes_objs = keys.iter().map(|k| Aes128::new(*k)).collect();
+        let aes_objs = keys
+            .iter()
+            .map(|k| Aes128EncryptOnly::new_with_key(*k))
+            .collect();
         Ok(Self {
             _ot: PhantomData::<ROT>,
             delta,
