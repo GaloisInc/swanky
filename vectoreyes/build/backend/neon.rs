@@ -14,6 +14,10 @@ const REQUIRED_FEATURES: &[&str] = &["neon", "aes"];
 /// consistent between the 128-bit and 256-bit vector types, _all_ neon vectors are arrays.
 struct Neon;
 impl VectorBackend for Neon {
+    fn scalar_docs(&self) -> Docs {
+        "# Neon\nThis function uses a scalar polyfill.\n".to_string()
+    }
+
     fn cfg(&self) -> Cfg {
         let mut requirements = vec![Cfg::Contains {
             key: "target_arch".to_string(),

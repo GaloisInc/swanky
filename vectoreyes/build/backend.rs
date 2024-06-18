@@ -42,6 +42,12 @@ pub trait VectorBackend {
         ty.array()
     }
 
+    /// What documentation should be generated for scalar implementations in this backend?
+    ///
+    /// As an example, the AVX2 implementation might have this function return "The AVX2 backend
+    /// currently uses a slow scalar implementation for this function."
+    fn scalar_docs(&self) -> Docs;
+
     fn pairwise(
         &self,
         ty: VectorType,
@@ -72,7 +78,7 @@ pub trait VectorBackend {
                 PairwiseOperator::Or => op_body(quote! { | }),
                 PairwiseOperator::And => op_body(quote! { & }),
             },
-            String::new(),
+            self.scalar_docs(),
         )
     }
 }
@@ -83,5 +89,8 @@ impl VectorBackend for Scalar {
     fn cfg(&self) -> Cfg {
         // The scalar backend unconditionally works.
         Cfg::true_()
+    }
+    fn scalar_docs(&self) -> Docs {
+        String::new()
     }
 }
