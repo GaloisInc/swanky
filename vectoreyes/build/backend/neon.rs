@@ -1,8 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use std::collections::{BTreeSet, HashMap};
+use std::fmt::Write;
 
-use super::types::VectorType;
+use super::types::{IntType, VectorType};
 
+use super::Docs;
 use super::{cfg::Cfg, VectorBackend};
 
 const REQUIRED_FEATURES: &[&str] = &["neon", "aes"];
@@ -16,6 +19,29 @@ struct Intrinsic {
     /// Which instructions might this intrinsic generate.
     instructions: Vec<InstructionJson>,
 }
+
+struct Builder<'a> {
+    neon: &'a Neon,
+    intrinsics_used: BTreeSet<&'a Intrinsic>,
+}
+impl Builder<'_> {
+    fn intrinsic(&mut self, name: &str) -> TokenStream {
+        let intrinsic = self
+            .neon
+            .intrinsics
+            .get(name)
+            .unwrap_or_else(|| panic!("unknown intrinsic {name:?}"));
+        for feature in intrinsic.required_features.iter() {
+            if !REQUIRED_FEATURES.contains(&feature.to_lowercase().as_str()) {
+                panic!("intrinsic {name:?} requires cpu feature {feature:?} which the avx2 backend doesn't require");
+            }
+        }
+        self.intrinsics_used.insert(intrinsic);
+        let name = format_ident!("{name}");
+        quote! { std::arch::aarch64::#name }
+    }
+}
+
 /// The ARM NEON vectoreyes backend
 ///
 /// Vectoreyes supports 256-bit vectors, but NEON only supports 128-bit vectors. So the neon
@@ -23,6 +49,48 @@ struct Intrinsic {
 /// consistent between the 128-bit and 256-bit vector types, _all_ neon vectors are arrays.
 struct Neon {
     intrinsics: HashMap<String, Intrinsic>,
+}
+impl Neon {
+    fn build(&self, body: &mut dyn FnMut(&mut Builder) -> TokenStream) -> (TokenStream, Docs) {
+        let mut builder = Builder {
+            neon: self,
+            intrinsics_used: Default::default(),
+        };
+        let out = body(&mut builder);
+        let mut docs = String::new();
+        if !builder.intrinsics_used.is_empty() {
+            docs.push_str("# Neon Intrinsics Used\n\n");
+            for intrinsic in builder.intrinsics_used.iter() {
+                const BASE_URL: &str =
+                    "https://developer.arm.com/architectures/instruction-sets/intrinsics/";
+                writeln!(
+                    &mut docs,
+                    "* [`{}`]({BASE_URL}{})",
+                    intrinsic.name, intrinsic.name
+                )
+                .unwrap();
+                for instruction in intrinsic.instructions.iter() {
+                    writeln!(&mut docs, "    - {}", instruction.preamble).unwrap();
+                    for instruction in instruction.list.iter() {
+                        writeln!(
+                            &mut docs,
+                            "        * [`{} {}`]({})",
+                            instruction.base_instruction, instruction.operands, instruction.url,
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+        }
+        (out, docs)
+    }
+    fn arm_int(&self, ty: IntType) -> String {
+        let su = match ty.signedness() {
+            super::types::Signedness::Signed => "s",
+            super::types::Signedness::Unsigned => "u",
+        };
+        format!("{su}{}", ty.bits())
+    }
 }
 impl VectorBackend for Neon {
     fn scalar_docs(&self) -> Docs {
@@ -54,6 +122,36 @@ impl VectorBackend for Neon {
         let name = format_ident!("{sign}int{}x{elems_per_lane}_t", ty.of().bits());
         quote! { [std::arch::aarch64::#name; #lane_count] }
     }
+    fn pairwise(
+        &self,
+        ty: VectorType,
+        op: super::PairwiseOperator,
+        lhs: &dyn quote::ToTokens,
+        rhs: &dyn quote::ToTokens,
+    ) -> (TokenStream, Docs) {
+        self.build(&mut |b| {
+            let op = match op {
+                super::PairwiseOperator::WrappingAdd => "add",
+                super::PairwiseOperator::WrappingSub => "sub",
+                super::PairwiseOperator::Xor => "eor",
+                super::PairwiseOperator::Or => "orr",
+                super::PairwiseOperator::And => "and",
+            };
+            let intrinsic = b.intrinsic(&format!("v{op}q_{}", self.arm_int(ty.of())));
+            quote! {
+                #ty(
+                    #lhs.0
+                        .array_zip(#rhs.0)
+                        .array_map(
+                            #[inline(always)]
+                            |(a, b)| unsafe { #intrinsic(a, b) }
+                        )
+                )
+            }
+        })
+    }
+}
+
 /// Unlike Intel, ARM doesn't provide a list of which CPU features are requried for each intrinsic.
 /// To fix this, we parse the `arm_neon.h` file from LLVM to figure out which target features are
 // required for each intrinsic.
