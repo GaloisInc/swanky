@@ -1,5 +1,7 @@
 {% import 'core.tmpl' as core %}
 
+include!(concat!(env!("OUT_DIR"), "/backend.rs"));
+
 {{ core.the_implementation(force_scalar_for_test=False) }}
 
 {% for ty in VECTOR_TYPES %}

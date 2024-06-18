@@ -304,6 +304,7 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
 
 {% for ty in VECTOR_TYPES %}
     {%set avx2_ty = "::std::arch::x86_64::__m" ~ ty.bits ~ "i" %}
+    {% if force_scalar_for_test %}
     {% call(scalar, avx2) visit_backends() %}
         {% call scalar() %}
             type {{ty}}Internal = [{{ty.ty}} ; {{ty.count}}];
@@ -312,6 +313,7 @@ pub const VECTOR_BACKEND: crate::VectorBackend = {
             type {{ty}}Internal = {{avx2_ty}};
         {% endcall %}
     {% endcall %}
+    {% endif %}
 
     /// `{{ty.array}}` as a vector.
     #[repr(transparent)]
