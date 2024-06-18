@@ -11,6 +11,11 @@ mod neon;
 mod types;
 mod utils;
 pub use generate::*;
+/// Markdown formatted documentation which will be added to the documentation of wrapper functions.
+///
+/// For example, the AVX2 pairwise addition function for U32x4 might note that it uses the `PADD`
+/// instruction.
+type Docs = String;
 
 /// A vector backend for vectoreyes
 ///

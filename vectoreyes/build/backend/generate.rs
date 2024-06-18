@@ -172,3 +172,57 @@ fn conversions(ty: VectorType, out: &mut TokenStream) {
 
     });
 }
+
+/// Generate a vectoreyes function, the usual way.
+///
+/// The "usual" way means that this function will generate functions which:
+///
+/// 1. Are `#[inline(always)]`
+/// 2. Are documented with the `description` provided, as well as
+/// 3. the scalar equivalent of this function (provided by `call_backend(Scalar)`), and
+/// 4. any backend-specific documentation
+///
+/// This function returns a complete function, with the given `prototype` and a body of
+/// `call_backend(backend)`.
+///
+/// # Example
+///
+/// ```ignore
+/// standard_fn(
+///     backend,
+///     "Perform a pairwise `wrapping_add`"
+///     quote! { fn my_addition(self, rhs: #ty) -> #ty },
+///     &|bknd| bknd.pairwise(ty, PairwiseOperator::WrappingAdd, &quote! { self }, &quote! { rhs }),
+/// );
+/// ```
+fn standard_fn(
+    backends: &Backends,
+    description: &str,
+    prototype: TokenStream,
+    call_backend: &dyn Fn(&dyn VectorBackend) -> (TokenStream, Docs),
+) -> TokenStream {
+    let scalar_equivalent = CodeBlock {
+        body: call_backend(&Scalar).0,
+        ignored: true,
+        ..Default::default()
+    };
+    let mut docs = String::new();
+    let body = backends.block(&mut |backend| {
+        let (body, new_docs) = call_backend(backend);
+        docs.push_str(new_docs.as_str());
+        body
+    });
+    quote! {
+        #[doc = #description]
+        ///
+        /// # Scalar Equivalent
+        #scalar_equivalent
+        ///
+        #[doc = #docs]
+        #[inline(always)]
+        #prototype {
+            #body
+        }
+    }
+}
+
