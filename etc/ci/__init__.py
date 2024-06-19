@@ -28,6 +28,12 @@ def test_rust(
     cargo_args: extra arguments to pass to cargo, for example, to enable features.
     cache_test_output: if True, then try to re-use the output of previous unit-tests
     """
+    host_triple = (
+        subprocess.check_output(["rustc", "-Vv"])
+        .decode("utf-8")
+        .split("host:")[1]
+        .split()[0]
+    )
     rich.get_console().rule(
         f"Test Rust cargo_args={repr(cargo_args)} cache_test_output={cache_test_output}"
     )
@@ -69,9 +75,9 @@ def test_rust(
             ]
             + cargo_args,
             extra_env={
-                "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER": str(
-                    ROOT / "etc/ci/wrappers/caching_test_runner.py"
-                ),
+                "CARGO_TARGET_"
+                + host_triple.upper().replace("-", "_")
+                + "_RUNNER": str(ROOT / "etc/ci/wrappers/caching_test_runner.py"),
             },
         )
     else:
