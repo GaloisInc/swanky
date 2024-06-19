@@ -19,7 +19,6 @@ from etc.lint.cmd import lint
 def test_rust(
     ctx: click.Context,
     features: list[str],
-    force_haswell: bool,
     cache_test_output: bool,
 ) -> None:
     """
@@ -27,7 +26,6 @@ def test_rust(
 
     ctx: the click Context of the current command
     features: which Cargo features should be enabled for the test
-    force_haswell: if True, force a build for the haswell CPU (to test a different AES latency)
     cache_test_output: if True, then try to re-use the output of previous unit-tests
     """
     if len(features) > 0:
@@ -39,25 +37,11 @@ def test_rust(
     rich.get_console().rule(
         "Test Rust%s%s features=%r"
         % (
-            tag(force_haswell, "force_haswell"),
             tag(cache_test_output, "cache_test_output"),
             features,
         )
     )
     env = dict(os.environ)
-    if force_haswell:
-        if platform.machine() not in ("AMD64", "x86_64"):
-            raise click.UsageError(
-                f"The host machine is {platform.machine()}, and so can't run haswell code."
-            )
-        flags = " ".join(
-            [
-                "-C target-cpu=haswell",
-                "-C target-feature=+aes",
-                '--cfg vectoreyes_target_cpu="haswell"',
-            ]
-        )
-        env |= {"RUSTFLAGS": flags, "RUSTDOCFLAGS": flags}
 
     def run(cmd: list[str], extra_env: dict[str, str] = dict()) -> None:
         "Run cmd with env|extra_env as the environment, with nice error reporting"
@@ -129,9 +113,8 @@ def ci() -> None:
 def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
     non_rust_tests(ctx)
-    test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=False)
-    test_rust(ctx, features=[], force_haswell=False, cache_test_output=False)
-    test_rust(ctx, features=["serde"], force_haswell=True, cache_test_output=False)
+    test_rust(ctx, features=["serde"], cache_test_output=False)
+    test_rust(ctx, features=[], cache_test_output=False)
 
 
 @ci.command()
@@ -166,6 +149,6 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
     try:
         unpack_target_dir(cache_dir)
         non_rust_tests(ctx)
-        test_rust(ctx, features=["serde"], force_haswell=False, cache_test_output=True)
+        test_rust(ctx, features=["serde"], cache_test_output=True)
     finally:
         pack_target_dir(cache_dir)
