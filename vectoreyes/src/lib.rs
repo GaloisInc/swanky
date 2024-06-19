@@ -4,23 +4,14 @@
 //! # Backends
 //! VectorEyes chooses what backend to execute vector operations with at compile-time.
 //! ## AVX2
-//! CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and `PCLMULQDQ` features will
-//! use the `AVX2` backend.
+//! x86-64 CPUs that support the `AVX`, `AVX2`, `SSE4.1`, `AES`, `SSE4.2`, and `PCLMULQDQ` features
+//! will use the `AVX2` backend.
 //!
-//! In addition, we have embedded specific latency numbers for:
+//! ## Neon
+//! This is available on aarch64/arm64 machines with `neon` and `aes` features.
 //!
-//! * `skylake`
-//! * `skylake-avx512`
-//! * `cascadelake`
-//! * `znver1`
-//! * `znver2`
-//! * `znver3`
-//!
-//! As a result, `vectoreyes` will be more efficient on these platforms. You can add specific
-//! latency numbers for more targets in `avx2.py`.
 //! ## Scalar
-//! At the moment, this is the only alternative to the `AVX2` backend. It is not particularly
-//! optimized.
+//! This is a fallback implementation that works on all CPUs. It's not particularlly performant.
 //!
 //! # Cargo Configuration
 //! ## Native CPU Setup
@@ -392,10 +383,8 @@ pub trait AesBlockCipher: 'static + Clone + Sync + Send {
     /// A pre-scheduled Aes block cipher with a compile-time constant key.
     const FIXED_KEY: Self;
 
-    /// Running `encrypt_many` with this many blocks will result in the best performance.
-    ///
-    /// When using hardware AES instructions, if the AES encrypt instructions all have a
-    /// throughput of 1, then this constant will be equal to the instruction latency.
+    /// Running `encrypt_many` with this many blocks will typically result in good
+    /// performance.
     const BLOCK_COUNT_HINT: usize;
 
     /// If you need to AES with a particular key, be careful about endianness issues.
