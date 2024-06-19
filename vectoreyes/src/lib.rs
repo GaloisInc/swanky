@@ -46,29 +46,7 @@
 //! consult the Intel documentation to see if a non-implemented intrinsic would
 //! more directly accomplish your goal, and we can add it!
 
-// TODO: support more fine-grained cpu features?
-
 use std::ops::*;
-
-/// What CPU micro architecture is being targeted?
-#[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MicroArchitecture {
-    /// <https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(client)>
-    Skylake,
-    /// <https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(server)>
-    SkylakeAvx512,
-    /// <https://en.wikichip.org/wiki/cascade_lake>
-    CascadeLake,
-    /// <https://en.wikichip.org/wiki/amd_zen>
-    AmdZenVer1,
-    /// <https://en.wikichip.org/wiki/amd/microarchitectures/zen_2>
-    AmdZenVer2,
-    /// <https://en.wikichip.org/wiki/amd/microarchitectures/zen_3>
-    AmdZenVer3,
-    /// A microarchitecture not on this list.
-    Unknown,
-}
 
 /// What backend will be used when targeting the current CPU?
 #[non_exhaustive]
@@ -77,10 +55,7 @@ pub enum VectorBackend {
     /// The fallback scalar backend (doesn't use vector instructions)
     Scalar,
     /// A vector backend targeting [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2)
-    Avx2 {
-        /// The selected (or detected) microarchitecture to target.
-        micro_architecture: MicroArchitecture,
-    },
+    Avx2,
 }
 
 /// A scalar that can live in the lane of a vector.
