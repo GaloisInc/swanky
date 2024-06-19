@@ -56,7 +56,12 @@ pub enum VectorBackend {
     Scalar,
     /// A vector backend targeting [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2)
     Avx2,
+    /// A vector backend targeting [ARM Neon](https://developer.arm.com/Architectures/Neon).
+    Neon,
 }
+
+/// The vector backend that this process is using.
+pub const VECTOR_BACKEND: VectorBackend = current_vector_backend();
 
 /// A scalar that can live in the lane of a vector.
 pub trait Scalar:

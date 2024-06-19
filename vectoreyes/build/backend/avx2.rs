@@ -112,7 +112,9 @@ impl VectorBackend for Avx2 {
     fn scalar_docs(&self) -> Docs {
         "# AVX2\nThis function uses a scalar polyfill.\n".to_string()
     }
-
+    fn vector_backend_variant(&self) -> &str {
+        "Avx2"
+    }
     fn cfg(&self) -> Cfg {
         let mut requirements = vec![Cfg::Contains {
             key: "target_arch".to_string(),

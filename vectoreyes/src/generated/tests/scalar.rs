@@ -15,9 +15,6 @@ macro_rules! constify_imm { ($func:path => ( $($normal_args:expr,)* @@ [0..256] 
  match $imm_arg { 0 => $func($($normal_args,)* 0), 1 => $func($($normal_args,)* 1), 2 => $func($($normal_args,)* 2), 3 => $func($($normal_args,)* 3), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: 0..4", $imm_arg), } }; ($func:path => ( $($normal_args:expr,)* @@ [0..2] $imm_arg:expr )) => { // Hopefully this gets optimized out...
  match $imm_arg { 0 => $func($($normal_args,)* 0), 1 => $func($($normal_args,)* 1), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: 0..2", $imm_arg), } }; ($func:path => ( $($normal_args:expr,)* @@ [[1, 2, 4, 8]] $imm_arg:expr )) => { // Hopefully this gets optimized out...
  match $imm_arg { 1 => $func($($normal_args,)* 1), 2 => $func($($normal_args,)* 2), 4 => $func($($normal_args,)* 4), 8 => $func($($normal_args,)* 8), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: [1, 2, 4, 8]", $imm_arg), } }; }
-#[doc = "The backend that is used to evaluate vector operations."]
-#[allow(dead_code)]
-pub const VECTOR_BACKEND: crate::VectorBackend = { crate::VectorBackend::Scalar };
 type I8x16Internal = [i8; 16];
 #[doc = "`[i8; 16]` as a vector."]
 #[repr(transparent)]

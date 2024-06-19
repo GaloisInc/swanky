@@ -97,6 +97,10 @@ impl VectorBackend for Neon {
         "# Neon\nThis function uses a scalar polyfill.\n".to_string()
     }
 
+    fn vector_backend_variant(&self) -> &str {
+        "Neon"
+    }
+
     fn cfg(&self) -> Cfg {
         let mut requirements = vec![Cfg::Contains {
             key: "target_arch".to_string(),

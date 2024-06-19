@@ -37,6 +37,10 @@ pub enum PairwiseOperator {
 pub trait VectorBackend {
     /// What [`Cfg`] string is required to be true for this backend to be usable.
     fn cfg(&self) -> Cfg;
+
+    /// Which `vectoreyes::VectorBackend` enum variant does this backend map to?
+    fn vector_backend_variant(&self) -> &str;
+
     /// What's the internal type/representation for vector `ty`?
     fn vector_contents(&self, ty: VectorType) -> TokenStream {
         ty.array()
@@ -92,5 +96,8 @@ impl VectorBackend for Scalar {
     }
     fn scalar_docs(&self) -> Docs {
         String::new()
+    }
+    fn vector_backend_variant(&self) -> &str {
+        "Scalar"
     }
 }

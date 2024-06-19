@@ -72,11 +72,7 @@ impl Backends {
 }
 
 pub fn generate() {
-    let backends = [
-        avx2_backend(),
-        neon_backend(),
-        Box::new(Scalar),
-    ];
+    let backends = [avx2_backend(), neon_backend(), Box::new(Scalar)];
     let mut previous_success = Cfg::false_();
     // Because backends have overlapping cfgs, we go through them and come up with a new cfg which
     // says that we pick the _first_ valid backend. We then store that list in the Backends struct.
@@ -103,6 +99,15 @@ pub fn generate() {
 
 fn implementation(backends: &Backends) -> TokenStream {
     let mut out = TokenStream::new();
+    let current_vector_backend = backends.block(&mut |backend| {
+        let variant = format_ident!("{}", backend.vector_backend_variant());
+        quote! { crate::VectorBackend::#variant }
+    });
+    out.append_all(quote! {
+        pub(crate) const fn current_vector_backend() -> crate::VectorBackend {
+            #current_vector_backend
+        }
+    });
     let internals = backends.define_module(format_ident!("internals"), &mut |backend| {
         let mut out = TokenStream::new();
         for ty in VectorType::all() {

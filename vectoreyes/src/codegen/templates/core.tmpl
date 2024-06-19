@@ -283,25 +283,6 @@ macro_rules! constify_imm {
     {% endfor %}
 }
 
-/// The backend that is used to evaluate vector operations.
-#[allow(dead_code)]
-pub const VECTOR_BACKEND: crate::VectorBackend = {
-    {% call(scalar, avx2) visit_backends(block=True) %}
-    {% call scalar() %}
-        crate::VectorBackend::Scalar
-    {% endcall %}
-    {% call avx2() %}
-        crate::VectorBackend::Avx2 {
-            micro_architecture: {
-                {% call(target_cpu) visit_avx2_target_cpu_block() %}
-                    crate::MicroArchitecture::{{ avx2_intrinsic_builder.TARGET_CPU_NAMES[target_cpu] }}
-                {% endcall %}
-            },
-        }
-    {% endcall %}
-    {% endcall %}
-};
-
 {% for ty in VECTOR_TYPES %}
     {%set avx2_ty = "::std::arch::x86_64::__m" ~ ty.bits ~ "i" %}
     {% if force_scalar_for_test %}

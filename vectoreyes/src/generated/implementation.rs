@@ -17,11 +17,6 @@ macro_rules! constify_imm { ($func:path => ( $($normal_args:expr,)* @@ [0..256] 
  match $imm_arg { 0 => $func($($normal_args,)* 0), 1 => $func($($normal_args,)* 1), 2 => $func($($normal_args,)* 2), 3 => $func($($normal_args,)* 3), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: 0..4", $imm_arg), } }; ($func:path => ( $($normal_args:expr,)* @@ [0..2] $imm_arg:expr )) => { // Hopefully this gets optimized out...
  match $imm_arg { 0 => $func($($normal_args,)* 0), 1 => $func($($normal_args,)* 1), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: 0..2", $imm_arg), } }; ($func:path => ( $($normal_args:expr,)* @@ [[1, 2, 4, 8]] $imm_arg:expr )) => { // Hopefully this gets optimized out...
  match $imm_arg { 1 => $func($($normal_args,)* 1), 2 => $func($($normal_args,)* 2), 4 => $func($($normal_args,)* 4), 8 => $func($($normal_args,)* 8), _ => panic!("Invalid immediate: {}. Expected immediate to satisfy: [1, 2, 4, 8]", $imm_arg), } }; }
-#[doc = "The backend that is used to evaluate vector operations."]
-#[allow(dead_code)]
-pub const VECTOR_BACKEND: crate::VectorBackend = {
-    select_impl_block! { scalar { crate::VectorBackend::Scalar } avx2 { crate::VectorBackend::Avx2 { micro_architecture: { #[cfg(vectoreyes_target_cpu="skylake")] { crate::MicroArchitecture::Skylake } #[cfg(vectoreyes_target_cpu="skylake-avx512")] { crate::MicroArchitecture::SkylakeAvx512 } #[cfg(vectoreyes_target_cpu="cascadelake")] { crate::MicroArchitecture::CascadeLake } #[cfg(vectoreyes_target_cpu="znver1")] { crate::MicroArchitecture::AmdZenVer1 } #[cfg(vectoreyes_target_cpu="znver2")] { crate::MicroArchitecture::AmdZenVer2 } #[cfg(vectoreyes_target_cpu="znver3")] { crate::MicroArchitecture::AmdZenVer3 } #[cfg(not(any( vectoreyes_target_cpu="skylake", vectoreyes_target_cpu="skylake-avx512", vectoreyes_target_cpu="cascadelake", vectoreyes_target_cpu="znver1", vectoreyes_target_cpu="znver2", vectoreyes_target_cpu="znver3", )))] { crate::MicroArchitecture::Unknown } }, } } }
-};
 #[doc = "`[i8; 16]` as a vector."]
 #[repr(transparent)]
 #[derive(Clone, Copy)]
