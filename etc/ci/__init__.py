@@ -18,28 +18,18 @@ from etc.lint.cmd import lint
 
 def test_rust(
     ctx: click.Context,
-    features: list[str],
+    cargo_args: list[str],
     cache_test_output: bool,
 ) -> None:
     """
     Test rust code
 
     ctx: the click Context of the current command
-    features: which Cargo features should be enabled for the test
+    cargo_args: extra arguments to pass to cargo, for example, to enable features.
     cache_test_output: if True, then try to re-use the output of previous unit-tests
     """
-    if len(features) > 0:
-        features_args = ["--features", ",".join(features)]
-    else:
-        features_args = []
-    # tag is a helper for generating the header for this output
-    tag: Callable[[bool, str], str] = lambda flag, msg: f" {msg}" if flag else ""
     rich.get_console().rule(
-        "Test Rust%s%s features=%r"
-        % (
-            tag(cache_test_output, "cache_test_output"),
-            features,
-        )
+        f"Test Rust cargo_args={repr(cargo_args)} cache_test_output={cache_test_output}"
     )
     env = dict(os.environ)
 
@@ -55,19 +45,19 @@ def test_rust(
 
     run(
         ["cargo", "clippy", "--workspace", "--all-targets", "--verbose"]
-        + features_args
+        + cargo_args
         + ["--", "-Dwarnings"]
     )
     run(
-        ["cargo", "doc", "--workspace", "--no-deps", "--verbose"] + features_args,
+        ["cargo", "doc", "--workspace", "--no-deps", "--verbose"] + cargo_args,
         extra_env={"RUSTDOCFLAGS": "-D warnings"},
     )
-    run(["cargo", "build", "--workspace", "--all-targets", "--verbose"] + features_args)
+    run(["cargo", "build", "--workspace", "--all-targets", "--verbose"] + cargo_args)
     if cache_test_output:
         # Doctests currently don't use the cargo runner :(
         if "SWANKY_CACHE_DIR" not in env:
             raise click.UsageError("--cache-dir not set, but caching is requested.")
-        run(["cargo", "test", "--workspace", "--doc", "--verbose"] + features_args)
+        run(["cargo", "test", "--workspace", "--doc", "--verbose"] + cargo_args)
         run(
             [
                 "cargo",
@@ -77,7 +67,7 @@ def test_rust(
                 "--workspace",
                 "--verbose",
             ]
-            + features_args,
+            + cargo_args,
             extra_env={
                 "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER": str(
                     ROOT / "etc/ci/wrappers/caching_test_runner.py"
@@ -85,7 +75,7 @@ def test_rust(
             },
         )
     else:
-        run(["cargo", "test", "--workspace", "--verbose"] + features_args)
+        run(["cargo", "test", "--workspace", "--verbose"] + cargo_args)
 
 
 def non_rust_tests(ctx: click.Context) -> None:
@@ -113,8 +103,8 @@ def ci() -> None:
 def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
     non_rust_tests(ctx)
-    test_rust(ctx, features=["serde"], cache_test_output=False)
-    test_rust(ctx, features=[], cache_test_output=False)
+    test_rust(ctx, cargo_args=["--features=serde"], cache_test_output=False)
+    test_rust(ctx, cargo_args=[], cache_test_output=False)
 
 
 @ci.command()
@@ -149,6 +139,6 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
     try:
         unpack_target_dir(cache_dir)
         non_rust_tests(ctx)
-        test_rust(ctx, features=["serde"], cache_test_output=True)
+        test_rust(ctx, cargo_args=["--features=serde"], cache_test_output=True)
     finally:
         pack_target_dir(cache_dir)
