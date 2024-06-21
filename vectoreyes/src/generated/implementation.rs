@@ -84,22 +84,6 @@ impl AsMut<[i8]> for I8x16 {
         arr
     }
 }
-impl serde::Serialize for I8x16 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i8; 16]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I8x16 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i8; 16]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I16x8> for I8x16 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I16x8\nas little endian bits of I8x16."]
     #[inline(always)]
@@ -408,22 +392,6 @@ impl AsMut<[i8]> for I8x32 {
     fn as_mut(&mut self) -> &mut [i8] {
         let arr: &mut [i8; 32] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for I8x32 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i8; 32]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I8x32 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i8; 32]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I16x16> for I8x32 {
@@ -759,22 +727,6 @@ impl AsMut<[i16]> for I16x8 {
         arr
     }
 }
-impl serde::Serialize for I16x8 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i16; 8]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I16x8 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i16; 8]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for I16x8 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I16x8."]
     #[inline(always)]
@@ -1103,22 +1055,6 @@ impl AsMut<[i16]> for I16x16 {
     fn as_mut(&mut self) -> &mut [i16] {
         let arr: &mut [i16; 16] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for I16x16 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i16; 16]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I16x16 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i16; 16]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for I16x16 {
@@ -1464,22 +1400,6 @@ impl AsMut<[i32]> for I32x4 {
         arr
     }
 }
-impl serde::Serialize for I32x4 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i32; 4]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I32x4 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i32; 4]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for I32x4 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I32x4."]
     #[inline(always)]
@@ -1823,22 +1743,6 @@ impl AsMut<[i32]> for I32x8 {
     fn as_mut(&mut self) -> &mut [i32] {
         let arr: &mut [i32; 8] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for I32x8 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i32; 8]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I32x8 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i32; 8]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for I32x8 {
@@ -2200,22 +2104,6 @@ impl AsMut<[i64]> for I64x2 {
         arr
     }
 }
-impl serde::Serialize for I64x2 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i64; 2]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I64x2 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i64; 2]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for I64x2 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of I64x2."]
     #[inline(always)]
@@ -2542,22 +2430,6 @@ impl AsMut<[i64]> for I64x4 {
     fn as_mut(&mut self) -> &mut [i64] {
         let arr: &mut [i64; 4] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for I64x4 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[i64; 4]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for I64x4 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[i64; 4]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for I64x4 {
@@ -2948,22 +2820,6 @@ impl AsMut<[u8]> for U8x16 {
         arr
     }
 }
-impl serde::Serialize for U8x16 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u8; 16]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U8x16 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u8; 16]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for U8x16 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U8x16."]
     #[inline(always)]
@@ -3273,22 +3129,6 @@ impl AsMut<[u8]> for U8x32 {
     fn as_mut(&mut self) -> &mut [u8] {
         let arr: &mut [u8; 32] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for U8x32 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u8; 32]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U8x32 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u8; 32]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for U8x32 {
@@ -3625,22 +3465,6 @@ impl AsMut<[u16]> for U16x8 {
         arr
     }
 }
-impl serde::Serialize for U16x8 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u16; 8]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U16x8 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u16; 8]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for U16x8 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U16x8."]
     #[inline(always)]
@@ -3970,22 +3794,6 @@ impl AsMut<[u16]> for U16x16 {
     fn as_mut(&mut self) -> &mut [u16] {
         let arr: &mut [u16; 16] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for U16x16 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u16; 16]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U16x16 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u16; 16]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for U16x16 {
@@ -4332,22 +4140,6 @@ impl AsMut<[u32]> for U32x4 {
         arr
     }
 }
-impl serde::Serialize for U32x4 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u32; 4]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U32x4 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u32; 4]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for U32x4 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U32x4."]
     #[inline(always)]
@@ -4692,22 +4484,6 @@ impl AsMut<[u32]> for U32x8 {
     fn as_mut(&mut self) -> &mut [u32] {
         let arr: &mut [u32; 8] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for U32x8 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u32; 8]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U32x8 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u32; 8]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for U32x8 {
@@ -5070,22 +4846,6 @@ impl AsMut<[u64]> for U64x2 {
         arr
     }
 }
-impl serde::Serialize for U64x2 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u64; 2]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U64x2 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u64; 2]>::deserialize(deserializer).map(Self::from_array)
-    }
-}
 impl From<I8x16> for U64x2 {
     #[doc = "This cast is 100% free. It reinterprets the little-endinan bits of I8x16\nas little endian bits of U64x2."]
     #[inline(always)]
@@ -5413,22 +5173,6 @@ impl AsMut<[u64]> for U64x4 {
     fn as_mut(&mut self) -> &mut [u64] {
         let arr: &mut [u64; 4] = bytemuck::cast_mut(self);
         arr
-    }
-}
-impl serde::Serialize for U64x4 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        <[u64; 4]>::from(*self).serialize(serializer)
-    }
-}
-impl<'de> serde::Deserialize<'de> for U64x4 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <[u64; 4]>::deserialize(deserializer).map(Self::from_array)
     }
 }
 impl From<I8x32> for U64x4 {
