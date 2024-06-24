@@ -1,3 +1,4 @@
+import itertools
 import os
 import platform
 import shlex
@@ -72,6 +73,11 @@ def _write_wrapper_script(name: str, script: str) -> Path:
     return script_path
 
 
+def _linker(target: str) -> str:
+    """What linker should we use for a given target?"""
+    return "mold" if "linux" in target else "lld"
+
+
 @dataclass(frozen=True)
 class _CrossCompile:
     """Cross-compilation configuration settings."""
@@ -110,10 +116,126 @@ class _CrossCompile:
         """The triple for this cross-compilation target."""
         return f"{self.target_arch}-unknown-linux-musl"
 
+    def update_env(
+        self, ctx: click.Context, env: dict[str, str], cargo_args: list[str]
+    ) -> None:
+        """
+        Update environment variables and cargo arguments for cross compilation.
+        """
+        if platform.system() != "Linux":
+            raise Exception("cross-compiling and testing only works on linux")
+        # By default, cargo makes a subdirectory inside of target/ for each target you're compiling
+        # for, to make sure that they don't conflict. However, this doesn't apply to build scripts which
+        # can be re-compiled with slightly different flags for each target. Because cargo will
+        # only cache one copy of each build script, it'll end up recompiling the script (even on a
+        # clean build).
+        #
+        # To fix this, we give a subdirectory of the target directory for _all_ of our
+        # cross-compilation needs.
+        env["CARGO_TARGET_DIR"] = os.path.join(
+            env["CARGO_TARGET_DIR"], f"swanky-{self.target}"
+        )
+        cargo_args.append(f"--target={self.target}")
+        # The environment for running cross-compiled targets.
+        cargo_runner_env = {
+            _cargo_target_runner_env_var(self.target): str(
+                self.user_mode_emulator(ctx)
+            ),
+        }
+        # A raw clang that nix hasn't wrapped to link against the host's libc (which would be bad
+        # for cross-compilation).
+        clang_unwrapped = _nix_build(
+            ctx,
+            "clang_unwrapped",
+            [str(ROOT / "etc/nix/llvm.nix"), "-A", "clang-unwrapped"],
+        )
+        env[f"CC_{self.target}"] = str(clang_unwrapped / "bin/clang")
+        env[f"CXX_{self.target}"] = str(clang_unwrapped / "bin/clang++")
+        musl_headers = _nix_build(
+            ctx,
+            f"musl_headers-{self.target}",
+            [str(ROOT / "etc/nix/musl-headers.nix"), "--argstr", "target", self.target],
+        )
+        # We need to get clang's include directory to add files like arm_neon.h to the include path
+        # To find this directory, we just search through the clang install.
+        clang_include_candidates = list(
+            itertools.chain.from_iterable(
+                [base / dir for dir in dirs if dir == "include"]
+                for base, dirs, _ in _nix_build(
+                    ctx,
+                    "clang_includes",
+                    [str(ROOT / "etc/nix/llvm.nix"), "-A", "libclang.lib"],
+                )
+                .resolve()
+                .walk()
+            )
+        )
+        if len(clang_include_candidates) != 1:
+            raise Exception("Could not find clang include directory")
+        clang_include = clang_include_candidates[0]
+        env[f"CFLAGS_{self.target}"] = (
+            env.get("CFLAGS", "")
+            + " -nostdinc"
+            + f" --sysroot={musl_headers.resolve()}"
+            + f" -isystem {musl_headers.resolve()}/include"
+            + f" -isystem {clang_include}"
+            + f" --target={self.target}"
+            + f" -mcpu={self.target_cpu}"
+        )
+        # Override the usual flags which target the host CPU
+        env["RUSTFLAGS"] = " ".join(
+            [
+                f"-Ctarget-cpu={self.target_cpu}",
+                "-Clinker-flavor=gcc",
+                f"-Clinker={clang_unwrapped}/bin/clang",
+                f"-Clink-arg=--target={self.target}",
+                f"-Clink-arg=-fuse-ld={_linker(self.target)}",
+            ]
+        )
+        # Check that the expected vectoreyes backend matches what's actualy in use
+        vectoreyes_backend = (
+            subprocess.check_output(
+                ["cargo", "run", "--verbose", "--example", "vectoreyes_print_backend"]
+                + cargo_args,
+                stdin=subprocess.DEVNULL,
+                env=env | cargo_runner_env,
+            )
+            .decode("utf-8")
+            .strip()
+        )
+        if vectoreyes_backend != self.expected_vectoreyes_backend:
+            raise click.ClickException(
+                f"{repr(self)} lead to unexpected vectoreyes backend {repr(vectoreyes_backend)}"
+            )
+        # Check that the version of musl that rust ships matches the version of musl that we got
+        # headers for.
+        rust_musl_version = (
+            subprocess.check_output(
+                ["cargo", "run", "--verbose", "--example", "print_musl_version"]
+                + cargo_args,
+                stdin=subprocess.DEVNULL,
+                env=env | cargo_runner_env,
+            )
+            .decode("utf-8")
+            .strip()
+        )
+        musl_headers_version = (musl_headers / "version.txt").read_text().strip()
+        if musl_headers_version != rust_musl_version:
+            raise click.ClickException(
+                f"Rust has musl version {rust_musl_version}, which doesn't match the "
+                + f"sysroot {musl_headers_version}"
+            )
+
 
 _NEON = _CrossCompile(
     target_arch="aarch64", target_cpu="neoverse-v1", expected_vectoreyes_backend="Neon"
 )
+
+
+def _cargo_target_runner_env_var(target: str) -> str:
+    """What's the cargo environment variable for the runner for a particular target triple?"""
+    return "CARGO_TARGET_" + target.upper().replace("-", "_") + "_RUNNER"
+
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
