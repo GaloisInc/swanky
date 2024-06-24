@@ -379,7 +379,7 @@ def ci() -> None:
 def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
     non_rust_tests(ctx)
-    for cross_compile in [None, _NEON]:
+    for cross_compile in [_NEON, None]:
         test_rust(
             ctx,
             cargo_args=["--features=serde"],
