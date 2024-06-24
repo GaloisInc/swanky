@@ -1,4 +1,5 @@
 import itertools
+import json
 import os
 import platform
 import shlex
@@ -293,6 +294,19 @@ def test_rust(
                     cross_compile.user_mode_emulator(ctx)
                 ),
             }
+    else:
+        # Unlike setting the RUSTFLAGS environment variable, this approach will only add to the
+        # flags that we've set in .cargo/config.toml
+        cargo_args += [
+            "--config=build.rustflags = "
+            + json.dumps(
+                [
+                    "-Clinker-flavor=gcc",
+                    "-Clinker=clang",
+                    f"-Clink-arg=-fuse-ld={_linker(host_triple)}",
+                ]
+            )
+        ]
 
     # Then, let's run some tests!
     def run(cmd: list[str], extra_env: dict[str, str] = dict()) -> None:

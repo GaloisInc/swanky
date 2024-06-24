@@ -6,9 +6,6 @@
 #
 # 1. We want to apply `--deny warnings' to just the code that lives in Swanky. We don't want to
 #    --deny warnings on dependencies, since they may have warnings.
-# 2. We want to tell rust to use lld as the linker in CI (since it's faster). It's not easy for us
-#    to _add_ rustflags using Cargo's options without overwriting the existing flags (see
-#    https://github.com/rust-lang/cargo/issues/5376).
 import os
 import sys
 from pathlib import Path
@@ -26,12 +23,5 @@ if len(rs_files_in_args) > 0:
     if rs_file.resolve().is_relative_to(ROOT):
         # only deny warnings for swanky code
         args += ["--deny", "warnings"]
-
-# Use lld as the linker for non-linux and mold as the linker for linux.
-if sys.platform == "linux":
-    linker = "mold"
-else:
-    linker = "lld"
-args += ["-Clinker=clang", "-Clinker-flavor=gcc", "-Clink-arg=-fuse-ld=" + linker]
 
 os.execvp(args[0], args)
