@@ -9,6 +9,7 @@ let
       "llvm-tools-preview"
       "clippy"
     ];
+    targets = [ "aarch64-unknown-linux-musl" ];
   };
 in
 runCommand "rust-${rust-toolchain-version}" { } ''
