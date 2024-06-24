@@ -379,8 +379,19 @@ def ci() -> None:
 def nightly(ctx: click.Context) -> None:
     """Run the nightly CI tests"""
     non_rust_tests(ctx)
-    test_rust(ctx, cargo_args=["--features=serde"], cache_test_output=False)
-    test_rust(ctx, cargo_args=[], cache_test_output=False)
+    for cross_compile in [None, _NEON]:
+        test_rust(
+            ctx,
+            cargo_args=["--features=serde"],
+            cache_test_output=False,
+            cross_compile=cross_compile,
+        )
+        test_rust(
+            ctx,
+            cargo_args=[],
+            cache_test_output=False,
+            cross_compile=cross_compile,
+        )
 
 
 @ci.command()
@@ -415,6 +426,18 @@ def quick(ctx: click.Context, cache_dir: Path) -> None:
     try:
         unpack_target_dir(cache_dir)
         non_rust_tests(ctx)
-        test_rust(ctx, cargo_args=["--features=serde"], cache_test_output=True)
+        test_rust(
+            ctx,
+            cargo_args=["-p", "vectoreyes"],
+            cache_test_output=True,
+            cross_compile=_NEON,
+            # These tests are fast enough, that the overhead of cargo-nextest isn't a win.
+            cargo_nextest=False,
+        )
+        test_rust(
+            ctx,
+            cargo_args=["--features=serde"],
+            cache_test_output=True,
+        )
     finally:
         pack_target_dir(cache_dir)
