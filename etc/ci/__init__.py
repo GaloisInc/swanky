@@ -1,8 +1,9 @@
 import os
 import platform
+import shlex
 import subprocess
 from base64 import urlsafe_b64encode
-from collections.abc import Callable
+from dataclasses import dataclass
 from hashlib import blake2b
 from pathlib import Path
 from uuid import uuid4
@@ -71,6 +72,48 @@ def _write_wrapper_script(name: str, script: str) -> Path:
     return script_path
 
 
+@dataclass(frozen=True)
+class _CrossCompile:
+    """Cross-compilation configuration settings."""
+
+    target_arch: str
+    """What architecture should be targeted?"""
+    target_cpu: str
+    """Which microarchitecture should be targeted?"""
+    expected_vectoreyes_backend: str
+    """Which vectoreyes baceknd should we assert is used?"""
+
+    def user_mode_emulator(self, ctx: click.Context) -> Path:
+        """
+        Return the path to a script that can be used to emulate executables built for this target.
+        """
+        qemu_bin = (
+            _nix_build(
+                ctx,
+                "qemu",
+                [
+                    str(ROOT / "etc/nix/pkgs.nix"),
+                    "-A",
+                    "qemu",
+                ],
+            )
+            / "bin"
+            / f"qemu-{self.target_arch}"
+        ).resolve()
+        return _write_wrapper_script(
+            "qemu",
+            f'exec {shlex.quote(str(qemu_bin))} -cpu {shlex.quote(self.target_cpu)} "$@"',
+        )
+
+    @property
+    def target(self) -> str:
+        """The triple for this cross-compilation target."""
+        return f"{self.target_arch}-unknown-linux-musl"
+
+
+_NEON = _CrossCompile(
+    target_arch="aarch64", target_cpu="neoverse-v1", expected_vectoreyes_backend="Neon"
+)
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
