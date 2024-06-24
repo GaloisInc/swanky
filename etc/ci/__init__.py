@@ -12,6 +12,7 @@ from uuid import uuid4
 import click
 import rich
 import rich.panel
+import rich.pretty
 import rich.syntax
 
 from etc import NIX_CACHE_KEY, ROOT
@@ -242,6 +243,7 @@ def test_rust(
     cargo_args: list[str],
     cache_test_output: bool,
     cargo_nextest: bool = True,
+    cross_compile: _CrossCompile | None = None,
 ) -> None:
     """
     Test rust code
@@ -250,18 +252,49 @@ def test_rust(
     cargo_args: extra arguments to pass to cargo, for example, to enable features.
     cache_test_output: if True, then try to re-use the output of previous unit-tests
     cargo_nextest: if True, then run tests using cargo-nextest instead of the native runner
+    cross_compile: if set, cross-compile and run on the specified target. Otherwise target the host
     """
+    rich.get_console().rule("Test Rust")
+    rich.pretty.pprint(
+        {
+            "cargo_args": cargo_args,
+            "cache_test_output": cache_test_output,
+            "cargo_nextest": cargo_nextest,
+            "cross_compile": cross_compile,
+        }
+    )
+    env = dict(os.environ)
     host_triple = (
         subprocess.check_output(["rustc", "-Vv"])
         .decode("utf-8")
         .split("host:")[1]
         .split()[0]
     )
-    rich.get_console().rule(
-        f"Test Rust cargo_args={repr(cargo_args)} cache_test_output={cache_test_output}"
-    )
-    env = dict(os.environ)
 
+    # First, set up the environment for cross-compilation and test caching.
+    if cache_test_output:
+        cargo_runner_env = {
+            _cargo_target_runner_env_var(
+                cross_compile.target if cross_compile else host_triple
+            ): str(ROOT / "etc/ci/wrappers/caching_test_runner.py"),
+        }
+    else:
+        cargo_runner_env = {}
+    if cross_compile:
+        cargo_args = list(cargo_args)
+        cross_compile.update_env(ctx, env, cargo_args)
+        if cache_test_output:
+            cargo_runner_env["SWANKY_CACHING_TEST_RUNNER_QEMU"] = str(
+                cross_compile.user_mode_emulator(ctx)
+            )
+        else:
+            cargo_runner_env = {
+                _cargo_target_runner_env_var(cross_compile.target): str(
+                    cross_compile.user_mode_emulator(ctx)
+                ),
+            }
+
+    # Then, let's run some tests!
     def run(cmd: list[str], extra_env: dict[str, str] = dict()) -> None:
         "Run cmd with env|extra_env as the environment, with nice error reporting"
         if (
@@ -298,11 +331,7 @@ def test_rust(
                 "--verbose",
             ]
             + cargo_args,
-            extra_env={
-                "CARGO_TARGET_"
-                + host_triple.upper().replace("-", "_")
-                + "_RUNNER": str(ROOT / "etc/ci/wrappers/caching_test_runner.py"),
-            },
+            extra_env=cargo_runner_env,
         )
     else:
         run(
