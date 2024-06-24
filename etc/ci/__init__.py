@@ -236,10 +236,12 @@ def _cargo_target_runner_env_var(target: str) -> str:
     """What's the cargo environment variable for the runner for a particular target triple?"""
     return "CARGO_TARGET_" + target.upper().replace("-", "_") + "_RUNNER"
 
+
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
     cache_test_output: bool,
+    cargo_nextest: bool = True,
 ) -> None:
     """
     Test rust code
@@ -247,6 +249,7 @@ def test_rust(
     ctx: the click Context of the current command
     cargo_args: extra arguments to pass to cargo, for example, to enable features.
     cache_test_output: if True, then try to re-use the output of previous unit-tests
+    cargo_nextest: if True, then run tests using cargo-nextest instead of the native runner
     """
     host_triple = (
         subprocess.check_output(["rustc", "-Vv"])
@@ -280,10 +283,12 @@ def test_rust(
     )
     run(["cargo", "build", "--workspace", "--all-targets", "--verbose"] + cargo_args)
     if cache_test_output:
-        # Doctests currently don't use the cargo runner :(
         if "SWANKY_CACHE_DIR" not in env:
             raise click.UsageError("--cache-dir not set, but caching is requested.")
-        run(["cargo", "test", "--workspace", "--doc", "--verbose"] + cargo_args)
+    if cargo_nextest:
+        # cargo nextest doesn't test rustdoc, so we test it separately.
+        # rustdoc tests presently ignore the runner, so we don't set the runner env here.
+        run(["cargo", "test", "--doc", "--verbose"] + cargo_args)
         run(
             [
                 "cargo",
@@ -301,7 +306,10 @@ def test_rust(
             },
         )
     else:
-        run(["cargo", "test", "--workspace", "--verbose"] + cargo_args)
+        run(
+            ["cargo", "test", "--verbose"] + cargo_args,
+            extra_env=cargo_runner_env,
+        )
 
 
 def non_rust_tests(ctx: click.Context) -> None:
