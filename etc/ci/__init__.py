@@ -273,15 +273,15 @@ def test_rust(
             raise click.ClickException("Command failed: " + " ".join(cmd))
 
     run(
-        ["cargo", "clippy", "--workspace", "--all-targets", "--verbose"]
+        ["cargo", "clippy", "--all-targets", "--verbose"]
         + cargo_args
         + ["--", "-Dwarnings"]
     )
     run(
-        ["cargo", "doc", "--workspace", "--no-deps", "--verbose"] + cargo_args,
+        ["cargo", "doc", "--no-deps", "--verbose"] + cargo_args,
         extra_env={"RUSTDOCFLAGS": "-D warnings"},
     )
-    run(["cargo", "build", "--workspace", "--all-targets", "--verbose"] + cargo_args)
+    run(["cargo", "build", "--all-targets", "--verbose"] + cargo_args)
     if cache_test_output:
         if "SWANKY_CACHE_DIR" not in env:
             raise click.UsageError("--cache-dir not set, but caching is requested.")
@@ -295,7 +295,6 @@ def test_rust(
                 "nextest",
                 "run",
                 "--no-fail-fast",
-                "--workspace",
                 "--verbose",
             ]
             + cargo_args,
