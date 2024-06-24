@@ -5,6 +5,7 @@ from base64 import urlsafe_b64encode
 from collections.abc import Callable
 from hashlib import blake2b
 from pathlib import Path
+from uuid import uuid4
 
 import click
 import rich
@@ -40,6 +41,34 @@ def _nix_build(ctx: click.Context, name: str, args: list[str]) -> Path:
     candidates = list(cache_dst.parent.glob(f"{cache_dst.name}*"))
     assert len(candidates) == 1
     return candidates[0]
+
+
+def _write_wrapper_script(name: str, script: str) -> Path:
+    """
+    Return a path to an executable bash script containing script.
+
+    This function will add the shebang.
+
+    name is just used for debugging purposes, and doesn't need to be unique.
+    """
+    script = f"#!/usr/bin/env bash\n{script}\n"
+    script_path = (
+        ROOT
+        / "target/nix-env-cache"
+        / urlsafe_b64encode(blake2b(script.encode("utf-8")).digest()).decode("ascii")[
+            0:32
+        ]
+    )
+    if not script_path.exists():
+        # Atomically write the file
+        tmp = script_path.with_suffix(f".tmp-{uuid4()}")
+        try:
+            tmp.write_text(script)
+            tmp.chmod(0o775)
+            tmp.rename(script_path)
+        finally:
+            tmp.unlink(missing_ok=True)
+    return script_path
 
 
 def test_rust(
