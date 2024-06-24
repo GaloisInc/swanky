@@ -16,6 +16,32 @@ from etc.ci.target_dir_cache import pack_target_dir, unpack_target_dir
 from etc.lint.cmd import lint
 
 
+def _nix_build(ctx: click.Context, name: str, args: list[str]) -> Path:
+    """
+    Run nix-build, with args, and return the path to the output nix derivation.
+
+    This path will be cached using a cache key based on name, as well as the hash of the etc/nix
+    directory.
+    """
+    # Add a suffix to the name to avoid the glob below matching too much if names share a common
+    # prefix.
+    cache_key = str(ctx.obj[NIX_CACHE_KEY]) + "_" + name + "-_-"
+    cache_dst = ROOT / "target/nix-env-cache" / cache_key
+    if not cache_dst.exists():
+        subprocess.check_call(
+            [
+                "nix-build",
+                "--out-link",
+                str(cache_dst),
+            ]
+            + args
+        )
+    # Sometimes nix appends a suffix to what's supposed to be the destination
+    candidates = list(cache_dst.parent.glob(f"{cache_dst.name}*"))
+    assert len(candidates) == 1
+    return candidates[0]
+
+
 def test_rust(
     ctx: click.Context,
     cargo_args: list[str],
