@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 version.workspace = true
+build = "build/main.rs"
 
 [lints]
 workspace = true
@@ -16,9 +17,6 @@ bytemuck.workspace = true
 subtle.workspace = true
 serde.workspace = true
 rand.workspace = true
-
-# NOTE: keep in sync with the cfg for the scalar backend in generated/implementation.rs
-[target.'cfg(not(all(target_arch = "x86_64",all(target_feature = "sse2",target_feature = "avx",target_feature = "sse4.1",target_feature = "avx2",target_feature = "aes",target_feature="sse4.2",target_feature="PCLMULQDQ"))))'.dependencies]
 aes.workspace = true
 lazy_static.workspace = true
 
@@ -27,3 +25,14 @@ aes.workspace = true
 proptest.workspace = true
 lazy_static.workspace = true
 serde_json.workspace = true
+
+[build-dependencies]
+prettyplease.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+quick-xml = { workspace = true, features = ["serialize", "overlapped-lists"] }
+zstd.workspace = true
+

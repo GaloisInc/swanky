@@ -8,6 +8,3 @@ pub mod implementation;
 #[allow(unused_imports)]
 #[rustfmt::skip]
 mod tests;
-
-#[rustfmt::skip]
-pub mod array_impls;

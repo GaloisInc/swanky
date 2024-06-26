@@ -1,5 +1,5 @@
 with import ./pkgs.nix { };
-let swankyLlvm = llvmPackages_18;
+let swankyLlvm = import ./llvm.nix;
 in
 (mkShell.override { stdenv = swankyLlvm.stdenv; }) {
   shellHook = ''

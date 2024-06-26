@@ -151,18 +151,7 @@
             impl crate::AesBlockCipher for Aes{{key_size}}{{encrypt_only}} {
             type Key = {{key_ty}};
             type EncryptOnly = Aes{{key_size}}EncryptOnly;
-            const BLOCK_COUNT_HINT: usize = {
-                {% call(avx2, scalar) visit_backends(block=True) %}
-                {% call avx2() %}
-                    {% call(target_cpu) visit_avx2_target_cpu_block() %}
-                        {{avx2_intrinsic_builder.AES_BLOCK_COUNT_HINT[target_cpu]}}
-                    {% endcall %}
-                {% endcall %}
-                {% call scalar() %}
-                    8
-                {% endcall %}
-                {% endcall %}
-            };
+            const BLOCK_COUNT_HINT: usize = 4;
         {% endif %}
             {% if force_scalar_for_test %}pub(super){% endif %}
             const FIXED_KEY: Self = Self {

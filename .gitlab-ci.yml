@@ -35,5 +35,9 @@ nightly-test:
   variables:
     TMPDIR: /tmp
   script:
-    - apt-get update && apt-get install -y nix python3
-    - ./swanky ci nightly
+    - apt-get update && apt-get install -y nix python3 lz4
+    - bash -c "set -euxo pipefail; ./swanky ci nightly 2>&1 | lz4 > ./log.lz4"
+  artifacts:
+    paths:
+      - log.lz4
+    expire_in: 1 week

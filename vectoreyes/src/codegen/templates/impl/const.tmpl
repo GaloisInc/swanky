@@ -1,3 +1,4 @@
+{% if force_scalar_for_test %}
 impl {{ty}} {
     /// Create a vector from an array.
     ///
@@ -29,4 +30,4 @@ impl {{ty}} {
     {% endcall %}
     {% endcall %}
 }
-
+{% endif %}

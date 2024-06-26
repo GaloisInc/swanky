@@ -8,6 +8,9 @@
 # contents of the binary along with its arguments. To help avoid the binary
 # accessing files which aren't part of the cache key, the binary is run with a
 # temporary directory as the working directory.
+#
+# If the environment variable SWANKY_CACHING_TEST_RUNNER_QEMU is set, then the subprocess will be
+# run like `$SWANKY_CACHING_TEST_RUNNER_QEMU target/deps/debug/asdf --exact my_test`
 import datetime
 import os
 import subprocess
@@ -25,21 +28,24 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 
 from etc.ci.xattr_hash import cached_blake2b
 
+SWANKY_CACHING_TEST_RUNNER_QEMU = os.environ.get("SWANKY_CACHING_TEST_RUNNER_QEMU")
+
 CACHE_DIR = Path(os.environ["SWANKY_CACHE_DIR"]) / "cached-tests-v1"
 TEST_RESULTS = CACHE_DIR / "test-results"
 TEST_RESULTS.mkdir(exist_ok=True, parents=True)
 
-exe = Path(sys.argv[1])
+exe = Path(sys.argv[1]).resolve()
 args = sys.argv[2:]
 assert exe.exists()
 
 
 exe_hash = cached_blake2b(exe)
 
-test_output = (
-    TEST_RESULTS
-    / sha256("\n".join(args).encode("ascii") + b"\n@$@$||\n" + exe_hash).hexdigest()
-)
+cache_key = "\n".join(args).encode("ascii") + b"\n@$@$||\n" + exe_hash
+if SWANKY_CACHING_TEST_RUNNER_QEMU:
+    cache_key += SWANKY_CACHING_TEST_RUNNER_QEMU.encode("ascii")
+
+test_output = TEST_RESULTS / sha256(cache_key).hexdigest()
 if test_output.exists():
     data = cbor2.loads(test_output.read_bytes())
     sys.stderr.write(data["cache_info"])
@@ -53,6 +59,8 @@ else:
     data = {
         "cache_info": f"CACHE HIT {exe} at {datetime.datetime.now().isoformat()} with {args}\n",
     }
+    if SWANKY_CACHING_TEST_RUNNER_QEMU:
+        data["cache_info"] += f"emulator={SWANKY_CACHING_TEST_RUNNER_QEMU}\n"
     lock = threading.Lock()
     output = []
 
@@ -69,13 +77,27 @@ else:
             dst.write(buf)
             dst.flush()
 
-    print(f"TEST CACHE MISS {exe} with {args}", file=sys.stderr)
+    print(
+        f"TEST CACHE MISS {exe} with {args}"
+        + (
+            f" emulator={SWANKY_CACHING_TEST_RUNNER_QEMU}"
+            if SWANKY_CACHING_TEST_RUNNER_QEMU
+            else ""
+        ),
+        file=sys.stderr,
+    )
     with tempfile.TemporaryDirectory() as tmp_str:
         # try to sandbox by changing the cwd
         tmp = Path(tmp_str)
         # We use the this dir so that we can hard link
         proc = subprocess.Popen(
-            [str(exe)] + args,
+            (
+                [SWANKY_CACHING_TEST_RUNNER_QEMU]
+                if SWANKY_CACHING_TEST_RUNNER_QEMU
+                else []
+            )
+            + [str(exe)]
+            + args,
             cwd=tmp,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

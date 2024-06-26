@@ -1,7 +1,10 @@
 use std::process::Command;
 
+mod array_utils_impls;
+mod backend;
+
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=build/main.rs");
     if std::env::var("CARGO_CFG_VECTOREYES_TARGET_CPU_NATIVE").is_ok() {
         let output = Command::new(std::env::var("RUSTC").expect("RUSTC env var"))
             .arg("-C")
@@ -25,9 +28,16 @@ fn main() {
         let last_whitespace = native_line.rfind(' ').expect("there is some whitespace");
         // The last two characters are ")."
         let target_cpu = &native_line[last_whitespace + 1..native_line.len() - 2];
-        if !lines.any(|line| line.trim() == target_cpu) {
+        if !lines.any(|line| {
+            line.split_ascii_whitespace()
+                .next()
+                .unwrap_or_default()
+                .contains(target_cpu)
+        }) {
             panic!("target_cpu {:?} doesn't seem to be valid", target_cpu);
         }
         println!("cargo:rustc-cfg=vectoreyes_target_cpu={:?}", target_cpu);
     }
+    array_utils_impls::generate();
+    backend::generate();
 }
