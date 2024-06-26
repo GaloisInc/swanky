@@ -2,5 +2,5 @@
 rustflags = [
     "-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native",
 ]
-# See this script for the rationale
+# Pass --html-in-header flags to rustdoc. See the script for details.
 rustdoc = "./etc/rustdoc-wrapper.sh"
