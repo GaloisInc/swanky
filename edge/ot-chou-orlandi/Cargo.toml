@@ -20,6 +20,9 @@ swanky-ocelot-error.workspace = true
 swanky-ot-traits.workspace = true
 blake3.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [dev-dependencies]
 swanky-ot-test.workspace = true
 criterion.workspace = true

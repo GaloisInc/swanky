@@ -29,6 +29,9 @@ vectoreyes.workspace = true
 blake3.workspace = true
 bytemuck.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [dev-dependencies]
 swanky-ot-test.workspace = true
 criterion.workspace = true

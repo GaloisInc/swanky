@@ -1,6 +1,8 @@
-[build]
-rustflags = [
-    "-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native", "-C", "link-args=-flto"
-]
 # Pass --html-in-header flags to rustdoc. See the script for details.
 rustdoc = "./etc/rustdoc-wrapper.sh"
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native", "-C", "link-args=-flto"]
+
+[target.wasm32-unknown-unknown]
+rustflags = []
