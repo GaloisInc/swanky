@@ -15,6 +15,7 @@
 //!
 
 #![deny(missing_docs)]
+#![allow(non_snake_case)]
 
 pub mod circuit;
 pub mod circuit_validator;
@@ -23,3 +24,4 @@ pub mod proof;
 pub mod vole;
 
 pub use proof::Proof;
+pub mod vole_prime;

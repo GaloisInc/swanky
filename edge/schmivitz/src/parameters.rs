@@ -42,3 +42,36 @@ pub const VOLE_SIZE_PARAM: usize = 8;
 /// [security parameter $`\lambda`$](SECURITY_PARAM) and the
 /// [VOLE size parameter $`r`$](VOLE_SIZE_PARAM).
 pub const REPETITION_PARAM: usize = 16;
+
+// The prime stuff
+///
+pub const TAU: usize = 16;
+///
+pub const NC: usize = TAU;
+///
+pub const KC: usize = 8; // Kc should be power of 2, such that Nc <= 2*Kc (comes from the 2*k^th root of unity thingy in the RS encoding)
+
+///
+pub const D0: usize = 8;
+///
+pub const D1: usize = 8;
+
+///
+pub const T0: usize = (SECURITY_PARAM + (TAU - 1)) / TAU;
+///
+pub const T1: usize = SECURITY_PARAM / TAU;
+
+///
+pub const N0: usize = 1 << D0;
+///
+pub const N1: usize = 1 << D1;
+
+///
+pub const MAX_DEG: usize = 2;
+
+///
+pub const MAX_BIT_LEN: usize = 512;
+///
+pub const ONE_LIMB: usize = 64;
+///
+pub const MAX_LIMBS_SUPPORTED: usize = MAX_BIT_LEN / ONE_LIMB;

@@ -9,7 +9,7 @@ use std::sync::Mutex;
 fn to_hex(buf: &[u8]) -> String {
     let mut out = String::new();
     for byte in buf {
-        write!(out, "{byte:x}").unwrap();
+        write!(out, "{:x}", byte).unwrap();
     }
     out
 }
@@ -33,8 +33,29 @@ fn main() {
         PrimeFieldCodegen {
             ident: "F127p",
             is_pub: true,
-            modulus: "170141183460469231731687303715884105727",
-            generator: "43",
+            modulus: "170141183460469231731687303715884105217",
+            generator: "5",
+            endianness: Little,
+        },
+        PrimeFieldCodegen {
+            ident: "F32p",
+            is_pub: true,
+            modulus: "4294966769",
+            generator: "3",
+            endianness: Little,
+        },
+        PrimeFieldCodegen {
+            ident: "F61p",
+            is_pub: true,
+            modulus: "2305843009213693951",
+            generator: "37",
+            endianness: Little,
+        },
+        PrimeFieldCodegen {
+            ident: "F64p",
+            is_pub: true,
+            modulus: "18446744073709551521",
+            generator: "3",
             endianness: Little,
         },
         PrimeFieldCodegen {
@@ -61,8 +82,8 @@ fn main() {
         PrimeFieldCodegen {
             ident: "F256p",
             is_pub: true,
-            modulus: "115792089210356248762697446949407573530086143415290314195533631308867097853951",
-            generator: "6",
+            modulus: "115792089237316195423570985008687907853269984665640564039457584007913129637873",
+            generator: "3",
             endianness: Little,
         },
         PrimeFieldCodegen {
@@ -176,7 +197,7 @@ fn main() {
         for (k, v) in outputs.iter() {
             std::fs::write(tmpdir.path().join(k), v.as_bytes()).unwrap();
         }
-        std::fs::rename(tmpdir.keep(), cache_entry).unwrap();
+        std::fs::rename(tmpdir.into_path(), cache_entry).unwrap();
     }
     println!("cargo:rerun-if-changed=build.rs");
 }
