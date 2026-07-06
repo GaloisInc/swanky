@@ -23,6 +23,9 @@ swanky-ot-traits.workspace = true
 itertools.workspace = true
 rand.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [dev-dependencies]
 swanky-ot-chou-orlandi.workspace = true
 swanky-ot-alsz-kos.workspace = true
