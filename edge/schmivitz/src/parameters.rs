@@ -44,34 +44,34 @@ pub const VOLE_SIZE_PARAM: usize = 8;
 pub const REPETITION_PARAM: usize = 16;
 
 // The prime stuff
-///
+/// The number of GGM tree repetition
 pub const TAU: usize = 16;
-///
+/// Number of instances of small-∆ VOLE
 pub const NC: usize = TAU;
-///
+/// Dimension of linear code C
 pub const KC: usize = 8; // Kc should be power of 2, such that Nc <= 2*Kc (comes from the 2*k^th root of unity thingy in the RS encoding)
 
-///
+/// Larger bit length for small-∆ VOLE
 pub const D0: usize = 8;
-///
+/// Smaller bit length for small-∆ VOLE
 pub const D1: usize = 8;
 
-///
+/// Larger GGM tree repetition
 pub const T0: usize = (SECURITY_PARAM + (TAU - 1)) / TAU;
-///
+/// Smaller GGM tree repetition
 pub const T1: usize = SECURITY_PARAM / TAU;
 
-///
+/// Sizes of ∆ space for small-∆ VOLE
 pub const N0: usize = 1 << D0;
-///
+/// Sizes of ∆ space for small-∆ VOLE
 pub const N1: usize = 1 << D1;
 
-///
+/// The maximum degree of the VOLE proofs
 pub const MAX_DEG: usize = 2;
 
-///
+/// Maximum supported bit length for Fields
 pub const MAX_BIT_LEN: usize = 512;
-///
+/// size of one u64 taking one limb of the Field element
 pub const ONE_LIMB: usize = 64;
-///
+/// Maximum limbs needed
 pub const MAX_LIMBS_SUPPORTED: usize = MAX_BIT_LEN / ONE_LIMB;
