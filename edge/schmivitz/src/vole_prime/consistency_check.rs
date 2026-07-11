@@ -86,7 +86,7 @@ pub(crate) fn compute_Delta_Chall<Fp: PrimeFiniteField>(
 #[cfg(test)]
 mod test {
     use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
-    use swanky_field_ff_primes::{F127p, F128p, F256p, F32p, F64p};
+    use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F64p};
 
     use crate::vole_prime::{
         commit_reconstruct::get_prime_ell_hat_len,
@@ -218,8 +218,8 @@ mod test {
         test_Delta_chall::<F64p>();
     }
     #[test]
-    fn test_Delta_chall_f127p() {
-        test_Delta_chall::<F127p>();
+    fn test_Delta_chall_frs127p() {
+        test_Delta_chall::<Frs127p>();
     }
     #[test]
     fn test_Delta_chall_f128p() {

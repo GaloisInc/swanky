@@ -52,7 +52,7 @@ mod test {
     use crate::vole_prime::convert_to_vole::Seed;
     use rand::Rng;
     use swanky_field::{FiniteField, PrimeFiniteField};
-    use swanky_field_ff_primes::{F127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
+    use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
 
     fn test_convert_to_vole<Fp>()
     where
@@ -94,8 +94,8 @@ mod test {
         test_convert_to_vole::<F64p>();
     }
     #[test]
-    fn test_convert_to_vole_f127p() {
-        test_convert_to_vole::<F127p>();
+    fn test_convert_to_vole_frs127p() {
+        test_convert_to_vole::<Frs127p>();
     }
     #[test]
     fn test_convert_to_vole_f128p() {

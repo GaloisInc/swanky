@@ -503,6 +503,28 @@ prime_field_using_ff!(
     /// $`P = 2^{127} - 511`$.
     F127p,
     f127p,
+    modulus = "170141183460469231731687303715884105727",
+    generator = "43",
+    limbs = 2,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U16,
+    num_bits = generic_array::typenum::U127,
+);
+impl FieldForFFT<2> for F127p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([1u128, 170141183460469231731687303715884105726u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{127} - 511`$.
+    Frs127p,
+    frs127rsp,
     modulus = "170141183460469231731687303715884105217",
     generator = "5",
     limbs = 2,
@@ -510,7 +532,7 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U16,
     num_bits = generic_array::typenum::U127,
 );
-impl FieldForFFT<2> for F127p {
+impl FieldForFFT<2> for Frs127p {
     const PHI_EXP: usize = 1;
 
     #[inline]

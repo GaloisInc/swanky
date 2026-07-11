@@ -208,7 +208,7 @@ mod test {
     use proptest::prelude::*;
     use rand::Rng;
     use swanky_field::{FiniteField, PrimeFiniteField};
-    use swanky_field_ff_primes::{F127p, F128p, F256p, F32p, F64p};
+    use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F64p};
 
     fn test_num_rec<Fp>()
     where
@@ -244,8 +244,8 @@ mod test {
     }
 
     #[test]
-    fn test_num_rec_f127p() {
-        test_num_rec::<F127p>();
+    fn test_num_rec_frs127p() {
+        test_num_rec::<Frs127p>();
     }
     #[test]
     fn test_num_rec_f128p() {
@@ -377,8 +377,8 @@ mod test {
         test_1_vc_depth_n::<F64p>();
     }
     #[test]
-    fn test_1_vc_depth_n_f127p() {
-        test_1_vc_depth_n::<F127p>();
+    fn test_1_vc_depth_n_frs127p() {
+        test_1_vc_depth_n::<Frs127p>();
     }
     #[test]
     fn test_1_vc_depth_n_f128p() {

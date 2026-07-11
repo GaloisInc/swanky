@@ -44,7 +44,7 @@ stupid test cases
 #[cfg(test)]
 mod test {
     use swanky_field::{FiniteField, PrimeFiniteField};
-    use swanky_field_ff_primes::{F127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
+    use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
 
     use crate::vole_prime::utils::{fp_a_gt_fp_b, fp_to_u64arr, get_vec_u8_bit};
 
@@ -93,8 +93,8 @@ mod test {
         test_a_gt_b::<F64p>();
     }
     #[test]
-    fn test_a_gt_b_f127p() {
-        test_a_gt_b::<F127p>();
+    fn test_a_gt_b_frs127p() {
+        test_a_gt_b::<Frs127p>();
     }
     #[test]
     fn test_a_gt_b_f128p() {

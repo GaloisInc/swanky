@@ -127,7 +127,7 @@ pub(crate) fn reed_solomon_encode<Fp: PrimeFiniteField + swanky_field_fft::Field
 #[cfg(test)]
 mod test {
     use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
-    use swanky_field_ff_primes::{F127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
+    use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
     use swanky_field_fft::{fft2, fft2_inverse};
 
     use super::compute_nth_root_of_unity;
@@ -154,8 +154,8 @@ mod test {
         test_root_of_unity::<F64p>();
     }
     #[test]
-    fn test_root_of_unity_f127p() {
-        test_root_of_unity::<F127p>();
+    fn test_root_of_unity_frs127p() {
+        test_root_of_unity::<Frs127p>();
     }
     #[test]
     fn test_root_of_unity_f128p() {
