@@ -15,7 +15,6 @@
 //!
 
 #![deny(missing_docs)]
-#![allow(non_snake_case)]
 
 pub mod circuit;
 pub mod circuit_validator;
