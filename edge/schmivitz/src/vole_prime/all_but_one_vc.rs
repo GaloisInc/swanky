@@ -144,7 +144,7 @@ pub(crate) fn open(decom: &Decom, chall_as_bytes: Vec<u8>, tree_depth: usize) ->
     let mut cop: Vec<Key> = Vec::with_capacity(tree_depth);
 
     let (ks, coms) = decom;
-    let mut a: usize = 0;
+    let mut computed_chall_num: usize = 0;
 
     let chall_as_bits = (0..tree_depth).map(|d| (chall_as_bytes[d / 8] >> d % 8) & 1 == 1).collect::<Vec<_>>();
 
@@ -156,12 +156,12 @@ pub(crate) fn open(decom: &Decom, chall_as_bytes: Vec<u8>, tree_depth: usize) ->
     for d in 0..tree_depth {
         let b = chall_as_bits[(tree_depth - 1) - d]; // iter.rev
         // let b_num = if b { 1 } else { 0 };
-        let idx: usize = (2 * a) + (1 - (b as usize));
+        let idx: usize = (2 * computed_chall_num) + (1 - (b as usize));
         cop.push(ks.get(d + 1, idx));
 
-        a = (2 * a) + (b as usize);
+        computed_chall_num = (2 * computed_chall_num) + (b as usize);
     }
-    debug_assert_eq!(chall_num, a);
+    debug_assert_eq!(chall_num, computed_chall_num);
     (cop, coms[chall_num])
 }
 
