@@ -14,6 +14,7 @@ use swanky_field::PrimeFiniteField;
 use super::all_but_one_vc::{chall_fp_vec_to_bytes_vec, get_chall_for_ith_tree};
 use super::crypto_primitives::H1;
 
+/// The spec is still under progress currently
 #[allow(dead_code)]
 pub(crate) struct Commit<Fp: PrimeFiniteField> {
     pub(crate) com: Com,
