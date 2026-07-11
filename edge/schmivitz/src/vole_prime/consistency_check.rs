@@ -36,7 +36,7 @@ pub(crate) fn compute_Hv_Chall<Fp: PrimeFiniteField>(
     C: Corrections<Fp>,
     ell_hat: usize,
 ) -> Vec<Fp> {
-    let mut C_bytes = chall_fp_vec_to_bytes_vec(C.to_vec());
+    let mut C_bytes = chall_fp_vec_to_bytes_vec(&C.to_vec());
     let mut hcom_plus_c_bytes = Vec::with_capacity(hcom.len() + C_bytes.len());
 
     hcom_plus_c_bytes.append(&mut hcom.to_vec());
@@ -60,7 +60,7 @@ pub(crate) fn compute_Delta_Chall<Fp: PrimeFiniteField>(
     nc: usize,
     tree_depth: usize,
 ) -> Vec<Fp> {
-    let mut U_tilde_bytes = chall_fp_vec_to_bytes_vec(U_tilde);
+    let mut U_tilde_bytes = chall_fp_vec_to_bytes_vec(&U_tilde);
     let mut h_small_plus_u_tilde_bytes = Vec::with_capacity(h_small.len() + U_tilde_bytes.len());
 
     h_small_plus_u_tilde_bytes.append(&mut U_tilde_bytes);

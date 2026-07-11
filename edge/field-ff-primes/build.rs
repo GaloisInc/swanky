@@ -89,15 +89,8 @@ fn main() {
         PrimeFieldCodegen {
             ident: "F256p",
             is_pub: true,
-            modulus: "115792089210356248762697446949407573530086143415290314195533631308867097853951",
-            generator: "6",
-            endianness: Little,
-        },
-        PrimeFieldCodegen {
-            ident: "Frs256p",
-            is_pub: true,
-            modulus: "115792089210356248762697446949407573530086143415290314195533631308867097853951",
-            generator: "6",
+            modulus: "115792089237316195423570985008687907853269984665640564039457584007913129637873",
+            generator: "3",
             endianness: Little,
         },
         PrimeFieldCodegen {

@@ -10,18 +10,20 @@ use swanky_field::PrimeFiniteField;
 use rand::Rng;
 
 /// Converts chall Fp to u8 vector accoridng to the bit len of chall Fp.
-pub(crate) fn chall_fp_vec_to_bytes_vec<Fp: PrimeFiniteField>(chall_fp: Vec<Fp>) -> Vec<u8> {
+pub(crate) fn chall_fp_vec_to_bytes_vec<Fp: PrimeFiniteField>(chall_fp: &Vec<Fp>) -> Vec<u8> {
     assert!(Fp::ZERO.bit_decomposition().len() >= 32);
 
-    let chall_fp_vec_len = chall_fp.len();
-    let chall_fp_byte_len = chall_fp[0].to_bytes().to_vec().len();
+    chall_fp.iter().flat_map(|fp| fp.to_bytes().to_vec()).collect()
 
-    let mut chall_bytes = Vec::with_capacity(chall_fp_vec_len * chall_fp_byte_len);
+    // let chall_fp_vec_len = chall_fp.len();
+    // let chall_fp_byte_len = chall_fp[0].to_bytes().to_vec().len();
 
-    for chall_i in chall_fp.clone() {
-        chall_bytes.extend(chall_i.to_bytes().to_vec());
-    }
-    return chall_bytes;
+    // let mut chall_bytes = Vec::with_capacity(chall_fp_vec_len * chall_fp_byte_len);
+
+    // for chall_i in chall_fp.clone() {
+    //     chall_bytes.extend(chall_i.to_bytes().to_vec());
+    // }
+    // return chall_bytes;
 }
 
 /// Pass the u8 vector of the Fp chall. Returns the correct u8 chall for the ith tree.
@@ -219,7 +221,7 @@ mod test {
         let mut chall = 0;
         let mut chall_fp = Vec::with_capacity(1);
         chall_fp.push(Fp::try_from(chall).expect("encode failed"));
-        let mut chall_as_bytes = chall_fp_vec_to_bytes_vec(chall_fp);
+        let mut chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
 
         let mut a = num_rec(chall_as_bytes, depth);
         assert_eq!(a, chall as usize);
@@ -228,7 +230,7 @@ mod test {
         chall = 15;
         let mut chall_fp = Vec::with_capacity(1);
         chall_fp.push(Fp::try_from(chall).expect("encode failed"));
-        chall_as_bytes = chall_fp_vec_to_bytes_vec(chall_fp);
+        chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
 
         a = num_rec(chall_as_bytes, depth);
         assert_eq!(a, chall as usize);
@@ -237,7 +239,7 @@ mod test {
         chall = (1 << 8) - 1;
         let mut chall_fp = Vec::with_capacity(1);
         chall_fp.push(Fp::try_from(chall).expect("encode failed"));
-        chall_as_bytes = chall_fp_vec_to_bytes_vec(chall_fp);
+        chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
 
         a = num_rec(chall_as_bytes, depth);
         assert_eq!(a, chall as usize);
@@ -264,7 +266,7 @@ mod test {
     ) -> Result<(), TestCaseError> {
         // prover side
         let (h, decom, _) = commit(r, iv, tree_depth);
-        let chall_bytes: Vec<u8> = chall_fp_vec_to_bytes_vec(chall_fp);
+        let chall_bytes: Vec<u8> = chall_fp_vec_to_bytes_vec(&chall_fp);
         let Fp_bit_len = Fp::ZERO.bit_decomposition().len();
         assert_eq!(chall_bytes.len(), chall_byte_len);
         let n_tree_chall_bytes = get_chall_for_ith_tree(chall_bytes, tree_idx, t0, Fp_bit_len);
@@ -337,7 +339,7 @@ mod test {
     ) -> Result<(), TestCaseError> {
         // prover side
         let (h, decom, _) = commit(r, iv, tree_depth);
-        let chall_bytes = chall_fp_vec_to_bytes_vec(chall_fp);
+        let chall_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
         let pdecom: Pdecom = open(&decom, chall_bytes.clone(), tree_depth);
 
         // verifier side

@@ -181,7 +181,7 @@ pub(crate) fn vole_open<Fp: PrimeFiniteField>(
 ) -> Vec<Pdecom> {
     let mut pdecom = Vec::with_capacity(tau);
 
-    let chall_as_bytes = chall_fp_vec_to_bytes_vec(chall.clone());
+    let chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall);
 
     let Fp_bit_len = Fp::ZERO.bit_decomposition().len();
     for i in 0..tau {
@@ -207,7 +207,7 @@ pub(crate) fn vole_verify<Fp: PrimeFiniteField>(
     depth: usize,
     tree_idx: usize,
 ) -> (H1, Vec<Seed>) {
-    let delta_as_bytes = chall_fp_vec_to_bytes_vec(delta);
+    let delta_as_bytes = chall_fp_vec_to_bytes_vec(&delta);
 
     let Fp_bit_len = Fp::ZERO.bit_decomposition().len();
     let ith_tree_delta_bytes = get_chall_for_ith_tree(delta_as_bytes, tree_idx, T0, Fp_bit_len);

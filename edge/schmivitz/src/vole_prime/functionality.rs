@@ -158,7 +158,7 @@ pub(crate) fn prover_p3<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>
 
     // line VOLE.P3::2
     let mut decom_delta: Vec<Pdecom> = Vec::with_capacity(nc);
-    let delta_as_bytes = chall_fp_vec_to_bytes_vec(delta.clone());
+    let delta_as_bytes = chall_fp_vec_to_bytes_vec(&delta.clone());
 
     let Fp_bit_len = Fp::ZERO.bit_decomposition().len();
     for i in 0..nc {
@@ -457,7 +457,6 @@ mod test {
     use crate::vole_prime::{
         self,
         commit_reconstruct::get_prime_ell_hat_len,
-        // parameters::{KC, NC, D0, D1, N0, N1, T0, T1, TAU}
     };
 
     use crate::parameters::{D0, D1, KC, N0, NC, T0, TAU};
@@ -471,11 +470,9 @@ mod test {
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
-        // TODO: changing to 0xff overflows
-        let r: IV = [0x01; 16];
-        let iv: IV = [0x01; 16];
+        let r: IV = [0xee; 16];
+        let iv: IV = [0xee; 16];
         let ell_hat = get_prime_ell_hat_len(1);
-        // let ell_hat = 1;
 
         let start = Instant::now();
         let vole_prover: vole_prime::functionality::VoleProver<Fp> =
@@ -494,7 +491,7 @@ mod test {
         assert!(vole_verifier.is_verifier);
     }
 
-    // RUSTFLAGS="-C debuginfo=2" cargo test --release test_vole_prover_and_verifier_f256p -- --nocapture
+    // NOTE: RUSTFLAGS="-C debuginfo=2" cargo test --release test_vole_prover_and_verifier_f256p -- --nocapture
 
     #[test]
     fn test_vole_prover_and_verifier_f32p() {

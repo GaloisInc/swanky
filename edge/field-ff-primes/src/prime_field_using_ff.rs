@@ -29,25 +29,25 @@ macro_rules! try_from_helper {
             type Error = BiggerThanModulus;
 
             fn try_from(value: u128) -> Result<Self, Self::Error> {
-                // TODO: Super patchy work, works for now, make it elegant
-                // NOTE: Chnaces of something getting "falsely encoded" due to the if statements is low ':),, but still fix this patchy fix
-                // For the              F256p                                       F384p                                           F400p
-                if value == 0xffffffffffffffffffffffffffffff43
-                    || value == 0xfffffffffffffffffffffffffffffec3
-                    || value == 0xfffffffffffffffffffffffffffffdaf
-                {
-                    let mut bytes = [0u8; $limbs * 8];
-                    let val_lo = value.to_le_bytes();
-                    let val_hi = (0xffffffffffffffffffffffffffffffff as u128).to_le_bytes();
-                    bytes[0..16].copy_from_slice(&val_lo);
-                    bytes[16..32].copy_from_slice(&val_hi);
-                    $name::from_bytes_array(bytes)
-                } else {
+                // // TODO: Super patchy work, works for now, make it elegant
+                // // NOTE: Chnaces of something getting "falsely encoded" due to the if statements is low ':),, but still fix this patchy fix
+                // // For the              F256p                                       F384p                                           F400p
+                // if value == 0xffffffffffffffffffffffffffffff43
+                //     || value == 0xfffffffffffffffffffffffffffffec3
+                //     || value == 0xfffffffffffffffffffffffffffffdaf
+                // {
+                //     let mut bytes = [0u8; $limbs * 8];
+                //     let val_lo = value.to_le_bytes();
+                //     let val_hi = (0xffffffffffffffffffffffffffffffff as u128).to_le_bytes();
+                //     bytes[0..16].copy_from_slice(&val_lo);
+                //     bytes[16..32].copy_from_slice(&val_hi);
+                //     $name::from_bytes_array(bytes)
+                // } else {
                     let mut bytes = [0u8; $limbs * 8];
                     let value = value.to_le_bytes();
                     bytes[0..16].copy_from_slice(&value);
                     $name::from_bytes_array(bytes)
-                }
+                // }
             }
         }
     };
