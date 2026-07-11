@@ -122,7 +122,7 @@ pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
 }
 
 /// Pass u8 vector chall derived from Fp vec chall. Returns the leaf position on the tree
-pub(crate) fn num_rec(chall_bytes: Vec<u8>, tree_depth: usize) -> usize {
+pub(crate) fn num_rec(chall_bytes: &Vec<u8>, tree_depth: usize) -> usize {
     let mut r = 0;
     let mut pow2 = 1;
     for d in 0..tree_depth {
@@ -140,7 +140,7 @@ pub(crate) fn open(decom: &Decom, chall_as_bytes: Vec<u8>, tree_depth: usize) ->
         "Open function from all-but-one vector commitment scheme failed because of incompatible lengths of decommitment and index to open."
     );
 
-    let chall_num = num_rec(chall_as_bytes.clone(), tree_depth);
+    let chall_num = num_rec(&chall_as_bytes, tree_depth);
     let mut cop: Vec<Key> = Vec::with_capacity(tree_depth);
 
     let (ks, coms) = decom;
@@ -192,7 +192,7 @@ pub(crate) fn reconstruct(
 
         pos = if *b { pos + how_many } else { pos };
     }
-    debug_assert_eq!(pos, num_rec(delta_as_bytes.clone(), depth));
+    debug_assert_eq!(pos, num_rec(&delta_as_bytes, depth));
     coms[pos] = com_j;
 
     let h_alpha = h1_on_coms(&coms);
@@ -223,7 +223,7 @@ mod test {
         chall_fp.push(Fp::try_from(chall).expect("encode failed"));
         let mut chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
 
-        let mut a = num_rec(chall_as_bytes, depth);
+        let mut a = num_rec(&chall_as_bytes, depth);
         assert_eq!(a, chall as usize);
 
         depth = 4;
@@ -232,7 +232,7 @@ mod test {
         chall_fp.push(Fp::try_from(chall).expect("encode failed"));
         chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
 
-        a = num_rec(chall_as_bytes, depth);
+        a = num_rec(&chall_as_bytes, depth);
         assert_eq!(a, chall as usize);
 
         depth = 8;
@@ -241,7 +241,7 @@ mod test {
         chall_fp.push(Fp::try_from(chall).expect("encode failed"));
         chall_as_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
 
-        a = num_rec(chall_as_bytes, depth);
+        a = num_rec(&chall_as_bytes, depth);
         assert_eq!(a, chall as usize);
     }
 
