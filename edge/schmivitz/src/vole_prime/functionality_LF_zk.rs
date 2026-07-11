@@ -321,9 +321,9 @@ pub(crate) fn zk_verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
 
     let ret = verifier_LF(proof_LF, iv, ell_hat, tau, n0, d0, d1, t0, nc, kc);
 
-    let VoleVerifier_LF { ref flag, S_LF: _ } = ret;
+    let VoleVerifier_LF { ref is_verifier, S_LF: _ } = ret;
 
-    if *flag == false {
+    if *is_verifier == false {
         return false;
     }
 

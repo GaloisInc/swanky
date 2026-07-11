@@ -219,7 +219,7 @@ pub(crate) fn create_vole_prover<Fp: PrimeFiniteField + swanky_field_fft::FieldF
 
 #[derive(Clone)]
 pub(crate) struct VoleVerifier<Fp: PrimeFiniteField> {
-    pub(crate) flag: bool,
+    pub(crate) is_verifier: bool,
     pub(crate) Q: Vec<Vec<Fp>>,
 }
 
@@ -252,7 +252,7 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
 
     let mut all_tree_seeds = Vec::with_capacity(tau);
     let mut all_tree_hi = Vec::with_capacity(tau);
-    let mut flag: bool = true;
+    let mut is_verifier: bool = true;
 
     for tree_idx in 0..tau {
         // line VOLE.V::2
@@ -289,7 +289,7 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
     if com != reconstructed_hash {
         let err = vec![];
         return VoleVerifier {
-            flag: false,
+            is_verifier: false,
             Q: err,
         };
     }
@@ -420,13 +420,13 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
     assert_eq!(h_small, H_1);
     for i in 0..h_small.len() {
         if h_small[i] != H_1[i] {
-            flag = false;
+            is_verifier = false;
             break;
         }
     }
 
     // line VOLE.V::14
-    VoleVerifier { flag: flag, Q: q }
+    VoleVerifier { is_verifier: is_verifier, Q: q }
 }
 
 // line This contains VOLE.V
@@ -491,7 +491,7 @@ mod test {
         let millis = duration.as_millis();
         println!("Verifier Time elapsed: {} ms", millis);
 
-        assert!(vole_verifier.flag);
+        assert!(vole_verifier.is_verifier);
     }
 
     // RUSTFLAGS="-C debuginfo=2" cargo test --release test_vole_prover_and_verifier_f256p -- --nocapture

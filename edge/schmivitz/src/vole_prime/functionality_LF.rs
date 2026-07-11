@@ -46,7 +46,7 @@ pub(crate) struct VoleProver_LF<Fp: PrimeFiniteField> {
 
 #[derive(Clone)]
 pub(crate) struct VoleVerifier_LF<Fp: PrimeFiniteField> {
-    pub(crate) flag: bool,
+    pub(crate) is_verifier: bool,
     pub(crate) S_LF: Vec<Fp>,
 }
 
@@ -252,7 +252,7 @@ pub(crate) fn verifier_LF<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
 
     let ret = verifier(voleprover, iv, 2 * ell_hat, tau, n0, d0, d1, t0, nc, kc);
 
-    let VoleVerifier { ref flag, ref Q } = ret;
+    let VoleVerifier { ref is_verifier, ref Q } = ret;
 
     assert_eq!(Q.len(), nc);
     assert_eq!(Q[0].len(), 2 * ell_hat);
@@ -319,7 +319,7 @@ pub(crate) fn verifier_LF<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
     assert_eq!(H_1, *h_large);
 
     VoleVerifier_LF {
-        flag: true,
+        is_verifier: true,
         S_LF: S.to_vec(),
     }
 }
@@ -452,7 +452,7 @@ mod test {
         let millis = duration.as_millis();
         println!("Verifier Time elapsed: {} ms", millis);
 
-        // assert!(vole_verifier.flag);
+        // assert!(vole_verifier.is_verifier);
     }
 
     // RUSTFLAGS="-C debuginfo=2" cargo test --release test_vole_prover_and_verifier_f256p -- --nocapture
