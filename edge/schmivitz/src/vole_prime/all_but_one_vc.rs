@@ -146,10 +146,12 @@ pub(crate) fn open(decom: &Decom, chall_as_bytes: Vec<u8>, tree_depth: usize) ->
     let (ks, coms) = decom;
     let mut a: usize = 0;
 
-    let mut chall_as_bits: Vec<bool> = Vec::with_capacity(tree_depth);
-    for d in 0..tree_depth {
-        chall_as_bits.push((chall_as_bytes[d / 8] >> d % 8) & 1 == 1);
-    }
+    let chall_as_bits = (0..tree_depth).map(|d| (chall_as_bytes[d / 8] >> d % 8) & 1 == 1).collect::<Vec<_>>();
+
+    // let mut chall_as_bits: Vec<bool> = Vec::with_capacity(tree_depth);
+    // for d in 0..tree_depth {
+    //     chall_as_bits.push((chall_as_bytes[d / 8] >> d % 8) & 1 == 1);
+    // }
 
     for d in 0..tree_depth {
         let b = chall_as_bits[(tree_depth - 1) - d]; // iter.rev
