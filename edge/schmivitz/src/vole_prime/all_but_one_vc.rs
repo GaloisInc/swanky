@@ -155,11 +155,11 @@ pub(crate) fn open(decom: &Decom, chall_as_bytes: Vec<u8>, tree_depth: usize) ->
 
     for d in 0..tree_depth {
         let b = chall_as_bits[(tree_depth - 1) - d]; // iter.rev
-        let b_num = if b { 1 } else { 0 };
-        let idx: usize = (2 * a) + (1 - b_num);
+        // let b_num = if b { 1 } else { 0 };
+        let idx: usize = (2 * a) + (1 - (b as usize));
         cop.push(ks.get(d + 1, idx));
 
-        a = (2 * a) + b_num;
+        a = (2 * a) + (b as usize);
     }
     debug_assert_eq!(chall_num, a);
     (cop, coms[chall_num])
