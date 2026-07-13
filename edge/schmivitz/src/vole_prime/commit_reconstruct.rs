@@ -80,7 +80,7 @@ pub(crate) fn vole_commit<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
                 let (com_i, decom_i, seeds) = commit(prg_seeds_i, iv, d1);
 
                 // if (i > 14) {
-                //     println!(
+                //     log::info!(
                 //         // "VOLE: {:?}, {:?}, {:?}, {:?}, {:?}",
                 //         "VOLE: {:?}",
                 //         // decom_delta.0,
@@ -126,7 +126,7 @@ pub(crate) fn vole_commit<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
     );
     assert_eq!(rs_code.len(), ell_hat * nc);
 
-    // println!("rs_code {:?}", rs_code);
+    // log::info!("rs_code {:?}", rs_code);
 
     // line VOLE.P1::8
     let mut U1: Vec<Fp> = Vec::with_capacity(ell_hat * kc);
@@ -216,7 +216,7 @@ pub(crate) fn vole_verify<Fp: PrimeFiniteField>(
     let (h, seed) = reconstruct(decom_delta.clone(), ith_tree_delta_bytes.clone(), iv, depth);
 
     // if tree_idx > 14 {
-    //     println!(
+    //     log::info!(
     //         // "VOLE: {:?}, {:?}, {:?}, {:?}, {:?}",
     //         "VOLE: {:?}",
     //         // decom_delta.0,
@@ -236,7 +236,9 @@ pub(crate) fn get_prime_ell_hat_len(l: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
+    use std::sync::Once;
+
+use rand::Rng;
     use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
 
@@ -253,11 +255,23 @@ mod test {
 
     use crate::vole::crypto_primitives::IV;
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     fn test_vole_commit_reconstruct<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+        
         let mut r: IV = [0; 16];
         let mut iv: IV = [0; 16];
 

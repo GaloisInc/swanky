@@ -85,7 +85,9 @@ pub(crate) fn compute_Delta_Chall<Fp: PrimeFiniteField>(
 
 #[cfg(test)]
 mod test {
-    use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
+    use std::sync::Once;
+
+use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F64p};
 
     use crate::vole_prime::{
@@ -98,12 +100,24 @@ mod test {
 
     use super::vole_hash;
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     // Test that [`vole_hash`] returns 0 when H is all 0.
     fn test_vole_hash_zero<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let l = 3;
         let l_hat = get_prime_ell_hat_len(l);
 
@@ -142,6 +156,9 @@ mod test {
         Fp: FiniteField + PrimeFiniteField,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let l = 3;
         let l_hat = get_prime_ell_hat_len(l);
 
@@ -180,6 +197,9 @@ mod test {
         Fp: FiniteField + PrimeFiniteField,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let hcom = [1; 32];
         let C: Vec<Fp> = vec![Fp::ONE; 2];
         let ell_hat = 8;
@@ -199,6 +219,9 @@ mod test {
         Fp: FiniteField + PrimeFiniteField,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let h_small = [1; 32];
         let U_tilde: Vec<Fp> = vec![Fp::ONE; 2];
         let nc = 8;

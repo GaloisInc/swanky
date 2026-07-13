@@ -196,7 +196,7 @@ pub(crate) fn prover_LF_p2<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<
 
     let h_large: H1 = h1(&inp);
 
-    println!("prover inp 2 {:?}", inp);
+    log::info!("prover inp 2 {:?}", inp);
 
     let delta: Vec<Fp> = compute_Delta_Chall(S.clone(), h_large, nc, d0);
 
@@ -312,7 +312,7 @@ pub(crate) fn verifier_LF<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
         }
     }
 
-    println!("verifier inp 2 {:?}", inp);
+    log::info!("verifier inp 2 {:?}", inp);
 
     let H_1: H1 = h1(&inp);
 
@@ -409,6 +409,7 @@ pub(crate) fn create_vole_LF_verifier<Fp: PrimeFiniteField + swanky_field_fft::F
 #[cfg(test)]
 mod test {
 
+    use std::sync::Once;
     use std::time::Instant;
 
     use swanky_field::{FiniteField, PrimeFiniteField};
@@ -427,11 +428,24 @@ mod test {
 
     use super::create_vole_LF_prover;
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     fn test_vole_prover_and_verifier<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         // TODO: changing to 0xff overflows
         let r: IV = [0x01; 16];
         let iv: IV = [0x01; 16];
@@ -443,14 +457,14 @@ mod test {
             create_vole_LF_prover(r, iv, ell_hat, TAU, NC, KC, T0, D0, D1);
         let duration = start.elapsed();
         let millis = duration.as_millis();
-        println!("Prover Time elapsed: {} ms", millis);
+        log::info!("Prover Time elapsed: {} ms", millis);
 
         let start = Instant::now();
         let vole_verifier =
             create_vole_LF_verifier(vole_prover, iv, ell_hat, TAU, N0, D0, D1, T0, NC, KC);
         let duration = start.elapsed();
         let millis = duration.as_millis();
-        println!("Verifier Time elapsed: {} ms", millis);
+        log::info!("Verifier Time elapsed: {} ms", millis);
 
         // assert!(vole_verifier.is_verifier);
     }

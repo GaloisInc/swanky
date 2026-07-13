@@ -379,7 +379,8 @@ pub(crate) fn zk_verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
 #[cfg(test)]
 mod test {
 
-    use std::time::Instant;
+    use std::sync::Once;
+use std::time::Instant;
 
     use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
@@ -397,12 +398,24 @@ mod test {
 
     use crate::vole::crypto_primitives::IV;
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     fn test_vole_prover_and_verifier<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
-        // TODO: changing to 0xff overflows
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+        
         let r: IV = [0x01; 16];
         let iv: IV = [0x01; 16];
         let deg = MAX_DEG;
@@ -429,14 +442,14 @@ mod test {
         let proof = zk_prover(r, iv, ell, ell_hat, tau, nc, kc, t0, d0, d1, deg, t, W);
         let duration = start.elapsed();
         let millis = duration.as_millis();
-        println!("Prover Time elapsed: {} ms", millis);
+        log::info!("Prover Time elapsed: {} ms", millis);
 
         let start = Instant::now();
         let vole_verifier =
             zk_verifier(proof, iv, ell_hat, ell, tau, n0, t0, d0, d1, deg, t, nc, kc);
         let duration = start.elapsed();
         let millis = duration.as_millis();
-        println!("Verifier Time elapsed: {} ms", millis);
+        log::info!("Verifier Time elapsed: {} ms", millis);
 
         assert!(vole_verifier == true);
     }

@@ -205,7 +205,9 @@ pub(crate) fn reconstruct(
 #[cfg(test)]
 mod test {
 
-    use super::{commit, open, reconstruct, Key, Pdecom, IV};
+    use std::sync::Once;
+
+use super::{commit, open, reconstruct, Key, Pdecom, IV};
     use crate::vole_prime::all_but_one_vc::{
         chall_fp_vec_to_bytes_vec, get_chall_for_ith_tree, num_rec, Seed,
     };
@@ -214,11 +216,24 @@ mod test {
     use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F64p};
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     fn test_num_rec<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+        
         let mut depth = 4;
         let mut chall = 0;
         let mut chall_fp = Vec::with_capacity(1);
@@ -266,6 +281,10 @@ mod test {
         t0: usize,
         chall_byte_len: usize,
     ) -> Result<(), TestCaseError> {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         // prover side
         let (h, decom, _) = commit(r, iv, tree_depth);
         let chall_bytes: Vec<u8> = chall_fp_vec_to_bytes_vec(&chall_fp);
@@ -277,7 +296,7 @@ mod test {
         // verifier side
         let (h1, _) = reconstruct(pdecom, n_tree_chall_bytes, iv, tree_depth);
         assert_eq!(h, h1);
-        println!(
+        log::info!(
             "Passed: tree_count:{} tree_idx:{} tree_depth:{}",
             t0 * 2,
             tree_idx,
@@ -292,6 +311,10 @@ mod test {
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let iv = [1u8; 16];
         let r: [u8; 16] = [2u8; 16];
         let Fp_bit_len = bit_len;
@@ -339,6 +362,10 @@ mod test {
         chall_fp: Vec<Fp>,
         tree_depth: usize,
     ) -> Result<(), TestCaseError> {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         // prover side
         let (h, decom, _) = commit(r, iv, tree_depth);
         let chall_bytes = chall_fp_vec_to_bytes_vec(&chall_fp);
@@ -358,6 +385,9 @@ mod test {
     {
         // let iv = [1u8; 16];
         // let r: [u8; 16] = [2u8; 16];
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
 
         let mut ur = [0u8; 32];
         rand::thread_rng().fill(&mut ur);

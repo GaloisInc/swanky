@@ -245,7 +245,7 @@ pub(crate) fn prg_compact_to_fp<Fp: PrimeFiniteField>(
             assert!(prg_u64_vec[0] as u128 <= x);
         }
 
-        // println!("i {}", i);
+        // log::info!("i {}", i);
         let mut prg_u64_arr = [0u64; MAX_LIMBS_SUPPORTED];
         prg_u64_arr[..Fp::MIN_LIMBS_NEEDED]
             .copy_from_slice(&prg_u64_vec[i..i + Fp::MIN_LIMBS_NEEDED]);

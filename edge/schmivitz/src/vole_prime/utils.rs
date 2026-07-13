@@ -43,13 +43,28 @@ stupid test cases
 */
 #[cfg(test)]
 mod test {
-    use swanky_field::{FiniteField, PrimeFiniteField};
+    use std::sync::Once;
+
+use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
 
     use crate::vole_prime::utils::{fp_a_gt_fp_b, fp_to_u64arr, get_vec_u8_bit};
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     #[test]
     fn test_get_bit() {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let input = vec![0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
         assert_eq!(get_vec_u8_bit(input, 9, 1), 1);
@@ -57,6 +72,10 @@ mod test {
 
     #[test]
     fn test_fp_to_u64arr_fp128() {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         const GEN: u64 = 5;
         let a = F128p::GENERATOR * F128p::try_from(100 as u128).expect("err");
         let b = F128p::GENERATOR * F128p::try_from(200 as u128).expect("err");
@@ -71,6 +90,10 @@ mod test {
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let fp_a = Fp::try_from(6).unwrap_or_default();
         let fp_b = Fp::try_from(10).unwrap_or_default();
         assert_eq!(fp_a_gt_fp_b(fp_a, fp_b), false);

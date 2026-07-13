@@ -32,7 +32,7 @@ pub(crate) fn convert_to_vole<Fp: PrimeFiniteField>(
         let out = prg_compact_to_fp(prg_out.prg_compact(prg_bit_out_len), prg_bit_out_len); // vec of size ell_hat returned
 
         // if j == 0 {
-        //     println!("OUT: {:?}, {:?}", out, seeds[j]);
+        //     log::info!("OUT: {:?}, {:?}", out, seeds[j]);
         // }
 
         let Fp_j = Fp::try_from(j as u128).unwrap_or_default();
@@ -48,17 +48,31 @@ pub(crate) fn convert_to_vole<Fp: PrimeFiniteField>(
 #[cfg(test)]
 mod test {
 
-    use super::convert_to_vole;
+    use std::sync::Once;
+
+use super::convert_to_vole;
     use crate::vole_prime::convert_to_vole::Seed;
     use rand::Rng;
     use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
+
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
 
     fn test_convert_to_vole<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+        
         for ell_hat in 1..3 {
             for depth in (2..16).step_by(6) {
                 let seed_len = 1 << depth;

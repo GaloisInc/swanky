@@ -125,7 +125,7 @@ pub(crate) fn prover_p2<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>
         inp.extend(tmp);
     }
 
-    println!("prover inp 1 {:?}", inp);
+    log::info!("prover inp 1 {:?}", inp);
 
     let h_small: H1 = h1(&inp); // This is just a normal hash
 
@@ -145,11 +145,11 @@ pub(crate) fn prover_p3<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>
     // TODO: Just for debuggung, remove later, for now useful, keep it
     // for i in 0..kc {
     //     for j in 0..ell_hat {
-    //         println!(
+    //         log::info!(
     //             "U: {:?}",
     //             V[i][j].clone() + U1_in_dim[i][j].clone() * delta[i].clone()
     //         );
-    //         println!(
+    //         log::info!(
     //             "P: {:?}",
     //             V[kc + i][j].clone() + P_in_dim[i][j].clone() * delta[kc + i].clone()
     //         );
@@ -313,7 +313,7 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
             let prg: pPRG = pPRG::new(all_tree_seeds[tree_idx][j], iv);
             let tmp = prg_compact_to_fp(prg.prg_compact(bit_len), bit_len);
             // if j == 0 {
-            //     println!("TMP: {:?}, {:?}", tmp, all_tree_seeds[tree_idx][j]);
+            //     log::info!("TMP: {:?}, {:?}", tmp, all_tree_seeds[tree_idx][j]);
             // }
             assert_eq!(tmp.len(), ell_hat);
 
@@ -349,7 +349,7 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
         if tree_idx < kc {
             q.push(q_prime.clone());
             // for ell_hat_idx in 0..ell_hat {
-            //     println!("Uq {:?}", q_prime[ell_hat_idx]);
+            //     log::info!("Uq {:?}", q_prime[ell_hat_idx]);
             // }
         } else {
             let mut tmp: Vec<Fp> = Vec::with_capacity(ell_hat);
@@ -357,7 +357,7 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
                 tmp.push(
                     q_prime[ell_hat_idx] + (delta[tree_idx] * C_in_dim[tree_idx - kc][ell_hat_idx]),
                 );
-                // println!(
+                // log::info!(
                 //     "Pq {:?}",
                 //     q_prime[ell_hat_idx] + (delta[tree_idx] * C_in_dim[tree_idx - kc][ell_hat_idx])
                 // );
@@ -411,7 +411,7 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
         inp.extend(res.to_bytes().to_vec());
     }
 
-    println!("verifier inp 1 {:?}", inp);
+    log::info!("verifier inp 1 {:?}", inp);
 
     let H_1: H1 = h1(&inp);
 
@@ -449,7 +449,8 @@ pub(crate) fn create_vole_verifier<Fp: PrimeFiniteField + swanky_field_fft::Fiel
 #[cfg(test)]
 mod test {
 
-    use std::time::Instant;
+    use std::sync::Once;
+use std::time::Instant;
 
     use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
@@ -465,11 +466,24 @@ mod test {
 
     use super::{create_vole_prover, create_vole_verifier};
 
+    static INIT: Once = Once::new();
+    fn init_logger() {
+        INIT.call_once(|| {
+            let _ =
+                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                    .try_init();
+        });
+    }
+
     fn test_vole_prover_and_verifier<Fp>()
     where
         Fp: FiniteField + PrimeFiniteField + swanky_field_fft::FieldForFFT<2>,
         <Fp as TryFrom<u128>>::Error: std::fmt::Debug,
     {
+
+        // if log-level `RUST_LOG` not already set, then set to info
+        init_logger();
+
         let r: IV = [0xee; 16];
         let iv: IV = [0xee; 16];
         let ell_hat = get_prime_ell_hat_len(1);
@@ -479,14 +493,14 @@ mod test {
             create_vole_prover(r, iv, ell_hat, TAU, NC, KC, T0, D0, D1);
         let duration = start.elapsed();
         let millis = duration.as_millis();
-        println!("Prover Time elapsed: {} ms", millis);
+        log::info!("Prover Time elapsed: {} ms", millis);
 
         let start = Instant::now();
         let vole_verifier =
             create_vole_verifier(vole_prover, iv, ell_hat, TAU, N0, D0, D1, T0, NC, KC);
         let duration = start.elapsed();
         let millis = duration.as_millis();
-        println!("Verifier Time elapsed: {} ms", millis);
+        log::info!("Verifier Time elapsed: {} ms", millis);
 
         assert!(vole_verifier.is_verifier);
     }
