@@ -4,21 +4,25 @@
 
 use swanky_field::PrimeFiniteField;
 
-use super::all_but_one_vc::{chall_fp_vec_to_bytes_vec, h1_on_coms};
+use super::all_but_one_vc::{chall_fp_vec_to_bytes_vec};
 use crate::parameters::MAX_LIMBS_SUPPORTED;
-use crate::vole::crypto_primitives::{Com, IV, Prg};
+use crate::vole::all_but_one_vc::h1_on_coms;
+use crate::vole::crypto_primitives::{Com, H1, IV, Prg};
 use crate::vole_prime;
-use crate::vole_prime::all_but_one_vc::{get_chall_for_ith_tree, Decom};
+use crate::vole_prime::all_but_one_vc::{get_chall_for_ith_tree};
 use crate::vole_prime::crypto_primitives::{pPRG, prg_compact_to_fp};
 use crate::vole_prime::reed_solomon::reed_solomon_encode;
 use crate::vole_prime::utils::fp_a_gt_fp_b;
 use crate::vole_prime::{
-    all_but_one_vc::{open, Pdecom},
+    all_but_one_vc::{open},
     commit_reconstruct::{vole_commit, vole_verify, Commit},
     consistency_check::{compute_Delta_Chall, compute_Hv_Chall, vole_hash},
     convert_to_vole::Corrections,
-    crypto_primitives::{h1, H1},
+    crypto_primitives::{h1},
 };
+use crate::vole::all_but_one_vc::Keys;
+use crate::vole::all_but_one_vc::Decom;
+use crate::vole::all_but_one_vc::Pdecom;
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -280,7 +284,8 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
         all_tree_hi.push(hi);
     }
 
-    let reconstructed_hash = h1_on_coms(&all_tree_hi);
+    let coms: Vec<Com> = all_tree_hi.into_iter().map(|h| h.into_com()).collect();
+    let reconstructed_hash = *h1_on_coms(&coms).as_ref();
 
     // line BAVC.Verify::16
     assert_eq!(com, reconstructed_hash);
@@ -413,13 +418,13 @@ pub(crate) fn verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>(
 
     log::info!("verifier inp 1 {:?}", inp);
 
-    let H_1: H1 = h1(&inp);
+    let h1: H1 = h1(&inp);
 
     // line VOLE.V:13
 
-    assert_eq!(h_small, H_1);
-    for i in 0..h_small.len() {
-        if h_small[i] != H_1[i] {
+    assert_eq!(*h_small.as_ref(), *h1.as_ref());
+    for i in 0..h_small.as_ref().len() {
+        if h_small.as_ref()[i] != h1.as_ref()[i] {
             is_verifier = false;
             break;
         }

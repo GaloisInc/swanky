@@ -1,9 +1,9 @@
 #![allow(clippy::needless_range_loop)]
-use crate::vole::crypto_primitives::{Com};
+use crate::vole::crypto_primitives::{Com, H1, H1_LENGTH};
 use crate::vole_prime::{
     all_but_one_vc::chall_fp_vec_to_bytes_vec,
     convert_to_vole::Corrections,
-    crypto_primitives::{h1, prg_compact_to_fp, H1, pPRG},
+    crypto_primitives::{h1, prg_compact_to_fp, pPRG},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use swanky_field::PrimeFiniteField;
@@ -41,7 +41,7 @@ pub(crate) fn compute_Hv_Chall<Fp: PrimeFiniteField>(
 
     hcom_plus_c_bytes.append(&mut hcom.to_vec());
     hcom_plus_c_bytes.append(&mut C_bytes);
-    let hv = h1(&hcom_plus_c_bytes);
+    let hv = *h1(&hcom_plus_c_bytes).as_ref();
 
     let Fp_bit_len = Fp::ZERO.bit_decomposition().len();
     let chall_bit_len = ell_hat * 2 * Fp_bit_len; // The actual chall bit size will be ell_hat * 2 * Fp_elem_size_in_bits
@@ -61,11 +61,11 @@ pub(crate) fn compute_Delta_Chall<Fp: PrimeFiniteField>(
     tree_depth: usize,
 ) -> Vec<Fp> {
     let mut U_tilde_bytes = chall_fp_vec_to_bytes_vec(&U_tilde);
-    let mut h_small_plus_u_tilde_bytes = Vec::with_capacity(h_small.len() + U_tilde_bytes.len());
+    let mut h_small_plus_u_tilde_bytes = Vec::with_capacity(H1_LENGTH + U_tilde_bytes.len());
 
     h_small_plus_u_tilde_bytes.append(&mut U_tilde_bytes);
-    h_small_plus_u_tilde_bytes.append(&mut h_small.to_vec());
-    let S_delta = h1(&h_small_plus_u_tilde_bytes);
+    h_small_plus_u_tilde_bytes.append(&mut h_small.as_ref().to_vec());
+    let S_delta = *h1(&h_small_plus_u_tilde_bytes).as_ref();
 
     // TODO: Use some cryptographic rng!!
     let mut rng = StdRng::from_seed(S_delta);
@@ -90,11 +90,11 @@ mod test {
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F64p};
 
-    use crate::vole_prime::{
+    use crate::{vole::crypto_primitives::{H1, H1_LENGTH}, vole_prime::{
         commit_reconstruct::get_prime_ell_hat_len,
         consistency_check::{compute_Delta_Chall, compute_Hv_Chall},
         // parameters::NC
-    };
+    }};
 
     use crate::parameters::NC;
 
@@ -222,7 +222,7 @@ use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField};
         // if log-level `RUST_LOG` not already set, then set to info
         init_logger();
 
-        let h_small = [1; 32];
+        let h_small = H1::from_bytes(&[1; H1_LENGTH]);
         let U_tilde: Vec<Fp> = vec![Fp::ONE; 2];
         let nc = 8;
         let tree_depth = 4;

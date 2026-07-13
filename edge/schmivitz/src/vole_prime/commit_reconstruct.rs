@@ -1,7 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::T0;
-use crate::vole::crypto_primitives::{Com, Seed, IV};
-use crate::vole_prime::all_but_one_vc::{commit, open, reconstruct, Decom, Pdecom};
+use crate::vole::crypto_primitives::{Com, H1, IV, Seed};
+use crate::vole_prime::all_but_one_vc::{open, reconstruct};
 use crate::vole_prime::convert_to_vole::convert_to_vole;
 use crate::vole_prime::crypto_primitives::{h1, pPRG};
 use crate::vole_prime::reed_solomon::reed_solomon_encode;
@@ -12,7 +12,10 @@ use std::thread;
 use swanky_field::PrimeFiniteField;
 
 use super::all_but_one_vc::{chall_fp_vec_to_bytes_vec, get_chall_for_ith_tree};
-use super::crypto_primitives::H1;
+
+use crate::vole::all_but_one_vc::{Keys, commit};
+use crate::vole::all_but_one_vc::Decom;
+use crate::vole::all_but_one_vc::Pdecom;
 
 /// The spec is still under progress currently
 #[allow(dead_code)]
@@ -158,7 +161,7 @@ pub(crate) fn vole_commit<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
         }
     }
 
-    let hcom = h1(&flat_com);
+    let hcom = *h1(&flat_com).as_ref();
 
     // line VOLE.P1::9
     Commit {
@@ -242,9 +245,9 @@ use rand::Rng;
     use swanky_field::{FiniteField, PrimeFiniteField};
     use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
 
-    use crate::vole_prime::{
+    use crate::vole::all_but_one_vc::h1_on_coms;
+use crate::vole_prime::{
         self,
-        all_but_one_vc::h1_on_coms,
         commit_reconstruct::vole_verify,
         // parameters::{Kc, Nc, D0, D1, N0, N1, T0, T1, TAU}
     };
@@ -253,7 +256,7 @@ use rand::Rng;
 
     use super::{get_prime_ell_hat_len, vole_commit, vole_open, Commit};
 
-    use crate::vole::crypto_primitives::IV;
+    use crate::vole::crypto_primitives::{Com, IV};
 
     static INIT: Once = Once::new();
     fn init_logger() {
@@ -312,7 +315,8 @@ use rand::Rng;
                 all_tree_hi.push(hi);
             }
         }
-        let reconstructed_hash = h1_on_coms(&all_tree_hi);
+        let coms: Vec<Com> = all_tree_hi.into_iter().map(|h| h.into_com()).collect();
+        let reconstructed_hash = *h1_on_coms(&coms).as_ref();
         // line BAVC.Verify::16
         assert_eq!(com, reconstructed_hash);
     }

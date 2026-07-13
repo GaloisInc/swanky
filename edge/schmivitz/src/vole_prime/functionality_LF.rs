@@ -5,18 +5,15 @@ use std::num::FpCategory;
 use swanky_field::PrimeFiniteField;
 
 use crate::{
-    vole::crypto_primitives::{Com, IV},
-    vole_prime::{
-        all_but_one_vc::{Decom, Pdecom},
-        consistency_check::{compute_Delta_Chall, compute_Hv_Chall},
-        convert_to_vole::Corrections,
-        crypto_primitives::{h1, H1},
-        functionality::{
-            prover_p1, prover_p2, prover_p3, verifier, VoleProver, VoleVerifier, P1, P2,
-        },
-        reed_solomon::reed_solomon_encode,
+    vole::crypto_primitives::{Com, H1, IV}, vole_prime::{
+        consistency_check::{compute_Delta_Chall, compute_Hv_Chall}, convert_to_vole::Corrections, crypto_primitives::h1, functionality::{
+            P1, P2, VoleProver, VoleVerifier, prover_p1, prover_p2, prover_p3, verifier,
+        }, reed_solomon::reed_solomon_encode,
     },
 };
+use crate::vole::all_but_one_vc::Keys;
+use crate::vole::all_but_one_vc::Decom;
+use crate::vole::all_but_one_vc::Pdecom;
 
 pub(crate) struct P1_LF<Fp: PrimeFiniteField> {
     pub(crate) p1: P1<Fp>,
@@ -278,7 +275,7 @@ pub(crate) fn verifier_LF<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
     let mut Q_dash: Vec<Fp> = Vec::with_capacity(ell_hat * nc);
     for i in 0..ell_hat {
         for j in 0..nc {
-            Q_dash.push(Q_bot[i][j] + (Q_top[i][j] * delta_prime[0])); // TODO: This can't be right or?!
+            Q_dash.push(Q_bot[i][j] + (Q_top[i][j] * delta_prime[0]));
         }
     }
 
@@ -314,9 +311,9 @@ pub(crate) fn verifier_LF<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
 
     log::info!("verifier inp 2 {:?}", inp);
 
-    let H_1: H1 = h1(&inp);
+    let h1: H1 = h1(&inp);
 
-    assert_eq!(H_1, *h_large);
+    assert_eq!(*h1.as_ref(), *h_large.as_ref());
 
     VoleVerifier_LF {
         is_verifier: true,

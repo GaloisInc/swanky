@@ -4,10 +4,14 @@
 
 use std::iter::zip;
 
-use crate::vole::crypto_primitives::{Com, Key, Seed, IV};
-use crate::vole_prime::crypto_primitives::{h0, h1, H1, pPRG};
+use crate::vole::all_but_one_vc::{h1_on_coms, tree};
+use crate::vole::crypto_primitives::{Com, H1, IV, Key, Seed};
+use crate::vole_prime::crypto_primitives::{h1, pPRG};
 use swanky_field::PrimeFiniteField;
 use rand::Rng;
+use crate::vole::all_but_one_vc::Keys;
+use crate::vole::all_but_one_vc::Decom;
+use crate::vole::all_but_one_vc::Pdecom;
 
 /// Converts chall Fp to u8 vector accoridng to the bit len of chall Fp.
 pub(crate) fn chall_fp_vec_to_bytes_vec<Fp: PrimeFiniteField>(chall_fp: &Vec<Fp>) -> Vec<u8> {
@@ -47,79 +51,79 @@ pub(crate) fn get_chall_for_ith_tree(
 }
 
 /// Takes the BAVC comms and returns H1
-pub(crate) fn h1_on_coms(coms: &[Com]) -> H1 {
-    let mut inp = vec![];
-    for com in coms {
-        inp.extend(com);
-    }
-    h1(&inp)
-}
+// pub(crate) fn h1_on_coms(coms: &[Com]) -> H1 {
+//     let mut inp = vec![];
+//     for com in coms {
+//         inp.extend(com);
+//     }
+//     h1(&inp)
+// }
 
-#[derive(Clone, Default)]
-pub struct Keys(Vec<Key>);
-impl Keys {
-    fn get(&self, depth: usize, idx: usize) -> Key {
-        let layer_start = (1 << depth) - 1;
-        self.0[layer_start + idx]
-    }
+// #[derive(Clone, Default)]
+// pub struct Keys(Vec<Key>);
+// impl Keys {
+//     fn get(&self, depth: usize, idx: usize) -> Key {
+//         let layer_start = (1 << depth) - 1;
+//         self.0[layer_start + idx]
+//     }
 
-    fn set(&mut self, depth: usize, idx: usize, k: Key) {
-        let layer_start = (1 << depth) - 1;
-        self.0[layer_start + idx] = k;
-    }
+//     fn set(&mut self, depth: usize, idx: usize, k: Key) {
+//         let layer_start = (1 << depth) - 1;
+//         self.0[layer_start + idx] = k;
+//     }
 
-    fn get_layer(&self, depth: usize) -> &[Key] {
-        let layer_start = (1 << depth) - 1;
-        let layer_end = (1 << (depth + 1)) - 1;
-        &self.0[layer_start..layer_end]
-    }
-}
+//     fn get_layer(&self, depth: usize) -> &[Key] {
+//         let layer_start = (1 << depth) - 1;
+//         let layer_end = (1 << (depth + 1)) - 1;
+//         &self.0[layer_start..layer_end]
+//     }
+// }
 
-pub(crate) type Decom = (Keys, Vec<Com>);
-pub(crate) type Pdecom = (Vec<Key>, Com);
+// pub(crate) type Decom = (Keys, Vec<Com>);
+// pub(crate) type Pdecom = (Vec<Key>, Com);
 
 /// Compute all the internal keys, bottom seeds and commitments at a given depth.
 ///
 /// This function is not present in the FAEST spec but it is a code fragment identified in
 /// both VC.commmit and VC.reconstruct that can be factorized.
 /// This function is used in [`commit()`] and [`reconstruct`].
-fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
-    let n = 1 << depth;
+// fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
+//     let n = 1 << depth;
 
-    let mut ks = Keys(vec![Key::default(); 2 * n - 1]);
-    // initialize the first key
-    ks.set(0, 0, r);
+//     let mut ks = Keys(vec![Key::default(); 2 * n - 1]);
+//     // initialize the first key
+//     ks.set(0, 0, r);
 
-    for d in 1..depth + 1 {
-        let n_previous_level = 1 << (d - 1);
-        for j in 0..n_previous_level {
-            let mut prg = pPRG::new(ks.get(d - 1, j), iv);
-            let (t1, t2) = prg.encrypt_double();
-            ks.set(d, j * 2, t1);
-            ks.set(d, j * 2 + 1, t2);
-        }
-    }
+//     for d in 1..depth + 1 {
+//         let n_previous_level = 1 << (d - 1);
+//         for j in 0..n_previous_level {
+//             let mut prg = pPRG::new(ks.get(d - 1, j), iv);
+//             let (t1, t2) = prg.encrypt_double();
+//             ks.set(d, j * 2, t1);
+//             ks.set(d, j * 2 + 1, t2);
+//         }
+//     }
 
-    // Set the bottom seeds and commitments:
-    let mut seeds = Vec::with_capacity(n);
-    let mut coms = Vec::with_capacity(n);
-    for k in ks.get_layer(depth) {
-        let (sd, com) = h0(*k, iv);
-        seeds.push(sd);
-        coms.push(com);
-    }
+//     // Set the bottom seeds and commitments:
+//     let mut seeds = Vec::with_capacity(n);
+//     let mut coms = Vec::with_capacity(n);
+//     for k in ks.get_layer(depth) {
+//         let (sd, com) = h0(*k, iv);
+//         seeds.push(sd);
+//         coms.push(com);
+//     }
 
-    (ks, seeds, coms)
-}
+//     (ks, seeds, coms)
+// }
 
-#[inline(never)]
-pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
-    let (ks, seeds, coms) = tree(iv, r, depth);
+// #[inline(never)]
+// pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (H1, Decom, Vec<Seed>) {
+//     let (ks, seeds, coms) = tree(iv, r, depth);
 
-    let h = h1_on_coms(&coms);
+//     let h = *h1_on_coms(&coms).as_ref();
 
-    (h, (ks, coms), seeds)
-}
+//     (h, (ks, coms), seeds)
+// }
 
 /// Pass u8 vector chall derived from Fp vec chall. Returns the leaf position on the tree
 pub(crate) fn num_rec(chall_bytes: &Vec<u8>, tree_depth: usize) -> usize {
@@ -207,10 +211,10 @@ mod test {
 
     use std::sync::Once;
 
-use super::{commit, open, reconstruct, Key, Pdecom, IV};
-    use crate::vole_prime::all_but_one_vc::{
-        chall_fp_vec_to_bytes_vec, get_chall_for_ith_tree, num_rec, Seed,
-    };
+use super::{open, reconstruct, Key, Pdecom, IV};
+    use crate::{vole::all_but_one_vc::commit, vole_prime::all_but_one_vc::{
+        Seed, chall_fp_vec_to_bytes_vec, get_chall_for_ith_tree, num_rec,
+    }};
     use proptest::prelude::*;
     use rand::Rng;
     use swanky_field::{FiniteField, PrimeFiniteField};
@@ -295,7 +299,7 @@ use super::{commit, open, reconstruct, Key, Pdecom, IV};
 
         // verifier side
         let (h1, _) = reconstruct(pdecom, n_tree_chall_bytes, iv, tree_depth);
-        assert_eq!(h, h1);
+        assert_eq!(h, *h1.as_ref());
         log::info!(
             "Passed: tree_count:{} tree_idx:{} tree_depth:{}",
             t0 * 2,
@@ -373,7 +377,7 @@ use super::{commit, open, reconstruct, Key, Pdecom, IV};
 
         // verifier side
         let (h1, _) = reconstruct(pdecom, chall_bytes, iv, tree_depth);
-        assert_eq!(h[..], h1[..]);
+        assert_eq!(h, *h1.as_ref());
 
         Ok(())
     }

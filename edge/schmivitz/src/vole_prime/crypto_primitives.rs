@@ -8,7 +8,7 @@ use crate::parameters::{MAX_LIMBS_SUPPORTED, ONE_LIMB};
 
 use crate::vole_prime::utils::get_vec_u8_bit;
 
-use crate::vole::crypto_primitives::{Com, Key, Seed, IV};
+use crate::vole::crypto_primitives::{Com, H1, IV, Key, Seed};
 use aes::Aes128;
 use aes::cipher::{BlockEncrypt, KeyInit};
 use aes::cipher::generic_array::GenericArray;
@@ -259,20 +259,20 @@ pub(crate) fn prg_compact_to_fp<Fp: PrimeFiniteField>(
     return ret;
 }
 
-pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
-    let mut hasher = Shake128::default();
-    hasher.update(&x);
-    hasher.update(&iv);
-    let mut reader = hasher.finalize_xof();
-    let mut seed = [u8::default(); SECURITY_PARAM / 8];
-    let mut commitment = [u8::default(); (SECURITY_PARAM * 2) / 8];
-    reader.read(seed.as_mut_slice());
-    reader.read(commitment.as_mut_slice());
-    (seed, commitment)
-}
+// pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
+//     let mut hasher = Shake128::default();
+//     hasher.update(&x);
+//     hasher.update(&iv);
+//     let mut reader = hasher.finalize_xof();
+//     let mut seed = [u8::default(); SECURITY_PARAM / 8];
+//     let mut commitment = [u8::default(); (SECURITY_PARAM * 2) / 8];
+//     reader.read(seed.as_mut_slice());
+//     reader.read(commitment.as_mut_slice());
+//     (seed, commitment)
+// }
 
-pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
-pub(crate) type H1 = [u8; H1_LENGTH];
+// pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
+// pub(crate) type H1 = [u8; H1_LENGTH];
 
 fn h1_internal(inp: &[u8], out: &mut [u8]) {
     let mut hasher = Shake128::default();
@@ -284,6 +284,6 @@ fn h1_internal(inp: &[u8], out: &mut [u8]) {
 
 pub(crate) fn h1(inp: &[u8]) -> H1 {
     let mut out = H1::default();
-    h1_internal(inp, &mut out);
+    h1_internal(inp, out.0.as_mut_slice());
     out
 }

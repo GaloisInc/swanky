@@ -5,21 +5,17 @@ use std::num::FpCategory;
 use swanky_field::PrimeFiniteField;
 
 use crate::{
-    vole::crypto_primitives::{Com, IV},
-    vole_prime::{
-        all_but_one_vc::{Decom, Pdecom},
-        consistency_check::{compute_Delta_Chall, compute_Hv_Chall},
-        convert_to_vole::Corrections,
-        crypto_primitives::{h1, H1},
-        functionality::{
-            prover_p1, prover_p2, prover_p3, verifier, VoleProver, VoleVerifier, P1, P2,
-        },
-        functionality_LF::{
-            prover_LF_p1, prover_LF_p2, verifier_LF, VoleProver_LF, VoleVerifier_LF, P1_LF, P2_LF,
-        },
-        reed_solomon::reed_solomon_encode,
+    vole::crypto_primitives::{Com, H1, IV}, vole_prime::{
+        consistency_check::{compute_Delta_Chall, compute_Hv_Chall}, convert_to_vole::Corrections, crypto_primitives::h1, functionality::{
+            P1, P2, VoleProver, VoleVerifier, prover_p1, prover_p2, prover_p3, verifier,
+        }, functionality_LF::{
+            P1_LF, P2_LF, VoleProver_LF, VoleVerifier_LF, prover_LF_p1, prover_LF_p2, verifier_LF,
+        }, reed_solomon::reed_solomon_encode,
     },
 };
+use crate::vole::all_but_one_vc::Keys;
+use crate::vole::all_but_one_vc::Decom;
+use crate::vole::all_but_one_vc::Pdecom;
 
 pub(crate) struct ZK_PROVER<Fp: PrimeFiniteField> {
     pub(crate) com: Com,
@@ -90,7 +86,7 @@ pub(crate) fn zk_prover<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>
     assert_eq!(P.len(), two_ell_hat * (nc - kc));
     assert_eq!(C.len(), two_ell_hat * (nc - kc));
     assert_eq!(U_tilde.len(), 2 * kc);
-    assert_eq!(h_small.len(), 32);
+    assert_eq!(h_small.as_ref().len(), 32);
     assert_eq!(W.len(), ell * kc);
 
     let mut D = Vec::with_capacity(ell * kc);
@@ -209,7 +205,7 @@ pub(crate) fn zk_prover<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2>>
         a_tilde_0.len() + a_tilde_deg_minus_1.len() + a_tilde_j.len()
     );
 
-    let delta_prime: Vec<Fp> = compute_Delta_Chall(a_tilde.clone(), [0; 32], 1, d0);
+    let delta_prime: Vec<Fp> = compute_Delta_Chall(a_tilde.clone(), H1::from_bytes(&[0; 32]), 1, d0);
 
     let p2_LF = prover_LF_p2(
         U1,
@@ -287,10 +283,10 @@ pub(crate) fn zk_verifier<Fp: PrimeFiniteField + swanky_field_fft::FieldForFFT<2
     assert_eq!(C.len(), two_ell_hat * (nc - kc));
     assert_eq!(chall.len(), 2 * two_ell_hat); // NOTE: This size comes from VOLE.V::1
     assert_eq!(U_tilde.len(), 2 * kc);
-    assert_eq!(h_small.len(), 32);
+    assert_eq!(h_small.as_ref().len(), 32);
     assert_eq!(delta_prime.len(), 1);
     assert_eq!(delta.len(), nc);
-    assert_eq!(h_large.len(), 32);
+    assert_eq!(h_large.as_ref().len(), 32);
     assert_eq!(S.len(), ell_hat * kc);
     assert_eq!(D.len(), ell * kc);
     assert_eq!(chi.len(), t);
