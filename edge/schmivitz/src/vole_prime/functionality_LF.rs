@@ -410,7 +410,7 @@ mod test {
     use std::time::Instant;
 
     use swanky_field::{FiniteField, PrimeFiniteField};
-    use swanky_field_ff_primes::{Frs127p, F128p, F256p, F32p, F384p, F400p, F61p, F64p};
+    use swanky_field_ff_primes::{F32p, F61p, F64p, F128p, F256p, F384p, F400p, Frs127p, Frs512p, Frs1024p, Frs2048p};
 
     use crate::vole_prime::functionality_LF::create_vole_LF_verifier;
     use crate::vole_prime::{
@@ -488,4 +488,20 @@ mod test {
     fn test_vole_prover_and_verifier_f256p() {
         test_vole_prover_and_verifier::<F256p>();
     }
+    #[test]
+    fn test_vole_prover_and_verifier_f512p() {
+        test_vole_prover_and_verifier::<Frs512p>();
+    }
+    #[test]
+    fn test_vole_prover_and_verifier_f1024p() {
+        test_vole_prover_and_verifier::<Frs1024p>();
+    }
+    #[test]
+    fn test_vole_prover_and_verifier_f2048p() {
+        test_vole_prover_and_verifier::<Frs2048p>();
+    }
+    // #[test]
+    // fn test_vole_prover_and_verifier_f4096p() {
+    //     test_vole_prover_and_verifier::<Frs4096p>();
+    // }
 }

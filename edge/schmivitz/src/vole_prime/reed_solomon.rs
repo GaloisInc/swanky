@@ -1,6 +1,6 @@
 use std::ops::Div;
 
-use crypto_bigint::{ArrayEncoding, Limb, NonZero, Uint, U512};
+use crypto_bigint::{ArrayEncoding, Limb, NonZero, Uint, U2048};
 use proptest::{bits::u64};
 use swanky_field::PrimeFiniteField;
 use swanky_field_fft::{self, fft2, fft2_in_place, fft2_inverse};
@@ -12,11 +12,11 @@ pub(crate) fn compute_nth_root_of_unity<Fp: PrimeFiniteField>(N: usize) -> Fp {
     let order = Fp::ZERO - Fp::ONE; // prime_mod - 1
 
     let order_uint: crypto_bigint::Uint<MAX_LIMBS_SUPPORTED> = order.as_int();
-    let N_uint: NonZero<Uint<8>> = NonZero::new(U512::from_u64(N as u64)).expect("N must be non-zero");
+    let N_uint: NonZero<Uint<MAX_LIMBS_SUPPORTED>> = NonZero::new(U2048::from_u64(N as u64)).expect("N must be non-zero");
     let exponent_uint = order_uint.rem(&N_uint); // should divide with 0 rem
-    assert_eq!(exponent_uint, U512::from_u64(0));
+    assert_eq!(exponent_uint, U2048::from_u64(0));
 
-    let exponent = Fp::try_from_int(exponent_uint).expect("failed from U512 to Fp");
+    let exponent = Fp::try_from_int(exponent_uint).expect("failed from U2048 to Fp");
 
     let exponent_bits = Fp::bit_decomposition(&exponent);
 

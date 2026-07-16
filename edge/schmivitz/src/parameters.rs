@@ -67,10 +67,10 @@ pub const N0: usize = 1 << D0;
 pub const N1: usize = 1 << D1;
 
 /// The maximum degree of the VOLE proofs
-pub const MAX_DEG: usize = 2;
+pub const MAX_DEG: usize = 32;
 
 /// Maximum supported bit length for Fields
-pub const MAX_BIT_LEN: usize = 512;
+pub const MAX_BIT_LEN: usize = 2048;
 /// size of one u64 taking one limb of the Field element
 pub const ONE_LIMB: usize = 64;
 /// Maximum limbs needed
