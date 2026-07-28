@@ -32,7 +32,7 @@ use swanky_error::{ErrorKind, Result, bail};
 ///
 /// This function is applied on the leaves commitments of the Tree-PRG/GGM-tree.
 /// This function corresponds to the H1 function in the FAEST spec, defined page 16.
-fn h1_on_coms(coms: &[Com]) -> H1 {
+pub fn h1_on_coms(coms: &[Com]) -> H1 {
     let mut inp = vec![];
     for com in coms {
         inp.extend(com);
@@ -49,23 +49,23 @@ fn h1_on_coms(coms: &[Com]) -> H1 {
 /// and the underlying vector indexing follows a breadth-first traversal.
 /// That is the element at depth `d` and position `p`, corresponds to the vector index $`2^d + p-1`$.
 #[derive(Clone, Default)]
-pub(crate) struct Keys(Vec<Key>);
+pub(crate) struct Keys(pub Vec<Key>);
 
 impl Keys {
     /// Get a key in the tree at `depth` and index `idx` in the associated layer.
-    fn get(&self, depth: usize, idx: usize) -> Key {
+    pub fn get(&self, depth: usize, idx: usize) -> Key {
         let layer_start = (1 << depth) - 1;
         self.0[layer_start + idx]
     }
 
     /// Set a key in the tree at `depth` and index `idx` in the associated layer.
-    fn set(&mut self, depth: usize, idx: usize, k: Key) {
+    pub fn set(&mut self, depth: usize, idx: usize, k: Key) {
         let layer_start = (1 << depth) - 1;
         self.0[layer_start + idx] = k;
     }
 
     /// Get a full layer as a slice of keys.
-    fn get_layer(&self, depth: usize) -> &[Key] {
+    pub fn get_layer(&self, depth: usize) -> &[Key] {
         let layer_start = (1 << depth) - 1;
         let layer_end = (1 << (depth + 1)) - 1;
         &self.0[layer_start..layer_end]
@@ -90,7 +90,7 @@ pub(crate) type Pdecom = (Vec<Key>, Com);
 /// This function is not present in the FAEST spec but it is a code fragment identified in
 /// both VC.commmit and VC.reconstruct that can be factorized.
 /// This function is used in [`commit()`] and [`reconstruct`].
-fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
+pub fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
     let n = 1 << depth;
 
     let mut ks = Keys(vec![Key::default(); 2 * n - 1]);

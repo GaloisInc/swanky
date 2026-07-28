@@ -23,3 +23,4 @@ pub mod proof;
 pub mod vole;
 
 pub use proof::Proof;
+pub mod vole_prime;

@@ -128,7 +128,7 @@ pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
 ///
 /// This is used for various purposes throughout the protocol.
 #[derive(Clone, Copy, Default)]
-pub(crate) struct H1([u8; H1_LENGTH]);
+pub(crate) struct H1(pub [u8; H1_LENGTH]);
 
 impl H1 {
     /// Compute the [`H1`] hash from input bytes.

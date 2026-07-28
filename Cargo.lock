@@ -2366,7 +2366,10 @@ dependencies = [
 name = "schmivitz"
 version = "0.6.0"
 dependencies = [
+ "aes",
+ "blake3",
  "criterion",
+ "crypto-bigint",
  "diet-mac-and-cheese",
  "env_logger 0.11.11",
  "generic-array 1.4.3",
@@ -2383,6 +2386,8 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
+ "swanky-field-ff-primes",
+ "swanky-field-fft",
  "swanky-rng",
  "swanky-serialization",
  "swanky-sieve-ir-api",

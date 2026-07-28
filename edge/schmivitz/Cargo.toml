@@ -30,6 +30,14 @@ sha3.workspace = true
 shake.workspace = true
 tempfile.workspace = true
 
+# I copied the missing ones from the gitlab, else was not compiling
+aes.workspace = true
+blake3.workspace = true
+proptest.workspace = true
+swanky-field-ff-primes.workspace = true
+swanky-field-fft.workspace = true
+crypto-bigint.workspace = true
+
 diet-mac-and-cheese.workspace = true
 mac-n-cheese-sieve-parser.workspace = true
 swanky-error.workspace = true

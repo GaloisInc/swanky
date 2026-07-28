@@ -31,10 +31,25 @@ macro_rules! try_from_helper {
             type Error = BiggerThanModulus;
 
             fn try_from(value: u128) -> Result<Self, Self::Error> {
-                let mut bytes = [0u8; $limbs * 8];
-                let value = value.to_le_bytes();
-                bytes[0..16].copy_from_slice(&value);
-                $name::from_bytes_array(bytes)
+                // // TODO: Super patchy work, works for now, make it elegant
+                // // NOTE: Chnaces of something getting "falsely encoded" due to the if statements is low ':),, but still fix this patchy fix
+                // // For the              F256p                                       F384p                                           F400p
+                // if value == 0xffffffffffffffffffffffffffffff43
+                //     || value == 0xfffffffffffffffffffffffffffffec3
+                //     || value == 0xfffffffffffffffffffffffffffffdaf
+                // {
+                //     let mut bytes = [0u8; $limbs * 8];
+                //     let val_lo = value.to_le_bytes();
+                //     let val_hi = (0xffffffffffffffffffffffffffffffff as u128).to_le_bytes();
+                //     bytes[0..16].copy_from_slice(&val_lo);
+                //     bytes[16..32].copy_from_slice(&val_hi);
+                //     $name::from_bytes_array(bytes)
+                // } else {
+                    let mut bytes = [0u8; $limbs * 8];
+                    let value = value.to_le_bytes();
+                    bytes[0..16].copy_from_slice(&value);
+                    $name::from_bytes_array(bytes)
+                // }
             }
         }
     };
@@ -58,6 +73,7 @@ macro_rules! try_from_helper {
         }
     };
 }
+use swanky_field_fft::FieldForFFT;
 pub(crate) use try_from_helper;
 
 /// This macro constructs a prime finite field using the `ff` library.
@@ -89,8 +105,9 @@ macro_rules! prime_field_using_ff {
         $(single_limb_modulus = $single_limb_modulus: expr)?
     ) => {
         mod $mod_name {
-            use swanky_field::{BiggerThanModulus, FiniteField, PrimeFiniteField, FiniteRing};
+            use swanky_field::{FiniteField, PrimeFiniteField, FiniteRing};
             use swanky_serialization::{CanonicalSerialize};
+            use swanky_field::{BiggerThanModulus};
             use ff::{Field, PrimeField};
             use generic_array::{typenum::Unsigned, GenericArray};
             use rand_core::{Rng, SeedableRng};
@@ -356,20 +373,6 @@ pub(crate) use prime_field_using_ff;
 // The modulus and generator for these fields is specified in `build.rs`
 prime_field_using_ff!(
     /// The finite field over the prime
-    /// $`P = 2^{384} - 2^{128} - 2^{96} + 2^{32} - 1
-    ///     = 39402006196394479212279040100143613805079739270465446667948293404245721771496870329047266088258938001861606973112319`$.
-    F384p,
-    f384p,
-    modulus = "39402006196394479212279040100143613805079739270465446667948293404245721771496870329047266088258938001861606973112319",
-    generator = "19",
-    limbs = 7,
-    actual_limbs = 6,
-    num_bytes = generic_array::typenum::U48,
-    num_bits = generic_array::typenum::U384,
-);
-
-prime_field_using_ff!(
-    /// The finite field over the prime
     /// $`Q = 39402006196394479212279040100143613805079739270465446667946905279627659399113263569398956308152294913554433653942643`$.
     F384q,
     f384q,
@@ -380,47 +383,6 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U48,
     num_bits = generic_array::typenum::U384,
 );
-
-prime_field_using_ff!(
-    /// The finite field over the prime
-    /// $`P = 2^{127} - 1`$.
-    F127p,
-    f127p,
-    modulus = "170141183460469231731687303715884105727",
-    generator = "43",
-    limbs = 2,
-    actual_limbs = 2,
-    num_bytes = generic_array::typenum::U16,
-    num_bits = generic_array::typenum::U127,
-);
-
-prime_field_using_ff!(
-    /// The finite field over the prime
-    /// $`P = 2^{128} - 159`$.
-    F128p,
-    f128p,
-    modulus = "340282366920938463463374607431768211297",
-    generator = "5",
-    limbs = 3,
-    actual_limbs = 2,
-    num_bytes = generic_array::typenum::U16,
-    num_bits = generic_array::typenum::U128,
-);
-
-prime_field_using_ff!(
-    /// The finite field over the prime
-    /// $`P = 2^{256} - 2^{224} + 2^{192} + 2^{96} - 1
-    ///     = 115792089210356248762697446949407573530086143415290314195533631308867097853951`$.
-    F256p,
-    f256p,
-    modulus = "115792089210356248762697446949407573530086143415290314195533631308867097853951",
-    generator = "6",
-    limbs = 5,
-    actual_limbs = 4,
-    num_bytes = generic_array::typenum::U32,
-    num_bits = generic_array::typenum::U256,
-);
-
 prime_field_using_ff!(
     /// The finite field over the prime
     /// $`P = 2^{256} - 2^{32} - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
@@ -435,7 +397,6 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U32,
     num_bits = generic_array::typenum::U256,
 );
-
 prime_field_using_ff!(
     /// The finite field over the prime
     /// $`P = 115792089237316195423570985008687907852837564279074904382605163141518161494337`$.
@@ -449,7 +410,6 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U32,
     num_bits = generic_array::typenum::U256,
 );
-
 prime_field_using_ff!(
     /// The BLS12-381 finite field.
     Fbls12381,
@@ -461,7 +421,6 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U32,
     num_bits = generic_array::typenum::U255,
 );
-
 prime_field_using_ff!(
     /// The BN-254 finite field.
     Fbn254,
@@ -474,6 +433,200 @@ prime_field_using_ff!(
     num_bits = generic_array::typenum::U254,
 );
 
+// NOTE: Primes just less than a power of two
+// https://t5k.org/lists/2small/0bit.html
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{32} - 527`$.
+    F32p,
+    f32p,
+    modulus = "4294966769",
+    generator = "3",
+    limbs = 1,
+    actual_limbs = 1,
+    num_bytes = generic_array::typenum::U4,
+    num_bits = generic_array::typenum::U32,
+    single_limb_modulus = 4294966769
+);
+impl FieldForFFT<2> for F32p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([1u128, 4294966768u128][ix]).unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{61} - 1`$.
+    F61p,
+    f61p,
+    modulus = "2305843009213693951",
+    generator = "37",
+    limbs = 1,
+    actual_limbs = 1,
+    num_bytes = generic_array::typenum::U8,
+    num_bits = generic_array::typenum::U61,
+    single_limb_modulus = 2305843009213693951
+);
+impl FieldForFFT<2> for F61p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([1u128, 2305843009213693950u128][ix]).unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{61} - 1`$.
+    F64p,
+    f64p,
+    modulus = "18446744073709551521",
+    generator = "3",
+    limbs = 2,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U8,
+    num_bits = generic_array::typenum::U64,
+);
+impl FieldForFFT<2> for F64p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([1u128, 18446744073709551520u128][ix]).unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{127} - 511`$.
+    F127p,
+    f127p,
+    modulus = "170141183460469231731687303715884105727",
+    generator = "43",
+    limbs = 2,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U16,
+    num_bits = generic_array::typenum::U127,
+);
+impl FieldForFFT<2> for F127p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([1u128, 170141183460469231731687303715884105726u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{127} - 511`$.
+    Frs127p,
+    frs127rsp,
+    modulus = "170141183460469231731687303715884105217",
+    generator = "5",
+    limbs = 2,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U16,
+    num_bits = generic_array::typenum::U127,
+);
+impl FieldForFFT<2> for Frs127p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([1u128, 170141183460469231731687303715884105216u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// The finite field over the prime
+    /// $`P = 2^{128} - 159`$.
+    F128p,
+    f128p,
+    modulus = "340282366920938463463374607431768211297",        // This mod is fine!!
+    generator = "5",
+    limbs = 3,
+    actual_limbs = 2,
+    num_bytes = generic_array::typenum::U16,
+    num_bits = generic_array::typenum::U128,
+);
+impl FieldForFFT<2> for F128p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from(
+            [
+                1u128,
+                340282366920938463463374607431768211296u128,
+                104721963583583438841328038195075850306u128,
+            ][ix],
+        )
+        .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// NOTE: Previous prime in the field-ff-primes crate
+    /// The finite field over the prime
+    /// $`P = 2^{256} - 2^{224} + 2^{192} + 2^{96} - 1
+    ///     = 115792089210356248762697446949407573530086143415290314195533631308867097853951`$.
+    /// NOTE: New minus small n prime
+    /// /// $`P = 2^{256} - 189`$.
+    F256p,
+    f256p,
+    //modulus = "115792089210356248762697446949407573530086143415290314195533631308867097853951",   // OLD
+    // modulus = "115792089237316195423570985008687907853269984665640564039457584007913129639747",     // NEW
+    modulus = "115792089237316195423570985008687907853269984665640564039457584007913129637873",     // EVEN NEWER
+    generator = "3",
+    limbs = 5,
+    actual_limbs = 4,
+    num_bytes = generic_array::typenum::U32,
+    num_bits = generic_array::typenum::U256,
+);
+impl FieldForFFT<2> for F256p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([0xfffffffffffffffffffffffffffff740 as u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// NOTE: Previous prime in the field-ff-primes crate
+    /// The finite field over the prime
+    /// $`P = 2^{384} - 2^{128} - 2^{96} + 2^{32} - 1
+    ///     = 39402006196394479212279040100143613805079739270465446667948293404245721771496870329047266088258938001861606973112319`$.
+    /// NOTE: New minus small n prime
+    /// $`P = 2^{384} - 317
+    F384p,
+    f384p,
+    // modulus = "39402006196394479212279040100143613805079739270465446667948293404245721771496870329047266088258938001861606973112319",    // OLD
+    modulus = "39402006196394479212279040100143613805079739270465446667948293404245721771497210611414266254884915640806627990306499",       // NEW
+    generator = "19",
+    limbs = 7,
+    actual_limbs = 6,
+    num_bytes = generic_array::typenum::U48,
+    num_bits = generic_array::typenum::U384,
+);
+impl FieldForFFT<2> for F384p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([0xfffffffffffffffffffffffffffffec3 as u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
 prime_field_using_ff!(
     /// The finite field over the prime $`2^{400} - 593`$.
     F400p,
@@ -485,3 +638,98 @@ prime_field_using_ff!(
     num_bytes = generic_array::typenum::U50,
     num_bits = generic_array::typenum::U400,
 );
+impl FieldForFFT<2> for F400p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([0xfffffffffffffffffffffffffffffdaf as u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+// These primes are not 2^n - small number, but rather p = c*2^32 + 1
+prime_field_using_ff!(
+    /// NTT friendly 512 bit prime
+    Frs512p,
+    frs512p,
+    modulus = "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433644711116801",
+    generator = "2653135687665933732116392076509140650815216084673071913799274672109843317862972825520025532916796169010684541040936963921422520982516932732201540090815717",
+    limbs = 9,
+    actual_limbs = 8,
+    num_bytes = generic_array::typenum::U64,
+    num_bits = generic_array::typenum::U512,
+);
+impl FieldForFFT<2> for Frs512p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([0xfffffffffffffffffffffffff0000000 as u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// NTT friendly 1024 bit prime
+    Frs1024p,
+    frs1024p,
+    modulus = "179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356321244742942721",
+    generator = "22832505786862897753078148751680270733331860838970131534296869387398223592305000977443419498510768487946698509029933304554893106469031756257836068742741753857530940829270365898820714812107283520410028918716711472464971819042262220977649135314963906236952025626572871773751662397013380098453055619232777035002",
+    limbs = 17,
+    actual_limbs = 16,
+    num_bytes = generic_array::typenum::U128,
+    num_bits = generic_array::typenum::U1024,
+);
+impl FieldForFFT<2> for Frs1024p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([0xfffffffffffffffffffff86100000000 as u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+prime_field_using_ff!(
+    /// NTT friendly 2048 bit prime
+    Frs2048p,
+    frs2048p,
+    modulus = "32317006071311007300714876688669951960444102669715484032130345427524655138867890893197201411522913463688717960921898019494119559150490921095088152386448283120630877367300996091750197750389652106796057638384067568276792218642619756161838094338476170470581645852036305042887575891541065808607552399123930385521914333389668342420684974786564569494856176035326322058077805659331026192708460314150258592864177116725943603718461857357598351152301645904403697613233287231227125684710820209725157101726931323469678542580656697935045997268352998638215525166389437335543602135433229604645318478604952148193555853608091773829121",
+    generator = "19291268532031067759301150772075288269172959059986750385164537061588752247453891949112826850975506531846971683485645819908013063087583765064790667687829608302309585343733315555577226135707678370442081781594564425075189427722345213073755396389829538731742120536104661349993511406620515573999970364358896506283192130919939719398055592064934576695989980001196194447336815253162667681945826745986282495032064633858026988864668286535558680800954268566664168613432327544436290907225483521470116696952512531713709956495386762365556231280187748786807690833120859284395608997017327545790909648604065027828113847539067671506549",
+    limbs = 33,
+    actual_limbs = 32,
+    num_bytes = generic_array::typenum::U256,
+    num_bits = generic_array::typenum::U2048,
+);
+impl FieldForFFT<2> for Frs2048p {
+    const PHI_EXP: usize = 1;
+
+    #[inline]
+    fn roots(ix: usize) -> Self {
+        Self::try_from([0xfffffffffffffffffffffd4d00000000 as u128][ix])
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+
+// prime_field_using_ff!(
+//     /// NTT friendly 4096 bit prime
+//     Frs4096p,
+//     frs4096p,
+//     modulus = "1044388881413152506691752710716624382579964249047383780384233483283953907971557456848826811934997558340890106714439262837987573438185793607263236087851365277945956976543709998340361590134383718314428070011855946226376318839397712745672334684344586617496807908705803704071284048740118609114467977783598029006686938976881787785946905630190260940599579453432823469303026696443059025015972399867714215541693835559885291486318237914434496734087811872639496475100189041349008417061675093668333850551032972088269550769983616369411933015213796825837188091833656751221318492846368125550225998300412344784862595674492194617023806505913245610825731835380087608622102834270197698202313169017678006675195485079921636419370285375124784014907159135459982790513399611551794271106831134090584272884279791554849782954323534517065223269061394905987693002122963395687782878948440616007412945674919823050571642377154816321380631045902916136926708342856440730447899971901781465763473223850267253059899795996090799469201774624817718449867455659250178329070473119433165550807568221846571746373296884912819520317457002440926616910874148385078411929804522981857338977648103126085903001302413467189726673216491511131602920781738033436090243804708331937773649921",
+//     generator = "661116002378496070632204327520180531229884591342196550548728348889932751513724944289698237713067706900813400836486358120970071286369123762317908198637968901859354324473589772911113983639371232203073419464672446484894198554307456766828137741037269923904965016789857059962326474481647230145761407243484721427921901466576848867678175563658924958764838117424367532286051199313584659556944423726297836513993700081117357168913889220894117310060266478025302873023864246518692907657216419375206424142417591747130142394410009344625233502303177686612333995227661716648914007090627187341157314111492489467797704579803028627274577884005217158222805268126417263893361413343450683133936654549033155202827771294074265309529727921391440704623788872807590064457780722052446280938651128594824953284322877989028248677636084908666601869460996215497303487251768679344620313765979580045688474312838302932543396108015321341548551896991661643980441497396170051035904644095337944826640012010731134572739883143530321055330201225938961206973055436326262752855360358670516267215178406784094165408355782861184429335186889669416783409991871612140613212789103635489545298470228856091259361931581505889732818111318949591638381451748695740321093481346352371765519550",
+//     limbs = 65,
+//     actual_limbs = 64,
+//     num_bytes = generic_array::typenum::U512,
+//     num_bits = generic_array::typenum::U4096,
+// );
+// impl FieldForFFT<2> for Frs4096p {
+//     const PHI_EXP: usize = 1;
+
+//     #[inline]
+//     fn roots(ix: usize) -> Self {
+//         Self::try_from([0xfffffffffffffffffffff84d00000000 as u128][ix])
+//             .unwrap_or_else(|_| unreachable!())
+//     }
+// }
