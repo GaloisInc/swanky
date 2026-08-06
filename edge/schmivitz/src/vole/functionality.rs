@@ -8,7 +8,7 @@ use crate::vole::DecommitmentSerde;
 use crate::vole::all_but_one_vc::{Decom, Pdecom};
 use crate::vole::commit_reconstruct::{B, compute_secret_key, recompose_d};
 use crate::vole::commit_reconstruct::{
-    Commit, Corrections, apply_corrections_to_q, l_hat, vole_commit, vole_open, vole_reconstruct,
+    Corrections, VoleCommitment, apply_corrections_to_q, l_hat, vole_open, vole_reconstruct,
 };
 use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{Chall1, Chall3, Com, H1, H3, IV, Seed, h2_chall1};
@@ -109,20 +109,20 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     l: usize,
 ) -> VoleProver {
     // line 2
-    let mu: H1 = H1::from_bytes(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
+    let mu: H1 = H1::hash(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
 
     // line 3
     let (r, iv) = compute_seed_iv(secret, &mu);
 
     // lines 4-5
     let t = std::time::Instant::now();
-    let Commit {
+    let VoleCommitment {
         h_com,
         decom,
         corrections,
         u,
         v,
-    } = vole_commit(r, iv, l_hat(l));
+    } = VoleCommitment::create(r, iv, l_hat(l));
     log::info!("vole_commit running time: {:?}", t.elapsed());
 
     // lines 6
@@ -147,7 +147,7 @@ pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
     log::info!("vole_hash(V) running time: {:?}", t.elapsed());
 
     // line 10
-    let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
+    let h_v = H1::hash(&bits_to_u8_many(&v_tilda));
 
     // Truncate `u` and `v`.
     let mut u_mut = u;
@@ -259,7 +259,7 @@ pub(crate) fn create_vole_verifier(
     } = decommitment_prover;
 
     // line 2
-    let mu: H1 = H1::from_bytes(statement_sig);
+    let mu: H1 = H1::hash(statement_sig);
 
     // lines 3-4
     let t = std::time::Instant::now();
@@ -301,7 +301,7 @@ pub(crate) fn create_vole_verifier(
         .collect();
     log::info!("Q + D running time: {:?}", t.elapsed());
 
-    let h_v = H1::from_bytes(&bits_to_u8_many(&q_xor_d));
+    let h_v = H1::hash(&bits_to_u8_many(&q_xor_d));
 
     // compute the secret key (AESVerify, line 1)
     let delta = compute_secret_key(chall3);
