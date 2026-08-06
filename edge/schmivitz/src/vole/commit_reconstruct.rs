@@ -31,7 +31,7 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
     r
 }
 
-/// Type for corrections applied to voles.
+/// VOLE correction values.
 #[derive(Clone, Default)]
 pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
 
@@ -43,6 +43,30 @@ impl Corrections {
         }
         s
     }
+
+    /// Convert corrections to associated bytes.
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        // Corrections are a vector containing tau vectors of long size
+        let how_many = self.0[0].len();
+        let tau = self.0.len();
+        let mut out = Vec::with_capacity((how_many * tau) / 8);
+
+        let mut b = 0u8;
+        let mut i = 0;
+        for c in self.0.iter() {
+            for bit in c.iter() {
+                b |= if *bit == F2::ZERO { 0 } else { 1 << i };
+                if i == 7 {
+                    out.push(b);
+                    b = 0u8;
+                    i = 0;
+                } else {
+                    i += 1;
+                }
+            }
+        }
+        out
+    }
 }
 
 /// hash the commitments coming from the small-domain VOLE
@@ -52,111 +76,119 @@ fn hash_commitments(com: &[Com]) -> Com {
     for i in 0..REPETITION_PARAM {
         com_bytes.extend::<&[u8]>(com[i].as_ref());
     }
-    H1::from_bytes(&com_bytes).into_com()
+    H1::hash(&com_bytes).into()
 }
 
-/// Vole Commitment
-pub(crate) struct Commit {
-    /// Hash of the commitments from all the small domain voles
+/// VOLEs alongside their associated commitments.
+///
+/// This type is constructed in `FAEST.VOLECommit` (Figure 5.4 of the FAEST spec
+/// v1.1).
+pub(crate) struct VoleCommitment {
+    /// Hash of the commitments from all the small domain VOLEs.
     pub(crate) h_com: Com,
-    /// Decommitment from all the small domain voles
+    /// Decommitment from all the small domain VOLEs.
     pub(crate) decom: [Decom; REPETITION_PARAM],
-    /// Corrections,
+    /// Correction values. These correspond to `c` in the Figure.
     pub(crate) corrections: Corrections,
-    /// Random masks associated to VOLEs
+    /// Random masks associated with VOLEs.
     pub(crate) u: Vec<F2>,
     /// Commitments associated to `u`. These are "packed" bit vectors.
     pub(crate) v: Vec<[F8b; REPETITION_PARAM]>,
 }
 
-/// Function generating the voles with associated commitments.
-///
-/// This corresponds to Figure 5.4 of the FAEST spec.
-/// This function relies on multithreading to improve the time performance.
-#[inline(never)]
-pub(crate) fn vole_commit(r: Seed, iv: IV, l_hat: usize) -> Commit {
-    let mut rng = Prg::new(r, iv);
-    let mut u: Vec<Vec<F2>> = Vec::with_capacity(REPETITION_PARAM);
-    let mut v = Vec::with_capacity(REPETITION_PARAM);
-    let mut decom: [Decom; REPETITION_PARAM] = Default::default();
-    let mut com = Vec::with_capacity(REPETITION_PARAM);
+impl VoleCommitment {
+    /// Generate the VOLEs alongside associated commitments.
+    ///
+    /// This corresponds to Figure 5.4 of the FAEST spec (v1.1). It uses
+    /// multithreading to improve performance.
+    #[inline(never)]
+    pub(crate) fn create(seed: Seed, iv: IV, l_hat: usize) -> VoleCommitment {
+        let mut rng = Prg::new(seed, iv);
+        let mut u: Vec<Vec<F2>> = Vec::with_capacity(REPETITION_PARAM);
+        let mut v = Vec::with_capacity(REPETITION_PARAM);
+        let mut decom: [Decom; REPETITION_PARAM] = Default::default();
+        let mut com = Vec::with_capacity(REPETITION_PARAM);
 
-    let t = std::time::Instant::now();
+        let t = std::time::Instant::now();
 
-    // Without multithreading: this is > 5x slower than with multithreading
-    // for i in 0..REPETITION_PARAM {
-    //     let seed = rng.r#gen::<Seed>();
-    //     let (com_i, decom_i, seeds) = commit(seed, iv, 8);
-    //     let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
-    //     com.push(com_i);
-    //     decom[i] = decom_i;
-    //     u.push(u_i);
-    //     v.push(v_i)
-    // }
+        // Without multithreading: this is > 5x slower than with multithreading
+        // for i in 0..REPETITION_PARAM {
+        //     let seed = rng.r#gen::<Seed>();
+        //     let (com_i, decom_i, seeds) = commit(seed, iv, 8);
+        //     let (u_i, v_i) = convert_to_vole(&seeds, iv, l_hat, true);
+        //     com.push(com_i);
+        //     decom[i] = decom_i;
+        //     u.push(u_i);
+        //     v.push(v_i)
+        // }
 
-    // With multithreading
-    let handles: [_; REPETITION_PARAM] = core::array::from_fn(|_| {
-        let seed = rng.random::<Seed>();
-        thread::spawn(move || {
-            // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
-            // `convert_to_vole` part, therefore it is more efficient to execute both in
-            // threads
-            let (com_i, decom_i, seeds) = commit(seed, iv, 8);
-            let (u_i, v_i) = convert_to_vole(
-                seeds.try_into().unwrap(), // The depth in `commit` above is hardcoded to `8`, so this will never fail.
-                iv,
-                l_hat,
-                true,
-            );
-            (com_i, decom_i, u_i, v_i)
-        })
-    });
+        // With multithreading.
+        // Lines 3-7.
+        let handles: [_; REPETITION_PARAM] = core::array::from_fn(|_| {
+            let seed = rng.random::<Seed>();
+            thread::spawn(move || {
+                // for smaller circuits the `commit/reconstruct` part is not negligible compared to the
+                // `convert_to_vole` part, therefore it is more efficient to execute both in
+                // threads
+                let (com_i, decom_i, seeds) = commit(seed, iv, 8);
+                let (u_i, v_i) = convert_to_vole(
+                    seeds
+                        .try_into()
+                        .expect("depth in `commit` hardcoded to 8, so this should never fail"),
+                    iv,
+                    l_hat,
+                    true,
+                );
+                (com_i, decom_i, u_i, v_i)
+            })
+        });
 
-    for (i, handle) in handles.into_iter().enumerate() {
-        let (com_i, decom_i, u_i, v_i) = handle.join().unwrap();
-        com.push(com_i);
-        decom[i] = decom_i;
-        u.push(u_i);
-        v.push(v_i);
-    }
+        for (i, handle) in handles.into_iter().enumerate() {
+            let (com_i, decom_i, u_i, v_i) = handle.join().unwrap();
+            com.push(com_i);
+            decom[i] = decom_i;
+            u.push(u_i);
+            v.push(v_i);
+        }
 
-    log::info!(
-        "multithreaded convert_to_vole prover running time: {:?}",
-        t.elapsed()
-    );
-    // End multithreading
+        log::info!(
+            "multithreaded convert_to_vole prover running time: {:?}",
+            t.elapsed()
+        );
+        // End multithreading
 
-    // let's compute the corrections
-    let t = std::time::Instant::now();
-    let u_0 = u[0].clone(); // TODO: opt transmute here
-    let mut corr: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
-    for i in 1..REPETITION_PARAM {
-        debug_assert_eq!(l_hat, u_0.len());
-        let ci: Vec<F2> = (0..l_hat)
+        // Lines 10-11: Compute the corrections `cᵢ`.
+        let t = std::time::Instant::now();
+        let u_0 = u[0].clone(); // TODO: opt transmute here
+        let mut corrections: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
+        for i in 1..REPETITION_PARAM {
+            debug_assert_eq!(l_hat, u_0.len());
+            let ci: Vec<F2> = (0..l_hat)
+                .into_par_iter()
+                .map(|j| u_0[j] + u[i][j])
+                .collect();
+            corrections[i - 1] = ci;
+        }
+        log::info!("corrections running time: {:?}", t.elapsed());
+
+        // Line 8: Convert to a row-wise, fixed-size representation.
+        let t = std::time::Instant::now();
+        let v_out: Vec<[F8b; REPETITION_PARAM]> = (0..l_hat)
             .into_par_iter()
-            .map(|j| u_0[j] + u[i][j])
+            .map(|i| core::array::from_fn(|tau| v[tau][i]))
             .collect();
-        corr[i - 1] = ci;
-    }
-    log::info!("corrections running time: {:?}", t.elapsed());
+        log::info!("pack to F8b running time: {:?}", t.elapsed());
 
-    // Convert to a row-wise, fixed-size representation.
-    let t = std::time::Instant::now();
-    let v_out: Vec<[F8b; REPETITION_PARAM]> = (0..l_hat)
-        .into_par_iter()
-        .map(|i| core::array::from_fn(|tau| v[tau][i]))
-        .collect();
-    log::info!("pack to F8b running time: {:?}", t.elapsed());
+        // Line 12: Hash the commitments.
+        let h_com = hash_commitments(&com);
 
-    // hash the commitments
-    let h_com = hash_commitments(&com);
-
-    Commit {
-        h_com,
-        decom,
-        corrections: Corrections(corr),
-        u: u_0,
-        v: v_out,
+        Self {
+            h_com,
+            decom,
+            corrections: Corrections(corrections),
+            u: u_0,
+            v: v_out,
+        }
     }
 }
 
@@ -358,37 +390,12 @@ pub(crate) fn l_hat(l: usize) -> usize {
     l + B + 2 * SECURITY_PARAM
 }
 
-/// Convert corrections to associated bytes.
-#[inline(never)]
-pub(crate) fn corrections_to_bytes(corrections: &Corrections) -> Vec<u8> {
-    // Corrections are a vector containing tau vectors of long size
-    let how_many = corrections.0[0].len();
-    let tau = corrections.0.len();
-    let mut out = Vec::with_capacity((how_many * tau) / 8);
-
-    let mut b = 0u8;
-    let mut i = 0;
-    for c in corrections.0.iter() {
-        for bit in c.iter() {
-            b |= if *bit == F2::ZERO { 0 } else { 1 << i };
-            if i == 7 {
-                out.push(b);
-                b = 0u8;
-                i = 0;
-            } else {
-                i += 1;
-            }
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod test {
     use std::iter::repeat_with;
 
     use super::{
-        Commit, apply_corrections_to_q, compute_secret_key, l_hat, vole_commit, vole_open,
+        VoleCommitment, apply_corrections_to_q, compute_secret_key, l_hat, vole_open,
         vole_reconstruct,
     };
     use crate::vole::crypto_primitives::H1;
@@ -407,16 +414,16 @@ mod test {
 
         let how_many = l_hat(1_000);
 
-        let mu: H1 = H1::from_bytes(&pk);
+        let mu: H1 = H1::hash(&pk);
         let (r, iv) = compute_seed_iv(&secret, &mu);
 
-        let Commit {
+        let VoleCommitment {
             h_com: _,
             decom,
             corrections,
             u,
             v,
-        } = vole_commit(r, iv, how_many);
+        } = VoleCommitment::create(r, iv, how_many);
 
         let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 

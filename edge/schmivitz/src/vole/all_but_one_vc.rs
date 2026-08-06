@@ -28,19 +28,6 @@ use crate::vole::crypto_primitives::{Com, H1, IV, Key, Prg, Seed, h0};
 use rand::RngExt;
 use swanky_error::{ErrorKind, Result, bail};
 
-/// Hash function hashing a sequence of [`Com`]mitments and returns a hash [`H1`].
-///
-/// This function is applied on the leaves commitments of the Tree-PRG/GGM-tree.
-/// This function corresponds to the H1 function in the FAEST spec, defined page 16.
-fn h1_on_coms(coms: &[Com]) -> H1 {
-    let mut inp = vec![];
-    for com in coms {
-        inp.extend(com);
-    }
-
-    H1::from_bytes(&inp)
-}
-
 /// Type storing all the [`Key`]s associated with the Tree-PRG/GGM-tree.
 ///
 /// Its internal structure uses a vector as opposed to a binary-tree.
@@ -128,8 +115,7 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
 pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (Com, Decom, Vec<Seed>) {
     let (ks, seeds, coms) = tree(iv, r, depth);
 
-    // compute the h
-    let h = h1_on_coms(&coms).into_com();
+    let h = H1::hash_commitments(&coms).into();
 
     (h, (ks, coms), seeds)
 }
@@ -220,8 +206,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<See
     debug_assert_eq!(pos, num_rec(&j));
     coms[pos] = com_j;
 
-    // compute the hash using H1
-    let h_computed = h1_on_coms(&coms).into_com();
+    let h_computed = H1::hash_commitments(&coms).into();
 
     debug_assert_eq!(seeds.len(), (1 << d));
     (h_computed, seeds)
