@@ -5,7 +5,7 @@ Implementation of algorithms to commit, open and reconstruct VOLEs.
 #![allow(clippy::needless_range_loop)]
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
-use crate::vole::convert_to_vole::{convert_to_vole, convert_to_vole_verifier};
+use crate::vole::convert_to_vole::{convert_to_vole_prover, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, Prg, Seed};
 use generic_array::{GenericArray, arr, typenum::U16};
 use rand::RngExt;
@@ -131,13 +131,12 @@ impl VoleCommitment {
                 // `convert_to_vole` part, therefore it is more efficient to execute both in
                 // threads
                 let (com_i, decom_i, seeds) = commit(seed, iv, 8);
-                let (u_i, v_i) = convert_to_vole(
+                let (u_i, v_i) = convert_to_vole_prover(
                     seeds
                         .try_into()
                         .expect("depth in `commit` hardcoded to 8, so this should never fail"),
                     iv,
                     l_hat,
-                    true,
                 );
                 (com_i, decom_i, u_i, v_i)
             })
