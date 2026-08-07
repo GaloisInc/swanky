@@ -161,7 +161,7 @@ impl<'a, C> Fancy for GarblerOffline<'a, C> {
     type Item = OfflineWire;
 }
 
-impl FancyBinaryConstant for GarblerOffline {
+impl<'a, C> FancyBinaryConstant for GarblerOffline<'a, C> {
     fn constant(&mut self, value: bool) -> Self::Item {
         let constant = F2::from(value);
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());

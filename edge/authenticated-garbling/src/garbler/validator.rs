@@ -96,7 +96,7 @@ impl<'a, C> Fancy for GarblerValidator<'a, C> {
     type Item = ValidatorWire;
 }
 
-impl FancyBinaryConstant for GarblerValidator {
+impl<'a, C> FancyBinaryConstant for GarblerValidator<'a, C> {
     fn constant(&mut self, value: bool) -> Self::Item {
         let constant = F2::from(value);
         let auth_share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta());
