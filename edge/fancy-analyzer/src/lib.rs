@@ -4,8 +4,8 @@
 
 use core::cmp::max;
 use fancy_traits::{
-    CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj,
-    HasModulus,
+    CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant,
+    FancyEncode, FancyOutput, FancyProj, HasModulus,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -199,13 +199,25 @@ impl FancyProj for CircuitAnalyzer {
 
 impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
+}
 
+impl FancyConstant for CircuitAnalyzer {
     fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
         self.nconstants += 1;
         Ok(AnalyzerItem {
             modulus: q,
             depth: 0,
         })
+    }
+}
+
+impl FancyBinaryConstant for CircuitAnalyzer {
+    fn constant(&mut self, _: bool) -> Self::Item {
+        self.nconstants += 1;
+        AnalyzerItem {
+            modulus: 2,
+            depth: 0,
+        }
     }
 }
 

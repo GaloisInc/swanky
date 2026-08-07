@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -46,7 +46,7 @@ impl<'a> MuxConstants<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for MuxConstants<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for MuxConstants<'a>
 where
     F::Item: 'a,
 {
@@ -57,15 +57,15 @@ where
         &self,
         backend: &mut F,
         inputs: Self::Input,
-        channel: &mut Channel,
+        _: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, c1, c2) = inputs;
-        match (c1, c2) {
-            (false, true) => Ok(b.clone()),
-            (true, false) => Ok(backend.negate(b)),
-            (false, false) => backend.constant(0, 2, channel),
-            (true, true) => backend.constant(1, 2, channel),
-        }
+        Ok(match (c1, c2) {
+            (false, true) => b.clone(),
+            (true, false) => backend.negate(b),
+            (false, false) => backend.constant(false),
+            (true, true) => backend.constant(true),
+        })
     }
 }
 

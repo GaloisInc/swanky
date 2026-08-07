@@ -3,7 +3,7 @@ use crate::{
     binary::{BinaryAdditionNoCarry, BinaryConstant},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -18,7 +18,7 @@ impl<'a> BinaryTwosComplement<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryTwosComplement<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryTwosComplement<'a>
 where
     F::Item: 'a,
 {
@@ -50,7 +50,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryTwosComplement`].
     pub struct TestBinaryTwosComplement(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryTwosComplement {
         type Input = BinaryBundle<F::Item>;
         type Output = BinaryBundle<F::Item>;
 
@@ -64,7 +64,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryTwosComplement {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0);
             BinaryBundle::new(inputs)
@@ -79,7 +79,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F> for TestBinaryTwosComplement {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output.wires().to_vec()
         }

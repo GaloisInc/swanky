@@ -33,9 +33,19 @@ pub trait HasModulus {
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
     type Item: Clone + HasModulus + core::fmt::Debug + core::default::Default;
+}
 
-    /// Encode a constant `x` with modulus `q`.
+/// Extension trait for [`Fancy`] that provides the ability to encode public constants.
+pub trait FancyConstant: Fancy {
+    /// Encode a constant value `x % q`.
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
+}
+
+/// Extension trait for [`Fancy`] that provides the ability to encode public
+/// constants, optimized for the binary setting.
+pub trait FancyBinaryConstant: Fancy {
+    /// Encode a binary constant value.
+    fn constant(&mut self, x: bool) -> Self::Item;
 }
 
 /// Extension trait for [`Fancy`] that provides encoding and receiving operations.

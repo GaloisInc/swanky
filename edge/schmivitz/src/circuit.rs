@@ -6,7 +6,9 @@
 */
 use crate::parameters::FIELD_SIZE;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyEncode, FancyZeroKnowledge};
+use fancy_traits::{
+    Circuit as FancyCircuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge,
+};
 use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
     TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
@@ -390,7 +392,7 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
+impl<'a, F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
     for CircuitInterpreter<'a>
 {
     type Input = ();
@@ -440,7 +442,7 @@ impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
 
                     let left = memory.get(left);
                     let right = F2::from_number(right)?;
-                    let right = backend.constant(right.into(), 2, channel)?;
+                    let right = backend.constant(right.into());
 
                     let res = backend.xor(&left, &right);
 

@@ -1,6 +1,6 @@
 use crate::{AnalyzerItem, CircuitAnalyzer};
 use core::fmt::Debug;
-use fancy_traits::{Fancy, FancyBinary, HasModulus};
+use fancy_traits::{Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, HasModulus};
 use std::ops::Deref;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -61,12 +61,23 @@ impl<F> Deref for CircuitAnalyzerWrapper<F> {
 
 impl<F: Fancy> Fancy for CircuitAnalyzerWrapper<F> {
     type Item = Wire<F::Item>;
+}
 
+impl<F: FancyConstant> FancyConstant for CircuitAnalyzerWrapper<F> {
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item> {
         Ok(Wire(
             self.internal.constant(x, q, channel)?,
-            self.analyzer.constant(x, q, channel)?,
+            FancyConstant::constant(&mut self.analyzer, x, q, channel)?,
         ))
+    }
+}
+
+impl<F: FancyBinaryConstant> FancyBinaryConstant for CircuitAnalyzerWrapper<F> {
+    fn constant(&mut self, x: bool) -> Self::Item {
+        Wire(
+            self.internal.constant(x),
+            FancyBinaryConstant::constant(&mut self.analyzer, x),
+        )
     }
 }
 

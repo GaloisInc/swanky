@@ -3,7 +3,7 @@ use crate::{
     binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction, Mux},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -31,7 +31,7 @@ impl<'a> Gcd<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for Gcd<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for Gcd<'a>
 where
     F::Item: 'a,
 {
@@ -47,7 +47,7 @@ where
         let (a_ref, b_ref) = inputs;
         let mut a = (*a_ref).clone();
         let mut b = (*b_ref).clone();
-        let zero = backend.constant(0, 2, channel)?;
+        let zero = backend.constant(false);
 
         for _ in 0..self.upper_bound {
             // Since the circuit is non-branching, we don't know whether `a > b`

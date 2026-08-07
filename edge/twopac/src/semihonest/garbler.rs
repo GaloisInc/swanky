@@ -1,5 +1,8 @@
 use fancy_garbling::{AllWire, ArithmeticWire, Garbler as Gb, WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj};
+use fancy_traits::{
+    Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    FancyOutput, FancyProj,
+};
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
@@ -151,14 +154,32 @@ impl<
 > Fancy for Garbler<RNG, OT, Wire>
 {
     type Item = Wire;
+}
 
+impl<
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyConstant for Garbler<RNG, OT, Wire>
+{
     fn constant(
         &mut self,
         x: u16,
         q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        self.garbler.constant(x, q, channel)
+        FancyConstant::constant(&mut self.garbler, x, q, channel)
+    }
+}
+
+impl<
+    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    OT: OtSender<Msg = Block> + SemiHonest,
+    Wire: WireLabel,
+> FancyBinaryConstant for Garbler<RNG, OT, Wire>
+{
+    fn constant(&mut self, x: bool) -> Self::Item {
+        FancyBinaryConstant::constant(&mut self.garbler, x)
     }
 }
 

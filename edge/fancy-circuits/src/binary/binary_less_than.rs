@@ -3,7 +3,7 @@ use crate::{
     binary::{BinarySubtraction, Mux, OrMany},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -20,7 +20,7 @@ impl<'a> BinaryLessThan<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryLessThan<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryLessThan<'a>
 where
     F::Item: 'a,
 {
@@ -78,7 +78,7 @@ impl<'a> BinaryLessThanSigned<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryLessThanSigned<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryLessThanSigned<'a>
 where
     F::Item: 'a,
 {
@@ -93,8 +93,8 @@ where
     ) -> Result<Self::Output> {
         assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
-        let zero = backend.constant(0, 2, channel)?;
-        let one = backend.constant(1, 2, channel)?;
+        let zero = backend.constant(false);
+        let one = backend.constant(true);
 
         // Determine whether x and y are positive or negative.
         // In two's complement, the most significant bit indicates the sign.
@@ -122,7 +122,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryLessThan`].
     pub struct TestBinaryLessThan(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestBinaryLessThan {
+    impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryLessThan {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
         type Output = F::Item;
 
@@ -136,7 +136,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryLessThan {
+    impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryLessThan {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
@@ -154,7 +154,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryLessThanSigned`].
     pub struct TestBinaryLessThanSigned(pub usize);
-    impl<F: FancyBinary> Circuit<F> for TestBinaryLessThanSigned {
+    impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryLessThanSigned {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
         type Output = F::Item;
 
@@ -168,7 +168,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryLessThanSigned {
+    impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryLessThanSigned {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);

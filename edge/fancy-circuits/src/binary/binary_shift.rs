@@ -1,6 +1,6 @@
 use crate::BinaryBundle;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -16,7 +16,7 @@ impl<'a> BinaryLeftShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryLeftShift<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryLeftShift<'a>
 where
     F::Item: 'a,
 {
@@ -27,10 +27,10 @@ where
         &self,
         backend: &mut F,
         inputs: Self::Input,
-        channel: &mut Channel,
+        _: &mut Channel,
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
-        let zero = backend.constant(0, 2, channel)?;
+        let zero = backend.constant(false);
 
         let mut wires = bundle.wires().to_vec();
         for _ in 0..n {
@@ -55,7 +55,7 @@ impl<'a> BinaryLeftShiftExtend<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryLeftShiftExtend<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryLeftShiftExtend<'a>
 where
     F::Item: 'a,
 {
@@ -66,11 +66,11 @@ where
         &self,
         backend: &mut F,
         inputs: Self::Input,
-        channel: &mut Channel,
+        _: &mut Channel,
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let mut wires = bundle.wires().to_vec();
-        let zero = backend.constant(0, 2, channel)?;
+        let zero = backend.constant(false);
         for _ in 0..n {
             wires.insert(0, zero.clone());
         }
@@ -90,7 +90,7 @@ impl<'a> BinaryRightShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryRightShift<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryRightShift<'a>
 where
     F::Item: 'a,
 {
@@ -124,7 +124,7 @@ impl<'a> BinaryLogicalRightShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryLogicalRightShift<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryLogicalRightShift<'a>
 where
     F::Item: 'a,
 {
@@ -138,7 +138,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
-        let zero = backend.constant(0, 2, channel)?;
+        let zero = backend.constant(false);
         BinaryRightShift::new().execute(backend, (x, n, zero), channel)
     }
 }
@@ -154,7 +154,7 @@ impl<'a> BinaryArithmeticRightShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryArithmeticRightShift<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryArithmeticRightShift<'a>
 where
     F::Item: 'a,
 {

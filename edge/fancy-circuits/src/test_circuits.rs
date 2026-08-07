@@ -1,15 +1,15 @@
 //! A collection of test circuits.
 
-pub mod fancy {
-    //! Circuits that test [`Fancy`].
+pub mod fancy_binary_constant {
+    //! Circuits that test [`FancyConstantBinary`].
 
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, Fancy};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinaryConstant};
     use swanky_channel::Channel;
     use swanky_error::Result;
 
     /// Circuit for testing [`Fancy::constant`] on binary values.
     pub struct TestBinaryConstant;
-    impl<F: Fancy> Circuit<F> for TestBinaryConstant {
+    impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
         type Input = ();
         type Output = Vec<F::Item>;
 
@@ -17,16 +17,13 @@ pub mod fancy {
             &self,
             backend: &mut F,
             _: Self::Input,
-            channel: &mut Channel,
+            _: &mut Channel,
         ) -> Result<Self::Output> {
-            let outputs = vec![
-                backend.constant(0, 2, channel)?,
-                backend.constant(1, 2, channel)?,
-            ];
+            let outputs = vec![backend.constant(false), backend.constant(true)];
             Ok(outputs)
         }
     }
-    impl<F: Fancy> CircuitInputMapper<F> for TestBinaryConstant {
+    impl<F: FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryConstant {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }
@@ -39,7 +36,7 @@ pub mod fancy {
             2
         }
     }
-    impl<F: Fancy> CircuitOutputMapper<F> for TestBinaryConstant {
+    impl<F: FancyBinaryConstant> CircuitOutputMapper<F> for TestBinaryConstant {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output
         }
@@ -234,7 +231,9 @@ pub mod arithmetic {
     //! Circuits that test [`FancyArithmetic`].
 
     use crate::arithmetic::AddMany;
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic};
+    use fancy_traits::{
+        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyConstant,
+    };
     use swanky_channel::Channel;
     use swanky_error::Result;
 
@@ -451,7 +450,7 @@ pub mod arithmetic {
 
     /// Circuit for testing constant gates.
     pub struct TestConstants(pub u16, pub u16);
-    impl<F: FancyArithmetic> Circuit<F> for TestConstants {
+    impl<F: FancyArithmetic + FancyConstant> Circuit<F> for TestConstants {
         type Input = F::Item;
         type Output = F::Item;
 
@@ -465,7 +464,7 @@ pub mod arithmetic {
             Ok(backend.add(&input, &constant))
         }
     }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestConstants {
+    impl<F: FancyArithmetic + FancyConstant> CircuitInputMapper<F> for TestConstants {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), 1);
             inputs[0].clone()
@@ -479,7 +478,7 @@ pub mod arithmetic {
             self.0
         }
     }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestConstants {
+    impl<F: FancyArithmetic + FancyConstant> CircuitOutputMapper<F> for TestConstants {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             vec![output]
         }

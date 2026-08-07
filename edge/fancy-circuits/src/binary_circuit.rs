@@ -1,4 +1,4 @@
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -14,7 +14,7 @@ pub struct BinaryCircuit {
     pub(crate) num_nonfree_gates: usize,
 }
 
-impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryCircuit {
     type Input = Vec<F::Item>;
     type Output = Vec<F::Item>;
 
@@ -28,7 +28,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
     }
 }
 
-impl<F: FancyBinary> CircuitInputMapper<F> for BinaryCircuit {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BinaryCircuit {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.input_refs.len());
         inputs
@@ -130,7 +130,7 @@ impl BinaryCircuit {
         }
     }
 
-    fn eval_to_wirelabels<F: FancyBinary>(
+    fn eval_to_wirelabels<F: FancyBinary + FancyBinaryConstant>(
         &self,
         f: &mut F,
         inputs: &[F::Item],
@@ -138,10 +138,9 @@ impl BinaryCircuit {
     ) -> swanky_error::Result<Vec<F::Item>> {
         let mut cache: Vec<Option<F::Item>> = vec![None; self.gates.len()];
         for (i, gate) in self.gates.iter().enumerate() {
-            let q = 2;
             let (zref_, val) = match *gate {
                 BinaryGate::Input { id } => (None, inputs[id].clone()),
-                BinaryGate::Constant { val } => (None, f.constant(val, q, channel)?),
+                BinaryGate::Constant { val } => (None, f.constant(val != 0)),
                 BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref].as_ref().unwrap())),
                 BinaryGate::Xor { xref, yref, out } => (
                     out,

@@ -14,7 +14,9 @@ use fancy_garbling::{
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
-use fancy_traits::{FancyArithmetic, FancyBinary, FancyProj, HasModulus};
+use fancy_traits::{
+    FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyProj, HasModulus,
+};
 use ndarray::Array3;
 use rand::{CryptoRng, Rng};
 #[cfg(feature = "serde")]
@@ -907,7 +909,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: FancyBinary + BinaryGadgets,
+        F: FancyBinary + FancyBinaryConstant + BinaryGadgets,
     {
         let mut errors = 0;
 
@@ -958,7 +960,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets,
+        F: FancyConstant + FancyBinary + FancyArithmetic + FancyProj + CrtGadgets,
     {
         let moduli = util::bitwidths_to_moduli(bitwidth);
 

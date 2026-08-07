@@ -7,6 +7,7 @@ use crate::wire::OfflineWire;
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::CircuitOutputMapper;
+use fancy_traits::FancyBinaryConstant;
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary};
 use rand::{CryptoRng, Rng};
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
@@ -158,9 +159,11 @@ impl<'a, C> GarblerOffline<'a, C> {
 
 impl<'a, C> Fancy for GarblerOffline<'a, C> {
     type Item = OfflineWire;
+}
 
-    fn constant(&mut self, value: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
-        let constant = F2::try_from(value).expect("constant must be boolean");
+impl FancyBinaryConstant for GarblerOffline {
+    fn constant(&mut self, value: bool) -> Self::Item {
+        let constant = F2::from(value);
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
         let wirelabel = if constant == F2::ONE {
             // `self.zero` corresponds to the zero wirelabel associated with the
@@ -170,7 +173,7 @@ impl<'a, C> Fancy for GarblerOffline<'a, C> {
             // Otherwise, the garbler uses the "null" wirelabel to represent zero.
             Default::default()
         };
-        Ok(OfflineWire::new(wirelabel, share))
+        OfflineWire::new(wirelabel, share)
     }
 }
 

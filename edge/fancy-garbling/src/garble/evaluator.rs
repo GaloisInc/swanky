@@ -7,7 +7,8 @@ use crate::{
     wire::WireLabel,
 };
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus, is_binary,
+    Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -25,12 +26,11 @@ pub struct Evaluator<Wire> {
 
 impl<Wire: WireLabel> Evaluator<Wire> {
     /// Create a new [`Evaluator`].
-    pub fn new(channel: &mut Channel) -> swanky_error::Result<Self> {
-        // Receive the constant one wirelabel from the garbler. This is used to
-        // make negation free.
-        let one = channel.read::<U8x16>()?;
+    pub fn new(_: &mut Channel) -> swanky_error::Result<Self> {
+        // We set the constant `1` wirelabel to simply be `1`.
+        let one = Wire::from_repr(U8x16::from(1u128), 2);
         Ok(Evaluator {
-            one: Wire::from_repr(one, 2),
+            one,
             current_gate: 0,
             current_output: 0,
         })
@@ -52,7 +52,6 @@ impl<Wire: WireLabel> Evaluator<Wire> {
 }
 
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
-    /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         *x + self.one
     }
@@ -207,9 +206,22 @@ impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
 
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
+}
 
+impl<Wire: WireLabel> FancyConstant for Evaluator<Wire> {
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         Ok(Wire::from_repr(channel.read()?, q))
+    }
+}
+
+impl<Wire: WireLabel> FancyBinaryConstant for Evaluator<Wire> {
+    fn constant(&mut self, x: bool) -> Self::Item {
+        if x {
+            self.one.clone()
+        } else {
+            // We use the "null" wirelabel to represent zero.
+            Default::default()
+        }
     }
 }
 

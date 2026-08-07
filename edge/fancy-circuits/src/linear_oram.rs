@@ -2,7 +2,9 @@ use crate::{
     BinaryBundle,
     binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
+use fancy_traits::{
+    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -22,7 +24,7 @@ impl<const N: usize> LinearOram<N> {
     }
 }
 
-impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
+impl<F: FancyBinary + FancyBinaryConstant, const N: usize> Circuit<F> for LinearOram<N> {
     type Input = (Vec<BinaryBundle<F::Item>>, BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
@@ -33,8 +35,8 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
-        let zero_bit = backend.constant(0, 2, channel)?;
-        let one_bit = backend.constant(1, 2, channel)?;
+        let zero_bit = backend.constant(false);
+        let one_bit = backend.constant(true);
 
         let zero =
             BinaryConstant::new_with_constants(0, N, Some(zero_bit.clone()), Some(one_bit.clone()))
@@ -63,7 +65,7 @@ impl<F: FancyBinary, const N: usize> Circuit<F> for LinearOram<N> {
     }
 }
 
-impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
+impl<F: FancyBinary + FancyBinaryConstant, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), (self.size + 1) * N);
         let (ram_bits, query_bits) = inputs.split_at(self.size * N);
@@ -86,7 +88,9 @@ impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
     }
 }
 
-impl<F: FancyBinary, const N: usize> CircuitOutputMapper<F> for LinearOram<N> {
+impl<F: FancyBinary + FancyBinaryConstant, const N: usize> CircuitOutputMapper<F>
+    for LinearOram<N>
+{
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.wires().to_vec()
     }
