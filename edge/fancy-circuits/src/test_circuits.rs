@@ -1,13 +1,13 @@
 //! A collection of test circuits.
 
 pub mod fancy_binary_constant {
-    //! Circuits that test [`FancyConstantBinary`].
+    //! Circuits that test [`FancyBinaryConstant`].
 
     use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinaryConstant};
     use swanky_channel::Channel;
     use swanky_error::Result;
 
-    /// Circuit for testing [`Fancy::constant`] on binary values.
+    /// Circuit for testing [`FancyBinaryConstant::constant`].
     pub struct TestBinaryConstant;
     impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
         type Input = ();

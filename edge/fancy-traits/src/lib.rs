@@ -22,8 +22,7 @@ pub trait HasModulus {
 /// The `Fancy` trait is the core trait for writing circuits.
 ///
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
-/// underlying wire representation, alongside a [`Fancy::constant`] method for
-/// creating constant (public) wires.
+/// underlying wire representation.
 ///
 /// This trait can be further extended to support binary, arithmetic, and/or
 /// projections by using the [`FancyBinary`], [`FancyArithmetic`], or
