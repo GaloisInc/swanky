@@ -35,24 +35,14 @@ impl<F: FancyBinary + FancyBinaryConstant, const N: usize> Circuit<F> for Linear
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
-        let zero_bit = backend.constant(false);
-        let one_bit = backend.constant(true);
 
-        let zero =
-            BinaryConstant::new_with_constants(0, N, Some(zero_bit.clone()), Some(one_bit.clone()))
-                .execute(backend, (), channel)?;
+        let zero = BinaryConstant::new(0, N).execute(backend, (), channel)?;
 
         // Traverse the RAM one element at a time, and multiplex the result
         // based on whether the query matches the current index.
         let mut result = zero.clone();
         for (i, item) in ram.iter().enumerate() {
-            let index = BinaryConstant::new_with_constants(
-                i as u128,
-                N,
-                Some(zero_bit.clone()),
-                Some(one_bit.clone()),
-            )
-            .execute(backend, (), channel)?;
+            let index = BinaryConstant::new(i as u128, N).execute(backend, (), channel)?;
             let is_equal = BinaryEquality::new().execute(backend, (&query, &index), channel)?;
             let mux = BinaryMultiplex::new().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`

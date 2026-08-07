@@ -7,37 +7,19 @@ use swanky_error::Result;
 ///
 /// For `(value, nbits)`, return a [`BinaryBundle`] containing `value` in its
 /// bit representation.
-pub struct BinaryConstant<F: Fancy> {
+pub struct BinaryConstant {
     value: u128,
     nbits: usize,
-    zero: Option<F::Item>,
-    one: Option<F::Item>,
 }
 
-impl<F: Fancy> BinaryConstant<F> {
+impl BinaryConstant {
     /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`.
     pub fn new(value: u128, nbits: usize) -> Self {
-        Self::new_with_constants(value, nbits, None, None)
-    }
-
-    /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`, using the
-    /// provided zero and one constants.
-    pub fn new_with_constants(
-        value: u128,
-        nbits: usize,
-        zero: Option<F::Item>,
-        one: Option<F::Item>,
-    ) -> Self {
-        Self {
-            value,
-            nbits,
-            zero,
-            one,
-        }
+        Self { value, nbits }
     }
 }
 
-impl<F: FancyBinaryConstant> Circuit<F> for BinaryConstant<F> {
+impl<F: FancyBinaryConstant> Circuit<F> for BinaryConstant {
     type Input = ();
     type Output = BinaryBundle<F::Item>;
 
@@ -45,22 +27,7 @@ impl<F: FancyBinaryConstant> Circuit<F> for BinaryConstant<F> {
         let xs = u128_to_bits(self.value, self.nbits);
         Ok(BinaryBundle::new(
             xs.into_iter()
-                .map(|x| match x != 0 {
-                    true => {
-                        if let Some(one) = &self.one {
-                            one.clone()
-                        } else {
-                            backend.constant(true)
-                        }
-                    }
-                    false => {
-                        if let Some(zero) = &self.zero {
-                            zero.clone()
-                        } else {
-                            backend.constant(false)
-                        }
-                    }
-                })
+                .map(|x| backend.constant(x != 0))
                 .collect::<Vec<_>>(),
         ))
     }
@@ -73,8 +40,8 @@ pub mod test {
     /// Circuit for testing [`BinaryConstant`].
     pub struct TestBinaryConstant(pub u128, pub usize);
     impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
-        type Input = <BinaryConstant<F> as Circuit<F>>::Input;
-        type Output = <BinaryConstant<F> as Circuit<F>>::Output;
+        type Input = <BinaryConstant as Circuit<F>>::Input;
+        type Output = <BinaryConstant as Circuit<F>>::Output;
 
         fn execute(
             &self,

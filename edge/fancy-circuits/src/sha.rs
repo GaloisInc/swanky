@@ -229,13 +229,8 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
         }
 
         // Append the original message length as a 64-bit big-endian integer.
-        let mut length = BinaryConstant::new_with_constants(
-            message_len as u128,
-            64,
-            Some(zero.clone()),
-            Some(one.clone()),
-        )
-        .execute(backend, (), channel)?;
+        let mut length =
+            BinaryConstant::new(message_len as u128, 64).execute(backend, (), channel)?;
         // Constants are represented in little-endian, but here we need message
         // length to be in big-endian. So we reverse the bundle before using it.
         length.reverse();
