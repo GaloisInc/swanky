@@ -5,7 +5,7 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
 };
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use rand::{CryptoRng, Rng, RngExt};
@@ -42,7 +42,7 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire
 
 impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
-    pub fn new(mut rng: RNG, _: &mut Channel) -> swanky_error::Result<Self> {
+    pub fn new(mut rng: RNG) -> Self {
         let delta = Wire::rand_delta(&mut rng, 2);
         // We fix the constant `1` value to `1`, and derive the zero wirelabel
         // as that value XORed with `Δ`.
@@ -50,13 +50,13 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
         let zero = delta.clone() + one;
         let mut deltas = HashMap::new();
         deltas.insert(2, delta);
-        Ok(Garbler {
+        Garbler {
             zero,
             deltas,
             current_gate: 0,
             current_output: 0,
             rng,
-        })
+        }
     }
 
     /// The current non-free gate index of the garbling computation

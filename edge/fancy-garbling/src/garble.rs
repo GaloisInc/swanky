@@ -203,9 +203,10 @@ mod streaming {
 
         let (inputs, moduli, expected) = super::helpers::plaintext(circuit);
 
+        let mut gb = Garbler::new(rng);
+        let mut ev = Evaluator::new();
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb = Garbler::new(rng, channel)?;
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
@@ -219,7 +220,6 @@ mod streaming {
                 Ok(())
             },
             |channel| {
-                let mut ev = Evaluator::new(channel)?;
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut ev,

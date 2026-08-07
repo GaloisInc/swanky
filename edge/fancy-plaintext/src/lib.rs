@@ -2,7 +2,7 @@
 #![deny(missing_docs)]
 
 use fancy_traits::{
-    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use rand::{CryptoRng, Rng, RngExt};

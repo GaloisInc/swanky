@@ -1,6 +1,6 @@
 use fancy_garbling::{AllWire, ArithmeticWire, Evaluator as Ev, WireLabel, WireMod2};
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj,
 };
 use rand::{CryptoRng, Rng};
@@ -26,7 +26,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let ot = OT::init(channel, &mut rng)
             .wrap_err(ErrorKind::InitializationError, "Failed to initialize OT.")?;
-        let evaluator = Ev::new(channel)?;
+        let evaluator = Ev::new();
         Ok(Self { evaluator, ot, rng })
     }
 

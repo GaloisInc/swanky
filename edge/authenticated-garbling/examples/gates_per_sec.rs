@@ -113,14 +113,14 @@ where
 
     println!("=== Streaming Garbling ===");
 
+    let mut gb = SemiHonestGarbler::<_, WireMod2>::new(SwankyRng::new());
+    let mut ev = SemiHonestEvaluator::<WireMod2>::new();
     let ((mut gb, zeros), (mut ev, wires)) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let mut gb = SemiHonestGarbler::<_, WireMod2>::new(SwankyRng::new(), channel)?;
             let zeros = gb.encode_many(&inputs, &moduli, channel)?;
             Ok((gb, zeros))
         },
         |channel| {
-            let mut ev = SemiHonestEvaluator::<WireMod2>::new(channel)?;
             let wires = ev.receive_many(&moduli, channel)?;
             Ok((ev, wires))
         },

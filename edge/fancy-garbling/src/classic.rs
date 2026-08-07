@@ -50,18 +50,18 @@ impl GarbledCircuit {
         circuit: &C,
         rng: RNG,
     ) -> swanky_error::Result<(Encoder<Wire>, Self, OutputMapping)> {
+        let mut garbler = Garbler::new(rng);
+
+        // Produce zero wirelabels for the inputs.
+        let inputs = (0..circuit.ninputs())
+            .map(|i| {
+                let q = circuit.modulus(i);
+                garbler.encode_zero(q)
+            })
+            .collect::<Vec<_>>();
+
         let mut channel = GarbledChannel::new_writer(None);
         let (en, output_mapping) = Channel::with(&mut channel, |channel| {
-            let mut garbler = Garbler::new(rng, channel)?;
-
-            // Produce zero wirelabels for the inputs.
-            let inputs = (0..circuit.ninputs())
-                .map(|i| {
-                    let q = circuit.modulus(i);
-                    garbler.encode_zero(q)
-                })
-                .collect::<Vec<_>>();
-
             // First, garble the circuit, outputting the zero wirelabels
             // associated with the output.
             let zeros = circuit.execute(&mut garbler, circuit.map(inputs.clone()), channel)?;
@@ -101,8 +101,8 @@ impl GarbledCircuit {
         circuit: &C,
         inputs: C::Input,
     ) -> swanky_error::Result<C::Output> {
+        let mut evaluator = Evaluator::new();
         Channel::with(GarbledChannel::from(self), |channel| {
-            let mut evaluator = Evaluator::new(channel)?;
             circuit.execute(&mut evaluator, inputs, channel)
         })
     }

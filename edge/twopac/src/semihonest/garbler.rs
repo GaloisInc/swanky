@@ -1,6 +1,6 @@
 use fancy_garbling::{AllWire, ArithmeticWire, Garbler as Gb, WireLabel, WireMod2};
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj,
 };
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
@@ -41,7 +41,7 @@ impl<
         let ot = OT::init(channel, &mut rng)
             .wrap_err(ErrorKind::InitializationError, "Failed to initialize OT.")?;
 
-        let garbler = Gb::new(RNG::from_seed(rng.random()), channel)?;
+        let garbler = Gb::new(RNG::from_seed(rng.random()));
         Ok(Garbler { garbler, ot, rng })
     }
 

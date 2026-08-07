@@ -7,7 +7,7 @@ use crate::{
     wire::WireLabel,
 };
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyConstant, FancyBinaryConstant, FancyEncode,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use swanky_channel::Channel;
@@ -26,14 +26,14 @@ pub struct Evaluator<Wire> {
 
 impl<Wire: WireLabel> Evaluator<Wire> {
     /// Create a new [`Evaluator`].
-    pub fn new(_: &mut Channel) -> swanky_error::Result<Self> {
+    pub fn new() -> Self {
         // We set the constant `1` wirelabel to simply be `1`.
         let one = Wire::from_repr(U8x16::from(1u128), 2);
-        Ok(Evaluator {
+        Evaluator {
             one,
             current_gate: 0,
             current_output: 0,
-        })
+        }
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -48,6 +48,12 @@ impl<Wire: WireLabel> Evaluator<Wire> {
         let current = self.current_output;
         self.current_output += 1;
         current
+    }
+}
+
+impl<Wire: WireLabel> Default for Evaluator<Wire> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
