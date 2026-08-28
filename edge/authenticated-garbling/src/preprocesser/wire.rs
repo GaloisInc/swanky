@@ -120,7 +120,7 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
 }
 
 impl<P: GenericParty> FancyBinaryConstant for WirePreProcessor<P> {
-    fn constant(&mut self, _: bool) -> Self::Item {
+    fn constant(&mut self, _: F2) -> Self::Item {
         let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
         Wire::new(authshare)
     }

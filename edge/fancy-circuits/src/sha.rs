@@ -7,6 +7,8 @@ use fancy_traits::{
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Circuit for the SHA-256 compression function, where the chaining values are
 /// fixed to the SHA-256 IV.
@@ -201,8 +203,8 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
     ) -> Result<Self::Output> {
         let message_len = inputs.len();
 
-        let one = backend.constant(true);
-        let zero = backend.constant(false);
+        let one = backend.constant(F2::ONE);
+        let zero = backend.constant(F2::ZERO);
 
         // Initialize the hash with SHA-256 IV.
         let mut chain: [F::Item; 256] = Self::IV

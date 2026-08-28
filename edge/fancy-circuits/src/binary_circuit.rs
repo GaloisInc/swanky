@@ -1,6 +1,7 @@
 use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 mod parser;
 
@@ -140,7 +141,7 @@ impl BinaryCircuit {
         for (i, gate) in self.gates.iter().enumerate() {
             let (zref_, val) = match *gate {
                 BinaryGate::Input { id } => (None, inputs[id].clone()),
-                BinaryGate::Constant { val } => (None, f.constant(val != 0)),
+                BinaryGate::Constant { val } => (None, f.constant(F2::from(val != 0))),
                 BinaryGate::Inv { xref, out } => (out, f.negate(cache[xref].as_ref().unwrap())),
                 BinaryGate::Xor { xref, yref, out } => (
                     out,

@@ -13,6 +13,7 @@ use rand::{CryptoRng, Rng, RngExt};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
 use super::security_warning::warn_proj;
@@ -379,8 +380,8 @@ impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant for Garbler<RNG, Wire> {
 }
 
 impl<RNG: CryptoRng, Wire: WireLabel> FancyBinaryConstant for Garbler<RNG, Wire> {
-    fn constant(&mut self, x: bool) -> Self::Item {
-        if x {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        if x.into() {
             // `self.zero` corresponds to the zero wirelabel associated with the
             // "one" wirelabel set to `F128b::ONE`.
             self.zero.clone()

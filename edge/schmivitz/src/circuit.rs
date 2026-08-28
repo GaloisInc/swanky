@@ -442,7 +442,7 @@ impl<'a, F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge + FancyEncode
 
                     let left = memory.get(left);
                     let right = F2::from_number(right)?;
-                    let right = backend.constant(right.into());
+                    let right = backend.constant(right);
 
                     let res = backend.xor(&left, &right);
 

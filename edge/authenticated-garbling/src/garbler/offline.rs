@@ -162,8 +162,7 @@ impl<'a, C> Fancy for GarblerOffline<'a, C> {
 }
 
 impl<'a, C> FancyBinaryConstant for GarblerOffline<'a, C> {
-    fn constant(&mut self, value: bool) -> Self::Item {
-        let constant = F2::from(value);
+    fn constant(&mut self, constant: F2) -> Self::Item {
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
         let wirelabel = if constant == F2::ONE {
             // `self.zero` corresponds to the zero wirelabel associated with the

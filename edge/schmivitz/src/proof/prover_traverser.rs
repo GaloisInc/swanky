@@ -218,8 +218,8 @@ impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
 }
 
 impl<VOLE: RandomVoleP> FancyBinaryConstant for ProverTraverser<VOLE> {
-    fn constant(&mut self, constant: bool) -> Self::Item {
-        Wire(F2::from(constant), F128b::ZERO)
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        Wire(constant, F128b::ZERO)
     }
 }
 

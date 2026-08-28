@@ -2,6 +2,7 @@ use crate::{BinaryBundle, util::u128_to_bits};
 use fancy_traits::{Circuit, Fancy, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Binary constant.
 ///
@@ -27,7 +28,7 @@ impl<F: FancyBinaryConstant> Circuit<F> for BinaryConstant {
         let xs = u128_to_bits(self.value, self.nbits);
         Ok(BinaryBundle::new(
             xs.into_iter()
-                .map(|x| backend.constant(x != 0))
+                .map(|x| backend.constant(F2::from(x != 0)))
                 .collect::<Vec<_>>(),
         ))
     }

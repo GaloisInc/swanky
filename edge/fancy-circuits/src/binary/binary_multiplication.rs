@@ -12,6 +12,8 @@ use fancy_traits::{
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] inputs `x` and `y`, output `x * y`.
 #[derive(Default)]
@@ -43,7 +45,7 @@ where
         let xwires = xs.wires();
         let ywires = ys.wires();
 
-        let zero = backend.constant(false);
+        let zero = backend.constant(F2::ZERO);
 
         let mut sum = xwires
             .iter()

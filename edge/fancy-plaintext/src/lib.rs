@@ -8,6 +8,7 @@ use fancy_traits::{
 use rand::{CryptoRng, Rng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
+use swanky_field_binary::F2;
 
 /// Plaintext implementation of [`Fancy`].
 pub struct Dummy;
@@ -173,9 +174,9 @@ impl FancyConstant for Dummy {
 }
 
 impl FancyBinaryConstant for Dummy {
-    fn constant(&mut self, x: bool) -> Self::Item {
+    fn constant(&mut self, x: F2) -> Self::Item {
         DummyVal {
-            val: x as u16,
+            val: x.into(),
             modulus: 2,
         }
     }

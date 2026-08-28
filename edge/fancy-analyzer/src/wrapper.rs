@@ -4,6 +4,7 @@ use fancy_traits::{Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, HasMo
 use std::ops::Deref;
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// The [`Fancy::Item`] type for [`CircuitAnalyzerWrapper`].
 #[derive(Clone, Copy, Debug, Default)]
@@ -73,7 +74,7 @@ impl<F: FancyConstant> FancyConstant for CircuitAnalyzerWrapper<F> {
 }
 
 impl<F: FancyBinaryConstant> FancyBinaryConstant for CircuitAnalyzerWrapper<F> {
-    fn constant(&mut self, x: bool) -> Self::Item {
+    fn constant(&mut self, x: F2) -> Self::Item {
         Wire(
             self.internal.constant(x),
             FancyBinaryConstant::constant(&mut self.analyzer, x),

@@ -12,6 +12,7 @@ use fancy_traits::{
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
+use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
@@ -221,8 +222,8 @@ impl<Wire: WireLabel> FancyConstant for Evaluator<Wire> {
 }
 
 impl<Wire: WireLabel> FancyBinaryConstant for Evaluator<Wire> {
-    fn constant(&mut self, x: bool) -> Self::Item {
-        if x {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        if x.into() {
             self.one.clone()
         } else {
             // We use the "null" wirelabel to represent zero.

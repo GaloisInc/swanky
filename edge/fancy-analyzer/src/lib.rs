@@ -9,6 +9,7 @@ use fancy_traits::{
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
+use swanky_field_binary::F2;
 
 mod wrapper;
 pub use wrapper::CircuitAnalyzerWrapper;
@@ -212,7 +213,7 @@ impl FancyConstant for CircuitAnalyzer {
 }
 
 impl FancyBinaryConstant for CircuitAnalyzer {
-    fn constant(&mut self, _: bool) -> Self::Item {
+    fn constant(&mut self, _: F2) -> Self::Item {
         self.nconstants += 1;
         AnalyzerItem {
             modulus: 2,

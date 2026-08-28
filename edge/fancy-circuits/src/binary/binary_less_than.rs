@@ -6,6 +6,8 @@ use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Binary less than.
 ///
@@ -93,8 +95,8 @@ where
     ) -> Result<Self::Output> {
         assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
-        let zero = backend.constant(false);
-        let one = backend.constant(true);
+        let zero = backend.constant(F2::ZERO);
+        let one = backend.constant(F2::ONE);
 
         // Determine whether x and y are positive or negative.
         // In two's complement, the most significant bit indicates the sign.

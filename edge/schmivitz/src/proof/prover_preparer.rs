@@ -135,8 +135,8 @@ impl<'a> Fancy for ProverPreparer<'a> {
 }
 
 impl<'a> FancyBinaryConstant for ProverPreparer<'a> {
-    fn constant(&mut self, constant: bool) -> Self::Item {
-        Wire(F2::from(constant))
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        Wire(constant)
     }
 }
 

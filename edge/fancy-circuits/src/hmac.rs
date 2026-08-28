@@ -8,6 +8,8 @@ use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Circuit for HMAC-SHA256.
 ///
@@ -55,8 +57,8 @@ where
     ) -> Result<Self::Output> {
         let (key, message) = inputs;
 
-        let zero = backend.constant(false);
-        let one = backend.constant(true);
+        let zero = backend.constant(F2::ZERO);
+        let one = backend.constant(F2::ONE);
 
         // Create ipad pattern (0x36 repeated 64 times for 512 bits).
         let ipad: Vec<F::Item> = Self::IPAD_BYTE

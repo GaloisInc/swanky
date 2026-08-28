@@ -6,6 +6,8 @@ pub mod fancy_binary_constant {
     use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinaryConstant};
     use swanky_channel::Channel;
     use swanky_error::Result;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     /// Circuit for testing [`FancyBinaryConstant::constant`].
     pub struct TestBinaryConstant;
@@ -19,7 +21,7 @@ pub mod fancy_binary_constant {
             _: Self::Input,
             _: &mut Channel,
         ) -> Result<Self::Output> {
-            let outputs = vec![backend.constant(false), backend.constant(true)];
+            let outputs = vec![backend.constant(F2::ZERO), backend.constant(F2::ONE)];
             Ok(outputs)
         }
     }

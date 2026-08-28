@@ -8,6 +8,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field_binary::F2;
 use swanky_ot_traits::Receiver as OtReceiver;
 
 /// Semi-honest evaluator.
@@ -159,7 +160,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
 impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
     FancyBinaryConstant for Evaluator<RNG, OT, Wire>
 {
-    fn constant(&mut self, x: bool) -> Self::Item {
+    fn constant(&mut self, x: F2) -> Self::Item {
         FancyBinaryConstant::constant(&mut self.evaluator, x)
     }
 }

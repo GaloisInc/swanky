@@ -141,8 +141,7 @@ impl<'a, C> Fancy for EvaluatorOnline<'a, C> {
 }
 
 impl<'a, C> FancyBinaryConstant for EvaluatorOnline<'a, C> {
-    fn constant(&mut self, x: bool) -> Self::Item {
-        let constant = F2::from(x);
+    fn constant(&mut self, constant: F2) -> Self::Item {
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
         let wirelabel = if constant == F2::ONE {

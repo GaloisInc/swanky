@@ -2,6 +2,8 @@ use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// For input `(b, x, y)` return `x` if `b == 0`, otherwise return `y`.
 #[derive(Default)]
@@ -63,8 +65,8 @@ where
         Ok(match (c1, c2) {
             (false, true) => b.clone(),
             (true, false) => backend.negate(b),
-            (false, false) => backend.constant(false),
-            (true, true) => backend.constant(true),
+            (false, false) => backend.constant(F2::ZERO),
+            (true, true) => backend.constant(F2::ONE),
         })
     }
 }

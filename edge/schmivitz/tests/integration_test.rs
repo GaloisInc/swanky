@@ -206,7 +206,7 @@ mod test {
             backend.assert_zero(&x, channel)?;
             let y = backend.xor(&x, &x);
             backend.assert_zero(&y, channel)?;
-            let one = backend.constant(true);
+            let one = backend.constant(F2::ONE);
             let y = backend.xor(&x, &one);
             let z = backend.xor(&y, &one);
             backend.assert_zero(&z, channel)?;

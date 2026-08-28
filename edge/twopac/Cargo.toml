@@ -18,6 +18,7 @@ swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
+swanky-field-binary.workspace = true
 swanky-ocelot-error.workspace = true
 swanky-ot-traits.workspace = true
 

@@ -3,6 +3,8 @@ use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// For a [`BinaryBundle`] `x` and an integer `n`, shift `x` left by `n`,
 /// retaining the size of `x`.
@@ -30,7 +32,7 @@ where
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
-        let zero = backend.constant(false);
+        let zero = backend.constant(F2::ZERO);
 
         let mut wires = bundle.wires().to_vec();
         for _ in 0..n {
@@ -70,7 +72,7 @@ where
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let mut wires = bundle.wires().to_vec();
-        let zero = backend.constant(false);
+        let zero = backend.constant(F2::ZERO);
         for _ in 0..n {
             wires.insert(0, zero.clone());
         }
@@ -138,7 +140,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
-        let zero = backend.constant(false);
+        let zero = backend.constant(F2::ZERO);
         BinaryRightShift::new().execute(backend, (x, n, zero), channel)
     }
 }

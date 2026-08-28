@@ -8,6 +8,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field_binary::F2;
 use swanky_ot_traits::Sender as OtSender;
 
 /// Semi-honest garbler.
@@ -178,7 +179,7 @@ impl<
     Wire: WireLabel,
 > FancyBinaryConstant for Garbler<RNG, OT, Wire>
 {
-    fn constant(&mut self, x: bool) -> Self::Item {
+    fn constant(&mut self, x: F2) -> Self::Item {
         FancyBinaryConstant::constant(&mut self.garbler, x)
     }
 }

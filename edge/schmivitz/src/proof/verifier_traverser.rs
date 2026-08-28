@@ -178,8 +178,12 @@ impl Fancy for VerifierTraverser {
 }
 
 impl FancyBinaryConstant for VerifierTraverser {
-    fn constant(&mut self, constant: bool) -> Self::Item {
-        let value = if constant { F128b::ONE } else { F128b::ZERO };
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        let value = if constant.into() {
+            F128b::ONE
+        } else {
+            F128b::ZERO
+        };
         Wire(-value * self.verifier_key)
     }
 }
