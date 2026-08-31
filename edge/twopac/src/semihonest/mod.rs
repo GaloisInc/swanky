@@ -14,7 +14,7 @@ mod tests {
     use fancy_circuits::{
         CrtBundle, CrtGadgets,
         arithmetic::{Constant, Multiplication, ReLU},
-        crypto::aes::AesNonExpanded,
+        crypto::aes::Aes128,
         test_circuits::arithmetic::TestAddition,
         util::{primes_with_width, product},
     };
@@ -212,13 +212,13 @@ mod tests {
 
     #[test]
     fn test_aes_arithmetic() {
-        let aes = AesNonExpanded::new();
+        let aes = Aes128::new();
         test_aes::<_, AllWire>(&aes);
     }
 
     #[test]
     fn test_aes_binary() {
-        let aes = AesNonExpanded::new();
+        let aes = Aes128::new();
         test_aes::<_, WireMod2>(&aes);
     }
 }

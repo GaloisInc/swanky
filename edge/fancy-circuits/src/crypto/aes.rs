@@ -6,18 +6,18 @@ use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// Circuit for AES-128 without key expansion.
+/// Circuit for AES-128.
 ///
 /// For an input `(key, block)`, output `AES-128(key, block)`.
-pub struct AesNonExpanded(BinaryCircuit);
+pub struct Aes128(BinaryCircuit);
 
-impl AesNonExpanded {
-    /// Create a new [`AesNonExpanded`] circuit.
+impl Aes128 {
+    /// Create a new [`Aes128`] circuit.
     ///
     /// # Performance Note!
     /// This involves parsing a Bristol Format file, and thus is not cheap! Hence,
     /// it is best to reuse this circuit if possible versus calling
-    /// [`AesNonExpanded::new`] every time this circuit is needed.
+    /// [`Aes128::new`] every time this circuit is needed.
     pub fn new() -> Self {
         let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-format/AES-non-expanded.txt"),
@@ -27,13 +27,13 @@ impl AesNonExpanded {
     }
 }
 
-impl Default for AesNonExpanded {
+impl Default for Aes128 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F: FancyBinary> Circuit<F> for AesNonExpanded {
+impl<F: FancyBinary> Circuit<F> for Aes128 {
     type Input = ([F::Item; 128], [F::Item; 128]);
     type Output = [F::Item; 128];
 
@@ -57,7 +57,7 @@ impl<F: FancyBinary> Circuit<F> for AesNonExpanded {
     }
 }
 
-impl<F: FancyBinary> CircuitInputMapper<F> for AesNonExpanded {
+impl<F: FancyBinary> CircuitInputMapper<F> for Aes128 {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 256);
         let (key, block) = inputs.split_at(128);
@@ -76,7 +76,7 @@ impl<F: FancyBinary> CircuitInputMapper<F> for AesNonExpanded {
     }
 }
 
-impl<F: FancyBinary> CircuitOutputMapper<F> for AesNonExpanded {
+impl<F: FancyBinary> CircuitOutputMapper<F> for Aes128 {
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.to_vec()
     }
@@ -87,10 +87,10 @@ mod test {
     use super::*;
 
     #[test]
-    fn aes_non_expanded() {
+    fn aes_128() {
         use fancy_plaintext::{Dummy, DummyVal};
 
-        let aes = AesNonExpanded::new();
+        let aes = Aes128::new();
 
         let key = [DummyVal::new(0, 2); 128];
         let block = [DummyVal::new(0, 2); 128];
@@ -142,11 +142,11 @@ mod test {
     }
 
     #[test]
-    fn aes_non_expanded_gc_eval() {
+    fn aes_128_gc_eval() {
         use fancy_garbling::{WireMod2, classic::GarbledCircuit};
         use swanky_rng::SwankyRng;
 
-        let aes = AesNonExpanded::new();
+        let aes = Aes128::new();
 
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();

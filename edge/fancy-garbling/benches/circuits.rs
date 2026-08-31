@@ -2,19 +2,19 @@
 
 use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_circuits::crypto::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
+use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunctionFixedIV};
 use fancy_garbling::{WireMod2, classic::GarbledCircuit};
 use swanky_rng::SwankyRng;
 
 fn bench_garble_aes_binary(c: &mut Criterion) {
-    let aes = AesNonExpanded::new();
+    let aes = Aes128::new();
     c.bench_function("garble::aes-binary", move |bench| {
         bench.iter(|| GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()));
     });
 }
 
 fn bench_eval_aes_binary(c: &mut Criterion) {
-    let aes = AesNonExpanded::new();
+    let aes = Aes128::new();
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();
     let inputs = en.encode_inputs(&vec![0; 256]);
     let key = inputs[..128].try_into().unwrap();

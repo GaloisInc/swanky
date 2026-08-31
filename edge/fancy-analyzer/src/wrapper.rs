@@ -89,7 +89,7 @@ impl<F: FancyBinary> FancyBinary for CircuitAnalyzerWrapper<F> {
 
 #[cfg(test)]
 mod tests {
-    use fancy_circuits::crypto::aes::AesNonExpanded;
+    use fancy_circuits::crypto::aes::Aes128;
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::Circuit;
     use swanky_channel::Channel;
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn aes_128_bristol_format_is_correct() {
-        let circuit = AesNonExpanded::new();
+        let circuit = Aes128::new();
         let mut analyzer = CircuitAnalyzerWrapper::new(Dummy::new());
         let key = [Wire::new(DummyVal::new_bool(false)); 128];
         let block = [Wire::new(DummyVal::new_bool(false)); 128];

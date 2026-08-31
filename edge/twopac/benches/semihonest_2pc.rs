@@ -2,7 +2,7 @@
 
 use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_circuits::crypto::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
+use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunctionFixedIV};
 use fancy_garbling::WireMod2;
 use fancy_traits::{CircuitInputMapper, FancyEncode};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
@@ -61,7 +61,7 @@ fn bench_circuit<
 }
 
 fn bench_aes_binary(c: &mut Criterion) {
-    let circ = AesNonExpanded::new();
+    let circ = Aes128::new();
     c.bench_function("twopac::semi-honest (AES-binary)", move |bench| {
         bench.iter(|| bench_circuit(&circ, vec![0u16; 128], vec![0u16; 128]))
     });

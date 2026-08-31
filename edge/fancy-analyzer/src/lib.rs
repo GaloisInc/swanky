@@ -233,11 +233,11 @@ impl FancyOutput for CircuitAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::CircuitAnalyzer;
-    use fancy_circuits::crypto::{aes::AesNonExpanded, sha::Sha256CompressionFunction};
+    use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunction};
 
     #[test]
     fn aes_128_bristol_format_is_correct() {
-        let circuit = AesNonExpanded::new();
+        let circuit = Aes128::new();
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&circuit).unwrap();
 
