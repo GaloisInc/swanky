@@ -20,7 +20,7 @@ impl AesNonExpanded {
     /// [`AesNonExpanded::new`] every time this circuit is needed.
     pub fn new() -> Self {
         let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../circuits/bristol-format/AES-non-expanded.txt"),
+            include_bytes!("../../circuits/bristol-format/AES-non-expanded.txt"),
         ))
         .expect("`AES-non-expanded.txt` file should always parse correctly");
         Self(circuit)

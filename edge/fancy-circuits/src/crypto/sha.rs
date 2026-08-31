@@ -20,7 +20,7 @@ impl Sha256CompressionFunctionFixedIV {
     /// needed.
     pub fn new() -> Self {
         let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../circuits/bristol-format/sha-256.txt"),
+            include_bytes!("../../circuits/bristol-format/sha-256.txt"),
         ))
         .expect("`sha-256.txt` file should always parse correctly");
         Self(circuit)
@@ -83,7 +83,7 @@ impl Sha256CompressionFunction {
     /// [`Sha256CompressionFunction::new`] every time this circuit is needed.
     pub fn new() -> Self {
         let circuit = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
-            include_bytes!("../circuits/bristol-fashion/sha256.txt"),
+            include_bytes!("../../circuits/bristol-fashion/sha256.txt"),
         ))
         .expect("`sha256.txt` file should always parse correctly");
         Self(circuit)
@@ -249,7 +249,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
 
 #[cfg(test)]
 mod test {
-    use crate::sha::{Sha256, Sha256CompressionFunction, Sha256CompressionFunctionFixedIV};
+    use crate::crypto::sha::{Sha256, Sha256CompressionFunction, Sha256CompressionFunctionFixedIV};
     use fancy_plaintext::{Dummy, DummyVal};
 
     #[cfg(test)]

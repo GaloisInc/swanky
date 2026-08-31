@@ -2,7 +2,7 @@
 
 use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
+use fancy_circuits::crypto::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
 use fancy_garbling::WireMod2;
 use fancy_traits::{CircuitInputMapper, FancyEncode};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};

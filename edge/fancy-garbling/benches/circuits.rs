@@ -2,7 +2,7 @@
 
 use core::time::Duration;
 use criterion::{Criterion, criterion_group, criterion_main};
-use fancy_circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
+use fancy_circuits::crypto::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
 use fancy_garbling::{WireMod2, classic::GarbledCircuit};
 use swanky_rng::SwankyRng;
 

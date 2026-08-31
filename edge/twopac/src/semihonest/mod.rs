@@ -13,8 +13,8 @@ mod tests {
     use fancy_analyzer::CircuitAnalyzer;
     use fancy_circuits::{
         CrtBundle, CrtGadgets,
-        aes::AesNonExpanded,
         arithmetic::{Constant, Multiplication, ReLU},
+        crypto::aes::AesNonExpanded,
         test_circuits::arithmetic::TestAddition,
         util::{primes_with_width, product},
     };

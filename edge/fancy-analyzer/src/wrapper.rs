@@ -89,7 +89,7 @@ impl<F: FancyBinary> FancyBinary for CircuitAnalyzerWrapper<F> {
 
 #[cfg(test)]
 mod tests {
-    use fancy_circuits::aes::AesNonExpanded;
+    use fancy_circuits::crypto::aes::AesNonExpanded;
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::Circuit;
     use swanky_channel::Channel;

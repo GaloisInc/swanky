@@ -1,10 +1,10 @@
 mod test {
     use fancy_circuits::{
         BinaryBundle,
-        aes::AesNonExpanded,
         binary::BinaryAddition,
-        hmac::HmacSha256,
-        sha::{Sha256, Sha256CompressionFunction},
+        crypto::aes::AesNonExpanded,
+        crypto::hmac::HmacSha256,
+        crypto::sha::{Sha256, Sha256CompressionFunction},
     };
     use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyZeroKnowledge};
     use merlin::Transcript;

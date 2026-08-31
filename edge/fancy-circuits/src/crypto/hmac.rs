@@ -3,7 +3,7 @@
 //! This module provides HMAC (Hash-based Message Authentication Code) using
 //! SHA-256 as the underlying hash function.
 
-use crate::{binary::PairwiseXor, sha::Sha256};
+use crate::{binary::PairwiseXor, crypto::sha::Sha256};
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
