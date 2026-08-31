@@ -11,6 +11,7 @@
 
 use crate::cache::Cache;
 use crate::proof_single::ProofSingle;
+use rand::SeedableRng;
 use rayon::prelude::*;
 use simple_arith_circuit::Circuit;
 use swanky_error::{ErrorKind, Result, bail, ensure};
@@ -48,7 +49,7 @@ impl<F: FiniteField, const N: usize> Proof<F, N> {
         log::debug!("Number of compression rounds = {nrounds}");
         let cache = Cache::new(circuit, compression_factor, true);
         // Each MPC-in-the-head repetition needs its own RNG, so we create the necessary RNGs here.
-        let mut rngs: Vec<SwankyRng> = (0..repetitions).map(|_| rng.fork()).collect();
+        let mut rngs: Vec<SwankyRng> = (0..repetitions).map(|_| SwankyRng::from_rng(rng)).collect();
         // Use `rayon` to parallelize the MPC-in-the-head repetitions.
         let proofs: Vec<ProofSingle<F, N>> = rngs
             .par_iter_mut()

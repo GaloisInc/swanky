@@ -1,5 +1,5 @@
 //! Defining the Evaluator's behavior in Circuit Psi according to PSTY19
-use crate::psi::circuit_psi::{circuits::*, *};
+use crate::psi::circuit_psi::*;
 use fancy_garbling::WireMod2;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;

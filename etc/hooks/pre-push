@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -e
+
+HERE=$(cd $(dirname $0); pwd)
+ROOT=${HERE}/../..
 
 CORE_CRATES=(
     # BEGIN CORE CRATES

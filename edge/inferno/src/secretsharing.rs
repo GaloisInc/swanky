@@ -582,7 +582,7 @@ mod tests {
                 fn sharing_serialize_serde_json(a in any_fe(), seed in any_seed()) {
                     let mut rng = SwankyRng::from_seed(seed);
                     let mut rngs: [SwankyRng; N] = (0..N)
-                        .map(|_| rng.fork())
+                        .map(|_| SwankyRng::from_rng(&mut rng))
                         .collect::<Vec<SwankyRng>>()
                         .try_into()
                         .unwrap();
@@ -600,7 +600,7 @@ mod tests {
                 fn sharing_serialize_bincode(a in any_fe(), seed in any_seed()) {
                     let mut rng = SwankyRng::from_seed(seed);
                     let mut rngs: [SwankyRng; N] = (0..N)
-                        .map(|_| rng.fork())
+                        .map(|_| SwankyRng::from_rng(&mut rng))
                         .collect::<Vec<SwankyRng>>()
                         .try_into()
                         .unwrap();
@@ -618,7 +618,7 @@ mod tests {
                 fn sharing_vec_serialize_bincode(a in any_fe(), seed in any_seed()) {
                     let mut rng = SwankyRng::from_seed(seed);
                     let mut rngs: [SwankyRng; N] = (0..N)
-                    .map(|_| rng.fork()).collect::<Vec<SwankyRng>>().try_into().unwrap();
+                    .map(|_| SwankyRng::from_rng(&mut rng)).collect::<Vec<SwankyRng>>().try_into().unwrap();
                     let vec: Vec<CorrectionSharing<$field, N>> = (0..100).map(|_| CorrectionSharing::<$field, N>::new(a, &mut rngs)).collect();
                     let ser = bincode::serialize(&vec).unwrap();
                     let vec_: Vec<CorrectionSharing<$field, N>> = bincode::deserialize(&ser).unwrap();

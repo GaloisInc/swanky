@@ -9,8 +9,8 @@
                 {% call scalar() %}
                     let mut out = [0; {{ty.count}}];
                     for (out_lane, src_lane) in out
-                        .chunks_exact_mut(16)
-                        .zip(self.as_array().chunks_exact(16))
+                        .as_chunks_mut::<16>().0.iter_mut()
+                        .zip(self.as_array().as_chunks::<16>().0)
                     {
                         {% if direction == 'left' %}
                         out_lane[AMOUNT..].copy_from_slice(&src_lane[0..16 - AMOUNT]);
@@ -44,9 +44,9 @@
             {% call scalar() %}
                 let mut arr = [0; {{ty.count}}];
                 for (lane_dst, (lane_src, order)) in
-                    arr.chunks_exact_mut(16).zip(
-                        self.as_array().chunks_exact(16)
-                        .zip(order.as_array().chunks_exact(16))
+                    arr.as_chunks_mut::<16>().0.iter_mut().zip(
+                        self.as_array().as_chunks::<16>().0.iter()
+                        .zip(order.as_array().as_chunks::<16>().0)
                     )
                 {
                     for (dst, idx) in lane_dst.iter_mut().zip(order) {

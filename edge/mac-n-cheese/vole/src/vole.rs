@@ -14,7 +14,7 @@ use swanky_ot_alsz_kos::explicit_round::{
     KosReceiver, KosReceiverStage2, KosSender, KosSenderStage2,
 };
 use swanky_party::ty_eq::Witness;
-use swanky_rng::SwankyRng;
+use swanky_rng::AesRng;
 use swanky_serialization::CanonicalSerialize;
 use swanky_svole_wykw::ggm_utils::*;
 
@@ -50,8 +50,8 @@ fn make_ggm_seeds(lpn_seeds: &Aes128EncryptOnly) -> (Aes128EncryptOnly, Aes128En
     )
 }
 
-fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> SwankyRng {
-    SwankyRng::from_seed(lpn_seeds.encrypt(U64x2::from([selector, 0]).into()))
+fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> AesRng {
+    AesRng::from_seed(lpn_seeds.encrypt(U64x2::from([selector, 0]).into()))
 }
 
 /// Generates powers of `FE::GENERATOR`.
@@ -136,6 +136,9 @@ impl<T: MacTypes> VoleSender<T> {
             phantom: PhantomData,
         })
     }
+    // Can't replace chunks_exact here as the size, while constant, is
+    // behind a generic parameter.
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     pub fn send(
         &self,
         arena: &KeyedArena,
@@ -290,7 +293,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
         // TODO: can we use one of the seeds that we've already agreed upon for this?
         // TODO: is this supposed to be done as part of a cointoss? (I'm just following the
         // original implementation, for now.)
-        let mut rng_chi = SwankyRng::from_seed(self.seed);
+        let mut rng_chi = AesRng::from_seed(self.seed);
         let (mut va, x_stars) = T::S::spsvole_sender_compute_va(
             &mut rng_chi,
             TransparentWrapper::peel_slice(TransparentWrapper::peel_slice(result)),
@@ -557,7 +560,7 @@ impl<T: MacTypes> VoleReceiverStep4<T> {
         let delta = receiver.delta;
         let seed = *<&[u8; 16]>::try_from(&incoming_bytes[0..16]).unwrap();
         incoming_bytes = &incoming_bytes[16..];
-        let mut rng_chi = SwankyRng::from_seed(Block::from(seed));
+        let mut rng_chi = AesRng::from_seed(Block::from(seed));
         let y: T::TF = receiver
             .pows
             .iter()

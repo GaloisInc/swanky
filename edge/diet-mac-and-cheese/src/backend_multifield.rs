@@ -32,6 +32,7 @@ use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
+use rand::SeedableRng;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
@@ -255,7 +256,7 @@ impl<
         lpn_extend: LpnParams,
         no_batching: bool,
     ) -> Result<Self> {
-        let rng2 = rng.fork();
+        let rng2 = SwankyRng::from_rng(&mut rng);
         let dmc = DietMacAndCheese::<P, FE, FE, C, SvoleFE>::init(
             channel,
             rng,
@@ -287,7 +288,7 @@ impl<
         svole2: SvoleFE,
         no_batching: bool,
     ) -> Result<Self> {
-        let rng2 = rng.fork();
+        let rng2 = SwankyRng::from_rng(&mut rng);
 
         let fcom = FCom::init_with_vole(svole2)?;
         let dmc = DietMacAndCheese::<P, FE, FE, C, SvoleFE>::init_with_fcom(
@@ -1560,7 +1561,7 @@ impl<
     pub fn load_backends(&mut self, channel: &mut C, lpn_size: LpnSize) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
-            let rng = self.rng.fork();
+            let rng = SwankyRng::from_rng(&mut self.rng);
             match spec {
                 TypeSpecification::Field(field) => {
                     self.load_backend(channel, rng, *field, *idx as usize, lpn_size)?;
@@ -2204,7 +2205,7 @@ impl<
         let type_store = self.type_store.clone();
         let mut handles = vec![];
         for (idx, spec) in type_store.iter() {
-            let rng = self.rng.fork();
+            let rng = SwankyRng::from_rng(&mut self.rng);
             match spec {
                 TypeSpecification::Field(field) => {
                     if *field == std::any::TypeId::of::<F2>() {

@@ -372,7 +372,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
         // Confirm when testing that all the triples are indeed valid.
         #[cfg(test)]
         {
-            for (i, triple) in out.chunks_exact(3).enumerate() {
+            for (i, triple) in out.as_chunks::<3>().0.iter().enumerate() {
                 assert_eq!(triple[0] * triple[1], triple[2], "Iteration {i} failed");
             }
         }

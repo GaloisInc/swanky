@@ -310,7 +310,7 @@ impl<T: FiniteField> Sender<T> {
         debug_assert!(self.base_voles.len() >= compute_num_saved::<T>(self.lpn_extend));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
-        let lpn_rng = self.lpn_rng.fork();
+        let lpn_rng = SwankyRng::from_rng(&mut self.lpn_rng);
         Ok(Self {
             lpn_setup: self.lpn_setup,
             lpn_extend: self.lpn_extend,
@@ -498,7 +498,7 @@ impl<T: FiniteField> Receiver<T> {
         debug_assert!(self.base_voles.len() >= compute_num_saved::<T>(self.lpn_extend));
 
         let spsvole = self.spsvole.duplicate(channel, rng)?;
-        let lpn_rng = self.lpn_rng.fork();
+        let lpn_rng = SwankyRng::from_rng(&mut self.lpn_rng);
         Ok(Self {
             lpn_setup: self.lpn_setup,
             lpn_extend: self.lpn_extend,

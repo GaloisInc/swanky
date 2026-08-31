@@ -14,6 +14,7 @@ use mac_n_cheese_ir::compilation_format::{
 };
 use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use parking_lot::{Condvar, Mutex, RwLock};
+use rand::SeedableRng;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_party::private::PartyPrivate;
@@ -477,7 +478,7 @@ pub fn run_proof_background<P: Party>(
     });
     for i in 0..num_threads {
         let runner_thread = runner_thread.clone();
-        let rng = rng.fork();
+        let rng = SwankyRng::from_rng(&mut rng);
         ts.spawn(format!("Runner thread {i}"), move || {
             runner_thread.run(i, rng)
         });

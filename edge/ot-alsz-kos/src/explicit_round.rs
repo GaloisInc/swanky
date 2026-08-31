@@ -288,8 +288,7 @@ impl KosSender {
         outgoing_bytes[0..16].copy_from_slice(&our_seed);
         outgoing_bytes = &mut outgoing_bytes[16..];
         debug_assert!(inputs.len() * 16 <= qs.len());
-        for (j, (input, q)) in inputs.iter().zip(qs.chunks_exact(16)).enumerate() {
-            let q: [u8; 16] = q.try_into().unwrap();
+        for (j, (input, &q)) in inputs.iter().zip(qs.as_chunks::<16>().0).enumerate() {
             let q = Block::from(q);
             let y0 = aes_hash.hash(q, j as u128) ^ input.0;
             let q = q ^ Block::from(self.alsz.s);
@@ -347,8 +346,7 @@ impl KosSenderStage2 {
         let mut chi = Block::default();
         let qs = arena.borrow_mut(self.qs);
         debug_assert_eq!(qs.len(), self.ncols * 16);
-        for q in qs.chunks_exact(16) {
-            let q: [u8; 16] = q.try_into().unwrap();
+        for &q in qs.as_chunks::<16>().0 {
             let q = Block::from(q);
             rng.fill_bytes(chi.as_mut());
             let [lo, hi] = q.carryless_mul_wide(chi);
@@ -519,7 +517,12 @@ impl KosReceiverStage2 {
         }
         let outgoing_blocks = [self.our_seed, x, t.0, t.1];
         debug_assert_eq!(outgoing.len(), outgoing_blocks.len() * 16);
-        for (dst, src) in outgoing.chunks_exact_mut(16).zip(outgoing_blocks.iter()) {
+        for (dst, src) in outgoing
+            .as_chunks_mut::<16>()
+            .0
+            .iter_mut()
+            .zip(outgoing_blocks.iter())
+        {
             dst.copy_from_slice(bytemuck::bytes_of(src));
         }
         Ok(out)

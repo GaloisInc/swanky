@@ -1,9 +1,14 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+set -e
+
+HERE=$(cd $(dirname $0); pwd)
+ROOT=${HERE}/../..
 
 # Run install_git_hooks.sh to enable this Git hook
 
 # Invariant 1: We want to run the formatter and linter for Swanky before every commit
-./swanky lint # Note that `./swanky link` runs `./swanky fmt --check`
+${ROOT}/swanky lint # Note that `swanky lint` runs `swanky fmt --check`
 
 # Invariant 2: We want to not have any Clippy errors prior to a commit
 cargo clippy --all-targets -- -Dwarnings # Warnings are considered errors

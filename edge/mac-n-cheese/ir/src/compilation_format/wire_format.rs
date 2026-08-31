@@ -88,6 +88,9 @@ pub mod simple {
             }
             self.own_wires = self.own_wires.checked_add(delta).unwrap();
         }
+        // Can't replace chunks_exact here as the size, while constant, is
+        // behind a generic parameter.
+        #[allow(clippy::chunks_exact_to_as_chunks)]
         pub(crate) fn write_wires(
             &mut self,
             wires: [(Wire, T); NARGS],
@@ -153,6 +156,9 @@ pub mod simple {
             self.buf.len() / WireFormat::<T, NARGS>::stride()
         }
         #[allow(clippy::should_implement_trait)]
+        // Can't replace chunks_exact here as the size, while constant, is
+        // behind a generic parameter.
+        #[allow(clippy::chunks_exact_to_as_chunks)]
         pub fn next(&mut self) -> swanky_error::Result<[ReadWire<T>; NARGS]>
         where
             ArrayUnrolledOps: UnrollableArraySize<NARGS>,
@@ -229,7 +235,12 @@ pub mod simd_batched {
             let mut buf_backing = [[[0_u32; 2]; NARGS]; BATCH_SIZE];
             let buf: &mut [u32] = bytemuck::cast_slice_mut(&mut buf_backing);
             debug_assert_eq!(buf.len(), NARGS * BATCH_SIZE * 2);
-            for (dst, which_arg) in buf.chunks_exact_mut(BATCH_SIZE * 2).zip(0..NARGS) {
+            for (dst, which_arg) in buf
+                .as_chunks_mut::<{ BATCH_SIZE * 2 }>()
+                .0
+                .iter_mut()
+                .zip(0..NARGS)
+            {
                 let wires: [Wire; BATCH_SIZE] = inputs.map(|input| input[which_arg]);
                 let (which_inputs, which_wires) = dst.split_at_mut(BATCH_SIZE);
                 debug_assert_eq!(which_inputs.len(), BATCH_SIZE);
@@ -267,6 +278,9 @@ pub mod simd_batched {
         pub which_input: U32x4,
         pub which_wire: U32x4,
     }
+    // Can't replace chunks_exact here as the size, while constant, is
+    // behind a generic parameter.
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     // This iterator should be TrustedLen
     pub fn read<const NARGS: usize>(
         buf: &[U32x4],

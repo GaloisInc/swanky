@@ -316,7 +316,9 @@ impl NeuralNet {
                     "Root value in {weights:?} must be an array",
                 )
             })?
-            .chunks_exact(2);
+            .as_chunks::<2>()
+            .0
+            .iter();
 
         let mut layers = Vec::<Layers>::new();
         for layer in layers_json

@@ -17,6 +17,7 @@ rand_core.workspace = true
 bytemuck.workspace = true
 
 [dev-dependencies]
+aes.workspace = true
 criterion.workspace = true
 proptest.workspace = true
 

@@ -17,7 +17,7 @@ use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_party::either::PartyEitherCopy;
 use swanky_party::ty_eq::{EqualityProposition, Witness};
-use swanky_rng::SwankyRng;
+use swanky_rng::{AesRng, SwankyRng};
 use swanky_serialization::CanonicalSerialize;
 
 use std::io::Read;
@@ -446,7 +446,7 @@ where
     ) -> swanky_error::Result<TaskResult<P, Self::TaskContinuation>> {
         let mut seed = [0; 16];
         seed.copy_from_slice(&input.challenge.unwrap()[0..16]);
-        let mut rng = SwankyRng::from_seed(seed.into());
+        let mut rng = AesRng::from_seed(seed.into());
         let mut acu: PartyEitherCopy<P, (U64x2, U64x2), U64x2> = PartyEitherCopy::default();
         let alpha = match P::WHICH {
             WhichParty::Prover(e) => PartyEitherCopy::new::<Prover>(e, ()),

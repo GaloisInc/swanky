@@ -29,8 +29,11 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut rng = SwankyRng::seed_from_u64(seed_sx);
-                let mut gb =
-                    Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng.fork()).unwrap();
+                let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(
+                    channel,
+                    SwankyRng::from_rng(&mut rng),
+                )
+                .unwrap();
                 Ok(OpprfSender::base_psi(
                     &mut gb,
                     primary_keys,
@@ -41,8 +44,11 @@ mod tests {
             },
             |channel| {
                 let mut rng = SwankyRng::seed_from_u64(seed_rx);
-                let mut ev =
-                    Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng.fork()).unwrap();
+                let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(
+                    channel,
+                    SwankyRng::from_rng(&mut rng),
+                )
+                .unwrap();
                 Ok(OpprfReceiver::base_psi(
                     &mut ev,
                     primary_keys,

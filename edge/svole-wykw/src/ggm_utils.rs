@@ -52,10 +52,11 @@ pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
         debug_assert_eq!(current_level.len(), 1 << (i + 1));
         debug_assert_eq!(current_level.len() % 2, 0);
         debug_assert_eq!(current_level.len(), 2 * prev_level.len());
-        let prev_chunks = prev_level.chunks_exact(Aes128EncryptOnly::BLOCK_COUNT_HINT);
-        let prev_remainder = prev_chunks.remainder();
-        let current_chunks =
-            current_level.chunks_exact_mut(Aes128EncryptOnly::BLOCK_COUNT_HINT * 2);
+        let (prev_chunks, prev_remainder) =
+            prev_level.as_chunks::<{ Aes128EncryptOnly::BLOCK_COUNT_HINT }>();
+        let current_chunks = current_level
+            .as_chunks_mut::<{ Aes128EncryptOnly::BLOCK_COUNT_HINT * 2 }>()
+            .0;
         // This loop does the same job as:
         // let mut k0 = Default::default();
         // let mut k1 = Default::default();
@@ -70,10 +71,7 @@ pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
         //     seeds.push(s1);
         // }
         // keys.push((k0, k1));
-        for (current, chunk) in current_chunks.zip(prev_chunks) {
-            let chunk: [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] = chunk
-                .try_into()
-                .expect("Chunks ought to be the size we've specified.");
+        for (current, &chunk) in current_chunks.iter_mut().zip(prev_chunks) {
             let s0 = aes.0.encrypt_many(chunk);
             let s1 = aes.1.encrypt_many(chunk);
             let s0 = s0.array_zip(chunk).array_map(
@@ -103,10 +101,15 @@ pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
             );
         }
         let current_remainder = current_level
-            .chunks_exact_mut(Aes128EncryptOnly::BLOCK_COUNT_HINT * 2)
-            .into_remainder();
+            .as_chunks_mut::<{ Aes128EncryptOnly::BLOCK_COUNT_HINT * 2 }>()
+            .1;
         debug_assert_eq!(current_remainder.len() % 2, 0);
-        for (current, s) in current_remainder.chunks_exact_mut(2).zip(prev_remainder) {
+        for (current, s) in current_remainder
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(prev_remainder)
+        {
             let s0 = aes.0.encrypt(*s) ^ *s;
             let s1 = aes.1.encrypt(*s) ^ *s;
             current[0] = s0;
@@ -192,11 +195,10 @@ pub fn ggm_prime<
         // Apply our PRF (lambda s: aes.encrypt(s) ^ s) to the previous level to generate the new
         // level.
         let mut level_xor = ot_output[level - 1];
-        let mut prev_level = prev_level.chunks_exact(Aes128EncryptOnly::BLOCK_COUNT_HINT);
+        let (prev_level, prev_level_remainder) =
+            prev_level.as_chunks::<{ Aes128EncryptOnly::BLOCK_COUNT_HINT }>();
         let mut i = 0;
-        for parents in prev_level.by_ref() {
-            let parents = <&[U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT]>::try_from(parents)
-                .expect("The chunk size matches");
+        for parents in prev_level {
             let parents = parents.array_enumerate().array_map(
                 #[inline(always)]
                 |(j, parent)| {
@@ -270,11 +272,10 @@ pub fn ggm_prime<
             // TODO: write current_level_entries
             i += Aes128EncryptOnly::BLOCK_COUNT_HINT;
         }
-        for (i, (parent, current)) in prev_level
-            .remainder()
+        for (i, (parent, current)) in prev_level_remainder
             .iter()
             .copied()
-            .zip(current_level.chunks_exact_mut(2))
+            .zip(current_level.as_chunks_mut::<2>().0)
             .enumerate()
         {
             // TODO: constant time

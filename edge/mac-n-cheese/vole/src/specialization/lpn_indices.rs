@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use swanky_field::FiniteField;
-use swanky_rng::SwankyRng;
+use swanky_rng::AesRng;
 use vectoreyes::{
     SimdBase, SimdBase4x64, SimdBase8, SimdBase8x, SimdBase32, U8x32, U16x8, U16x16, U32x8, U64x4,
     array_utils::ArrayUnrolledExt,
@@ -223,7 +223,7 @@ fn test_visit_permutations() {
 
 /// The upper 6 values in each vector should not be used. The lower 10 contain the indices.
 #[inline(always)] // since it's using SIMD
-pub(super) fn matrix_entries_vectorized(rng: &mut SwankyRng) -> [U16x16; 4] {
+pub(super) fn matrix_entries_vectorized(rng: &mut AesRng) -> [U16x16; 4] {
     // Since we're operating on GF(2^40), the associated prime field has a modulus of 2. As a result,
     // the prime field entry that's associated with the matrix entry is always 1.
     // These indices are supposed to be uniform mod 2^16. We can get that distribution for free by
@@ -250,7 +250,7 @@ pub(super) fn matrix_entries_vectorized(rng: &mut SwankyRng) -> [U16x16; 4] {
 }
 
 pub(super) fn matrix_entries<'a, FE: FiniteField>(
-    rng: &'a mut SwankyRng,
+    rng: &'a mut AesRng,
 ) -> impl Iterator<Item = [(u16, FE); 10]> + 'a {
     std::iter::repeat_with(move || {
         matrix_entries_vectorized(rng).array_zip(<[[FE; 10]; 4]>::array_generate(|_| {

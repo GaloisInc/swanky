@@ -1,10 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::{
-    Rng,
+    Rng, RngExt,
     distr::{Distribution, Uniform},
 };
 use std::hint::black_box;
-use swanky_rng::{SwankyRng, UniformIntegersUnderBound};
+use swanky_rng::{AesRng, UniformIntegersUnderBound};
+use vectoreyes::U8x16;
 
 mod measurement {
     use criterion::measurement::WallTime;
@@ -17,20 +18,64 @@ mod measurement {
 
 use measurement::*;
 
-fn bench_swanky_rand(c: &mut Criterion<Measurement>) {
-    c.bench_function("SwankyRng::rand", |b| {
-        let mut rng = SwankyRng::new();
-        let mut x = (0..16 * 1024)
-            .map(|_| rand::random::<u8>())
-            .collect::<Vec<u8>>();
-        b.iter(|| rng.fill_bytes(black_box(&mut x)));
+fn bench_aes_rand_random(c: &mut Criterion<Measurement>) {
+    c.bench_function("AesRng::random::<[u8; 16]>", |b| {
+        let mut rng = AesRng::new();
+        b.iter(|| {
+            let result = rng.random::<[u8; 16]>();
+            black_box(result);
+        });
+    });
+
+    c.bench_function("AesRng::random::<u64>", |b| {
+        let mut rng = AesRng::new();
+        b.iter(|| {
+            let result = rng.random::<u64>();
+            black_box(result);
+        });
+    });
+
+    c.bench_function("AesRng::random::<u128>", |b| {
+        let mut rng = AesRng::new();
+        b.iter(|| {
+            let result = rng.random::<u128>();
+            black_box(result);
+        });
+    });
+
+    c.bench_function("AesRng::random::<U8x16>", |b| {
+        let mut rng = AesRng::new();
+        b.iter(|| {
+            let result = rng.random::<U8x16>();
+            black_box(result);
+        });
     });
 }
 
-fn bench_swanky_rand_int_108000(c: &mut Criterion<Measurement>) {
+fn bench_aes_rand_fill_bytes(c: &mut Criterion<Measurement>) {
+    c.bench_function("AesRng::fill_bytes ([u8; 16])", |b| {
+        let mut rng = AesRng::new();
+        let mut bytes = [0u8; 16];
+        b.iter(|| {
+            rng.fill_bytes(&mut bytes);
+            black_box(bytes);
+        });
+    });
+
+    c.bench_function("AesRng::fill_bytes (u64)", |b| {
+        let mut rng = AesRng::new();
+        let mut bytes = [0u8; 8];
+        b.iter(|| {
+            rng.fill_bytes(&mut bytes);
+            black_box(bytes);
+        });
+    });
+}
+
+fn bench_aes_rand_int_108000(c: &mut Criterion<Measurement>) {
     const BOUND: u32 = 108000;
-    c.bench_function("SwankyRng::rand 32 integers under 108000", |b| {
-        let mut rng = SwankyRng::new();
+    c.bench_function("AesRng::rand 32 integers under 108000", |b| {
+        let mut rng = AesRng::new();
         let dist = Uniform::new(0, BOUND).expect("bounds finite and low < high");
         b.iter(|| {
             for _ in 0..32 {
@@ -39,9 +84,9 @@ fn bench_swanky_rand_int_108000(c: &mut Criterion<Measurement>) {
         });
     });
     c.bench_function(
-        "SwankyRng::uniform_integers_under_bound 32 integers under 108000",
+        "AesRng::uniform_integers_under_bound 32 integers under 108000",
         |b| {
-            let mut rng = SwankyRng::new();
+            let mut rng = AesRng::new();
             let dist = UniformIntegersUnderBound::new(BOUND);
             b.iter(|| {
                 black_box(dist.sample(&mut rng));
@@ -51,10 +96,10 @@ fn bench_swanky_rand_int_108000(c: &mut Criterion<Measurement>) {
     );
 }
 
-fn bench_swanky_rand_int_126(c: &mut Criterion<Measurement>) {
+fn bench_aes_rand_int_126(c: &mut Criterion<Measurement>) {
     const BOUND: u32 = 126;
-    c.bench_function("SwankyRng::rand 32 integers under 126", |b| {
-        let mut rng = SwankyRng::new();
+    c.bench_function("AesRng::rand 32 integers under 126", |b| {
+        let mut rng = AesRng::new();
         let dist = Uniform::new(0, BOUND).expect("bounds finite and low < high");
         b.iter(|| {
             for _ in 0..32 {
@@ -63,9 +108,9 @@ fn bench_swanky_rand_int_126(c: &mut Criterion<Measurement>) {
         });
     });
     c.bench_function(
-        "SwankyRng::uniform_integers_under_bound 32 integers under 126",
+        "AesRng::uniform_integers_under_bound 32 integers under 126",
         |b| {
-            let mut rng = SwankyRng::new();
+            let mut rng = AesRng::new();
             let dist = UniformIntegersUnderBound::new(BOUND);
             b.iter(|| {
                 black_box(dist.sample(&mut rng));
@@ -76,8 +121,11 @@ fn bench_swanky_rand_int_126(c: &mut Criterion<Measurement>) {
 }
 
 criterion_group! {
-    name = swanky_rng;
+    name = aes_rng;
     config = Criterion::default().with_measurement(new_measurement()).sample_size(4096);
-    targets = bench_swanky_rand, bench_swanky_rand_int_126, bench_swanky_rand_int_108000
+    targets = bench_aes_rand_random,
+              bench_aes_rand_fill_bytes,
+              bench_aes_rand_int_126,
+              bench_aes_rand_int_108000
 }
-criterion_main!(swanky_rng);
+criterion_main!(aes_rng);

@@ -5,7 +5,7 @@ use rand::{Rng, SeedableRng, TryRng, rand_core::Infallible};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use shake::Shake128;
 use swanky_field_binary::F128b;
-use swanky_rng::SwankyRng;
+use swanky_rng::AesRng;
 use swanky_serialization::CanonicalSerialize;
 
 /// Initialization Vector.
@@ -21,12 +21,12 @@ pub(crate) type Seed = [u8; SECURITY_PARAM / 8];
 ///
 /// This is a thin wrapper around [`SwankyRng`], which itself implements a
 /// AES-CTR-based PRG as defined in the FAEST spec.
-pub(crate) struct Prg(SwankyRng);
+pub(crate) struct Prg(AesRng);
 
 impl Prg {
     /// Create a new [`Prg`] using the provided [`Seed`] and [`IV`].
     pub(crate) fn new(seed: Seed, iv: IV) -> Self {
-        Self(SwankyRng::from_seed_and_iv(
+        Self(AesRng::from_seed_and_iv(
             seed.into(),
             u128::from_le_bytes(iv),
         ))
@@ -34,7 +34,7 @@ impl Prg {
 
     /// Create a new [`Prg`] using the provided [`Seed`].
     pub(crate) fn new_no_iv(seed: Seed) -> Self {
-        Self(SwankyRng::from_seed(seed.into()))
+        Self(AesRng::from_seed(seed.into()))
     }
 }
 
@@ -59,7 +59,7 @@ mod tests {
     use super::IV;
     use rand::RngExt;
     use swanky_field_binary::F2;
-    use swanky_rng::SwankyRng;
+    use swanky_rng::AesRng;
 
     #[test]
     fn swanky_prg_matches_stream_bits() {
@@ -71,7 +71,7 @@ mod tests {
             100000, 1048575, 1048576, 1048577,
         ];
         for &l in &lengths {
-            let mut rng = SwankyRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
+            let mut rng = AesRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
             let randoms = (0..l / 64 + 1)
                 .map(|_| rng.random::<u64>())
                 .collect::<Vec<_>>();
@@ -83,7 +83,7 @@ mod tests {
                 }
             }
             expected_bits.truncate(l);
-            let mut stream = SwankyRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
+            let mut stream = AesRng::from_seed_and_iv(seed.into(), u128::from_le_bytes(iv));
             // let mut stream = PRG_Stream::new(seed, iv);
             let mut stream_bits = Vec::with_capacity(l);
             while stream_bits.len() < l {

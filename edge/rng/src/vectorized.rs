@@ -1,4 +1,4 @@
-use super::SwankyRng;
+use super::AesRng;
 use vectoreyes::{
     Aes128EncryptOnly, AesBlockCipher, SimdBase, SimdBase32, SimdBase64, U32x4, U32x8, U64x4,
     array_utils::{ArrayAdjacentPairs, ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
@@ -50,7 +50,7 @@ impl UniformIntegersUnderBound {
     /// Produce `Aes128EncryptOnly::BLOCK_COUNT_HINT * 4` uniformly distributed `u32`s (under the
     /// given bound).
     #[inline(always)]
-    pub fn sample(&self, rng: &mut SwankyRng) -> [U32x8; Aes128EncryptOnly::BLOCK_COUNT_HINT / 2] {
+    pub fn sample(&self, rng: &mut AesRng) -> [U32x8; Aes128EncryptOnly::BLOCK_COUNT_HINT / 2] {
         debug_assert_eq!(Aes128EncryptOnly::BLOCK_COUNT_HINT % 2, 0);
         const N: usize = Aes128EncryptOnly::BLOCK_COUNT_HINT;
         const HALF_N: usize = Aes128EncryptOnly::BLOCK_COUNT_HINT / 2;
@@ -65,7 +65,7 @@ impl UniformIntegersUnderBound {
     /// # Alternatives
     /// Consider using [Self::sample] instead. It may be faster on some platforms.
     #[inline(always)]
-    pub fn sample_20(&self, rng: &mut SwankyRng) -> [U32x8; 3] {
+    pub fn sample_20(&self, rng: &mut AesRng) -> [U32x8; 3] {
         const N: usize = 5;
         const HALF_N: usize = 3;
         self.lemire_body::<N, HALF_N>(rng)
@@ -82,10 +82,7 @@ impl UniformIntegersUnderBound {
     // This is an implementation of "Debiased Integer Multiplication — Lemire's Method"
     // See https://www.pcg-random.org/posts/bounded-rands.html
     #[inline(always)]
-    fn lemire_body<const N: usize, const HALF_N: usize>(
-        &self,
-        rng: &mut SwankyRng,
-    ) -> [U32x8; HALF_N]
+    fn lemire_body<const N: usize, const HALF_N: usize>(&self, rng: &mut AesRng) -> [U32x8; HALF_N]
     where
         ArrayUnrolledOps: UnrollableArraySize<N> + UnrollableArraySize<HALF_N>,
         [U32x8; N]: ArrayAdjacentPairs<T = U32x8, AdjacentPairs = [(U32x8, U32x8); HALF_N]>,
@@ -149,7 +146,7 @@ mod tests {
             seed in any::<[u8; 16]>(),
             bound in 1..=500_000_u32,
         ) {
-            let mut rng = SwankyRng::from_seed(seed.into());
+            let mut rng = AesRng::from_seed(seed.into());
             let dist = UniformIntegersUnderBound::new(bound);
             for x in dist.sample(&mut rng).iter() {
                 for y in x.as_array().iter().copied() {
@@ -165,7 +162,7 @@ mod tests {
             seed in any::<[u8; 16]>(),
             bound in 1..=500_000_u32,
         ) {
-            let mut rng = SwankyRng::from_seed(seed.into());
+            let mut rng = AesRng::from_seed(seed.into());
             let dist = UniformIntegersUnderBound::new(bound);
             let out = dist.sample_20(&mut rng);
             for (i,x) in out.iter().copied().enumerate() {

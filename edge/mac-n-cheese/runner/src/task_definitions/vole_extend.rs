@@ -87,6 +87,9 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         Ok(())
     }
 
+    // Can't replace chunks_exact here as the size, while constant,
+    // requires unsupported operations.
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     fn start_task(
         &self,
         ctx: &mut crate::task_framework::TaskContext,
@@ -163,6 +166,9 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for VoleExtendTask<P, T> {
         }))
     }
 
+    // Can't replace chunks_exact here as the size, while constant,
+    // requires unsupported operations.
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     fn continue_task(
         &self,
         tc: Box<Self::TaskContinuation>,

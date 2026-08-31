@@ -228,20 +228,22 @@ where
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
     ) -> Result<DietMacAndCheese<P, T, T, C, VOLE2>> {
+        use rand::SeedableRng;
+
         self.channel
             .flush()
             .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
         match P::WHICH {
             WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, C, VOLE2>::init(
                 &mut self.channel,
-                self.rng.fork(),
+                SwankyRng::from_rng(&mut self.rng),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,
             ),
             WhichParty::Verifier(ev) => DietMacAndCheese::<P, T, T, C, VOLE2>::init_with_delta(
                 &mut self.channel,
-                self.rng.fork(),
+                SwankyRng::from_rng(&mut self.rng),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,

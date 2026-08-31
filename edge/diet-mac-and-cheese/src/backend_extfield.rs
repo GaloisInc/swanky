@@ -18,6 +18,7 @@ use crate::{
     svole_trait::SvoleT,
 };
 use generic_array::GenericArray;
+use rand::SeedableRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
@@ -57,7 +58,12 @@ where
         fcom_ext: &FCom<P, T, T, SVOLE2>,
         no_batching: bool,
     ) -> Result<Self> {
-        let dmc = DietMacAndCheese::init_with_fcom(channel, rng.fork(), fcom, no_batching)?;
+        let dmc = DietMacAndCheese::init_with_fcom(
+            channel,
+            SwankyRng::from_rng(&mut rng),
+            fcom,
+            no_batching,
+        )?;
         let lifted_dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom_ext, no_batching)?;
         Ok(Self {
             dmc,
