@@ -7,81 +7,104 @@
 //! - **Bristol Fashion**: The new format: <https://nigelsmart.github.io/MPC-Circuits>
 
 use crate::{BinaryCircuit, BinaryGate};
-use regex::{Captures, Regex};
 use std::{io::BufRead, str::FromStr};
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 
-enum GateType {
-    AndGate,
-    XorGate,
+/// Grab the next token from `parts`, failing if there is none.
+fn next_token<'a>(parts: &mut impl Iterator<Item = &'a str>) -> Result<&'a str> {
+    parts
+        .next()
+        .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Missing token"))
 }
 
-fn cap2int(cap: &Captures, idx: usize) -> Result<usize> {
-    let s = cap
-        .get(idx)
-        .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Failed to match index '{idx}'"))?;
-    FromStr::from_str(s.as_str())
-        .wrap_err(ErrorKind::OtherError, "Failed to convert value to string")
+/// Grab the next token from `parts` and parse it as a [`usize`].
+fn next_usize<'t>(parts: &mut impl Iterator<Item = &'t str>) -> Result<usize> {
+    let s = next_token(parts)?;
+    usize::from_str(s).wrap_err_with(ErrorKind::OtherError, || {
+        format!("Failed to parse usize from '{s}'")
+    })
 }
 
-fn cap2typ(cap: &Captures, idx: usize) -> Result<GateType> {
-    let s = cap
-        .get(idx)
-        .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Failed to match index '{idx}'"))?;
-    let s = s.as_str();
-    match s {
-        "AND" => Ok(GateType::AndGate),
-        "XOR" => Ok(GateType::XorGate),
-        s => swanky_error::bail!(ErrorKind::OtherError, "Unknown gate type '{s}'"),
-    }
-}
-
-fn regex2captures<'t>(re: &Regex, line: &'t str) -> Result<Captures<'t>> {
-    re.captures(line)
-        .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Failed to find match for regex"))
+/// Parses a gate definition of the form
+/// `<# input wires> <# output wires> <input wires...> <output wire> <gate type>`,
+/// returning the resulting [`BinaryGate`].
+fn parse_gate(line: &str) -> Result<BinaryGate> {
+    let mut parts = line.split_whitespace();
+    let ninput_wires = next_usize(&mut parts)?;
+    let noutput_wires = next_usize(&mut parts)?;
+    ensure!(
+        noutput_wires == 1,
+        ErrorKind::OtherError,
+        "Expected one output wire, got {}",
+        noutput_wires
+    );
+    let gate = match ninput_wires {
+        1 => {
+            let xref = next_usize(&mut parts)?;
+            let out = next_usize(&mut parts)?;
+            let typ = next_token(&mut parts)?;
+            ensure!(
+                typ == "INV",
+                ErrorKind::OtherError,
+                "Unknown one-input gate type '{}'",
+                typ
+            );
+            BinaryGate::Inv { xref, out }
+        }
+        2 => {
+            let xref = next_usize(&mut parts)?;
+            let yref = next_usize(&mut parts)?;
+            let out = next_usize(&mut parts)?;
+            let typ = next_token(&mut parts)?;
+            match typ {
+                "AND" => BinaryGate::And { xref, yref, out },
+                "XOR" => BinaryGate::Xor { xref, yref, out },
+                typ => swanky_error::bail!(
+                    ErrorKind::OtherError,
+                    "Unknown two-input gate type '{}'",
+                    typ
+                ),
+            }
+        }
+        n => swanky_error::bail!(
+            ErrorKind::OtherError,
+            "Unsupported number of input wires: {}",
+            n
+        ),
+    };
+    ensure!(
+        parts.next().is_none(),
+        ErrorKind::OtherError,
+        "Trailing data in gate definition: {}",
+        line
+    );
+    Ok(gate)
 }
 
 impl BinaryCircuit {
-    /// Generates a new [`BinaryCircuit`] from the provided [`BufRead`]er. The file
-    /// must follow the Bristol Fashion format.
+    /// Generate a new [`BinaryCircuit`] from the provided reader. The file must
+    /// follow the Bristol Fashion format.
     pub fn parse_bristol_fashion(mut reader: impl BufRead) -> Result<Self> {
         // Parse first line: "ngates nwires\n".
         let mut line = String::new();
         reader
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let parts = line.split_whitespace().collect::<Vec<_>>();
-        ensure!(
-            parts.len() == 2,
-            ErrorKind::OtherError,
-            "Failed to parse gate and wire count"
-        );
-        let ngates = FromStr::from_str(parts[0])
-            .wrap_err(ErrorKind::OtherError, "Failed to parse gate count")?;
-        let nwires: usize = FromStr::from_str(parts[1])
-            .wrap_err(ErrorKind::OtherError, "Failed to parse wire count")?;
+        let mut parts = line.split_whitespace();
+        let ngates = next_usize(&mut parts)?;
+        let nwires = next_usize(&mut parts)?;
 
         // Parse second line: "ninputs input1 input2 ...\n".
         let mut line = String::new();
         reader
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let parts = line.split_whitespace().collect::<Vec<_>>();
-        ensure!(!parts.is_empty(), ErrorKind::OtherError, "Empty input line");
+        let mut parts = line.split_whitespace();
 
-        let ninputs: usize = FromStr::from_str(parts[0])
-            .wrap_err(ErrorKind::OtherError, "Failed to parse number of parties")?;
-        ensure!(
-            parts.len() == ninputs + 1,
-            ErrorKind::OtherError,
-            "Expected {} input values, got {}",
-            ninputs,
-            parts.len() - 1
-        );
+        let ninputs = next_usize(&mut parts)?;
         let mut ninputs_total = 0;
-        for part in parts.iter().skip(1) {
-            let ninputs: usize = FromStr::from_str(part)
-                .wrap_err(ErrorKind::OtherError, "Failed to parse input count")?;
+        for _ in 0..ninputs {
+            let ninputs = next_usize(&mut parts)?;
             ninputs_total += ninputs;
         }
 
@@ -91,45 +114,20 @@ impl BinaryCircuit {
         reader
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let parts = line.split_whitespace().collect::<Vec<_>>();
-        ensure!(
-            !parts.is_empty(),
-            ErrorKind::OtherError,
-            "Empty output line"
-        );
-        let noutputs: usize = FromStr::from_str(parts[0]).wrap_err(
-            ErrorKind::OtherError,
-            "Failed to parse number of output parties",
-        )?;
-        ensure!(
-            parts.len() == noutputs + 1,
-            ErrorKind::OtherError,
-            "Expected {} output values, got {}",
-            noutputs,
-            parts.len() - 1
-        );
+        let mut parts = line.split_whitespace();
+        let noutputs = next_usize(&mut parts)?;
         let mut noutputs_total = 0;
-        for part in parts.iter().skip(1) {
-            let noutputs: usize = FromStr::from_str(part)
-                .wrap_err(ErrorKind::OtherError, "Failed to parse output count")?;
+        for _ in 0..noutputs {
+            let noutputs = next_usize(&mut parts)?;
             noutputs_total += noutputs;
         }
 
         let mut circ = Self::new(Some(ngates));
 
-        let re1 = Regex::new(r"1 1 (\d+) (\d+) INV").expect("regex should be valid");
-        let re2 = Regex::new(r"2 1 (\d+) (\d+) (\d+) ((AND|XOR))").expect("regex should be valid");
-
-        let mut id = 0;
-
         // Process inputs.
         for i in 0..ninputs_total {
-            circ.gates.push(BinaryGate::Input { id: i });
             circ.input_refs.push(i);
         }
-        // Create a constant wire for negations.
-        circ.gates.push(BinaryGate::Constant { val: 1 });
-        circ.const_refs.push(ninputs_total);
         // Process outputs.
         for i in (0..noutputs_total).rev() {
             circ.output_refs.push(nwires - noutputs_total + i);
@@ -142,51 +140,15 @@ impl BinaryCircuit {
             if line.is_empty() {
                 continue;
             }
-            match line.chars().next() {
-                Some('1') => {
-                    let cap = regex2captures(&re1, line)?;
-                    let yref = cap2int(&cap, 1)?;
-                    let out = cap2int(&cap, 2)?;
-                    circ.gates.push(BinaryGate::Inv {
-                        xref: yref,
-                        out: Some(out),
-                    })
-                }
-                Some('2') => {
-                    let cap = regex2captures(&re2, line)?;
-                    let xref = cap2int(&cap, 1)?;
-                    let yref = cap2int(&cap, 2)?;
-                    let out = cap2int(&cap, 3)?;
-                    let typ = cap2typ(&cap, 4)?;
-                    let gate = match typ {
-                        GateType::AndGate => {
-                            let gate = BinaryGate::And {
-                                xref,
-                                yref,
-                                id,
-                                out: Some(out),
-                            };
-                            id += 1;
-                            gate
-                        }
-                        GateType::XorGate => BinaryGate::Xor {
-                            xref,
-                            yref,
-                            out: Some(out),
-                        },
-                    };
-                    circ.gates.push(gate);
-                }
-                None => break,
-                _ => {
-                    swanky_error::bail!(ErrorKind::OtherError, "Invalid gate definition: {}", line);
-                }
-            }
+            let gate = parse_gate(line).wrap_err_with(ErrorKind::OtherError, || {
+                format!("Invalid gate definition: {line}")
+            })?;
+            circ.gates.push(gate);
         }
         Ok(circ)
     }
 
-    /// Generates a new [`BinaryCircuit`] from the provided [`BufRead`]er. The file
+    /// Generates a new [`BinaryCircuit`] from the provided reader. The file
     /// must follow the Bristol Format given here:
     /// <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>.
     pub fn parse_bristol_format(mut reader: impl BufRead) -> Result<Self> {
@@ -195,94 +157,65 @@ impl BinaryCircuit {
         reader
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let re = Regex::new(r"(\d+)\s+(\d+)").expect("regex should be valid");
-        let cap = regex2captures(&re, &line)?;
-        let ngates = cap2int(&cap, 1)?;
-        let nwires = cap2int(&cap, 2)?;
+        let mut parts = line.split_whitespace();
+        let ngates = next_usize(&mut parts)?;
+        let nwires = next_usize(&mut parts)?;
+        ensure!(
+            parts.next().is_none(),
+            ErrorKind::OtherError,
+            "Trailing data in gate and wire count line: {}",
+            line.trim()
+        );
 
         // Parse second line: n1 n2 n3\n
         let mut line = String::new();
         reader
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let re = Regex::new(r"(\d+)\s+(\d+)\s+(\d+)").expect("regex should be valid");
-        let cap = regex2captures(&re, &line)?;
-        let n1 = cap2int(&cap, 1)?; // Number of garbler inputs
-        let n2 = cap2int(&cap, 2)?; // Number of evaluator inputs
-        let n3 = cap2int(&cap, 3)?; // Number of outputs
+        let mut parts = line.split_whitespace();
+        let ngarbler_inputs = next_usize(&mut parts)?;
+        let nevaluator_inputs = next_usize(&mut parts)?;
+        let noutputs = next_usize(&mut parts)?;
+        ensure!(
+            parts.next().is_none(),
+            ErrorKind::OtherError,
+            "Trailing data in input and output count line: {}",
+            line.trim()
+        );
 
         // Parse third line: \n
         let mut line = String::new();
         reader
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        #[allow(clippy::trivial_regex)]
-        let re = Regex::new(r"\n").expect("regex should be valid");
-        let _ = regex2captures(&re, &line)?;
+        ensure!(
+            line.trim().is_empty(),
+            ErrorKind::OtherError,
+            "Expected an empty line, got: {}",
+            line.trim()
+        );
 
         let mut circ = Self::new(Some(ngates));
 
-        let re1 = Regex::new(r"1 1 (\d+) (\d+) INV").expect("regex should be valid");
-        let re2 = Regex::new(r"2 1 (\d+) (\d+) (\d+) ((AND|XOR))").expect("regex should be valid");
-
-        let mut id = 0;
-
         // Process inputs.
-        for i in 0..n1 + n2 {
-            circ.gates.push(BinaryGate::Input { id: i });
+        for i in 0..ngarbler_inputs + nevaluator_inputs {
             circ.input_refs.push(i);
         }
-        // Create a constant wire for negations.
-        // This is no longer required for the implementation
-        // of our garbler/evaluator pair. Consider removing
-        circ.gates.push(BinaryGate::Constant { val: 1 });
-        circ.const_refs.push(n1 + n2);
         // Process outputs.
-        for i in 0..n3 {
-            circ.output_refs.push(nwires - n3 + i);
+        for i in 0..noutputs {
+            circ.output_refs.push(nwires - noutputs + i);
         }
+        // Parse gate definitions (same as Bristol Fashion).
         for line in reader.lines() {
             let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-            match line.chars().next() {
-                Some('1') => {
-                    let cap = regex2captures(&re1, &line)?;
-                    let yref = cap2int(&cap, 1)?;
-                    let out = cap2int(&cap, 2)?;
-                    circ.gates.push(BinaryGate::Inv {
-                        xref: yref,
-                        out: Some(out),
-                    })
-                }
-                Some('2') => {
-                    let cap = regex2captures(&re2, &line)?;
-                    let xref = cap2int(&cap, 1)?;
-                    let yref = cap2int(&cap, 2)?;
-                    let out = cap2int(&cap, 3)?;
-                    let typ = cap2typ(&cap, 4)?;
-                    let gate = match typ {
-                        GateType::AndGate => {
-                            let gate = BinaryGate::And {
-                                xref,
-                                yref,
-                                id,
-                                out: Some(out),
-                            };
-                            id += 1;
-                            gate
-                        }
-                        GateType::XorGate => BinaryGate::Xor {
-                            xref,
-                            yref,
-                            out: Some(out),
-                        },
-                    };
-                    circ.gates.push(gate);
-                }
-                None => break,
-                _ => {
-                    swanky_error::bail!(ErrorKind::OtherError, "Invalid wire value");
-                }
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
             }
+            let gate = parse_gate(line).wrap_err_with(ErrorKind::OtherError, || {
+                format!("Invalid gate definition: {line}")
+            })?;
+            circ.gates.push(gate);
         }
         Ok(circ)
     }
@@ -290,7 +223,7 @@ impl BinaryCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{BinaryCircuit, BinaryGate};
+    use crate::BinaryCircuit;
     use std::io::Cursor;
 
     #[test]
@@ -334,14 +267,6 @@ mod tests {
         assert_eq!(circuit.output_refs.len(), 128);
         // Verify circuit has gates.
         assert!(!circuit.gates.is_empty());
-        // First 256 gates should be inputs.
-        for i in 0..256 {
-            if let BinaryGate::Input { id } = circuit.gates[i] {
-                assert_eq!(id, i);
-            } else {
-                panic!("Expected Input gate at position {}", i);
-            }
-        }
 
         // Test SHA-256 circuit.
         let result = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(

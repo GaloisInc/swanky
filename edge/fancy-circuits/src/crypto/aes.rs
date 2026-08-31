@@ -19,10 +19,13 @@ impl Aes128 {
     /// it is best to reuse this circuit if possible versus calling
     /// [`Aes128::new`] every time this circuit is needed.
     pub fn new() -> Self {
+        // Note: This is faster than using the Bristol Fashion circuit, even
+        // though there are 400 more AND gates in this one! This implies that
+        // our binary circuit evaluator isn't that good.
         let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-format/AES-non-expanded.txt"),
         ))
-        .expect("`AES-non-expanded.txt` file should always parse correctly");
+        .expect("`AES-non-expanded.txt` should always parse correctly");
         Self(circuit)
     }
 }

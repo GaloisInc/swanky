@@ -23,7 +23,6 @@ swanky-channel.workspace = true
 swanky-error.workspace = true
 
 rand.workspace = true
-regex.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]

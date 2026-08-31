@@ -23,7 +23,6 @@ serde = ["dep:serde", "dep:serde_json"]
 [dependencies]
 itertools.workspace = true
 rand.workspace = true
-regex.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 subtle.workspace = true
