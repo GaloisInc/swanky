@@ -257,7 +257,7 @@ impl VoleVerifier {
             u_tilda,
             pdecom,
             iv,
-            extended_witness_len: l,
+            extended_witness_len,
         } = decommitment_prover;
 
         // line 2
