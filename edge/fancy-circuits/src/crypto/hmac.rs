@@ -83,11 +83,10 @@ where
             .collect();
 
         // Compute `key ⊕ ipad`.
-        let key_vec = key.to_vec();
-        let key_xor_ipad = xor.execute(backend, (&key_vec, &ipad), channel)?;
+        let key_xor_ipad = xor.execute(backend, (key, &ipad), channel)?;
 
         // Compute `key ⊕ opad`.
-        let key_xor_opad = xor.execute(backend, (&key_vec, &opad), channel)?;
+        let key_xor_opad = xor.execute(backend, (key, &opad), channel)?;
 
         // Inner hash: `H((key ⊕ ipad) || message)`.
         let mut inner_input = key_xor_ipad;
