@@ -17,21 +17,80 @@ fn next_token<'a>(parts: &mut impl Iterator<Item = &'a str>) -> Result<&'a str> 
         .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Missing token"))
 }
 
-/// Grab the next token from `parts` and parse it as a [`usize`].
-fn next_usize<'t>(parts: &mut impl Iterator<Item = &'t str>) -> Result<usize> {
+/// Grab the next token from `parts` and parse it as a [`u32`].
+fn next_u32<'t>(parts: &mut impl Iterator<Item = &'t str>) -> Result<u32> {
     let s = next_token(parts)?;
-    usize::from_str(s).wrap_err_with(ErrorKind::OtherError, || {
-        format!("Failed to parse usize from '{s}'")
+    u32::from_str(s).wrap_err_with(ErrorKind::OtherError, || {
+        format!("Failed to parse u32 from '{s}'")
     })
+}
+
+/// Translation from the wire numbering used by a circuit file to the canonical
+/// numbering used by [`BinaryCircuit`], where the input wires come first and the
+/// output wire of the `i`th gate is wire `ninputs + i`.
+struct WireMap {
+    /// Canonical wire index of each wire in the file, or `u32::MAX` if that wire
+    /// has not been assigned a value yet.
+    map: Vec<u32>,
+    /// Canonical index to assign to the next wire that gets defined.
+    next: u32,
+}
+
+impl WireMap {
+    /// Build a [`WireMap`] for a circuit file on `nwires` wires, the first
+    /// `ninputs` of which are the circuit's inputs.
+    ///
+    /// # Panics
+    /// This panics if `ninputs <= nwires`.
+    fn new(nwires: u32, ninputs: u32) -> Self {
+        assert!(ninputs <= nwires);
+        let mut map = vec![u32::MAX; nwires as usize];
+        for (i, wire) in map.iter_mut().enumerate().take(ninputs as usize) {
+            *wire = i as u32;
+        }
+        Self { map, next: ninputs }
+    }
+
+    /// Look up the canonical index of `wire`, failing if it has not been
+    /// defined yet.
+    fn get(&self, wire: u32) -> Result<u32> {
+        let canonical = *self.map.get(wire as usize).ok_or_else(|| {
+            swanky_error!(
+                ErrorKind::OtherError,
+                "Wire {wire} is out of range of the circuit's wire count"
+            )
+        })?;
+        ensure!(
+            canonical != u32::MAX,
+            ErrorKind::OtherError,
+            "Wire {} is used before it is defined",
+            wire
+        );
+        Ok(canonical)
+    }
+
+    /// Assign the next canonical index to `wire`.
+    fn set(&mut self, wire: u32) -> Result<()> {
+        let canonical = self.map.get_mut(wire as usize).ok_or_else(|| {
+            swanky_error!(
+                ErrorKind::OtherError,
+                "Wire {wire} is out of range of the circuit's wire count"
+            )
+        })?;
+        *canonical = self.next;
+        self.next += 1;
+        Ok(())
+    }
 }
 
 /// Parses a gate definition of the form
 /// `<# input wires> <# output wires> <input wires...> <output wire> <gate type>`,
-/// returning the resulting [`BinaryGate`].
-fn parse_gate(line: &str) -> Result<BinaryGate> {
+/// returning the resulting [`BinaryGate`]. The gate's wires are translated
+/// through `wires`, whose output wire is defined as a side effect.
+fn parse_gate(line: &str, wires: &mut WireMap) -> Result<BinaryGate> {
     let mut parts = line.split_whitespace();
-    let ninput_wires = next_usize(&mut parts)?;
-    let noutput_wires = next_usize(&mut parts)?;
+    let ninput_wires = next_u32(&mut parts)?;
+    let noutput_wires = next_u32(&mut parts)?;
     ensure!(
         noutput_wires == 1,
         ErrorKind::OtherError,
@@ -40,8 +99,8 @@ fn parse_gate(line: &str) -> Result<BinaryGate> {
     );
     let gate = match ninput_wires {
         1 => {
-            let xref = next_usize(&mut parts)?;
-            let out = next_usize(&mut parts)?;
+            let xref = wires.get(next_u32(&mut parts)?)?;
+            let out = next_u32(&mut parts)?;
             let typ = next_token(&mut parts)?;
             ensure!(
                 typ == "INV",
@@ -49,22 +108,25 @@ fn parse_gate(line: &str) -> Result<BinaryGate> {
                 "Unknown one-input gate type '{}'",
                 typ
             );
-            BinaryGate::Inv { xref, out }
+            wires.set(out)?;
+            BinaryGate::Inv { xref }
         }
         2 => {
-            let xref = next_usize(&mut parts)?;
-            let yref = next_usize(&mut parts)?;
-            let out = next_usize(&mut parts)?;
+            let xref = wires.get(next_u32(&mut parts)?)?;
+            let yref = wires.get(next_u32(&mut parts)?)?;
+            let out = next_u32(&mut parts)?;
             let typ = next_token(&mut parts)?;
-            match typ {
-                "AND" => BinaryGate::And { xref, yref, out },
-                "XOR" => BinaryGate::Xor { xref, yref, out },
+            let gate = match typ {
+                "AND" => BinaryGate::And { xref, yref },
+                "XOR" => BinaryGate::Xor { xref, yref },
                 typ => swanky_error::bail!(
                     ErrorKind::OtherError,
                     "Unknown two-input gate type '{}'",
                     typ
                 ),
-            }
+            };
+            wires.set(out)?;
+            gate
         }
         n => swanky_error::bail!(
             ErrorKind::OtherError,
@@ -91,8 +153,8 @@ impl BinaryCircuit {
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let mut parts = line.split_whitespace();
-        let ngates = next_usize(&mut parts)?;
-        let nwires = next_usize(&mut parts)?;
+        let ngates = next_u32(&mut parts)?;
+        let nwires = next_u32(&mut parts)?;
 
         // Parse second line: "ninputs input1 input2 ...\n".
         let mut line = String::new();
@@ -101,10 +163,10 @@ impl BinaryCircuit {
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let mut parts = line.split_whitespace();
 
-        let ninputs = next_usize(&mut parts)?;
+        let ninputs = next_u32(&mut parts)?;
         let mut ninputs_total = 0;
         for _ in 0..ninputs {
-            let ninputs = next_usize(&mut parts)?;
+            let ninputs = next_u32(&mut parts)?;
             ninputs_total += ninputs;
         }
 
@@ -115,36 +177,37 @@ impl BinaryCircuit {
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let mut parts = line.split_whitespace();
-        let noutputs = next_usize(&mut parts)?;
+        let noutputs = next_u32(&mut parts)?;
         let mut noutputs_total = 0;
         for _ in 0..noutputs {
-            let noutputs = next_usize(&mut parts)?;
+            let noutputs = next_u32(&mut parts)?;
             noutputs_total += noutputs;
         }
 
-        let mut circ = Self::new(Some(ngates));
+        let mut circ = Self::new(ninputs_total as usize, Some(ngates as usize));
+        let mut wires = WireMap::new(nwires, ninputs_total);
 
-        // Process inputs.
-        for i in 0..ninputs_total {
-            circ.input_refs.push(i);
-        }
-        // Process outputs.
-        for i in (0..noutputs_total).rev() {
-            circ.output_refs.push(nwires - noutputs_total + i);
-        }
-
-        // Parse gate definitions (same as Bristol Format).
+        // Parse gate definitions.
         for line in reader.lines() {
             let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            let gate = parse_gate(line).wrap_err_with(ErrorKind::OtherError, || {
+            let gate = parse_gate(line, &mut wires).wrap_err_with(ErrorKind::OtherError, || {
                 format!("Invalid gate definition: {line}")
             })?;
             circ.gates.push(gate);
         }
+
+        // Process outputs, which are the last `noutputs_total` wires of the
+        // file, in reverse order.
+        for i in (0..noutputs_total).rev() {
+            circ.output_refs
+                .push(wires.get(nwires - noutputs_total + i)?);
+        }
+
+        circ.batch_gates_by_type();
         Ok(circ)
     }
 
@@ -158,8 +221,8 @@ impl BinaryCircuit {
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let mut parts = line.split_whitespace();
-        let ngates = next_usize(&mut parts)?;
-        let nwires = next_usize(&mut parts)?;
+        let ngates = next_u32(&mut parts)?;
+        let nwires = next_u32(&mut parts)?;
         ensure!(
             parts.next().is_none(),
             ErrorKind::OtherError,
@@ -173,9 +236,9 @@ impl BinaryCircuit {
             .read_line(&mut line)
             .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
         let mut parts = line.split_whitespace();
-        let ngarbler_inputs = next_usize(&mut parts)?;
-        let nevaluator_inputs = next_usize(&mut parts)?;
-        let noutputs = next_usize(&mut parts)?;
+        let ngarbler_inputs = next_u32(&mut parts)?;
+        let nevaluator_inputs = next_u32(&mut parts)?;
+        let noutputs = next_u32(&mut parts)?;
         ensure!(
             parts.next().is_none(),
             ErrorKind::OtherError,
@@ -195,16 +258,10 @@ impl BinaryCircuit {
             line.trim()
         );
 
-        let mut circ = Self::new(Some(ngates));
+        let ninputs = ngarbler_inputs + nevaluator_inputs;
+        let mut circ = Self::new(ninputs as usize, Some(ngates as usize));
+        let mut wires = WireMap::new(nwires, ninputs);
 
-        // Process inputs.
-        for i in 0..ngarbler_inputs + nevaluator_inputs {
-            circ.input_refs.push(i);
-        }
-        // Process outputs.
-        for i in 0..noutputs {
-            circ.output_refs.push(nwires - noutputs + i);
-        }
         // Parse gate definitions (same as Bristol Fashion).
         for line in reader.lines() {
             let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
@@ -212,11 +269,18 @@ impl BinaryCircuit {
             if line.is_empty() {
                 continue;
             }
-            let gate = parse_gate(line).wrap_err_with(ErrorKind::OtherError, || {
+            let gate = parse_gate(line, &mut wires).wrap_err_with(ErrorKind::OtherError, || {
                 format!("Invalid gate definition: {line}")
             })?;
             circ.gates.push(gate);
         }
+
+        // Process outputs, which are the last `noutputs` wires of the file.
+        for i in 0..noutputs {
+            circ.output_refs.push(wires.get(nwires - noutputs + i)?);
+        }
+
+        circ.batch_gates_by_type();
         Ok(circ)
     }
 }
@@ -262,7 +326,7 @@ mod tests {
         assert!(result.is_ok());
         let circuit = result.unwrap();
         // AES-128: 2 input values with 128 bits each = 256 inputs total.
-        assert_eq!(circuit.input_refs.len(), 256);
+        assert_eq!(circuit.ninputs, 256);
         // AES-128: 1 output value with 128 bits output = 128 outputs total.
         assert_eq!(circuit.output_refs.len(), 128);
         // Verify circuit has gates.
@@ -274,11 +338,11 @@ mod tests {
         ));
         assert!(result.is_ok());
         let circuit = result.unwrap();
-        // SHA-256: 2 parties with 512 + 256 = 768 inputs total
-        assert_eq!(circuit.input_refs.len(), 768);
-        // SHA-256: 1 party with 256 bits output = 256 outputs total
+        // SHA-256: 2 parties with 512 + 256 = 768 inputs total.
+        assert_eq!(circuit.ninputs, 768);
+        // SHA-256: 1 party with 256 bits output = 256 outputs total.
         assert_eq!(circuit.output_refs.len(), 256);
-        // Verify circuit has gates
+        // Verify circuit has gates.
         assert!(!circuit.gates.is_empty());
     }
 }
