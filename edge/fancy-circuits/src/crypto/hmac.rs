@@ -22,8 +22,16 @@ use swanky_error::Result;
 /// This implementation uses a 512-bit key (the SHA-256 block size) to avoid needing
 /// to hash long keys. For shorter keys, pad with zeros to 512 bits before passing
 /// to this circuit.
+///
+/// # Performance Note!
+/// This involves parsing a circuit file, and thus is not cheap!
+/// Hence, it is best to reuse this circuit if possible versus calling
+/// [`HmacSha256::new`] every time this circuit is needed.
 #[derive(Default)]
-pub struct HmacSha256<'a>(PhantomData<&'a ()>);
+pub struct HmacSha256<'a> {
+    sha: Sha256,
+    phantom: PhantomData<&'a ()>,
+}
 
 impl<'a> HmacSha256<'a> {
     /// Create a new [`HmacSha256`] circuit.
@@ -53,6 +61,8 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
+        let xor = PairwiseXor::new();
+
         let (key, message) = inputs;
 
         let zero = backend.constant(0, 2, channel)?;
@@ -74,20 +84,20 @@ where
 
         // Compute `key ⊕ ipad`.
         let key_vec = key.to_vec();
-        let key_xor_ipad = PairwiseXor::new().execute(backend, (&key_vec, &ipad), channel)?;
+        let key_xor_ipad = xor.execute(backend, (&key_vec, &ipad), channel)?;
 
         // Compute `key ⊕ opad`.
-        let key_xor_opad = PairwiseXor::new().execute(backend, (&key_vec, &opad), channel)?;
+        let key_xor_opad = xor.execute(backend, (&key_vec, &opad), channel)?;
 
         // Inner hash: `H((key ⊕ ipad) || message)`.
         let mut inner_input = key_xor_ipad;
         inner_input.extend_from_slice(message);
-        let inner_hash = Sha256::new().execute(backend, inner_input, channel)?;
+        let inner_hash = self.sha.execute(backend, inner_input, channel)?;
 
         // Outer hash: `H((key ⊕ opad) || inner_hash)`.
         let mut outer_input = key_xor_opad;
         outer_input.extend_from_slice(&inner_hash);
-        let hmac = Sha256::new().execute(backend, outer_input, channel)?;
+        let hmac = self.sha.execute(backend, outer_input, channel)?;
 
         Ok(hmac)
     }
