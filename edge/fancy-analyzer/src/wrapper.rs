@@ -117,12 +117,11 @@ mod tests {
             "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
         );
 
-        // These counts come from
-        // <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
+        // These counts come from <https://nigelsmart.github.io/MPC-Circuits/>
         //
         // Note: If we change the AES circuit, these will need to change!
-        assert_eq!(analyzer.nands(), 6800);
-        assert_eq!(analyzer.nxors(), 25124);
-        assert_eq!(analyzer.nnegs, 1692);
+        assert_eq!(analyzer.nands(), 6400);
+        assert_eq!(analyzer.nxors(), 28176);
+        assert_eq!(analyzer.nnegs, 2087);
     }
 }

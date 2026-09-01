@@ -241,13 +241,12 @@ mod tests {
         let mut analyzer = CircuitAnalyzer::new();
         analyzer.eval(&circuit).unwrap();
 
-        // These counts come from
-        // <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
+        // These counts come from <https://nigelsmart.github.io/MPC-Circuits/>
         //
         // Note: If we change the AES circuit, these will need to change!
-        assert_eq!(analyzer.nands(), 6800);
-        assert_eq!(analyzer.nxors(), 25124);
-        assert_eq!(analyzer.nnegs, 1692);
+        assert_eq!(analyzer.nands(), 6400);
+        assert_eq!(analyzer.nxors(), 28176);
+        assert_eq!(analyzer.nnegs, 2087);
     }
 
     #[test]
