@@ -15,14 +15,14 @@ impl Aes128 {
     /// Create a new [`Aes128`] circuit.
     ///
     /// # Performance Note!
-    /// This involves parsing a Bristol Format file, and thus is not cheap! Hence,
-    /// it is best to reuse this circuit if possible versus calling
+    /// This involves parsing a Bristol Fashion file, and thus is not cheap!
+    /// Hence, it is best to reuse this circuit if possible versus calling
     /// [`Aes128::new`] every time this circuit is needed.
     pub fn new() -> Self {
-        let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../../circuits/bristol-format/AES-non-expanded.txt"),
+        let circuit = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+            include_bytes!("../../circuits/bristol-fashion/aes_128.txt"),
         ))
-        .expect("`AES-non-expanded.txt` should always parse correctly");
+        .expect("`aes_128.txt` should always parse correctly");
         Self(circuit)
     }
 }
@@ -43,13 +43,11 @@ impl<F: FancyBinary> Circuit<F> for Aes128 {
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        // Confusingly, the AES Bristol Format file takes the block _first_, and
-        // the key _second_. Since the more conventional approach is to take
-        // (key, block), we swap the values here before feeding them into the
-        // `BinaryCircuit` for evaluation, leaving the interface using the
-        // conventional approach.
-        let mut combined = inputs.1.to_vec();
-        combined.extend_from_slice(&inputs.0);
+        // Bristol Fashion expects its input in the _reverse_ order of what would
+        // be expected, so we need to reverse each input when building the vector
+        // to pass to [`BinaryCircuit`].
+        let mut combined = inputs.0.iter().rev().cloned().collect::<Vec<_>>();
+        combined.extend(inputs.1.iter().rev().cloned());
         let output = self.0.execute(backend, combined, channel)?;
         Ok(output
             .try_into()
