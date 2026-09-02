@@ -7,13 +7,11 @@ use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
 use crate::vole::convert_to_vole::{convert_to_vole_prover, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, Prg, Seed};
-use generic_array::{GenericArray, arr, typenum::U16};
 use rand::RngExt;
 use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b};
-use swanky_serialization::CanonicalSerialize;
 
 use super::consistency_check::HashConsistency;
 
@@ -212,7 +210,12 @@ pub(crate) fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
 ///
 /// This function implements steps 20-22 of Fig 8.2
 pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> [Pdecom; REPETITION_PARAM] {
-    let mut pdecom: [Pdecom; REPETITION_PARAM] = Default::default();
+    let mut pdecom: [Pdecom; REPETITION_PARAM] = std::array::from_fn(|_| {
+        (
+            Default::default(),
+            std::array::from_fn(|_| Default::default()),
+        )
+    });
     for i in 0..REPETITION_PARAM {
         let delta_i = chal_dec(chal, i);
         let pdecom_i = open(&decom[i], delta_i);
@@ -298,15 +301,9 @@ pub(crate) fn vole_reconstruct(
 }
 
 // Compute the secret key delta from a challenge
-pub(crate) fn compute_secret_key(chall3: &Chall3) -> GenericArray<F8b, U16> {
+pub(crate) fn compute_secret_key(chall3: &Chall3) -> [F8b; REPETITION_PARAM] {
     // compute the big delta
-    (0..REPETITION_PARAM)
-        .map(|tau| {
-            let delta_i = chal_dec(chall3, tau);
-            F8b::from_bytes(&arr![bools_to_u8(&delta_i)])
-        })
-        .collect::<Result<GenericArray<F8b, U16>, _>>()
-        .unwrap()
+    core::array::from_fn(|tau| F8b::from(bools_to_u8(&chal_dec(chall3, tau))))
 }
 
 /// This function applies corrections to the verifier part of voles `q` using a challenge.
@@ -398,11 +395,13 @@ mod test {
         VoleCommitment, apply_corrections_to_q, compute_secret_key, l_hat, vole_open,
         vole_reconstruct,
     };
+    use crate::parameters::{FLambda, SECURITY_PARAM};
     use crate::vole::crypto_primitives::H1;
     use crate::vole::functionality::compute_seed_iv;
+    use crate::vole::lift;
     use rand::rng;
-    use swanky_field::{FiniteRing, IsSubFieldOf};
-    use swanky_field_binary::{F2, F8b, F128b};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     #[test]
     fn test_vole_commit_reconstruct() {
@@ -425,7 +424,7 @@ mod test {
             v,
         } = VoleCommitment::create(r, iv, how_many);
 
-        let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let chall3: [u8; SECURITY_PARAM / 8] = std::array::from_fn(|i| i as u8);
 
         let pdecom = vole_open(&chall3, &decom);
 
@@ -434,17 +433,17 @@ mod test {
         // Change Q_i with the corrections:
         // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
         // Q = (Q_0 ... Q_{tau-1})
-        let q_f128b = apply_corrections_to_q(q, &chall3, &corrections, how_many);
+        let q_flambda = apply_corrections_to_q(q, &chall3, &corrections, how_many);
 
         // compute the big delta
         let big_delta = compute_secret_key(&chall3);
-        let big_delta_f128b: F128b = F8b::form_superfield(&big_delta);
+        let big_delta_flambda: FLambda = lift(&big_delta);
 
         for pos in 0..how_many {
-            let v_f128b: F128b = F8b::form_superfield(&v[pos].into());
+            let v_flambda: FLambda = lift(&v[pos]);
             assert_eq!(
-                v_f128b + u[pos] * big_delta_f128b,
-                F8b::form_superfield(&q_f128b[pos].into())
+                v_flambda + u[pos] * big_delta_flambda,
+                lift(&q_flambda[pos])
             );
         }
     }

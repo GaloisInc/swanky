@@ -1,11 +1,8 @@
 /*! Cryptographic primitives used for VOLE-it-HEAD */
-use crate::parameters::SECURITY_PARAM;
+use crate::parameters::{AesRng, FLambda, SECURITY_PARAM, ShakeXof};
 use crate::vole::commit_reconstruct::Corrections;
 use rand::{Rng, SeedableRng, TryRng, rand_core::Infallible};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
-use shake::Shake128;
-use swanky_field_binary::F128b;
-use swanky_rng::AesRng;
 use swanky_serialization::CanonicalSerialize;
 
 /// Initialization Vector.
@@ -56,14 +53,14 @@ impl TryRng for Prg {
 
 #[cfg(test)]
 mod tests {
-    use super::IV;
+    use super::{IV, Seed};
+    use crate::parameters::{AesRng, SECURITY_PARAM};
     use rand::RngExt;
     use swanky_field_binary::F2;
-    use swanky_rng::AesRng;
 
     #[test]
     fn swanky_prg_matches_stream_bits() {
-        let seed: IV = [5u8; 16];
+        let seed: Seed = [5u8; SECURITY_PARAM / 8];
         let iv: IV = [11u8; 16];
 
         let lengths = [
@@ -102,7 +99,7 @@ mod tests {
 }
 
 fn hash(bytes: &[u8], domain_seperator: u8, output: &mut [u8]) {
-    let mut hasher = Shake128::default();
+    let mut hasher = ShakeXof::default();
     hasher.update(bytes);
     hasher.update(&[domain_seperator]);
     hasher.finalize_xof_into(output);
@@ -114,7 +111,7 @@ fn hash(bytes: &[u8], domain_seperator: u8, output: &mut [u8]) {
 /// This function corresponds to the H0 in the FAEST spec, defined page 16.
 pub(crate) fn h0(x: Key, iv: IV) -> (Seed, Com) {
     // Hash x||iv to generate the Key
-    let mut hasher = Shake128::default();
+    let mut hasher = ShakeXof::default();
     hasher.update(&x);
     hasher.update(&iv);
     hasher.update(&[0u8]);
@@ -134,8 +131,14 @@ pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
 /// Hash digest for a collision-resistant hash function.
 ///
 /// This is used for various purposes throughout the protocol.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub(crate) struct H1([u8; H1_LENGTH]);
+
+impl core::default::Default for H1 {
+    fn default() -> Self {
+        Self(std::array::from_fn(|_| Default::default()))
+    }
+}
 
 impl H1 {
     /// Compute the [`H1`] hash from a slice of bytes.
@@ -172,7 +175,7 @@ impl AsRef<[u8; H1_LENGTH]> for H1 {
 ///
 /// This is `$H_2^j$` in FAEST spec
 #[derive(Default)]
-struct H2Hasher(Shake128);
+struct H2Hasher(ShakeXof);
 
 impl H2Hasher {
     fn update(&mut self, data: &[u8]) {
@@ -233,7 +236,7 @@ pub(crate) type Chall3 = [u8; CHALL3_LENGTH];
 ///
 /// This computes `$H_2^3$` in FAEST spec.
 #[allow(unused)]
-pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &F128b, b_tilde: &F128b) -> Chall3 {
+pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &FLambda, b_tilde: &FLambda) -> Chall3 {
     let mut hasher = H2Hasher::default();
 
     hasher.update(chall2);
@@ -249,8 +252,14 @@ pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &F128b, b_tilde: &F128b) -> Ch
 ///
 /// This should incorporate secret information or randomness (e.g. that only
 /// the verifier knows), to derive secret, per-proof values.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct H3([u8; (SECURITY_PARAM + 128) / 8]);
+
+impl core::default::Default for H3 {
+    fn default() -> Self {
+        Self(std::array::from_fn(|_| Default::default()))
+    }
+}
 
 impl H3 {
     /// Compute the [`H3`] hash from a slice of bytes.
@@ -261,9 +270,9 @@ impl H3 {
         out
     }
 
-    /// Derive the [`H3`] hash from an instance of `Shake128`, which we assume
+    /// Derive the [`H3`] hash from an instance of [`ShakeXof`], which we assume
     /// has already been updated with all relevant secret information.
-    pub(crate) fn from_xof(mut xof: Shake128) -> Self {
+    pub(crate) fn from_xof(mut xof: ShakeXof) -> Self {
         let mut out = H3::default();
         // Append 0x3 for domain separation
         xof.update(&[3u8]);

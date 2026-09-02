@@ -1,12 +1,11 @@
 use super::crypto_primitives::CHALL1_LENGTH;
-use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV, lift};
+use crate::parameters::{FLambda, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use crate::vole::functionality::{PartialDecommitment, VoleProver, VoleVerifier};
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::IsSubFieldOf;
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field_binary::{F2, F8b};
 
 // This is a first attempt to connect the VOLE part to the circuit traverser.
 
@@ -47,17 +46,17 @@ impl RandomVoleP for VoleProver {
         &self.u[0..self.extended_witness_length()]
     }
 
-    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn aggregate_commitment_values(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         let ell = self.extended_witness_length();
         self.u[ell..ell + REPETITION_PARAM * VOLE_SIZE_PARAM]
             .iter()
-            .map(|f2| F128b::from(*f2))
+            .map(|f2| FLambda::from(*f2))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }
 
-    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn aggregate_commitment_masks(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         let ell = self.extended_witness_length();
         self.v[ell..ell + REPETITION_PARAM * VOLE_SIZE_PARAM]
             .to_vec()
@@ -65,7 +64,7 @@ impl RandomVoleP for VoleProver {
             .unwrap()
     }
 
-    fn vole_mask(&self, i: usize) -> Result<F128b> {
+    fn vole_mask(&self, i: usize) -> Result<FLambda> {
         if i < self.extended_witness_length() {
             Ok(self.v[i])
         } else {
@@ -109,11 +108,11 @@ impl RandomVoleV for VoleVerifier {
     }
 
     fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
-        self.delta.as_ref()
+        &self.delta
     }
 
-    fn verifier_key(&self) -> F128b {
-        F8b::form_superfield(&self.delta)
+    fn verifier_key(&self) -> FLambda {
+        lift(&self.delta)
     }
 
     fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
@@ -121,11 +120,11 @@ impl RandomVoleV for VoleVerifier {
         &self.q[0..count - SECURITY_PARAM]
     }
 
-    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn mask_voles(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         let count = self.q.len();
         self.q[count - SECURITY_PARAM..]
             .iter()
-            .map(|qi| F8b::form_superfield(qi.into()))
+            .map(lift)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()

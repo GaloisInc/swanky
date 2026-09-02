@@ -11,7 +11,7 @@
 //! to [Baum et al.](https://eprint.iacr.org/2023/996.pdf).
 
 /// Computational security parameter ($`\lambda`$ in the paper).
-pub const SECURITY_PARAM: usize = 128;
+pub const SECURITY_PARAM: usize = if cfg!(feature = "256bit") { 256 } else { 128 };
 
 /// The field size ($`p`$ in the paper) in which the input circuit / polynomials
 /// and the witness are defined.
@@ -41,4 +41,31 @@ pub const VOLE_SIZE_PARAM: usize = 8;
 /// This maintains the property that $`\lambda \approx r\tau`$, for the
 /// [security parameter $`\lambda`$](SECURITY_PARAM) and the
 /// [VOLE size parameter $`r`$](VOLE_SIZE_PARAM).
-pub const REPETITION_PARAM: usize = 16;
+pub const REPETITION_PARAM: usize = if cfg!(feature = "256bit") { 32 } else { 16 };
+
+#[cfg(not(feature = "256bit"))]
+/// The binary field used throughout the protocol.
+pub type FLambda = swanky_field_binary::F128b;
+#[cfg(feature = "256bit")]
+/// The binary field used throughout the protocol.
+pub type FLambda = swanky_field_binary::F256b;
+
+// FIXME (maybe): AesRng and Aes256Rng use standard `u128` counters. This results in
+// architecture-specific endianness (usually little-endian). In contrast, FAEST 1.1 specifically
+// calls out a big-endian counter on the PRG (v1.1 spec, Sec. 3.3), and FAEST increments the lower
+// 32-bits in little-endian order using AddToLowerWord (v2 spec, Sec, 9.3.4) and tweaks the upper
+// word. For interop (with whichever version we eventually target), it may be desirable to make this
+// architecture-independent and match the spec.
+#[cfg(not(feature = "256bit"))]
+/// The RNG used throughout the protocol.
+pub(crate) type AesRng = swanky_rng::AesRng;
+#[cfg(feature = "256bit")]
+/// The RNG used throughout the protocol.
+pub(crate) type AesRng = swanky_rng::Aes256Rng;
+
+#[cfg(not(feature = "256bit"))]
+/// The XOF used throughout the protocol.
+pub(crate) type ShakeXof = shake::Shake128;
+#[cfg(feature = "256bit")]
+/// The XOF used throughout the protocol.
+pub(crate) type ShakeXof = shake::Shake256;

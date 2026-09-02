@@ -14,18 +14,18 @@ use rayon::iter::*;
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field::{FiniteField, FiniteRing};
+use swanky_field_binary::{F2, F8b};
 
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    parameters::SECURITY_PARAM,
+    parameters::{FLambda, REPETITION_PARAM, SECURITY_PARAM},
     proof::{
         prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
         transcript::ChiGenerator,
     },
-    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
+    vole::{AsSecretBytes, RandomVoleP, RandomVoleV, lift},
 };
 
 use self::verifier_traverser::VerifierTraverser;
@@ -42,9 +42,9 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     witness_commitment: Vec<F2>,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
-    degree_1_commitment: F128b,
+    degree_1_commitment: FLambda,
     /// Aggregated commitment to the assert_zero gates.
-    assert_zero_commitment: F128b,
+    assert_zero_commitment: FLambda,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: [u8; SECURITY_PARAM / 8],
     /// Partial decommitment of the VOLEs.
@@ -265,16 +265,16 @@ where
             .collect::<Vec<_>>();
 
         let witness_voles = reconstructed_voles.witness_voles();
-        let masked_witnesses: Vec<F128b> = witness_voles
+        let masked_witnesses: Vec<FLambda> = witness_voles
             .par_iter()
             .zip(d_delta.par_iter())
             .map(|(qs, dds)| {
-                let masked_witness: [F8b; 16] = zip(qs, dds)
+                let masked_witness: [F8b; REPETITION_PARAM] = zip(qs, dds)
                     .map(|(q, dd)| q + dd)
                     .collect::<Vec<_>>()
                     .try_into()
                     .unwrap();
-                F8b::form_superfield(&masked_witness.into())
+                lift(&masked_witness)
             })
             .collect();
         log::info!("4: reconstructed voles with masks {:?}", t.elapsed());
@@ -334,15 +334,15 @@ where
 ///
 /// Specifically, we compute
 /// $` \sum_{i = 0}^{128} v_i X^i`$,
-/// where $`X`$ is [`F128b::GENERATOR`], the generator for the field.
-fn combine(values: [F128b; 128]) -> F128b {
+/// where $`X`$ is [`FLambda::GENERATOR`], the generator for the field.
+fn combine(values: [FLambda; SECURITY_PARAM]) -> FLambda {
     // Start with `X^0 = 1`
-    let mut power = F128b::ONE;
-    let mut acc = F128b::ZERO;
+    let mut power = FLambda::ONE;
+    let mut acc = FLambda::ZERO;
 
     for vi in values {
         acc += vi * power;
-        power *= F128b::GENERATOR;
+        power *= FLambda::GENERATOR;
     }
     acc
 }

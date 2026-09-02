@@ -6,14 +6,14 @@
 
 use std::iter::{repeat_with, zip};
 
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{FLambda, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field::FiniteRing;
+use swanky_field_binary::{F2, F8b};
 
-use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV};
+use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV, lift};
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -116,27 +116,27 @@ impl RandomVoleP for InsecureVole {
         &self.values[0..self.extended_witness_length]
     }
 
-    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn aggregate_commitment_values(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         self.values
             .iter()
             .skip(self.extended_witness_length)
-            .map(|f2| F128b::from(*f2))
+            .map(|f2| FLambda::from(*f2))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }
 
-    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn aggregate_commitment_masks(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         self.masks
             .iter()
             .skip(self.extended_witness_length)
-            .map(|mask| F8b::form_superfield(mask.into()))
+            .map(lift)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }
 
-    fn vole_mask(&self, i: usize) -> Result<F128b> {
+    fn vole_mask(&self, i: usize) -> Result<FLambda> {
         if i >= self.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -145,7 +145,7 @@ impl RandomVoleP for InsecureVole {
                 i
             );
         }
-        Ok(F8b::form_superfield(&self.masks[i].into()))
+        Ok(lift(&self.masks[i]))
     }
 
     fn decommit(self, _challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
@@ -242,8 +242,8 @@ impl RandomVoleV for InsecureCommitments {
     }
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
-    fn verifier_key(&self) -> F128b {
-        F8b::form_superfield(&self.verifier_key.into())
+    fn verifier_key(&self) -> FLambda {
+        lift(&self.verifier_key)
     }
 
     /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
@@ -255,13 +255,13 @@ impl RandomVoleV for InsecureCommitments {
 
     /// Get the lifted VOLEs corresponding to the mask for the aggregate commitment
     /// ($`q_{\ell+1}, \dots, q_{\ell + r\tau}`$ in the paper).
-    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn mask_voles(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         // Lift the commitments -- we only want the last $`r\tau`$ of them, so we skip the first ones.
         // This will panic if we constructed the type with the wrong length.
         self.verifier_commitments
             .iter()
             .skip(self.extended_witness_length)
-            .map(|q| -> F128b { F8b::form_superfield(q.into()) })
+            .map(lift)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()

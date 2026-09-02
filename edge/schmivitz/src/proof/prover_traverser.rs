@@ -4,10 +4,11 @@ use fancy_traits::{
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
 use swanky_sieve_ir_parser::WireId;
 
+use crate::parameters::FLambda;
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
@@ -33,15 +34,15 @@ pub struct ProverTraverser<Vole> {
     /// Partial aggregation of the value $`\tilde a`$ from the protocol.
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,1}`$$.
-    aggregate_degree_0: F128b,
+    aggregate_degree_0: FLambda,
     /// Partial aggregation of the value $`\tilde b`$ from the protocol.
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,0}`$$.
-    aggregate_degree_1: F128b,
+    aggregate_degree_1: FLambda,
 
     /// Partial aggregation of the assert zero check.
     /// TODO: Add this to the specification and reference it.
-    aggregate_assert_zero: F128b,
+    aggregate_assert_zero: FLambda,
 }
 
 impl<Vole: RandomVoleP> ProverTraverser<Vole> {
@@ -68,14 +69,14 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
             voles,
             vole_assignment_count: 0,
 
-            aggregate_degree_0: F128b::ZERO,
-            aggregate_degree_1: F128b::ZERO,
+            aggregate_degree_0: FLambda::ZERO,
+            aggregate_degree_1: FLambda::ZERO,
 
-            aggregate_assert_zero: F128b::ZERO,
+            aggregate_assert_zero: FLambda::ZERO,
         })
     }
 
-    fn next_vole(&mut self) -> Result<F128b> {
+    fn next_vole(&mut self) -> Result<FLambda> {
         let next_index = self.vole_assignment_count;
         self.vole_assignment_count += 1;
 
@@ -99,7 +100,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// The components that were passed to [`Self::new()`] are returned unchanged.
     ///
     /// This will fail if there were unused challenges or VOLEs.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, Vole)> {
+    pub(crate) fn into_parts(self) -> Result<(FLambda, FLambda, FLambda, Vole)> {
         if self.vole_assignment_count != self.voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -147,7 +148,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
 /// An [`F2`] element alongside its associated VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Wire(F2, F128b);
+pub struct Wire(F2, FLambda);
 
 impl HasModulus for Wire {
     fn modulus(&self) -> u16 {
@@ -158,7 +159,7 @@ impl HasModulus for Wire {
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
 impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
-    type Wire = (F2, F128b);
+    type Wire = (F2, FLambda);
 
     fn input_public(&mut self) -> Result<Self::Wire> {
         unimplemented!("VOLE-in-the-head does not support `input_public`")
@@ -219,7 +220,7 @@ impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
 
 impl<VOLE: RandomVoleP> FancyBinaryConstant for ProverTraverser<VOLE> {
     fn constant(&mut self, constant: F2) -> Self::Item {
-        Wire(constant, F128b::ZERO)
+        Wire(constant, FLambda::ZERO)
     }
 }
 

@@ -6,7 +6,7 @@
 #![allow(clippy::needless_range_loop)]
 use std::time::Instant;
 
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
+use crate::parameters::{FLambda, REPETITION_PARAM, SECURITY_PARAM, ShakeXof};
 use crate::vole::AsSecretBytes;
 use crate::vole::DecommitmentSerde;
 use crate::vole::all_but_one_vc::{Decom, Pdecom};
@@ -16,13 +16,11 @@ use crate::vole::commit_reconstruct::{
 };
 use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{Chall1, Chall3, Com, H1, H3, IV, Seed, h2_chall1};
-use generic_array::GenericArray;
-use generic_array::typenum::U16;
+use crate::vole::lift;
 use rayon::prelude::*;
 use sha3::digest::Update;
-use shake::Shake128;
-use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field::FiniteRing;
+use swanky_field_binary::{F2, F8b};
 
 #[cfg(test)]
 use crate::vole::crypto_primitives::{Chall2, h2_chall3};
@@ -34,7 +32,7 @@ use crate::vole::crypto_primitives::{Chall2, h2_chall3};
 /// more general circuits/polynomials. It's supposed to be a representation
 /// of the public components of the computation.
 pub(crate) fn compute_seed_iv<Secret: AsSecretBytes>(secret: &Secret, mu: &H1) -> (Seed, IV) {
-    let mut hasher = Shake128::default();
+    let mut hasher = ShakeXof::default();
 
     hasher.update(secret.as_bytes().as_ref());
     hasher.update(mu.as_ref());
@@ -55,7 +53,7 @@ pub(crate) fn compute_chall_1(mu: &H1, h_com: &Com, corrections: &Corrections, i
 
 /// Compute third challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
 #[cfg(test)]
-pub(crate) fn compute_chall_3(chall2: &Chall2, a_tilda: F128b, b_tilda: F128b) -> Chall3 {
+pub(crate) fn compute_chall_3(chall2: &Chall2, a_tilda: FLambda, b_tilda: FLambda) -> Chall3 {
     h2_chall3(chall2, &a_tilda, &b_tilda)
 }
 
@@ -92,7 +90,7 @@ pub struct VoleProver {
     /// VOLE `u` values.
     pub(crate) u: Vec<F2>,
     /// VOLE `v` values.
-    pub(crate) v: Vec<F128b>,
+    pub(crate) v: Vec<FLambda>,
     /// First challenge.
     pub(crate) chall1: Chall1,
     /// Consistency hash of `u`.
@@ -167,7 +165,7 @@ impl VoleProver {
         let v_lifted = v
             .into_par_iter()
             .take(extended_witness_len + SECURITY_PARAM)
-            .map(|vi| F8b::form_superfield(&vi.into()))
+            .map(|vi| lift(&vi))
             .collect();
         log::info!("v_lifted running time: {:?}", t.elapsed());
 
@@ -236,7 +234,7 @@ pub struct VoleVerifier {
     /// Consistency check. TODO: update challenge appropriately!!
     h_v: H1,
     /// secret key
-    pub(crate) delta: GenericArray<F8b, U16>,
+    pub(crate) delta: [F8b; REPETITION_PARAM],
     /// Size of extended witness. `ell` in the paper.
     pub(crate) l: usize,
 }
@@ -331,7 +329,7 @@ impl VoleVerifier {
 
 /// Adpation of FAEST Verify function Fig. 8.3
 #[cfg(test)]
-pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: F128b, b_tilda: F128b) -> bool {
+pub(crate) fn verify(chall3: &Chall3, chall2: Chall2, a_tilda: FLambda, b_tilda: FLambda) -> bool {
     // Line 20
     let chall3_prime = compute_chall_3(&chall2, a_tilda, b_tilda);
 
@@ -345,16 +343,15 @@ mod test {
 
     use super::{Chall1, Chall2, H1, HashConsistency};
     use super::{VoleProver, VoleVerifier, verify};
-    use crate::parameters::SECURITY_PARAM;
+    use crate::parameters::{FLambda, SECURITY_PARAM, ShakeXof};
     use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
+    use crate::vole::lift;
     use rand::rng;
     use rayon::prelude::*;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
-    use shake::Shake128;
-    use swanky_field::{FiniteRing, IsSubFieldOf};
-    use swanky_field_binary::F2;
-    use swanky_field_binary::{F8b, F128b};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::{F2, F8b};
     use swanky_serialization::CanonicalSerialize;
 
     static INIT: Once = Once::new();
@@ -376,7 +373,7 @@ mod test {
     ) -> Chall2 {
         let mut out: Chall2 = [0u8; CHALL2_LENGTH];
 
-        let mut hasher = Shake128::default();
+        let mut hasher = ShakeXof::default();
         hasher.update(chall1);
         hasher.update(u_tilda.pack_to_bytes().as_slice());
         hasher.update(h_v.as_ref());
@@ -426,8 +423,8 @@ mod test {
             vole_prover.h_v,
             &dummy_masked,
         );
-        let dummy_a_tilda = F128b::ZERO;
-        let dummy_b_tilda = F128b::ZERO;
+        let dummy_a_tilda = FLambda::ZERO;
+        let dummy_b_tilda = FLambda::ZERO;
         let chall3 = compute_chall_3(&chall2, dummy_a_tilda, dummy_b_tilda);
         log::info!("2: t_copy_challenges: {:?}", t_copy_challenges.elapsed());
 
@@ -446,12 +443,8 @@ mod test {
         log::info!("5: t_verify: {:?}", t_verify.elapsed());
 
         let t_finalcheck = std::time::Instant::now();
-        let delta_lifted: F128b = F8b::form_superfield(&vole_v.delta);
-        let q_lifted: Vec<F128b> = vole_v
-            .q
-            .into_par_iter()
-            .map(|qi| F8b::form_superfield(&qi.into()))
-            .collect();
+        let delta_lifted: FLambda = lift(&vole_v.delta);
+        let q_lifted: Vec<FLambda> = vole_v.q.into_par_iter().map(|qi| lift(&qi)).collect();
         for pos in 0..how_many {
             assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
         }
@@ -479,8 +472,8 @@ mod test {
 
     #[test]
     fn test_form() {
-        let v = [27u8; 16];
-        let t: F128b = F128b::from_bytes(&v.into()).unwrap();
+        let v = [27u8; SECURITY_PARAM / 8];
+        let t: FLambda = FLambda::from_bytes(&v.into()).unwrap();
         assert_eq!(t.to_bytes()[0], 27u8);
         assert_eq!(t.to_bytes()[1], 27u8);
 

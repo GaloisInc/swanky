@@ -1,9 +1,9 @@
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 use swanky_sieve_ir_parser::WireId;
 
-use crate::parameters::{FIELD_SIZE, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{FIELD_SIZE, FLambda, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 
 pub(crate) struct Transcript<'a>(&'a mut merlin::Transcript);
 
@@ -68,16 +68,16 @@ impl Transcript<'_> {
         let mut bytes = [0u8; 16];
         self.0
             .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
-        let seed = F128b::from_uniform_bytes(&bytes);
+        let seed = FLambda::from_uniform_bytes(&bytes);
         ChiGenerator::new(seed)
     }
 
     /// Adds the commitment to the aggregated polynomial coefficients to the transcript.
     pub(crate) fn append_polynomial_commitments(
         &mut self,
-        degree_0_commitment: &F128b,
-        degree_1_commitment: &F128b,
-        assert_zero_commitment: &F128b,
+        degree_0_commitment: &FLambda,
+        degree_1_commitment: &FLambda,
+        assert_zero_commitment: &FLambda,
     ) {
         self.0
             .append_message(b"b~: degree 0 commitment", &degree_0_commitment.to_bytes());
@@ -99,19 +99,19 @@ impl Transcript<'_> {
 
 /// Iterator that generates powers of chi challenges.
 pub(crate) struct ChiGenerator {
-    chi: F128b,
-    power_of_chi: F128b,
+    chi: FLambda,
+    power_of_chi: FLambda,
 }
 
 impl ChiGenerator {
-    pub(crate) fn new(chi: F128b) -> ChiGenerator {
+    pub(crate) fn new(chi: FLambda) -> ChiGenerator {
         ChiGenerator {
             chi,
-            power_of_chi: F128b::ONE,
+            power_of_chi: FLambda::ONE,
         }
     }
 
-    pub(crate) fn next(&mut self) -> F128b {
+    pub(crate) fn next(&mut self) -> FLambda {
         self.power_of_chi *= self.chi;
         self.power_of_chi
     }

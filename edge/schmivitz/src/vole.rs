@@ -11,9 +11,10 @@ use crypto_primitives::Chall3;
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::Result;
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field_binary::{F2, F8b};
+use swanky_serialization::CanonicalSerialize;
 
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{FLambda, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;
@@ -23,6 +24,35 @@ pub(crate) mod convert_to_vole;
 pub(crate) mod crypto_primitives;
 pub mod functionality;
 pub(crate) mod integration;
+
+/// Lift a $`\tau`$-length vector of [`F8b`] VOLE tags into a single [`FLambda`] element.
+///
+/// Each of the $`\tau`$ small-field VOLE instances contributes one [`F8b`] tag per correlation
+/// (see [`RandomVoleV::witness_voles()`]), but the degree-2 proof of Baum et al. Figure 7 works
+/// over $`\mathbb F_{2^\lambda}`$ and needs them as single elements.
+///
+/// Any $`\mathbb F_2`$-linear bijection is a valid choice here. The VOLE relation
+/// $`q = u \Delta + v`$ has $`u \in \mathbb F_2`$, so lifting each of $`u`$, $`v`$, $`q`$ and
+/// $`\Delta`$ with the same map preserves it; every later operation happens entirely inside
+/// [`FLambda`], identically on the prover's and the verifier's side.
+///
+/// We use the map that reads the $`\tau`$ tags as the low-to-high polynomial coefficients of the
+/// result, which makes the lift a byte copy: byte `i` of an [`FLambda`] holds exactly the
+/// coefficients of the `i`th [`F8b`].
+///
+/// Note that this is deliberately *not* the $`\mathbb F_{2^8}`$-tower isomorphism that
+/// [`swanky_field::IsSubFieldOf`] provides via `F8b::form_superfield`. That map is additionally a
+/// *ring* homomorphism, which this protocol never needs, and it costs a change-of-basis matrix
+/// multiply per lift rather than a copy.
+pub(crate) fn lift(tags: &[F8b; REPETITION_PARAM]) -> FLambda {
+    // Since `REPETITION_PARAM * VOLE_SIZE_PARAM == SECURITY_PARAM`, there is exactly one tag byte
+    // per byte of an `FLambda`.
+    let bytes: [u8; REPETITION_PARAM] = tags.map(|tag| tag.to_bytes()[0]);
+
+    // This unwrap is safe because the length is fixed and deserializing a binary field element
+    // cannot fail.
+    FLambda::from_bytes(&bytes.into()).unwrap()
+}
 
 /// Trait capturing the interface of serializable/deserializable Decommitment
 pub trait DecommitmentSerde {
@@ -116,26 +146,26 @@ where
     fn witness_mask(&self) -> &[F2];
 
     /// Gets the VOLE values ($`u_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// embedded into [`F128b`] from [`F2`].
+    /// embedded into [`FLambda`] from [`F2`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde a`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVoleP::witness_mask()`].
-    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+    fn aggregate_commitment_values(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// lifted into [`F128b`] from `[`[`F8b`]`; 16]`.
+    /// lifted into [`FLambda`] from `[`[`F8b`]`; 16]`.
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde b`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVoleP::witness_mask()`].
-    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+    fn aggregate_commitment_masks(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
-    /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
+    /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`FLambda`] from
     /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
@@ -143,7 +173,7 @@ where
     ///
     /// The index `i` must be in the range $`[0, \ell)`$, where $`\ell`$ is the
     /// value returned by [`RandomVoleP::extended_witness_length()`].
-    fn vole_mask(&self, i: usize) -> Result<F128b>;
+    fn vole_mask(&self, i: usize) -> Result<FLambda>;
 
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
@@ -189,7 +219,7 @@ pub trait RandomVoleV {
     fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM];
 
     /// Get the lifted verifier key $`\Delta`$.
-    fn verifier_key(&self) -> F128b;
+    fn verifier_key(&self) -> FLambda;
 
     /// Get the value tags corresponding to the witness $`\mathbf Q_{[0..\ell)}`$,
     /// where $`\ell`$ is the [`Self::extended_witness_length`].
@@ -199,5 +229,5 @@ pub trait RandomVoleV {
     /// $`\mathbf Q_{[\ell..\ell + \lambda)}`$, where $`\ell`$ is the
     /// [`Self::extended_witness_length`] and $`\lambda`$ is the security
     /// parameter (and equal to [`REPETITION_PARAM`]` * `[`VOLE_SIZE_PARAM`]).
-    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+    fn mask_voles(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM];
 }

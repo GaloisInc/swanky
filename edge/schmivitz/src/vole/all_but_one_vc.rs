@@ -83,6 +83,10 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
         let n_previous_level = 1 << (d - 1);
         for j in 0..n_previous_level {
             let mut prg = Prg::new_no_iv(ks.get(d - 1, j));
+            // FIXME(hamlinb): This likely generates more bits than necessary (by 4x, since
+            // generating `[u8; N]` generates N u64s). Additionally, skipping PRG bits does not
+            // match the spec (see v1.1, Fig. 5.1). See the note about `[T; n]` here:
+            // https://docs.rs/rand/latest/rand/distr/struct.StandardUniform.html.
             let (t1, t2) = prg.random();
             ks.set(d, j * 2, t1);
             ks.set(d, j * 2 + 1, t2);
@@ -175,7 +179,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<See
 
     let (cop, com_j) = pdecom;
 
-    let mut coms = vec![Com::default(); 1 << d];
+    let mut coms: Vec<Com> = vec![std::array::from_fn(|_| Default::default()); 1 << d];
     // The seeds computed by `reconstruct` have one the same number of seeds with
     // a default seed in the delta position.
     let mut seeds = vec![Seed::default(); 1 << d];
@@ -230,8 +234,10 @@ pub(crate) fn verify(h_com: Com, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result
 
 #[cfg(test)]
 mod test {
-    use super::{IV, Key, Seed, commit, num_rec, open, reconstruct, verify};
+    use super::{IV, Key, commit, num_rec, open, reconstruct, verify};
     use proptest::prelude::*;
+
+    use crate::parameters::SECURITY_PARAM;
 
     #[test]
     fn test_num_rec_at_len_4() {
@@ -321,13 +327,10 @@ mod test {
         #[test]
         fn test_1_vc_works_on_randomized_input(
             ref j in prop::collection::vec(any::<bool>(), 8),
-            ref rand_arr in prop::array::uniform32(any::<u8>()))
-        {
-            // setup random iv and r:
-            let iv : IV = rand_arr[0..16].try_into().unwrap() ;
-            let r : Seed = rand_arr[16..32].try_into().unwrap();
-
-            // Test
+            iv in prop::array::uniform16(any::<u8>()),
+            key in prop::collection::vec(any::<u8>(), SECURITY_PARAM / 8),
+        ) {
+            let r: [u8; SECURITY_PARAM / 8] = key.try_into().unwrap();
             test_1_vc_correctness(r, iv, j.to_vec())?;
         }
     }
