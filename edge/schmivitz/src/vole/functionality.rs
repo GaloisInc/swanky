@@ -265,7 +265,7 @@ impl VoleVerifier {
 
         // lines 3-4
         let t = std::time::Instant::now();
-        let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(*l));
+        let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(*extended_witness_len));
         log::info!("vole_reconstruct running time: {:?}", t.elapsed());
 
         // line 5
@@ -273,13 +273,13 @@ impl VoleVerifier {
 
         // lines 6-14
         let t = std::time::Instant::now();
-        let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
+        let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*extended_witness_len));
         log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
 
         // line 15
         // hash column-wise Q\tilda + D\tilda
         let t = std::time::Instant::now();
-        let hasher = VoleHasher::from_seed(chall1, *l);
+        let hasher = VoleHasher::from_seed(chall1, *extended_witness_len);
         let q_tilda = hasher
             .hash_matrix(&q_f8arrs)
             .iter()
@@ -310,14 +310,14 @@ impl VoleVerifier {
 
         // Truncate the qs (part of line 19)
         let mut q = q_f8arrs;
-        q.truncate(l + SECURITY_PARAM);
+        q.truncate(extended_witness_len + SECURITY_PARAM);
 
         Self {
             q,
             u_tilda: *u_tilda,
             h_v,
             delta,
-            l: *l,
+            l: *extended_witness_len,
         }
     }
 
