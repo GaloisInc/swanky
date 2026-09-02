@@ -345,7 +345,7 @@ _MISSING_DOCS_QUERY = """
 def _tree_sitter_rust_language() -> tree_sitter.Language:
     so_paths = []
     for entry in os.environ["buildInputs"].split():
-        if "tree-sitter-rust-grammar" in entry:
+        if "tree-sitter-rust" in entry:
             so_paths.append(entry)
     if len(so_paths) != 1:
         raise Exception(
@@ -374,7 +374,7 @@ def _contains_deny_missing_docs(code: bytes) -> bool:
         assert _MISSING_DOCS_PARSER is not None
         return (
             len(
-                _MISSING_DOCS_QUERY_OBJ.captures(
+                tree_sitter.QueryCursor(_MISSING_DOCS_QUERY_OBJ).captures(
                     _MISSING_DOCS_PARSER.parse(code).root_node
                 )
             )
