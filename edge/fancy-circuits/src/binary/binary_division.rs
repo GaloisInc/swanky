@@ -1,6 +1,8 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryAddition, BinaryConstant, BinaryMultiplex, BinaryTwosComplement},
+    binary::{
+        BinaryAddition, BinaryConstant, BinaryLeftShiftPad, BinaryMultiplex, BinaryTwosComplement,
+    },
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
@@ -38,8 +40,7 @@ where
         let mut acc = BinaryConstant::new(0, xs.len()).execute(backend, (), channel)?;
         let mut qs = BinaryBundle::new(Vec::new());
         for x in xs.iter().rev() {
-            acc.pop();
-            acc.insert(0, x.clone());
+            acc = BinaryLeftShiftPad::new().execute(backend, (&acc, 1, x), channel)?;
             let (res, cout) =
                 BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
             acc = BinaryMultiplex::new().execute(backend, (cout.clone(), &acc, &res), channel)?;

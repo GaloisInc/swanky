@@ -27,11 +27,6 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.len() == 0
     }
 
-    /// Insert a wire from the Bundle
-    pub(crate) fn insert(&mut self, wire_index: usize, val: W) {
-        self.0.insert(wire_index, val)
-    }
-
     /// push a wire onto the Bundle.
     pub(crate) fn push(&mut self, val: W) {
         self.0.push(val);
