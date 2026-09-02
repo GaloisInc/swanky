@@ -53,7 +53,7 @@ where
             .collect::<Result<_>>()
             .map(BinaryBundle::new)?;
 
-        sum.pad(&zero, 1);
+        sum.push(zero);
 
         for (i, ywire) in ywires.iter().enumerate().take(xwires.len()).skip(1) {
             let mul = xwires

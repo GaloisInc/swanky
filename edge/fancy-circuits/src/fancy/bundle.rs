@@ -27,13 +27,6 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.len() == 0
     }
 
-    /// Pad the Bundle with val, n times.
-    pub(crate) fn pad(&mut self, val: &W, n: usize) {
-        for _ in 0..n {
-            self.0.push(val.clone());
-        }
-    }
-
     /// Insert a wire from the Bundle
     pub(crate) fn insert(&mut self, wire_index: usize, val: W) {
         self.0.insert(wire_index, val)
