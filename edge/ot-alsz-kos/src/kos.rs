@@ -3,13 +3,12 @@
 
 use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, SeedableRng};
-use std::io::ErrorKind;
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver as OtReceiver, Sender as OtSender,
@@ -35,7 +34,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         channel: &mut C,
         m: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>> {
         let m = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
         } else {
@@ -46,7 +45,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         // Check correlation
         let mut seed = Block::default();
         rng.fill_bytes(seed.as_mut());
-        let seed = swanky_cointoss::send(channel, &[seed])?;
+        let seed = swanky_cointoss::send(channel, &[seed])
+            .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let mut rng = SwankyRng::from_seed(seed[0]);
         let mut check = (Block::default(), Block::default());
         let mut chi = Block::default();
@@ -58,17 +58,22 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let [lo, hi] = q.carryless_mul_wide(chi);
             check = swanky_deprecated_bitwise_utils::xor_two_blocks(&check, &(lo, hi));
         }
-        let x = channel.read_block()?;
-        let t0 = channel.read_block()?;
-        let t1 = channel.read_block()?;
+        let x = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+        let t0 = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+        let t1 = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let [lo, hi] = x.carryless_mul_wide(self.ot.s_);
         let check = swanky_deprecated_bitwise_utils::xor_two_blocks(&check, &(lo, hi));
-        if check != (t0, t1) {
-            return Err(Error::from(std::io::Error::new(
-                ErrorKind::InvalidData,
-                "Consistency check failed",
-            )));
-        }
+        ensure!(
+            check == (t0, t1),
+            ErrorKind::OtherError,
+            "Consistency check failed"
+        );
         Ok(qs)
     }
 }
@@ -78,7 +83,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> FixedKeyInitializer for Sender<OT>
         channel: &mut C,
         s_: [u8; 16],
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = AlszSender::<OT>::init_fixed_key(channel, s_, rng)?;
         Ok(Self { ot })
     }
@@ -90,7 +95,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = AlszSender::<OT>::init(channel, rng)?;
         Ok(Self { ot })
     }
@@ -100,7 +105,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
         channel: &mut C,
         inputs: &[(Block, Block)],
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let m = inputs.len();
         let qs = self.send_setup(channel, m, rng)?;
         // Output result
@@ -113,10 +118,16 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
             let q = q ^ self.ot.s_;
             let y1 =
                 TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ input.1;
-            channel.write_block(&y0)?;
-            channel.write_block(&y1)?;
+            channel
+                .write_block(&y0)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+            channel
+                .write_block(&y1)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
 }
@@ -128,7 +139,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
         m: usize,
         delta: Self::Msg,
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let qs = self.send_setup(channel, m, rng)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
@@ -139,10 +150,14 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
             let x1 = x0 ^ delta;
             let q = q ^ self.ot.s_;
             let y = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ x1;
-            channel.write_block(&y)?;
+            channel
+                .write_block(&y)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             out.push(x0);
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(out)
     }
 }
@@ -153,7 +168,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
         channel: &mut C,
         m: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
+    ) -> Result<Vec<(Self::Msg, Self::Msg)>> {
         let qs = self.send_setup(channel, m, rng)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
@@ -181,7 +196,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>> {
         let m = inputs.len();
         let m = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
@@ -195,7 +210,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         // Check correlation
         let mut seed = Block::default();
         rng.fill_bytes(seed.as_mut());
-        let seed = swanky_cointoss::receive(channel, &[seed])?;
+        let seed = swanky_cointoss::receive(channel, &[seed])
+            .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let mut rng = SwankyRng::from_seed(seed[0]);
         let mut x = Block::default();
         let mut t = (Block::default(), Block::default());
@@ -210,10 +226,18 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             let [lo, hi] = tj.carryless_mul_wide(chi);
             t = swanky_deprecated_bitwise_utils::xor_two_blocks(&t, &(lo, hi));
         }
-        channel.write_block(&x)?;
-        channel.write_block(&t.0)?;
-        channel.write_block(&t.1)?;
-        channel.flush()?;
+        channel
+            .write_block(&x)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        channel
+            .write_block(&t.0)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        channel
+            .write_block(&t.1)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(ts)
     }
 }
@@ -224,7 +248,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = AlszReceiver::<OT>::init(channel, rng)?;
         Ok(Self { ot })
     }
@@ -234,15 +258,19 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
         channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
+    ) -> Result<Vec<Block>> {
         let ts = self.receive_setup(channel, inputs, rng)?;
         // Output result
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y0 = channel.read_block()?;
-            let y1 = channel.read_block()?;
+            let y0 = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+            let y1 = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ TweakableCircularCorrelationRobustHash::fixed_key()
                 .hash(Block::from(t), j as u128);
@@ -258,13 +286,15 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
         channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let ts = self.receive_setup(channel, inputs, rng)?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y = channel.read_block()?;
+            let y = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if *b { y } else { Block::default() };
             let h =
                 TweakableCircularCorrelationRobustHash::fixed_key().hash(Block::from(t), j as u128);
@@ -280,7 +310,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
         channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let ts = self.receive_setup(channel, inputs, rng)?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {

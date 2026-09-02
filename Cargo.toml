@@ -46,7 +46,6 @@ members = [
   "edge/mac-n-cheese/vole",
   "edge/mac-n-cheese/wire-map",
   "edge/malicious-hooks",
-  "edge/ocelot-error",
   "edge/oprf-kkrt",
   "edge/oprf-kmprt",
   "edge/oprf-traits",
@@ -126,7 +125,6 @@ swanky-field-test = { path = "edge/field-test" }
 swanky-flatbuffer-build = { path = "edge/flatbuffer-build" }
 swanky-malicious-hooks = { path = "edge/malicious-hooks" }
 swanky-garbled-nn = { path = "edge/garbled-nn" }
-swanky-ocelot-error = { path = "edge/ocelot-error" }
 swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
 swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
 swanky-oprf-traits = { path = "edge/oprf-traits" }

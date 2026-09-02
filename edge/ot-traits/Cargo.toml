@@ -11,7 +11,7 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-rand.workspace = true
 swanky-channel-legacy.workspace = true
-swanky-ocelot-error.workspace = true
+swanky-error.workspace = true
 
+rand.workspace = true

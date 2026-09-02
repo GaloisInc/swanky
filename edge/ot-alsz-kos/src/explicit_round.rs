@@ -9,7 +9,7 @@ use std::convert::TryInto;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_rng::SwankyRng;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16, U64x2, array_utils::ArrayUnrolledExt};
 
@@ -53,7 +53,7 @@ impl AlszSender {
     >(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let s: u128 = rng.random();
         let mut ot = BaseOtReceiver::init(channel, rng)?;
         // We need to make a vector of bools in order to use the BaseOt API.
@@ -83,7 +83,7 @@ impl AlszSender {
         m: usize,
         selector: u64,
         mut incoming_bytes: &[u8],
-    ) -> Result<BorrowedAllocation<'a, u8>, Error> {
+    ) -> Result<BorrowedAllocation<'a, u8>> {
         const NROWS: usize = 128;
         let ncols = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
@@ -95,13 +95,13 @@ impl AlszSender {
         for (j, aes) in self.rngs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let q = &mut qs[range];
-            if incoming_bytes.len() < u_len {
-                return Err(Error::Other(format!(
-                    "{} bytes were need for AlszSender::send_setup, but only {} remain",
-                    u_len,
-                    incoming_bytes.len()
-                )));
-            }
+            ensure!(
+                incoming_bytes.len() >= u_len,
+                ErrorKind::OtherError,
+                "{} bytes were need for AlszSender::send_setup, but only {} remain",
+                u_len,
+                incoming_bytes.len()
+            );
             let u = &incoming_bytes[0..u_len];
             incoming_bytes = &incoming_bytes[u_len..];
             fill_rng_with_selector(aes, selector, q);
@@ -111,12 +111,12 @@ impl AlszSender {
                 swanky_bytearray_utils::xor_inplace(q, u);
             }
         }
-        if !incoming_bytes.is_empty() {
-            return Err(Error::Other(format!(
-                "{} extra bytes were given to AlszSender::send_setup",
-                incoming_bytes.len()
-            )));
-        }
+        ensure!(
+            incoming_bytes.is_empty(),
+            ErrorKind::OtherError,
+            "{} extra bytes were given to AlszSender::send_setup",
+            incoming_bytes.len(),
+        );
         let mut dst = arena.alloc_slice_fill_with(qs.len(), |_| 0);
         swanky_bit_matrix_transpose::transpose_pre_allocated(&qs, &mut dst, NROWS, ncols);
         Ok(dst)
@@ -137,7 +137,7 @@ impl AlszReceiver {
     >(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut ot = BaseOtSender::init(channel, rng)?;
         let mut seeds = Vec::with_capacity(128);
         for _ in 0..128 {
@@ -165,7 +165,7 @@ impl AlszReceiver {
         m: usize,
         mut outgoing_bytes: &mut [u8],
         selector: u64,
-    ) -> Result<BorrowedAllocation<'a, u8>, Error> {
+    ) -> Result<BorrowedAllocation<'a, u8>> {
         let ncols = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
         } else {
@@ -176,13 +176,13 @@ impl AlszReceiver {
         for (j, (rng0, rng1)) in self.rngs.iter().enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let t = &mut ts[range];
-            if outgoing_bytes.len() < g_len {
-                return Err(Error::Other(format!(
-                    "{} bytes were need for AlszReceiver::receive_setup(), but only {} remain",
-                    g_len,
-                    outgoing_bytes.len()
-                )));
-            }
+            ensure!(
+                outgoing_bytes.len() >= g_len,
+                ErrorKind::OtherError,
+                "{} bytes were need for AlszReceiver::receive_setup(), but only {} remain",
+                g_len,
+                outgoing_bytes.len()
+            );
             let (g, remaining) = outgoing_bytes.split_at_mut(g_len);
             outgoing_bytes = remaining;
             fill_rng_with_selector(rng0, selector, t);
@@ -190,12 +190,12 @@ impl AlszReceiver {
             swanky_bytearray_utils::xor_inplace(g, t);
             swanky_bytearray_utils::xor_inplace(g, r);
         }
-        if !outgoing_bytes.is_empty() {
-            return Err(Error::Other(format!(
-                "{} extra bytes were given to AlszReceiver::receive_setup",
-                outgoing_bytes.len()
-            )));
-        }
+        ensure!(
+            outgoing_bytes.is_empty(),
+            ErrorKind::OtherError,
+            "{} extra bytes were given to AlszReceiver::receive_setup",
+            outgoing_bytes.len()
+        );
         let mut dst = arena.alloc_slice_fill_with(ts.len(), |_| 0);
         swanky_bit_matrix_transpose::transpose_pre_allocated(&ts, &mut dst, NROWS, ncols);
         Ok(dst)
@@ -215,7 +215,7 @@ impl KosSender {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         Ok(KosSender {
             alsz: AlszSender::init::<_, _, swanky_ot_chou_orlandi::Receiver>(channel, rng)?,
         })
@@ -255,7 +255,7 @@ impl KosSender {
         rng: &mut impl CryptoRng,
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
-    ) -> Result<KosSenderStage2, Error> {
+    ) -> Result<KosSenderStage2> {
         let aes_hash = TweakableCircularCorrelationRobustHash::fixed_key();
         let num_inputs = inputs.len();
         let m = if !num_inputs.is_multiple_of(8) {
@@ -263,18 +263,18 @@ impl KosSender {
         } else {
             num_inputs
         };
-        if incoming_bytes.len() != Self::send_incoming_bytes(num_inputs) {
-            return Err(Error::Other(format!(
-                "KosSender::send unexpected incoming_bytes length {}",
-                incoming_bytes.len()
-            )));
-        }
-        if outgoing_bytes.len() != Self::send_outgoing_bytes(num_inputs) {
-            return Err(Error::Other(format!(
-                "KosSender::send unexpected outgoing length {}",
-                outgoing_bytes.len()
-            )));
-        }
+        ensure!(
+            incoming_bytes.len() == Self::send_incoming_bytes(num_inputs),
+            ErrorKind::OtherError,
+            "KosSender::send unexpected incoming_bytes length {}",
+            incoming_bytes.len()
+        );
+        ensure!(
+            outgoing_bytes.len() == Self::send_outgoing_bytes(num_inputs),
+            ErrorKind::OtherError,
+            "KosSender::send unexpected outgoing length {}",
+            outgoing_bytes.len()
+        );
         let ncols = m + 128 + SSP;
         let alsz_bytes = AlszSender::send_setup_input_bytes(ncols);
         let qs = self
@@ -320,13 +320,13 @@ impl KosSenderStage2 {
     pub const INCOMING_BYTES: usize = 16 * 4; // cointoss reveal, x, t0, t1
     /// Execute round two of the `KosSender` protocol. `incoming` contains the incoming bytes sent
     /// from the receiver. `arena` must be the same arena passed to the `send` function.
-    pub fn stage2(self, arena: &KeyedArena, incoming: &[u8]) -> Result<(), Error> {
-        if incoming.len() != Self::INCOMING_BYTES {
-            return Err(Error::Other(format!(
-                "Unexpected incoming bytes to KosSenderStage2: {}",
-                incoming.len()
-            )));
-        }
+    pub fn stage2(self, arena: &KeyedArena, incoming: &[u8]) -> Result<()> {
+        ensure!(
+            incoming.len() == Self::INCOMING_BYTES,
+            ErrorKind::OtherError,
+            "Unexpected incoming bytes to KosSenderStage2: {}",
+            incoming.len()
+        );
         let incoming_seed: [u8; 16] = incoming[0..16].try_into().unwrap();
         let x: [u8; 16] = incoming[16..32].try_into().unwrap();
         let t0: [u8; 16] = incoming[32..48].try_into().unwrap();
@@ -335,12 +335,13 @@ impl KosSenderStage2 {
         let t0 = Block::from(t0);
         let t1 = Block::from(t1);
         // This isn't doing a constant-time comparison, and that's okay.
-        // The commitment that the other party gave us isn't private to them (they gave it to us).
-        if blake3::hash(&incoming_seed).as_bytes() != self.incoming_commitment.as_slice() {
-            return Err(Error::Other(
-                "KosSenderStage2 reciever lied in cointoss".to_string(),
-            ));
-        }
+        // The commitment that the other party gave us isn't private to them
+        // (they gave it to us).
+        ensure!(
+            blake3::hash(&incoming_seed).as_bytes() == self.incoming_commitment.as_slice(),
+            ErrorKind::OtherError,
+            "KosSenderStage2 reciever lied in cointoss"
+        );
         let mut rng = SwankyRng::from_seed(Block::from(self.our_seed) ^ Block::from(incoming_seed));
         let mut check = (Block::default(), Block::default());
         let mut chi = Block::default();
@@ -354,11 +355,11 @@ impl KosSenderStage2 {
         }
         let [lo, hi] = x.carryless_mul_wide(self.ot_s);
         check = (check.0 ^ lo, check.1 ^ hi);
-        if check != (t0, t1) {
-            return Err(Error::Other(
-                "KosSenderStage2 consistency check failed".to_string(),
-            ));
-        }
+        ensure!(
+            check == (t0, t1),
+            ErrorKind::OtherError,
+            "KosSenderStage2 consistency check failed"
+        );
         Ok(())
     }
 }
@@ -373,7 +374,7 @@ impl KosReceiver {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         Ok(KosReceiver {
             alsz: AlszReceiver::init::<_, _, swanky_ot_chou_orlandi::Sender>(channel, rng)?,
         })
@@ -392,13 +393,13 @@ impl KosReceiver {
         choices: BorrowedAllocation<bool>,
         rng: &mut RNG,
         mut outgoing_bytes: &mut [u8],
-    ) -> Result<KosReceiverStage2, Error> {
-        if outgoing_bytes.len() != Self::receive_outgoing_bytes(choices.len()) {
-            return Err(Error::Other(format!(
-                "KosReceiver::receive unexpected outgoing length {}",
-                outgoing_bytes.len()
-            )));
-        }
+    ) -> Result<KosReceiverStage2> {
+        ensure!(
+            outgoing_bytes.len() == Self::receive_outgoing_bytes(choices.len()),
+            ErrorKind::OtherError,
+            "KosReceiver::receive unexpected outgoing length {}",
+            outgoing_bytes.len()
+        );
         let m = choices.len();
         let m = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
@@ -468,23 +469,23 @@ impl KosReceiverStage2 {
         arena: &'a KeyedArena,
         mut incoming: &[u8],
         outgoing: &mut [u8],
-    ) -> Result<BorrowedAllocation<'a, Block>, Error> {
+    ) -> Result<BorrowedAllocation<'a, Block>> {
         let aes_hash = TweakableCircularCorrelationRobustHash::fixed_key();
         let choices = arena.borrow_mut(self.choices);
         let ts = arena.borrow_mut(self.ts);
         let r_ = arena.borrow_mut(self.r_);
-        if outgoing.len() != Self::OUTGOING_BYTES {
-            return Err(Error::Other(format!(
-                "KosReceiverStage2::stage2 unexpected outgoing length {}",
-                outgoing.len()
-            )));
-        }
-        if incoming.len() != Self::incoming_bytes(choices.len()) {
-            return Err(Error::Other(format!(
-                "KosReceiverStage2::stage2 unexpected incoming length {}",
-                incoming.len()
-            )));
-        }
+        ensure!(
+            outgoing.len() == Self::OUTGOING_BYTES,
+            ErrorKind::OtherError,
+            "KosReceiverStage2::stage2 unexpected outgoing length {}",
+            outgoing.len()
+        );
+        ensure!(
+            incoming.len() == Self::incoming_bytes(choices.len()),
+            ErrorKind::OtherError,
+            "KosReceiverStage2::stage2 unexpected incoming length {}",
+            incoming.len()
+        );
         let their_seed: [u8; 16] = incoming[0..16].try_into().unwrap();
         incoming = &incoming[16..];
         let mut rng = SwankyRng::from_seed(Block::from(their_seed) ^ self.our_seed);

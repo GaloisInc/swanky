@@ -7,17 +7,11 @@ use std::collections::HashSet;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 mod cuckoo;
-
-impl From<cuckoo::Error> for Error {
-    fn from(e: cuckoo::Error) -> Error {
-        Error::Other(format!("Cuckoo hash error: {e}"))
-    }
-}
 
 // Number of times to iterate when creating the sender's hash table.
 const N_TABLE_LOOPS: usize = 128;
@@ -70,7 +64,7 @@ struct Parameters {
 }
 
 impl Parameters {
-    pub fn new(n: usize) -> Result<Self, Error> {
+    pub fn new(n: usize) -> Result<Self> {
         let (m1, m2, beta1, beta2, h1, h2) = if n <= 1 << 12 {
             (1.17, 0.15, 27, 63, 3, 2)
         } else if n <= 1 << 14 {
@@ -82,7 +76,7 @@ impl Parameters {
         } else if n <= 1 << 24 {
             (1.12, 0.17, 31, 63, 3, 2)
         } else {
-            return Err(Error::InvalidInputLength);
+            bail!(ErrorKind::CorrelationFailure, "Invalid input length");
         };
         let m1 = ((n as f32) * m1).ceil() as usize;
         let m2 = ((n as f32) * m2).ceil() as usize;
@@ -110,7 +104,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     Sender<OPRF>
 {
     /// Initialize the OPPRF sender.
-    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -127,7 +121,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         points: &[(Block, Block512)],
         ninputs: usize,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -136,7 +130,9 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
-            let h = channel.read_block()?;
+            let h = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let aes = Aes128EncryptOnly::new_with_key(h);
             hashkeys.push(aes);
         }
@@ -197,7 +193,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         points: Vec<(Block, Block512)>,
         npoints: usize,
         rng: &mut RNG,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -250,7 +246,9 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
             if map.len() == points.len() {
                 // Success! Send `m` to the receiver and exit the loop.
-                channel.write_usize(m)?;
+                channel
+                    .write_usize(m)
+                    .wrap_err(ErrorKind::NetworkError, "Unable to write usize")?;
                 break;
             }
             // Failure :-(. Increment `offset` and try again.
@@ -268,11 +266,17 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
         }
         // Send `v` and `table` to the receiver.
-        channel.write_block(&v)?;
+        channel
+            .write_block(&v)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         for entry in table.iter() {
-            channel.write_block512(entry)?;
+            channel
+                .write_block512(entry)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block512")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
 
@@ -304,7 +308,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     Receiver<OPRF>
 {
     /// Initialize the OPPRF receiver.
-    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -319,7 +323,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         channel: &mut C,
         inputs: &[Block],
         rng: &mut RNG,
-    ) -> Result<Vec<Block512>, Error>
+    ) -> Result<Vec<Block512>>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -345,9 +349,13 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 table = table_;
                 // Send `hashkeys` to the sender.
                 for h in hashkeys.into_iter() {
-                    channel.write_block(&h)?;
+                    channel
+                        .write_block(&h)
+                        .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
                 }
-                channel.flush()?;
+                channel
+                    .flush()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
                 break;
             }
         }
@@ -371,12 +379,18 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 
         let zero = Block512::default();
         for (item, output) in table.items.into_iter().zip(oprf_outputs) {
-            let m = channel.read_usize()?;
-            let v = channel.read_block()?;
+            let m = channel
+                .read_usize()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read usize")?;
+            let v = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let h = hash_output(v, output, m);
             let mut output = output;
             for i in 0..m {
-                let entry = channel.read_block512()?;
+                let entry = channel
+                    .read_block512()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read block512")?;
                 output ^= if i == h { entry } else { zero };
             }
             if let Some(item) = item {
