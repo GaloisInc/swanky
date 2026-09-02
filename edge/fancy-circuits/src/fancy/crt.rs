@@ -108,12 +108,6 @@ impl<W: Clone + HasModulus> DerefMut for CrtBundle<W> {
     }
 }
 
-impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
-    fn from(b: Bundle<W>) -> CrtBundle<W> {
-        CrtBundle(b)
-    }
-}
-
 impl<F: FancyArithmetic + FancyBinary + FancyEncode + FancyOutput> CrtGadgets for F {}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
