@@ -30,3 +30,7 @@ criterion.workspace = true
 [[bench]]
 name = "f128b"
 harness = false
+
+[[bench]]
+name = "f256b"
+harness = false
