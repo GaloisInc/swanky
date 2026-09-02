@@ -21,6 +21,8 @@ fancy-plaintext.workspace = true
 fancy-traits.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
+swanky-field.workspace = true
+swanky-field-binary.workspace = true
 
 rand.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }

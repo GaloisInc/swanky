@@ -12,7 +12,7 @@ use fancy_circuits::crypto::aes::Aes128;
 use fancy_circuits::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
 };
-use fancy_circuits::test_circuits::fancy::TestBinaryConstant;
+use fancy_circuits::test_circuits::fancy_binary_constant::TestBinaryConstant;
 use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
 use rand::RngExt;

@@ -7,7 +7,7 @@ use crate::{
     util::product,
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj};
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyConstant, FancyProj};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -26,7 +26,8 @@ impl<'a> Division<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for Division<'a>
+impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets + FancyConstant> Circuit<F>
+    for Division<'a>
 where
     F::Item: 'a,
 {

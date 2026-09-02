@@ -9,7 +9,6 @@ if __name__ == "__main__":
         import logging
 
         import rich.traceback
-        import rich_click.patch
         from rich.logging import RichHandler
 
         rich.traceback.install(show_locals=True)
@@ -20,8 +19,6 @@ if __name__ == "__main__":
             datefmt="[%X]",
             handlers=[RichHandler(rich_tracebacks=True)],
         )
-
-        rich_click.patch.patch()
 
         from etc.main import main
 

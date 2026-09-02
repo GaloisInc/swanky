@@ -21,8 +21,8 @@ mod tests {
     use fancy_garbling::{AllWire, WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
-        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyEncode,
-        FancyOutput, FancyProj,
+        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyConstant,
+        FancyEncode, FancyOutput, FancyProj,
     };
     use rand::RngExt;
     use swanky_channel::Channel;
@@ -72,7 +72,7 @@ mod tests {
             TestCircuit(PhantomData)
         }
     }
-    impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for TestCircuit<'a>
+    impl<'a, F: FancyConstant + FancyArithmetic + FancyProj> Circuit<F> for TestCircuit<'a>
     where
         F::Item: 'a,
     {

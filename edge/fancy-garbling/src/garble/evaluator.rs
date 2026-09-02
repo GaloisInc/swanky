@@ -7,10 +7,12 @@ use crate::{
     wire::WireLabel,
 };
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus, is_binary,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
+use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
 /// Streaming evaluator using a callback to receive ciphertexts as needed.
@@ -25,15 +27,14 @@ pub struct Evaluator<Wire> {
 
 impl<Wire: WireLabel> Evaluator<Wire> {
     /// Create a new [`Evaluator`].
-    pub fn new(channel: &mut Channel) -> swanky_error::Result<Self> {
-        // Receive the constant one wirelabel from the garbler. This is used to
-        // make negation free.
-        let one = channel.read::<U8x16>()?;
-        Ok(Evaluator {
-            one: Wire::from_repr(one, 2),
+    pub fn new() -> Self {
+        // We set the constant `1` wirelabel to simply be `1`.
+        let one = Wire::from_repr(U8x16::from(1u128), 2);
+        Evaluator {
+            one,
             current_gate: 0,
             current_output: 0,
-        })
+        }
     }
 
     /// The current non-free gate index of the garbling computation.
@@ -51,8 +52,13 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     }
 }
 
+impl<Wire: WireLabel> Default for Evaluator<Wire> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
-    /// Negate is a noop for the evaluator
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         *x + self.one
     }
@@ -207,9 +213,22 @@ impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
 
 impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
+}
 
+impl<Wire: WireLabel> FancyConstant for Evaluator<Wire> {
     fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         Ok(Wire::from_repr(channel.read()?, q))
+    }
+}
+
+impl<Wire: WireLabel> FancyBinaryConstant for Evaluator<Wire> {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        if x.into() {
+            self.one.clone()
+        } else {
+            // We use the "null" wirelabel to represent zero.
+            Default::default()
+        }
     }
 }
 

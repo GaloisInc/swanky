@@ -1,4 +1,4 @@
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -19,7 +19,7 @@ pub struct BinaryCircuit {
     output_refs: Vec<u32>,
 }
 
-impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryCircuit {
     type Input = Vec<F::Item>;
     type Output = Vec<F::Item>;
 
@@ -56,7 +56,7 @@ impl<F: FancyBinary> Circuit<F> for BinaryCircuit {
     }
 }
 
-impl<F: FancyBinary> CircuitInputMapper<F> for BinaryCircuit {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BinaryCircuit {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.ninputs);
         inputs

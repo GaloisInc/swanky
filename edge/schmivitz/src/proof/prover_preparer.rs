@@ -1,4 +1,6 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -130,11 +132,11 @@ impl<'a> FieldBackend<F2> for ProverPreparer<'a> {
 
 impl<'a> Fancy for ProverPreparer<'a> {
     type Item = Wire;
+}
 
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-        Ok(Wire(F2::from(value != 0)))
+impl<'a> FancyBinaryConstant for ProverPreparer<'a> {
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        Wire(constant)
     }
 }
 
