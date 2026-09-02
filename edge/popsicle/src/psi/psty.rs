@@ -457,6 +457,7 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyBinaryConstant>(
 
     for b in eqs.into_iter() {
         let b_ws = one
+            .wires()
             .iter()
             .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;

@@ -923,6 +923,7 @@ fn fancy_compute_payload_aggregate<F: FancyConstant + FancyArithmetic + FancyPro
 
     for (i, b) in eqs.iter().enumerate() {
         let b_ws = one
+            .wires()
             .iter()
             .map(|w| f.mul(w, b, channel))
             .collect::<swanky_error::Result<Vec<F::Item>>>()?;

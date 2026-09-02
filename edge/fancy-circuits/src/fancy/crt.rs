@@ -21,7 +21,7 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
 
     // /// Return the moduli of all the wires in the bundle.
     pub(crate) fn moduli(&self) -> Vec<u16> {
-        self.0.iter().map(HasModulus::modulus).collect()
+        self.wires().iter().map(HasModulus::modulus).collect()
     }
 
     /// Returns a new bundle only containing wires with matching moduli.
@@ -38,14 +38,15 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
         Self::new(new_ws)
     }
 
-    /// Extract the underlying bundle from this CRT bundle.
-    pub fn extract(self) -> Bundle<W> {
-        self.0
-    }
-
     /// Return the product of all the wires' moduli.
     pub fn composite_modulus(&self) -> u128 {
-        util::product(&self.iter().map(HasModulus::modulus).collect::<Vec<_>>())
+        util::product(
+            &self
+                .wires()
+                .iter()
+                .map(HasModulus::modulus)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 

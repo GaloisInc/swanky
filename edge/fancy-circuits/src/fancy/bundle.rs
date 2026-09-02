@@ -37,11 +37,6 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.0.pop()
     }
 
-    /// Access the underlying iterator
-    pub fn iter(&self) -> std::slice::Iter<'_, W> {
-        self.0.iter()
-    }
-
     /// Reverse the wires
     pub(crate) fn reverse(&mut self) {
         self.0.reverse();

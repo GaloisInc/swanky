@@ -71,6 +71,7 @@ where
             let c = backend.and(&c1, &c2, channel)?;
 
             let c_ws = one
+                .wires()
                 .iter()
                 .map(|w| backend.mul(w, &c, channel))
                 .collect::<Result<Vec<_>>>()?;
