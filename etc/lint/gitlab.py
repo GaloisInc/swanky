@@ -1,8 +1,8 @@
 from collections import defaultdict
 from typing import DefaultDict, Dict, FrozenSet, Set
 
-import click
 import rich
+import rich_click as click
 
 from etc import ROOT
 from etc.lint import LintResult

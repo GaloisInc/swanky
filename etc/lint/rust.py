@@ -10,11 +10,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, List, Optional
 
-import click
 import rich
 import rich.panel
 import rich.syntax
 import rich.text
+import rich_click as click
 import toml
 import tree_sitter
 

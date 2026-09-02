@@ -1,7 +1,7 @@
 import tomllib
 
-import click
 import rich
+import rich_click as click
 
 from etc import ROOT
 from etc.lint import LintResult

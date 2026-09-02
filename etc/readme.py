@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from string import Template
 
-import click
+import rich_click as click
 import toml
 
 from etc import ROOT

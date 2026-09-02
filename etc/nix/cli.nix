@@ -17,7 +17,6 @@ in
     (python312.withPackages (py: [
       py.black
       py.cbor2
-      py.click
       py.isort
       py.jinja2
       py.rich
