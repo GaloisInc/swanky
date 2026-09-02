@@ -32,10 +32,10 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.moduli(), ys.moduli());
+        assert_eq!(xs.len(), ys.len());
 
         let ys_neg = BinaryTwosComplement::new().execute(backend, ys, channel)?;
-        let mut acc = BinaryConstant::new(0, xs.size()).execute(backend, (), channel)?;
+        let mut acc = BinaryConstant::new(0, xs.len()).execute(backend, (), channel)?;
         let mut qs = BinaryBundle::new(Vec::new());
         for x in xs.iter().rev() {
             acc.pop();

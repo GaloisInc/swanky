@@ -40,7 +40,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.moduli(), ys.moduli());
+        assert_eq!(xs.len(), ys.len());
 
         let xwires = xs.wires();
         let ywires = ys.wires();
@@ -97,7 +97,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.moduli(), ys.moduli());
+        assert_eq!(xs.len(), ys.len());
 
         let xwires = xs.wires();
         let ywires = ys.wires();

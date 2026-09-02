@@ -12,19 +12,19 @@ impl<W: Clone + HasModulus> Bundle<W> {
         Bundle(ws)
     }
 
-    /// Return the moduli of all the wires in the bundle.
-    pub(crate) fn moduli(&self) -> Vec<u16> {
-        self.0.iter().map(HasModulus::modulus).collect()
-    }
-
     /// Extract the wires from this bundle.
     pub fn wires(&self) -> &Vec<W> {
         &self.0
     }
 
-    /// Get the number of wires in this bundle.
-    pub fn size(&self) -> usize {
+    /// The number of wires in this bundle.
+    pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    /// Whether the bundle is empty or not.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns a new bundle only containing wires with matching moduli.

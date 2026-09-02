@@ -35,8 +35,8 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
+        assert_eq!(x.len(), y.len());
 
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
@@ -93,8 +93,9 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
+        assert_eq!(x.len(), y.len());
+
         let zero = backend.constant(F2::ZERO);
         let one = backend.constant(F2::ONE);
 

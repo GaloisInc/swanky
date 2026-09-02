@@ -159,7 +159,7 @@ impl OutputMap {
     pub fn to_outputs<W: BinaryWireLabel>(&self, bundles: &[BinaryBundle<W>]) -> Result<Vec<i64>> {
         let mut outputs = Vec::with_capacity(bundles.len());
         for (i, bundle) in bundles.iter().enumerate() {
-            let mut bits = Vec::with_capacity(bundle.size());
+            let mut bits = Vec::with_capacity(bundle.len());
             for (j, wire) in bundle.wires().iter().enumerate() {
                 let mut decoded = None;
                 for k in 0..2 {

@@ -19,6 +19,11 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
 
+    // /// Return the moduli of all the wires in the bundle.
+    pub(crate) fn moduli(&self) -> Vec<u16> {
+        self.0.iter().map(HasModulus::modulus).collect()
+    }
+
     /// Extract the underlying bundle from this CRT bundle.
     pub fn extract(self) -> Bundle<W> {
         self.0

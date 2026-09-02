@@ -38,7 +38,7 @@ where
                 .map(|x| backend.negate(x))
                 .collect::<Vec<_>>(),
         );
-        let one = BinaryConstant::new(1, input.size()).execute(backend, (), channel)?;
+        let one = BinaryConstant::new(1, input.len()).execute(backend, (), channel)?;
         BinaryAdditionNoCarry::new().execute(backend, (&not_xs, &one), channel)
     }
 }
