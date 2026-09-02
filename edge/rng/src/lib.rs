@@ -3,13 +3,16 @@
 //! [`SwankyRng`] is the prefered PRNG to use, although the underlying PRNG may
 //! change depending on the platform and/or future changes to this library. If
 //! you need a _specific_ PRNG, these can be accessed as well. Currently, there
-//! is only one:
-//! - [`AesRng`]: A PRNG based on AES-CTR mode.
+//! are two:
+//! - [`AesRng`]: A PRNG based on AES128-CTR mode.
+//! - [`Aes256Rng`]: A PRNG based on AES256-CTR mode.
 #![deny(missing_docs)]
 use rand_core::Infallible;
 
 mod aesrng;
 pub use aesrng::AesRng;
+mod aes256rng;
+pub use aes256rng::Aes256Rng;
 mod vectorized;
 use rand::{SeedableRng, TryCryptoRng, TryRng};
 pub use vectorized::UniformIntegersUnderBound;
