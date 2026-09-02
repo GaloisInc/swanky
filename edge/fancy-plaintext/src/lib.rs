@@ -2,12 +2,13 @@
 #![deny(missing_docs)]
 
 use fancy_traits::{
-    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
-    is_binary,
+    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use rand::{CryptoRng, Rng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
+use swanky_field_binary::F2;
 
 /// Plaintext implementation of [`Fancy`].
 pub struct Dummy;
@@ -164,9 +165,20 @@ impl FancyProj for Dummy {
 
 impl Fancy for Dummy {
     type Item = DummyVal;
+}
 
+impl FancyConstant for Dummy {
     fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> Result<DummyVal> {
         Ok(DummyVal { val, modulus })
+    }
+}
+
+impl FancyBinaryConstant for Dummy {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        DummyVal {
+            val: x.into(),
+            modulus: 2,
+        }
     }
 }
 

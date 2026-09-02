@@ -833,6 +833,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
 ]
 
 [[package]]
@@ -847,6 +848,8 @@ dependencies = [
  "serde",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
  "swanky-rng",
 ]
 
@@ -868,6 +871,7 @@ dependencies = [
  "swanky-channel",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-rng",
  "vectoreyes",
 ]
@@ -880,6 +884,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
 ]
 
 [[package]]
@@ -888,6 +893,7 @@ version = "0.6.0"
 dependencies = [
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-rng",
 ]
 
@@ -3134,6 +3140,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ocelot-error",
  "swanky-ot-alsz-kos",
  "swanky-ot-chou-orlandi",

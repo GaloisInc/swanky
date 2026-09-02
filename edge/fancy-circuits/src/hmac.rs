@@ -5,9 +5,11 @@
 
 use crate::{binary::PairwiseXor, sha::Sha256};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Circuit for HMAC-SHA256.
 ///
@@ -38,7 +40,7 @@ impl<'a> HmacSha256<'a> {
     const OPAD_BYTE: &'static str = "01011100";
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for HmacSha256<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for HmacSha256<'a>
 where
     F::Item: 'a,
 {
@@ -55,8 +57,8 @@ where
     ) -> Result<Self::Output> {
         let (key, message) = inputs;
 
-        let zero = backend.constant(0, 2, channel)?;
-        let one = backend.constant(1, 2, channel)?;
+        let zero = backend.constant(F2::ZERO);
+        let one = backend.constant(F2::ONE);
 
         // Create ipad pattern (0x36 repeated 64 times for 512 bits).
         let ipad: Vec<F::Item> = Self::IPAD_BYTE

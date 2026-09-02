@@ -1,4 +1,6 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
+};
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
@@ -213,11 +215,11 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
 
 impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
     type Item = Wire;
+}
 
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-        Ok(Wire(F2::from(value != 0), F128b::ZERO))
+impl<VOLE: RandomVoleP> FancyBinaryConstant for ProverTraverser<VOLE> {
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        Wire(constant, F128b::ZERO)
     }
 }
 

@@ -1,5 +1,7 @@
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyEncode};
+use fancy_traits::{
+    CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode,
+};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -136,9 +138,10 @@ where
 
 impl<'a, C> Fancy for EvaluatorOnline<'a, C> {
     type Item = EvaluatorWire;
+}
 
-    fn constant(&mut self, x: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
-        let constant = F2::try_from(x).expect("constant must be boolean");
+impl<'a, C> FancyBinaryConstant for EvaluatorOnline<'a, C> {
+    fn constant(&mut self, constant: F2) -> Self::Item {
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
         let wirelabel = if constant == F2::ONE {
@@ -147,7 +150,7 @@ impl<'a, C> Fancy for EvaluatorOnline<'a, C> {
             Default::default()
         };
 
-        Ok(EvaluatorWire::new(constant, wirelabel, share))
+        EvaluatorWire::new(constant, wirelabel, share)
     }
 }
 

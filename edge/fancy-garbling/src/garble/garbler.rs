@@ -5,13 +5,16 @@ use crate::{
     util::{output_tweak, tweak, tweak2},
 };
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus, is_binary,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, FancyProj, HasModulus, is_binary,
 };
 use rand::{CryptoRng, Rng, RngExt};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
+use vectoreyes::U8x16;
 
 use super::security_warning::warn_proj;
 
@@ -40,22 +43,21 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire
 
 impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
-    pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
-        let zero = Wire::rand(&mut rng, 2);
+    pub fn new(mut rng: RNG) -> Self {
         let delta = Wire::rand_delta(&mut rng, 2);
-        let one = zero.clone() + delta.clone();
+        // We fix the constant `1` value to `1`, and derive the zero wirelabel
+        // as that value XORed with `Δ`.
+        let one = Wire::from_repr(U8x16::from(1u128), 2);
+        let zero = delta.clone() + one;
         let mut deltas = HashMap::new();
         deltas.insert(2, delta);
-        // Send the one wirelabel to the evaluator. This is used to make binary
-        // negation free.
-        channel.write(&one.to_repr())?;
-        Ok(Garbler {
+        Garbler {
             zero,
             deltas,
             current_gate: 0,
             current_output: 0,
             rng,
-        })
+        }
     }
 
     /// The current non-free gate index of the garbling computation
@@ -120,8 +122,7 @@ impl<RNG: Rng + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        let zero = self.zero;
-        self.xor(&zero, x)
+        self.zero + *x
     }
 }
 
@@ -368,11 +369,26 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbl
 
 impl<RNG: Rng + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
+}
 
+impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant for Garbler<RNG, Wire> {
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let (zero, wire) = Wire::constant(x, q, &self.delta(q), &mut self.rng);
         channel.write(&wire.to_repr())?;
         Ok(zero)
+    }
+}
+
+impl<RNG: CryptoRng, Wire: WireLabel> FancyBinaryConstant for Garbler<RNG, Wire> {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        if x.into() {
+            // `self.zero` corresponds to the zero wirelabel associated with the
+            // "one" wirelabel set to `F128b::ONE`.
+            self.zero.clone()
+        } else {
+            // Otherwise, the garbler uses the "null" wirelabel to represent zero.
+            Default::default()
+        }
     }
 }
 
