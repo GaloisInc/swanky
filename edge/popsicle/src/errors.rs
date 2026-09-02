@@ -5,7 +5,7 @@ pub enum Error {
     /// Coin tossing failed.
     CoinTossError(swanky_cointoss::Error),
     /// The underlying oblivious PRF failed.
-    OprfError(swanky_ocelot_error::Error),
+    OprfError(swanky_error::Error),
     /// An input/output error occurred.
     IoError(std::io::Error),
     /// The cuckoo hash is full.
@@ -48,9 +48,9 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<swanky_ocelot_error::Error> for Error {
+impl From<swanky_error::Error> for Error {
     #[inline]
-    fn from(e: swanky_ocelot_error::Error) -> Error {
+    fn from(e: swanky_error::Error) -> Error {
         Error::OprfError(e)
     }
 }

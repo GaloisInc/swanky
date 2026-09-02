@@ -8,8 +8,8 @@ use super::{
 use generic_array::typenum::Unsigned;
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
-use swanky_ocelot_error::Error;
 use swanky_rng::SwankyRng;
 
 /// The base VOLE sender
@@ -30,7 +30,7 @@ impl<FE: FF> Sender<FE> {
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let copee = CopeeSender::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee, pows })
     }
@@ -41,7 +41,7 @@ impl<FE: FF> Sender<FE> {
         channel: &mut C,
         n: usize,
         mut rng: &mut RNG,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+    ) -> Result<Vec<(FE::PrimeField, FE)>> {
         let mut uws = Vec::with_capacity(n);
         for _ in 0..n {
             let u = FE::PrimeField::random(&mut rng);
@@ -56,16 +56,24 @@ impl<FE: FF> Sender<FE> {
             z += c * *pow;
             x += a * *pow;
         }
-        channel.flush()?;
-        let seed = channel.read_block()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
+        let seed = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let mut rng_chi = SwankyRng::from_seed(seed);
         for (u, w) in uws.iter().copied() {
             let chi = FE::random(&mut rng_chi);
             z += chi * w;
             x += u * chi;
         }
-        channel.write_serializable(&x)?;
-        channel.write_serializable(&z)?;
+        channel
+            .write_serializable(&x)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
+        channel
+            .write_serializable(&z)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
         Ok(uws)
     }
 }
@@ -76,7 +84,7 @@ impl<FE: FF> Receiver<FE> {
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let copee = CopeeReceiver::<FE>::init(channel, pows.clone(), rng)?;
         Ok(Self { copee, pows })
     }
@@ -86,7 +94,7 @@ impl<FE: FF> Receiver<FE> {
         pows: Powers<FE>,
         rng: &mut RNG,
         delta: FE,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let copee = CopeeReceiver::<FE>::init_with_picked_delta(channel, pows.clone(), rng, delta)?;
         Ok(Self { copee, pows })
     }
@@ -100,7 +108,7 @@ impl<FE: FF> Receiver<FE> {
         channel: &mut C,
         len: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<FE>, Error> {
+    ) -> Result<Vec<FE>> {
         let r = Degree::<FE>::USIZE;
         let mut v: Vec<FE> = Vec::with_capacity(len);
         let seed = rng.random();
@@ -115,18 +123,27 @@ impl<FE: FF> Receiver<FE> {
             let b = self.copee.receive(channel)?;
             y += self.pows.get()[i] * b
         }
-        channel.write_block(&seed)?;
-        channel.flush()?;
-        let x = channel.read_serializable()?;
-        let z: FE = channel.read_serializable()?;
+        channel
+            .write_block(&seed)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
+        let x = channel
+            .read_serializable()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
+        let z: FE = channel
+            .read_serializable()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
         let mut delta = self.copee.delta();
         delta *= x;
         delta += y;
-        if z == delta {
-            Ok(v)
-        } else {
-            Err(Error::CorrelationCheckFailed)
-        }
+        ensure!(
+            z == delta,
+            ErrorKind::CorrelationFailure,
+            "Correlation check failed"
+        );
+        Ok(v)
     }
 }
 

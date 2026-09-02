@@ -11,8 +11,8 @@ use rand::{
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_ocelot_error::Error;
 use swanky_rng::SwankyRng;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
@@ -154,7 +154,7 @@ impl<T: FiniteField> Sender<T> {
         num_saved: usize,
         rng: &mut SwankyRng,
         output: &mut Vec<(V, T)>,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
@@ -242,7 +242,7 @@ impl<T: FiniteField> Sender<T> {
         mut rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let pows: Powers<T> = Default::default();
         let mut base_sender = BaseSender::<T>::init(channel, pows.clone(), rng)?;
         let base_voles_setup: Vec<(T::PrimeField, T)> = base_sender.send(
@@ -252,7 +252,8 @@ impl<T: FiniteField> Sender<T> {
         )?;
         let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
         let seed = rng.random::<Block>();
-        let seed = swanky_cointoss::receive(channel, &[seed])?[0];
+        let seed = swanky_cointoss::receive(channel, &[seed])
+            .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?[0];
         let lpn_rng = SwankyRng::from_seed(seed);
         let mut sender = Self {
             lpn_setup,
@@ -278,7 +279,7 @@ impl<T: FiniteField> Sender<T> {
         channel: &mut C,
         rng: &mut SwankyRng,
         output: &mut Vec<(V, T)>,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
@@ -296,7 +297,7 @@ impl<T: FiniteField> Sender<T> {
         &mut self,
         channel: &mut C,
         rng: &mut SwankyRng,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut base_voles: Vec<(T::PrimeField, T)> = Vec::new();
         self.send_internal(
             channel,
@@ -340,7 +341,7 @@ impl<T: FiniteField> Receiver<T> {
         num_saved: usize,
         rng: &mut SwankyRng,
         output: &mut Vec<T>,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
@@ -417,7 +418,7 @@ impl<T: FiniteField> Receiver<T> {
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
         delta: Option<T>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let pows: Powers<T> = Default::default();
         let mut base_receiver = if let Some(delta) = delta {
             BaseReceiver::<T>::init_with_picked_delta(channel, pows.clone(), rng, delta)?
@@ -429,7 +430,8 @@ impl<T: FiniteField> Receiver<T> {
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
         let seed = rng.random::<Block>();
-        let seed = swanky_cointoss::send(channel, &[seed])?[0];
+        let seed = swanky_cointoss::send(channel, &[seed])
+            .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?[0];
         let lpn_rng = SwankyRng::from_seed(seed);
         let mut receiver = Self {
             lpn_setup,
@@ -463,7 +465,7 @@ impl<T: FiniteField> Receiver<T> {
         channel: &mut C,
         rng: &mut SwankyRng,
         output: &mut Vec<T>,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     where
         T::PrimeField: IsSubFieldOf<V>,
     {
@@ -481,7 +483,7 @@ impl<T: FiniteField> Receiver<T> {
         &mut self,
         channel: &mut C,
         rng: &mut SwankyRng,
-    ) -> Result<Self, Error>
+    ) -> Result<Self>
     where
         T::PrimeField: IsSubFieldOf<SFE>,
     {

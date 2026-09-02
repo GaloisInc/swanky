@@ -10,7 +10,7 @@ use swanky_block::Block;
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::CorrelationRobustHash;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver as OtReceiver, Sender as OtSender,
@@ -35,7 +35,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
         channel: &mut C,
         s_: [u8; 16],
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
         let ks = ot.receive(channel, &s, rng)?;
@@ -57,7 +57,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         &mut self,
         channel: &mut C,
         m: usize,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>> {
         const nrows: usize = 128;
         let ncols = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
@@ -70,7 +70,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         for (j, (b, rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let q = &mut qs[range];
-            channel.read_bytes(&mut u)?;
+            channel
+                .read_bytes(&mut u)
+                .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
             rng.fill_bytes(q);
             scutils::xor_inplace(q, if *b { &u } else { &zero });
         }
@@ -84,7 +86,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut s_ = [0u8; 16];
         rng.fill_bytes(&mut s_);
         Sender::<OT>::init_fixed_key(channel, s_, rng)
@@ -95,7 +97,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
         channel: &mut C,
         inputs: &[(Self::Msg, Self::Msg)],
         _: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let m = inputs.len();
         let qs = self.send_setup(channel, m)?;
         for (j, input) in inputs.iter().enumerate() {
@@ -105,10 +107,16 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
             let y0 = CorrelationRobustHash::fixed_key().hash(q) ^ input.0;
             let q = q ^ self.s_;
             let y1 = CorrelationRobustHash::fixed_key().hash(q) ^ input.1;
-            channel.write_block(&y0)?;
-            channel.write_block(&y1)?;
+            channel
+                .write_block(&y0)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+            channel
+                .write_block(&y1)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
 }
@@ -126,7 +134,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
         m: usize,
         delta: Self::Msg,
         _: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let qs = self.send_setup(channel, m)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
@@ -137,10 +145,14 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
             let x1 = x0 ^ delta;
             let q = q ^ self.s_;
             let y = CorrelationRobustHash::fixed_key().hash(q) ^ x1;
-            channel.write_block(&y)?;
+            channel
+                .write_block(&y)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             out.push(x0);
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(out)
     }
 }
@@ -151,7 +163,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
         channel: &mut C,
         m: usize,
         _: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error> {
+    ) -> Result<Vec<(Self::Msg, Self::Msg)>> {
         let qs = self.send_setup(channel, m)?;
         let mut out = Vec::with_capacity(m);
         for j in 0..m {
@@ -173,7 +185,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
         channel: &mut C,
         r: &[u8],
         m: usize,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>> {
         const nrows: usize = 128;
         let ncols = if !m.is_multiple_of(8) {
             m + (8 - m % 8)
@@ -189,9 +201,13 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
             self.rngs[j].1.fill_bytes(&mut g);
             scutils::xor_inplace(&mut g, t);
             scutils::xor_inplace(&mut g, r);
-            channel.write_bytes(&g)?;
+            channel
+                .write_bytes(&g)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(swanky_bit_matrix_transpose::transpose(&ts, nrows, ncols))
     }
 }
@@ -202,7 +218,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let mut ks = Vec::with_capacity(128);
         let mut k0 = Block::default();
@@ -228,15 +244,19 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         channel: &mut C,
         inputs: &[bool],
         _: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y0 = channel.read_block()?;
-            let y1 = channel.read_block()?;
+            let y0 = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+            let y1 = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if *b { y1 } else { y0 };
             let y = y ^ CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(y);
@@ -251,14 +271,16 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
         channel: &mut C,
         inputs: &[bool],
         _: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let y = channel.read_block()?;
+            let y = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if *b { y } else { Block::default() };
             let h = CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(y ^ h);
@@ -273,7 +295,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
         channel: &mut C,
         inputs: &[bool],
         _: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error> {
+    ) -> Result<Vec<Self::Msg>> {
         let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());

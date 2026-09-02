@@ -20,7 +20,6 @@ swanky-oprf-kkrt.workspace = true
 swanky-oprf-kmprt.workspace = true
 swanky-oprf-traits.workspace = true
 swanky-ot-alsz-kos.workspace = true
-swanky-ocelot-error.workspace = true
 swanky-twopac.workspace = true
 
 itertools.workspace = true
@@ -44,8 +43,6 @@ swanky-error.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
-swanky-ot-alsz-kos.workspace = true
-swanky-ocelot-error.workspace = true
 criterion.workspace = true
 proptest.workspace = true
 
