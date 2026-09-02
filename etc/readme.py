@@ -60,10 +60,8 @@ def gen_crate_list(ctx: click.Context, check: bool) -> None:
         raise click.ClickException(
             "The following errors were encountered:\n" + "\n".join(errors)
         )
-    descriptions_md: Callable[[list[tuple[str, str]]], str] = (
-        lambda descriptions: "\n".join(
-            f"- **`{name}`**: {desc}" for name, desc in sorted(descriptions)
-        )
+    descriptions_md: Callable[[list[tuple[str, str]]], str] = lambda descriptions: (
+        "\n".join(f"- **`{name}`**: {desc}" for name, desc in sorted(descriptions))
     )
     description_body = _README_TEMPLATE.safe_substitute(
         core=descriptions_md(core_descriptions),
