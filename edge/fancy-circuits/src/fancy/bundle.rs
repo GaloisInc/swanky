@@ -27,20 +27,6 @@ impl<W: Clone + HasModulus> Bundle<W> {
         self.len() == 0
     }
 
-    /// Returns a new bundle only containing wires with matching moduli.
-    pub(crate) fn with_moduli(&self, moduli: &[u16]) -> Bundle<W> {
-        let old_ws = self.wires();
-        let mut new_ws = Vec::with_capacity(moduli.len());
-        for &p in moduli {
-            if let Some(w) = old_ws.iter().find(|&x| x.modulus() == p) {
-                new_ws.push(w.clone());
-            } else {
-                panic!("Bundle::with_moduli: no {} modulus in bundle", p);
-            }
-        }
-        Bundle(new_ws)
-    }
-
     /// Pad the Bundle with val, n times.
     pub(crate) fn pad(&mut self, val: &W, n: usize) {
         for _ in 0..n {

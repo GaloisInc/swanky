@@ -223,7 +223,7 @@ where
         // use the mask to either output x or 0
         let output_bundle = match output_moduli {
             Some(ps) => x.with_moduli(ps),
-            None => (*x).clone().extract(),
+            None => (*x).clone(),
         };
 
         output_bundle
