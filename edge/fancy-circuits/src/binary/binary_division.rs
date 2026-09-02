@@ -9,7 +9,7 @@ use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// For [`BinaryBundle`]s `x` and `y`, output `x / y`.
+/// For [`BinaryBundle`]s `x` and `y` (for `y != 0`), output `x / y`.
 #[derive(Default)]
 pub struct BinaryDivision<'a>(PhantomData<&'a ()>);
 
