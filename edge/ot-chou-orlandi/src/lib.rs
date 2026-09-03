@@ -21,7 +21,7 @@ use rand::{CryptoRng, Rng};
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
@@ -42,11 +42,15 @@ impl OtSender for Sender {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         mut rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let y = Scalar::random(&mut rng);
         let s = &y * RISTRETTO_BASEPOINT_TABLE;
-        channel.write_pt(&s)?;
-        channel.flush()?;
+        channel
+            .write_pt(&s)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(Self { y, s, counter: 0 })
     }
 
@@ -55,25 +59,33 @@ impl OtSender for Sender {
         channel: &mut C,
         inputs: &[(Block, Block)],
         _: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let ys = self.y * self.s;
         let ks = (0..inputs.len())
             .map(|i| {
-                let r = channel.read_pt()?;
+                let r = channel
+                    .read_pt()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
                 let yr = self.y * r;
                 let k0 = hash_pt(self.counter + i as u128, &yr);
                 let k1 = hash_pt(self.counter + i as u128, &(yr - ys));
                 Ok((k0, k1))
             })
-            .collect::<Result<Vec<(Block, Block)>, Error>>()?;
+            .collect::<Result<Vec<(Block, Block)>>>()?;
         self.counter += inputs.len() as u128;
         for (input, k) in inputs.iter().zip(ks) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
-            channel.write_block(&c0)?;
-            channel.write_block(&c1)?;
+            channel
+                .write_block(&c0)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+            channel
+                .write_block(&c1)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
 }
@@ -96,8 +108,10 @@ impl OtReceiver for Receiver {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         _: &mut RNG,
-    ) -> Result<Self, Error> {
-        let s = channel.read_pt()?;
+    ) -> Result<Self> {
+        let s = channel
+            .read_pt()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
         let s = RistrettoBasepointTable::create(&s);
         Ok(Self { s, counter: 0 })
     }
@@ -107,7 +121,7 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         inputs: &[bool],
         mut rng: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
+    ) -> Result<Vec<Block>> {
         let zero = &Scalar::ZERO * &self.s;
         let one = &Scalar::ONE * &self.s;
         let ks = inputs
@@ -117,18 +131,26 @@ impl OtReceiver for Receiver {
                 let x = Scalar::random(&mut rng);
                 let c = if *b { one } else { zero };
                 let r = c + &x * RISTRETTO_BASEPOINT_TABLE;
-                channel.write_pt(&r)?;
+                channel
+                    .write_pt(&r)
+                    .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
                 Ok(hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
-            .collect::<Result<Vec<Block>, Error>>()?;
-        channel.flush()?;
+            .collect::<Result<Vec<Block>>>()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         self.counter += inputs.len() as u128;
         inputs
             .iter()
             .zip(ks)
             .map(|(b, k)| {
-                let c0 = channel.read_block()?;
-                let c1 = channel.read_block()?;
+                let c0 = channel
+                    .read_block()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+                let c1 = channel
+                    .read_block()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let c = k ^ if *b { c1 } else { c0 };
                 Ok(c)
             })

@@ -11,13 +11,14 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-curve25519-dalek.workspace = true
-rand.workspace = true
 swanky-adversary.workspace = true
 swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
-swanky-ocelot-error.workspace = true
+swanky-error.workspace = true
 swanky-ot-traits.workspace = true
+
+curve25519-dalek.workspace = true
+rand.workspace = true
 blake3.workspace = true
 
 [dev-dependencies]
@@ -27,4 +28,3 @@ criterion.workspace = true
 [[bench]]
 name = "ot"
 harness = false
-

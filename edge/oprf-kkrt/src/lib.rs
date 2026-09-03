@@ -14,7 +14,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
@@ -35,7 +35,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self, Error>
+    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -45,7 +45,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         rng.fill_bytes(&mut s_);
         let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
         let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
-        let keys = swanky_cointoss::send(channel, &seeds)?;
+        let keys = swanky_cointoss::send(channel, &seeds)
+            .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
@@ -61,12 +62,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         })
     }
 
-    fn send<C, RNG>(
-        &mut self,
-        channel: &mut C,
-        m: usize,
-        _: &mut RNG,
-    ) -> Result<Vec<Self::Seed>, Error>
+    fn send<C, RNG>(&mut self, channel: &mut C, m: usize, _: &mut RNG) -> Result<Vec<Self::Seed>>
     where
         C: AbstractChannel,
         RNG: CryptoRng + Rng,
@@ -85,8 +81,12 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let q = &mut qs[range];
             self.rngs[j].fill_bytes(q);
-            channel.read_bytes(&mut t0)?;
-            channel.read_bytes(&mut t1)?;
+            channel
+                .read_bytes(&mut t0)
+                .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
+            channel
+                .read_bytes(&mut t1)
+                .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
             scutils::xor_inplace(q, if *b { &t1 } else { &t0 });
         }
         let qs = swanky_bit_matrix_transpose::transpose(&qs, ncols, nrows);
@@ -138,10 +138,11 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
-        let keys = swanky_cointoss::receive(channel, &seeds)?;
+        let keys = swanky_cointoss::receive(channel, &seeds)
+            .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
         let mut k0 = Block::default();
@@ -168,7 +169,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         channel: &mut C,
         inputs: &[Self::Input],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Output>, Error> {
+    ) -> Result<Vec<Self::Output>> {
         let m = inputs.len();
         // Round up if necessary so that `m mod 16 ≡ 0`.
         let nrows = if m % 16 != 0 { m + (16 - m % 16) } else { m };
@@ -198,12 +199,18 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             let t1 = &t1s[range];
             self.rngs[j].0.fill_bytes(&mut t);
             scutils::xor_inplace(&mut t, t0);
-            channel.write_bytes(&t)?;
+            channel
+                .write_bytes(&t)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
             self.rngs[j].1.fill_bytes(&mut t);
             scutils::xor_inplace(&mut t, t1);
-            channel.write_bytes(&t)?;
+            channel
+                .write_bytes(&t)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(out[0..m].to_vec())
     }
 }

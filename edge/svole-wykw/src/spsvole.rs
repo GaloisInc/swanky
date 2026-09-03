@@ -13,8 +13,8 @@ use swanky_adversary::Malicious;
 use swanky_block::Block;
 use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
-use swanky_ocelot_error::Error;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
@@ -40,22 +40,33 @@ pub(super) type SpsReceiver<FE> = Receiver<KosSender, FE>;
 
 // Implementation of the EQ protocol functionality described in
 // <https://eprint.iacr.org/2020/925.pdf>, Page 30.
-fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool, Error> {
+fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool> {
     let mut com = [0u8; 32];
-    channel.read_bytes(&mut com)?;
+    channel
+        .read_bytes(&mut com)
+        .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
 
-    channel.write_serializable(&x)?;
-    channel.flush()?;
+    channel
+        .write_serializable(&x)
+        .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
+    channel
+        .flush()
+        .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
 
     let mut seed = [0u8; 32];
-    channel.read_bytes(&mut seed)?;
-    let y = channel.read_serializable::<FE>()?;
+    channel
+        .read_bytes(&mut seed)
+        .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
+    let y = channel
+        .read_serializable::<FE>()
+        .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
 
-    if blake3::keyed_hash(&seed, &y.to_bytes()) == com {
-        Ok(x == y)
-    } else {
-        Err(Error::InvalidOpening)
-    }
+    ensure!(
+        blake3::keyed_hash(&seed, &y.to_bytes()) == com,
+        ErrorKind::OtherError,
+        "Invalid opening"
+    );
+    Ok(x == y)
 }
 
 // Implementation of the EQ protocol functionality described in
@@ -64,21 +75,31 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
     channel: &mut C,
     rng: &mut RNG,
     y: FE,
-) -> Result<bool, Error> {
+) -> Result<bool> {
     let seed = rng.random::<[u8; 32]>();
     let com = blake3::keyed_hash(&seed, &y.to_bytes());
 
-    channel.write_bytes(com.as_bytes())?;
-    channel.flush()?;
+    channel
+        .write_bytes(com.as_bytes())
+        .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
+    channel
+        .flush()
+        .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
 
-    let x = channel.read_serializable::<FE>()?;
-    if x != y {
-        return Err(Error::InvalidOpening);
-    }
+    let x = channel
+        .read_serializable::<FE>()
+        .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
+    ensure!(x == y, ErrorKind::OtherError, "Invalid opening");
 
-    channel.write_bytes(&seed)?;
-    channel.write_serializable(&y)?;
-    channel.flush()?;
+    channel
+        .write_bytes(&seed)
+        .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
+    channel
+        .write_serializable(&y)
+        .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
+    channel
+        .flush()
+        .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
 
     Ok(x == y)
 }
@@ -88,11 +109,12 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = OT::init(channel, rng)?;
         let seed0 = rng.random::<Block>();
         let seed1 = rng.random::<Block>();
-        let seeds = swanky_cointoss::send(channel, &[seed0, seed1])?;
+        let seeds = swanky_cointoss::send(channel, &[seed0, seed1])
+            .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
@@ -113,7 +135,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         n: usize,                            // Equal to cols / weight
         base_voles: &[(FE::PrimeField, FE)], // Equals to weight + r
         mut rng: &mut RNG,
-    ) -> Result<Vec<(FE::PrimeField, FE)>, Error> {
+    ) -> Result<Vec<(FE::PrimeField, FE)>> {
         debug_assert!(
             (n as u128 - 1).leading_zeros() + (n as u128).trailing_zeros() == 128,
             "expected power of 2, instead found: {n}"
@@ -130,7 +152,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         for (a, _) in base_uws.iter().copied() {
             let beta = FE::PrimeField::random_nonzero(&mut rng);
             let a_prime = beta - a;
-            channel.write_serializable(&a_prime)?;
+            channel
+                .write_serializable(&a_prime)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
             betas.push(beta);
         }
         let distribution = Uniform::try_from(0..n).expect("bounds finite and low < high");
@@ -163,7 +187,9 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                 &mut result[i * n..(i + 1) * n],
                 &mut self.ggm_temporary_storage,
             );
-            let d: FE = channel.read_serializable()?;
+            let d: FE = channel
+                .read_serializable()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
             result[i * n + alpha] = (beta, w - (d + sum));
         }
 
@@ -179,7 +205,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         uws: &[(FE::PrimeField, FE)],      // length = m * t = n
         base_xzs: &[(FE::PrimeField, FE)], // length = r
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let r = Degree::<FE>::USIZE;
         // Generate `chi`s from seed and send seed to receiver at the end.
         let seed = rng.random::<Block>();
@@ -206,21 +232,28 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             .iter()
             .zip(x_stars.iter().zip(base_xzs.iter().copied()))
         {
-            channel.write_serializable(&(*x_star - x))?;
+            channel
+                .write_serializable(&(*x_star - x))
+                .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
             va -= *pows * z;
         }
-        channel.write_block(&seed)?;
-        channel.flush()?;
+        channel
+            .write_block(&seed)
+            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
 
         let b = eq_send(channel, va)?;
-        if b { Ok(()) } else { Err(Error::EqCheckFailed) }
+        ensure!(b, ErrorKind::OtherError, "Equality check failed");
+        Ok(())
     }
 
     pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = OT::init(channel, rng)?;
         Ok(Self {
             ot,
@@ -237,11 +270,12 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         pows: Powers<FE>,
         delta: FE,
         mut rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = OT::init(channel, &mut rng)?;
         let seed0 = rng.random::<Block>();
         let seed1 = rng.random::<Block>();
-        let seeds = swanky_cointoss::receive(channel, &[seed0, seed1])?;
+        let seeds = swanky_cointoss::receive(channel, &[seed0, seed1])
+            .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
         let aes1 = Aes128EncryptOnly::new_with_key(seeds[1]);
         Ok(Self {
@@ -259,7 +293,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         n: usize,
         base_voles: &[FE], // Length equals weight + r
         rng: &mut RNG,
-    ) -> Result<Vec<FE>, Error> {
+    ) -> Result<Vec<FE>> {
         let nbits = 128 - (n as u128 - 1).leading_zeros() as usize;
         let r = Degree::<FE>::USIZE;
         let total_len = base_voles.len();
@@ -269,7 +303,9 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         let mut gammas = Vec::with_capacity(t);
         let mut result = vec![FE::ZERO; n * t];
         for v in base_vs.iter() {
-            let a_prime = channel.read_serializable::<FE::PrimeField>()?;
+            let a_prime = channel
+                .read_serializable::<FE::PrimeField>()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
             let gamma = *v - a_prime * self.delta;
             gammas.push(gamma);
         }
@@ -291,9 +327,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         self.ot.send(channel, &keys, rng)?;
         for (i, gamma) in gammas.into_iter().enumerate() {
             let d = gamma - result[i * n..(i + 1) * n].iter().copied().sum();
-            channel.write_serializable(&d)?;
+            channel
+                .write_serializable(&d)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
 
         self.receive_batch_consistency_check(channel, &result, base_consistency, rng)?;
         Ok(result)
@@ -306,11 +346,13 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         vs: &[FE],
         y_stars: &[FE],
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let r = Degree::<FE>::USIZE;
         let mut x_stars: Vec<FE::PrimeField> = vec![FE::PrimeField::ZERO; r];
         for item in x_stars.iter_mut() {
-            *item = channel.read_serializable()?;
+            *item = channel
+                .read_serializable()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
         }
         let y = self
             .pows
@@ -319,7 +361,9 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             .zip(x_stars.into_iter().zip(y_stars.iter()))
             .map(|(pow, (x, y))| (*y - x * self.delta) * *pow)
             .sum();
-        let seed = channel.read_block()?;
+        let seed = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let mut rng_chi = SwankyRng::from_seed(seed);
         let mut vb = FE::ZERO;
         for v in vs.iter() {
@@ -327,18 +371,15 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         vb -= y;
         let res = eq_receive(channel, rng, vb)?;
-        if res {
-            Ok(())
-        } else {
-            Err(Error::EqCheckFailed)
-        }
+        ensure!(res, ErrorKind::OtherError, "Equality check failed");
+        Ok(())
     }
 
     pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ot = OT::init(channel, rng)?;
         Ok(Self {
             ot,

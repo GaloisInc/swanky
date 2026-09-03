@@ -12,7 +12,7 @@ use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
@@ -28,10 +28,7 @@ pub struct Receiver {}
 impl OtSender for Sender {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        _: &mut C,
-        _: &mut RNG,
-    ) -> Result<Self, Error> {
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
     }
 
@@ -40,18 +37,24 @@ impl OtSender for Sender {
         channel: &mut C,
         inputs: &[(Block, Block)],
         mut rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let m = inputs.len();
         let mut cs = Vec::with_capacity(m);
         let mut pks = Vec::with_capacity(m);
         for _ in 0..m {
             let c = RistrettoPoint::random(&mut rng);
-            channel.write_pt(&c)?;
+            channel
+                .write_pt(&c)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
             cs.push(c);
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         for c in cs.into_iter() {
-            let pk0 = channel.read_pt()?;
+            let pk0 = channel
+                .read_pt()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
             pks.push((pk0, c - pk0));
         }
         for (i, (input, pk)) in inputs.iter().zip(pks).enumerate() {
@@ -61,11 +64,19 @@ impl OtSender for Sender {
             let e01 = h ^ input.0;
             let h = hash_pt(i as u128, &(pk.1 * r));
             let e11 = h ^ input.1;
-            channel.write_pt(&ei0)?;
-            channel.write_block(&e01)?;
-            channel.write_block(&e11)?;
+            channel
+                .write_pt(&ei0)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
+            channel
+                .write_block(&e01)
+                .wrap_err(ErrorKind::NetworkError, "Unnable to write block")?;
+            channel
+                .write_block(&e11)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
 }
@@ -79,10 +90,7 @@ impl std::fmt::Display for Sender {
 impl OtReceiver for Receiver {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        _: &mut C,
-        _: &mut RNG,
-    ) -> Result<Self, Error> {
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
     }
 
@@ -91,12 +99,14 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         inputs: &[bool],
         mut rng: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
+    ) -> Result<Vec<Block>> {
         let m = inputs.len();
         let mut cs = Vec::with_capacity(m);
         let mut ks = Vec::with_capacity(m);
         for _ in 0..m {
-            let c = channel.read_pt()?;
+            let c = channel
+                .read_pt()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
             cs.push(c);
         }
         for (b, c) in inputs.iter().zip(cs) {
@@ -104,20 +114,32 @@ impl OtReceiver for Receiver {
             let pk = &k * RISTRETTO_BASEPOINT_TABLE;
             let pk_ = c - pk;
             match b {
-                false => channel.write_pt(&pk)?,
-                true => channel.write_pt(&pk_)?,
+                false => channel
+                    .write_pt(&pk)
+                    .wrap_err(ErrorKind::NetworkError, "Unable to write point")?,
+                true => channel
+                    .write_pt(&pk_)
+                    .wrap_err(ErrorKind::NetworkError, "Unable to write point")?,
             };
             ks.push(k);
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         inputs
             .iter()
             .zip(ks)
             .enumerate()
             .map(|(i, (b, k))| {
-                let ei0 = channel.read_pt()?;
-                let e01 = channel.read_block()?;
-                let e11 = channel.read_block()?;
+                let ei0 = channel
+                    .read_pt()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
+                let e01 = channel
+                    .read_block()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+                let e11 = channel
+                    .read_block()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let e1 = match b {
                     false => e01,
                     true => e11,
