@@ -527,6 +527,13 @@ impl VoleHasher {
 
         let x1_packed = pack_flambda(x1);
 
+        let mut x1_bits = [[false; SECURITY_PARAM + B]; SECURITY_PARAM];
+        for col in 0..SECURITY_PARAM + B {
+            let decomp = x1_packed[col].bit_decomposition();
+            for j in 0..SECURITY_PARAM {
+                x1_bits[j][col] = decomp[j];
+            }
+        }
         for j in 0..SECURITY_PARAM {
             // Line 14 (call ToBits and truncate).
             let h2_bits = h2[j].bit_decomposition();
@@ -536,13 +543,8 @@ impl VoleHasher {
             // Line 14 (append).
             let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
 
-            let mut x1_bits = [false; SECURITY_PARAM + B];
-            for col in 0..SECURITY_PARAM + B {
-                x1_bits[col] = x1_packed[col].bit_decomposition()[j];
-            }
-
             // Line 14 (XOR with x1).
-            let single_out = izip!(all_bits, x1_bits)
+            let single_out = izip!(all_bits, x1_bits[j])
                 .map(|(b1, b2)| F2::from(b1) + F2::from(b2))
                 .collect::<Vec<_>>()
                 .try_into()
