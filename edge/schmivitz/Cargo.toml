@@ -18,7 +18,6 @@ publish.workspace = true
 version.workspace = true
 
 [features]
-default = ["256bit"]
 256bit = []
 
 [dependencies]
