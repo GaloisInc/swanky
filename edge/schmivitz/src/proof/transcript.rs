@@ -65,10 +65,15 @@ impl Transcript<'_> {
     /// Use the transcript to extract a seed challenge and use exponentiation to
     /// derive a vector of random values.
     pub(crate) fn extract_challenge(&mut self) -> ChiGenerator {
-        let mut bytes = [0u8; 16];
+        let mut bytes = [0u8; SECURITY_PARAM / 8];
         self.0
             .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
-        let seed = FLambda::from_uniform_bytes(&bytes);
+        // NOTE: Normally, it would be desirable to use `from_uniform_bytes`. However, this is
+        // hardcoded to provide a maximum of 128 bits of entropy, which is insufficient for the
+        // $`\lambda = 256`$ case. Using `from_bytes` is fine as long as we continue to use binary
+        // fields with bit widths congruent to 0 mod 8.
+        let seed = FLambda::from_bytes(&bytes.into())
+            .unwrap_or_else(|_| panic!("Constructing seed from {} bytes failed", bytes.len()));
         ChiGenerator::new(seed)
     }
 
