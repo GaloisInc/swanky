@@ -3,7 +3,7 @@ use crate::{
     binary::{BinaryAddition, BinaryConstant, BinaryMultiplex, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -18,7 +18,7 @@ impl<'a> BinaryDivision<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryDivision<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryDivision<'a>
 where
     F::Item: 'a,
 {

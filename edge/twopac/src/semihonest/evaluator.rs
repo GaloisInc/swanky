@@ -1,10 +1,14 @@
 use fancy_garbling::{AllWire, ArithmeticWire, Evaluator as Ev, WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj};
+use fancy_traits::{
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, FancyProj,
+};
 use rand::{CryptoRng, Rng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field_binary::F2;
 use swanky_ot_traits::Receiver as OtReceiver;
 
 /// Semi-honest evaluator.
@@ -23,7 +27,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let ot = OT::init(channel, &mut rng)
             .wrap_err(ErrorKind::InitializationError, "Failed to initialize OT.")?;
-        let evaluator = Ev::new(channel)?;
+        let evaluator = Ev::new();
         Ok(Self { evaluator, ot, rng })
     }
 
@@ -138,14 +142,26 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     for Evaluator<RNG, OT, Wire>
 {
     type Item = Wire;
+}
 
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyConstant
+    for Evaluator<RNG, OT, Wire>
+{
     fn constant(
         &mut self,
         x: u16,
         q: u16,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.constant(x, q, channel)
+        FancyConstant::constant(&mut self.evaluator, x, q, channel)
+    }
+}
+
+impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
+    FancyBinaryConstant for Evaluator<RNG, OT, Wire>
+{
+    fn constant(&mut self, x: F2) -> Self::Item {
+        FancyBinaryConstant::constant(&mut self.evaluator, x)
     }
 }
 

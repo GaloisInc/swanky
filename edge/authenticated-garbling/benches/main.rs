@@ -5,7 +5,7 @@ use fancy_circuits::{
     binary::{TestBinaryAddition, TestBinarySubtraction},
     test_circuits::{
         binary::{TestAndGateFanN, TestOrGateFanN, TestXorGateFanN},
-        fancy::TestBinaryConstant,
+        fancy_binary_constant::TestBinaryConstant,
     },
 };
 use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};

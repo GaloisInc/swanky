@@ -9,7 +9,7 @@ use fancy_circuits::{
     CrtBundle, CrtGadgets,
     arithmetic::{Addition, Constant, ConstantMultiplication, Max, ReLU, Sgn},
 };
-use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj, HasModulus};
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyConstant, FancyProj, HasModulus};
 use ndarray::Array3;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -22,7 +22,9 @@ pub(crate) struct ArithmeticNeuralNet<'a, F> {
     secret_weights_owned: bool,
 }
 
-impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> ArithmeticNeuralNet<'a, F> {
+impl<'a, F: FancyConstant + FancyBinary + FancyArithmetic + FancyProj + CrtGadgets>
+    ArithmeticNeuralNet<'a, F>
+{
     /// Create a new `ArithmeticNeuralNet` for the provided backend and using
     /// the specified moduli for each layer of the neural net.
     ///
@@ -163,7 +165,7 @@ impl<'a, F> ArithmeticLayer<'a, F> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralNet
+impl<'a, F: FancyConstant + FancyBinary + FancyArithmetic + FancyProj + CrtGadgets> FancyNeuralNet
     for ArithmeticLayer<'a, F>
 {
     type Item = CrtBundle<F::Item>;

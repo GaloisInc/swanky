@@ -1,10 +1,14 @@
 //! SHA circuits.
 
 use crate::{BinaryCircuit, binary::BinaryConstant};
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
+use fancy_traits::{
+    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
+};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 
 /// Circuit for the SHA-256 compression function, where the chaining values are
 /// fixed to the SHA-256 IV.
@@ -33,7 +37,7 @@ impl Default for Sha256CompressionFunctionFixedIV {
     }
 }
 
-impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunctionFixedIV {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunctionFixedIV {
     type Input = [F::Item; 512];
     type Output = [F::Item; 256];
 
@@ -50,7 +54,9 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunctionFixedIV {
     }
 }
 
-impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunctionFixedIV {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F>
+    for Sha256CompressionFunctionFixedIV
+{
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 512);
         inputs.try_into().unwrap()
@@ -65,7 +71,9 @@ impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunctionFixedIV 
     }
 }
 
-impl<F: FancyBinary> CircuitOutputMapper<F> for Sha256CompressionFunctionFixedIV {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F>
+    for Sha256CompressionFunctionFixedIV
+{
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.to_vec()
     }
@@ -96,7 +104,7 @@ impl Default for Sha256CompressionFunction {
     }
 }
 
-impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunction {
     type Input = ([F::Item; 512], [F::Item; 256]);
     type Output = [F::Item; 256];
 
@@ -118,7 +126,7 @@ impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
     }
 }
 
-impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Sha256CompressionFunction {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 768);
         let (block, chain) = inputs.split_at(512);
@@ -143,7 +151,7 @@ impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
     }
 }
 
-impl<F: FancyBinary> CircuitOutputMapper<F> for Sha256CompressionFunction {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F> for Sha256CompressionFunction {
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.to_vec()
     }
@@ -183,7 +191,7 @@ impl Default for Sha256 {
     }
 }
 
-impl<F: FancyBinary> Circuit<F> for Sha256 {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
     type Input = Vec<F::Item>;
     type Output = [F::Item; 256];
 
@@ -195,8 +203,8 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
     ) -> Result<Self::Output> {
         let message_len = inputs.len();
 
-        let one = backend.constant(1, 2, channel)?;
-        let zero = backend.constant(0, 2, channel)?;
+        let one = backend.constant(F2::ONE);
+        let zero = backend.constant(F2::ZERO);
 
         // Initialize the hash with SHA-256 IV.
         let mut chain: [F::Item; 256] = Self::IV
@@ -223,13 +231,8 @@ impl<F: FancyBinary> Circuit<F> for Sha256 {
         }
 
         // Append the original message length as a 64-bit big-endian integer.
-        let mut length = BinaryConstant::new_with_constants(
-            message_len as u128,
-            64,
-            Some(zero.clone()),
-            Some(one.clone()),
-        )
-        .execute(backend, (), channel)?;
+        let mut length =
+            BinaryConstant::new(message_len as u128, 64).execute(backend, (), channel)?;
         // Constants are represented in little-endian, but here we need message
         // length to be in big-endian. So we reverse the bundle before using it.
         length.reverse();

@@ -37,7 +37,7 @@ use fancy_circuits::{
     util::{PRIMES, crt, crt_inv, primes_with_width, product},
 };
 use fancy_garbling::AllWire;
-use fancy_traits::{Circuit, FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
+use fancy_traits::{Circuit, FancyArithmetic, FancyConstant, FancyEncode, FancyOutput, FancyProj};
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -863,7 +863,7 @@ fn encode_opprf_payload(opprf_ids: &[Block512]) -> Vec<u16> {
 /// Fancy function to compute a weighted average for matching ID's
 /// where one party provides the weights and the other
 //  the values
-fn fancy_compute_payload_aggregate<F: FancyArithmetic + FancyProj + CrtGadgets>(
+fn fancy_compute_payload_aggregate<F: FancyConstant + FancyArithmetic + FancyProj + CrtGadgets>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],

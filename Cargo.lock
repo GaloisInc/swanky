@@ -833,6 +833,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
 ]
 
 [[package]]
@@ -847,6 +848,8 @@ dependencies = [
  "serde",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
  "swanky-rng",
 ]
 
@@ -868,6 +871,7 @@ dependencies = [
  "swanky-channel",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-rng",
  "vectoreyes",
 ]
@@ -880,6 +884,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
 ]
 
 [[package]]
@@ -888,6 +893,7 @@ version = "0.6.0"
 dependencies = [
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-rng",
 ]
 
@@ -1920,7 +1926,6 @@ dependencies = [
  "swanky-cointoss",
  "swanky-cr-hash",
  "swanky-error",
- "swanky-ocelot-error",
  "swanky-oprf-kkrt",
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
@@ -2883,13 +2888,6 @@ name = "swanky-malicious-hooks"
 version = "0.6.0"
 
 [[package]]
-name = "swanky-ocelot-error"
-version = "0.6.0"
-dependencies = [
- "swanky-cointoss",
-]
-
-[[package]]
 name = "swanky-oprf-kkrt"
 version = "0.6.0"
 dependencies = [
@@ -2901,7 +2899,7 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-deprecated-bitwise-utils",
- "swanky-ocelot-error",
+ "swanky-error",
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
@@ -2919,7 +2917,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-block",
  "swanky-channel-legacy",
- "swanky-ocelot-error",
+ "swanky-error",
  "swanky-oprf-kkrt",
  "swanky-oprf-traits",
  "swanky-rng",
@@ -2932,7 +2930,7 @@ version = "0.6.0"
 dependencies = [
  "rand 0.10.2",
  "swanky-channel-legacy",
- "swanky-ocelot-error",
+ "swanky-error",
 ]
 
 [[package]]
@@ -2952,7 +2950,7 @@ dependencies = [
  "swanky-cointoss",
  "swanky-cr-hash",
  "swanky-deprecated-bitwise-utils",
- "swanky-ocelot-error",
+ "swanky-error",
  "swanky-ot-chou-orlandi",
  "swanky-ot-test",
  "swanky-ot-traits",
@@ -2971,7 +2969,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-block",
  "swanky-channel-legacy",
- "swanky-ocelot-error",
+ "swanky-error",
  "swanky-ot-test",
  "swanky-ot-traits",
 ]
@@ -2984,7 +2982,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-block",
  "swanky-channel-legacy",
- "swanky-ocelot-error",
+ "swanky-error",
  "swanky-ot-test",
  "swanky-ot-traits",
 ]
@@ -3000,7 +2998,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-block",
  "swanky-channel-legacy",
- "swanky-ocelot-error",
+ "swanky-error",
  "swanky-ot-test",
  "swanky-ot-traits",
 ]
@@ -3023,7 +3021,7 @@ version = "0.6.0"
 dependencies = [
  "rand 0.10.2",
  "swanky-channel-legacy",
- "swanky-ocelot-error",
+ "swanky-error",
 ]
 
 [[package]]
@@ -3107,10 +3105,10 @@ dependencies = [
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
+ "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
- "swanky-ocelot-error",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-rng",
@@ -3134,7 +3132,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel",
  "swanky-error",
- "swanky-ocelot-error",
+ "swanky-field-binary",
  "swanky-ot-alsz-kos",
  "swanky-ot-chou-orlandi",
  "swanky-ot-traits",

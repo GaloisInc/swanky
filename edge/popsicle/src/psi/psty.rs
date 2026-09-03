@@ -11,7 +11,7 @@ use fancy_circuits::{
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
 use fancy_garbling::AllWire;
-use fancy_traits::{Circuit, FancyBinary, FancyEncode, FancyOutput};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyOutput};
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -429,7 +429,7 @@ fn fancy_compute_intersection<F: FancyBinary>(
 }
 
 /// Fancy function to compute the cardinality
-fn fancy_compute_cardinality<F: FancyBinary>(
+fn fancy_compute_cardinality<F: FancyBinary + FancyBinaryConstant>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],

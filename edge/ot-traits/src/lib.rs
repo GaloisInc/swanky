@@ -3,7 +3,7 @@
 
 use rand::{CryptoRng, Rng};
 use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
+use swanky_error::Result;
 
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
 pub trait Sender
@@ -18,14 +18,14 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error>;
+    ) -> Result<Self>;
     /// Sends messages.
     fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Self::Msg, Self::Msg)],
         rng: &mut RNG,
-    ) -> Result<(), Error>;
+    ) -> Result<()>;
 }
 
 /// Trait for initializing an oblivious transfer object with a fixed key.
@@ -39,7 +39,7 @@ where
         channel: &mut C,
         s_: [u8; 16],
         rng: &mut RNG,
-    ) -> Result<Self, Error>;
+    ) -> Result<Self>;
 }
 
 /// Trait for one-out-of-two oblivious transfer from the receiver's
@@ -56,14 +56,14 @@ where
     fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error>;
+    ) -> Result<Self>;
     /// Receives messages.
     fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
+    ) -> Result<Vec<Self::Msg>>;
 }
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the sender's
@@ -80,7 +80,7 @@ where
         m: usize,
         delta: Self::Msg,
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
+    ) -> Result<Vec<Self::Msg>>;
 }
 
 /// Trait for one-out-of-two _correlated_ oblivious transfer from the receiver's
@@ -95,7 +95,7 @@ where
         channel: &mut C,
         inputs: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
+    ) -> Result<Vec<Self::Msg>>;
 }
 
 /// Trait for one-out-of-two _random_ oblivious transfer from the sender's
@@ -111,7 +111,7 @@ where
         channel: &mut C,
         m: usize,
         rng: &mut RNG,
-    ) -> Result<Vec<(Self::Msg, Self::Msg)>, Error>;
+    ) -> Result<Vec<(Self::Msg, Self::Msg)>>;
 }
 
 /// Trait for one-out-of-two _random_ oblivious transfer from the receiver's
@@ -126,5 +126,5 @@ where
         channel: &mut C,
         deltas: &[bool],
         rng: &mut RNG,
-    ) -> Result<Vec<Self::Msg>, Error>;
+    ) -> Result<Vec<Self::Msg>>;
 }

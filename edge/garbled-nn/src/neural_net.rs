@@ -14,7 +14,9 @@ use fancy_garbling::{
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
-use fancy_traits::{FancyArithmetic, FancyBinary, FancyProj, HasModulus};
+use fancy_traits::{
+    FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyProj, HasModulus,
+};
 use ndarray::Array3;
 use rand::{CryptoRng, Rng};
 #[cfg(feature = "serde")]
@@ -848,7 +850,7 @@ impl NeuralNet {
     ) -> Result<(InputEncoder<W>, GarbledCircuit, OutputMap)> {
         let mut channel = GarbledChannel::new_writer(None);
         let (inputs, outputs, delta) = Channel::with(&mut channel, |channel| {
-            let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng, channel)?;
+            let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng);
 
             // Construct the zero wires for the input.
             let inputs = (0..self.ninputs())
@@ -885,7 +887,7 @@ impl NeuralNet {
     ) -> Result<Vec<BinaryBundle<W>>> {
         // Evaluate the garbled circuit on the input wirelabels.
         Channel::with(GarbledChannel::from(gc), |channel| {
-            let mut evaluator = fancy_garbling::Evaluator::<W>::new(channel)?;
+            let mut evaluator = fancy_garbling::Evaluator::<W>::new();
             let mut nn = BinaryNeuralNet::new(&mut evaluator, bitwidth, false);
             nn.eval(self, inputs, secret_weights, channel)
         })
@@ -907,7 +909,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: FancyBinary + BinaryGadgets,
+        F: FancyBinary + FancyBinaryConstant + BinaryGadgets,
     {
         let mut errors = 0;
 
@@ -958,7 +960,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets,
+        F: FancyConstant + FancyBinary + FancyArithmetic + FancyProj + CrtGadgets,
     {
         let moduli = util::bitwidths_to_moduli(bitwidth);
 

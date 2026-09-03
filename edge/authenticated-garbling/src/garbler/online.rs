@@ -115,14 +115,6 @@ impl<'a, C> GarblerOnline<'a, C> {
 
 impl<'a, C> Fancy for GarblerOnline<'a, C> {
     type Item = ValidatorWire;
-
-    fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
-        // TODO: `constant` should _not_ be a part of `Fancy`, but maybe live in
-        // a `FancyConstant` trait?
-        unimplemented!(
-            "In the online phase, we don't do any circuit evaluation, so `constant` should never be called."
-        )
-    }
 }
 
 impl<'a, C> FancyEncode for GarblerOnline<'a, C> {

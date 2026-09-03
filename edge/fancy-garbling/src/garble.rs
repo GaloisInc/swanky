@@ -177,7 +177,7 @@ mod streaming {
     use fancy_circuits::util::RngExt;
     use fancy_circuits::{CrtBundle, CrtGadgets};
     use fancy_plaintext::Dummy;
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyConstant};
     use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
     use rand::{RngExt as _, rng};
     use swanky_channel::Channel;
@@ -203,9 +203,10 @@ mod streaming {
 
         let (inputs, moduli, expected) = super::helpers::plaintext(circuit);
 
+        let mut gb = Garbler::new(rng);
+        let mut ev = Evaluator::new();
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut gb = Garbler::new(rng, channel)?;
                 let zeros = gb.encode_many(&inputs, &moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
@@ -219,7 +220,6 @@ mod streaming {
                 Ok(())
             },
             |channel| {
-                let mut ev = Evaluator::new(channel)?;
                 let wires = ev.receive_many(&moduli, channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
@@ -287,7 +287,7 @@ mod streaming {
 
     /// Circuit for testing multiple CRT operations.
     struct TestComplexGadget(pub Vec<u16>, pub usize);
-    impl<F: FancyArithmetic + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
+    impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
         type Input = Vec<CrtBundle<F::Item>>;
         type Output = Vec<CrtBundle<F::Item>>;
 
@@ -309,7 +309,9 @@ mod streaming {
             Ok(outputs)
         }
     }
-    impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitInputMapper<F> for TestComplexGadget {
+    impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> CircuitInputMapper<F>
+        for TestComplexGadget
+    {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0.len() * self.1);
             inputs
@@ -326,7 +328,9 @@ mod streaming {
             self.0[i % self.0.len()]
         }
     }
-    impl<F: FancyArithmetic + FancyProj + CrtGadgets> CircuitOutputMapper<F> for TestComplexGadget {
+    impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> CircuitOutputMapper<F>
+        for TestComplexGadget
+    {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output
                 .iter()

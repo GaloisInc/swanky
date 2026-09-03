@@ -4,7 +4,7 @@
 use rand::{CryptoRng, Rng};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
-use swanky_ocelot_error::Error;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 /// Oblivious transfer sender.
@@ -15,10 +15,7 @@ pub struct Receiver {}
 impl OtSender for Sender {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        _: &mut C,
-        _: &mut RNG,
-    ) -> Result<Self, Error> {
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
     }
 
@@ -27,17 +24,23 @@ impl OtSender for Sender {
         channel: &mut C,
         inputs: &[(Block, Block)],
         _: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut bs = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let b = channel.read_bool()?;
+            let b = channel
+                .read_bool()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read bool")?;
             bs.push(b);
         }
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { m.1 } else { m.0 };
-            channel.write_block(&m)?;
+            channel
+                .write_block(&m)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
 }
@@ -51,10 +54,7 @@ impl std::fmt::Display for Sender {
 impl OtReceiver for Receiver {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        _: &mut C,
-        _: &mut RNG,
-    ) -> Result<Self, Error> {
+    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
     }
 
@@ -63,14 +63,20 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         inputs: &[bool],
         _: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
+    ) -> Result<Vec<Block>> {
         for b in inputs.iter() {
-            channel.write_bool(*b)?;
+            channel
+                .write_bool(*b)
+                .wrap_err(ErrorKind::NetworkError, "Unable to write bool")?;
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         let mut out = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
-            let m = channel.read_block()?;
+            let m = channel
+                .read_block()
+                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             out.push(m);
         }
         Ok(out)
