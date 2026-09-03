@@ -43,6 +43,9 @@ pub const VOLE_SIZE_PARAM: usize = 8;
 /// [VOLE size parameter $`r`$](VOLE_SIZE_PARAM).
 pub const REPETITION_PARAM: usize = if cfg!(feature = "256bit") { 32 } else { 16 };
 
+// Check statically that $`\lambda = r \times \tau`$.
+const _: () = assert!(REPETITION_PARAM * VOLE_SIZE_PARAM == SECURITY_PARAM);
+
 #[cfg(not(feature = "256bit"))]
 /// The binary field used throughout the protocol.
 pub type FLambda = swanky_field_binary::F128b;
