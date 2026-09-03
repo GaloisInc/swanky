@@ -21,6 +21,8 @@ impl RandomVoleP for VoleProver {
         _rng: &mut impl CryptoRng,
     ) -> (Self, Self::VoleChallenge) {
         log::info!("NB VOLES {:?}", extended_witness_length);
+        // FIXME(hamlinb): This appears to use `SECURITY_PARAM` *bytes* of entropy, rather than
+        // `SECURITY_PARAM` bits. Looks like we're squeezing too much. Clarify this.
         let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
