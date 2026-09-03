@@ -101,7 +101,7 @@ impl<F: FancyBinary> FancyBinary for CircuitAnalyzerWrapper<F> {
 
 #[cfg(test)]
 mod tests {
-    use fancy_circuits::aes::AesNonExpanded;
+    use fancy_circuits::crypto::aes::Aes128;
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::Circuit;
     use swanky_channel::Channel;
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn aes_128_bristol_format_is_correct() {
-        let circuit = AesNonExpanded::new();
+        let circuit = Aes128::new();
         let mut analyzer = CircuitAnalyzerWrapper::new(Dummy::new());
         let key = [Wire::new(DummyVal::new_bool(false)); 128];
         let block = [Wire::new(DummyVal::new_bool(false)); 128];
@@ -129,12 +129,11 @@ mod tests {
             "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
         );
 
-        // These counts come from
-        // <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
+        // These counts come from <https://nigelsmart.github.io/MPC-Circuits/>
         //
         // Note: If we change the AES circuit, these will need to change!
-        assert_eq!(analyzer.nands(), 6800);
-        assert_eq!(analyzer.nxors(), 25124);
-        assert_eq!(analyzer.nnegs, 1692);
+        assert_eq!(analyzer.nands(), 6400);
+        assert_eq!(analyzer.nxors(), 28176);
+        assert_eq!(analyzer.nnegs, 2087);
     }
 }
