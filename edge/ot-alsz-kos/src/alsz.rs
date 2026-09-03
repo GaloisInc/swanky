@@ -31,7 +31,7 @@ pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest = swanky_ot_chou_orla
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT> {
-    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         s_: [u8; 16],
         rng: &mut RNG,
@@ -83,16 +83,13 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let mut s_ = [0u8; 16];
         rng.fill_bytes(&mut s_);
         Sender::<OT>::init_fixed_key(channel, s_, rng)
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Self::Msg, Self::Msg)],
@@ -128,7 +125,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> std::fmt::Display for Sender<OT> 
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
-    fn send_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -158,7 +155,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
-    fn send_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -215,10 +212,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
 impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let mut ks = Vec::with_capacity(128);
         let mut k0 = Block::default();
@@ -239,7 +233,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
@@ -266,7 +260,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT> {
-    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],
@@ -290,7 +284,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
-    fn receive_random<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],

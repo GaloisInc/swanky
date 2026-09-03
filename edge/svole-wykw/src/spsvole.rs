@@ -6,7 +6,7 @@ use super::{
 };
 use generic_array::typenum::Unsigned;
 use rand::{
-    CryptoRng, Rng, RngExt, SeedableRng,
+    CryptoRng, RngExt, SeedableRng,
     distr::{Distribution, Uniform},
 };
 use swanky_adversary::Malicious;
@@ -71,7 +71,7 @@ fn eq_send<C: AbstractChannel, FE: FF>(channel: &mut C, x: FE) -> Result<bool> {
 
 // Implementation of the EQ protocol functionality described in
 // <https://eprint.iacr.org/2020/925.pdf>, Page 30.
-fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
+fn eq_receive<C: AbstractChannel, RNG: CryptoRng, FE: FF>(
     channel: &mut C,
     rng: &mut RNG,
     y: FE,
@@ -105,7 +105,7 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng + Rng, FE: FF>(
 }
 
 impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
@@ -129,7 +129,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     //   * t executions of the original spsvole protocol, as it is necessary for svole
     //   * in the consistency check, the prover sends the seed so the verifier to
     //     pseudorandomly generate the `chi`s
-    pub(super) fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         n: usize,                            // Equal to cols / weight
@@ -199,7 +199,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     }
 
     #[inline(always)]
-    fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         uws: &[(FE::PrimeField, FE)],      // length = m * t = n
@@ -249,7 +249,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         Ok(())
     }
 
-    pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
@@ -265,7 +265,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
 }
 
 impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         delta: FE,
@@ -287,7 +287,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         })
     }
 
-    pub(super) fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         n: usize,
@@ -340,7 +340,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
     }
 
     #[inline(always)]
-    fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive_batch_consistency_check<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         vs: &[FE],
@@ -375,7 +375,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         Ok(())
     }
 
-    pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn duplicate<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,

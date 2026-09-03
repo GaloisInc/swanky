@@ -1,6 +1,6 @@
 use crate::WireLabel;
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use subtle::ConditionallySelectable;
 use vectoreyes::{SimdBase, U8x16};
 
@@ -91,7 +91,7 @@ impl ConditionallySelectable for WireMod2 {
 }
 
 impl WireLabel for WireMod2 {
-    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
+    fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::rand_delta] Expected modulo 2. Got {}", q);
         }
@@ -122,7 +122,7 @@ impl WireLabel for WireMod2 {
         Self { val: inp }
     }
 
-    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::rand] Expected modulo 2. Got {}", q);
         }

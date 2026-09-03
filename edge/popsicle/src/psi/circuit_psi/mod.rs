@@ -4,7 +4,7 @@ use crate::psi::circuit_psi::{base_psi::*, circuits::*};
 use fancy_circuits::BinaryBundle;
 use fancy_garbling::WireMod2;
 use fancy_traits::{Fancy, FancyBinary};
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, SeedableRng};
 use swanky_block::Block512;
 use swanky_channel::Channel;
 

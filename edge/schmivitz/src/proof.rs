@@ -9,7 +9,7 @@
 //!
 use fancy_traits::Circuit as FancyCircuit;
 use merlin::Transcript;
-use rand::{CryptoRng, Rng, rng};
+use rand::{CryptoRng, rng};
 use rayon::iter::*;
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
@@ -81,7 +81,7 @@ where
         rng: &mut RNG,
     ) -> Result<Self>
     where
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let (gates, private_input, max_wire_id) = circuit.to_interpreter();
         Self::prove(
@@ -105,7 +105,7 @@ where
     where
         C: FancyCircuit<ProverPreparer<'a>, Input = ()>
             + FancyCircuit<ProverTraverser<VoleP>, Input = ()>,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let t = std::time::Instant::now();
         let mut transcript = transcript::Transcript::from(transcript);

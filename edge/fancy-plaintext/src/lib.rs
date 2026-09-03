@@ -5,7 +5,7 @@ use fancy_traits::{
     Circuit, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj, HasModulus, is_binary,
 };
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
 use swanky_field_binary::F2;
@@ -49,12 +49,12 @@ impl DummyVal {
     }
 
     /// Generate a random boolean [`DummyVal`].
-    pub fn rand_bool<RNG: CryptoRng + Rng>(rng: &mut RNG) -> Self {
+    pub fn rand_bool<RNG: CryptoRng>(rng: &mut RNG) -> Self {
         Self::rand(2, rng)
     }
 
     /// Generate a random [`DummyVal`].
-    pub fn rand<RNG: CryptoRng + Rng>(modulus: u16, rng: &mut RNG) -> Self {
+    pub fn rand<RNG: CryptoRng>(modulus: u16, rng: &mut RNG) -> Self {
         Self::new(rng.random::<u16>(), modulus)
     }
 }

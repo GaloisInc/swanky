@@ -6,7 +6,7 @@ use super::{
     utils::Powers,
 };
 use generic_array::typenum::Unsigned;
-use rand::{CryptoRng, Rng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
@@ -26,7 +26,7 @@ pub struct Receiver<FE: FF> {
 
 impl<FE: FF> Sender<FE> {
     /// Initalize the base vole sender
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
@@ -36,7 +36,7 @@ impl<FE: FF> Sender<FE> {
     }
 
     /// Recieve `n` `(x, beta)` pairs such that $`T = \beta - x \cdot \Delta`$
-    pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         n: usize,
@@ -80,7 +80,7 @@ impl<FE: FF> Sender<FE> {
 
 impl<FE: FF> Receiver<FE> {
     /// Initalize the base vole receiver with a random `delta`
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
@@ -89,7 +89,7 @@ impl<FE: FF> Receiver<FE> {
         Ok(Self { copee, pows })
     }
     /// Initalize the base vole receiver with a supplied `delta`
-    pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
@@ -103,7 +103,7 @@ impl<FE: FF> Receiver<FE> {
         self.copee.delta()
     }
     /// Recieve `len` base VOLE `T` values where $`T = \beta - x \cdot \Delta`$
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         len: usize,
