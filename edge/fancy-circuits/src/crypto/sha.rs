@@ -1,6 +1,6 @@
 //! SHA circuits.
 
-use crate::{BinaryCircuit, binary::BinaryConstant};
+use crate::{binary::BinaryConstant, bristol::BristolFashionCircuit};
 use fancy_traits::{
     Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
 };
@@ -11,7 +11,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 
 /// Circuit for the SHA-256 compression function.
-pub struct Sha256CompressionFunction(BinaryCircuit);
+pub struct Sha256CompressionFunction(BristolFashionCircuit);
 
 impl Sha256CompressionFunction {
     /// Create a new [`Sha256CompressionFunction`] circuit.
@@ -21,7 +21,7 @@ impl Sha256CompressionFunction {
     /// Hence, it is best to reuse this circuit if possible versus calling
     /// [`Sha256CompressionFunction::new`] every time this circuit is needed.
     pub fn new() -> Self {
-        let circuit = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+        let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/sha256.txt"),
         ))
         .expect("`sha256.txt` file should always parse correctly");

@@ -4,7 +4,7 @@ use swanky_error::Result;
 
 mod parser;
 
-/// A binary circuit represented as a vector of gates.
+/// Internal representation of a Bristol Fashion circuit.
 ///
 /// Wires are numbered canonically: the input wires are wires `0..ninputs`, and
 /// the output wire of the `i`th gate is wire `ninputs + i`. Because a gate's
@@ -13,13 +13,13 @@ mod parser;
 /// gate's output to a single buffer of wires, instead of writing into a
 /// pre-initialized one.
 #[derive(Clone, Debug, PartialEq)]
-pub struct BinaryCircuit {
+pub(crate) struct BristolFashionCircuit {
     gates: Vec<BinaryGate>,
     ninputs: usize,
     output_refs: Vec<u32>,
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryCircuit {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BristolFashionCircuit {
     type Input = Vec<F::Item>;
     type Output = Vec<F::Item>;
 
@@ -56,7 +56,7 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryCircuit {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BinaryCircuit {
+impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BristolFashionCircuit {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.ninputs);
         inputs
@@ -71,10 +71,12 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BinaryCircu
     }
 }
 
-/// Binary gates used by [`BinaryCircuit`].
-// We use `u32` here on purpose to reduce the size of the `BinaryCircuit`.
+/// Binary gates used by [`BristolFashionCircuit`].
+// Note: We use `u32` here on purpose to reduce the size of the
+// `BristolFashionCircuit`. None of the circuits come close to surpassing 2^32
+// gates, and hence this is okay.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum BinaryGate {
+pub(crate) enum BinaryGate {
     /// XOR gate.
     Xor {
         /// Left input wire index.
@@ -109,10 +111,10 @@ impl std::fmt::Display for BinaryGate {
     }
 }
 
-impl BinaryCircuit {
-    /// Construct a new empty [`BinaryCircuit`] on `ninputs` inputs, allocating
-    /// `ngates` of space to store gates if provided.
-    pub fn new(ninputs: usize, ngates: Option<usize>) -> Self {
+impl BristolFashionCircuit {
+    /// Construct a new empty [`BristolFashionCircuit`] on `ninputs` inputs,
+    /// allocating `ngates` of space to store gates if provided.
+    pub(crate) fn new(ninputs: usize, ngates: Option<usize>) -> Self {
         let gates = if let Some(n) = ngates {
             Vec::with_capacity(n)
         } else {

@@ -1,6 +1,6 @@
 //! AES circuits.
 
-use crate::BinaryCircuit;
+use crate::bristol::BristolFashionCircuit;
 use fancy_traits::{
     Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
 };
@@ -11,7 +11,7 @@ use swanky_error::Result;
 /// Circuit for AES-128.
 ///
 /// For an input `(key, block)`, output `AES-128(key, block)`.
-pub struct Aes128(BinaryCircuit);
+pub struct Aes128(BristolFashionCircuit);
 
 impl Aes128 {
     /// Create a new [`Aes128`] circuit.
@@ -21,7 +21,7 @@ impl Aes128 {
     /// Hence, it is best to reuse this circuit if possible versus calling
     /// [`Aes128::new`] every time this circuit is needed.
     pub fn new() -> Self {
-        let circuit = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+        let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/aes_128.txt"),
         ))
         .expect("`aes_128.txt` should always parse correctly");

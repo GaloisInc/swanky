@@ -17,6 +17,5 @@ pub mod test_circuits;
 mod fancy;
 pub use crate::fancy::*;
 
-mod binary_circuit;
+mod bristol;
 pub mod util;
-pub use binary_circuit::{BinaryCircuit, BinaryGate};

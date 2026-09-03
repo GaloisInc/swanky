@@ -1,12 +1,7 @@
-//! Functions for parsing and running circuit files.
-//!
-//! This module provides parsers for two Bristol circuit formats:
-//!
-//! - **Bristol Format**: The original format:
-//!   <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>
-//! - **Bristol Fashion**: The new format: <https://nigelsmart.github.io/MPC-Circuits>
+//! Methods for parsing and running Bristol Fashion files, as defined here:
+//! <https://nigelsmart.github.io/MPC-Circuits>
 
-use crate::{BinaryCircuit, BinaryGate};
+use crate::bristol::{BinaryGate, BristolFashionCircuit};
 use std::{io::BufRead, str::FromStr};
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 
@@ -26,8 +21,8 @@ fn next_u32<'t>(parts: &mut impl Iterator<Item = &'t str>) -> Result<u32> {
 }
 
 /// Translation from the wire numbering used by a circuit file to the canonical
-/// numbering used by [`BinaryCircuit`], where the input wires come first and the
-/// output wire of the `i`th gate is wire `ninputs + i`.
+/// numbering used by [`BristolFashionCircuit`], where the input wires come
+/// first and the output wire of the `i`th gate is wire `ninputs + i`.
 struct WireMap {
     /// Canonical wire index of each wire in the file, or `u32::MAX` if that wire
     /// has not been assigned a value yet.
@@ -143,10 +138,10 @@ fn parse_gate(line: &str, wires: &mut WireMap) -> Result<BinaryGate> {
     Ok(gate)
 }
 
-impl BinaryCircuit {
-    /// Generate a new [`BinaryCircuit`] from the provided reader. The file must
-    /// follow the Bristol Fashion format.
-    pub fn parse_bristol_fashion(mut reader: impl BufRead) -> Result<Self> {
+impl BristolFashionCircuit {
+    /// Generate a new [`BristolFashionCircuit`] from the provided reader. The
+    /// file must follow the Bristol Fashion format.
+    pub(crate) fn parse_bristol_fashion(mut reader: impl BufRead) -> Result<Self> {
         // Parse first line: "ngates nwires\n".
         let mut line = String::new();
         reader
@@ -210,117 +205,19 @@ impl BinaryCircuit {
         circ.batch_gates_by_type();
         Ok(circ)
     }
-
-    /// Generates a new [`BinaryCircuit`] from the provided reader. The file
-    /// must follow the Bristol Format given here:
-    /// <https://nigelsmart.github.io/MPC-Circuits/old-circuits.html>.
-    pub fn parse_bristol_format(mut reader: impl BufRead) -> Result<Self> {
-        // Parse first line: ngates nwires\n
-        let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let mut parts = line.split_whitespace();
-        let ngates = next_u32(&mut parts)?;
-        let nwires = next_u32(&mut parts)?;
-        ensure!(
-            parts.next().is_none(),
-            ErrorKind::OtherError,
-            "Trailing data in gate and wire count line: {}",
-            line.trim()
-        );
-
-        // Parse second line: n1 n2 n3\n
-        let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        let mut parts = line.split_whitespace();
-        let ngarbler_inputs = next_u32(&mut parts)?;
-        let nevaluator_inputs = next_u32(&mut parts)?;
-        let noutputs = next_u32(&mut parts)?;
-        ensure!(
-            parts.next().is_none(),
-            ErrorKind::OtherError,
-            "Trailing data in input and output count line: {}",
-            line.trim()
-        );
-
-        // Parse third line: \n
-        let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-        ensure!(
-            line.trim().is_empty(),
-            ErrorKind::OtherError,
-            "Expected an empty line, got: {}",
-            line.trim()
-        );
-
-        let ninputs = ngarbler_inputs + nevaluator_inputs;
-        let mut circ = Self::new(ninputs as usize, Some(ngates as usize));
-        let mut wires = WireMap::new(nwires, ninputs);
-
-        // Parse gate definitions (same as Bristol Fashion).
-        for line in reader.lines() {
-            let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let gate = parse_gate(line, &mut wires).wrap_err_with(ErrorKind::OtherError, || {
-                format!("Invalid gate definition: {line}")
-            })?;
-            circ.gates.push(gate);
-        }
-
-        // Process outputs, which are the last `noutputs` wires of the file.
-        for i in 0..noutputs {
-            circ.output_refs.push(wires.get(nwires - noutputs + i)?);
-        }
-
-        circ.batch_gates_by_type();
-        Ok(circ)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::BinaryCircuit;
+    use crate::bristol::BristolFashionCircuit;
     use std::io::Cursor;
-
-    #[test]
-    fn bristol_format_parser_works() {
-        // Tests all the circuits in the `circuits/bristol-format` directory.
-
-        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../../circuits/bristol-format/adder_32bit.txt"),
-        ));
-        assert!(result.is_ok());
-
-        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../../circuits/bristol-format/AES-non-expanded.txt"),
-        ));
-        assert!(result.is_ok());
-
-        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../../circuits/bristol-format/sha-1.txt"),
-        ));
-        assert!(result.is_ok());
-
-        let result = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../../circuits/bristol-format/sha-256.txt"),
-        ));
-        assert!(result.is_ok());
-    }
 
     #[test]
     fn bristol_fashion_parser_works() {
         // Tests all the circuits in the `circuits/bristol-fashion` directory.
 
         // Test AES-128 circuit.
-        let result = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+        let result = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/aes_128.txt"),
         ));
         assert!(result.is_ok());
@@ -333,7 +230,7 @@ mod tests {
         assert!(!circuit.gates.is_empty());
 
         // Test SHA-256 circuit.
-        let result = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+        let result = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/sha256.txt"),
         ));
         assert!(result.is_ok());
