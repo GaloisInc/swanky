@@ -3,21 +3,16 @@
 
 use crate::bristol::{BinaryGate, BristolFashionCircuit};
 use std::{io::BufRead, str::FromStr};
-use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 
 /// Grab the next token from `parts`, failing if there is none.
-fn next_token<'a>(parts: &mut impl Iterator<Item = &'a str>) -> Result<&'a str> {
-    parts
-        .next()
-        .ok_or_else(|| swanky_error!(ErrorKind::OtherError, "Missing token"))
+fn next_token<'a>(parts: &mut impl Iterator<Item = &'a str>) -> &'a str {
+    parts.next().expect("Token should exist")
 }
 
 /// Grab the next token from `parts` and parse it as a [`u32`].
-fn next_u32<'t>(parts: &mut impl Iterator<Item = &'t str>) -> Result<u32> {
-    let s = next_token(parts)?;
-    u32::from_str(s).wrap_err_with(ErrorKind::OtherError, || {
-        format!("Failed to parse u32 from '{s}'")
-    })
+fn next_u32<'t>(parts: &mut impl Iterator<Item = &'t str>) -> u32 {
+    let s = next_token(parts);
+    u32::from_str(s).expect("Token should be a valid u32")
 }
 
 /// Translation from the wire numbering used by a circuit file to the canonical
@@ -48,33 +43,27 @@ impl WireMap {
 
     /// Look up the canonical index of `wire`, failing if it has not been
     /// defined yet.
-    fn get(&self, wire: u32) -> Result<u32> {
-        let canonical = *self.map.get(wire as usize).ok_or_else(|| {
-            swanky_error!(
-                ErrorKind::OtherError,
-                "Wire {wire} is out of range of the circuit's wire count"
-            )
-        })?;
-        ensure!(
-            canonical != u32::MAX,
-            ErrorKind::OtherError,
-            "Wire {} is used before it is defined",
-            wire
+    fn get(&self, wire: u32) -> u32 {
+        let canonical = *self
+            .map
+            .get(wire as usize)
+            .expect("Wire should be in range of circuit's wire count");
+        assert_ne!(
+            canonical,
+            u32::MAX,
+            "Wire {wire} is used before it is defined",
         );
-        Ok(canonical)
+        canonical
     }
 
     /// Assign the next canonical index to `wire`.
-    fn set(&mut self, wire: u32) -> Result<()> {
-        let canonical = self.map.get_mut(wire as usize).ok_or_else(|| {
-            swanky_error!(
-                ErrorKind::OtherError,
-                "Wire {wire} is out of range of the circuit's wire count"
-            )
-        })?;
+    fn set(&mut self, wire: u32) {
+        let canonical = self
+            .map
+            .get_mut(wire as usize)
+            .expect("Wire should be in range of circuit's wire count");
         *canonical = self.next;
         self.next += 1;
-        Ok(())
     }
 }
 
@@ -82,86 +71,77 @@ impl WireMap {
 /// `<# input wires> <# output wires> <input wires...> <output wire> <gate type>`,
 /// returning the resulting [`BinaryGate`]. The gate's wires are translated
 /// through `wires`, whose output wire is defined as a side effect.
-fn parse_gate(line: &str, wires: &mut WireMap) -> Result<BinaryGate> {
+fn parse_gate(line: &str, wires: &mut WireMap) -> BinaryGate {
     let mut parts = line.split_whitespace();
-    let ninput_wires = next_u32(&mut parts)?;
-    let noutput_wires = next_u32(&mut parts)?;
-    ensure!(
-        noutput_wires == 1,
-        ErrorKind::OtherError,
-        "Expected one output wire, got {}",
-        noutput_wires
+    let ninput_wires = next_u32(&mut parts);
+    let noutput_wires = next_u32(&mut parts);
+    assert_eq!(
+        noutput_wires, 1,
+        "Expected one output wire, got {noutput_wires}",
     );
     let gate = match ninput_wires {
         1 => {
-            let xref = wires.get(next_u32(&mut parts)?)?;
-            let out = next_u32(&mut parts)?;
-            let typ = next_token(&mut parts)?;
-            ensure!(
-                typ == "INV",
-                ErrorKind::OtherError,
-                "Unknown one-input gate type '{}'",
-                typ
-            );
-            wires.set(out)?;
+            let xref = wires.get(next_u32(&mut parts));
+            let out = next_u32(&mut parts);
+            let typ = next_token(&mut parts);
+            assert_eq!(typ, "INV", "Unknown one-input gate type '{typ}'");
+            wires.set(out);
             BinaryGate::Inv { xref }
         }
         2 => {
-            let xref = wires.get(next_u32(&mut parts)?)?;
-            let yref = wires.get(next_u32(&mut parts)?)?;
-            let out = next_u32(&mut parts)?;
-            let typ = next_token(&mut parts)?;
+            let xref = wires.get(next_u32(&mut parts));
+            let yref = wires.get(next_u32(&mut parts));
+            let out = next_u32(&mut parts);
+            let typ = next_token(&mut parts);
             let gate = match typ {
                 "AND" => BinaryGate::And { xref, yref },
                 "XOR" => BinaryGate::Xor { xref, yref },
-                typ => swanky_error::bail!(
-                    ErrorKind::OtherError,
-                    "Unknown two-input gate type '{}'",
-                    typ
-                ),
+                typ => panic!("Unknown two-input gate type '{typ}'"),
             };
-            wires.set(out)?;
+            wires.set(out);
             gate
         }
-        n => swanky_error::bail!(
-            ErrorKind::OtherError,
-            "Unsupported number of input wires: {}",
-            n
-        ),
+        n => panic!("Unsupported number of input wires: {n}"),
     };
-    ensure!(
+    assert!(
         parts.next().is_none(),
-        ErrorKind::OtherError,
-        "Trailing data in gate definition: {}",
-        line
+        "Trailing data in gate definition: {line}"
     );
-    Ok(gate)
+    gate
 }
 
 impl BristolFashionCircuit {
     /// Generate a new [`BristolFashionCircuit`] from the provided reader. The
     /// file must follow the Bristol Fashion format.
-    pub(crate) fn parse_bristol_fashion(mut reader: impl BufRead) -> Result<Self> {
+    ///
+    /// # Panics
+    /// This panics on any parsing failure.
+    ///
+    /// # Security Note
+    /// This method has not been vetted to correctly handle malformed Bristol
+    /// Fashion files. Hence, it is not meant to parse arbitrary input files,
+    /// but only those vetting to be correctly formatted!
+    pub(crate) fn parse_bristol_fashion(mut reader: impl BufRead) -> Self {
         // Parse first line: "ngates nwires\n".
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+            .expect("Line should be readable");
         let mut parts = line.split_whitespace();
-        let ngates = next_u32(&mut parts)?;
-        let nwires = next_u32(&mut parts)?;
+        let ngates = next_u32(&mut parts);
+        let nwires = next_u32(&mut parts);
 
         // Parse second line: "ninputs input1 input2 ...\n".
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+            .expect("Line should be readable");
         let mut parts = line.split_whitespace();
 
-        let ninputs = next_u32(&mut parts)?;
+        let ninputs = next_u32(&mut parts);
         let mut ninputs_total = 0;
         for _ in 0..ninputs {
-            let ninputs = next_u32(&mut parts)?;
+            let ninputs = next_u32(&mut parts);
             ninputs_total += ninputs;
         }
 
@@ -170,12 +150,12 @@ impl BristolFashionCircuit {
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+            .expect("Line should be readable");
         let mut parts = line.split_whitespace();
-        let noutputs = next_u32(&mut parts)?;
+        let noutputs = next_u32(&mut parts);
         let mut noutputs_total = 0;
         for _ in 0..noutputs {
-            let noutputs = next_u32(&mut parts)?;
+            let noutputs = next_u32(&mut parts);
             noutputs_total += noutputs;
         }
 
@@ -184,14 +164,12 @@ impl BristolFashionCircuit {
 
         // Parse gate definitions.
         for line in reader.lines() {
-            let line = line.wrap_err(ErrorKind::OtherError, "Failed to read line")?;
+            let line = line.expect("Line should be readable");
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            let gate = parse_gate(line, &mut wires).wrap_err_with(ErrorKind::OtherError, || {
-                format!("Invalid gate definition: {line}")
-            })?;
+            let gate = parse_gate(line, &mut wires);
             circ.gates.push(gate);
         }
 
@@ -199,11 +177,11 @@ impl BristolFashionCircuit {
         // file, in reverse order.
         for i in (0..noutputs_total).rev() {
             circ.output_refs
-                .push(wires.get(nwires - noutputs_total + i)?);
+                .push(wires.get(nwires - noutputs_total + i));
         }
 
         circ.batch_gates_by_type();
-        Ok(circ)
+        circ
     }
 }
 
@@ -217,11 +195,9 @@ mod tests {
         // Tests all the circuits in the `circuits/bristol-fashion` directory.
 
         // Test AES-128 circuit.
-        let result = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+        let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/aes_128.txt"),
         ));
-        assert!(result.is_ok());
-        let circuit = result.unwrap();
         // AES-128: 2 input values with 128 bits each = 256 inputs total.
         assert_eq!(circuit.ninputs, 256);
         // AES-128: 1 output value with 128 bits output = 128 outputs total.
@@ -230,11 +206,9 @@ mod tests {
         assert!(!circuit.gates.is_empty());
 
         // Test SHA-256 circuit.
-        let result = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+        let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/sha256.txt"),
         ));
-        assert!(result.is_ok());
-        let circuit = result.unwrap();
         // SHA-256: 2 parties with 512 + 256 = 768 inputs total.
         assert_eq!(circuit.ninputs, 768);
         // SHA-256: 1 party with 256 bits output = 256 outputs total.

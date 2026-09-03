@@ -23,8 +23,7 @@ impl Aes128 {
     pub fn new() -> Self {
         let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/aes_128.txt"),
-        ))
-        .expect("`aes_128.txt` should always parse correctly");
+        ));
         Self(circuit)
     }
 }

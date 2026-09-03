@@ -23,8 +23,7 @@ impl Sha256CompressionFunction {
     pub fn new() -> Self {
         let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
             include_bytes!("../../circuits/bristol-fashion/sha256.txt"),
-        ))
-        .expect("`sha256.txt` file should always parse correctly");
+        ));
         Self(circuit)
     }
 }

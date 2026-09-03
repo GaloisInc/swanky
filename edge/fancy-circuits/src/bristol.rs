@@ -72,9 +72,11 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BristolFash
 }
 
 /// Binary gates used by [`BristolFashionCircuit`].
-// Note: We use `u32` here on purpose to reduce the size of the
-// `BristolFashionCircuit`. None of the circuits come close to surpassing 2^32
-// gates, and hence this is okay.
+///
+/// # Note
+/// We use `u32` here on purpose to reduce the size of the
+/// [`BristolFashionCircuit`]. None of the circuits come close to surpassing
+/// 2^32 gates, and hence this is okay.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum BinaryGate {
     /// XOR gate.
