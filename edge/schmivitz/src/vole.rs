@@ -156,7 +156,7 @@ where
     fn aggregate_commitment_values(&self) -> [FLambda; REPETITION_PARAM * VOLE_SIZE_PARAM];
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// lifted into [`FLambda`] from `[`[`F8b`]`; 16]`.
+    /// lifted into [`FLambda`] from `[`[`F8b`]`; `SECURITY_PARAM`]`.
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde b`$.

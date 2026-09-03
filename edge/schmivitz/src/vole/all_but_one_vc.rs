@@ -16,7 +16,7 @@
 //!
 //! It also implements the helper function `num_rec` Fig 3.2, page 16.
 //!
-//! We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
+//! We assume the $`\lambda`$ security parameter in the spec to be 128 or 256 as set in
 //! [`SECURITY_PARAM`](crate::parameters::SECURITY_PARAM).
 
 use crate::vole::crypto_primitives::{Com, H1, IV, Key, Prg, Seed, h0};

@@ -17,7 +17,7 @@ use swanky_field_binary::{F2, F8b};
 use swanky_serialization::CanonicalSerialize;
 
 /// Packs bits of the input into `FLambda`s. This does not do a field-to-field transformation;
-/// it uses `FLambda` as a representation of 128 bits, not as a polynomial!
+/// it uses `FLambda` as a representation of $`\lambda`$ bits, not as a polynomial!
 fn pack_flambda(arrs: &[[F8b; REPETITION_PARAM]]) -> Vec<FLambda> {
     arrs.into_par_iter()
         .map(|xi| {
@@ -41,9 +41,9 @@ fn transpose_u8_matrix<const LIN: usize, const COL: usize>(
     }
 }
 
-/// Take a sequence of [`FLambda`] values, interpret every value into its bit decomposition,
-/// that becomes a n*128 boolean matrix where n is the length of the sequence.
-/// Apply `to_field_f128` (which includes padding) to every column in lock step and emit a sequence of
+/// Take a sequence of [`FLambda`] values, interpret every value into its bit decomposition, that
+/// becomes a n*128 boolean matrix where n is the length of the sequence. Apply `to_field_flambda`
+/// (which includes padding) to every column in lock step and emit a sequence of
 /// 128 [`FLambda`] values.
 #[inline(never)]
 #[allow(dead_code)]
@@ -301,7 +301,7 @@ impl VoleHasher {
         let (x0, x1) = x.split_at(self.ell + SECURITY_PARAM);
 
         // Line 7. This pads and converts to a field -- it is called `y_hat` in the spec.
-        let x0_vec = self.to_field_128(x0);
+        let x0_vec = self.to_field_lambda(x0);
 
         // Line 10 and 11.
         // This differs from the FAEST spec where the powers are in reverse order; this is also valid!
@@ -339,7 +339,7 @@ impl VoleHasher {
     }
 
     // Padding plus ToField (Fig 3.1) from FAEST, where `k` is fixed to the security parameter (128).
-    fn to_field_128(&self, x: &[F2]) -> Vec<FLambda> {
+    fn to_field_lambda(&self, x: &[F2]) -> Vec<FLambda> {
         let padding =
             repeat_n(F2::ZERO, self.ell_prime - (self.ell + SECURITY_PARAM)).collect::<Vec<_>>();
 
@@ -402,7 +402,7 @@ impl VoleHasher {
         // One downside of this option is that it needs the vector of values to be explicitly and it cannot just use the enumerator.
 
         /*
-        let x0_vec = to_field_f128_and_pad_lockstep(&pack_flambda(x0));
+        let x0_vec = to_field_flambda_and_pad_lockstep(&pack_flambda(x0));
         fn powers(base: FLambda, n: usize) -> Vec<FLambda> {
             let mut out = Vec::with_capacity(n);
             let mut p = base;
@@ -569,13 +569,13 @@ mod test {
     use swanky_serialization::CanonicalSerialize;
 
     #[test]
-    fn test_padding_of_to_field_f128_and_pad() {
-        // Called with an `ell`-length input, `to_field_128` pads up to a multiple of lambda and
+    fn test_padding_of_to_field_flambda_and_pad() {
+        // Called with an `ell`-length input, `to_field_lambda` pads up to a multiple of lambda and
         // emits one field element per lambda-bit chunk, so there are `ceil(ell / lambda)` of them.
         for ell in [1000, SECURITY_PARAM, SECURITY_PARAM + 1] {
             let v = vec![F2::ZERO; ell];
             let hasher = VoleHasher::from_seed([0; CHALL1_LENGTH], ell);
-            let t = hasher.to_field_128(&v);
+            let t = hasher.to_field_lambda(&v);
             assert_eq!(t.len(), ell.div_ceil(SECURITY_PARAM), "ell = {ell}");
         }
 
@@ -585,7 +585,7 @@ mod test {
         v[0] = F2::ONE;
         v[SECURITY_PARAM + 1] = F2::ONE;
         let hasher = VoleHasher::from_seed([0; CHALL1_LENGTH], SECURITY_PARAM + 2);
-        let t = hasher.to_field_128(&v);
+        let t = hasher.to_field_lambda(&v);
         let mut res1 = [0u8; SECURITY_PARAM / 8];
         res1[0] = 1u8;
         assert_eq!(t[0], FLambda::from_bytes(&res1.into()).unwrap());
