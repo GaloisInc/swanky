@@ -45,6 +45,7 @@ impl Corrections {
     }
 
     /// Convert corrections to associated bytes.
+    // TODO: This can probably be replaced by `F2`s `CanonicalSerialize` impl!
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         // Corrections are a vector containing tau vectors of long size
         let how_many = self.0[0].len();
