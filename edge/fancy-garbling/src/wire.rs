@@ -7,7 +7,7 @@
 
 use crate::util;
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use vectoreyes::{
     U8x16,
@@ -71,14 +71,14 @@ pub trait WireLabel:
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
-    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self;
+    fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self;
 
     /// A random [`WireLabel`] `mod q`.
     ///
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
-    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self;
+    fn rand<R: CryptoRng>(rng: &mut R, q: u16) -> Self;
 
     /// Converts a hashed block into a valid wire of the given modulus `q`.
     ///
@@ -112,7 +112,7 @@ pub trait WireLabel:
 
     /// Computes a [`WireLabel`] for `x % q`, returning both the zero
     /// [`WireLabel`] as well as the [`WireLabel`] for `x % q`.
-    fn constant<RNG: CryptoRng + Rng>(x: u16, q: u16, delta: &Self, rng: &mut RNG) -> (Self, Self) {
+    fn constant<RNG: CryptoRng>(x: u16, q: u16, delta: &Self, rng: &mut RNG) -> (Self, Self) {
         let zero = Self::rand(rng, q);
         let wire = zero.clone() + delta.clone() * x;
         (zero, wire)
@@ -228,7 +228,7 @@ impl core::ops::MulAssign<u16> for AllWire {
 }
 
 impl WireLabel for AllWire {
-    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
+    fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         match q {
             2 => AllWire::Mod2(WireMod2::rand_delta(rng, q)),
             3 => AllWire::Mod3(WireMod3::rand_delta(rng, q)),
@@ -258,7 +258,7 @@ impl WireLabel for AllWire {
         }
     }
 
-    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         match q {
             2 => AllWire::Mod2(WireMod2::rand(rng, q)),
             3 => AllWire::Mod3(WireMod3::rand(rng, q)),

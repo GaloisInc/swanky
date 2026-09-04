@@ -25,7 +25,6 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 
 rand.workspace = true
-regex.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]

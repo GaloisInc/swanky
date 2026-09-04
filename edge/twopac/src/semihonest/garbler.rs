@@ -3,7 +3,7 @@ use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj,
 };
-use rand::{CryptoRng, Rng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
@@ -32,7 +32,7 @@ impl<OT, RNG, Wire> std::ops::DerefMut for Garbler<RNG, OT, Wire> {
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
 > Garbler<RNG, OT, Wire>
@@ -61,8 +61,8 @@ impl<
     }
 }
 
-impl<RNG: CryptoRng + Rng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest>
-    FancyBinary for Garbler<RNG, OT, WireMod2>
+impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest> FancyBinary
+    for Garbler<RNG, OT, WireMod2>
 {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.garbler.negate(x)
@@ -82,8 +82,8 @@ impl<RNG: CryptoRng + Rng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block>
     }
 }
 
-impl<RNG: CryptoRng + Rng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest>
-    FancyBinary for Garbler<RNG, OT, AllWire>
+impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest> FancyBinary
+    for Garbler<RNG, OT, AllWire>
 {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.garbler.negate(x)
@@ -104,7 +104,7 @@ impl<RNG: CryptoRng + Rng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block>
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel + ArithmeticWire,
 > FancyArithmetic for Garbler<RNG, OT, Wire>
@@ -132,7 +132,7 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel + ArithmeticWire,
 > FancyProj for Garbler<RNG, OT, Wire>
@@ -149,7 +149,7 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
 > Fancy for Garbler<RNG, OT, Wire>
@@ -158,7 +158,7 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
 > FancyConstant for Garbler<RNG, OT, Wire>
@@ -174,7 +174,7 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
 > FancyBinaryConstant for Garbler<RNG, OT, Wire>
@@ -185,7 +185,7 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
 > FancyEncode for Garbler<RNG, OT, Wire>
@@ -225,7 +225,7 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
 > FancyOutput for Garbler<RNG, OT, Wire>

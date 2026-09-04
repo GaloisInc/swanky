@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! Base traits impl-ed by all our OPRF implementations
 
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
 
@@ -24,12 +24,9 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self>;
+    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         m: usize,
@@ -45,12 +42,9 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self>;
+    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[Self::Input],

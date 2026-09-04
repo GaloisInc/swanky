@@ -1,6 +1,6 @@
 //! Util mostly in support of cuckoo hashing.
 
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use sha2::{Digest, Sha256};
 use swanky_block::Block;
 use swanky_cr_hash::CorrelationRobustHash;
@@ -33,19 +33,19 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
 
 #[allow(dead_code)]
 /// used in tests
-pub fn rand_vec<RNG: CryptoRng + Rng>(n: usize, rng: &mut RNG) -> Vec<u8> {
+pub fn rand_vec<RNG: CryptoRng>(n: usize, rng: &mut RNG) -> Vec<u8> {
     (0..n).map(|_| rng.random()).collect()
 }
 
 #[allow(dead_code)]
 /// used in tests
-pub fn rand_vec_vec<RNG: CryptoRng + Rng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
+pub fn rand_vec_vec<RNG: CryptoRng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n).map(|_| rand_vec(m, rng)).collect()
 }
 
 #[allow(dead_code)]
 /// used in tests
-pub fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
+pub fn rand_u64_vec<RNG: CryptoRng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
     (0..n).map(|_| rng.random::<u64>() % modulus).collect()
 }
 

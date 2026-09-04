@@ -18,7 +18,7 @@ impl<'a, F: FancyBinary> Circuit<F> for PairwiseXor<'a>
 where
     F::Item: 'a,
 {
-    type Input = (&'a Vec<F::Item>, &'a Vec<F::Item>);
+    type Input = (&'a [F::Item], &'a [F::Item]);
     type Output = Vec<F::Item>;
 
     fn execute(

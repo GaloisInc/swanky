@@ -3,7 +3,7 @@ use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj,
 };
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
@@ -20,7 +20,7 @@ pub struct Evaluator<RNG, OT, Wire> {
 
 impl<RNG, OT, Wire> Evaluator<RNG, OT, Wire> {}
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
     Evaluator<RNG, OT, Wire>
 {
     /// Make a new `Evaluator`.
@@ -51,7 +51,7 @@ fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
     })
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     for Evaluator<RNG, OT, WireMod2>
 {
     fn and(
@@ -72,7 +72,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     }
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     for Evaluator<RNG, OT, AllWire>
 {
     fn and(
@@ -93,11 +93,8 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     }
 }
 
-impl<
-    RNG: CryptoRng + Rng,
-    OT: OtReceiver<Msg = Block> + SemiHonest,
-    Wire: WireLabel + ArithmeticWire,
-> FancyArithmetic for Evaluator<RNG, OT, Wire>
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel + ArithmeticWire>
+    FancyArithmetic for Evaluator<RNG, OT, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
         self.evaluator.add(x, y)
@@ -121,11 +118,8 @@ impl<
     }
 }
 
-impl<
-    RNG: CryptoRng + Rng,
-    OT: OtReceiver<Msg = Block> + SemiHonest,
-    Wire: WireLabel + ArithmeticWire,
-> FancyProj for Evaluator<RNG, OT, Wire>
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel + ArithmeticWire>
+    FancyProj for Evaluator<RNG, OT, Wire>
 {
     fn proj(
         &mut self,
@@ -138,13 +132,13 @@ impl<
     }
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> Fancy
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> Fancy
     for Evaluator<RNG, OT, Wire>
 {
     type Item = Wire;
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyConstant
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyConstant
     for Evaluator<RNG, OT, Wire>
 {
     fn constant(
@@ -157,15 +151,15 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     }
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
-    FancyBinaryConstant for Evaluator<RNG, OT, Wire>
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyBinaryConstant
+    for Evaluator<RNG, OT, Wire>
 {
     fn constant(&mut self, x: F2) -> Self::Item {
         FancyBinaryConstant::constant(&mut self.evaluator, x)
     }
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyEncode
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyEncode
     for Evaluator<RNG, OT, Wire>
 {
     /// Receive garbler input wires.
@@ -210,7 +204,7 @@ impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireL
     }
 }
 
-impl<RNG: CryptoRng + Rng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyOutput
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyOutput
     for Evaluator<RNG, OT, Wire>
 {
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
