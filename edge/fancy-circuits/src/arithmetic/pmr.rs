@@ -68,7 +68,7 @@ where
             backend.proj(&z, q, Some(gadget_projection_tt(p, q)), channel)
         };
 
-        let n = xs.size();
+        let n = xs.len();
         let mut x = vec![vec![None; n + 1]; n + 1];
 
         for j in 0..n {

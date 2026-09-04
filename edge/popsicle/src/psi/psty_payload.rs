@@ -32,7 +32,7 @@ use crate::{
     utils,
 };
 use fancy_circuits::{
-    Bundle, CrtBundle, CrtGadgets,
+    CrtBundle, CrtGadgets,
     arithmetic::{Addition, Constant, Division, Equality, Multiplication, Subtraction},
     util::{PRIMES, crt, crt_inv, primes_with_width, product},
 };
@@ -895,9 +895,9 @@ fn fancy_compute_payload_aggregate<F: FancyConstant + FancyArithmetic + FancyPro
         .chunks(PAYLOAD_PRIME_SIZE_EXPANDED)
         .zip_eq(receiver_masks.chunks(PAYLOAD_PRIME_SIZE_EXPANDED))
         .map(|(xp, tp)| {
-            let b_x = Bundle::new(xp.to_vec());
-            let b_t = Bundle::new(tp.to_vec());
-            Subtraction::new().execute(f, (&CrtBundle::from(b_t), &CrtBundle::from(b_x)), channel)
+            let b_x = CrtBundle::new(xp.to_vec());
+            let b_t = CrtBundle::new(tp.to_vec());
+            Subtraction::new().execute(f, (&b_t, &b_x), channel)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -923,6 +923,7 @@ fn fancy_compute_payload_aggregate<F: FancyConstant + FancyArithmetic + FancyPro
 
     for (i, b) in eqs.iter().enumerate() {
         let b_ws = one
+            .wires()
             .iter()
             .map(|w| f.mul(w, b, channel))
             .collect::<swanky_error::Result<Vec<F::Item>>>()?;

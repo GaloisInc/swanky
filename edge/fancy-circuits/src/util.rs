@@ -4,7 +4,7 @@
 
 use rand::RngExt as _;
 
-use crate::Bundle;
+use crate::CrtBundle;
 use fancy_traits::HasModulus;
 
 /// Convert a `u128` into a vector of bits.
@@ -172,7 +172,7 @@ fn base_primes_with_width(nbits: usize, primes: &[u16]) -> Vec<u16> {
 /// `accuracy`.
 ///
 /// Supported accuracy: ["100%", "99.9%", "99%"]
-pub(crate) fn get_ms<W: Clone + HasModulus>(x: &Bundle<W>, accuracy: &str) -> Vec<u16> {
+pub(crate) fn get_ms<W: Clone + HasModulus>(x: &CrtBundle<W>, accuracy: &str) -> Vec<u16> {
     match accuracy {
         "100%" => match x.moduli().len() {
             3 => vec![2; 5],

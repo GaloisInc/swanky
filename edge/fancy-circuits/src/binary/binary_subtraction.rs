@@ -35,7 +35,8 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.moduli(), y.moduli());
+        assert_eq!(x.len(), y.len());
+
         let neg_y = BinaryTwosComplement::new().execute(backend, y, channel)?;
         BinaryAddition::new().execute(backend, (x, &neg_y), channel)
     }

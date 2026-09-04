@@ -29,7 +29,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.size(), y.size());
+        assert_eq!(x.len(), y.len());
         let bundle = x
             .wires()
             .iter()
