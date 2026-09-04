@@ -24,7 +24,7 @@
 //! The protocol requires 1.5 rounds of communication.
 #![deny(missing_docs)]
 
-use rand::{CryptoRng, Rng, RngExt, SeedableRng, distr::StandardUniform, prelude::Distribution};
+use rand::{CryptoRng, RngExt, SeedableRng, distr::StandardUniform, prelude::Distribution};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 #[cfg(test)]
@@ -45,7 +45,7 @@ mod entry_points {
 }
 
 /// Generate a random value of type `T`.
-pub fn random<P: GenericParty, T, RNG: CryptoRng + Rng>(
+pub fn random<P: GenericParty, T, RNG: CryptoRng>(
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> swanky_error::Result<T>
@@ -62,7 +62,7 @@ where
 }
 
 /// Generate a random seed (that is, a 128-bit value).
-pub fn random_seed<P: GenericParty, RNG: CryptoRng + Rng>(
+pub fn random_seed<P: GenericParty, RNG: CryptoRng>(
     channel: &mut Channel,
     rng: &mut RNG,
 ) -> swanky_error::Result<U8x16> {

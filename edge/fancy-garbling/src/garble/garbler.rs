@@ -8,7 +8,7 @@ use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj, HasModulus, is_binary,
 };
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -30,7 +30,7 @@ pub struct Garbler<RNG, Wire> {
 }
 
 #[cfg(feature = "serde")]
-impl<RNG: CryptoRng + Rng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         let f = std::fs::File::open(filename)?;
@@ -41,7 +41,7 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire
     }
 }
 
-impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
     pub fn new(mut rng: RNG) -> Self {
         let delta = Wire::rand_delta(&mut rng, 2);
@@ -98,7 +98,7 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
+impl<RNG: CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     fn and(
         &mut self,
         A: &Self::Item,
@@ -126,7 +126,7 @@ impl<RNG: Rng + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     }
 }
 
-impl<RNG: Rng + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
+impl<RNG: CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     /// We can negate by having garbler xor wire with Delta
     ///
     /// Since we treat all garbler wires as zero,
@@ -171,9 +171,7 @@ impl<RNG: Rng + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
-    for Garbler<RNG, Wire>
-{
+impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Garbler<RNG, Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
         x.clone() + y.clone()
@@ -306,7 +304,7 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbler<RNG, Wire> {
     fn proj(
         &mut self,
         A: &Wire,
@@ -367,7 +365,7 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbl
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
 }
 
@@ -392,7 +390,7 @@ impl<RNG: CryptoRng, Wire: WireLabel> FancyBinaryConstant for Garbler<RNG, Wire>
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -421,7 +419,7 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel> FancyOutput for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> FancyOutput for Garbler<RNG, Wire> {
     fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = X.modulus();
         let i = self.current_output();

@@ -48,7 +48,7 @@ fn fill_rng_with_selector(aes: &Aes128EncryptOnly, selector: u64, mut dst: &mut 
 impl AlszSender {
     pub(super) fn init<
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
         BaseOtReceiver: swanky_ot_traits::Receiver<Msg = Block>,
     >(
         channel: &mut C,
@@ -132,7 +132,7 @@ struct AlszReceiver {
 impl AlszReceiver {
     pub(super) fn init<
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
         BaseOtSender: swanky_ot_traits::Sender<Msg = Block>,
     >(
         channel: &mut C,
@@ -212,7 +212,7 @@ pub struct KosSender {
 }
 impl KosSender {
     /// Initialize the KOS OT protocol on the provided channel.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self> {
@@ -371,7 +371,7 @@ pub struct KosReceiver {
 }
 impl KosReceiver {
     /// Initialize a fresh receiver state.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self> {
@@ -386,7 +386,7 @@ impl KosReceiver {
     }
 
     /// Setup a receive operation. See [`KosSender::send`] for more info.
-    pub fn receive<RNG: CryptoRng + Rng>(
+    pub fn receive<RNG: CryptoRng>(
         &self,
         arena: &KeyedArena,
         selector: u64,

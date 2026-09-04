@@ -13,7 +13,7 @@ use fancy_circuits::{
 use fancy_garbling::AllWire;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyOutput};
 use itertools::Itertools;
-use rand::{CryptoRng, Rng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
@@ -68,7 +68,7 @@ pub struct ReceiverState {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn init<RNG: CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -80,7 +80,7 @@ impl Sender {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn send<RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn send<RNG: CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         channel: &mut Channel,
@@ -136,7 +136,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>)>
     where
-        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random()))
             .wrap_err(
@@ -157,7 +157,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut gb, &x, &y, channel)?;
@@ -172,7 +172,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut gb, &x, &y, channel)?;
@@ -212,7 +212,7 @@ impl SenderState {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn init<RNG: CryptoRng + SeedableRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -224,7 +224,7 @@ impl Receiver {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn receive<RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn receive<RNG: CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Msg],
         channel: &mut Channel,
@@ -277,7 +277,7 @@ impl ReceiverState {
         Vec<AllWire>,
     )>
     where
-        RNG: CryptoRng + Rng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
@@ -302,7 +302,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<Vec<Msg>>
     where
-        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut ev, &x, &y, channel)?;
@@ -328,7 +328,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<usize>
     where
-        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut ev, &x, &y, channel)?;
@@ -352,7 +352,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
         let payload_len = payloads[0].len();
         if !(payloads.iter().all(|p| p.len() == payload_len)) {

@@ -38,7 +38,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let mut ot = OT::init(channel, rng)?;
         let mut s_ = [0u8; 64];
@@ -65,7 +65,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn send<C, RNG>(&mut self, channel: &mut C, m: usize, _: &mut RNG) -> Result<Vec<Self::Seed>>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
         let nrows = if !m.is_multiple_of(16) {
@@ -135,10 +135,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::receive(channel, &seeds)
@@ -164,7 +161,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[Self::Input],

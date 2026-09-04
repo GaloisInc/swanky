@@ -26,7 +26,7 @@ pub struct Receiver(Party);
 
 impl Sender {
     /// Initialize a PSI sender.
-    pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
@@ -35,7 +35,7 @@ impl Sender {
     }
 
     /// Send inputs to all parties and particpate in one party receiving the output.
-    pub fn send<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
@@ -55,7 +55,7 @@ impl Sender {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -63,7 +63,7 @@ impl Receiver {
     }
 
     /// Send inputs and receive result - only one party should call this.
-    pub fn receive<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
@@ -96,7 +96,7 @@ impl Receiver {
 }
 
 impl Party {
-    fn init<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
@@ -124,7 +124,7 @@ impl Party {
 
     /// Share secret shares of zero using OPPRF, returning the xor of the OPPRF outputs -
     /// this phase is common to both the senders and the receiver.
-    fn conditional_secret_sharing<C: AbstractChannel, RNG: Rng + CryptoRng + SeedableRng>(
+    fn conditional_secret_sharing<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         &mut self,
         inputs: &[Block],
         channels: &mut [(PartyId, C)],

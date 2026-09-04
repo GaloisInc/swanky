@@ -3,7 +3,7 @@
 
 use super::utils::Powers;
 use generic_array::{GenericArray, typenum::Unsigned};
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 use swanky_adversary::Malicious;
@@ -45,7 +45,7 @@ fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: Block) -> FE::PrimeField {
 }
 
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
@@ -106,7 +106,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
 }
 
 impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
-    pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
@@ -138,7 +138,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             counter: 0,
         })
     }
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,

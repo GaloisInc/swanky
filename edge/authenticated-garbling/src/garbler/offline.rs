@@ -9,7 +9,7 @@ use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::CircuitOutputMapper;
 use fancy_traits::FancyBinaryConstant;
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary};
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -69,7 +69,7 @@ where
     C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyGarbler>>,
 {
     /// Initialize a [`GarblerOffline`] object for the given circuit.
-    pub fn initialize<RNG: CryptoRng + Rng>(
+    pub fn initialize<RNG: CryptoRng>(
         circuit: &'a C,
         channel: &mut Channel,
         rng: &mut RNG,

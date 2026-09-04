@@ -17,7 +17,7 @@ use curve25519_dalek::{
     ristretto::{RistrettoBasepointTable, RistrettoPoint},
     scalar::Scalar,
 };
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
@@ -39,7 +39,7 @@ pub struct Sender {
 impl OtSender for Sender {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         mut rng: &mut RNG,
     ) -> Result<Self> {
@@ -54,7 +54,7 @@ impl OtSender for Sender {
         Ok(Self { y, s, counter: 0 })
     }
 
-    fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[(Block, Block)],
@@ -105,10 +105,7 @@ pub struct Receiver {
 impl OtReceiver for Receiver {
     type Msg = Block;
 
-    fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
-        channel: &mut C,
-        _: &mut RNG,
-    ) -> Result<Self> {
+    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, _: &mut RNG) -> Result<Self> {
         let s = channel
             .read_pt()
             .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
@@ -116,7 +113,7 @@ impl OtReceiver for Receiver {
         Ok(Self { s, counter: 0 })
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
         inputs: &[bool],

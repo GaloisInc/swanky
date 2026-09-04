@@ -2,7 +2,7 @@
 //! Implementation of the hash-based multi-use OPPRF of Kolesnikov, Matania,
 //! Pinkas, Rosulek, and Trieu (cf. <https://eprint.iacr.org/2017/799>).
 
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use std::collections::HashSet;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
@@ -107,7 +107,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
@@ -124,7 +124,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     ) -> Result<()>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let params = Parameters::new(ninputs)?;
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
@@ -196,7 +196,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     ) -> Result<()>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         // Check that all input points are unique.
         debug_assert_eq!(
@@ -311,7 +311,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let oprf = OPRF::init(channel, rng)?;
         Ok(Self { oprf })
@@ -326,7 +326,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     ) -> Result<Vec<Block512>>
     where
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let params = Parameters::new(inputs.len())?;
         let table;

@@ -79,7 +79,7 @@
 //!     Secure 2PC with Function-independent Preprocessing using LEGO".
 //!     <https://eprint.iacr.org/2016/1069.pdf>
 
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
@@ -248,7 +248,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// The verifier's $`\Delta`$ value is randomly generated using `rng`.
     pub fn new<RNG>(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self>
     where
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(e) => {
@@ -268,7 +268,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
         mut rng: RNG,
     ) -> swanky_error::Result<Self>
     where
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         let result = match P::GENERIC_WHICH {
             GenericWhichParty::Party0(e) => AuthBitGenerator {
@@ -300,7 +300,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// `Party0` supplies the bits to authenticate, and `Party1` specifies
     /// the number of bits. The resulting authenticated bits are
     /// [`Vec::extend`]ed into `out`.
-    pub fn generate<RNG: CryptoRng + Rng, I: Iterator<Item = F2>>(
+    pub fn generate<RNG: CryptoRng, I: Iterator<Item = F2>>(
         &mut self,
         bits_in: PartyEither<P, I, usize>,
         out: &mut Vec<AuthBit<P>>,
