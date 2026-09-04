@@ -25,8 +25,13 @@ use vectoreyes::{
 /// If needing to generate a [`U8x16`], `AesRng::random::<U8x16>` is the most
 /// performant: around 3x faster than using `AesRng::fill_bytes` followed by a
 /// conversion.
-#[derive(Debug)]
 pub struct AesRng(BlockRng<AesRngCore>);
+
+impl core::fmt::Debug for AesRng {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AesRng").finish()
+    }
+}
 
 impl TryRng for AesRng {
     type Error = Infallible;
