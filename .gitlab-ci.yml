@@ -54,7 +54,7 @@ push-docs:
 
 
 nightly-test:
-  image: debian:bookworm
+  image: debian:trixie
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
