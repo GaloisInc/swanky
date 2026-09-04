@@ -1,13 +1,46 @@
 use crate::BinaryBundle;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinaryConstant};
+use fancy_traits::{Circuit, Fancy, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 
-/// For a [`BinaryBundle`] `x` and an integer `n`, shift `x` left by `n`,
-/// retaining the size of `x`.
+/// For [`BinaryBundle`] `x`, integer `n`, and pad `c`, compute `x << n`,
+/// retaining the size of `x` and padding on the right with `c`.
+#[derive(Default)]
+pub struct BinaryLeftShiftPad<'a>(PhantomData<&'a ()>);
+
+impl<'a> BinaryLeftShiftPad<'a> {
+    /// Create a new [`BinaryLeftShiftPad`] circuit.
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<'a, F: Fancy> Circuit<F> for BinaryLeftShiftPad<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a BinaryBundle<F::Item>, usize, &'a F::Item);
+    type Output = BinaryBundle<F::Item>;
+
+    fn execute(&self, _: &mut F, inputs: Self::Input, _: &mut Channel) -> Result<Self::Output> {
+        let (bundle, n, pad) = inputs;
+
+        let mut wires = bundle.wires().to_vec();
+        for _ in 0..n {
+            wires.pop();
+            wires.insert(0, pad.clone());
+        }
+        Ok(BinaryBundle::new(wires))
+    }
+}
+
+/// For [`BinaryBundle`] `x` and integer `n`, compute `x << n`, retaining the
+/// size of `x`.
+///
+/// This is equivalent to `x.wrapping_shl(n)` in Rust.
 #[derive(Default)]
 pub struct BinaryLeftShift<'a>(PhantomData<&'a ()>);
 
@@ -29,24 +62,18 @@ where
         &self,
         backend: &mut F,
         inputs: Self::Input,
-        _: &mut Channel,
+        channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let zero = backend.constant(F2::ZERO);
-
-        let mut wires = bundle.wires().to_vec();
-        for _ in 0..n {
-            wires.pop();
-            wires.insert(0, zero.clone());
-        }
-        Ok(BinaryBundle::new(wires))
+        BinaryLeftShiftPad::new().execute(backend, (bundle, n, &zero), channel)
     }
 }
 
-/// For a [`BinaryBundle`] `x` and an integer `n`, shift `x` left by `n` 0s,
-/// extending the [`BinaryBundle`].
+/// For [`BinaryBundle`] `x` and integer `n`, compute `x << n`, extending the
+/// size of `x` as needed.
 ///
-/// That is, $`x = x_1,...,x_m`$ becomes $`x_1,...,x_m,0_1,...,0_n`$.
+/// This is equivalent to `x << n` in Rust.
 #[derive(Default)]
 pub struct BinaryLeftShiftExtend<'a>(PhantomData<&'a ()>);
 
@@ -80,19 +107,19 @@ where
     }
 }
 
-/// For a [`BinaryBundle`] `x`, integer `n`, and pad `c`, shift `x` right by
-/// `n`, retaining the size of `x` and filling space on the left by `c`.
+/// For [`BinaryBundle`] `x`, integer `n`, and pad `c`, compute `x >> n`,
+/// retaining the size of `x` and filling space on the left by `c`.
 #[derive(Default)]
-pub struct BinaryRightShift<'a>(PhantomData<&'a ()>);
+pub struct BinaryRightShiftPad<'a>(PhantomData<&'a ()>);
 
-impl<'a> BinaryRightShift<'a> {
-    /// Create a new [`BinaryRightShift`] circuit.
+impl<'a> BinaryRightShiftPad<'a> {
+    /// Create a new [`BinaryRightShiftPad`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryRightShift<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryRightShiftPad<'a>
 where
     F::Item: 'a,
 {
@@ -115,18 +142,21 @@ where
     }
 }
 
-/// Logical right shift.
+/// For [`BinaryBundle`] `x` and integer `n`, compute `x >> n`,
+/// retaining the size of `x`.
+///
+/// This is equivalent to `x >> n` in Rust.
 #[derive(Default)]
-pub struct BinaryLogicalRightShift<'a>(PhantomData<&'a ()>);
+pub struct BinaryRightShift<'a>(PhantomData<&'a ()>);
 
-impl<'a> BinaryLogicalRightShift<'a> {
-    /// Create a new [`BinaryLogicalRightShift`] circuit.
+impl<'a> BinaryRightShift<'a> {
+    /// Create a new [`BinaryRightShift`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryLogicalRightShift<'a>
+impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryRightShift<'a>
 where
     F::Item: 'a,
 {
@@ -141,7 +171,7 @@ where
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
         let zero = backend.constant(F2::ZERO);
-        BinaryRightShift::new().execute(backend, (x, n, zero), channel)
+        BinaryRightShiftPad::new().execute(backend, (x, n, zero), channel)
     }
 }
 
@@ -171,7 +201,7 @@ where
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
         let pad = x.wires().last().unwrap();
-        BinaryRightShift::new().execute(backend, (x, n, pad.clone()), channel)
+        BinaryRightShiftPad::new().execute(backend, (x, n, pad.clone()), channel)
     }
 }
 
@@ -181,7 +211,7 @@ mod test {
         BinaryBundle,
         binary::{
             BinaryArithmeticRightShift, BinaryLeftShift, BinaryLeftShiftExtend,
-            binary_shift::BinaryLogicalRightShift,
+            binary_shift::BinaryRightShift,
         },
     };
     use fancy_plaintext::Dummy;
@@ -193,48 +223,40 @@ mod test {
         let mut rng = rng();
 
         for _ in 0..16 {
-            let shift_size = rng.random_range(..N);
             let x = rng.random::<u64>();
+            let n = rng.random_range(..N);
             let input = BinaryBundle::from((x as u128, N));
-            let output =
-                Dummy::eval(&BinaryLeftShift::new(), (&input, shift_size as usize)).unwrap();
-            assert_eq!(
-                Into::<u128>::into(output) as u64,
-                x.wrapping_shl(shift_size as u32)
-            );
+            let output = Dummy::eval(&BinaryLeftShift::new(), (&input, n)).unwrap();
+            assert_eq!(Into::<u128>::into(output) as u64, x.wrapping_shl(n as u32));
         }
     }
 
     #[test]
     fn left_shift_extend() {
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
         let mut rng = rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let shift_size = rng.random_range(..nbits);
-            let x = rng.random::<u128>() % q;
-            let input = BinaryBundle::from((x, nbits));
-            let output = Dummy::eval(&BinaryLeftShiftExtend::new(), (&input, shift_size)).unwrap();
-            assert_eq!(Into::<u128>::into(output), x << shift_size);
+            let x = rng.random::<u128>() % Q;
+            let n = rng.random_range(..N);
+            let input = BinaryBundle::from((x, N));
+            let output = Dummy::eval(&BinaryLeftShiftExtend::new(), (&input, n)).unwrap();
+            assert_eq!(Into::<u128>::into(output), x << n);
         }
     }
 
     #[test]
-    fn logical_right_shift() {
+    fn right_shift() {
         const N: usize = 64;
         let mut rng = rng();
 
         for _ in 0..16 {
-            let shift_size = rng.random_range(..N);
             let x = rng.random::<u64>();
+            let n = rng.random_range(..N);
             let input = BinaryBundle::from((x as u128, N));
-            let output = Dummy::eval(
-                &BinaryLogicalRightShift::new(),
-                (&input, shift_size as usize),
-            )
-            .unwrap();
-            assert_eq!(Into::<u128>::into(output) as u64, x >> shift_size);
+            let output = Dummy::eval(&BinaryRightShift::new(), (&input, n)).unwrap();
+            assert_eq!(Into::<u128>::into(output) as u64, x >> n);
         }
     }
 
@@ -246,11 +268,10 @@ mod test {
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
-            let shift_size = rng.random_range(..N);
+            let n = rng.random_range(..N);
             let x_input = BinaryBundle::from((x, N));
-            let output =
-                Dummy::eval(&BinaryArithmeticRightShift::new(), (&x_input, shift_size)).unwrap();
-            assert_eq!(Into::<u128>::into(output) as i64, (x as i64) >> shift_size);
+            let output = Dummy::eval(&BinaryArithmeticRightShift::new(), (&x_input, n)).unwrap();
+            assert_eq!(Into::<u128>::into(output) as i64, (x as i64) >> n);
         }
     }
 }

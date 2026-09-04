@@ -1,13 +1,15 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryAddition, BinaryConstant, BinaryMultiplex, BinaryTwosComplement},
+    binary::{
+        BinaryAddition, BinaryConstant, BinaryLeftShiftPad, BinaryMultiplex, BinaryTwosComplement,
+    },
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// For [`BinaryBundle`]s `x` and `y`, output `x / y`.
+/// For [`BinaryBundle`]s `x` and `y` (for `y != 0`), output `x / y`.
 #[derive(Default)]
 pub struct BinaryDivision<'a>(PhantomData<&'a ()>);
 
@@ -32,14 +34,13 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.moduli(), ys.moduli());
+        assert_eq!(xs.len(), ys.len());
 
         let ys_neg = BinaryTwosComplement::new().execute(backend, ys, channel)?;
-        let mut acc = BinaryConstant::new(0, xs.size()).execute(backend, (), channel)?;
+        let mut acc = BinaryConstant::new(0, xs.len()).execute(backend, (), channel)?;
         let mut qs = BinaryBundle::new(Vec::new());
-        for x in xs.iter().rev() {
-            acc.pop();
-            acc.insert(0, x.clone());
+        for x in xs.wires().iter().rev() {
+            acc = BinaryLeftShiftPad::new().execute(backend, (&acc, 1, x), channel)?;
             let (res, cout) =
                 BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
             acc = BinaryMultiplex::new().execute(backend, (cout.clone(), &acc, &res), channel)?;

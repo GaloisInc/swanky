@@ -19,14 +19,34 @@ impl<W: Clone + HasModulus> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
 
-    /// Extract the underlying bundle from this CRT bundle.
-    pub fn extract(self) -> Bundle<W> {
-        self.0
+    // /// Return the moduli of all the wires in the bundle.
+    pub(crate) fn moduli(&self) -> Vec<u16> {
+        self.wires().iter().map(HasModulus::modulus).collect()
+    }
+
+    /// Returns a new bundle only containing wires with matching moduli.
+    pub(crate) fn with_moduli(&self, moduli: &[u16]) -> Self {
+        let old_ws = self.wires();
+        let mut new_ws = Vec::with_capacity(moduli.len());
+        for &p in moduli {
+            if let Some(w) = old_ws.iter().find(|&x| x.modulus() == p) {
+                new_ws.push(w.clone());
+            } else {
+                panic!("Bundle::with_moduli: no {} modulus in bundle", p);
+            }
+        }
+        Self::new(new_ws)
     }
 
     /// Return the product of all the wires' moduli.
     pub fn composite_modulus(&self) -> u128 {
-        util::product(&self.iter().map(HasModulus::modulus).collect::<Vec<_>>())
+        util::product(
+            &self
+                .wires()
+                .iter()
+                .map(HasModulus::modulus)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -85,12 +105,6 @@ impl<W: Clone + HasModulus> Deref for CrtBundle<W> {
 impl<W: Clone + HasModulus> DerefMut for CrtBundle<W> {
     fn deref_mut(&mut self) -> &mut Bundle<W> {
         &mut self.0
-    }
-}
-
-impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
-    fn from(b: Bundle<W>) -> CrtBundle<W> {
-        CrtBundle(b)
     }
 }
 

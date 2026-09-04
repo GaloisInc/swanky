@@ -79,6 +79,7 @@ impl<'a, F: FancyBinary + FancyBinaryConstant + BinaryGadgets> BinaryNeuralNet<'
         let mut result = Vec::with_capacity(output.len());
         for out in output.iter() {
             let vals = out
+                .wires()
                 .iter()
                 .map(|v| self.backend.output(v, channel))
                 .collect::<Result<Vec<_>>>()?;
