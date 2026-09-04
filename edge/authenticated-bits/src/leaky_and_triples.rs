@@ -21,7 +21,7 @@ use crate::{
     authshares::{AuthShare, AuthShareGenerator},
 };
 use itertools::Itertools;
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_f_eq::EqualityFunctionality;
@@ -74,7 +74,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// The AND and Leaky AND triple generation protocols require that parties
     /// have Δ with different least significant bits (lsb). Towards that we
     /// require that Party0's Δ has lsb == 1 and Party1's Δ has lsb == 0.
-    pub(crate) fn generate_valid_delta<RNG: CryptoRng + Rng>(rng: &mut RNG) -> U8x16 {
+    pub(crate) fn generate_valid_delta<RNG: CryptoRng>(rng: &mut RNG) -> U8x16 {
         let delta = rng.random::<F128b>();
         // We require that for Party A `lsb(Δ) = 1`, and for Party
         // B `lsb(Δ) = 0`. So adjust `delta` as needed.
@@ -98,7 +98,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     }
 
     /// Create a new [`LeakyAndTripleGenerator`].
-    pub(crate) fn new<RNG: CryptoRng + Rng>(
+    pub(crate) fn new<RNG: CryptoRng>(
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -112,7 +112,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// # Panics
     /// This panics if $`\mathsf{lsb}(\Delta_\mathsf{A}) \neq 1`$ or if
     /// $`\mathsf{lsb}(\Delta_\mathsf{B}) \neq 0`$.
-    pub(crate) fn new_with_delta<RNG: CryptoRng + Rng>(
+    pub(crate) fn new_with_delta<RNG: CryptoRng>(
         delta: U8x16,
         channel: &mut Channel,
         rng: &mut RNG,
@@ -139,7 +139,7 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// [^1]: J. Katz, S. Ranellucci, M. Rosulek, X. Wang. "Optimizing
     /// Authenticated Garbling for Faster Secure Two-Party Computation".
     /// <https://eprint.iacr.org/2018/578.pdf>
-    pub(crate) fn generate<RNG: CryptoRng + Rng>(
+    pub(crate) fn generate<RNG: CryptoRng>(
         &mut self,
         ntriples: usize,
         out: &mut Vec<LeakyAndTriple<P>>,

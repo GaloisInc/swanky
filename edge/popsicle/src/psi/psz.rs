@@ -10,7 +10,7 @@ use crate::{
     utils,
 };
 use itertools::Itertools;
-use rand::{CryptoRng, Rng, RngExt, seq::SliceRandom};
+use rand::{CryptoRng, RngExt, seq::SliceRandom};
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
@@ -31,7 +31,7 @@ pub struct Receiver {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -40,7 +40,7 @@ impl Sender {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn send<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -77,7 +77,7 @@ impl Sender {
 
     /// Run the PSI protocol over `inputs`. Returns a random key for each input which can
     /// be used to encrypt payloads.
-    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -126,7 +126,7 @@ impl Sender {
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> Result<Self, Error> {
@@ -135,7 +135,7 @@ impl Receiver {
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -173,7 +173,7 @@ impl Receiver {
 
     /// Run the PSI protocol over `inputs`, receiving a vector of tuples consisting of
     /// the intersection items and associated payloads.
-    pub fn receive_payloads<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn receive_payloads<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,
@@ -228,7 +228,7 @@ impl Receiver {
     }
 
     // Helper to do computation common to both receive and receive_payloads
-    fn perform_oprfs<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    fn perform_oprfs<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
         channel: &mut C,

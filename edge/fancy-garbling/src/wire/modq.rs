@@ -1,6 +1,6 @@
 use crate::{ArithmeticWire, WireLabel, util, wire::_unrank};
 use fancy_traits::HasModulus;
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use vectoreyes::U8x16;
 
 /// Intermediate struct to deserialize WireModQ to
@@ -154,7 +154,7 @@ impl core::ops::MulAssign<u16> for WireModQ {
 }
 
 impl WireLabel for WireModQ {
-    fn rand_delta<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
+    fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
             panic!(
                 "[WireModQ::rand_delta] Modulus must be at least 2. Got {}",
@@ -207,7 +207,7 @@ impl WireLabel for WireModQ {
         Self { q, ds }
     }
 
-    fn rand<R: CryptoRng + Rng>(rng: &mut R, q: u16) -> Self {
+    fn rand<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         if q < 2 {
             panic!("[WireModQ::rand] Modulus must be at least 2. Got {}", q);
         }

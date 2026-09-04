@@ -65,7 +65,7 @@
 use digest::Digest as CryptoDigest;
 use generic_array::typenum::Unsigned;
 use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, SeedableRng};
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
 use swanky_block::Block;
@@ -299,7 +299,7 @@ impl<Field: FieldForLigero, H: CryptoDigest> Secret<Field, H> {
     /// The `mask` should be a committed vector of random elements the same size
     /// as the shared portion of the witness. If there is no shared witness, it
     /// should be an empty vector.
-    fn new<R: Rng + CryptoRng>(
+    fn new<R: CryptoRng>(
         rng: &mut R,
         c: &Circuit<Field>,
         inp: &[Field],
@@ -660,7 +660,7 @@ pub struct Round3<Field> {
 
 impl<Field: FieldForLigero> Round3<Field> {
     /// Pick Verifier's columns to view.
-    fn new<R: Rng + CryptoRng>(params: &Params<Field>, rng: &mut R) -> Self {
+    fn new<R: CryptoRng>(params: &Params<Field>, rng: &mut R) -> Self {
         warn_vulnerabilities();
 
         Round3 {
@@ -976,7 +976,7 @@ pub mod interactive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create an interactive prover out of a circuit and witness.
-        pub fn new<R: Rng + CryptoRng>(
+        pub fn new<R: CryptoRng>(
             rng: &mut R,
             c: &Circuit<Field>,
             w: &[Field],
@@ -1211,7 +1211,7 @@ pub mod interactive {
         }
 
         /// Generate round-1 verifier message.
-        pub fn round1<R: Rng + CryptoRng>(&mut self, rng: &mut R, r0: Round0<H>) -> Round1<Field> {
+        pub fn round1<R: CryptoRng>(&mut self, rng: &mut R, r0: Round0<H>) -> Round1<Field> {
             let r1 = Round1::new(
                 &self.public.params,
                 self.shared().len(),
@@ -1226,11 +1226,7 @@ pub mod interactive {
         }
 
         /// Generate round-3 verifier message.
-        pub fn round3<R: Rng + CryptoRng>(
-            &mut self,
-            rng: &mut R,
-            r2: Round2<Field>,
-        ) -> Round3<Field> {
+        pub fn round3<R: CryptoRng>(&mut self, rng: &mut R, r2: Round2<Field>) -> Round3<Field> {
             let r3 = Round3::new(&self.public.params, rng);
 
             self.r2 = Some(r2);
@@ -1464,7 +1460,7 @@ pub mod noninteractive {
 
     impl<Field: FieldForLigero, H: CryptoDigest> Prover<Field, H> {
         /// Create a non-interactive prover from a circuit and witness.
-        pub fn new<R: Rng + CryptoRng>(
+        pub fn new<R: CryptoRng>(
             rng: &mut R,
             circuit: &Circuit<Field>,
             witness: &[Field],

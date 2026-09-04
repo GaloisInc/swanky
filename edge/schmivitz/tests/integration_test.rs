@@ -1,10 +1,10 @@
 mod test {
     use fancy_circuits::{
         BinaryBundle,
-        aes::AesNonExpanded,
         binary::BinaryAddition,
-        hmac::HmacSha256,
-        sha::{Sha256, Sha256CompressionFunction},
+        crypto::aes::Aes128,
+        crypto::hmac::HmacSha256,
+        crypto::sha::{Sha256, Sha256CompressionFunction},
     };
     use fancy_traits::{
         Circuit as FancyCircuit, FancyBinary, FancyBinaryConstant, FancyZeroKnowledge,
@@ -421,7 +421,7 @@ mod test {
         test_sieveir(&circuit)
     }
 
-    struct TestAes(AesNonExpanded);
+    struct TestAes(Aes128);
 
     impl<F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge> FancyCircuit<F> for TestAes {
         type Input = ();
@@ -466,7 +466,7 @@ mod test {
             init_logger();
         }
 
-        let circuit = TestAes(AesNonExpanded::new());
+        let circuit = TestAes(Aes128::new());
 
         let private_input = (0..256).map(|_| F2::ZERO).collect::<Vec<_>>();
         test_circuit(&circuit, &private_input)

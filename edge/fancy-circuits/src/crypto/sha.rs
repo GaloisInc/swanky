@@ -1,6 +1,6 @@
 //! SHA circuits.
 
-use crate::{BinaryCircuit, binary::BinaryConstant};
+use crate::{binary::BinaryConstant, bristol::BristolFashionCircuit};
 use fancy_traits::{
     Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
 };
@@ -10,77 +10,8 @@ use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 
-/// Circuit for the SHA-256 compression function, where the chaining values are
-/// fixed to the SHA-256 IV.
-pub struct Sha256CompressionFunctionFixedIV(BinaryCircuit);
-
-impl Sha256CompressionFunctionFixedIV {
-    /// Create a new [`Sha256CompressionFunctionFixedIV`] circuit.
-    ///
-    /// # Performance Note!
-    /// This involves parsing a Bristol Format file, and thus is not cheap!
-    /// Hence, it is best to reuse this circuit if possible versus calling
-    /// [`Sha256CompressionFunctionFixedIV::new`] every time this circuit is
-    /// needed.
-    pub fn new() -> Self {
-        let circuit = BinaryCircuit::parse_bristol_format(Cursor::<&'static [u8]>::new(
-            include_bytes!("../circuits/bristol-format/sha-256.txt"),
-        ))
-        .expect("`sha-256.txt` file should always parse correctly");
-        Self(circuit)
-    }
-}
-
-impl Default for Sha256CompressionFunctionFixedIV {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunctionFixedIV {
-    type Input = [F::Item; 512];
-    type Output = [F::Item; 256];
-
-    fn execute(
-        &self,
-        backend: &mut F,
-        input: Self::Input,
-        channel: &mut Channel,
-    ) -> Result<Self::Output> {
-        let output = self.0.execute(backend, input.to_vec(), channel)?;
-        Ok(output
-            .try_into()
-            .expect("SHA-256 compression function output should always be 256 elements"))
-    }
-}
-
-impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F>
-    for Sha256CompressionFunctionFixedIV
-{
-    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-        assert_eq!(inputs.len(), 512);
-        inputs.try_into().unwrap()
-    }
-
-    fn ninputs(&self) -> usize {
-        512
-    }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
-}
-
-impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F>
-    for Sha256CompressionFunctionFixedIV
-{
-    fn flatten(output: Self::Output) -> Vec<F::Item> {
-        output.to_vec()
-    }
-}
-
 /// Circuit for the SHA-256 compression function.
-pub struct Sha256CompressionFunction(BinaryCircuit);
+pub struct Sha256CompressionFunction(BristolFashionCircuit);
 
 impl Sha256CompressionFunction {
     /// Create a new [`Sha256CompressionFunction`] circuit.
@@ -90,10 +21,9 @@ impl Sha256CompressionFunction {
     /// Hence, it is best to reuse this circuit if possible versus calling
     /// [`Sha256CompressionFunction::new`] every time this circuit is needed.
     pub fn new() -> Self {
-        let circuit = BinaryCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
-            include_bytes!("../circuits/bristol-fashion/sha256.txt"),
-        ))
-        .expect("`sha256.txt` file should always parse correctly");
+        let circuit = BristolFashionCircuit::parse_bristol_fashion(Cursor::<&'static [u8]>::new(
+            include_bytes!("../../circuits/bristol-fashion/sha256.txt"),
+        ));
         Self(circuit)
     }
 }
@@ -252,7 +182,7 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
 
 #[cfg(test)]
 mod test {
-    use crate::sha::{Sha256, Sha256CompressionFunction, Sha256CompressionFunctionFixedIV};
+    use crate::crypto::sha::{Sha256, Sha256CompressionFunction};
     use fancy_plaintext::{Dummy, DummyVal};
 
     #[cfg(test)]
@@ -271,7 +201,6 @@ mod test {
         // Uses the test vectors found here:
         // <https://nigelsmart.github.io/MPC-Circuits/sha-256-test.txt>.
 
-        let sha256_fixed_iv = Sha256CompressionFunctionFixedIV::new();
         let sha256 = Sha256CompressionFunction::new();
 
         let iv = string_to_bool_vec(
@@ -279,7 +208,7 @@ mod test {
         ).try_into().unwrap();
 
         let block = [DummyVal::new_bool(false); 512];
-        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
+        let output = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -287,13 +216,11 @@ mod test {
                 .collect::<String>(),
             "1101101001010110100110001011111000010111101110011011010001101001011000100011001101010111100110010111011110011111101111101100101010001100111001011101010010010001110000001101001001100010010000111011101011111110111110011110101000011000001101111010100111011000"
         );
-        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
-        assert_eq!(output, output_with_iv);
 
         let block = string_to_bool_vec(
             "00000000000000010000001000000011000001000000010100000110000001110000100000001001000010100000101100001100000011010000111000001111000100000001000100010010000100110001010000010101000101100001011100011000000110010001101000011011000111000001110100011110000111110010000000100001001000100010001100100100001001010010011000100111001010000010100100101010001010110010110000101101001011100010111100110000001100010011001000110011001101000011010100110110001101110011100000111001001110100011101100111100001111010011111000111111",
         ).try_into().unwrap();
-        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
+        let output = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -301,11 +228,9 @@ mod test {
                 .collect::<String>(),
             "1111110010011001101000101101111110001000111101000010101001111010011110111011100111010001100000000011001111001101110001101010001000000010010101100111010101011111100111010101101110011010010100000100010010101001110011000011000101011010101111101000010010100111"
         );
-        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
-        assert_eq!(output, output_with_iv);
 
         let block = [DummyVal::new_bool(true); 512];
-        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
+        let output = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -313,13 +238,11 @@ mod test {
                 .collect::<String>(),
             "1110111100001100011101001000110111110100110110100101000010101000110101101100010000111100000000010011111011011100001111001110011101101100100111011001111110101001101000010100010110001010110111100101011011101011100001101100000010100110010001001001001011010010"
         );
-        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
-        assert_eq!(output, output_with_iv);
 
         let block = string_to_bool_vec(
             "00100100001111110110101010001000100001011010001100001000110100110001001100011001100010100010111000000011011100000111001101000100101001000000100100111000001000100010100110011111001100011101000000001000001011101111101010011000111011000100111001101100100010010100010100101000001000011110011000111000110100000001001101110111101111100101010001100110110011110011010011101001000011000110110011000000101011000010100110110111110010010111110001010000110111010011111110000100110101011011010110110101010001110000100100010111",
         ).try_into().unwrap();
-        let output = Dummy::eval(&sha256_fixed_iv, block).unwrap();
+        let output = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(
             output
                 .iter()
@@ -327,8 +250,6 @@ mod test {
                 .collect::<String>(),
             "1100111100001010111001001110101101100111110100111000111111111110101110010100000001101000100110000100101100100010101010111101111001001110100100101011110001010100100011010001010001011000010111100100100011011100101010001000100000101101011110110000100111001110"
         );
-        let output_with_iv = Dummy::eval(&sha256, (block, iv)).unwrap();
-        assert_eq!(output, output_with_iv);
     }
 
     #[test]

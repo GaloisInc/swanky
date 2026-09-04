@@ -5,7 +5,7 @@ use popsicle::psty_payload::{Receiver, Sender};
 use swanky_block::Block512;
 use swanky_rng::SwankyRng;
 
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 
 use std::time::Duration;
 
@@ -30,7 +30,7 @@ fn int_vec_block512(values: Vec<u64>) -> Vec<Block512> {
         })
         .collect()
 }
-fn rand_u64_vec<RNG: CryptoRng + Rng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
+fn rand_u64_vec<RNG: CryptoRng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
     (0..n).map(|_| rng.random::<u64>() % modulus).collect()
 }
 
