@@ -90,7 +90,7 @@ impl UniformIntegersUnderBound {
         let range = U64x4::broadcast(self.bound as u64);
         let t = U32x8::broadcast(self.threshold);
         loop {
-            let rand_bits = rng.random_bits_custom_size::<N>();
+            let rand_bits = rng.random_u8x16s_custom_size::<N>();
             let x = rand_bits.array_map(
                 #[inline(always)]
                 |x| U64x4::from(U32x4::from(x)),
