@@ -7,7 +7,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] `x`, integer `n`, and pad `c`, compute `x << n`,
-/// retaining the size of `x` and padding on the left with `c`.
+/// retaining the size of `x` and padding on the right with `c`.
 #[derive(Default)]
 pub struct BinaryLeftShiftPad<'a>(PhantomData<&'a ()>);
 
