@@ -11,6 +11,7 @@ CORE_CRATES=(
     swanky-channel
     swanky-error
     swanky-party
+    swanky-rng
     swanky-serialization
     vectoreyes
     # END CORE CRATES
