@@ -18,6 +18,7 @@ have a lesser stability guarantee.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-error`**: A common error type for Swanky.
 - **`swanky-party`**: Support for types indexed by a party.
+- **`swanky-rng`**: Pseudorandom number generators for use in Swanky.
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
 - **`vectoreyes`**: Cross-platform SIMD types and functions
 
@@ -72,7 +73,6 @@ have a lesser stability guarantee.
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
-- **`swanky-rng`**: A fast random number generator based on AES-CTR.
 - **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
 - **`swanky-sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol

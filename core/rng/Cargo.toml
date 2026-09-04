@@ -1,6 +1,6 @@
 [package]
 name = "swanky-rng"
-description = "A fast random number generator based on AES-CTR."
+description = "Pseudorandom number generators for use in Swanky."
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

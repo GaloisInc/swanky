@@ -1,4 +1,4 @@
-//! Pseudorandom number generators (PRNGs) used in Swanky.
+//! Pseudorandom number generators (PRNGs) for use in Swanky.
 //!
 //! [`SwankyRng`] is the prefered PRNG to use, although the underlying PRNG may
 //! change depending on the platform and/or future changes to this library. If
@@ -6,6 +6,7 @@
 //! is only one:
 //! - [`AesRng`]: A PRNG based on AES-CTR mode.
 #![deny(missing_docs)]
+
 use rand_core::Infallible;
 
 mod aesrng;
@@ -19,13 +20,19 @@ pub use vectorized::UniformIntegersUnderBound;
 /// This is currently a thin wrapper around [`AesRng`], although that is subject
 /// to change in the future and/or depending on the platform. See the
 /// documentation of [`AesRng`] for any performance considerations.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct SwankyRng(AesRng);
 
 impl SwankyRng {
     /// Create a new [`SwankyRng`] using a random seed from [`rand::random`].
     pub fn new() -> Self {
         Self(AesRng::new())
+    }
+}
+
+impl core::fmt::Debug for SwankyRng {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SwankyRng").finish()
     }
 }
 

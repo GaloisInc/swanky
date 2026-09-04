@@ -11,6 +11,9 @@
 /core/party
 /core/party/
 
+/core/rng
+/core/rng/
+
 /core/serialization
 /core/serialization/
 
@@ -128,9 +131,6 @@
 
 /edge/popsicle @amaloz @rissa
 /edge/popsicle/ @amaloz @rissa
-
-/edge/rng @amaloz @rissa
-/edge/rng/ @amaloz @rissa
 
 /edge/schmivitz @benoit.razet @marcella
 /edge/schmivitz/ @benoit.razet @marcella

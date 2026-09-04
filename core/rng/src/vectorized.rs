@@ -57,20 +57,6 @@ impl UniformIntegersUnderBound {
         self.lemire_body::<N, HALF_N>(rng)
     }
 
-    /// Produce 20 uniformly distributed `u32`s under the given bound.
-    ///
-    /// Random numbers are returned in `out[0][..]`, `out[1][..]`, and the even-indexed entries of
-    /// `out[2]` (i.e. `out[2][0]`, `out[2][2]`, `out[2][4]`, `out[2][6]`).
-    ///
-    /// # Alternatives
-    /// Consider using [Self::sample] instead. It may be faster on some platforms.
-    #[inline(always)]
-    pub fn sample_20(&self, rng: &mut AesRng) -> [U32x8; 3] {
-        const N: usize = 5;
-        const HALF_N: usize = 3;
-        self.lemire_body::<N, HALF_N>(rng)
-    }
-
     // NOTE: these techniques can also be extended to random number generation with a non-constant
     // upper-bound. However, if the bound is not known in advance, you might need to make different
     // choices. This is important when, for example, speeding up a Fisher-Yates shuffle.
@@ -90,7 +76,7 @@ impl UniformIntegersUnderBound {
         let range = U64x4::broadcast(self.bound as u64);
         let t = U32x8::broadcast(self.threshold);
         loop {
-            let rand_bits = rng.random_bits_custom_size::<N>();
+            let rand_bits = rng.random_u8x16s_custom_size::<N>();
             let x = rand_bits.array_map(
                 #[inline(always)]
                 |x| U64x4::from(U32x4::from(x)),
@@ -150,26 +136,6 @@ mod tests {
             let dist = UniformIntegersUnderBound::new(bound);
             for x in dist.sample(&mut rng).iter() {
                 for y in x.as_array().iter().copied() {
-                    prop_assert!(y < bound);
-                }
-            }
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn lemire_20_within_bounds(
-            seed in any::<[u8; 16]>(),
-            bound in 1..=500_000_u32,
-        ) {
-            let mut rng = AesRng::from_seed(seed.into());
-            let dist = UniformIntegersUnderBound::new(bound);
-            let out = dist.sample_20(&mut rng);
-            for (i,x) in out.iter().copied().enumerate() {
-                for (j,y) in x.as_array().iter().copied().enumerate() {
-                    if i == 2 && (j % 2) == 1 {
-                        prop_assert_eq!(y, 0);
-                    }
                     prop_assert!(y < bound);
                 }
             }

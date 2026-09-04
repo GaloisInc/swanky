@@ -25,8 +25,13 @@ use vectoreyes::{
 /// If needing to generate a [`U8x16`], `AesRng::random::<U8x16>` is the most
 /// performant: around 3x faster than using `AesRng::fill_bytes` followed by a
 /// conversion.
-#[derive(Debug)]
 pub struct AesRng(BlockRng<AesRngCore>);
+
+impl core::fmt::Debug for AesRng {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AesRng").finish()
+    }
+}
 
 impl TryRng for AesRng {
     type Error = Infallible;
@@ -65,22 +70,27 @@ impl AesRng {
     }
 
     /// Create a new [`AesRng`] using a given seed and IV.
+    ///
+    /// # Security considerations
+    /// One must be careful to avoid situations where the same seed is used, and
+    /// the IVs either match or are sufficiently close, as this could produce
+    /// identical RNG outputs!
     pub fn from_seed_and_iv(seed: U8x16, iv: u128) -> Self {
         Self(BlockRng::new(AesRngCore::from_seed_and_iv(seed, iv)))
     }
 
-    /// Generate random bits.
+    /// Generate [`Aes128EncryptOnly::BLOCK_COUNT_HINT`] random [`U8x16`]s.
     #[inline(always)]
-    pub fn random_bits(&mut self) -> [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] {
+    pub fn random_u8x16s(&mut self) -> [U8x16; Aes128EncryptOnly::BLOCK_COUNT_HINT] {
         self.0.core.gen_rand_bits()
     }
 
-    /// Generate `N * 128` random bits.
+    /// Generate `N` random [`U8x16`]s.
     ///
     /// # Alternatives
-    /// Consider using [Self::random_bits] instead.
+    /// Consider using [`Self::random_u8x16s`] for an optimal choice of `N`.
     #[inline(always)]
-    pub fn random_bits_custom_size<const N: usize>(&mut self) -> [U8x16; N]
+    pub fn random_u8x16s_custom_size<const N: usize>(&mut self) -> [U8x16; N]
     where
         ArrayUnrolledOps: UnrollableArraySize<N>,
     {
@@ -96,7 +106,6 @@ impl Default for AesRng {
 }
 
 /// The core of [`AesRng`], used with [`BlockRng`].
-#[derive(Debug)]
 pub struct AesRngCore {
     aes: Aes128EncryptOnly,
     counter: u128,

@@ -461,7 +461,7 @@ where
             #[inline(always)]
             |[a, b, c]| {
                 // Hopefully the reorder buffer will fix this for us.
-                let challenge = rng.random_bits_custom_size::<2>();
+                let challenge = rng.random_u8x16s_custom_size::<2>();
                 let mask = U64x2::broadcast((1_u64 << Degree::<TF>::U64) - 1);
                 let challenge = challenge.array_map(
                     #[inline(always)]
