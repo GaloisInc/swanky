@@ -199,7 +199,7 @@ mod tests {
         for _ in 0..100 {
             let q = 2 + (rng.random::<u16>() % 110);
             let x = AllWire::rand(&mut rng, q);
-            let y = x.hashback(1u128, q);
+            let y = AllWire::hash_to_mod(x.hash(1u128), q);
             assert!(x != y);
             match y {
                 AllWire::Mod2(WireMod2 { val }) => assert!(u128::from(val) > 0),

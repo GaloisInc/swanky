@@ -201,7 +201,7 @@ impl<Wire: WireLabel + ArithmeticWireLabel> FancyProj for Evaluator<Wire> {
         }
         let t = tweak(self.current_gate());
         if x.color() == 0 {
-            Ok(x.hashback(t, q))
+            Ok(Wire::hash_to_mod(x.hash(t), q))
         } else {
             let ct = gate[x.color() as usize - 1];
             Ok(Wire::from_repr(ct ^ x.hash(t), q))

@@ -326,8 +326,10 @@ impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyProj for Garble
 
         // output zero-wire
         // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-        let C = (A.clone() + Din.clone() * ((q_in - tao) % q_in)).hashback(g, q_out)
-            + Dout.clone() * ((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out);
+        let C = Wire::hash_to_mod(
+            (A.clone() + Din.clone() * ((q_in - tao) % q_in)).hash(g),
+            q_out,
+        ) + Dout.clone() * ((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out);
 
         // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
         let C_precomputed = {
