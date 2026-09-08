@@ -8,6 +8,7 @@
 use crate::util;
 use fancy_traits::HasModulus;
 use rand::CryptoRng;
+use subtle::ConditionallySelectable;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use vectoreyes::{
     U8x16,
@@ -36,6 +37,22 @@ where
 /// A marker trait indicating that the given [`WireLabel`] instantiation
 /// supports arithmetic operations.
 pub trait ArithmeticWireLabel: WireLabel {}
+
+/// The [`BinaryWireLabel`] provides the subroutines to implement AND gates
+/// for the garbler and evaluator in [`fancy_traits::FancyBinary`].
+pub trait BinaryWireLabel: WireLabel + ConditionallySelectable {
+    /// Garbles an 'and' gate given two input wires and the delta.
+    ///
+    /// Outputs a tuple consisting of the two gates (that should be transfered to the evaluator)
+    /// and the next wirelabel for the garbler.
+    fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (U8x16, U8x16, Self);
+
+    /// Evaluates an 'and' gate given two inputs wires and two half-gates from the garbler.
+    ///
+    /// Outputs C = A & B
+    fn evaluate_and_gate(gate_num: usize, A: &Self, B: &Self, gate0: &U8x16, gate1: &U8x16)
+    -> Self;
+}
 
 /// A trait that defines a wirelabel as used in garbled circuits.
 ///

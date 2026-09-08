@@ -1,12 +1,10 @@
 //! Structs and functions for creating, streaming, and evaluating garbled circuits.
 
-mod binary_and;
 mod evaluator;
 mod garbler;
 mod security_warning;
 
 pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
-pub use binary_and::BinaryWireLabel;
 
 #[cfg(test)]
 mod helpers {

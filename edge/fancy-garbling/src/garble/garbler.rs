@@ -1,7 +1,5 @@
 use crate::{
-    AllWire, ArithmeticWireLabel, WireLabel, WireMod2,
-    garble::binary_and::BinaryWireLabel,
-    hash_wires,
+    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireLabel, WireMod2, hash_wires,
     util::{output_tweak, tweak, tweak2},
 };
 use fancy_traits::{
