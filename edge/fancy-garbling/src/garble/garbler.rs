@@ -1,5 +1,5 @@
 use crate::{
-    AllWire, ArithmeticWire, WireLabel, WireMod2,
+    AllWire, ArithmeticWireLabel, WireLabel, WireMod2,
     garble::binary_and::BinaryWireLabel,
     hash_wires,
     util::{output_tweak, tweak, tweak2},
@@ -171,7 +171,7 @@ impl<RNG: CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for Garbler<RNG, Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
         x.clone() + y.clone()
@@ -304,7 +304,7 @@ impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic for Garbl
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyProj for Garbler<RNG, Wire> {
     fn proj(
         &mut self,
         A: &Wire,

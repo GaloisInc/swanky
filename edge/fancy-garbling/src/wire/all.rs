@@ -2,7 +2,7 @@ use fancy_traits::HasModulus;
 use rand::CryptoRng;
 use vectoreyes::U8x16;
 
-use crate::{ArithmeticWire, WireLabel, WireMod2, WireMod3, WireModQ};
+use crate::{ArithmeticWireLabel, WireLabel, WireMod2, WireMod3, WireModQ};
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -160,7 +160,7 @@ impl WireLabel for AllWire {
     }
 }
 
-impl ArithmeticWire for AllWire {}
+impl ArithmeticWireLabel for AllWire {}
 
 #[cfg(test)]
 mod tests {

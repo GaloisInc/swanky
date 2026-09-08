@@ -35,7 +35,7 @@ where
 
 /// A marker trait indicating that the given [`WireLabel`] instantiation
 /// supports arithmetic operations.
-pub trait ArithmeticWire: Clone {}
+pub trait ArithmeticWireLabel: WireLabel {}
 
 /// A trait that defines a wirelabel as used in garbled circuits.
 ///

@@ -1,4 +1,4 @@
-use fancy_garbling::{AllWire, ArithmeticWire, Evaluator as Ev, WireLabel, WireMod2};
+use fancy_garbling::{AllWire, ArithmeticWireLabel, Evaluator as Ev, WireLabel, WireMod2};
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj,
@@ -93,8 +93,11 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel + ArithmeticWire>
-    FancyArithmetic for Evaluator<RNG, OT, Wire>
+impl<
+    RNG: CryptoRng,
+    OT: OtReceiver<Msg = Block> + SemiHonest,
+    Wire: WireLabel + ArithmeticWireLabel,
+> FancyArithmetic for Evaluator<RNG, OT, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
         self.evaluator.add(x, y)
@@ -118,8 +121,11 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel +
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel + ArithmeticWire>
-    FancyProj for Evaluator<RNG, OT, Wire>
+impl<
+    RNG: CryptoRng,
+    OT: OtReceiver<Msg = Block> + SemiHonest,
+    Wire: WireLabel + ArithmeticWireLabel,
+> FancyProj for Evaluator<RNG, OT, Wire>
 {
     fn proj(
         &mut self,
