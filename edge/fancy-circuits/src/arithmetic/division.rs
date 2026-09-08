@@ -7,7 +7,7 @@ use crate::{
     util::product,
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyConstant, FancyProj};
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyConstant, FancyProj, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -29,7 +29,7 @@ impl<'a> Division<'a> {
 impl<'a, F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets + FancyConstant> Circuit<F>
     for Division<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = CrtBundle<F::Item>;

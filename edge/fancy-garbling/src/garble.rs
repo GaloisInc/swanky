@@ -177,7 +177,9 @@ mod streaming {
     use fancy_circuits::util::RngExt;
     use fancy_circuits::{CrtBundle, CrtGadgets};
     use fancy_plaintext::Dummy;
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyConstant};
+    use fancy_traits::{
+        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyConstant, HasModulus,
+    };
     use fancy_traits::{FancyArithmetic, FancyEncode, FancyOutput, FancyProj};
     use rand::{RngExt as _, rng};
     use swanky_channel::Channel;
@@ -287,7 +289,10 @@ mod streaming {
 
     /// Circuit for testing multiple CRT operations.
     struct TestComplexGadget(pub Vec<u16>, pub usize);
-    impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget {
+    impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> Circuit<F> for TestComplexGadget
+    where
+        F::Item: HasModulus,
+    {
         type Input = Vec<CrtBundle<F::Item>>;
         type Output = Vec<CrtBundle<F::Item>>;
 
@@ -311,6 +316,8 @@ mod streaming {
     }
     impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> CircuitInputMapper<F>
         for TestComplexGadget
+    where
+        F::Item: HasModulus,
     {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0.len() * self.1);
@@ -330,6 +337,8 @@ mod streaming {
     }
     impl<F: FancyArithmetic + FancyConstant + FancyProj + CrtGadgets> CircuitOutputMapper<F>
         for TestComplexGadget
+    where
+        F::Item: HasModulus,
     {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output

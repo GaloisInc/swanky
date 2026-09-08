@@ -3,7 +3,7 @@ use crate::{
     util::{self, u128_from_bits},
 };
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyBinary, FancyEncode, FancyOutput, HasModulus};
+use fancy_traits::{FancyBinary, FancyEncode, FancyOutput};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
 
@@ -12,7 +12,7 @@ use swanky_channel::Channel;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryBundle<W>(Bundle<W>);
 
-impl<W: Clone + HasModulus> BinaryBundle<W> {
+impl<W> BinaryBundle<W> {
     /// Create a new binary bundle from a vector of wires.
     pub fn new(ws: Vec<W>) -> BinaryBundle<W> {
         BinaryBundle(Bundle::new(ws))
@@ -37,7 +37,7 @@ impl From<BinaryBundle<DummyVal>> for u128 {
     }
 }
 
-impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
+impl<W> Deref for BinaryBundle<W> {
     type Target = Bundle<W>;
 
     fn deref(&self) -> &Bundle<W> {
@@ -45,7 +45,7 @@ impl<W: Clone + HasModulus> Deref for BinaryBundle<W> {
     }
 }
 
-impl<W: Clone + HasModulus> DerefMut for BinaryBundle<W> {
+impl<W> DerefMut for BinaryBundle<W> {
     fn deref_mut(&mut self) -> &mut Bundle<W> {
         &mut self.0
     }

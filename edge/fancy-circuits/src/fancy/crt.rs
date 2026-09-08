@@ -13,12 +13,14 @@ use swanky_channel::Channel;
 #[derive(Clone)]
 pub struct CrtBundle<W>(Bundle<W>);
 
-impl<W: Clone + HasModulus> CrtBundle<W> {
+impl<W> CrtBundle<W> {
     /// Create a new CRT bundle from a vector of wires.
     pub fn new(ws: Vec<W>) -> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
+}
 
+impl<W: Clone + HasModulus> CrtBundle<W> {
     // /// Return the moduli of all the wires in the bundle.
     pub(crate) fn moduli(&self) -> Vec<u16> {
         self.wires().iter().map(HasModulus::modulus).collect()
@@ -94,7 +96,7 @@ impl CrtBundle<DummyVal> {
     }
 }
 
-impl<W: Clone + HasModulus> Deref for CrtBundle<W> {
+impl<W> Deref for CrtBundle<W> {
     type Target = Bundle<W>;
 
     fn deref(&self) -> &Bundle<W> {
@@ -102,16 +104,22 @@ impl<W: Clone + HasModulus> Deref for CrtBundle<W> {
     }
 }
 
-impl<W: Clone + HasModulus> DerefMut for CrtBundle<W> {
+impl<W> DerefMut for CrtBundle<W> {
     fn deref_mut(&mut self) -> &mut Bundle<W> {
         &mut self.0
     }
 }
 
-impl<F: FancyArithmetic + FancyBinary + FancyEncode + FancyOutput> CrtGadgets for F {}
+impl<F: FancyArithmetic + FancyBinary + FancyEncode + FancyOutput> CrtGadgets for F where
+    F::Item: Clone + HasModulus
+{
+}
 
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
-pub trait CrtGadgets: BundleGadgets + FancyEncode {
+pub trait CrtGadgets: BundleGadgets + FancyEncode
+where
+    Self::Item: HasModulus,
+{
     /// Encode a CRT input bundle.
     fn crt_encode(
         &mut self,

@@ -21,7 +21,7 @@ impl<'a> ToPmr<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for ToPmr<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = &'a CrtBundle<F::Item>;
     type Output = CrtBundle<F::Item>;
@@ -108,7 +108,7 @@ impl<'a> PmrLessThan<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for PmrLessThan<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = F::Item;
@@ -146,7 +146,7 @@ impl<'a> PmrGreaterThanOrEqual<'a> {
 
 impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> Circuit<F> for PmrGreaterThanOrEqual<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = F::Item;

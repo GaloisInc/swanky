@@ -5,7 +5,10 @@ use swanky_error::Result;
 /// Given `(x, modulus)`, change the modulus of `x` to `modulus`.
 pub struct ModChange;
 
-impl<F: FancyProj> Circuit<F> for ModChange {
+impl<F: FancyProj> Circuit<F> for ModChange
+where
+    F::Item: HasModulus,
+{
     type Input = (F::Item, u16);
     type Output = F::Item;
 

@@ -37,7 +37,9 @@ use fancy_circuits::{
     util::{PRIMES, crt, crt_inv, primes_with_width, product},
 };
 use fancy_garbling::AllWire;
-use fancy_traits::{Circuit, FancyArithmetic, FancyConstant, FancyEncode, FancyOutput, FancyProj};
+use fancy_traits::{
+    Circuit, FancyArithmetic, FancyConstant, FancyEncode, FancyOutput, FancyProj, HasModulus,
+};
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -871,7 +873,10 @@ fn fancy_compute_payload_aggregate<F: FancyConstant + FancyArithmetic + FancyPro
     receiver_payloads: &[F::Item],
     receiver_masks: &[F::Item],
     channel: &mut Channel,
-) -> swanky_error::Result<(CrtBundle<F::Item>, CrtBundle<F::Item>)> {
+) -> swanky_error::Result<(CrtBundle<F::Item>, CrtBundle<F::Item>)>
+where
+    F::Item: HasModulus,
+{
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
     assert_eq!(sender_payloads.len(), receiver_payloads.len());
     assert_eq!(receiver_payloads.len(), receiver_masks.len());

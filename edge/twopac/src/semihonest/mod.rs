@@ -22,7 +22,7 @@ mod tests {
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
         Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyConstant,
-        FancyEncode, FancyOutput, FancyProj,
+        FancyEncode, FancyOutput, FancyProj, HasModulus,
     };
     use rand::RngExt;
     use swanky_channel::Channel;
@@ -74,7 +74,7 @@ mod tests {
     }
     impl<'a, F: FancyConstant + FancyArithmetic + FancyProj> Circuit<F> for TestCircuit<'a>
     where
-        F::Item: 'a,
+        F::Item: HasModulus + 'a,
     {
         type Input = &'a [CrtBundle<F::Item>];
         type Output = Vec<CrtBundle<F::Item>>;

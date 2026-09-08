@@ -20,7 +20,7 @@ impl<'a> MixedRadixAdditionMSBOnly<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAdditionMSBOnly<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = &'a [CrtBundle<F::Item>];
     type Output = F::Item;
@@ -105,7 +105,7 @@ impl<'a> MixedRadixAddition<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for MixedRadixAddition<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = &'a [CrtBundle<F::Item>];
     type Output = CrtBundle<F::Item>;
@@ -204,7 +204,7 @@ impl<'a> FractionalMixedRadix<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for FractionalMixedRadix<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a [u16]);
     type Output = F::Item;

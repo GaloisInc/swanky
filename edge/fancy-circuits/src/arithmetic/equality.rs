@@ -17,7 +17,7 @@ impl<'a> Equality<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for Equality<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>);
     type Output = F::Item;

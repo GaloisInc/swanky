@@ -20,7 +20,7 @@ impl<'a> ConstantExponentiation<'a> {
 
 impl<'a, F: FancyProj> Circuit<F> for ConstantExponentiation<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, u32);
     type Output = CrtBundle<F::Item>;
