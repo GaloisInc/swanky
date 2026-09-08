@@ -1,6 +1,7 @@
 use crate::{
-    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireLabel, WireMod2, hash_wires,
+    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireLabel, WireMod2,
     util::{output_tweak, tweak, tweak2},
+    wire::hash_wires,
 };
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,

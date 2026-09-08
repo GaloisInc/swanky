@@ -1,4 +1,4 @@
-use crate::{BinaryWireLabel, WireLabel, hash_wires, util::tweak2};
+use crate::{BinaryWireLabel, WireLabel, util::tweak2, wire::hash_wires};
 use fancy_traits::HasModulus;
 use rand::{CryptoRng, RngExt};
 use subtle::ConditionallySelectable;

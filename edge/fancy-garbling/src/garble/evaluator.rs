@@ -1,8 +1,8 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireMod2, hash_wires,
+    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireMod2,
     util::{output_tweak, tweak, tweak2},
-    wire::WireLabel,
+    wire::{WireLabel, hash_wires},
 };
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
