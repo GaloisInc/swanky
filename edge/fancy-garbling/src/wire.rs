@@ -101,9 +101,6 @@ pub trait WireLabel:
 
     /// Converts a hashed block into a valid wire of the given modulus `q`.
     ///
-    /// This is useful when separately using [`hash_wires`] to hash a set of
-    /// wires in one shot for efficiency reasons.
-    ///
     /// # Panics
     /// This panics if `q` does not align with the modulus supported by the
     /// [`WireLabel`].
