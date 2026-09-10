@@ -1,12 +1,12 @@
 use fancy_traits::{
     Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
 };
-use mac_n_cheese_sieve_parser::WireId;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F128b};
 use swanky_sieve_ir_api::FieldBackend;
+use swanky_sieve_ir_parser::WireId;
 
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;

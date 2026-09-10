@@ -2,11 +2,11 @@ use std::{fs::File, path::PathBuf, time::Instant};
 
 use clap::{Args, Subcommand};
 use mac_n_cheese_ir::circuit_builder::build_privates;
-use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_vole::party::{Party, Prover, Verifier, WhichParty};
 use mac_n_cheese_wire_map::WireMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt};
 use swanky_party::{private::PartyPrivate, ty_eq::Witness};
+use swanky_sieve_ir_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 
 use self::{
     circuit_ir::CircuitChunk,
@@ -217,14 +217,14 @@ pub fn sieve_compiler_main(args: SieveArgs) -> swanky_error::Result<()> {
                     if args.text {
                         sieve_compiler_main_party::<
                             Prover,
-                            mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
-                            mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
+                            swanky_sieve_ir_parser::text_parser::RelationReader<File>,
+                            swanky_sieve_ir_parser::text_parser::ValueStreamReader<File>,
                         >(&args, witness_path)?;
                     } else {
                         sieve_compiler_main_party::<
                             Prover,
-                            mac_n_cheese_sieve_parser::fb_reader::RelationReader,
-                            mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
+                            swanky_sieve_ir_parser::fb_reader::RelationReader,
+                            swanky_sieve_ir_parser::fb_reader::ValueStreamReader,
                         >(&args, witness_path)?;
                     }
                 }
@@ -232,27 +232,27 @@ pub fn sieve_compiler_main(args: SieveArgs) -> swanky_error::Result<()> {
                     if args.text {
                         sieve_compiler_main_party::<
                             Verifier,
-                            mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
-                            mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
+                            swanky_sieve_ir_parser::text_parser::RelationReader<File>,
+                            swanky_sieve_ir_parser::text_parser::ValueStreamReader<File>,
                         >(&args, PartyPrivate::empty(Witness::EQUAL_TYPES))?
                     } else {
                         sieve_compiler_main_party::<
                             Verifier,
-                            mac_n_cheese_sieve_parser::fb_reader::RelationReader,
-                            mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
+                            swanky_sieve_ir_parser::fb_reader::RelationReader,
+                            swanky_sieve_ir_parser::fb_reader::ValueStreamReader,
                         >(&args, PartyPrivate::empty(Witness::EQUAL_TYPES))?
                     }
                 }
                 Command::PlaintextEvaluate { witness } => {
                     if args.text {
                         plaintext_eval::plaintext_evaluate::<
-                            mac_n_cheese_sieve_parser::text_parser::RelationReader<File>,
-                            mac_n_cheese_sieve_parser::text_parser::ValueStreamReader<File>,
+                            swanky_sieve_ir_parser::text_parser::RelationReader<File>,
+                            swanky_sieve_ir_parser::text_parser::ValueStreamReader<File>,
                         >(&args, witness)?;
                     } else {
                         plaintext_eval::plaintext_evaluate::<
-                            mac_n_cheese_sieve_parser::fb_reader::RelationReader,
-                            mac_n_cheese_sieve_parser::fb_reader::ValueStreamReader,
+                            swanky_sieve_ir_parser::fb_reader::RelationReader,
+                            swanky_sieve_ir_parser::fb_reader::ValueStreamReader,
                         >(&args, witness)?;
                     }
                 }

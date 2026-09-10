@@ -728,7 +728,6 @@ dependencies = [
  "generic-array",
  "jemallocator",
  "log",
- "mac-n-cheese-sieve-parser",
  "nix",
  "num-bigint 0.5.1",
  "num-traits",
@@ -750,6 +749,7 @@ dependencies = [
  "swanky-polynomial",
  "swanky-rng",
  "swanky-serialization",
+ "swanky-sieve-ir-parser",
  "swanky-svole-wykw",
  "toml",
 ]
@@ -1441,7 +1441,6 @@ dependencies = [
  "dhat",
  "flume",
  "mac-n-cheese-ir",
- "mac-n-cheese-sieve-parser",
  "mac-n-cheese-vole",
  "mac-n-cheese-wire-map",
  "mimalloc",
@@ -1456,6 +1455,7 @@ dependencies = [
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-party",
+ "swanky-sieve-ir-parser",
  "vectoreyes",
 ]
 
@@ -1563,20 +1563,6 @@ dependencies = [
  "swanky-serialization",
  "swanky-svole-wykw",
  "vectoreyes",
-]
-
-[[package]]
-name = "mac-n-cheese-sieve-parser"
-version = "0.6.0"
-dependencies = [
- "bumpalo",
- "crypto-bigint",
- "flatbuffers",
- "flume",
- "generic-array",
- "memchr",
- "swanky-error",
- "swanky-flatbuffer-build",
 ]
 
 [[package]]
@@ -2343,7 +2329,6 @@ dependencies = [
  "generic-array",
  "itertools 0.15.0",
  "log",
- "mac-n-cheese-sieve-parser",
  "merlin",
  "pretty_env_logger",
  "proptest",
@@ -2359,6 +2344,7 @@ dependencies = [
  "swanky-serialization",
  "swanky-sieve-ir-api",
  "swanky-sieve-ir-codegen",
+ "swanky-sieve-ir-parser",
  "tempfile",
 ]
 
@@ -3077,14 +3063,28 @@ name = "swanky-sieve-ir-codegen"
 version = "0.6.0"
 dependencies = [
  "crypto-bigint",
- "mac-n-cheese-sieve-parser",
  "proc-macro2",
  "quote",
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
  "swanky-serialization",
+ "swanky-sieve-ir-parser",
  "syn 3.0.3",
+]
+
+[[package]]
+name = "swanky-sieve-ir-parser"
+version = "0.6.0"
+dependencies = [
+ "bumpalo",
+ "crypto-bigint",
+ "flatbuffers",
+ "flume",
+ "generic-array",
+ "memchr",
+ "swanky-error",
+ "swanky-flatbuffer-build",
 ]
 
 [[package]]
@@ -3465,12 +3465,12 @@ dependencies = [
  "diet-mac-and-cheese",
  "generic-array",
  "log",
- "mac-n-cheese-sieve-parser",
  "pretty_env_logger",
  "rand 0.10.2",
  "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-rng",
+ "swanky-sieve-ir-parser",
  "wasm-bindgen",
 ]
 
@@ -3482,7 +3482,6 @@ dependencies = [
  "diet-mac-and-cheese",
  "generic-array",
  "log",
- "mac-n-cheese-sieve-parser",
  "pretty_env_logger",
  "rand 0.10.2",
  "rustls",
@@ -3491,6 +3490,7 @@ dependencies = [
  "swanky-error",
  "swanky-field-binary",
  "swanky-rng",
+ "swanky-sieve-ir-parser",
  "tungstenite",
 ]
 

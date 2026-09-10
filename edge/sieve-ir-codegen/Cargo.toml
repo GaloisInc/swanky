@@ -17,7 +17,7 @@ proc-macro = true
 
 [dependencies]
 crypto-bigint.workspace = true
-mac-n-cheese-sieve-parser.workspace = true
+swanky-sieve-ir-parser.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true

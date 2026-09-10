@@ -43,7 +43,6 @@ members = [
   "edge/mac-n-cheese/inspector",
   "edge/mac-n-cheese/ir",
   "edge/mac-n-cheese/runner",
-  "edge/mac-n-cheese/sieve-parser",
   "edge/mac-n-cheese/vole",
   "edge/mac-n-cheese/wire-map",
   "edge/malicious-hooks",
@@ -61,6 +60,7 @@ members = [
   "edge/schmivitz",
   "edge/sieve-ir-api",
   "edge/sieve-ir-codegen",
+  "edge/sieve-ir-parser",
   "edge/simple-arith-circuit",
   "edge/svole-wykw",
   "edge/twopac",
@@ -96,7 +96,6 @@ mac-n-cheese-event-log = { path = "edge/mac-n-cheese/event-log" }
 mac-n-cheese-inspector = { path = "edge/mac-n-cheese/inspector" }
 mac-n-cheese-ir = { path = "edge/mac-n-cheese/ir" }
 mac-n-cheese-runner = { path = "edge/mac-n-cheese/runner" }
-mac-n-cheese-sieve-parser = { path = "edge/mac-n-cheese/sieve-parser" }
 mac-n-cheese-vole = { path = "edge/mac-n-cheese/vole" }
 mac-n-cheese-wire-map = { path = "edge/mac-n-cheese/wire-map" }
 popsicle = { path = "edge/popsicle" }
@@ -123,8 +122,8 @@ swanky-field-ff-primes = { path = "edge/field-ff-primes" }
 swanky-field-fft = { path = "edge/field-fft" }
 swanky-field-test = { path = "edge/field-test" }
 swanky-flatbuffer-build = { path = "edge/flatbuffer-build" }
-swanky-malicious-hooks = { path = "edge/malicious-hooks" }
 swanky-garbled-nn = { path = "edge/garbled-nn" }
+swanky-malicious-hooks = { path = "edge/malicious-hooks" }
 swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
 swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
 swanky-oprf-traits = { path = "edge/oprf-traits" }
@@ -140,6 +139,7 @@ swanky-rng = { path = "core/rng" }
 swanky-serialization = { path = "core/serialization" }
 swanky-sieve-ir-api = { path = "edge/sieve-ir-api" }
 swanky-sieve-ir-codegen = { path = "edge/sieve-ir-codegen" }
+swanky-sieve-ir-parser = { path = "edge/sieve-ir-parser" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
 swanky-twopac = { path = "edge/twopac" }
 vectoreyes = { path = "core/vectoreyes" }

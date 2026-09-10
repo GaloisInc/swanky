@@ -3,13 +3,13 @@ use std::{
     sync::Arc,
 };
 
-use mac_n_cheese_sieve_parser::{
+use rustc_hash::FxHashMap;
+use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
+use swanky_sieve_ir_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType,
     PluginTypeArg, RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
     ValueStreamReader, WireId, WireRange as ParserWireRange,
 };
-use rustc_hash::FxHashMap;
-use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 
 use crate::sieve_compiler::{
     Inputs,
@@ -35,22 +35,22 @@ fn circuit_reader_thread<RR: RelationReader, VSR: ValueStreamReader>(
     let mut types: Vec<Type> = Vec::new();
     for ty in relation.header().types.iter() {
         match ty {
-            mac_n_cheese_sieve_parser::Type::Field { modulus } => types.push(Type::Field(
+            swanky_sieve_ir_parser::Type::Field { modulus } => types.push(Type::Field(
                 FieldType::from_modulus(modulus).ok_or_swanky_error(
                     ErrorKind::UnsupportedError,
                     format!("Unknown modulus {modulus}"),
                 )?,
             )),
-            mac_n_cheese_sieve_parser::Type::ExtField { .. } => {
+            swanky_sieve_ir_parser::Type::ExtField { .. } => {
                 swanky_error::bail!(
                     ErrorKind::UnsupportedError,
                     "Extension fields not supported!"
                 )
             }
-            mac_n_cheese_sieve_parser::Type::Ring { .. } => {
+            swanky_sieve_ir_parser::Type::Ring { .. } => {
                 swanky_error::bail!(ErrorKind::UnsupportedError, "Rings not supported!")
             }
-            mac_n_cheese_sieve_parser::Type::PluginType(PluginType {
+            swanky_sieve_ir_parser::Type::PluginType(PluginType {
                 name,
                 operation,
                 args: _,
@@ -282,8 +282,8 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
     fn copy(
         &mut self,
         _ty: TypeId,
-        _dst: mac_n_cheese_sieve_parser::WireRange,
-        _src: &[mac_n_cheese_sieve_parser::WireRange],
+        _dst: swanky_sieve_ir_parser::WireRange,
+        _src: &[swanky_sieve_ir_parser::WireRange],
     ) -> swanky_error::Result<()> {
         unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
@@ -298,14 +298,14 @@ impl<S: InstructionSink> FunctionBodyVisitor for Visitor<S> {
     fn public_input(
         &mut self,
         _ty: TypeId,
-        _dst: mac_n_cheese_sieve_parser::WireRange,
+        _dst: swanky_sieve_ir_parser::WireRange,
     ) -> swanky_error::Result<()> {
         unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
     fn private_input(
         &mut self,
         _ty: TypeId,
-        _dst: mac_n_cheese_sieve_parser::WireRange,
+        _dst: swanky_sieve_ir_parser::WireRange,
     ) -> swanky_error::Result<()> {
         unimplemented!("Full Fat Mac'n'Cheese no longer supported")
     }
@@ -555,8 +555,8 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
     fn define_function<BodyCb>(
         &mut self,
         name: Identifier,
-        outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        outputs: &[swanky_sieve_ir_parser::TypedCount],
+        inputs: &[swanky_sieve_ir_parser::TypedCount],
         body: BodyCb,
     ) -> swanky_error::Result<()>
     where
@@ -595,9 +595,9 @@ impl<S: InstructionSink> RelationVisitor for Visitor<S> {
     fn define_plugin_function(
         &mut self,
         name: Identifier,
-        outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        inputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        body: mac_n_cheese_sieve_parser::PluginBinding,
+        outputs: &[swanky_sieve_ir_parser::TypedCount],
+        inputs: &[swanky_sieve_ir_parser::TypedCount],
+        body: swanky_sieve_ir_parser::PluginBinding,
     ) -> swanky_error::Result<()> {
         let PluginBinding {
             plugin_type:

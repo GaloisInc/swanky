@@ -3,10 +3,10 @@ use crate::circuit_ir::{
     FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
     first_unused_wire_id,
 };
-use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field_binary::{F2, F63b, F128b};
 use swanky_field_f61p::F61p;
+use swanky_sieve_ir_parser::PluginTypeArg;
 
 pub(crate) struct GaloisPolyV0;
 
@@ -354,13 +354,13 @@ mod tests {
         fields::F61P_MODULUS,
         plugins::Plugin,
     };
-    use mac_n_cheese_sieve_parser::Number;
     use rand::Rng;
     use swanky_field::FiniteRing;
     use swanky_field::PrimeFiniteField;
     use swanky_field_f61p::F61p;
     use swanky_polynomial::Polynomial;
     use swanky_rng::SwankyRng;
+    use swanky_sieve_ir_parser::Number;
 
     fn convert_poly<F: PrimeFiniteField>(p: Polynomial<F>) -> Vec<Number> {
         let mut coeffs = p.coefficients;

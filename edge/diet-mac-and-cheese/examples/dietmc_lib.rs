@@ -20,13 +20,13 @@ use diet_mac_and_cheese::LpnSize;
 use diet_mac_and_cheese::circuit_ir::{CircInputs, FunStore, GateM, TypeStore};
 use diet_mac_and_cheese::party::{Prover, Verifier};
 use diet_mac_and_cheese::svole_trait::Svole;
-use mac_n_cheese_sieve_parser::Number;
 use swanky_channel_legacy::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
 use swanky_field_f61p::F61p;
 use swanky_rng::SwankyRng;
+use swanky_sieve_ir_parser::Number;
 
 fn field_to_number<F: FiniteField>(v: F) -> Number {
     // NOTE: We assume that `to_bytes()` converts a field value into a sequence of bytes in lower-endian.

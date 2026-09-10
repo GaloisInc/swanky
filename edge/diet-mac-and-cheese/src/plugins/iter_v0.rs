@@ -4,8 +4,8 @@ use crate::circuit_ir::{
     first_unused_wire_id,
 };
 use crate::number_to_u64;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use swanky_error::{ErrorKind, Result, ResultExt, bail, ensure};
+use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
 pub(crate) struct IterV0;
 
@@ -254,8 +254,8 @@ impl Plugin for IterV0 {
 
 #[cfg(test)]
 mod tests {
-    use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use swanky_field_f61p::F61p;
+    use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
     use crate::{
         backend_multifield::tests::{

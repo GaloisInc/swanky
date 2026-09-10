@@ -1,7 +1,7 @@
 use std::io::{Cursor, Read};
 
-use mac_n_cheese_sieve_parser::PrintingVisitor;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_sieve_ir_parser::PrintingVisitor;
 
 fn main() -> swanky_error::Result<()> {
     let mut input = Vec::new();
@@ -9,7 +9,7 @@ fn main() -> swanky_error::Result<()> {
         .lock()
         .read_to_end(&mut input)
         .wrap_err(ErrorKind::OtherError, "Failed to read stdin.")?;
-    let parser = mac_n_cheese_sieve_parser::text_parser::RelationReader::new(Cursor::new(input))?;
+    let parser = swanky_sieve_ir_parser::text_parser::RelationReader::new(Cursor::new(input))?;
     println!("{}", parser.header());
     println!("@begin");
     {
