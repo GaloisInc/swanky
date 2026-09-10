@@ -1,6 +1,6 @@
 use crate::{CrtBundle, arithmetic::ModChange};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyProj};
+use fancy_traits::{Circuit, FancyProj, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -20,7 +20,7 @@ impl<'a> Remainder<'a> {
 
 impl<'a, F: FancyProj> Circuit<F> for Remainder<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, u16);
     type Output = CrtBundle<F::Item>;

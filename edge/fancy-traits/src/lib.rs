@@ -32,7 +32,7 @@ pub trait HasModulus {
 /// for converting wires into their underlying plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
-    type Item: Clone + HasModulus + core::fmt::Debug + core::default::Default;
+    type Item: Clone + core::fmt::Debug + Default;
 }
 
 /// Extension trait for [`Fancy`] that provides the ability to encode public constants.

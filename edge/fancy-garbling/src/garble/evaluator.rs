@@ -1,10 +1,8 @@
 use super::security_warning::warn_proj;
 use crate::{
-    AllWire, ArithmeticWire, WireMod2,
-    garble::binary_and::BinaryWireLabel,
-    hash_wires,
+    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireMod2,
     util::{output_tweak, tweak, tweak2},
-    wire::WireLabel,
+    wire::{WireLabel, hash_wires},
 };
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
@@ -119,7 +117,7 @@ impl FancyBinary for Evaluator<AllWire> {
     }
 }
 
-impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
+impl<Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for Evaluator<Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
         x.clone() + y.clone()
@@ -186,7 +184,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyArithmetic for Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
+impl<Wire: WireLabel + ArithmeticWireLabel> FancyProj for Evaluator<Wire> {
     fn proj(
         &mut self,
         x: &Wire,
@@ -203,7 +201,7 @@ impl<Wire: WireLabel + ArithmeticWire> FancyProj for Evaluator<Wire> {
         }
         let t = tweak(self.current_gate());
         if x.color() == 0 {
-            Ok(x.hashback(t, q))
+            Ok(Wire::hash_to_mod(x.hash(t), q))
         } else {
             let ct = gate[x.color() as usize - 1];
             Ok(Wire::from_repr(ct ^ x.hash(t), q))

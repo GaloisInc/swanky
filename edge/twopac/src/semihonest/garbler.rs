@@ -1,4 +1,4 @@
-use fancy_garbling::{AllWire, ArithmeticWire, Garbler as Gb, WireLabel, WireMod2};
+use fancy_garbling::{AllWire, ArithmeticWireLabel, Garbler as Gb, WireLabel, WireMod2};
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
     FancyOutput, FancyProj,
@@ -106,7 +106,7 @@ impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + Sem
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel + ArithmeticWire,
+    Wire: WireLabel + ArithmeticWireLabel,
 > FancyArithmetic for Garbler<RNG, OT, Wire>
 {
     fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
@@ -134,7 +134,7 @@ impl<
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel + ArithmeticWire,
+    Wire: WireLabel + ArithmeticWireLabel,
 > FancyProj for Garbler<RNG, OT, Wire>
 {
     fn proj(

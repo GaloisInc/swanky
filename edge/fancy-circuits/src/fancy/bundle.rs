@@ -1,4 +1,4 @@
-use fancy_traits::{FancyOutput, HasModulus};
+use fancy_traits::FancyOutput;
 use swanky_channel::Channel;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
@@ -6,7 +6,7 @@ use swanky_channel::Channel;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bundle<W>(Vec<W>);
 
-impl<W: Clone + HasModulus> Bundle<W> {
+impl<W> Bundle<W> {
     /// Create a new bundle from some wires.
     pub fn new(ws: Vec<W>) -> Bundle<W> {
         Bundle(ws)

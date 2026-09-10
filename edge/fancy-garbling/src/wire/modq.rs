@@ -1,4 +1,4 @@
-use crate::{ArithmeticWire, WireLabel, util, wire::_unrank};
+use crate::{ArithmeticWireLabel, WireLabel, util, wire::_unrank};
 use fancy_traits::HasModulus;
 use rand::{CryptoRng, RngExt};
 use vectoreyes::U8x16;
@@ -228,7 +228,7 @@ impl WireLabel for WireModQ {
     }
 }
 
-impl ArithmeticWire for WireModQ {}
+impl ArithmeticWireLabel for WireModQ {}
 
 #[cfg(test)]
 mod tests {

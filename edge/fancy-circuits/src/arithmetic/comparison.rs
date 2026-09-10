@@ -4,7 +4,7 @@ use crate::{
     util::get_ms,
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj};
+use fancy_traits::{Circuit, FancyArithmetic, FancyBinary, FancyProj, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -21,7 +21,7 @@ impl<'a> Sign<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for Sign<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a str);
     type Output = F::Item;
@@ -54,7 +54,7 @@ impl<'a> LessThan<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for LessThan<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>, &'a str);
     type Output = F::Item;
@@ -84,7 +84,7 @@ impl<'a> GreaterThanOrEqual<'a> {
 
 impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> Circuit<F> for GreaterThanOrEqual<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a CrtBundle<F::Item>, &'a str);
     type Output = F::Item;
@@ -113,7 +113,7 @@ impl<'a> Max<'a> {
 
 impl<'a, F: FancyBinary + FancyArithmetic + FancyProj> Circuit<F> for Max<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a [CrtBundle<F::Item>], &'a str);
     type Output = CrtBundle<F::Item>;
@@ -161,7 +161,7 @@ impl<'a> Sgn<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for Sgn<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a str, Option<&'a [u16]>);
     type Output = CrtBundle<F::Item>;
@@ -200,7 +200,7 @@ impl<'a> ReLU<'a> {
 
 impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for ReLU<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, &'a str, Option<&'a [u16]>);
     type Output = CrtBundle<F::Item>;
