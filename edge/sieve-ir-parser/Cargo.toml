@@ -1,5 +1,5 @@
 [package]
-name = "mac-n-cheese-sieve-parser"
+name = "swanky-sieve-ir-parser"
 description = "A parser for SIEVE IR (a zero knowledge proof circuit format)"
 authors.workspace = true
 edition.workspace = true

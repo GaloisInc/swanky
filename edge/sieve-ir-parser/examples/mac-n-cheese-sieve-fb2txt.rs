@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use mac_n_cheese_sieve_parser::{PrintingVisitor, RelationReader, fb_reader};
+use swanky_sieve_ir_parser::{PrintingVisitor, RelationReader, fb_reader};
 
 fn main() -> swanky_error::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();

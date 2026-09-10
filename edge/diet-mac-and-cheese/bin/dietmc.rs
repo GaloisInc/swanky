@@ -11,8 +11,6 @@ use diet_mac_and_cheese::sieveir_reader_text::InputText;
 use diet_mac_and_cheese::svole_thread::SvoleAtomic;
 use diet_mac_and_cheese::svole_trait::Svole;
 use log::info;
-use mac_n_cheese_sieve_parser::RelationReader as RR;
-use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
@@ -24,6 +22,8 @@ use swanky_channel_legacy::{Channel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field_binary::{F2, F40b};
 use swanky_rng::SwankyRng;
+use swanky_sieve_ir_parser::RelationReader as RR;
+use swanky_sieve_ir_parser::text_parser::RelationReader;
 
 #[cfg(feature = "jemalloc")]
 use jemallocator::Jemalloc;

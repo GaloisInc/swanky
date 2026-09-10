@@ -194,11 +194,11 @@ impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
 mod tests {
     use crate::circuit::CircuitIngestor;
     use crate::proof::{Circuit, prover_preparer::ProverPreparer};
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use rand::rng;
     use std::io::Cursor;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
+    use swanky_sieve_ir_parser::text_parser::RelationReader;
 
     /// Take a string description of a circuit and parse it.
     fn load_circuit(circuit: &str) -> swanky_error::Result<Circuit> {

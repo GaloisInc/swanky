@@ -20,7 +20,7 @@ version.workspace = true
 [dependencies]
 diet-mac-and-cheese.workspace = true
 fancy-traits.workspace = true
-mac-n-cheese-sieve-parser.workspace = true
+swanky-sieve-ir-parser.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true

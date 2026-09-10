@@ -9,9 +9,9 @@
 
 use crate::circuit::Circuit;
 use crate::circuit::GateM;
-use mac_n_cheese_sieve_parser::WireId;
 use std::collections::BTreeMap;
 use swanky_error::{ErrorKind, bail};
+use swanky_sieve_ir_parser::WireId;
 
 #[derive(Default)]
 struct ValidatorMemory {
@@ -96,7 +96,7 @@ pub fn validate_circuit(circuit: &Circuit) -> swanky_error::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mac_n_cheese_sieve_parser::{TypeId, WireRange};
+    use swanky_sieve_ir_parser::{TypeId, WireRange};
 
     const TY: TypeId = 0;
 

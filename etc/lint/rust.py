@@ -319,6 +319,7 @@ LIBS_NOT_YET_DOCUMENTED = {
     "edge/field-fft/src/lib.rs",
     "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm/src/lib.rs",
     "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
+    "edge/sieve-ir-parser/src/lib.rs",
     "edge/keyed_arena/src/lib.rs",
     "edge/mac-n-cheese/event-log/src/lib.rs",
     "edge/mac-n-cheese/ir/src/lib.rs",

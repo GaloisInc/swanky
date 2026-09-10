@@ -4,7 +4,6 @@
 //! `backend_multifield::load_backend`!
 
 use generic_array::{GenericArray, typenum::Unsigned};
-use mac_n_cheese_sieve_parser::Number;
 use std::any::{TypeId, type_name};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::PrimeFiniteField;
@@ -12,6 +11,7 @@ use swanky_field_binary::{F2, F40b, F63b};
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::{F127p, F128p, F384p, F384q, Secp256k1, Secp256k1order};
 use swanky_serialization::CanonicalSerialize;
+use swanky_sieve_ir_parser::Number;
 
 use crate::number_to_u64;
 
