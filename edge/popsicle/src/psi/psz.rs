@@ -13,7 +13,7 @@ use rand::{CryptoRng, RngExt, seq::SliceRandom};
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_cointoss;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
@@ -31,28 +31,23 @@ pub struct Receiver {
 
 impl Sender {
     /// Initialize the PSI sender.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    pub fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self> {
         let oprf = swanky_oprf_kkrt::Sender::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn send<C: AbstractChannel, RNG: CryptoRng>(
+    pub fn send<RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<()> {
         let key = swanky_cointoss::send(channel, &[rng.random()])
             .wrap_err(ErrorKind::OtherError, "Cointoss protocol failed")?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
-        let nbins = channel
-            .read_usize()
-            .wrap_err(ErrorKind::NetworkError, "Failed to read `usize`")?;
+        let nbins = channel.read()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
@@ -76,27 +71,22 @@ impl Sender {
                     .wrap_err(ErrorKind::NetworkError, "Failed to write bytes")?;
             }
         }
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
         Ok(())
     }
 
     /// Run the PSI protocol over `inputs`. Returns a random key for each input which can
     /// be used to encrypt payloads.
-    pub fn send_payloads<C: AbstractChannel, RNG: CryptoRng>(
+    pub fn send_payloads<RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Vec<Block>> {
         let key = swanky_cointoss::send(channel, &[rng.random()])
             .wrap_err(ErrorKind::OtherError, "Cointoss protocol failed")?[0];
         let masksize = compute_masksize(inputs.len())?;
         let inputs = utils::compress_and_hash_inputs(inputs, key);
-        let nbins = channel
-            .read_usize()
-            .wrap_err(ErrorKind::NetworkError, "Failed to read `usize`")?;
+        let nbins = channel.read()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
         let payloads = (0..inputs.len())
             .map(|_| rng.random::<Block>())
@@ -136,28 +126,22 @@ impl Sender {
                     .wrap_err(ErrorKind::NetworkError, "Failed to write bytes")?;
             }
         }
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
         Ok(payloads)
     }
 }
 
 impl Receiver {
     /// Initialize the PSI receiver.
-    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
-        rng: &mut RNG,
-    ) -> Result<Self> {
+    pub fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self> {
         let oprf = swanky_oprf_kkrt::Receiver::init(channel, rng)?;
         Ok(Self { oprf })
     }
 
     /// Run the PSI protocol over `inputs`.
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng>(
+    pub fn receive<RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<Vec<Vec<u8>>> {
         let n = inputs.len();
@@ -169,9 +153,8 @@ impl Receiver {
         let mut hs = vec![HashSet::with_capacity(n); NHASHES];
         for h in hs.iter_mut() {
             for _ in 0..n {
-                let buf = channel
-                    .read_vec(masksize)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read vector")?;
+                let mut buf = vec![0; masksize];
+                channel.read_bytes(&mut buf)?;
                 h.insert(buf);
             }
         }
@@ -194,10 +177,10 @@ impl Receiver {
 
     /// Run the PSI protocol over `inputs`, receiving a vector of tuples consisting of
     /// the intersection items and associated payloads.
-    pub fn receive_payloads<C: AbstractChannel, RNG: CryptoRng>(
+    pub fn receive_payloads<RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<
         HashMap<
@@ -219,9 +202,7 @@ impl Receiver {
                 channel
                     .read_bytes(&mut tag)
                     .wrap_err(ErrorKind::NetworkError, "Failed to read bytes")?;
-                let ct = channel
-                    .read_block()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
+                let ct = channel.read::<Block>()?;
                 h.insert(tag, ct);
             }
         }
@@ -251,10 +232,10 @@ impl Receiver {
     }
 
     // Helper to do computation common to both receive and receive_payloads
-    fn perform_oprfs<C: AbstractChannel, RNG: CryptoRng>(
+    fn perform_oprfs<RNG: CryptoRng>(
         &mut self,
         inputs: &[Vec<u8>],
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut RNG,
     ) -> Result<(
         CuckooHash,    // Cuckoo Table
@@ -269,12 +250,7 @@ impl Receiver {
         let nbins = tbl.nbins;
 
         // Send cuckoo hash info to sender.
-        channel
-            .write_usize(nbins)
-            .wrap_err(ErrorKind::NetworkError, "Failed to write `usize`")?;
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
+        channel.write(&nbins)?;
 
         // Extract inputs from cuckoo hash.
         let oprf_inputs = tbl
@@ -303,11 +279,6 @@ impl SemiHonest for Receiver {}
 mod tests {
     use super::*;
     use crate::utils::rand_vec_vec;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
     use swanky_rng::SwankyRng;
 
     const ITEM_SIZE: usize = 8;
@@ -316,36 +287,29 @@ mod tests {
     #[test]
     fn test_psi_complete_intersection() {
         let mut rng = SwankyRng::new();
-        let (sender, receiver) = UnixStream::pair().unwrap();
         let sender_inputs = rand_vec_vec(SET_SIZE, ITEM_SIZE, &mut rng);
         let receiver_inputs = sender_inputs.clone();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            psi.send(&sender_inputs, &mut channel, &mut rng).unwrap();
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-        let intersection = psi
-            .receive(&receiver_inputs, &mut channel, &mut rng)
-            .unwrap();
-        handle.join().unwrap();
-        assert_eq!(intersection.len(), SET_SIZE);
+        swanky_channel::local::local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut psi = Sender::init(channel, &mut rng)?;
+                psi.send(&sender_inputs, channel, &mut rng)
+            },
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut psi = Receiver::init(channel, &mut rng)?;
+                let intersection = psi.receive(&receiver_inputs, channel, &mut rng)?;
+                assert_eq!(intersection.len(), SET_SIZE);
+                Ok(())
+            },
+        )
+        .unwrap();
     }
 
     #[test]
     fn test_payloads() {
         let mut rng = SwankyRng::new();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-
         let intersection_size = SET_SIZE / 2;
-
         let intersection = rand_vec_vec(intersection_size, ITEM_SIZE, &mut rng);
 
         let mut sender_inputs = rand_vec_vec(SET_SIZE - intersection_size, ITEM_SIZE, &mut rng);
@@ -353,29 +317,19 @@ mod tests {
         sender_inputs.extend(intersection.clone());
         receiver_inputs.extend(intersection);
 
-        let thread_sender_inputs = sender_inputs.clone();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut psi = Sender::init(&mut channel, &mut rng).unwrap();
-            psi.send_payloads(&thread_sender_inputs, &mut channel, &mut rng)
-                .unwrap()
-        });
-
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut psi = Receiver::init(&mut channel, &mut rng).unwrap();
-
-        let receiver_payloads = psi
-            .receive_payloads(&receiver_inputs, &mut channel, &mut rng)
-            .unwrap();
-
-        let sender_payloads = handle.join().unwrap();
-
+        let (sender_payloads, receiver_payloads) = swanky_channel::local::local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut psi = Sender::init(channel, &mut rng)?;
+                psi.send_payloads(&sender_inputs, channel, &mut rng)
+            },
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut psi = Receiver::init(channel, &mut rng)?;
+                psi.receive_payloads(&receiver_inputs, channel, &mut rng)
+            },
+        )
+        .unwrap();
         assert_eq!(receiver_payloads.len(), intersection_size);
 
         for (item, payload) in sender_inputs.iter().zip(sender_payloads.iter()) {
