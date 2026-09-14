@@ -25,11 +25,11 @@ pub trait HasModulus {
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
 /// underlying wire representation.
 ///
-/// This trait can be further extended to support binary, arithmetic, and/or
-/// projections by using the [`FancyBinary`], [`FancyArithmetic`], or
-/// [`FancyProj`] extension traits, respectively. The [`FancyEncode`] trait
-/// allows for encoding values into wires, and the [`FancyOutput`] trait allows
-/// for converting wires into their underlying plaintext representation.
+/// This trait can be further extended to support binary or arithmetic by using
+/// the [`FancyBinary`] or [`FancyArithmetic`] extension traits, respectively.
+/// The [`FancyEncode`] trait allows for encoding values into wires, and the
+/// [`FancyOutput`] trait allows for converting wires into their underlying
+/// plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
     type Item: Clone + core::fmt::Debug + Default;
