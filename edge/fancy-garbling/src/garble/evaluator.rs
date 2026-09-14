@@ -1,12 +1,11 @@
-use super::security_warning::warn_proj;
 use crate::{
     AllWire, ArithmeticWireLabel, BinaryWireLabel, WireMod2,
-    util::{output_tweak, tweak, tweak2},
+    util::{output_tweak, tweak2},
     wire::{WireLabel, hash_wires},
 };
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput, FancyProj, HasModulus, is_binary,
+    FancyOutput, HasModulus, is_binary,
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -181,31 +180,6 @@ impl<Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for Evaluator<Wire> 
 
         let res = L + R + A.clone() * new_b_color;
         Ok(res)
-    }
-}
-
-impl<Wire: WireLabel + ArithmeticWireLabel> FancyProj for Evaluator<Wire> {
-    fn proj(
-        &mut self,
-        x: &Wire,
-        q: u16,
-        _: Option<Vec<u16>>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Wire> {
-        warn_proj();
-        let ngates = (x.modulus() - 1) as usize;
-        let mut gate = Vec::with_capacity(ngates);
-        for _ in 0..ngates {
-            let block = channel.read::<U8x16>()?;
-            gate.push(block);
-        }
-        let t = tweak(self.current_gate());
-        if x.color() == 0 {
-            Ok(Wire::hash_to_mod(x.hash(t), q))
-        } else {
-            let ct = gate[x.color() as usize - 1];
-            Ok(Wire::from_repr(ct ^ x.hash(t), q))
-        }
     }
 }
 

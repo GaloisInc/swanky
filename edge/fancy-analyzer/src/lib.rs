@@ -5,7 +5,7 @@
 use core::cmp::max;
 use fancy_traits::{
     CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant,
-    FancyEncode, FancyOutput, FancyProj, HasModulus,
+    FancyEncode, FancyOutput, HasModulus,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -180,21 +180,6 @@ impl FancyArithmetic for CircuitAnalyzer {
             modulus: x.modulus,
             depth: max(x.depth, y.depth) + 1,
         })
-    }
-}
-
-impl FancyProj for CircuitAnalyzer {
-    fn proj(
-        &mut self,
-        _: &Self::Item,
-        _: u16,
-        _: Option<Vec<u16>>,
-        _: &mut Channel,
-    ) -> Result<Self::Item> {
-        swanky_error::bail!(
-            ErrorKind::UnsupportedError,
-            "Projection gates are unsupported"
-        )
     }
 }
 

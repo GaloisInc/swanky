@@ -32,11 +32,6 @@ impl<W> Bundle<W> {
         self.0.push(val);
     }
 
-    /// Pop a wire from the Bundle.
-    pub(crate) fn pop(&mut self) -> Option<W> {
-        self.0.pop()
-    }
-
     /// Reverse the wires
     pub(crate) fn reverse(&mut self) {
         self.0.reverse();

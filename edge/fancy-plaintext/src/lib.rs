@@ -3,7 +3,7 @@
 
 use fancy_traits::{
     Circuit, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput, FancyProj, HasModulus, is_binary,
+    FancyOutput, HasModulus, is_binary,
 };
 use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
@@ -137,29 +137,6 @@ impl FancyArithmetic for Dummy {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
         })
-    }
-}
-
-impl FancyProj for Dummy {
-    fn proj(
-        &mut self,
-        x: &DummyVal,
-        modulus: u16,
-        tt: Option<Vec<u16>>,
-        _: &mut Channel,
-    ) -> swanky_error::Result<DummyVal> {
-        assert!(tt.is_some(), "`tt` must not be `None`");
-        let tt = tt.unwrap();
-        assert!(
-            tt.len() >= x.modulus() as usize,
-            "`tt` not large enough for `x`s modulus"
-        );
-        assert!(
-            tt.iter().all(|&x| x < modulus),
-            "`tt` value larger than `q`"
-        );
-        let val = tt[x.val as usize];
-        Ok(DummyVal { val, modulus })
     }
 }
 
