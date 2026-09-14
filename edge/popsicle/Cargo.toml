@@ -16,28 +16,30 @@ workspace = true
 [lib]
 
 [dependencies]
-swanky-oprf-kkrt.workspace = true
-swanky-oprf-kmprt.workspace = true
-swanky-oprf-traits.workspace = true
-swanky-ot-alsz-kos.workspace = true
-swanky-twopac.workspace = true
-
-itertools.workspace = true
-rand.workspace = true
-sha2.workspace = true
-aes-gcm.workspace = true
 fancy-circuits.workspace = true
 fancy-garbling = { workspace = true, features = ["serde"] }
 fancy-traits.workspace = true
 swanky-adversary.workspace = true
-swanky-cr-hash.workspace = true
-swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
+swanky-cr-hash.workspace = true
 swanky-error.workspace = true
+swanky-oprf-kkrt.workspace = true
+swanky-oprf-kmprt.workspace = true
+swanky-oprf-traits.workspace = true
+swanky-ot-alsz-kos.workspace = true
+swanky-rng.workspace = true
+swanky-twopac.workspace = true
 vectoreyes.workspace = true
+
+aes-gcm.workspace = true
+itertools.workspace = true
+rand.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
