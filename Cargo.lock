@@ -2613,6 +2613,7 @@ dependencies = [
  "rand_core 0.10.1",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-error",
  "swanky-rng",
 ]
 
