@@ -54,10 +54,6 @@ harness = false
 name = "psty"
 harness = false
 
-[[bench]]
-name = "psty_payload"
-harness = false
-
 [[example]]
 name = "psty"
 
