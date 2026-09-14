@@ -30,7 +30,6 @@ swanky-oprf-kkrt.workspace = true
 swanky-oprf-kmprt.workspace = true
 swanky-oprf-traits.workspace = true
 swanky-ot-alsz-kos.workspace = true
-swanky-rng.workspace = true
 swanky-twopac.workspace = true
 vectoreyes.workspace = true
 
@@ -42,6 +41,8 @@ serde_json = { workspace = true }
 sha2.workspace = true
 
 [dev-dependencies]
+swanky-rng.workspace = true
+
 criterion.workspace = true
 proptest.workspace = true
 
