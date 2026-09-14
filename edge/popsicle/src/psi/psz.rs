@@ -5,7 +5,6 @@
 //! The current implementation does not hash the output of the (relaxed) OPRF.
 
 use crate::{
-    Error,
     cuckoo::{CuckooHash, compute_masksize},
     utils,
 };
@@ -16,6 +15,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
 
 const NHASHES: usize = 3;
@@ -34,7 +34,7 @@ impl Sender {
     pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let oprf = swanky_oprf_kkrt::Sender::init(channel, rng)?;
         Ok(Self { oprf })
     }
@@ -45,11 +45,14 @@ impl Sender {
         inputs: &[Vec<u8>],
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<(), Error> {
-        let key = swanky_cointoss::send(channel, &[rng.random()])?[0];
+    ) -> Result<()> {
+        let key = swanky_cointoss::send(channel, &[rng.random()])
+            .wrap_err(ErrorKind::OtherError, "Cointoss protocol failed")?[0];
         let inputs = utils::compress_and_hash_inputs(inputs, key);
         let masksize = compute_masksize(inputs.len())?;
-        let nbins = channel.read_usize()?;
+        let nbins = channel
+            .read_usize()
+            .wrap_err(ErrorKind::NetworkError, "Failed to read `usize`")?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
@@ -68,10 +71,14 @@ impl Sender {
                 self.oprf.encode(inputs[j], &mut encoded);
                 encoded ^= seeds[bin];
 
-                channel.write_bytes(encoded.prefix(masksize))?;
+                channel
+                    .write_bytes(encoded.prefix(masksize))
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write bytes")?;
             }
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
         Ok(())
     }
 
@@ -82,11 +89,14 @@ impl Sender {
         inputs: &[Vec<u8>],
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
-        let key = swanky_cointoss::send(channel, &[rng.random()])?[0];
+    ) -> Result<Vec<Block>> {
+        let key = swanky_cointoss::send(channel, &[rng.random()])
+            .wrap_err(ErrorKind::OtherError, "Cointoss protocol failed")?[0];
         let masksize = compute_masksize(inputs.len())?;
         let inputs = utils::compress_and_hash_inputs(inputs, key);
-        let nbins = channel.read_usize()?;
+        let nbins = channel
+            .read_usize()
+            .wrap_err(ErrorKind::NetworkError, "Failed to read `usize`")?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
         let payloads = (0..inputs.len())
             .map(|_| rng.random::<Block>())
@@ -118,11 +128,17 @@ impl Sender {
                     .zip(key.iter())
                     .for_each(|(a, &b)| *a ^= b);
 
-                channel.write_bytes(&tag[0..masksize])?;
-                channel.write_bytes(ct.as_ref())?;
+                channel
+                    .write_bytes(&tag[0..masksize])
+                    .wrap_err(ErrorKind::NetworkError, "Failedd to write bytes")?;
+                channel
+                    .write_bytes(ct.as_ref())
+                    .wrap_err(ErrorKind::NetworkError, "Failed to write bytes")?;
             }
         }
-        channel.flush()?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
         Ok(payloads)
     }
 }
@@ -132,7 +148,7 @@ impl Receiver {
     pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let oprf = swanky_oprf_kkrt::Receiver::init(channel, rng)?;
         Ok(Self { oprf })
     }
@@ -143,7 +159,7 @@ impl Receiver {
         inputs: &[Vec<u8>],
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> Result<Vec<Vec<u8>>> {
         let n = inputs.len();
         let masksize = compute_masksize(n)?;
 
@@ -153,7 +169,9 @@ impl Receiver {
         let mut hs = vec![HashSet::with_capacity(n); NHASHES];
         for h in hs.iter_mut() {
             for _ in 0..n {
-                let buf = channel.read_vec(masksize)?;
+                let buf = channel
+                    .read_vec(masksize)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read vector")?;
                 h.insert(buf);
             }
         }
@@ -186,7 +204,6 @@ impl Receiver {
             Vec<u8>, // Intersection item
             Block,   // Payload
         >,
-        Error,
     > {
         let (tbl, outputs) = self.perform_oprfs(inputs, channel, rng)?;
         let n = inputs.len();
@@ -199,8 +216,12 @@ impl Receiver {
         for h in hs.iter_mut() {
             for _ in 0..n {
                 let mut tag = vec![0; masksize];
-                channel.read_bytes(&mut tag)?;
-                let ct = channel.read_block()?;
+                channel
+                    .read_bytes(&mut tag)
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read bytes")?;
+                let ct = channel
+                    .read_block()
+                    .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
                 h.insert(tag, ct);
             }
         }
@@ -235,14 +256,12 @@ impl Receiver {
         inputs: &[Vec<u8>],
         channel: &mut C,
         rng: &mut RNG,
-    ) -> Result<
-        (
-            CuckooHash,    // Cuckoo Table
-            Vec<Block512>, // OPRF outputs
-        ),
-        Error,
-    > {
-        let key = swanky_cointoss::receive(channel, &[rng.random()])?[0];
+    ) -> Result<(
+        CuckooHash,    // Cuckoo Table
+        Vec<Block512>, // OPRF outputs
+    )> {
+        let key = swanky_cointoss::receive(channel, &[rng.random()])
+            .wrap_err(ErrorKind::OtherError, "Cointoss protocol failed")?[0];
 
         let hashed = utils::compress_and_hash_inputs(inputs, key);
 
@@ -250,8 +269,12 @@ impl Receiver {
         let nbins = tbl.nbins;
 
         // Send cuckoo hash info to sender.
-        channel.write_usize(nbins)?;
-        channel.flush()?;
+        channel
+            .write_usize(nbins)
+            .wrap_err(ErrorKind::NetworkError, "Failed to write `usize`")?;
+        channel
+            .flush()
+            .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
 
         // Extract inputs from cuckoo hash.
         let oprf_inputs = tbl

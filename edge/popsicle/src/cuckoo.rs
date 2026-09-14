@@ -6,9 +6,9 @@
 //     effectively get rid of the ch large structure and methods currently in popsicle/src/cuckoo)
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
-use crate::Error;
 use std::fmt::Debug;
 use swanky_block::Block;
+use swanky_error::{ErrorKind, Result, bail};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
 
 #[derive(Clone, Debug)]
@@ -38,7 +38,7 @@ pub(crate) struct CuckooHash {
 /// The number of times to loop when trying to place an entry in a bin.
 const NITERS: usize = 1000;
 
-fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
+fn compute_nbins(n: usize, nhashes: usize) -> Result<usize> {
     // Numbers taken from <https://thomaschneider.de/papers/PSZ18.pdf>, §3.2.2.
     if nhashes == 3 {
         if n < 1 << 27 {
@@ -51,11 +51,16 @@ fn compute_nbins(n: usize, nhashes: usize) -> Result<usize, Error> {
     } else if nhashes == 5 {
         Ok((1.05 * (n as f64)).ceil() as usize)
     } else {
-        Err(Error::InvalidCuckooParameters { nitems: n, nhashes })
+        bail!(
+            ErrorKind::OtherError,
+            "Invalid cuckoo parameters: {}, {}",
+            n,
+            nhashes
+        );
     }
 }
 
-pub fn compute_masksize(n: usize) -> Result<usize, Error> {
+pub fn compute_masksize(n: usize) -> Result<usize> {
     // Numbers taken from <https://eprint.iacr.org/2016/799>, Table 2 (the `v`
     // column).
     let masksize = if n <= 1 << 8 {
@@ -71,7 +76,7 @@ pub fn compute_masksize(n: usize) -> Result<usize, Error> {
     } else if n <= 1 << 28 {
         12
     } else {
-        return Err(Error::InvalidCuckooSetSize(n));
+        bail!(ErrorKind::OtherError, "Invalid cuckoo set size: {}", n);
     };
     Ok(masksize)
 }
@@ -80,7 +85,7 @@ impl CuckooHash {
     /// Build a new cuckoo hash table, hashing `inputs` in. We require that the
     /// lower-order-bits of the values in `inputs` are zero-ed out, as those
     /// bits will be used to store the hash index.
-    pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash, Error> {
+    pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash> {
         let nbins = compute_nbins(inputs.len(), nhashes)?;
 
         let mut tbl = CuckooHash {
@@ -99,7 +104,7 @@ impl CuckooHash {
 
     /// Place `input`, alongside the input index `idx` it corresponds to, in the
     /// hash table.
-    pub fn hash(&mut self, input: Block, idx: usize) -> Result<(), Error> {
+    pub fn hash(&mut self, input: Block, idx: usize) -> Result<()> {
         let mut item = CuckooItem {
             entry: input,
             input_index: idx,
@@ -118,7 +123,7 @@ impl CuckooHash {
                 return Ok(());
             }
         }
-        Err(Error::CuckooHashFull)
+        bail!(ErrorKind::OtherError, "Cuckoo hash full");
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
