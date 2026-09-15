@@ -219,7 +219,7 @@ impl DecommitmentSerde for PartialDecommitment {
 
         let iv_bytes = 16;
         // FIXME(hamlinb): Should this be (SECURITY_PARAM + B) / 8?
-        let u_tilda_bytes = SECURITY_PARAM + B / 8;
+        let u_tilda_bytes = (SECURITY_PARAM + B) / 8;
 
         pdecom_bytes + corrections_bytes + iv_bytes + u_tilda_bytes
     }
