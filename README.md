@@ -84,8 +84,8 @@ have a lesser stability guarantee.
 
 # A note on security
 
-**2024-02-09** Projection gates in arithmetic garbled circuits have [a proven security vulnerability](https://github.com/defund/ctf/tree/master/dicectf-quals-2024/dicenet/solve) in their design. The issue affects the fancy-garbling library and its dependencies (including popsicle).
-We are currently investigating the impact this bug has on Arithmetic Garbling (CRT) in swanky.
+~~**2024-02-09** Projection gates in arithmetic garbled circuits have [a proven security vulnerability](https://github.com/defund/ctf/tree/master/dicectf-quals-2024/dicenet/solve) in their design.~~
+As of **2026-09-15** projection gates have been removed from `fancy-garbling`.
 
 `swanky` is currently **research** software. Do not deploy it in production, or trust
 it with sensitive data.

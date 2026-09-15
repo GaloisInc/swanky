@@ -1,11 +1,11 @@
 use crate::{
     AllWire, ArithmeticWireLabel, BinaryWireLabel, WireLabel, WireMod2,
-    util::{output_tweak, tweak, tweak2},
+    util::{output_tweak, tweak2},
     wire::hash_wires,
 };
 use fancy_traits::{
     Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput, FancyProj, HasModulus, is_binary,
+    FancyOutput, HasModulus, is_binary,
 };
 use rand::{CryptoRng, RngExt};
 #[cfg(feature = "serde")]
@@ -14,8 +14,6 @@ use std::collections::HashMap;
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
-
-use super::security_warning::warn_proj;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG, Wire> {
@@ -300,69 +298,6 @@ impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for 
             channel.write(block)?;
         }
         Ok(X + Y)
-    }
-}
-
-impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyProj for Garbler<RNG, Wire> {
-    fn proj(
-        &mut self,
-        A: &Wire,
-        q_out: u16,
-        tt: Option<Vec<u16>>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Wire> {
-        warn_proj();
-        assert!(tt.is_some(), "`tt` must not be `None`");
-        let tt = tt.unwrap();
-
-        let q_in = A.modulus();
-        let mut gate = vec![Default::default(); q_in as usize - 1];
-
-        let tao = A.color();
-        let g = tweak(self.current_gate());
-
-        let Din = self.delta(q_in);
-        let Dout = self.delta(q_out);
-
-        // output zero-wire
-        // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-        let C = Wire::hash_to_mod(
-            (A.clone() + Din.clone() * ((q_in - tao) % q_in)).hash(g),
-            q_out,
-        ) + Dout.clone() * ((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out);
-
-        // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
-        let C_precomputed = {
-            let mut C_ = C.clone();
-            (0..q_out)
-                .map(|x| {
-                    if x > 0 {
-                        C_ += Dout.clone();
-                    }
-                    C_.to_repr()
-                })
-                .collect::<Vec<_>>()
-        };
-
-        let mut A_ = A.clone();
-        for x in 0..q_in {
-            if x > 0 {
-                A_ += Din.clone(); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
-            }
-
-            let ix = (tao as usize + x as usize) % q_in as usize;
-            if ix == 0 {
-                continue;
-            }
-
-            let ct = A_.hash(g) ^ C_precomputed[tt[x as usize] as usize];
-            gate[ix - 1] = ct;
-        }
-
-        for block in gate.iter() {
-            channel.write(block)?;
-        }
-        Ok(C)
     }
 }
 
