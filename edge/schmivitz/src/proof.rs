@@ -63,7 +63,7 @@ where
     pub fn proof_size_estimate(&self) -> usize {
         // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
         let witness_commitment_bytes = self.witness_commitment.len() / 8;
-        let degree_1_commitment_bytes = 16;
+        let degree_1_commitment_bytes = SECURITY_PARAM / 8;
         let decommitment_challenge_bytes = SECURITY_PARAM / 8;
 
         let partial_decommitment_size = self.partial_decommitment.proof_size_estimate();
