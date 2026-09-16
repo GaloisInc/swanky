@@ -19,6 +19,7 @@ use vectoreyes::U8x16;
 pub struct Garbler<RNG, Wire> {
     // Zero wirelabel used for binary negation.
     zero: Wire,
+    delta_mod_2: Wire,
     // Map from modulus to associated delta wirelabel.
     deltas: HashMap<u16, Wire>,
     current_output: usize,
@@ -46,11 +47,10 @@ impl<RNG: CryptoRng, Wire: WireLabel> Garbler<RNG, Wire> {
         // as that value XORed with `Δ`.
         let one = Wire::from_repr(U8x16::from(1u128), 2);
         let zero = delta.clone() + one;
-        let mut deltas = HashMap::new();
-        deltas.insert(2, delta);
         Garbler {
             zero,
-            deltas,
+            delta_mod_2: delta,
+            deltas: HashMap::new(),
             current_gate: 0,
             current_output: 0,
             rng,
@@ -67,12 +67,15 @@ impl<RNG: CryptoRng, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     pub fn delta(&mut self, q: u16) -> Wire {
-        if let Some(delta) = self.deltas.get(&q) {
-            return delta.clone();
+        if q == 2 {
+            self.delta_mod_2.clone()
+        } else if let Some(delta) = self.deltas.get(&q) {
+            delta.clone()
+        } else {
+            let w = Wire::rand_delta(&mut self.rng, q);
+            self.deltas.insert(q, w.clone());
+            w
         }
-        let w = Wire::rand_delta(&mut self.rng, q);
-        self.deltas.insert(q, w.clone());
-        w
     }
 
     /// The current output index of the garbling computation.
@@ -82,10 +85,10 @@ impl<RNG: CryptoRng, Wire: WireLabel> Garbler<RNG, Wire> {
         current
     }
 
-    /// Get the deltas, consuming the Garbler.
-    ///
-    /// This is useful for reusing wires in multiple garbled circuit instances.
-    pub fn get_deltas(self) -> HashMap<u16, Wire> {
+    /// Get the deltas, consuming the [`Garbler`].
+    pub fn get_deltas(mut self) -> HashMap<u16, Wire> {
+        // Put `delta_mod_2` in the `HashMap` before returning it.
+        self.deltas.insert(2, self.delta_mod_2);
         self.deltas
     }
 
