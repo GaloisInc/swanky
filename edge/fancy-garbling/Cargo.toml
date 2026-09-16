@@ -41,10 +41,6 @@ vectoreyes.workspace = true
 swanky-rng.workspace = true
 criterion.workspace = true
 
-[[bin]]
-name = "gen-deltas"
-required-features = ["serde"]
-
 [[bench]]
 name = "wire_operations"
 harness = false
