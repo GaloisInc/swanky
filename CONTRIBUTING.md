@@ -8,7 +8,8 @@ This document is still a work in progress. More information will be added later.
 2. [Goals of Swanky](#goals-of-swanky)
 3. [Swanky Development Process](CONTRIBUTING/swanky-development-process.md)
 4. [Swanky Implementation Information](CONTRIBUTING/swanky-implementation-info.md)
-5. [Swanky API Guidelines](#swanky-api-guidelines)
+5. [Swanky and AI Tools](#swanky-and-ai-tools)
+6. [Swanky API Guidelines](#swanky-api-guidelines)
 
 The first two sections of this document describes the _process_ of developing Swanky (e.g. how to go about adding a new feature, how to structure code review, etc.). The remainder of this document is about technical considerations when developing for Swanky.
 
@@ -31,6 +32,22 @@ See the [Swanky Development Process](CONTRIBUTING/swanky-development-process.md)
 ## Swanky Implementation Information
 
 See the [Swanky Implementation Information](CONTRIBUTING/swanky-implementation-info.md) document for details.
+
+## Swanky and AI Tools
+
+AI tools CAN be used in contributions to Swanky AS LONG AS they follow the below requirements:
+
+* For any new functionality, any public APIs and integration tests MUST be human
+  authored, and done BEFORE using any AI tools.
+* All API documentation MUST be human authored.
+* All commits MUST be human authored (messages and choice of contents).
+* The use of AI generated code in any commit MUST be disclosed in the commit
+  message.
+* We _strongly_ RECOMMEND the use of test-driven development as part of using AI.
+* THE HUMAN AUTHOR IS RESPONSIBLE FOR ALL CODE IN A COMMIT. In addition, the
+  human author is responsible for following commit best practices, such as
+  having each commit only relate to a single change, commits being sufficiently
+  small in scope, etc.
 
 ## Swanky API Guidelines
 

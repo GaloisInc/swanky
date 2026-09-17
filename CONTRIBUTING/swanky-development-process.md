@@ -105,19 +105,3 @@ After a successful code review, once the "Merge it In!" button has been pressed,
 If you ask a reviewer to review too much code it can be overwhelming. Instead, break the code into many smaller pieces, that can be reviewed separately.
 
 Ask questions of the code author in comments! If you have a question about the code, it can help indicate that code should be restructured or differently documented. At worst, it'll help your understanding!
-
-## AI Tools
-
-AI tools CAN be used in contributions to Swanky AS LONG AS they follow the below requirements:
-
-* For any new functionality, any public APIs and integration tests MUST be human
-  authored, and done BEFORE using any AI tools.
-* All API documentation MUST be human authored.
-* All commits MUST be human authored (messages and choice of contents).
-* The use of AI generated code in any commit MUST be disclosed in the commit
-  message.
-* We _strongly_ RECOMMEND the use of test-driven development as part of using AI.
-* THE HUMAN AUTHOR IS RESPONSIBLE FOR ALL CODE IN A COMMIT. In addition, the
-  human author is responsible for following commit best practices, such as
-  having each commit only relate to a single change, commits being sufficiently
-  small in scope, etc.
