@@ -467,11 +467,11 @@ cryptographic use-cases), should take `self` and return `Self` on success, rathe
 If `Self` is returned, then it should be the last element of the resulting tuple.
 
 * **Good**
-  - `fn my_protocol_function(self, x: u128) -> Result<(u128, Self)>`
-  - `fn my_protocol_function(self, x: u128) -> Result<Self>`
+  * `fn my_protocol_function(self, x: u128) -> Result<(u128, Self)>`
+  * `fn my_protocol_function(self, x: u128) -> Result<Self>`
 * **Bad**
-  - `fn my_protocol_function(self, x: u128) -> Result<(Self, u128)>` (`Self` should be the last tuple element!)
-  - `fn my_protocol_function(&mut self, x: u128)`
+  * `fn my_protocol_function(self, x: u128) -> Result<(Self, u128)>` (`Self` should be the last tuple element!)
+  * `fn my_protocol_function(&mut self, x: u128)`
 
 #### Rationale
 
