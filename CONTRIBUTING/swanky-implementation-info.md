@@ -2,7 +2,7 @@
 
 This document outlines implementation-specific information when contributing to Swanky.
 
-[[_TOC_]] <!-- This command generates a Table Of Contents in GitLab -->
+[[_TOC_]]
 
 ## Language Choice
 

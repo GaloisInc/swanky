@@ -2,7 +2,7 @@
 
 This document outlines the development process for contributing to Swanky.
 
-[[_TOC_]] <!-- This command generates a Table Of Contents in GitLab -->
+[[_TOC_]]
 
 ## Goals of the development process
 
