@@ -1,4 +1,4 @@
-# Swanky Development Process
+# Swanky Implementation Information
 
 This document outlines implementation-specific information when contributing to Swanky.
 
