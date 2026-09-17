@@ -1,4 +1,4 @@
-### Language Choice
+## Language Choice
 
 Swanky is written almost entirely in ([stable](#rust-version)) Rust.
 
@@ -8,7 +8,7 @@ For WebAssembly/webdev projects, some glue code is written in JavaScript. As of 
 
 In very rare cases, some Swanky code is written in C. Rust is preferred.
 
-### Target Platform
+## Target Platform
 
 Swanky primarily targets x86-64 Linux. As many Swanky developers use Macs, it should also run on both ARM and Intel Macs. Wasm32 is supported as a secondary target.
 
@@ -22,11 +22,11 @@ In some cases, we may depend on external tools for code generation. If this is t
 
 The goal of this requirement is to make sure that it is easy for new users to get started with Swanky. It's much easier to say "all you need is Rust," than it is to start requiring additional tools on top.
 
-### Repository Organization
+## Repository Organization
 
 Swanky is developed in a monorepo.
 
-#### One Feature Per Crate
+### One Feature Per Crate
 
 We prefer to have many smaller crates rather than a few big crates. This strategy can drastically improve compilation times (especially for release builds). It also makes it easier for us to more precisely track the dependencies of Swanky components.
 
@@ -41,15 +41,15 @@ Use it like:
 $ ./swanky new-crate swanky-ot-kos
 ```
 
-#### Cargo Features
+### Cargo Features
 
 [Cargo features](https://doc.rust-lang.org/cargo/reference/features.html) allow for conditional compilation of Rust code.
 
 We should _avoid_ defining Cargo features whenever possible! Features are extremely hard to test, since we'd need to test all combinations of features.
 
-##### How to avoid defining a Feature
+#### How to avoid defining a Feature
 
-###### Optionally Compile a Module
+##### Optionally Compile a Module
 
 For code that would look like:
 
@@ -60,7 +60,7 @@ pub mod cool_module;
 
 Rather than defining a Cargo feature, it's preferable to create a [new crate](#one-feature-per-crate) with the optional functionality, instead.
 
-###### Optionally Implement a Trait
+##### Optionally Implement a Trait
 
 For example, maybe you want to implement the [`num::Zero`](https://docs.rs/num/latest/num/trait.Zero.html) trait on a type you define, but you don't want to pull in the `num` dependency in all cases.
 
@@ -75,14 +75,14 @@ The better way is to unconditionally depend (i.e. without a Cargo feature) on th
 
 This technique isn't specific to the `num` ecosystem, either. Many Rust libraries provide an explicit `_traits`-style crate.
 
-#### Crate Layout
+### Crate Layout
 
 Crates must
 
 * live in the `core/` or `edge/` directory. The directory structure must match the name of the crate (to make it easy to find the crate). For example `swanky-ot-kos` might live in `crates/ot-kos` or `crates/ot/kos`, but it shouldn't live in `crates/kos`.
 * be named starting with the `swanky-` prefix. This makes it easy to determine which crates come from Swanky, and which crates are external dependencies.
 
-### Documentation
+## Documentation
 
 Swanky APIs should be documented using [rustdoc](https://doc.rust-lang.org/rustdoc/index.html).
 
@@ -112,7 +112,7 @@ graph TD;
 ```
 ````
 
-### Code Formatting
+## Code Formatting
 
 In the Swanky repo, Rust code is automatically formatted with [rustfmt](https://github.com/rust-lang/rustfmt), and [black](https://github.com/psf/black) and [isort](https://pycqa.github.io/isort/) for Python code. CI will reject any code which isn't properly formatted.
 
@@ -120,9 +120,9 @@ We enforce code formatting practices (in CI) to try to keep git patches as meani
 
 You can autoformat Rust code with `cargo fmt` or format all code with `./swanky fmt`.
 
-### Dependencies
+## Dependencies
 
-#### Version Pinning
+### Version Pinning
 
 We commit _exact_ versions of all dependencies into the Swanky repository. This ensures that _every_ user and developer of Swanky gets the identical dependencies, avoiding issues with dependency version mismatch.
 
@@ -130,11 +130,11 @@ CI will ensure that the checked-in version files (`Cargo.lock` and `rust-toolcha
 
 Because our focus is on cryptographic research, and not shipping a production library, we do not test Swanky against versions of dependencies or versions of Rust other than those that we've pinned.
 
-#### Rust Version
+### Rust Version
 
 We pin a stable version of the Rust toolchain in the `rust-toolchain` file. We only use stable Rust features and do not build off of nightly. Our MSRV (Minimum Supported Rust Version) is the version that we have pinned. We try to update the pinned Rust version as new Rust versions are released.
 
-### Cargo Workspace Inheritance
+## Cargo Workspace Inheritance
 
 To ensure uniformity across Cargo metadata, `swanky` employs [Cargo's workspace inheritance functionality](https://betterprogramming.pub/workspace-inheritance-in-rust-65d0bb8f9424).
 This functionality lets us set a common set of metadata (such as version, license, author) in the root `Cargo.toml` file, and have it automatically applied across all of our crates.
@@ -161,7 +161,7 @@ rand = { workspace = true, features = [ "log" ] }
 
 CI will enforce the use of workspace inheritance.
 
-### Tests
+## Tests
 
 All code in Swanky _should_ be tested via Rust tests. Ideally, tests would test both valid input (the happy path) and invalid inputs.
 
@@ -175,11 +175,11 @@ sense to reduce the number of iterations for slow-running tests. This can be
 done using
 [`#![proptest_config](ProptestConfig::with_cases(...))]`](https://proptest-rs.github.io/proptest/proptest/tutorial/config.html).
 
-#### Assets for Tests
+### Assets for Tests
 
 Rather than reading files from tests (which will fail in CI due to a file not found error, due to our test caching setup), use `include_bytes!` or `include_str!` to instead copy the test asset that you want into the test binary at compile-time.
 
-### Panicking
+## Panicking
 
 [￼`panic!`￼](https://doc.rust-lang.org/std/macro.panic.html)/[￼`unwrap`￼](https://doc.rust-lang.org/std/result/enum.Result.html#method.unwrap) (and friends) should only be used to report _internal_ errors (i.e. assertion failures) in the program. They should not be used as a general error handling technique (expect for tests and build scripts). If a program panics, that means that it has a bug.
 
@@ -191,7 +191,7 @@ Rust also provides helpers [`assert_eq!`](https://doc.rust-lang.org/std/macro.as
 
 We (except in extreme cases) avoid the use of [`std::panic::catch_unwind`](https://doc.rust-lang.org/std/panic/fn.catch_unwind.html) in Swanky, which makes it easier to reason about our code.
 
-#### Examples of Good Use of Panic
+### Examples of Good Use of Panic
 
 ```rust
 #[test]
@@ -226,7 +226,7 @@ fn swanky_binary_search(haystack: &[u32], needle: u32) -> Option<usize> {
 }
 ```
 
-#### Examples of Poor Use of Panic
+### Examples of Poor Use of Panic
 
 ```rust
 fn main() -> eyre::Result<()> {
@@ -251,7 +251,7 @@ fn main() {
 }
 ```
 
-### Unsafe Code
+## Unsafe Code
 
 Unsafe code should be avoided if possible., but sometimes it is necessary to use `unsafe` code, either for performance reasons, or maybe to interface with some [FFI](https://en.wikipedia.org/wiki/Foreign_function_interface).
 
@@ -263,12 +263,12 @@ The `unsafe` keyword tells the Rust compiler that the programmer will take respo
 
 See [the sample implementation of `swap`](https://doc.rust-lang.org/std/ptr/fn.read.html#examples) as a good example of both of these principles.
 
-### Constant-Time Operations
+## Constant-Time Operations
 
 Swanky code that operates on private values should use constant-time operations to avoid [timing attacks](https://en.wikipedia.org/wiki/Timing_attack). We use the [subtle crate](https://docs.rs/subtle/latest/subtle/)
 to execute constant-time operations.
 
-### Allocations
+## Allocations
 
 Invoking the memory allocator to `malloc()` and `free()` memory takes a lot of computational resources. Reducing memory allocation can frequently produce large speedups in our benchmarks.
 
@@ -318,13 +318,13 @@ fn range(n: usize) -> impl Iterator<Item = usize> {
 }
 ```
 
-### Clippy
+## Clippy
 
 All of our Rust code _must_ pass cargo clippy. You can check that your code conforms to our configuration with `cargo clippy`. (Some projects deviate from this configuration if some warnings are too noisy for their application, or not noisy enough.)
 
 If you find that a clippy lint that we have enabled is not a good match for your project, you can disable it in your code. The lint should be disabled for as small a scope as possible (e.g. disable the lint for a single function rather than a whole crate), and the reason for disabling the lint should be documented in a comment.
 
-### Retry-Safe Code
+## Retry-Safe Code
 
 Most protocols, unless it's explicitly designed to be retry-safe (which tends to be rare in our
 cryptographic use-cases), should take `self` and return `Self` on success, rather than taking
@@ -339,7 +339,7 @@ If `Self` is returned, then it should be the last element of the resulting tuple
   * `fn my_protocol_function(self, x: u128) -> Result<(Self, u128)>` (`Self` should be the last tuple element!)
   * `fn my_protocol_function(&mut self, x: u128)`
 
-#### Rationale
+### Rationale
 
 Consider the following code:
 
