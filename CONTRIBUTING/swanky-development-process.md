@@ -1,3 +1,9 @@
+# Swanky Development Process
+
+This document outlines the development process for contributing to Swanky.
+
+[[_TOC_]] <!-- This command generates a Table Of Contents in GitLab -->
+
 ## Goals of the development process
 
 * **Distribute Swanky knowledge.** If a question comes up about a part of Swanky, we should be able to answer it, even if the person who originally wrote the code is on PTO and attending the 17th annual Diet Soda Taste Test Competition. We want to ensure that Swanky knowledge is distributed among the team, rather than localized in one person.
