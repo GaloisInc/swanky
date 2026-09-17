@@ -1,3 +1,9 @@
+# Swanky Development Process
+
+This document outlines implementation-specific information when contributing to Swanky.
+
+[[_TOC_]] <!-- This command generates a Table Of Contents in GitLab -->
+
 ## Language Choice
 
 Swanky is written almost entirely in ([stable](#rust-version)) Rust.
