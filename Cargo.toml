@@ -16,7 +16,6 @@ members = [
   "edge/channel-legacy",
   "edge/cointoss",
   "edge/cr-hash",
-  "edge/deprecated-bitwise-utils",
   "edge/diet-mac-and-cheese",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
@@ -111,7 +110,6 @@ swanky-channel = { path = "core/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
 swanky-cr-hash = { path = "edge/cr-hash" }
-swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
 swanky-error = { path = "core/error" }
 swanky-f-eq = { path = "edge/f-eq" }
 swanky-f-rand = { path = "edge/f-rand" }

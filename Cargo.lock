@@ -2702,14 +2702,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-deprecated-bitwise-utils"
-version = "0.6.0"
-dependencies = [
- "rand 0.10.2",
- "swanky-block",
-]
-
-[[package]]
 name = "swanky-error"
 version = "0.6.0"
 
