@@ -2934,7 +2934,6 @@ dependencies = [
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-cr-hash",
- "swanky-deprecated-bitwise-utils",
  "swanky-error",
  "swanky-field-binary",
  "swanky-ot-chou-orlandi",

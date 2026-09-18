@@ -58,7 +58,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             let q = Block::from(q);
             rng.fill_bytes(chi.as_mut());
             let [lo, hi] = q.carryless_mul_wide(chi);
-            check = swanky_deprecated_bitwise_utils::xor_two_blocks(&check, &(lo, hi));
+            check = (check.0 ^ lo, check.1 ^ hi)
         }
         let x = channel
             .read_block()
@@ -70,7 +70,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
             .read_block()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let [lo, hi] = x.carryless_mul_wide(self.ot.s_);
-        let check = swanky_deprecated_bitwise_utils::xor_two_blocks(&check, &(lo, hi));
+        let check = (check.0 ^ lo, check.1 ^ hi);
         ensure!(
             check == (t0, t1),
             ErrorKind::OtherError,
@@ -248,7 +248,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             rng.fill_bytes(chi.as_mut());
             x ^= if xj.into() { chi } else { Block::default() };
             let [lo, hi] = tj.carryless_mul_wide(chi);
-            t = swanky_deprecated_bitwise_utils::xor_two_blocks(&t, &(lo, hi));
+            t = (t.0 ^ lo, t.1 ^ hi);
         }
         channel
             .write_block(&x)
