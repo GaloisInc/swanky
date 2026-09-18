@@ -166,10 +166,10 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             let mut choices_ = F2BitDeserializer::new(&mut std::io::empty())
                 .wrap_err(
                     ErrorKind::SerializationError,
-                    "could not initialize bit serializer",
+                    "Could not initialize bit deserializer",
                 )?
                 .read_vector(&mut &(!alpha).to_le_bytes()[..], nbits)
-                .wrap_err(ErrorKind::SerializationError, "failed to read bits")?;
+                .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
             choices_.reverse(); // to get the first bit as MSB.
             choices.extend(choices_);
             alphas.push(alpha);

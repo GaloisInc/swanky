@@ -42,10 +42,10 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
         let s = F2BitDeserializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
-                "could not initialize bit deserializer",
+                "Could not initialize bit deserializer",
             )?
             .read_vector(&mut &s_[..], 8 * 16)
-            .wrap_err(ErrorKind::SerializationError, "failed to read bits")?;
+            .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
             .into_iter()
@@ -253,10 +253,10 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
         F2BitSerializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
-                "could not initialize bit serializer",
+                "Could not initialize bit serializer",
             )?
             .write_vec(&mut r, inputs.iter().copied())
-            .wrap_err(ErrorKind::SerializationError, "failed to write bits")?;
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, &b) in inputs.iter().enumerate() {
@@ -289,10 +289,10 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
         F2BitSerializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
-                "could not initialize bit serializer",
+                "Could not initialize bit serializer",
             )?
             .write_vec(&mut r, inputs.iter().copied())
-            .wrap_err(ErrorKind::SerializationError, "failed to write bits")?;
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for (j, &b) in inputs.iter().enumerate() {
@@ -322,10 +322,10 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
         F2BitSerializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
-                "could not initialize bit serializer",
+                "Could not initialize bit serializer",
             )?
             .write_vec(&mut r, inputs.iter().copied())
-            .wrap_err(ErrorKind::SerializationError, "failed to write bits")?;
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {

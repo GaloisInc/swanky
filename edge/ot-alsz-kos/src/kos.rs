@@ -214,7 +214,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         F2BitSerializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
-                "could not initialize bit serializer",
+                "Could not initialize bit serializer",
             )?
             .write_vec(
                 &mut r,
@@ -223,7 +223,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
                     .copied()
                     .chain((0..(m_ - m)).map(|_| rand::random::<F2>())),
             )
-            .wrap_err(ErrorKind::SerializationError, "failed to write bits")?;
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.ot.receive_setup(channel, &r, m_)?;
         // Check correlation
         let mut seed = Block::default();
@@ -236,10 +236,10 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
         let r_ = F2BitDeserializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
-                "could not initialize bit deserializer",
+                "Could not initialize bit deserializer",
             )?
             .read_vector(&mut &r[..], m_)
-            .wrap_err(ErrorKind::SerializationError, "failed to read bits")?;
+            .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
         let mut chi = Block::default();
         for (j, xj) in r_.into_iter().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
