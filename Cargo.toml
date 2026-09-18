@@ -16,7 +16,6 @@ members = [
   "edge/channel-legacy",
   "edge/cointoss",
   "edge/cr-hash",
-  "edge/deprecated-bitwise-utils",
   "edge/diet-mac-and-cheese",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm",
   "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket",
@@ -111,7 +110,6 @@ swanky-channel = { path = "core/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }
 swanky-cr-hash = { path = "edge/cr-hash" }
-swanky-deprecated-bitwise-utils = { path = "edge/deprecated-bitwise-utils" }
 swanky-error = { path = "core/error" }
 swanky-f-eq = { path = "edge/f-eq" }
 swanky-f-rand = { path = "edge/f-rand" }
@@ -159,20 +157,16 @@ aes-gcm = "0.11.0"
 arc-swap = "1.9.2"
 arrayvec = "0.7.8"
 bincode = "=1.3.3" # See https://sr.ht/~stygianentity/bincode/
-bitpacking = "0.9.3"
-bitvec = { version = "1.1.1", features = ["alloc"] }
 # We disable avx512 since we typically run on skylake.
 blake3 = { version = "1.8.7", features = ["no_avx512"] }
 bufstream = "0.1.4"
 bumpalo = "3.20.3"
-bumpalo-herd = "0.1.3"
 bytemuck = { version = "1.25.2", features = [
   "derive",
   "min_const_generics",
   "extern_crate_alloc",
   "aarch64_simd",
 ] }
-bytes = "1.12.1"
 cc = "1.4.3"
 ciborium = "0.2.2"
 clap = { version = "4.6.6", features = ["derive"] }
@@ -189,15 +183,12 @@ env_logger = "0.11.11"
 flatbuffers = "25.12.19" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
 flume = "0.12.0"
 generic-array = { version = "1.4.5", features = ["serde"] }
-hex = "0.4.3"
-io-uring = "0.7.14"
 itertools = "0.15.0"
 jemallocator = "0.5.4"
 libc = "0.2.189"
 log = "0.4.33"
 lz4 = "1.28.1"
 memchr = "2.8.3"
-memmap2 = "0.9.11"
 merkle-cbt = "0.3.2"
 merlin = "3.0.0"
 mimalloc = { version = "0.1.52", default-features = false }
@@ -206,7 +197,6 @@ ndarray = "0.17.2"
 # Rather than enabling nix features on a per-crate basis (which could lead to issues where
 # compiling the whole workspace might succeed, but compiling an individual crate might fail),
 # we just enable all the features we need at the workspace root.
-nix = { version = "0.31.3", features = ["sched"] }
 num-bigint = "0.5.1"
 num_cpus = "1.17.0"
 num-traits = "0.2.19"
@@ -221,7 +211,6 @@ rand = "0.10.2"
 rand_chacha = "0.10.0"
 rand_core = "0.10.1"
 rayon = "1.12.0"
-ring = "0.17.14"
 rpmalloc = "0.2.2"
 rustc-hash = "2.1.3"
 rustls = { version = "0.23.43", default-features = false, features = [
@@ -239,7 +228,6 @@ smallvec = { version = "1.15.2", features = [
   "union",
   "const_new",
 ] }
-snafu = "0.9.2"
 snmalloc-rs = { version = "0.7.5", default-features = false, features = [
   "build_cc",
   "usecxx17",

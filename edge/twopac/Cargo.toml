@@ -21,7 +21,6 @@ swanky-error.workspace = true
 swanky-field-binary.workspace = true
 swanky-ot-traits.workspace = true
 
-itertools.workspace = true
 rand.workspace = true
 
 [dev-dependencies]

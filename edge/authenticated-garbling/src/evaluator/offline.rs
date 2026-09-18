@@ -72,7 +72,7 @@ impl<'a, C> EvaluatorOffline<'a, C> {
                 ErrorKind::InitializationError,
                 "Failed to create sequence deserializer.",
             )?;
-        let gate_bits = bit_ser.read_vector(channel.as_std_io(), nands).wrap_err(
+        let gate_bits = bit_ser.read_vec(channel.as_std_io(), nands).wrap_err(
             ErrorKind::SerializationError,
             "Failed to read serialized bits.",
         )?;

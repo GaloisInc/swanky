@@ -16,5 +16,4 @@ swanky-polynomial.workspace = true
 swanky-serialization.workspace = true
 proptest.workspace = true
 generic-array.workspace = true
-crypto-bigint.workspace = true
 

@@ -11,16 +11,18 @@ use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver as OtReceiver, Sender as OtSender,
 };
 use swanky_rng::SwankyRng;
+use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 
 /// Oblivious transfer sender.
 pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Receiver> {
     _ot: PhantomData<OT>,
-    s: Vec<bool>,
+    s: Vec<F2>,
     pub(super) s_: Block,
     rngs: Vec<SwankyRng>,
 }
@@ -37,7 +39,13 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
         rng: &mut RNG,
     ) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
-        let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
+        let s = F2BitDeserializer::new(&mut std::io::empty())
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Could not initialize bit deserializer",
+            )?
+            .read_vec(&mut &s_[..], 8 * 16)
+            .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
             .into_iter()
@@ -67,14 +75,14 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         let mut qs = vec![0u8; nrows * ncols / 8];
         let mut u = vec![0u8; ncols / 8];
         let zero = vec![0u8; ncols / 8];
-        for (j, (b, rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
+        for (j, (&b, rng)) in self.s.iter().zip(self.rngs.iter_mut()).enumerate() {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let q = &mut qs[range];
             channel
                 .read_bytes(&mut u)
                 .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
             rng.fill_bytes(q);
-            scutils::xor_inplace(q, if *b { &u } else { &zero });
+            scutils::xor_inplace(q, if b.into() { &u } else { &zero });
         }
         Ok(swanky_bit_matrix_transpose::transpose(&qs, nrows, ncols))
     }
@@ -236,13 +244,22 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
     fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>> {
-        let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
+        let mut r = Vec::with_capacity(
+            (inputs.len() / 8) + if inputs.len().is_multiple_of(8) { 0 } else { 1 },
+        );
+        F2BitSerializer::new(&mut std::io::empty())
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Could not initialize bit serializer",
+            )?
+            .write_vec(&mut r, inputs.iter().copied())
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
-        for (j, b) in inputs.iter().enumerate() {
+        for (j, &b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y0 = channel
@@ -251,7 +268,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
             let y1 = channel
                 .read_block()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-            let y = if *b { y1 } else { y0 };
+            let y = if b.into() { y1 } else { y0 };
             let y = y ^ CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(y);
         }
@@ -263,19 +280,28 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
     fn receive_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>> {
-        let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
+        let mut r = Vec::with_capacity(
+            (inputs.len() / 8) + if inputs.len().is_multiple_of(8) { 0 } else { 1 },
+        );
+        F2BitSerializer::new(&mut std::io::empty())
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Could not initialize bit serializer",
+            )?
+            .write_vec(&mut r, inputs.iter().copied())
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
-        for (j, b) in inputs.iter().enumerate() {
+        for (j, &b) in inputs.iter().enumerate() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel
                 .read_block()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-            let y = if *b { y } else { Block::default() };
+            let y = if b.into() { y } else { Block::default() };
             let h = CorrelationRobustHash::fixed_key().hash(Block::from(t));
             out.push(y ^ h);
         }
@@ -287,10 +313,19 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
     fn receive_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         _: &mut RNG,
     ) -> Result<Vec<Self::Msg>> {
-        let r = swanky_deprecated_bitwise_utils::boolvec_to_u8vec(inputs);
+        let mut r = Vec::with_capacity(
+            (inputs.len() / 8) + if inputs.len().is_multiple_of(8) { 0 } else { 1 },
+        );
+        F2BitSerializer::new(&mut std::io::empty())
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Could not initialize bit serializer",
+            )?
+            .write_vec(&mut r, inputs.iter().copied())
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.receive_setup(channel, &r, inputs.len())?;
         let mut out = Vec::with_capacity(inputs.len());
         for j in 0..inputs.len() {

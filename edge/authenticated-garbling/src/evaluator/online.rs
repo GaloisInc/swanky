@@ -105,7 +105,7 @@ impl<'a, C> EvaluatorOnline<'a, C> {
             "Failed to initialize sequence serializer.",
         )?;
         bit_ser
-            .write_vec(channel.as_std_io(), &self.lc_values)
+            .write_vec(channel.as_std_io(), self.lc_values.iter().copied())
             .wrap_err(
                 ErrorKind::SerializationError,
                 "Failed to write serialized bits.",

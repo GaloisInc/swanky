@@ -25,7 +25,6 @@ rand.workspace = true
 swanky-rng.workspace = true
 
 criterion.workspace = true
-proptest.workspace = true
 
 [[bench]]
 name = "oprf"

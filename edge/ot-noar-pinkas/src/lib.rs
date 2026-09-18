@@ -13,6 +13,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field_binary::F2;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
@@ -97,7 +98,7 @@ impl OtReceiver for Receiver {
     fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         mut rng: &mut RNG,
     ) -> Result<Vec<Block>> {
         let m = inputs.len();
@@ -109,11 +110,11 @@ impl OtReceiver for Receiver {
                 .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
             cs.push(c);
         }
-        for (b, c) in inputs.iter().zip(cs) {
+        for (&b, c) in inputs.iter().zip(cs) {
             let k = Scalar::random(&mut rng);
             let pk = &k * RISTRETTO_BASEPOINT_TABLE;
             let pk_ = c - pk;
-            match b {
+            match b.into() {
                 false => channel
                     .write_pt(&pk)
                     .wrap_err(ErrorKind::NetworkError, "Unable to write point")?,
@@ -130,7 +131,7 @@ impl OtReceiver for Receiver {
             .iter()
             .zip(ks)
             .enumerate()
-            .map(|(i, (b, k))| {
+            .map(|(i, (&b, k))| {
                 let ei0 = channel
                     .read_pt()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
@@ -140,7 +141,7 @@ impl OtReceiver for Receiver {
                 let e11 = channel
                     .read_block()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-                let e1 = match b {
+                let e1 = match b.into() {
                     false => e01,
                     true => e11,
                 };

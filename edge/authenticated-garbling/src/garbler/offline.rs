@@ -129,7 +129,7 @@ where
         )?;
         // Send the LSB of the zero-wirelabels of the output wires of the AND gates.
         bit_ser
-            .write_vec(channel.as_std_io(), &self.gate_bits)
+            .write_vec(channel.as_std_io(), self.gate_bits.iter().copied())
             .wrap_err(
                 ErrorKind::SerializationError,
                 "Failed to write serialized bits.",

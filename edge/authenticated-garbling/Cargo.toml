@@ -31,8 +31,6 @@ fancy-circuits.workspace = true
 fancy-plaintext.workspace = true
 
 criterion.workspace = true
-proptest.workspace = true
-
 
 [[bench]]
 name = "main"

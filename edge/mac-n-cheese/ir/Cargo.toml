@@ -15,7 +15,6 @@ workspace = true
 vectoreyes.workspace = true
 bytemuck.workspace = true
 rustc-hash.workspace = true
-subtle.workspace = true
 smallvec = { workspace = true, features = ["serde"] }
 generic-array.workspace = true
 flatbuffers.workspace = true

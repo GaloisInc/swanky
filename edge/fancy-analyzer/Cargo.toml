@@ -19,8 +19,6 @@ swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true
 
-rand.workspace = true
-
 [dev-dependencies]
 fancy-circuits.workspace = true
 fancy-plaintext.workspace = true

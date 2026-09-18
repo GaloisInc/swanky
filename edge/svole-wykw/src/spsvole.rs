@@ -11,13 +11,14 @@ use rand::{
 };
 use swanky_adversary::Malicious;
 use swanky_block::Block;
-use swanky_bytearray_utils::unpack_bits;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
+use swanky_field_binary::F2BitDeserializer;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
+use swanky_serialization::SequenceDeserializer;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
@@ -162,7 +163,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
         let mut choices = Vec::with_capacity(t * nbits);
         for _ in 0..t {
             let alpha = distribution.sample(&mut rng);
-            let mut choices_ = unpack_bits(&(!alpha).to_le_bytes(), nbits);
+            let mut choices_ = F2BitDeserializer::new(&mut std::io::empty())
+                .wrap_err(
+                    ErrorKind::SerializationError,
+                    "Could not initialize bit deserializer",
+                )?
+                .read_vec(&mut &(!alpha).to_le_bytes()[..], nbits)
+                .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
             choices_.reverse(); // to get the first bit as MSB.
             choices.extend(choices_);
             alphas.push(alpha);
