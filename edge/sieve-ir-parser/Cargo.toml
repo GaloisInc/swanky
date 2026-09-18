@@ -12,10 +12,8 @@ workspace = true
 
 [dependencies]
 flatbuffers.workspace = true
-bumpalo = { workspace = true, features = ["collections"] }
 crypto-bigint.workspace = true
 memchr.workspace = true
-generic-array.workspace = true
 flume.workspace = true
 swanky-error.workspace = true
 

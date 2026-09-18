@@ -13,10 +13,8 @@ workspace = true
 [dependencies]
 swanky-ot-traits.workspace = true
 swanky-ot-alsz-kos.workspace = true
-swanky-adversary.workspace = true
 swanky-party.workspace = true
 swanky-channel.workspace = true
-swanky-cointoss.workspace = true
 swanky-error.workspace = true
 swanky-f-eq.workspace = true
 swanky-f-rand.workspace = true

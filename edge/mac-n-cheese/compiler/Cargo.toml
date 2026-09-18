@@ -21,13 +21,8 @@ crossbeam.workspace = true
 num_cpus.workspace = true
 mimalloc = { workspace = true, default-features = false }
 clap = { workspace = true, features = ["derive"] }
-bumpalo.workspace = true
-arrayvec.workspace = true
 mac-n-cheese-wire-map.workspace = true
 flume.workspace = true
-bitvec.workspace = true
-crypto-bigint.workspace = true
-dhat.workspace = true
 smallvec.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true

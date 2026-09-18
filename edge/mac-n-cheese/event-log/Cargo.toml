@@ -17,7 +17,6 @@ parking_lot.workspace = true
 lz4.workspace = true
 serde = { workspace = true, features = ["derive"] }
 crossbeam-queue.workspace = true
-rustc-hash.workspace = true
 smallvec = { workspace = true, features = ["serde"] }
 swanky-error.workspace = true
 

@@ -31,13 +31,11 @@ swanky-serialization.workspace = true
 # `fancy-traits`.
 swanky-sieve-ir-api.workspace = true
 
-aes.workspace = true
 env_logger.workspace = true
 generic-array.workspace = true
 itertools.workspace = true
 log.workspace = true
 merlin.workspace = true
-pretty_env_logger.workspace = true
 rand.workspace = true
 rayon.workspace = true
 sha3.workspace = true

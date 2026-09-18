@@ -332,12 +332,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "cfg_aliases"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
-
-[[package]]
 name = "chacha20"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -728,9 +722,6 @@ dependencies = [
  "generic-array",
  "jemallocator",
  "log",
- "nix",
- "num-bigint 0.5.1",
- "num-traits",
  "pretty_env_logger",
  "proptest",
  "rand 0.10.2",
@@ -830,7 +821,6 @@ dependencies = [
  "fancy-circuits",
  "fancy-plaintext",
  "fancy-traits",
- "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
  "swanky-field-binary",
@@ -865,7 +855,6 @@ dependencies = [
  "serde",
  "serde_json",
  "subtle",
- "swanky-adversary",
  "swanky-channel",
  "swanky-cr-hash",
  "swanky-error",
@@ -892,7 +881,6 @@ dependencies = [
  "swanky-channel",
  "swanky-error",
  "swanky-field-binary",
- "swanky-rng",
 ]
 
 [[package]]
@@ -1148,7 +1136,6 @@ dependencies = [
  "sha2",
  "simple-arith-circuit",
  "sprs",
- "subtle",
  "swanky-block",
  "swanky-field",
  "swanky-field-ff-primes",
@@ -1196,7 +1183,6 @@ dependencies = [
  "serde",
  "serde_json",
  "simple-arith-circuit",
- "snafu",
  "swanky-block",
  "swanky-error",
  "swanky-field",
@@ -1432,13 +1418,8 @@ dependencies = [
 name = "mac-n-cheese-compiler"
 version = "0.6.0"
 dependencies = [
- "arrayvec",
- "bitvec",
- "bumpalo",
  "clap",
  "crossbeam",
- "crypto-bigint",
- "dhat",
  "flume",
  "mac-n-cheese-ir",
  "mac-n-cheese-vole",
@@ -1468,7 +1449,6 @@ dependencies = [
  "crossbeam-queue",
  "lz4",
  "parking_lot",
- "rustc-hash 2.1.3",
  "serde",
  "smallvec",
  "swanky-error",
@@ -1503,7 +1483,6 @@ dependencies = [
  "rand 0.10.2",
  "rustc-hash 2.1.3",
  "smallvec",
- "subtle",
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
@@ -1522,7 +1501,6 @@ version = "0.6.0"
 dependencies = [
  "aes-gcm",
  "arc-swap",
- "arrayvec",
  "blake3",
  "bufstream",
  "bumpalo",
@@ -1535,7 +1513,6 @@ dependencies = [
  "jemallocator",
  "keyed_arena",
  "libc",
- "lz4",
  "mac-n-cheese-event-log",
  "mac-n-cheese-ir",
  "mac-n-cheese-vole",
@@ -1543,16 +1520,13 @@ dependencies = [
  "moka",
  "num_cpus",
  "parking_lot",
- "proptest",
  "rand 0.10.2",
- "ring",
  "rpmalloc",
  "rustc-hash 2.1.3",
  "rustls",
  "rustls-pemfile",
  "smallvec",
  "snmalloc-rs",
- "subtle",
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
@@ -1596,7 +1570,6 @@ dependencies = [
 name = "mac-n-cheese-wire-map"
 version = "0.6.0"
 dependencies = [
- "bytemuck",
  "rand 0.10.2",
  "swanky-error",
  "vectoreyes",
@@ -1693,18 +1666,6 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
-]
-
-[[package]]
-name = "nix"
-version = "0.31.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
-dependencies = [
- "bitflags 2.13.1",
- "cfg-if",
- "cfg_aliases",
- "libc",
 ]
 
 [[package]]
@@ -1899,8 +1860,6 @@ dependencies = [
  "itertools 0.15.0",
  "proptest",
  "rand 0.10.2",
- "serde",
- "serde_json",
  "sha2",
  "swanky-adversary",
  "swanky-block",
@@ -2320,7 +2279,6 @@ dependencies = [
 name = "schmivitz"
 version = "0.6.0"
 dependencies = [
- "aes",
  "criterion",
  "diet-mac-and-cheese",
  "env_logger 0.11.11",
@@ -2330,7 +2288,6 @@ dependencies = [
  "itertools 0.15.0",
  "log",
  "merlin",
- "pretty_env_logger",
  "proptest",
  "rand 0.10.2",
  "rayon",
@@ -2496,27 +2453,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snafu"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e45cb604038abb7b926b679887b3226d8d0f23874b66623625a0454be425a4b7"
-dependencies = [
- "snafu-derive",
-]
-
-[[package]]
-name = "snafu-derive"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "287f59010008f0d7cf5e3b03196d666c1acc46c8d3e9cf34c28a1a7157601e72"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "snmalloc-rs"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2590,9 +2526,7 @@ dependencies = [
  "itertools 0.15.0",
  "proptest",
  "rand 0.10.2",
- "swanky-adversary",
  "swanky-channel",
- "swanky-cointoss",
  "swanky-error",
  "swanky-f-eq",
  "swanky-f-rand",
@@ -2616,7 +2550,6 @@ dependencies = [
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",
- "proptest",
  "rand 0.10.2",
  "swanky-authenticated-bits",
  "swanky-channel",
@@ -2758,7 +2691,6 @@ dependencies = [
  "proptest",
  "rand 0.10.2",
  "subtle",
- "swanky-error",
  "swanky-field",
  "swanky-field-test",
  "swanky-polynomial",
@@ -2803,7 +2735,6 @@ dependencies = [
  "swanky-field",
  "swanky-field-fft",
  "swanky-field-test",
- "swanky-polynomial",
  "swanky-serialization",
  "tempfile",
 ]
@@ -2819,7 +2750,6 @@ dependencies = [
 name = "swanky-field-test"
 version = "0.6.0"
 dependencies = [
- "crypto-bigint",
  "generic-array",
  "proptest",
  "swanky-field",
@@ -2889,7 +2819,6 @@ name = "swanky-oprf-kmprt"
 version = "0.6.0"
 dependencies = [
  "criterion",
- "proptest",
  "rand 0.10.2",
  "swanky-adversary",
  "swanky-block",
@@ -3061,7 +2990,6 @@ dependencies = [
 name = "swanky-sieve-ir-codegen"
 version = "0.6.0"
 dependencies = [
- "crypto-bigint",
  "proc-macro2",
  "quote",
  "swanky-error",
@@ -3076,11 +3004,9 @@ dependencies = [
 name = "swanky-sieve-ir-parser"
 version = "0.6.0"
 dependencies = [
- "bumpalo",
  "crypto-bigint",
  "flatbuffers",
  "flume",
- "generic-array",
  "memchr",
  "swanky-error",
  "swanky-flatbuffer-build",
@@ -3123,7 +3049,6 @@ dependencies = [
  "fancy-garbling",
  "fancy-plaintext",
  "fancy-traits",
- "itertools 0.15.0",
  "rand 0.10.2",
  "swanky-adversary",
  "swanky-block",
@@ -3458,14 +3383,10 @@ dependencies = [
 name = "web-mac-n-cheese-wasm"
 version = "0.6.0"
 dependencies = [
- "clap",
  "console_error_panic_hook",
  "console_log",
  "diet-mac-and-cheese",
- "generic-array",
  "log",
- "pretty_env_logger",
- "rand 0.10.2",
  "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-rng",
@@ -3479,10 +3400,8 @@ version = "0.6.0"
 dependencies = [
  "clap",
  "diet-mac-and-cheese",
- "generic-array",
  "log",
  "pretty_env_logger",
- "rand 0.10.2",
  "rustls",
  "rustls-pemfile",
  "swanky-channel-legacy",
@@ -3716,18 +3635,18 @@ dependencies = [
 
 [[package]]
 name = "zstd-safe"
-version = "7.2.4"
+version = "7.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
+checksum = "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882"
 dependencies = [
  "zstd-sys",
 ]
 
 [[package]]
 name = "zstd-sys"
-version = "2.0.16+zstd.1.5.7"
+version = "2.1.0+zstd.1.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+checksum = "0ef0a8027ec3ee71300ab3bcbcd0393f434aa72b91ca6d635a39941deae8eea0"
 dependencies = [
  "cc",
  "pkg-config",
