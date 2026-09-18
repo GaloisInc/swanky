@@ -50,7 +50,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
                 ErrorKind::SerializationError,
                 "Could not initialize bit deserializer",
             )?
-            .read_vector(&mut &s_[..], 8 * 64)
+            .read_vec(&mut &s_[..], 8 * 64)
             .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
         let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::send(channel, &seeds)

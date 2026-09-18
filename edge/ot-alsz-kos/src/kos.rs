@@ -238,7 +238,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
                 ErrorKind::SerializationError,
                 "Could not initialize bit deserializer",
             )?
-            .read_vector(&mut &r[..], m_)
+            .read_vec(&mut &r[..], m_)
             .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
         let mut chi = Block::default();
         for (j, xj) in r_.into_iter().enumerate() {

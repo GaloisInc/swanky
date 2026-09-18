@@ -168,7 +168,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
                     ErrorKind::SerializationError,
                     "Could not initialize bit deserializer",
                 )?
-                .read_vector(&mut &(!alpha).to_le_bytes()[..], nbits)
+                .read_vec(&mut &(!alpha).to_le_bytes()[..], nbits)
                 .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
             choices_.reverse(); // to get the first bit as MSB.
             choices.extend(choices_);

@@ -363,7 +363,7 @@ mod tests {
         );
         let mut alpha_bits = F2BitDeserializer::new(&mut std::io::empty())
             .unwrap()
-            .read_vector(&mut &alpha.to_le_bytes()[..], keys.len())
+            .read_vec(&mut &alpha.to_le_bytes()[..], keys.len())
             .unwrap();
         alpha_bits.reverse();
         let alpha_keys: Vec<U8x16> = alpha_bits

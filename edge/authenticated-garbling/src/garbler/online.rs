@@ -96,7 +96,7 @@ impl<'a, C> GarblerOnline<'a, C> {
                 ErrorKind::InitializationError,
                 "Failed to create sequence deserializer.",
             )?;
-        let lc_values = bit_deser.read_vector(channel.as_std_io(), nands).wrap_err(
+        let lc_values = bit_deser.read_vec(channel.as_std_io(), nands).wrap_err(
             ErrorKind::SerializationError,
             "Failed to read serialized bits.",
         )?;

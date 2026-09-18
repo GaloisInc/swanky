@@ -277,7 +277,7 @@ pub struct F2BitDeserializer {
 impl F2BitDeserializer {
     /// A wrapper around [`F2BitDeserializer::read`] which reads a specific number of
     /// bits defined by len and returns those bits
-    pub fn read_vector<R: std::io::Read>(
+    pub fn read_vec<R: std::io::Read>(
         &mut self,
         src: &mut R,
         len: usize,

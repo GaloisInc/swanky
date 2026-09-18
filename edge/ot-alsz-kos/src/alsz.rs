@@ -44,7 +44,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
                 ErrorKind::SerializationError,
                 "Could not initialize bit deserializer",
             )?
-            .read_vector(&mut &s_[..], 8 * 16)
+            .read_vec(&mut &s_[..], 8 * 16)
             .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
         let ks = ot.receive(channel, &s, rng)?;
         let rngs = ks
