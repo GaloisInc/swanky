@@ -218,9 +218,13 @@ pub struct F2BitSerializer {
 impl F2BitSerializer {
     /// A wrapper around [`F2BitSerializer::write`] and [`F2BitSerializer::finish`] which writes a vector of
     /// bits into the channel and finishes afterwards.
-    pub fn write_vec<W: std::io::Write>(mut self, dst: &mut W, bits: &[F2]) -> Result<(), Error> {
-        for b in bits.iter() {
-            self.write(dst, *b)?;
+    pub fn write_vec<W: std::io::Write>(
+        mut self,
+        dst: &mut W,
+        bits: impl Iterator<Item = F2>,
+    ) -> Result<(), Error> {
+        for b in bits {
+            self.write(dst, b)?;
         }
         self.finish(dst)
     }
