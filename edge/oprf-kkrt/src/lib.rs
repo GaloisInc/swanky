@@ -15,14 +15,16 @@ use swanky_block::{Block, Block512};
 use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field_binary::{F2, F2BitDeserializer};
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_rng::SwankyRng;
+use swanky_serialization::SequenceDeserializer;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiver> {
     _ot: PhantomData<OT>,
-    s: Vec<bool>,
+    s: Vec<F2>,
     s_: [u8; 64],
     code: PseudorandomCode,
     rngs: Vec<SwankyRng>,
@@ -43,7 +45,13 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let mut ot = OT::init(channel, rng)?;
         let mut s_ = [0u8; 64];
         rng.fill_bytes(&mut s_);
-        let s = swanky_deprecated_bitwise_utils::u8vec_to_boolvec(&s_);
+        let s = F2BitDeserializer::new(&mut std::io::empty())
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "could not initialize bit deserializer",
+            )?
+            .read_vector(&mut &s_[..], 8 * 64)
+            .wrap_err(ErrorKind::SerializationError, "failed to read bits")?;
         let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::send(channel, &seeds)
             .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
@@ -77,7 +85,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         let mut t0 = vec![0u8; nrows / 8];
         let mut t1 = vec![0u8; nrows / 8];
         let mut qs = vec![0u8; nrows * ncols / 8];
-        for (j, b) in self.s.iter().enumerate() {
+        for (j, &b) in self.s.iter().enumerate() {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let q = &mut qs[range];
             self.rngs[j].fill_bytes(q);
@@ -87,7 +95,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             channel
                 .read_bytes(&mut t1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
-            scutils::xor_inplace(q, if *b { &t1 } else { &t0 });
+            scutils::xor_inplace(q, if b.into() { &t1 } else { &t0 });
         }
         let qs = swanky_bit_matrix_transpose::transpose(&qs, ncols, nrows);
         let seeds = qs

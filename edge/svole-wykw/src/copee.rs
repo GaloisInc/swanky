@@ -2,7 +2,7 @@
 //! <https://eprint.iacr.org/2020/925>, Figure 15).
 
 use super::utils::Powers;
-use generic_array::{GenericArray, typenum::Unsigned};
+use generic_array::{GenericArray, functional::FunctionalSequence, typenum::Unsigned};
 use rand::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -11,6 +11,7 @@ use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
+use swanky_field_binary::F2;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{RandomReceiver as ROTReceiver, RandomSender as ROTSender};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
@@ -27,7 +28,7 @@ pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
 pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
-    choices: GenericArray<bool, FE::NumberOfBitsInBitDecomposition>,
+    choices: GenericArray<F2, FE::NumberOfBitsInBitDecomposition>,
     aes_objs: Vec<Aes128EncryptOnly>,
     pows: Powers<FE>,
     twos: Vec<FE>,
@@ -114,7 +115,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
     ) -> Result<Self> {
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let mut ot = ROT::init(channel, &mut rng)?;
-        let choices = delta.bit_decomposition();
+        let choices = delta.bit_decomposition().map(|b| b.into());
         let mut acc = FE::ONE;
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
@@ -161,7 +162,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
                 let mut tau = channel
                     .read_serializable::<FE::PrimeField>()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
-                let choice = Choice::from(self.choices[j + k] as u8);
+                let choice = Choice::from(u8::from(self.choices[j + k]));
                 tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
                 sum += v * *two;

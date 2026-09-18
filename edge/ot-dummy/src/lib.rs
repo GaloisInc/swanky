@@ -5,6 +5,7 @@ use rand::CryptoRng;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field_binary::F2;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 /// Oblivious transfer sender.
@@ -61,12 +62,12 @@ impl OtReceiver for Receiver {
     fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         _: &mut RNG,
     ) -> Result<Vec<Block>> {
-        for b in inputs.iter() {
+        for &b in inputs.iter() {
             channel
-                .write_bool(*b)
+                .write_bool(b.into())
                 .wrap_err(ErrorKind::NetworkError, "Unable to write bool")?;
         }
         channel

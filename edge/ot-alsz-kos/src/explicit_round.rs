@@ -59,7 +59,7 @@ impl AlszSender {
         // We need to make a vector of bools in order to use the BaseOt API.
         let mut s_bit_vec = Vec::with_capacity(128);
         for i in 0..128 {
-            s_bit_vec.push(((s >> i) & 1) != 0);
+            s_bit_vec.push((((s >> i) & 1) != 0).into());
         }
         let seeds = ot.receive(channel, &s_bit_vec, rng)?;
         let rngs = seeds

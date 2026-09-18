@@ -22,6 +22,7 @@ use swanky_adversary::{Malicious, SemiHonest};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field_binary::F2;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 
 fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
@@ -116,7 +117,7 @@ impl OtReceiver for Receiver {
     fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         mut rng: &mut RNG,
     ) -> Result<Vec<Block>> {
         let zero = &Scalar::ZERO * &self.s;
@@ -124,9 +125,9 @@ impl OtReceiver for Receiver {
         let ks = inputs
             .iter()
             .enumerate()
-            .map(|(i, b)| {
+            .map(|(i, &b)| {
                 let x = Scalar::random(&mut rng);
-                let c = if *b { one } else { zero };
+                let c = if b.into() { one } else { zero };
                 let r = c + &x * RISTRETTO_BASEPOINT_TABLE;
                 channel
                     .write_pt(&r)
@@ -141,14 +142,14 @@ impl OtReceiver for Receiver {
         inputs
             .iter()
             .zip(ks)
-            .map(|(b, k)| {
+            .map(|(&b, k)| {
                 let c0 = channel
                     .read_block()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let c1 = channel
                     .read_block()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-                let c = k ^ if *b { c1 } else { c0 };
+                let c = k ^ if b.into() { c1 } else { c0 };
                 Ok(c)
             })
             .collect()

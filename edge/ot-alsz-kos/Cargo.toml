@@ -21,9 +21,11 @@ swanky-cointoss.workspace = true
 swanky-cr-hash.workspace = true
 swanky-deprecated-bitwise-utils.workspace = true
 swanky-error.workspace = true
+swanky-field-binary.workspace = true
 swanky-ot-chou-orlandi.workspace = true
 swanky-ot-traits.workspace = true
 swanky-rng.workspace = true
+swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
 blake3.workspace = true

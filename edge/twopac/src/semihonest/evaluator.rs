@@ -31,11 +31,7 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
         Ok(Self { evaluator, ot, rng })
     }
 
-    fn run_ot(
-        &mut self,
-        inputs: &[bool],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Block>> {
+    fn run_ot(&mut self, inputs: &[F2], channel: &mut Channel) -> swanky_error::Result<Vec<Block>> {
         self.ot
             .receive(channel, inputs, &mut self.rng)
             .wrap_err(ErrorKind::OtherError, "Failed to run OT.")
@@ -172,7 +168,7 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> 
         for (x, q) in inputs.iter().zip(moduli.iter()) {
             let len = f32::from(*q).log(2.0).ceil() as usize;
             for b in (0..len).map(|i| x & (1 << i) != 0) {
-                bs.push(b);
+                bs.push(b.into());
             }
             lens.push(len);
         }

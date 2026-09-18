@@ -4,6 +4,7 @@
 use rand::CryptoRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Trait for one-out-of-two oblivious transfer from the sender's point-of-view.
 pub trait Sender
@@ -55,7 +56,7 @@ where
     fn receive<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>>;
 }
@@ -87,7 +88,7 @@ where
     fn receive_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[bool],
+        inputs: &[F2],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>>;
 }
@@ -118,7 +119,7 @@ where
     fn receive_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        deltas: &[bool],
+        deltas: &[F2],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Msg>>;
 }

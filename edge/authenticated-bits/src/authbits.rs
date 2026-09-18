@@ -309,9 +309,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     ) -> swanky_error::Result<()> {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(e) => {
-                let bits = bits_in.into_inner(e);
-                // TODO: Once OT uses F2 instead of bool this line won't be necessary.
-                let bits = bits.map(bool::from).collect::<Vec<bool>>();
+                let bits = bits_in.into_inner(e).collect::<Vec<_>>();
                 let macs = self
                     .ot
                     .as_mut()
@@ -323,13 +321,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
                     )?;
 
                 out.extend(bits.into_iter().zip(macs).map(|(bit, mac)| {
-                    AuthBit(PartyEitherCopy::new(
-                        e,
-                        ProverAuthBit {
-                            bit: bit.into(),
-                            mac,
-                        },
-                    ))
+                    AuthBit(PartyEitherCopy::new(e, ProverAuthBit { bit, mac }))
                 }));
                 Ok(())
             }

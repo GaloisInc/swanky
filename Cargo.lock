@@ -2882,12 +2882,13 @@ dependencies = [
  "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
- "swanky-deprecated-bitwise-utils",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-oprf-traits",
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -2935,10 +2936,12 @@ dependencies = [
  "swanky-cr-hash",
  "swanky-deprecated-bitwise-utils",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ot-chou-orlandi",
  "swanky-ot-test",
  "swanky-ot-traits",
  "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -2954,6 +2957,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
 ]
@@ -2967,6 +2971,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
 ]
@@ -2983,6 +2988,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
 ]
@@ -2995,6 +3001,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-block",
  "swanky-channel-legacy",
+ "swanky-field-binary",
  "swanky-ot-traits",
  "swanky-rng",
 ]
@@ -3006,6 +3013,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-channel-legacy",
  "swanky-error",
+ "swanky-field-binary",
 ]
 
 [[package]]
@@ -3100,7 +3108,6 @@ dependencies = [
  "subtle",
  "swanky-adversary",
  "swanky-block",
- "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-error",
@@ -3110,6 +3117,7 @@ dependencies = [
  "swanky-ot-alsz-kos",
  "swanky-ot-traits",
  "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 

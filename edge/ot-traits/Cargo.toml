@@ -13,5 +13,6 @@ workspace = true
 [dependencies]
 swanky-channel-legacy.workspace = true
 swanky-error.workspace = true
+swanky-field-binary.workspace = true
 
 rand.workspace = true
