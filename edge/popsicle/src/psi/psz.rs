@@ -113,7 +113,10 @@ impl Sender {
 
                 // encrypt payload
                 let mut ct = payloads[j];
-                swanky_bytearray_utils::xor_inplace(ct.as_mut(), key);
+                ct.as_mut()
+                    .iter_mut()
+                    .zip(key.iter())
+                    .for_each(|(a, &b)| *a ^= b);
 
                 channel.write_bytes(&tag[0..masksize])?;
                 channel.write_bytes(ct.as_ref())?;

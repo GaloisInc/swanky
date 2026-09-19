@@ -108,7 +108,7 @@ impl AlszSender {
             let b = ((self.s >> j) & 1) != 0;
             // TODO: constant-time
             if b {
-                swanky_bytearray_utils::xor_inplace(q, u);
+                q.iter_mut().zip(u.iter()).for_each(|(a, &b)| *a ^= b);
             }
         }
         ensure!(
@@ -187,8 +187,12 @@ impl AlszReceiver {
             outgoing_bytes = remaining;
             fill_rng_with_selector(rng0, selector, t);
             fill_rng_with_selector(rng1, selector, g);
-            swanky_bytearray_utils::xor_inplace(g, t);
-            swanky_bytearray_utils::xor_inplace(g, r);
+            g.iter_mut()
+                .zip(t.iter().zip(r.iter()))
+                .for_each(|(a, (&b, &c))| {
+                    *a ^= b;
+                    *a ^= c;
+                });
         }
         ensure!(
             outgoing_bytes.is_empty(),
