@@ -33,9 +33,6 @@
 /edge/block @cphifer
 /edge/block/ @cphifer
 
-/edge/bytearray-utils @cphifer
-/edge/bytearray-utils/ @cphifer
-
 /edge/channel-legacy @cphifer
 /edge/channel-legacy/ @cphifer
 

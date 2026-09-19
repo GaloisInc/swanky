@@ -2582,13 +2582,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-bytearray-utils"
-version = "0.6.0"
-dependencies = [
- "rand 0.10.2",
-]
-
-[[package]]
 name = "swanky-channel"
 version = "0.6.0"
 dependencies = [

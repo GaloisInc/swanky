@@ -46,7 +46,6 @@ have a lesser stability guarantee.
 - **`swanky-authenticated-garbling`**: Authenticated malicious garbling in the presence of a malicious garbler and evaluator
 - **`swanky-bit-matrix-transpose`**: Transpose a bit matrix
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
-- **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
 - **`swanky-cointoss`**: A simple coin-tossing protocol.
 - **`swanky-cr-hash`**: Correlation-robust hashing.
