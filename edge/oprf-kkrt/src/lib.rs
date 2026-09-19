@@ -12,7 +12,6 @@ use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
@@ -131,7 +130,11 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         output: &mut <Sender<OT> as ObliviousPrf>::Output,
     ) {
         self.code.encode(input, output.into());
-        scutils::and_inplace(output.as_mut(), &self.s_);
+        output
+            .as_mut()
+            .iter_mut()
+            .zip(self.s_.iter())
+            .for_each(|(a, &b)| *a &= b);
     }
 }
 

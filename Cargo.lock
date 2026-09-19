@@ -2800,7 +2800,6 @@ dependencies = [
  "swanky-adversary",
  "swanky-bit-matrix-transpose",
  "swanky-block",
- "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-error",
