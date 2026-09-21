@@ -69,6 +69,7 @@ have a lesser stability guarantee.
 - **`swanky-ot-noar-pinkas`**: An implementation of the Noar-Pinkas OT protocol
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
+- **`swanky-ot-traits-new`**: Base traits for Oblivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
 - **`swanky-sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
