@@ -1860,6 +1860,8 @@ dependencies = [
  "itertools 0.15.0",
  "proptest",
  "rand 0.10.2",
+ "serde",
+ "serde_json",
  "sha2",
  "swanky-adversary",
  "swanky-block",
