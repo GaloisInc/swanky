@@ -7,7 +7,6 @@ use rand::{CryptoRng, Rng, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
-use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -82,7 +81,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
                 .read_bytes(&mut u)
                 .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
             rng.fill_bytes(q);
-            scutils::xor_inplace(q, if b.into() { &u } else { &zero });
+            q.iter_mut()
+                .zip(if b.into() { u.iter() } else { zero.iter() })
+                .for_each(|(a, &b)| *a ^= b);
         }
         Ok(swanky_bit_matrix_transpose::transpose(&qs, nrows, ncols))
     }
@@ -204,8 +205,13 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
             let t = &mut ts[range];
             self.rngs[j].0.fill_bytes(t);
             self.rngs[j].1.fill_bytes(&mut g);
-            scutils::xor_inplace(&mut g, t);
-            scutils::xor_inplace(&mut g, r);
+            g.iter_mut()
+                .zip(t.iter().zip(r.iter()))
+                .for_each(|(a, (&b, &c))| {
+                    *a ^= b;
+                    *a ^= c;
+                });
+
             channel
                 .write_bytes(&g)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;

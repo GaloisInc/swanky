@@ -12,7 +12,6 @@ members = [
   "edge/authenticated-garbling",
   "edge/bit-matrix-transpose",
   "edge/block",
-  "edge/bytearray-utils",
   "edge/channel-legacy",
   "edge/cointoss",
   "edge/cr-hash",
@@ -105,7 +104,6 @@ swanky-authenticated-bits = { path = "edge/authenticated-bits" }
 swanky-authenticated-garbling = { path = "edge/authenticated-garbling" }
 swanky-bit-matrix-transpose = { path = "edge/bit-matrix-transpose" }
 swanky-block = { path = "edge/block" }
-swanky-bytearray-utils = { path = "edge/bytearray-utils" }
 swanky-channel = { path = "core/channel" }
 swanky-channel-legacy = { path = "edge/channel-legacy" }
 swanky-cointoss = { path = "edge/cointoss" }

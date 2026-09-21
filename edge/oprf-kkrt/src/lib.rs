@@ -12,7 +12,6 @@ use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_bytearray_utils as scutils;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
@@ -95,7 +94,9 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             channel
                 .read_bytes(&mut t1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
-            scutils::xor_inplace(q, if b.into() { &t1 } else { &t0 });
+            q.iter_mut()
+                .zip(if b.into() { t1.iter() } else { t0.iter() })
+                .for_each(|(a, &b)| *a ^= b);
         }
         let qs = swanky_bit_matrix_transpose::transpose(&qs, ncols, nrows);
         let seeds = qs
@@ -108,7 +109,11 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
     fn compute(&self, seed: Self::Seed, input: Self::Input) -> Self::Output {
         let mut output = Self::Output::default();
         self.encode(input, &mut output);
-        scutils::xor_inplace(output.as_mut(), seed.as_ref());
+        output
+            .as_mut()
+            .iter_mut()
+            .zip(seed.as_ref().iter())
+            .for_each(|(a, &b)| *a ^= b);
         output
     }
 }
@@ -125,7 +130,11 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
         output: &mut <Sender<OT> as ObliviousPrf>::Output,
     ) {
         self.code.encode(input, output.into());
-        scutils::and_inplace(output.as_mut(), &self.s_);
+        output
+            .as_mut()
+            .iter_mut()
+            .zip(self.s_.iter())
+            .for_each(|(a, &b)| *a &= b);
     }
 }
 
@@ -192,7 +201,9 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             let range = j * ncols / 8..(j + 1) * ncols / 8;
             let t1 = &mut t1s[range];
             self.code.encode(*input, (&mut c).into());
-            scutils::xor_inplace(t1, c.as_ref());
+            t1.iter_mut()
+                .zip(c.as_ref().iter())
+                .for_each(|(a, &b)| *a ^= b);
         }
         let t0s = swanky_bit_matrix_transpose::transpose(&t0s, nrows, ncols);
         let t1s = swanky_bit_matrix_transpose::transpose(&t1s, nrows, ncols);
@@ -203,12 +214,12 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let t1 = &t1s[range];
             self.rngs[j].0.fill_bytes(&mut t);
-            scutils::xor_inplace(&mut t, t0);
+            t.iter_mut().zip(t0.iter()).for_each(|(a, &b)| *a ^= b);
             channel
                 .write_bytes(&t)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
             self.rngs[j].1.fill_bytes(&mut t);
-            scutils::xor_inplace(&mut t, t1);
+            t.iter_mut().zip(t1.iter()).for_each(|(a, &b)| *a ^= b);
             channel
                 .write_bytes(&t)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;

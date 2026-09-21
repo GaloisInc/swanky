@@ -1863,7 +1863,6 @@ dependencies = [
  "sha2",
  "swanky-adversary",
  "swanky-block",
- "swanky-bytearray-utils",
  "swanky-channel",
  "swanky-channel-legacy",
  "swanky-cointoss",
@@ -2583,13 +2582,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-bytearray-utils"
-version = "0.6.0"
-dependencies = [
- "rand 0.10.2",
-]
-
-[[package]]
 name = "swanky-channel"
 version = "0.6.0"
 dependencies = [
@@ -2801,7 +2793,6 @@ dependencies = [
  "swanky-adversary",
  "swanky-bit-matrix-transpose",
  "swanky-block",
- "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-error",
@@ -2851,7 +2842,6 @@ dependencies = [
  "swanky-adversary",
  "swanky-bit-matrix-transpose",
  "swanky-block",
- "swanky-bytearray-utils",
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-cr-hash",

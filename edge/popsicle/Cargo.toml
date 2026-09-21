@@ -33,7 +33,6 @@ swanky-adversary.workspace = true
 swanky-cr-hash.workspace = true
 swanky-rng.workspace = true
 swanky-block.workspace = true
-swanky-bytearray-utils.workspace = true
 swanky-channel.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true

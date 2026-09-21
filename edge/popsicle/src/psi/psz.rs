@@ -113,7 +113,10 @@ impl Sender {
 
                 // encrypt payload
                 let mut ct = payloads[j];
-                swanky_bytearray_utils::xor_inplace(ct.as_mut(), key);
+                ct.as_mut()
+                    .iter_mut()
+                    .zip(key.iter())
+                    .for_each(|(a, &b)| *a ^= b);
 
                 channel.write_bytes(&tag[0..masksize])?;
                 channel.write_bytes(ct.as_ref())?;
@@ -211,14 +214,13 @@ impl Receiver {
                 let tag = &output.as_ref()[0..masksize];
 
                 // if the tag is present, decrypt the payload using F(x).
-                if let Some(ct) = hs[item.hash_index].get(tag) {
+                if let Some(&ct) = hs[item.hash_index].get(tag) {
                     let val = inputs[item.input_index].clone();
-                    let key = &output.as_ref()[masksize..masksize + 16];
-                    let payload_bytes = swanky_bytearray_utils::xor(ct.as_ref(), key);
-                    let payload = Block::from(
-                        <[u8; 16]>::try_from(payload_bytes.as_slice())
+                    let key = Block::from(
+                        <[u8; 16]>::try_from(&output.as_ref()[masksize..masksize + 16])
                             .expect("it is exactly 16 bytes long"),
                     );
+                    let payload = ct ^ key;
                     intersection.insert(val, payload);
                 }
             }

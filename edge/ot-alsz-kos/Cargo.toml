@@ -15,7 +15,6 @@ keyed_arena.workspace = true
 swanky-adversary.workspace = true
 swanky-bit-matrix-transpose.workspace = true
 swanky-block.workspace = true
-swanky-bytearray-utils.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
 swanky-cr-hash.workspace = true
