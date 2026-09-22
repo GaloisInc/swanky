@@ -2932,6 +2932,9 @@ dependencies = [
 [[package]]
 name = "swanky-ot-traits-new"
 version = "0.6.0"
+dependencies = [
+ "swanky-party",
+]
 
 [[package]]
 name = "swanky-party"

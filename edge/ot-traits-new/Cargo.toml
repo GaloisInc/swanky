@@ -11,4 +11,4 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-# my_dependency.workspace = true
+swanky-party.workspace = true
