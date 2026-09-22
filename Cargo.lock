@@ -2933,7 +2933,10 @@ dependencies = [
 name = "swanky-ot-traits-new"
 version = "0.6.0"
 dependencies = [
+ "swanky-channel",
+ "swanky-error",
  "swanky-party",
+ "swanky-rng",
 ]
 
 [[package]]
