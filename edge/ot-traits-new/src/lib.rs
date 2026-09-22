@@ -4,8 +4,9 @@
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
-use swanky_party::either::PartyEither;
+use swanky_party::{either::PartyEither, private::PartyPrivate};
 use swanky_rng::SwankyRng;
+use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
 swanky_party::party_system! {
@@ -49,4 +50,32 @@ pub trait RandomOT<P: Party>: OTInit<P> {
     ) -> Result<Self>
     where
         I::IntoIter: ExactSizeIterator;
+}
+
+/// 1-out-of-2 OT protocols.
+///
+/// The `Sender` holds two messages, `M_0` and `M_1`.
+/// The `Receiver` wants exactly one of these two messages, `M_b` for
+/// `b ∈ {0, 1}`.
+///
+/// A protocol implementing this trait should guarantee:
+///
+/// - `Receiver` learned `M_b`
+/// - `Receiver` learns nothing about `M_{1 - b}` (i.e. the other
+///   message)
+/// - `Sender` learns nothing about `b` (i.e. which message the
+///   `Receiver` chooses)
+pub trait ObliviousTransfer<P: Party>: OTInit<P> {
+    /// Run OT.
+    fn ot<
+        I: IntoIterator<Item = F2>,
+        V: IntoIterator<Item = [T; 2]>,
+        T: CanonicalSerialize,
+        O: Extend<T>,
+    >(
+        self,
+        inputs: PartyPrivate<Receiver, P, I>,
+        values: PartyPrivate<Sender, P, V>,
+        outputs: PartyPrivate<Receiver, P, &mut O>,
+    ) -> Result<Self>;
 }

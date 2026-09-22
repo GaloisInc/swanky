@@ -2938,6 +2938,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-party",
  "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
