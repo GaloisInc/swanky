@@ -36,9 +36,8 @@ pub trait RandomOT<P: Party>: OTInit<P> {
     ///
     /// `inputs` : For the sender, the number of input values.
     ///            For the receiver, the selection bits.
-    /// `outputs`: For the sender, the pairs of encryption keys (as
-    ///            arrays).
-    ///            For the receiver, the selected encryption keys.
+    /// `outputs`: For the sender, the pairs of messages (as arrays).
+    ///            For the receiver, the selected messages.
     fn random_ot<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         self,
         inputs: PartyEither<P, usize, I>,
