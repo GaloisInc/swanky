@@ -1,8 +1,6 @@
 # Contributing to Swanky
 
-This document is still a work in progress. More information will be added later.
-
-:wave: Hello newcomer to Swanky! This document contains a lot of _stuff_ about our development process. Here are the most important sections for introducing you to Swanky:
+:wave: Hello newcomer to Swanky! This set of documents contains a lot of _stuff_ about our development process. Here are the most important sections for introducing you to Swanky:
 
 1. [Code of Conduct](#code-of-conduct)
 2. [Goals of Swanky](#goals-of-swanky)
@@ -11,11 +9,11 @@ This document is still a work in progress. More information will be added later.
 5. [Swanky and AI Tools](#swanky-and-ai-tools)
 6. [Swanky API Guidelines](#swanky-api-guidelines)
 
-The first two sections of this document describes the _process_ of developing Swanky (e.g. how to go about adding a new feature, how to structure code review, etc.). The remainder of this document is about technical considerations when developing for Swanky.
+Section three of this document describes the _process_ of developing Swanky (e.g. how to go about adding a new feature, how to structure code review, etc.). Section four of this document is about technical considerations when developing for Swanky.
 
-In this document, we aim to emphasize _why_ we recommend the practices outlined in this document. If there's some development practice that doesn't have a good reason behind it, then we shouldn't be doing it!
+We aim to emphasize _why_ we recommend the practices outlined. If there is some development practice that doesn't have a good reason behind it, then we shouldn't be doing it!
 
-Parts of Swanky currently diverge from these standards. We are working to help align all of Swanky with these standards.
+Parts of Swanky currently diverge from these standards. We are working to help align all of Swanky with these standards (see [the development process documentation](#swanky-development-process) for more details).
 
 [[_TOC_]]
 
