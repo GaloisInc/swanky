@@ -10,11 +10,13 @@ This document outlines the development process for contributing to Swanky.
 * **Professional Development.** Working on Swanky should be a learning opportunity, where people learn new skills and techniques.
 * **Improve Code.** More eyes on both design and implementation will catch issues earlier, and avoid making the same mistakes over again, in addition to improving APIs and making the code easier to use.
 
+To accomplish the above, this document will describe the processes and practices we strive to follow when developing Swanky.
+
 ## Start with a Design
 
-Before you start writing code, start by planning it out, ideally with the rest of team. This is especially important for wide-reaching changes or core components—if your change is going to affect every user of Swanky, you should make sure that they're on board before you make the change.
+Before you start writing code, start by planning it out, ideally capturing the design in an issue that can be reviewed. If you plan on touching a component that has a [`CODEOWNER`](#codeowners), then they will need to align on the proposed design. This is especially important for wide-reaching changes or `core` components.
 
-For most cases, design docs should live as Gitlab issues, to allow people to comment on them. When the design is implemented, the content of the design document (not necessarily verbatim) should be included in the merge request, ideally as part of the rustdoc for the module.
+When the design is implemented, the content of the design document (not necessarily verbatim) should be included in the [merge request](#merge-requests), ideally as part of the `rustdoc` for the module.
 
 ## Git Branching Style
 
