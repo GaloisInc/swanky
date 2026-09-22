@@ -75,6 +75,20 @@ Merge requests which make breaking changes to APIs should also update the change
 
 All MRs need to pass CI's checks. CI will, in addition to running Rust tests, also run a series of lints. It can be faster to run them locally (via `./swanky lint`), rather than waiting for CI to tell you that there was a failure.
 
+## Code Review
+
+The number one rule of code review is: "be kind!" Someone spent time writing the contribution that you are looking at. Code review provides a wonderful teaching/learning opportunity for everyone involved—treat it that way!
+
+One goal of code review is to try to help avoid mistakes in code, or point out ways that it could be better. Beyond that, after a successful code review, reviewers should walk away with a deep understanding of the code that they just read. If none of the reviewers feel like they have a deep understanding of the code, it suggests that _something_ should be revisited: is the code confusing? Is it not the specialty of the reviewers?
+
+After a successful code review, once the "Merge it In!" button has been pressed, the responsibility of the code should lie with the whole team. If the code has a bug in it, that's not the responsibility of the person who typed it; it's the responsibility of the whole team. On a healthy team, individuals aren't responsible for success or failure. The team should succeed or fail as a group, and code review is an important practice to make that a reality.
+
+### Tips for Code Review
+
+If you ask a reviewer to review too much code it can be overwhelming. Instead, break the code into many smaller pieces, that can be reviewed separately.
+
+Ask questions of the code author in comments! If you have a question about the code, it can help indicate that code should be restructured or differently documented. At worst, it'll help your understanding!
+
 ## `CODEOWNERS`
 
 Each component[^what-is-a-component] of Swanky is owned by a team of at least _two_ people. This information is recorded in our [`CODEOWNERS`](https://docs.gitlab.com/ee/user/project/codeowners/) file.
@@ -91,17 +105,3 @@ The code owners are responsible for shepherding the components that they own, in
   We want to ensure that there's enough written down so that we can get new code owners up-to-speed, even if existing code owners are unavailable.
 
 These responsibilities may consume hours. For example, if project A funds a 1,000 line code change to library B, project A could fund a code owner of library B for the 1-2 hours it would take to review the change.
-
-## Code Review
-
-The number one rule of code review is: "be kind!" Someone spent time writing the contribution that you are looking at. Code review provides a wonderful teaching/learning opportunity for everyone involved—treat it that way!
-
-One goal of code review is to try to help avoid mistakes in code, or point out ways that it could be better. Beyond that, after a successful code review, reviewers should walk away with a deep understanding of the code that they just read. If none of the reviewers feel like they have a deep understanding of the code, it suggests that _something_ should be revisited: is the code confusing? Is it not the specialty of the reviewers?
-
-After a successful code review, once the "Merge it In!" button has been pressed, the responsibility of the code should lie with the whole team. If the code has a bug in it, that's not the responsibility of the person who typed it; it's the responsibility of the whole team. On a healthy team, individuals aren't responsible for success or failure. The team should succeed or fail as a group, and code review is an important practice to make that a reality.
-
-### Tips for Code Review
-
-If you ask a reviewer to review too much code it can be overwhelming. Instead, break the code into many smaller pieces, that can be reviewed separately.
-
-Ask questions of the code author in comments! If you have a question about the code, it can help indicate that code should be restructured or differently documented. At worst, it'll help your understanding!
