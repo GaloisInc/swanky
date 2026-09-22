@@ -55,16 +55,16 @@ pub trait RandomOT<P: Party>: OTInit<P> {
 
 /// 1-out-of-2 OT protocols.
 ///
-/// The `Sender` holds two messages, `M_0` and `M_1`.
-/// The `Receiver` wants exactly one of these two messages, `M_b` for
-/// `b ∈ {0, 1}`.
+/// The `Sender` holds two messages, $`M_0`$ and $`M_1`$.
+/// The `Receiver` wants exactly one of these two messages, $`M_b`$
+/// for $`b \in {0, 1}`$.
 ///
 /// A protocol implementing this trait should guarantee:
 ///
-/// - `Receiver` learned `M_b`
-/// - `Receiver` learns nothing about `M_{1 - b}` (i.e. the other
+/// - `Receiver` learned $`M_b`$
+/// - `Receiver` learns nothing about $`M_{1 - b}`$ (i.e. the other
 ///   message)
-/// - `Sender` learns nothing about `b` (i.e. which message the
+/// - `Sender` learns nothing about $`b`$ (i.e. which message the
 ///   `Receiver` chooses)
 pub trait ObliviousTransfer<P: Party>: OTInit<P> {
     /// Run OT.
