@@ -91,17 +91,13 @@ Ask questions of the code author in comments! If you have a question about the c
 
 ## `CODEOWNERS`
 
-Each component[^what-is-a-component] of Swanky is owned by a team of at least _two_ people. This information is recorded in our [`CODEOWNERS`](https://docs.gitlab.com/ee/user/project/codeowners/) file.
-
-[^what-is-a-component]: A component of Swanky ought to be one crate. However, there are some crates, like ocelot, which contain many different protocols and components. Until they get broken up into several different crates, different modules in ocelot might have distinct code owners.
+We aspire to have each component (i.e. crate) of Swanky owned by a team of at least _two_ people. This information is recorded in our [`CODEOWNERS`](../CODEOWNERS) file.
 
 The code owners are responsible for shepherding the components that they own, including:
 
-* **Reviewing code which modifies their components.** Gitlab will automatically ask code owners to review any merge request which modifies code that they own.
+* **Reviewing code which modifies their components.** Git forges will automatically ask code owners to review any merge request which modifies code that they own.
 * **Managing the health of the component.** This includes triaging issues which may impact the component.
 * **Fielding questions about the component.** The code owners should be the resident experts on the components they own.
 * **Documenting their component.** Someone should be able to read documentation to get fully up-to-speed on a component, without _needing_ to speak to one of its code owners. (We want code owners to be able to field questions because it's faster than _requiring_ everyone who has a question about a component to put in the leg work to learn about it.)
 
-  We want to ensure that there's enough written down so that we can get new code owners up-to-speed, even if existing code owners are unavailable.
-
-These responsibilities may consume hours. For example, if project A funds a 1,000 line code change to library B, project A could fund a code owner of library B for the 1-2 hours it would take to review the change.
+We want to ensure that there's enough written down so that we can get new code owners up-to-speed, even if existing code owners are unavailable.
