@@ -19,6 +19,10 @@ Parts of Swanky currently diverge from these standards. We are working to help a
 
 [[_TOC_]]
 
+## Code of Conduct
+
+See our [Code of Conduct](CODE_OF_CONDUCT.md) for details.
+
 ## Goals of Swanky
 
 Swanky is a development platform for cryptographic research, intended for prototyping cryptographic protocols and implementation techniques. For Swanky to accelerate research and prototyping, it must provide a stable foundation that we can build on: it must be understandable, well-written, and well-designed. We'd rather our users be making progress instead of figuring out why some five-year-old library panics exclusively during the waxing gibbous moon. While there is some cost to developing Swanky-destined cryptography in such a manner, we believe that using software engineering practices to develop a new Swanky component will not only help streamline the development of this new component, but will also make it easier to re-use the component in the future. As they say, "one milligram of prevention is worth a centigram of cure."
