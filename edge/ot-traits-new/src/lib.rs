@@ -22,9 +22,6 @@ swanky_party::party_system! {
 pub use party::*;
 
 /// Initialization of OT protocols.
-///
-/// Initialization is shared between random OT and constructions built
-/// on it, so this helps reduce duplication between implementations.
 pub trait OTInit<P: Party>: Sized {
     /// Initialize and return an OT protocol.
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self>;
