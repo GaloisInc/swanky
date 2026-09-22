@@ -2935,8 +2935,10 @@ version = "0.6.0"
 dependencies = [
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-party",
  "swanky-rng",
+ "vectoreyes",
 ]
 
 [[package]]
