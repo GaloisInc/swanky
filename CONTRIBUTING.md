@@ -4,10 +4,10 @@ This document is still a work in progress. More information will be added later.
 
 :wave: Hello newcomer to Swanky! This document contains a lot of _stuff_ about our development process. Here are the most important sections for introducing you to Swanky:
 
-1. [Code of Conduct](CODE_OF_CONDUCT.md)
+1. [Code of Conduct](#code-of-conduct)
 2. [Goals of Swanky](#goals-of-swanky)
-3. [Swanky Development Process](CONTRIBUTING/swanky-development-process.md)
-4. [Swanky Implementation Information](CONTRIBUTING/swanky-implementation-info.md)
+3. [Swanky Development Process](#swanky-development-process)
+4. [Swanky Implementation Information](#swanky-implementation-information)
 5. [Swanky and AI Tools](#swanky-and-ai-tools)
 6. [Swanky API Guidelines](#swanky-api-guidelines)
 
