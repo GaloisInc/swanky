@@ -26,7 +26,7 @@ pub use party::*;
 /// on it, so this helps reduce duplication between implementations.
 pub trait OTInit<P: Party>: Sized {
     /// Initialize and return an OT protocol.
-    fn init(rng: &mut SwankyRng, channel: &mut Channel) -> Result<Self>;
+    fn init(channel: &mut Channel, rng: &mut SwankyRng) -> Result<Self>;
 }
 
 /// OT protocols where the messages are random.
@@ -45,8 +45,8 @@ pub trait RandomOT<P: Party>: OTInit<P> {
         self,
         inputs: PartyEither<P, usize, I>,
         outputs: &mut O,
-        rng: &mut SwankyRng,
         channel: &mut Channel,
+        rng: &mut SwankyRng,
     ) -> Result<Self>
     where
         I::IntoIter: ExactSizeIterator;
@@ -77,5 +77,7 @@ pub trait ObliviousTransfer<P: Party>: OTInit<P> {
         inputs: PartyPrivate<Receiver, P, I>,
         values: PartyPrivate<Sender, P, V>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
+        channel: &mut Channel,
+        rng: &mut SwankyRng,
     ) -> Result<Self>;
 }
