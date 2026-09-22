@@ -31,7 +31,7 @@ pub trait OTInit<P: Party>: Sized {
 ///
 /// 1-out-of-2 protocols can be constructed using protocols
 /// implementing this trait using a standard OTP construction.
-pub trait RandomOT<P: Party>: OTInit<P> {
+pub trait OTRandom<P: Party>: OTInit<P> {
     /// Run random OT.
     ///
     /// `inputs` : For the sender, the number of input values.
