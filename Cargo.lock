@@ -2933,11 +2933,11 @@ dependencies = [
 name = "swanky-ot-traits-new"
 version = "0.6.0"
 dependencies = [
+ "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
  "swanky-field-binary",
  "swanky-party",
- "swanky-rng",
  "swanky-serialization",
  "vectoreyes",
 ]

@@ -15,6 +15,7 @@ swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true
 swanky-party.workspace = true
-swanky-rng.workspace = true
 swanky-serialization.workspace = true
 vectoreyes.workspace = true
+
+rand.workspace = true

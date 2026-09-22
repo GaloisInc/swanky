@@ -1,11 +1,12 @@
 #![deny(missing_docs)]
 //! Base traits for Oblivious Transfer protocols
 
+use rand::CryptoRng;
+
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 use swanky_party::{either::PartyEither, private::PartyPrivate};
-use swanky_rng::SwankyRng;
 use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
@@ -26,7 +27,7 @@ pub use party::*;
 /// on it, so this helps reduce duplication between implementations.
 pub trait OTInit<P: Party>: Sized {
     /// Initialize and return an OT protocol.
-    fn init(channel: &mut Channel, rng: &mut SwankyRng) -> Result<Self>;
+    fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self>;
 }
 
 /// OT protocols where the messages are random.
@@ -46,7 +47,7 @@ pub trait RandomOT<P: Party>: OTInit<P> {
         inputs: PartyEither<P, usize, I>,
         outputs: &mut O,
         channel: &mut Channel,
-        rng: &mut SwankyRng,
+        rng: &mut impl CryptoRng,
     ) -> Result<Self>
     where
         I::IntoIter: ExactSizeIterator;
@@ -78,6 +79,6 @@ pub trait ObliviousTransfer<P: Party>: OTInit<P> {
         values: PartyPrivate<Sender, P, V>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
-        rng: &mut SwankyRng,
+        rng: &mut impl CryptoRng,
     ) -> Result<Self>;
 }
