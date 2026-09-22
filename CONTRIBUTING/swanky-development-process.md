@@ -16,6 +16,27 @@ Before you start writing code, start by planning it out, ideally with the rest o
 
 For most cases, design docs should live as Gitlab issues, to allow people to comment on them. When the design is implemented, the content of the design document (not necessarily verbatim) should be included in the merge request, ideally as part of the rustdoc for the module.
 
+## Git Branching Style
+
+We follow the [Github Flow](https://docs.github.com/en/get-started/quickstart/github-flow) git branching workflow. `dev` is the main branch of the Swanky repo. In this workflow, you:
+
+1. Branch off the target branch (typically `dev`)
+2. Commit and push your changes to the branch
+3. Open a [Merge Request](#merge-requests) from your branch to the target branch.
+4. Have a [Code Review](#code-review)
+5. Merge the branch in, and then delete the feature branch.
+
+If a project demands it, you can merge into a project-specific branch, before merging the project-specific branch into `dev`, but it's preferable to just work off of `dev`.
+
+### Branch Naming
+
+We generate a lot of branches! In order to keep them tidy, it can be helpful to name branches like:
+
+* **Feature Branches:** `feature/<name>`
+* **Refactor Branches:** `refactor/<name>`
+* **Experimental Branches:** `experimental/<name>`
+* **Bugfix Branches:** `bugfix/<name>`
+
 ## Commit Practices / Invariants
 
 In order to facilitate improved knowledge transfer, ease of code review and debugging and traceability of code changes, commits should have:
@@ -53,27 +74,6 @@ Merge requests which make breaking changes to APIs should also update the change
 ### Running CI Checks Locally
 
 All MRs need to pass CI's checks. CI will, in addition to running Rust tests, also run a series of lints. It can be faster to run them locally (via `./swanky lint`), rather than waiting for CI to tell you that there was a failure.
-
-### Git Branching Style
-
-We follow the [Github Flow](https://docs.github.com/en/get-started/quickstart/github-flow) git branching workflow. `dev` is the main branch of the Swanky repo. In this workflow, you:
-
-1. Branch off the target branch (typically `dev`)
-2. Commit and push your changes to the branch
-3. Open a [Merge Request](#merge-requests) from your branch to the target branch.
-4. Have a [Code Review](#code-review)
-5. Merge the branch in, and then delete the feature branch.
-
-If a project demands it, you can merge into a project-specific branch, before merging the project-specific branch into `dev`, but it's preferable to just work off of `dev`.
-
-### Branch Naming
-
-We generate a lot of branches! In order to keep them tidy, it can be helpful to name branches like:
-
-* **Feature Branches:** `feature/<name>`
-* **Refactor Branches:** `refactor/<name>`
-* **Experimental Branches:** `experimental/<name>`
-* **Bugfix Branches:** `bugfix/<name>`
 
 ## `CODEOWNERS`
 
