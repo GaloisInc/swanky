@@ -23,7 +23,6 @@ sprs.workspace = true
 ndarray.workspace = true
 num-traits.workspace = true
 rand.workspace = true
-subtle.workspace = true
 swanky-rng.workspace = true
 swanky-block.workspace = true
 swanky-field.workspace = true

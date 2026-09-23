@@ -1,4 +1,6 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyEncode, FancyZeroKnowledge, HasModulus};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -173,12 +175,16 @@ impl FieldBackend<F2> for VerifierTraverser {
 
 impl Fancy for VerifierTraverser {
     type Item = Wire;
+}
 
-    fn constant(&mut self, value: u16, modulus: u16, _: &mut Channel) -> Result<Self::Item> {
-        assert!(value == 0 || value == 1);
-        assert_eq!(modulus, 2);
-        let value = if value == 0 { F128b::ZERO } else { F128b::ONE };
-        Ok(Wire(-value * self.verifier_key))
+impl FancyBinaryConstant for VerifierTraverser {
+    fn constant(&mut self, constant: F2) -> Self::Item {
+        let value = if constant.into() {
+            F128b::ONE
+        } else {
+            F128b::ZERO
+        };
+        Wire(-value * self.verifier_key)
     }
 }
 

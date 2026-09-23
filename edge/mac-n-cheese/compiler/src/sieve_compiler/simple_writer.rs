@@ -6,13 +6,13 @@ use mac_n_cheese_ir::circuit_builder::{
     CircuitBuilder, PrivateBuilder, TaskOutputRef, TaskPrototypeRef, build_circuit,
     vole_supplier::VoleSupplier,
 };
-use mac_n_cheese_sieve_parser::ValueStreamReader;
 use mac_n_cheese_vole::party::{Party, Prover, WhichParty};
 use mac_n_cheese_wire_map::WireMap;
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
 use swanky_field_binary::F2;
 use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
+use swanky_sieve_ir_parser::ValueStreamReader;
 
 use super::{
     Inputs,

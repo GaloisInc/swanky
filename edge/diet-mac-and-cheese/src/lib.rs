@@ -109,7 +109,7 @@ pub(crate) fn mapping_lpn_size_large_field(lpn_size: LpnSize) -> (LpnParams, Lpn
     }
 }
 
-use mac_n_cheese_sieve_parser::Number;
+use swanky_sieve_ir_parser::Number;
 
 /// Convert a [`Number`] into `Some(u64)` if it'll fit, `None` otherwise.
 pub(crate) fn number_to_u64(x: &Number) -> swanky_error::Result<u64> {

@@ -3,7 +3,7 @@ use bytemuck::TransparentWrapper;
 use generic_array::{GenericArray, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
 use rand::prelude::Distribution;
-use rand::{CryptoRng, Rng, RngExt, SeedableRng, distr::Uniform};
+use rand::{CryptoRng, RngExt, SeedableRng, distr::Uniform};
 use std::{marker::PhantomData, ops::Deref};
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
@@ -113,7 +113,7 @@ pub struct VoleSender<T: MacTypes> {
 }
 
 impl<T: MacTypes> VoleSender<T> {
-    pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
     ) -> swanky_error::Result<Self> {
@@ -378,7 +378,7 @@ pub struct VoleReceiver<T: MacTypes> {
     phantom: PhantomData<T>,
 }
 impl<T: MacTypes> VoleReceiver<T> {
-    pub fn init<C: AbstractChannel, RNG: Rng + CryptoRng>(
+    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         rng: &mut RNG,
         delta: T::TF,

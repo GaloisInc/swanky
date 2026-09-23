@@ -11,6 +11,9 @@
 /core/party
 /core/party/
 
+/core/rng
+/core/rng/
+
 /core/serialization
 /core/serialization/
 
@@ -30,9 +33,6 @@
 /edge/block @cphifer
 /edge/block/ @cphifer
 
-/edge/bytearray-utils @cphifer
-/edge/bytearray-utils/ @cphifer
-
 /edge/channel-legacy @cphifer
 /edge/channel-legacy/ @cphifer
 
@@ -41,9 +41,6 @@
 
 /edge/cr-hash @amaloz @rissa
 /edge/cr-hash/ @amaloz @rissa
-
-/edge/deprecated-bitwise-utils @cphifer
-/edge/deprecated-bitwise-utils/ @cphifer
 
 /edge/diet-mac-and-cheese @benoit.razet @cphifer
 /edge/diet-mac-and-cheese/ @benoit.razet @cphifer
@@ -96,9 +93,6 @@
 /edge/malicious-hooks @amaloz @rissa
 /edge/malicious-hooks/ @amaloz @rissa
 
-/edge/ocelot-error @amaloz @rissa
-/edge/ocelot-error/ @amaloz @rissa
-
 /edge/oprf-kkrt @amaloz @rissa
 /edge/oprf-kkrt/ @amaloz @rissa
 
@@ -131,9 +125,6 @@
 
 /edge/popsicle @amaloz @rissa
 /edge/popsicle/ @amaloz @rissa
-
-/edge/rng @amaloz @rissa
-/edge/rng/ @amaloz @rissa
 
 /edge/schmivitz @benoit.razet @marcella
 /edge/schmivitz/ @benoit.razet @marcella

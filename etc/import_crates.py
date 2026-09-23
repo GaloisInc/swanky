@@ -4,7 +4,7 @@ import tomllib
 from collections import defaultdict
 from pathlib import Path
 
-import click
+import rich_click as click
 
 from etc import ROOT
 

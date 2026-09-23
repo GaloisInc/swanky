@@ -18,17 +18,13 @@ workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-clap.workspace = true
 console_error_panic_hook.workspace = true
 console_log.workspace = true
 log.workspace = true
-pretty_env_logger.workspace = true
-rand.workspace = true
-generic-array.workspace = true
 wasm-bindgen.workspace = true
 
 diet-mac-and-cheese.workspace = true
-mac-n-cheese-sieve-parser.workspace = true
+swanky-sieve-ir-parser.workspace = true
 swanky-rng.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-field-binary.workspace = true

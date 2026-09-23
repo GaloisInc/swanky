@@ -2,8 +2,8 @@ import json
 import subprocess
 from typing import Any, cast
 
-import click
 import rich
+import rich_click as click
 from rich.text import Text
 from rich.tree import Tree
 

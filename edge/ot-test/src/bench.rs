@@ -11,6 +11,7 @@ use std::{
 use criterion::Criterion;
 use swanky_block::Block;
 use swanky_channel_legacy::Channel;
+use swanky_field_binary::F2;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
@@ -19,12 +20,12 @@ use swanky_rng::SwankyRng;
 fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
-fn rand_bool_vec(size: usize) -> Vec<bool> {
-    (0..size).map(|_| rand::random::<bool>()).collect()
+fn rand_f2_vec(size: usize) -> Vec<F2> {
+    (0..size).map(|_| rand::random::<F2>()).collect()
 }
 
 fn bench_block_ot_inner<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>(
-    bs: &[bool],
+    bs: &[F2],
     ms: Vec<(Block, Block)>,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -60,7 +61,7 @@ pub fn bench_block_ot<S: Sender<Msg = Block>, R: Receiver<Msg = Block>>(
             let m0s = rand_block_vec(size);
             let m1s = rand_block_vec(size);
             let ms = m0s.into_iter().zip(m1s).collect::<Vec<(Block, Block)>>();
-            let bs = rand_bool_vec(size);
+            let bs = rand_f2_vec(size);
             bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()));
         },
     );
@@ -70,7 +71,7 @@ fn bench_block_cot_inner<
     OTSender: CorrelatedSender<Msg = Block>,
     OTReceiver: CorrelatedReceiver<Msg = Block>,
 >(
-    bs: &[bool],
+    bs: &[F2],
     delta: Block,
 ) {
     let m = bs.len();
@@ -106,7 +107,7 @@ pub fn bench_correlated_ot<S: CorrelatedSender<Msg = Block>, R: CorrelatedReceiv
         ),
         move |bench| {
             let delta = rand::random::<Block>();
-            let bs = rand_bool_vec(size);
+            let bs = rand_f2_vec(size);
             bench.iter(|| bench_block_cot_inner::<S, R>(&bs, delta))
         },
     );
@@ -116,7 +117,7 @@ fn bench_block_rot_inner<
     OTSender: RandomSender<Msg = Block>,
     OTReceiver: RandomReceiver<Msg = Block>,
 >(
-    bs: &[bool],
+    bs: &[F2],
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let m = bs.len();
@@ -149,7 +150,7 @@ pub fn bench_random_ot<S: RandomSender<Msg = Block>, R: RandomReceiver<Msg = Blo
             std::any::type_name::<R>()
         ),
         move |bench| {
-            let bs = rand_bool_vec(size);
+            let bs = rand_f2_vec(size);
             bench.iter(|| bench_block_rot_inner::<S, R>(&bs))
         },
     );

@@ -22,14 +22,6 @@ impl EvaluatorOutput {
 
 impl Fancy for EvaluatorOutput {
     type Item = EvaluatorWire;
-
-    fn constant(&mut self, _: u16, _: u16, _: &mut Channel) -> Result<Self::Item> {
-        // TODO: `constant` should _not_ be a part of `Fancy`, but maybe live in
-        // a `FancyConstant` trait?
-        unimplemented!(
-            "In the validation phase, we don't do any circuit evaluation, so `constant should never be called."
-        )
-    }
 }
 
 impl FancyOutput for EvaluatorOutput {

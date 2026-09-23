@@ -1,4 +1,4 @@
-use fancy_traits::{FancyOutput, HasModulus};
+use fancy_traits::FancyOutput;
 use swanky_channel::Channel;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
@@ -6,15 +6,10 @@ use swanky_channel::Channel;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bundle<W>(Vec<W>);
 
-impl<W: Clone + HasModulus> Bundle<W> {
+impl<W> Bundle<W> {
     /// Create a new bundle from some wires.
     pub fn new(ws: Vec<W>) -> Bundle<W> {
         Bundle(ws)
-    }
-
-    /// Return the moduli of all the wires in the bundle.
-    pub(crate) fn moduli(&self) -> Vec<u16> {
-        self.0.iter().map(HasModulus::modulus).collect()
     }
 
     /// Extract the wires from this bundle.
@@ -22,50 +17,19 @@ impl<W: Clone + HasModulus> Bundle<W> {
         &self.0
     }
 
-    /// Get the number of wires in this bundle.
-    pub fn size(&self) -> usize {
+    /// The number of wires in this bundle.
+    pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    /// Returns a new bundle only containing wires with matching moduli.
-    pub(crate) fn with_moduli(&self, moduli: &[u16]) -> Bundle<W> {
-        let old_ws = self.wires();
-        let mut new_ws = Vec::with_capacity(moduli.len());
-        for &p in moduli {
-            if let Some(w) = old_ws.iter().find(|&x| x.modulus() == p) {
-                new_ws.push(w.clone());
-            } else {
-                panic!("Bundle::with_moduli: no {} modulus in bundle", p);
-            }
-        }
-        Bundle(new_ws)
-    }
-
-    /// Pad the Bundle with val, n times.
-    pub(crate) fn pad(&mut self, val: &W, n: usize) {
-        for _ in 0..n {
-            self.0.push(val.clone());
-        }
-    }
-
-    /// Insert a wire from the Bundle
-    pub(crate) fn insert(&mut self, wire_index: usize, val: W) {
-        self.0.insert(wire_index, val)
+    /// Whether the bundle is empty or not.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// push a wire onto the Bundle.
     pub(crate) fn push(&mut self, val: W) {
         self.0.push(val);
-    }
-
-    /// Pop a wire from the Bundle.
-    pub(crate) fn pop(&mut self) -> Option<W> {
-        self.0.pop()
-    }
-
-    /// Access the underlying iterator
-    pub fn iter(&self) -> std::slice::Iter<'_, W> {
-        self.0.iter()
     }
 
     /// Reverse the wires

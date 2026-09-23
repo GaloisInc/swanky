@@ -1,11 +1,11 @@
 use crate::secretsharing::{CorrectionSharing, LinearSharing, SecretSharing};
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use simple_arith_circuit::{Circuit, Op};
 use swanky_field::FiniteField;
 
 /// A trait for additional functionality for circuit execution needed by inferno.
 pub(crate) trait CircuitEvaluator<F: FiniteField, const N: usize> {
-    fn eval_secret_sharing<R: Rng + CryptoRng>(
+    fn eval_secret_sharing<R: CryptoRng>(
         &self,
         inputs: &[SecretSharing<F, N>],
         xs: &mut Vec<SecretSharing<F, N>>,
@@ -31,7 +31,7 @@ impl<F: FiniteField, const N: usize> CircuitEvaluator<F, N> for Circuit<F> {
     /// gates. The output is a secret shared value of the output wire.
     ///
     /// Note: This assumes that the circuit only has _one_ output wire!
-    fn eval_secret_sharing<R: Rng + CryptoRng>(
+    fn eval_secret_sharing<R: CryptoRng>(
         &self,
         inputs: &[SecretSharing<F, N>],
         xs: &mut Vec<SecretSharing<F, N>>,

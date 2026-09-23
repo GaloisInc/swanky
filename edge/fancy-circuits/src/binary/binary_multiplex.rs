@@ -4,7 +4,7 @@ use crate::{
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -51,7 +51,7 @@ where
 /// == 0` and `c2` otherwise.
 pub struct BinaryMultiplexConstantBits;
 
-impl<F: FancyBinary> Circuit<F> for BinaryMultiplexConstantBits {
+impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryMultiplexConstantBits {
     type Input = (F::Item, u128, u128, usize);
     type Output = BinaryBundle<F::Item>;
 

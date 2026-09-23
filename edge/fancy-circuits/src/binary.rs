@@ -76,8 +76,9 @@ mod binary_shift;
 pub use binary_shift::BinaryArithmeticRightShift;
 pub use binary_shift::BinaryLeftShift;
 pub use binary_shift::BinaryLeftShiftExtend;
-pub use binary_shift::BinaryLogicalRightShift;
+pub use binary_shift::BinaryLeftShiftPad;
 pub use binary_shift::BinaryRightShift;
+pub use binary_shift::BinaryRightShiftPad;
 
 mod binary_abs;
 pub use binary_abs::BinaryAbs;

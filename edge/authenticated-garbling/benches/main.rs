@@ -1,11 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::{
-    aes::AesNonExpanded,
     binary::{TestBinaryAddition, TestBinarySubtraction},
+    crypto::aes::Aes128,
     test_circuits::{
         binary::{TestAndGateFanN, TestOrGateFanN, TestXorGateFanN},
-        fancy::TestBinaryConstant,
+        fancy_binary_constant::TestBinaryConstant,
     },
 };
 use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
@@ -233,7 +233,7 @@ fn bench_aes(c: &mut Criterion) {
         .map(|_| rng_gb.random::<u16>() % 2)
         .collect::<Vec<_>>();
 
-    let circuit = AesNonExpanded::new();
+    let circuit = Aes128::new();
     c.bench_function("aes", move |b| {
         b.iter(|| {
             test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);

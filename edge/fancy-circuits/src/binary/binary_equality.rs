@@ -30,8 +30,9 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        assert_eq!(inputs.0.moduli(), inputs.1.moduli());
         let (x, y) = inputs;
+        assert_eq!(x.len(), y.len());
+
         let zs = x
             .wires()
             .iter()

@@ -2,7 +2,7 @@
 //! MPC-in-the-head evaluation.
 
 use blake3::Hasher;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_field::FiniteField;
 use swanky_polynomial::{lagrange_denominator, lagrange_numerator};
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
@@ -76,7 +76,7 @@ pub(crate) trait LinearSharing<F: FiniteField, const N: usize>:
     type SelfWithPrimeField: LinearSharing<F::PrimeField, N>;
     /// Generate a new sharing of `secret`, where each share is generated
     /// using its corresponding RNG provided in `rngs`.
-    fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self;
+    fn new<R: CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self;
     /// Generate a _non-random_ sharing of `secret`.
     fn new_non_random(secret: F) -> Self;
     /// Hash each individual share into its associated `Hasher`.
@@ -99,7 +99,7 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for CorrectionSharing<F
     type SelfWithPrimeField = CorrectionSharing<F::PrimeField, N>;
 
     #[inline]
-    fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self {
+    fn new<R: CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self {
         let mut sum = F::ZERO;
         let mut shares = [F::ZERO; N];
         for (share, rng) in shares.iter_mut().zip(rngs.iter_mut()) {
@@ -167,7 +167,7 @@ impl<F: FiniteField, const N: usize> CorrectionSharing<F, N> {
     /// Generate a `CorrectionSharing` from an array of RNGs and a correction
     /// element.
     #[inline]
-    pub fn from_rngs<R: Rng + CryptoRng>(correction: F, rngs: &mut [R; N]) -> Self {
+    pub fn from_rngs<R: CryptoRng>(correction: F, rngs: &mut [R; N]) -> Self {
         let mut shares = [F::ZERO; N];
         for (share, rng) in shares.iter_mut().zip(rngs.iter_mut()) {
             *share = F::random(rng);
@@ -337,7 +337,7 @@ impl<F: FiniteField, const N: usize> LinearSharing<F, N> for SecretSharing<F, N>
     type SelfWithPrimeField = SecretSharing<F::PrimeField, N>;
 
     #[inline]
-    fn new<R: Rng + CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self {
+    fn new<R: CryptoRng>(secret: F, rngs: &mut [R; N]) -> Self {
         Self {
             shares: CorrectionSharing::new(secret, rngs),
             secret,
@@ -378,7 +378,7 @@ impl<F: FiniteField, const N: usize> SecretSharing<F, N> {
     /// Generate a random `SecretSharing` given a set of RNGs corresponding to
     /// each of the shares.
     #[inline]
-    pub fn random<R: Rng + CryptoRng>(rngs: &mut [R; N]) -> Self {
+    pub fn random<R: CryptoRng>(rngs: &mut [R; N]) -> Self {
         let mut secret = F::ZERO;
         let mut shares = [F::ZERO; N];
         for (share, rng) in shares.iter_mut().zip(rngs.iter_mut()) {

@@ -10,6 +10,7 @@ use std::{
 
 use swanky_block::Block;
 use swanky_channel_legacy::Channel;
+use swanky_field_binary::F2;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
     Receiver, Sender,
@@ -20,8 +21,8 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
     (0..size).map(|_| rand::random::<Block>()).collect()
 }
 
-fn rand_bool_vec(size: usize) -> Vec<bool> {
-    (0..size).map(|_| rand::random::<bool>()).collect()
+fn rand_f2_vec(size: usize) -> Vec<F2> {
+    (0..size).map(|_| rand::random::<F2>()).collect()
 }
 
 /// Test the functionality of an OT protocol by OT-ing `ninputs` blocks.
@@ -30,7 +31,7 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
 ) {
     let m0s = rand_block_vec(ninputs);
     let m1s = rand_block_vec(ninputs);
-    let bs = rand_bool_vec(ninputs);
+    let bs = rand_f2_vec(ninputs);
     let m0s_ = m0s.clone();
     let m1s_ = m1s.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -51,7 +52,7 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
     let results = otext.receive(&mut channel, &bs, &mut rng).unwrap();
     handle.join().unwrap();
     for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j] { m1s_[j] } else { m0s_[j] })
+        assert_eq!(results[j], if bs[j].into() { m1s_[j] } else { m0s_[j] })
     }
 }
 
@@ -63,7 +64,7 @@ pub fn test_cotext<
     ninputs: usize,
 ) {
     let delta = rand::random::<Block>();
-    let bs = rand_bool_vec(ninputs);
+    let bs = rand_f2_vec(ninputs);
     let out = Arc::new(Mutex::new(vec![]));
     let out_ = out.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -89,7 +90,14 @@ pub fn test_cotext<
     handle.join().unwrap();
     let out_ = out_.lock().unwrap();
     for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j] { out_[j] ^ delta } else { out_[j] })
+        assert_eq!(
+            results[j],
+            if bs[j].into() {
+                out_[j] ^ delta
+            } else {
+                out_[j]
+            }
+        )
     }
 }
 
@@ -100,7 +108,7 @@ pub fn test_rotext<
 >(
     ninputs: usize,
 ) {
-    let bs = rand_bool_vec(ninputs);
+    let bs = rand_f2_vec(ninputs);
     let out = Arc::new(Mutex::new(vec![]));
     let out_ = out.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -122,7 +130,7 @@ pub fn test_rotext<
     handle.join().unwrap();
     let out_ = out_.lock().unwrap();
     for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+        assert_eq!(results[j], if bs[j].into() { out_[j].1 } else { out_[j].0 })
     }
 }
 
@@ -133,7 +141,7 @@ pub fn test_rotext_fixed_key<
 >(
     ninputs: usize,
 ) {
-    let bs = rand_bool_vec(ninputs);
+    let bs = rand_f2_vec(ninputs);
     let out = Arc::new(Mutex::new(vec![]));
     let out_ = out.clone();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -159,7 +167,7 @@ pub fn test_rotext_fixed_key<
     handle.join().unwrap();
     let out_ = out_.lock().unwrap();
     for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j] { out_[j].1 } else { out_[j].0 })
+        assert_eq!(results[j], if bs[j].into() { out_[j].1 } else { out_[j].0 })
     }
 }
 

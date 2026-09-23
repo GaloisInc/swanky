@@ -1,7 +1,7 @@
 use crate::{EvaluatorOnline, WirePreProcessor, preprocesser::f_preprocessing, ps::PartyEvaluator};
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_traits::CircuitInputMapper;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -41,7 +41,7 @@ where
     C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<PartyEvaluator>>,
 {
     /// Initialize a [`EvaluatorOffline`] object for the given circuit.
-    pub fn initialize<RNG: CryptoRng + Rng>(
+    pub fn initialize<RNG: CryptoRng>(
         circuit: &'a C,
         channel: &mut Channel,
         rng: &mut RNG,
@@ -72,7 +72,7 @@ impl<'a, C> EvaluatorOffline<'a, C> {
                 ErrorKind::InitializationError,
                 "Failed to create sequence deserializer.",
             )?;
-        let gate_bits = bit_ser.read_vector(channel.as_std_io(), nands).wrap_err(
+        let gate_bits = bit_ser.read_vec(channel.as_std_io(), nands).wrap_err(
             ErrorKind::SerializationError,
             "Failed to read serialized bits.",
         )?;

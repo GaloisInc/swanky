@@ -27,7 +27,7 @@
 
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_traits::CircuitInputMapper;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use swanky_authenticated_bits::{and_triples::AndTripleGenerator, authshares::AuthShare};
 use swanky_channel::Channel;
 use swanky_party::GenericParty;
@@ -41,7 +41,7 @@ pub use crate::preprocesser::wire::WirePreProcessor;
 /// [`AndTriple`](swanky_authenticated_bits::and_triples::AndTriple)s and
 /// [`AuthShare`]s in its "online" portion. This function returns the (1) wire
 /// shares and (2) triple output shares for the given circuit of interest.
-pub(crate) fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng + Rng>(
+pub(crate) fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng>(
     circuit: &C,
     and_generator: &mut AndTripleGenerator<P>,
     channel: &mut Channel,

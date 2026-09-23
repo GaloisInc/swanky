@@ -15,7 +15,6 @@ workspace = true
 [dependencies]
 bincode.workspace = true
 blake3.workspace = true
-clap = { workspace = true, features = ["derive"] }
 generic-array.workspace = true
 log.workspace = true
 parking_lot.workspace = true
@@ -29,9 +28,9 @@ swanky-polynomial.workspace = true
 swanky-serialization.workspace = true
 serde = { workspace = true, features = ["derive"] }
 simple-arith-circuit = { workspace = true, features = ["serde"] }
-snafu.workspace = true
 
 [dev-dependencies]
+clap = { workspace = true, features = ["derive"] }
 criterion.workspace = true
 proptest.workspace = true
 serde_json.workspace = true

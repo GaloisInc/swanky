@@ -62,7 +62,7 @@ impl BasePsi for OpprfSender {
         has_payload: bool,
     ) -> swanky_error::Result<Self>
     where
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
@@ -97,7 +97,7 @@ impl BasePsi for OpprfSender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         // refresh key if cuckoo hash is full
         self.key = channel.read::<Block>()?;
@@ -163,7 +163,7 @@ impl BasePsi for OpprfSender {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs

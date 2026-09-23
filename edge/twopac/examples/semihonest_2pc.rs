@@ -1,4 +1,4 @@
-use fancy_circuits::{aes::AesNonExpanded, sha::Sha256CompressionFunctionFixedIV};
+use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunction};
 use fancy_garbling::WireMod2;
 use fancy_traits::{CircuitInputMapper, FancyEncode};
 use std::time::SystemTime;
@@ -91,8 +91,8 @@ fn run_circuit<
 }
 
 fn main() {
-    let circ = AesNonExpanded::new();
+    let circ = Aes128::new();
     run_circuit(&circ, vec![0; 128], vec![0; 128]);
-    let circ = Sha256CompressionFunctionFixedIV::new();
-    run_circuit(&circ, vec![0; 512], vec![]);
+    let circ = Sha256CompressionFunction::new();
+    run_circuit(&circ, vec![0; 512], vec![0; 256]);
 }

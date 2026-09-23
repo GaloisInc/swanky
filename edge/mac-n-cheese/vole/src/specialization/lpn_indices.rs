@@ -229,7 +229,7 @@ pub(super) fn matrix_entries_vectorized(rng: &mut AesRng) -> [U16x16; 4] {
     // These indices are supposed to be uniform mod 2^16. We can get that distribution for free by
     // just using u16 values.
     loop {
-        let raw = rng.random_bits_custom_size::<5>();
+        let raw = rng.random_u8x16s_custom_size::<5>();
         // We need to start by turning these 5 U8x16 values (which we'll be intrpreting as U16x8)
         // into U16x16 values, shuffled so that no two arrays share the same values (except in their
         // upper 2 values).

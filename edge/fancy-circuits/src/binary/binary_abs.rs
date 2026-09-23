@@ -3,7 +3,7 @@ use crate::{
     binary::{BinaryMultiplex, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -18,7 +18,7 @@ impl<'a> BinaryAbs<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryAbs<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryAbs<'a>
 where
     F::Item: 'a,
 {

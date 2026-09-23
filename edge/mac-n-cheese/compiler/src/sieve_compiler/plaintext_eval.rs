@@ -1,8 +1,8 @@
 use std::{path::PathBuf, sync::Arc, time::Instant};
 
-use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 use mac_n_cheese_wire_map::WireMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
+use swanky_sieve_ir_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 
 use crate::sieve_compiler::{
     circuit_ir::{CircuitChunk, CounterInfo, Instruction, Permissiveness, WireRange},

@@ -26,7 +26,7 @@ pub struct PsiGarbler<RNG, B> {
 
 impl<RNG, B> PsiGarbler<RNG, B>
 where
-    RNG: Rng + CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
 {
     /// Creates a PsiGarbler from a dedicated channel and rng
     pub fn new(channel: &mut Channel, seed: RNG::Seed) -> swanky_error::Result<Self>
@@ -46,7 +46,7 @@ impl<RNG, B> SemiHonest for PsiGarbler<RNG, B> {}
 
 impl<RNG, B> CircuitPsi for PsiGarbler<RNG, B>
 where
-    RNG: Rng + CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     B: BasePsi,
 {
     /// Computes the Circuit PSI on the garbler's inputs.

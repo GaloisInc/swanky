@@ -1,5 +1,4 @@
 use mac_n_cheese_ir::compilation_format::FieldMacType;
-use mac_n_cheese_sieve_parser::Number;
 use mac_n_cheese_wire_map::WireMap;
 
 use std::ops::{Deref, DerefMut, Index};
@@ -11,6 +10,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_field_f61p::F61p;
 use swanky_field_ff_primes::F128p;
+use swanky_sieve_ir_parser::Number;
 
 pub trait ValueParseableFiniteField: FiniteField {
     fn parse_sieve_value(v: &Number) -> swanky_error::Result<Self>;

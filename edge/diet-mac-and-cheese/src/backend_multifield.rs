@@ -30,8 +30,6 @@ use crate::{
 };
 use generic_array::typenum::Unsigned;
 use log::{debug, info, warn};
-use mac_n_cheese_sieve_parser::text_parser::RelationReader;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use rand::SeedableRng;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
@@ -51,6 +49,8 @@ use swanky_party::{
     ty_eq::{EqualityProposition, Witness},
 };
 use swanky_rng::SwankyRng;
+use swanky_sieve_ir_parser::text_parser::RelationReader;
+use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 use swanky_svole_wykw::LpnParams;
 
 // This file implements IR0+ support for diet-mac-n-cheese and is broken up into the following components:
@@ -2663,7 +2663,6 @@ pub(crate) mod tests {
         circuit_ir::{CircInputs, FunStore, FuncDecl, GateM, WireId, WireRange},
         fields::{F384P_MODULUS, F384Q_MODULUS},
     };
-    use mac_n_cheese_sieve_parser::Number;
     use rand::SeedableRng;
     use std::env;
     use std::net::TcpStream;
@@ -2680,6 +2679,7 @@ pub(crate) mod tests {
     use swanky_field_f61p::F61p;
     use swanky_field_ff_primes::{F384p, F384q, Secp256k1, Secp256k1order};
     use swanky_rng::SwankyRng;
+    use swanky_sieve_ir_parser::Number;
 
     pub(crate) const FF0: u8 = 0;
     const FF1: u8 = 1;

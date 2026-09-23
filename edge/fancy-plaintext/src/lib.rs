@@ -2,12 +2,13 @@
 #![deny(missing_docs)]
 
 use fancy_traits::{
-    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus,
-    is_binary,
+    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, HasModulus, is_binary,
 };
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
+use swanky_field_binary::F2;
 
 /// Plaintext implementation of [`Fancy`].
 pub struct Dummy;
@@ -48,12 +49,12 @@ impl DummyVal {
     }
 
     /// Generate a random boolean [`DummyVal`].
-    pub fn rand_bool<RNG: CryptoRng + Rng>(rng: &mut RNG) -> Self {
+    pub fn rand_bool<RNG: CryptoRng>(rng: &mut RNG) -> Self {
         Self::rand(2, rng)
     }
 
     /// Generate a random [`DummyVal`].
-    pub fn rand<RNG: CryptoRng + Rng>(modulus: u16, rng: &mut RNG) -> Self {
+    pub fn rand<RNG: CryptoRng>(modulus: u16, rng: &mut RNG) -> Self {
         Self::new(rng.random::<u16>(), modulus)
     }
 }
@@ -139,34 +140,22 @@ impl FancyArithmetic for Dummy {
     }
 }
 
-impl FancyProj for Dummy {
-    fn proj(
-        &mut self,
-        x: &DummyVal,
-        modulus: u16,
-        tt: Option<Vec<u16>>,
-        _: &mut Channel,
-    ) -> swanky_error::Result<DummyVal> {
-        assert!(tt.is_some(), "`tt` must not be `None`");
-        let tt = tt.unwrap();
-        assert!(
-            tt.len() >= x.modulus() as usize,
-            "`tt` not large enough for `x`s modulus"
-        );
-        assert!(
-            tt.iter().all(|&x| x < modulus),
-            "`tt` value larger than `q`"
-        );
-        let val = tt[x.val as usize];
+impl Fancy for Dummy {
+    type Item = DummyVal;
+}
+
+impl FancyConstant for Dummy {
+    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> Result<DummyVal> {
         Ok(DummyVal { val, modulus })
     }
 }
 
-impl Fancy for Dummy {
-    type Item = DummyVal;
-
-    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> Result<DummyVal> {
-        Ok(DummyVal { val, modulus })
+impl FancyBinaryConstant for Dummy {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        DummyVal {
+            val: x.into(),
+            modulus: 2,
+        }
     }
 }
 

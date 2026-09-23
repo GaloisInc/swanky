@@ -15,7 +15,6 @@ use crate::{
     plugins::{Plugin, PluginExecution, PluginType, RamArithV0, RamArithV1, RamBoolV0, RamBoolV1},
 };
 use log::debug;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
@@ -23,6 +22,7 @@ use std::{
 };
 use swanky_error::{ErrorKind, Result, bail, ensure, swanky_error};
 use swanky_field::FiniteField;
+use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
 /// A SIEVE IR wire identifier.
 ///
@@ -243,11 +243,11 @@ impl TypeStore {
     }
 }
 
-impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
+impl TryFrom<Vec<swanky_sieve_ir_parser::Type>> for TypeStore {
     type Error = swanky_error::Error;
 
     fn try_from(
-        types: Vec<mac_n_cheese_sieve_parser::Type>,
+        types: Vec<swanky_sieve_ir_parser::Type>,
     ) -> std::result::Result<Self, Self::Error> {
         debug!("Converting Circuit IR types to `TypeStore`");
         ensure!(
@@ -259,10 +259,10 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
         let mut store = TypeStore::default();
         for (i, ty) in types.into_iter().enumerate() {
             let spec = match ty {
-                mac_n_cheese_sieve_parser::Type::Field { modulus } => {
+                swanky_sieve_ir_parser::Type::Field { modulus } => {
                     TypeSpecification::Field(modulus_to_type_id(modulus)?)
                 }
-                mac_n_cheese_sieve_parser::Type::ExtField {
+                swanky_sieve_ir_parser::Type::ExtField {
                     index,
                     degree,
                     modulus,
@@ -284,13 +284,13 @@ impl TryFrom<Vec<mac_n_cheese_sieve_parser::Type>> for TypeStore {
                         modulus,
                     )?)
                 }
-                mac_n_cheese_sieve_parser::Type::Ring { .. } => {
+                swanky_sieve_ir_parser::Type::Ring { .. } => {
                     bail!(
                         ErrorKind::UnsupportedError,
                         "Rings not supported in Diet Mac'n'Cheese."
                     )
                 }
-                mac_n_cheese_sieve_parser::Type::PluginType(ty) => {
+                swanky_sieve_ir_parser::Type::PluginType(ty) => {
                     TypeSpecification::Plugin(PluginType::from(ty))
                 }
             };

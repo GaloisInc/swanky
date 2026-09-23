@@ -11,6 +11,7 @@ use swanky_error::Result;
 mod circuit;
 pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;
+use swanky_field_binary::F2;
 pub use zk::FancyZeroKnowledge;
 
 /// An object that has a modulus.
@@ -22,20 +23,29 @@ pub trait HasModulus {
 /// The `Fancy` trait is the core trait for writing circuits.
 ///
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
-/// underlying wire representation, alongside a [`Fancy::constant`] method for
-/// creating constant (public) wires.
+/// underlying wire representation.
 ///
-/// This trait can be further extended to support binary, arithmetic, and/or
-/// projections by using the [`FancyBinary`], [`FancyArithmetic`], or
-/// [`FancyProj`] extension traits, respectively. The [`FancyEncode`] trait
-/// allows for encoding values into wires, and the [`FancyOutput`] trait allows
-/// for converting wires into their underlying plaintext representation.
+/// This trait can be further extended to support binary or arithmetic by using
+/// the [`FancyBinary`] or [`FancyArithmetic`] extension traits, respectively.
+/// The [`FancyEncode`] trait allows for encoding values into wires, and the
+/// [`FancyOutput`] trait allows for converting wires into their underlying
+/// plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
-    type Item: Clone + HasModulus + core::fmt::Debug + core::default::Default;
+    type Item: Clone + core::fmt::Debug + Default;
+}
 
-    /// Encode a constant `x` with modulus `q`.
+/// Extension trait for [`Fancy`] that provides the ability to encode public constants.
+pub trait FancyConstant: Fancy {
+    /// Encode a constant value `x % q`.
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
+}
+
+/// Extension trait for [`Fancy`] that provides the ability to encode public
+/// constants, optimized for the binary setting.
+pub trait FancyBinaryConstant: Fancy {
+    /// Encode a binary constant value.
+    fn constant(&mut self, x: F2) -> Self::Item;
 }
 
 /// Extension trait for [`Fancy`] that provides encoding and receiving operations.
@@ -124,32 +134,6 @@ pub trait FancyArithmetic: Fancy {
 
     /// Multiply `x` and `y`.
     fn mul(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item>;
-}
-
-/// Extension trait for [`Fancy`] that provides a projection gate, alongside
-/// methods that utilize projection gates.
-///
-/// # Security Warning
-/// In its current form, using projection gates in arithmetic garbling is
-/// **insecure**.
-pub trait FancyProj: Fancy {
-    /// Project `x` according to the truth table `tt`. Resulting wire has
-    /// modulus `q`.
-    ///
-    /// Optional `tt` is useful for hiding the gate from the evaluator.
-    ///
-    /// # Panics
-    /// This may panic in certain implementations if `tt` is `None` when it
-    /// should be `Some`. In addition, it may panic if `tt` is improperly
-    /// formed: either the length of `tt` is smaller than `x`s modulus, or the
-    /// values in `tt` are larger than `q`.
-    fn proj(
-        &mut self,
-        x: &Self::Item,
-        q: u16,
-        tt: Option<Vec<u16>>,
-        channel: &mut Channel,
-    ) -> Result<Self::Item>;
 }
 
 /// Utility macro for asserting that a wire is binary (i.e., has modulus two).

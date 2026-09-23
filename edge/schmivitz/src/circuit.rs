@@ -6,11 +6,8 @@
 */
 use crate::parameters::FIELD_SIZE;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
-use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyEncode, FancyZeroKnowledge};
-use mac_n_cheese_sieve_parser::{
-    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
-    TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
-    text_parser::RelationReader, text_parser::ValueStreamReader,
+use fancy_traits::{
+    Circuit as FancyCircuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge,
 };
 use std::{
     cmp::max,
@@ -23,6 +20,11 @@ use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::PrimeFiniteField;
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::{CircuitExecuter, FieldBackend};
+use swanky_sieve_ir_parser::{
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, RelationVisitor, Type, TypeId,
+    TypedWireRange, ValueStreamKind, ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
+    text_parser::RelationReader, text_parser::ValueStreamReader,
+};
 use tempfile::tempdir;
 
 /// Gates
@@ -274,8 +276,8 @@ impl RelationVisitor for CircuitIngestor {
     fn define_function<BodyCb>(
         &mut self,
         _name: Identifier,
-        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
+        _outputs: &[swanky_sieve_ir_parser::TypedCount],
+        _inputs: &[swanky_sieve_ir_parser::TypedCount],
         _body: BodyCb,
     ) -> swanky_error::Result<()>
     where
@@ -290,9 +292,9 @@ impl RelationVisitor for CircuitIngestor {
     fn define_plugin_function(
         &mut self,
         _name: Identifier,
-        _outputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _inputs: &[mac_n_cheese_sieve_parser::TypedCount],
-        _body: mac_n_cheese_sieve_parser::PluginBinding,
+        _outputs: &[swanky_sieve_ir_parser::TypedCount],
+        _inputs: &[swanky_sieve_ir_parser::TypedCount],
+        _body: swanky_sieve_ir_parser::PluginBinding,
     ) -> swanky_error::Result<()> {
         bail!(
             ErrorKind::UnsupportedError,
@@ -390,7 +392,7 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
+impl<'a, F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
     for CircuitInterpreter<'a>
 {
     type Input = ();
@@ -440,7 +442,7 @@ impl<'a, F: FancyBinary + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
 
                     let left = memory.get(left);
                     let right = F2::from_number(right)?;
-                    let right = backend.constant(right.into(), 2, channel)?;
+                    let right = backend.constant(right);
 
                     let res = backend.xor(&left, &right);
 
@@ -592,8 +594,8 @@ impl<F: Default + Clone> CircuitMemory<F> {
 
 #[cfg(test)]
 mod tests {
-    use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use std::io::Cursor;
+    use swanky_sieve_ir_parser::text_parser::RelationReader;
 
     #[test]
     fn header_cannot_include_plugins() {

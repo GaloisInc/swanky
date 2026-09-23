@@ -7,7 +7,6 @@ use std::time::Instant;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind as SwankyErrorKind, swanky_error};
 use swanky_garbled_nn::NeuralNet;
-use swanky_garbled_nn::{Accuracy, bitwidths_to_moduli};
 
 /// Garbled Neural Net Experiment Launcher
 ///
@@ -25,24 +24,12 @@ struct Cli {
     /// replicated).
     #[arg(short = 'w', long, default_value = "15", value_delimiter=',', value_terminator=" ", num_args = 1..)]
     bitwidth: Vec<usize>,
-    /// Run in boolean mode.
-    #[arg(short = 'b', long, default_value_t = false)]
-    boolean: bool,
     /// Use secret weights.
     #[arg(short = 's', long, default_value_t = false)]
     secret: bool,
     /// Number of tests to run.
     #[arg(short = 'n', long)]
     ntests: Option<usize>,
-    /// Accuracy of ReLU.
-    #[arg(long = "relu", default_value = "100%")]
-    relu_accuracy: String,
-    /// Accuracy of sign.
-    #[arg(long = "sign", default_value = "100%")]
-    sign_accuracy: String,
-    /// Accuracy of max.
-    #[arg(long = "max", default_value = "100%")]
-    max_accuracy: String,
     #[command(subcommand)]
     command: Commands,
 }
@@ -70,12 +57,6 @@ pub fn main() -> swanky_error::Result<()> {
     let dir = cli.dir;
     let ntests = cli.ntests;
     let mut bitwidth = cli.bitwidth;
-
-    let accuracy = &Accuracy {
-        relu: cli.relu_accuracy,
-        sign: cli.sign_accuracy,
-        max: cli.max_accuracy,
-    };
 
     let nn = NeuralNet::from_dir(&dir)?;
     println!("{nn:?}");
@@ -123,30 +104,16 @@ pub fn main() -> swanky_error::Result<()> {
         Commands::Dummy => {
             Channel::with(std::io::empty(), |channel| {
                 let mut dummy = Dummy::new();
-                if cli.boolean {
-                    nn.boolean_accuracy_test::<DummyVal, Dummy>(
-                        &mut dummy, &tests, &labels, &bitwidth, cli.secret, channel,
-                    )?;
-                } else {
-                    nn.arith_accuracy_test::<DummyVal, Dummy>(
-                        &mut dummy, &tests, &labels, &bitwidth, cli.secret, accuracy, channel,
-                    )?;
-                }
+                nn.boolean_accuracy_test::<DummyVal, Dummy>(
+                    &mut dummy, &tests, &labels, &bitwidth, cli.secret, channel,
+                )?;
                 Ok(())
             })
             .map_err(|e| swanky_error!(SwankyErrorKind::OtherError, "Accuracy test failed: {e}"))?;
         }
         Commands::Bench { niters } => {
-            bench(
-                &nn,
-                &tests,
-                &bitwidth,
-                *niters,
-                cli.secret,
-                cli.boolean,
-                accuracy,
-            )
-            .map_err(|e| swanky_error!(SwankyErrorKind::OtherError, "Benchmark failed: {e}"))?;
+            bench(&nn, &tests, &bitwidth, *niters, cli.secret)
+                .map_err(|e| swanky_error!(SwankyErrorKind::OtherError, "Benchmark failed: {e}"))?;
         }
     }
     Ok(())
@@ -159,42 +126,17 @@ pub fn bench(
     bitwidth: &[usize],
     niters: usize,
     secret_weights: bool,
-    binary: bool,
-    accuracy: &Accuracy,
 ) -> swanky_error::Result<()> {
-    let moduli = bitwidths_to_moduli(bitwidth);
-
-    if binary {
-        nn.analyze_binary(bitwidth, secret_weights).map_err(|e| {
-            swanky_error!(SwankyErrorKind::OtherError, "Binary informer failed: {e}")
-        })?;
-    } else {
-        nn.analyze_arith(&moduli, secret_weights, accuracy)
-            .map_err(|e| {
-                swanky_error!(
-                    SwankyErrorKind::OtherError,
-                    "Arithmetic informer failed: {e}"
-                )
-            })?;
-    }
+    nn.analyze_binary(bitwidth, secret_weights)
+        .map_err(|e| swanky_error!(SwankyErrorKind::OtherError, "Binary informer failed: {e}"))?;
 
     let total_time = Instant::now();
 
     for _ in 0..niters {
-        if binary {
-            nn.eval_roundtrip_binary(&inputs[0], bitwidth, secret_weights)
-                .map_err(|e| {
-                    swanky_error!(SwankyErrorKind::OtherError, "Binary evaluation failed: {e}")
-                })?;
-        } else {
-            nn.eval_roundtrip_arith(&inputs[0], &moduli, secret_weights, accuracy)
-                .map_err(|e| {
-                    swanky_error!(
-                        SwankyErrorKind::OtherError,
-                        "Arithmetic evaluation failed: {e}"
-                    )
-                })?;
-        }
+        nn.eval_roundtrip_binary(&inputs[0], bitwidth, secret_weights)
+            .map_err(|e| {
+                swanky_error!(SwankyErrorKind::OtherError, "Binary evaluation failed: {e}")
+            })?;
     }
 
     println!(

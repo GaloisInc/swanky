@@ -1,8 +1,8 @@
 import subprocess
 from typing import Annotated
 
-import click
 import rich
+import rich_click as click
 
 from etc import ROOT
 

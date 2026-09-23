@@ -1,72 +1,36 @@
 use crate::{BinaryBundle, util::u128_to_bits};
-use fancy_traits::{Circuit, Fancy};
+use fancy_traits::{Circuit, Fancy, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Binary constant.
 ///
 /// For `(value, nbits)`, return a [`BinaryBundle`] containing `value` in its
 /// bit representation.
-pub struct BinaryConstant<F: Fancy> {
+pub struct BinaryConstant {
     value: u128,
     nbits: usize,
-    zero: Option<F::Item>,
-    one: Option<F::Item>,
 }
 
-impl<F: Fancy> BinaryConstant<F> {
+impl BinaryConstant {
     /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`.
     pub fn new(value: u128, nbits: usize) -> Self {
-        Self::new_with_constants(value, nbits, None, None)
-    }
-
-    /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`, using the
-    /// provided zero and one constants.
-    pub fn new_with_constants(
-        value: u128,
-        nbits: usize,
-        zero: Option<F::Item>,
-        one: Option<F::Item>,
-    ) -> Self {
-        Self {
-            value,
-            nbits,
-            zero,
-            one,
-        }
+        Self { value, nbits }
     }
 }
 
-impl<F: Fancy> Circuit<F> for BinaryConstant<F> {
+impl<F: FancyBinaryConstant> Circuit<F> for BinaryConstant {
     type Input = ();
     type Output = BinaryBundle<F::Item>;
 
-    fn execute(
-        &self,
-        backend: &mut F,
-        _: Self::Input,
-        channel: &mut Channel,
-    ) -> Result<Self::Output> {
+    fn execute(&self, backend: &mut F, _: Self::Input, _: &mut Channel) -> Result<Self::Output> {
         let xs = u128_to_bits(self.value, self.nbits);
-        xs.into_iter()
-            .map(|x| match x != 0 {
-                true => {
-                    if let Some(one) = &self.one {
-                        Ok(one.clone())
-                    } else {
-                        backend.constant(1, 2, channel)
-                    }
-                }
-                false => {
-                    if let Some(zero) = &self.zero {
-                        Ok(zero.clone())
-                    } else {
-                        backend.constant(0, 2, channel)
-                    }
-                }
-            })
-            .collect::<Result<_>>()
-            .map(BinaryBundle::new)
+        Ok(BinaryBundle::new(
+            xs.into_iter()
+                .map(|x| backend.constant(F2::from(x != 0)))
+                .collect::<Vec<_>>(),
+        ))
     }
 }
 
@@ -76,9 +40,9 @@ pub mod test {
 
     /// Circuit for testing [`BinaryConstant`].
     pub struct TestBinaryConstant(pub u128, pub usize);
-    impl<F: Fancy> Circuit<F> for TestBinaryConstant {
-        type Input = <BinaryConstant<F> as Circuit<F>>::Input;
-        type Output = <BinaryConstant<F> as Circuit<F>>::Output;
+    impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
+        type Input = <BinaryConstant as Circuit<F>>::Input;
+        type Output = <BinaryConstant as Circuit<F>>::Output;
 
         fn execute(
             &self,
@@ -90,7 +54,7 @@ pub mod test {
         }
     }
 
-    impl<F: Fancy> CircuitInputMapper<F> for TestBinaryConstant {
+    impl<F: FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryConstant {
         fn map(&self, inputs: Vec<<F as Fancy>::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }

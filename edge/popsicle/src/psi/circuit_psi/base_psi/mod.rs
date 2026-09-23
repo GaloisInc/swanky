@@ -35,7 +35,7 @@ pub trait BasePsi {
     ) -> swanky_error::Result<Self>
     where
         Self: Sized,
-        RNG: Rng + CryptoRng + SeedableRng;
+        RNG: CryptoRng + SeedableRng;
     /// Parties locally hash their inputs
     ///
     /// This allows them to agree on an ordering of their inputs.
@@ -47,7 +47,7 @@ pub trait BasePsi {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng;
+        RNG: CryptoRng + SeedableRng;
     /// Parties call an OPPRF on their inputs
     ///
     /// This allows them to agree on a hidden representation of
@@ -61,7 +61,7 @@ pub trait BasePsi {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: Rng + CryptoRng + SeedableRng;
+        RNG: CryptoRng + SeedableRng;
     /// Parties turn their inputs into garbled wires
     fn encode_circuit_inputs<F>(
         &mut self,
@@ -82,7 +82,7 @@ pub trait BasePsi {
     where
         Self: Sized,
         F: FancyEncode,
-        RNG: Rng + CryptoRng + SeedableRng,
+        RNG: CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();
 

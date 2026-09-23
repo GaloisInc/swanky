@@ -1,6 +1,5 @@
 use popsicle::psz::{Receiver, Sender};
 use std::time::SystemTime;
-use swanky_channel_legacy::track_unix_channel_pair;
 use swanky_rng::SwankyRng;
 
 const NBYTES: usize = 16;
@@ -16,61 +15,44 @@ fn rand_vec_vec(ninputs: usize, nbytes: usize) -> Vec<Vec<u8>> {
 }
 
 fn psz_payload(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) {
-    let (mut tx, mut rx) = track_unix_channel_pair();
     let total = SystemTime::now();
-    std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
+    swanky_channel::local::local_channel_pair(
+        |channel| {
+            let mut rng = SwankyRng::new();
 
-        let start = SystemTime::now();
-        let mut sender = Sender::init(&mut tx, &mut rng).unwrap();
-        println!(
-            "Sender :: init time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
-        sender.send_payloads(&inputs1, &mut tx, &mut rng).unwrap();
-        println!(
-            "Sender :: send time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        println!(
-            "Sender :: communication (read): {:.2} Mb",
-            tx.kilobits_read() / 1000.0
-        );
-        println!(
-            "Sender :: communication (write): {:.2} Mb",
-            tx.kilobits_written() / 1000.0
-        );
-    });
+            let start = SystemTime::now();
+            let mut sender = Sender::init(channel, &mut rng)?;
+            println!(
+                "Sender :: init time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            sender.send_payloads(&inputs1, channel, &mut rng)?;
+            println!(
+                "Sender :: send time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            Ok(())
+        },
+        |channel| {
+            let mut rng = SwankyRng::new();
 
-    let mut rng = SwankyRng::new();
-
-    let start = SystemTime::now();
-    let mut receiver = Receiver::init(&mut rx, &mut rng).unwrap();
-    println!(
-        "Receiver :: init time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    let start = SystemTime::now();
-    let _intersection = receiver
-        .receive_payloads(&inputs2, &mut rx, &mut rng)
-        .unwrap();
-    println!(
-        "Receiver :: receive time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    println!(
-        "Receiver :: communication (read): {:.2} Mb",
-        rx.kilobits_read() / 1000.0
-    );
-    println!(
-        "Receiver :: communication (write): {:.2} Mb",
-        rx.kilobits_written() / 1000.0
-    );
-    println!(
-        "Total communication: {:.2} Mb",
-        (rx.kilobits_written() + rx.kilobits_read()) / 1000.0
-    );
+            let start = SystemTime::now();
+            let mut receiver = Receiver::init(channel, &mut rng)?;
+            println!(
+                "Receiver :: init time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            let _ = receiver.receive_payloads(&inputs2, channel, &mut rng)?;
+            println!(
+                "Receiver :: receive time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            Ok(())
+        },
+    )
+    .unwrap();
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 

@@ -1,7 +1,7 @@
 use super::supported_fields::FieldIndexedArray;
 
-use mac_n_cheese_sieve_parser::{RelationReader, ValueStreamReader};
 use mac_n_cheese_wire_map::WireId;
+use swanky_sieve_ir_parser::{RelationReader, ValueStreamReader};
 
 use std::{
     fmt::Debug,

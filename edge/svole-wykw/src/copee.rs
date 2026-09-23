@@ -2,15 +2,16 @@
 //! <https://eprint.iacr.org/2020/925>, Figure 15).
 
 use super::utils::Powers;
-use generic_array::{GenericArray, typenum::Unsigned};
-use rand::{CryptoRng, Rng};
+use generic_array::{GenericArray, functional::FunctionalSequence, typenum::Unsigned};
+use rand::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 use swanky_adversary::Malicious;
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
-use swanky_ocelot_error::Error;
+use swanky_field_binary::F2;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{RandomReceiver as ROTReceiver, RandomSender as ROTSender};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
@@ -27,7 +28,7 @@ pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
 pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
-    choices: GenericArray<bool, FE::NumberOfBitsInBitDecomposition>,
+    choices: GenericArray<F2, FE::NumberOfBitsInBitDecomposition>,
     aes_objs: Vec<Aes128EncryptOnly>,
     pows: Powers<FE>,
     twos: Vec<FE>,
@@ -45,11 +46,11 @@ fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: Block) -> FE::PrimeField {
 }
 
 impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut ot = ROT::init(channel, &mut rng)?;
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let r = Degree::<FE>::USIZE;
@@ -84,7 +85,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         &mut self,
         channel: &mut C,
         input: &FE::PrimeField,
-    ) -> Result<FE, Error> {
+    ) -> Result<FE> {
         let pt = Block::from(self.counter as u128);
         let mut w = FE::ZERO;
         for (i, pow) in self.pows.get().iter().enumerate() {
@@ -94,7 +95,9 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 sum += w0 * *two;
-                channel.write_serializable(&(w0 - w1 - *input))?;
+                channel
+                    .write_serializable(&(w0 - w1 - *input))
+                    .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
             }
             w += sum * *pow;
         }
@@ -104,15 +107,15 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
 }
 
 impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
-    pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
         delta: FE,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let mut ot = ROT::init(channel, &mut rng)?;
-        let choices = delta.bit_decomposition();
+        let choices = delta.bit_decomposition().map(|b| b.into());
         let mut acc = FE::ONE;
         let two = FE::ONE + FE::ONE;
         let mut twos = vec![FE::ZERO; nbits];
@@ -136,11 +139,11 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
             counter: 0,
         })
     }
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         mut rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let delta = FE::random(&mut rng);
         Self::init_with_picked_delta(channel, pows, rng, delta)
     }
@@ -149,15 +152,17 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
         self.delta
     }
 
-    pub(super) fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE, Error> {
+    pub(super) fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE> {
         let pt = Block::from(self.counter as u128);
         let mut res = FE::ZERO;
         for (j, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let w = prf::<FE>(&self.aes_objs[j * self.nbits + k], pt);
-                let mut tau = channel.read_serializable::<FE::PrimeField>()?;
-                let choice = Choice::from(self.choices[j + k] as u8);
+                let mut tau = channel
+                    .read_serializable::<FE::PrimeField>()
+                    .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
+                let choice = Choice::from(u8::from(self.choices[j + k]));
                 tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
                 sum += v * *two;

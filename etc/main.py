@@ -4,7 +4,7 @@ import subprocess
 from hashlib import sha256
 from pathlib import Path
 
-import click
+import rich_click as click
 
 from etc import NIX_CACHE_KEY, ROOT
 

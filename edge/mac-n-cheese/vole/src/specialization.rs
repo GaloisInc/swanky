@@ -241,7 +241,7 @@ where
                 #[inline(always)]
                 |(a, b)| U64x2::from([FE::peel(a), FE::peel(b)]),
             );
-            let random_bits: [U8x16; 4] = rng_chi.random_bits_custom_size();
+            let random_bits: [U8x16; 4] = rng_chi.random_u8x16s_custom_size();
             let random_field_elements: [U64x2; 4] = random_bits.array_map(
                 #[inline(always)]
                 |bits| U64x2::from(bits) & mask,
@@ -287,7 +287,7 @@ where
                 #[inline(always)]
                 |(a, b)| U64x2::from([a, b]),
             );
-            let random_bits: [U8x16; 4] = rng_chi.random_bits_custom_size();
+            let random_bits: [U8x16; 4] = rng_chi.random_u8x16s_custom_size();
             let random_field_elements: [U64x2; 4] = random_bits.array_map(
                 #[inline(always)]
                 |bits| U64x2::from(bits) & mask,

@@ -1,10 +1,7 @@
 use super::crypto_primitives::CHALL1_LENGTH;
-use super::functionality::{VoleVerifier, decommit};
 use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
-use crate::vole::functionality::{
-    PartialDecommitment, VoleProver, create_vole_prover, create_vole_verifier,
-};
+use crate::vole::functionality::{PartialDecommitment, VoleProver, VoleVerifier};
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::{ErrorKind, Result, bail};
@@ -28,7 +25,7 @@ impl RandomVoleP for VoleProver {
         let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
-        let vole = create_vole_prover(&statement_sig, secret, extended_witness_length);
+        let vole = VoleProver::create(&statement_sig, secret, extended_witness_length);
         let chall = vole.chall1;
 
         // Part of line 13.
@@ -82,7 +79,7 @@ impl RandomVoleP for VoleProver {
     }
 
     fn decommit(self, challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
-        decommit(self, challenge)
+        self.decommit(challenge)
     }
 }
 
@@ -97,7 +94,7 @@ impl RandomVoleV for VoleVerifier {
         let mut statement_sig = [0u8; SECURITY_PARAM];
         transcript.challenge_bytes(b"statement signature", &mut statement_sig);
 
-        let verifier = create_vole_verifier(&statement_sig, decom, chall3);
+        let verifier = VoleVerifier::create(&statement_sig, decom, chall3);
         assert_eq!(verifier.q.len(), verifier.l + SECURITY_PARAM);
 
         transcript.append_message(b"u_tilda", &verifier.u_tilda().as_bytes());

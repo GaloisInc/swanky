@@ -18,6 +18,7 @@ have a lesser stability guarantee.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
 - **`swanky-error`**: A common error type for Swanky.
 - **`swanky-party`**: Support for types indexed by a party.
+- **`swanky-rng`**: Pseudorandom number generators for use in Swanky.
 - **`swanky-serialization`**: Traits and utilities for compact serialization into a canonical byte representation
 - **`vectoreyes`**: Cross-platform SIMD types and functions
 
@@ -36,7 +37,6 @@ have a lesser stability guarantee.
 - **`mac-n-cheese-inspector`**: A tool to inspect mac n'cheese IR files
 - **`mac-n-cheese-ir`**: The definition of the mac n'cheese IR
 - **`mac-n-cheese-runner`**: A tool to proof mac n'cheese IR files in zero-knowledge
-- **`mac-n-cheese-sieve-parser`**: A parser for SIEVE IR (a zero knowledge proof circuit format)
 - **`mac-n-cheese-vole`**: An implementation of Vector Oblivious Linear Evaluation
 - **`mac-n-cheese-wire-map`**: An implementation of a sparse array
 - **`popsicle`**: A library for private set intersection
@@ -46,11 +46,9 @@ have a lesser stability guarantee.
 - **`swanky-authenticated-garbling`**: Authenticated malicious garbling in the presence of a malicious garbler and evaluator
 - **`swanky-bit-matrix-transpose`**: Transpose a bit matrix
 - **`swanky-block`**: 128-, 256-, and  512-bit data blocks.
-- **`swanky-bytearray-utils`**: Functions for working with bits and bytearrays.
 - **`swanky-channel-legacy`**: A (legacy) channel abstraction; use `swanky-channel` for new code!
 - **`swanky-cointoss`**: A simple coin-tossing protocol.
 - **`swanky-cr-hash`**: Correlation-robust hashing.
-- **`swanky-deprecated-bitwise-utils`**: [DEPRECATED] Old bitwise utilities from ocelot
 - **`swanky-f-eq`**: Two-party functionality for checking equality of inputs in an oblivious manner.
 - **`swanky-f-rand`**: Two-party functionality for generating unbiased random values.
 - **`swanky-field`**: Definitions of the core `FiniteField` and `FiniteRing` traits
@@ -62,7 +60,6 @@ have a lesser stability guarantee.
 - **`swanky-flatbuffer-build`**: Tooling to automate compiling flatbuffer schemas
 - **`swanky-garbled-nn`**: Garbled neural networks using `fancy-garbling`
 - **`swanky-malicious-hooks`**: Hooks for testing malicious behavior in various cryptographic protocols.
-- **`swanky-ocelot-error`**: [DEPRECATED] An error type used by crates formerly contained in ocelot
 - **`swanky-oprf-kkrt`**: An implementation of the kkrt OPRF protocol
 - **`swanky-oprf-kmprt`**: An implementation of the KMPRT OPRF protocol
 - **`swanky-oprf-traits`**: Base traits impl-ed by all our OPRF implementations
@@ -73,9 +70,9 @@ have a lesser stability guarantee.
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
-- **`swanky-rng`**: A fast random number generator based on AES-CTR.
 - **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
 - **`swanky-sieve-ir-codegen`**: A library providing macros to statically parse SIEVE IR zero-knowledge circuits.
+- **`swanky-sieve-ir-parser`**: A parser for SIEVE IR (a zero knowledge proof circuit format)
 - **`swanky-svole-wykw`**: An implementation of the WYKW svole protocol
 - **`swanky-twopac`**: Two-party secure computation using garbled circuits.
 - **`web-mac-n-cheese-wasm`**: Web Mac'n'Cheese, the wasm part
@@ -85,8 +82,8 @@ have a lesser stability guarantee.
 
 # A note on security
 
-**2024-02-09** Projection gates in arithmetic garbled circuits have [a proven security vulnerability](https://github.com/defund/ctf/tree/master/dicectf-quals-2024/dicenet/solve) in their design. The issue affects the fancy-garbling library and its dependencies (including popsicle).
-We are currently investigating the impact this bug has on Arithmetic Garbling (CRT) in swanky.
+~~**2024-02-09** Projection gates in arithmetic garbled circuits have [a proven security vulnerability](https://github.com/defund/ctf/tree/master/dicectf-quals-2024/dicenet/solve) in their design.~~
+As of **2026-09-15** projection gates have been removed from `fancy-garbling`.
 
 `swanky` is currently **research** software. Do not deploy it in production, or trust
 it with sensitive data.

@@ -1,6 +1,6 @@
 /*! Cryptographic primitives used for VOLE-it-HEAD */
 use crate::parameters::SECURITY_PARAM;
-use crate::vole::commit_reconstruct::{Corrections, corrections_to_bytes};
+use crate::vole::commit_reconstruct::Corrections;
 use rand::{Rng, SeedableRng, TryRng, rand_core::Infallible};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use shake::Shake128;
@@ -101,6 +101,13 @@ mod tests {
     }
 }
 
+fn hash(bytes: &[u8], domain_seperator: u8, output: &mut [u8]) {
+    let mut hasher = Shake128::default();
+    hasher.update(bytes);
+    hasher.update(&[domain_seperator]);
+    hasher.finalize_xof_into(output);
+}
+
 /// Hash function that generates a [`Seed`] and a [`Com`]mitment from a [`Key`] and an initialization vector [`IV`].
 ///
 /// This function is applied on the leaves keys of the Tree-PRG/GGM-tree to generate the seeds and commitments.
@@ -131,21 +138,27 @@ pub(crate) const H1_LENGTH: usize = (SECURITY_PARAM / 8) * 2;
 pub(crate) struct H1([u8; H1_LENGTH]);
 
 impl H1 {
-    /// Compute the [`H1`] hash from input bytes.
-    pub(crate) fn from_bytes(inp: &[u8]) -> H1 {
+    /// Compute the [`H1`] hash from a slice of bytes.
+    pub(crate) fn hash(bytes: &[u8]) -> H1 {
         let mut out = H1::default();
-
-        let mut hasher = Shake128::default();
-        hasher.update(inp);
-        hasher.update(&[1u8]);
-
-        hasher.finalize_xof_into(&mut out.0);
+        hash(bytes, 1, &mut out.0);
         out
     }
 
-    /// Treat this hash digest as a commitment.
-    pub(crate) fn into_com(self) -> Com {
-        self.0
+    /// Hash a sequence of commitments, returning the resulting hash.
+    ///
+    /// This function is applied to the leaves commitments of the
+    /// Tree-PRG/GGM-tree, and corresponds to the H1 function in the FAEST spec,
+    /// defined on page 16.
+    pub(crate) fn hash_commitments(commitments: &[Com]) -> Self {
+        let bytes = commitments.iter().flat_map(|com| *com).collect::<Vec<_>>();
+        Self::hash(&bytes)
+    }
+}
+
+impl From<H1> for Com {
+    fn from(value: H1) -> Self {
+        value.0
     }
 }
 
@@ -186,7 +199,7 @@ pub(crate) fn h2_chall1(mu: &H1, hcom: &Com, corrections: &Corrections, iv: &IV)
 
     hasher.update(&mu.0);
     hasher.update(hcom);
-    hasher.update(&corrections_to_bytes(corrections));
+    hasher.update(&corrections.to_bytes());
     hasher.update(iv);
 
     let mut out = [0u8; CHALL1_LENGTH];
@@ -240,41 +253,27 @@ pub(crate) fn h2_chall3(chall2: &Chall2, a_tilde: &F128b, b_tilde: &F128b) -> Ch
 pub(crate) struct H3([u8; (SECURITY_PARAM + 128) / 8]);
 
 impl H3 {
-    /// Derive the [`H3`] hash from an input.
+    /// Compute the [`H3`] hash from a slice of bytes.
     #[allow(unused)]
-    pub(crate) fn from_input(inp: &[u8]) -> Self {
-        let mut hasher = Shake128::default();
-        hasher.update(inp);
-
-        // Append 0x3 for domain separation
-        hasher.update(&[3u8]);
-        let mut reader = hasher.finalize_xof();
-
-        let mut out: H3 = Default::default();
-        reader.read(out.as_mut());
+    pub(crate) fn hash(bytes: &[u8]) -> Self {
+        let mut out = H3::default();
+        hash(bytes, 3, &mut out.0);
         out
     }
 
     /// Derive the [`H3`] hash from an instance of `Shake128`, which we assume
     /// has already been updated with all relevant secret information.
     pub(crate) fn from_xof(mut xof: Shake128) -> Self {
+        let mut out = H3::default();
         // Append 0x3 for domain separation
         xof.update(&[3u8]);
-
-        let mut out: H3 = Default::default();
-        xof.finalize_xof_into(out.as_mut());
+        xof.finalize_xof_into(&mut out.0);
         out
     }
 }
 
-impl AsRef<[u8; SECURITY_PARAM / 8 + 128 / 8]> for H3 {
-    fn as_ref(&self) -> &[u8; SECURITY_PARAM / 8 + 128 / 8] {
+impl AsRef<[u8; (SECURITY_PARAM + 128) / 8]> for H3 {
+    fn as_ref(&self) -> &[u8; (SECURITY_PARAM + 128) / 8] {
         &self.0
-    }
-}
-
-impl AsMut<[u8; SECURITY_PARAM / 8 + 128 / 8]> for H3 {
-    fn as_mut(&mut self) -> &mut [u8; SECURITY_PARAM / 8 + 128 / 8] {
-        &mut self.0
     }
 }

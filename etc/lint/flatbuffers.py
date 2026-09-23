@@ -1,5 +1,5 @@
-import click
 import rich
+import rich_click as click
 import toml
 
 from etc import ROOT

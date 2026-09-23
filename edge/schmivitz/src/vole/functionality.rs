@@ -1,14 +1,18 @@
-/*!
-Implement high-level functionality for VOLE protocol.
-*/
+//! Implementation of the core VOLE protocol.
+//!
+//! The implementation is based on v1.1 of the FAEST spec[^1].
+//!
+//! [^1]: <https://faest.info/faest-spec-v1.1.pdf>
 #![allow(clippy::needless_range_loop)]
+use std::time::Instant;
+
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::AsSecretBytes;
 use crate::vole::DecommitmentSerde;
 use crate::vole::all_but_one_vc::{Decom, Pdecom};
 use crate::vole::commit_reconstruct::{B, compute_secret_key, recompose_d};
 use crate::vole::commit_reconstruct::{
-    Commit, Corrections, apply_corrections_to_q, l_hat, vole_commit, vole_open, vole_reconstruct,
+    Corrections, VoleCommitment, apply_corrections_to_q, l_hat, vole_open, vole_reconstruct,
 };
 use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{Chall1, Chall3, Com, H1, H3, IV, Seed, h2_chall1};
@@ -79,100 +83,120 @@ fn bits_to_u8_many(bits: &[F2]) -> Vec<u8> {
 /// Structure of vole created by the functionality on the prover side.
 #[derive(Clone)]
 pub struct VoleProver {
-    /// initial vector
-    pub(crate) iv: IV,
-    /// Decommitment
-    pub(crate) decom: [Decom; REPETITION_PARAM],
-    /// Corrections
-    pub(crate) corrections: Corrections,
-    /// u
+    /// Initialization vector.
+    iv: IV,
+    /// Decommitment for the VOLE commitment.
+    decom: [Decom; REPETITION_PARAM],
+    /// VOLE corrections.
+    corrections: Corrections,
+    /// VOLE `u` values.
     pub(crate) u: Vec<F2>,
-    /// v
+    /// VOLE `v` values.
     pub(crate) v: Vec<F128b>,
-    /// First challenge
+    /// First challenge.
     pub(crate) chall1: Chall1,
-    /// consistency hash of u
+    /// Consistency hash of `u`.
     pub(crate) u_tilda: HashConsistency,
-    /// hash of the consistency hash of V
+    /// Hash of the consistency hash of `V`.
     pub(crate) h_v: H1,
-    /// Size of the extended witness.
-    l: usize,
+    /// Length of the extended witness. Corresponds to `ℓ` in the paper.
+    extended_witness_len: usize,
 }
 
-/// Create VOLEs given a statement signature on the prover side.
-///
-/// Adapted from parts of FAEST.sign from Fig. 8.2
-#[inline(never)]
-pub(crate) fn create_vole_prover<Secret: AsSecretBytes>(
-    statement_sig: &[u8],
-    secret: &Secret,
-    l: usize,
-) -> VoleProver {
-    // line 2
-    let mu: H1 = H1::from_bytes(statement_sig); // Hash the signature of the circuit+instance the prover/verifier agree to execute.
+impl VoleProver {
+    /// Create VOLEs given a statement signature.
+    ///
+    /// Adapted from parts of `FAEST.sign`, Figure 8.2 from the FAEST spec.
+    pub(crate) fn create<Secret: AsSecretBytes>(
+        statement_sig: &[u8],
+        // Corresponds to `sk` in the spec.
+        secret: &Secret,
+        // Corresponds to `ℓ` in the spec.
+        extended_witness_len: usize,
+    ) -> VoleProver {
+        // Line 2: Hash the statement signature.
+        //
+        // The output corresponds to `μ` in the spec.
+        let hash_of_stmt = H1::hash(statement_sig);
 
-    // line 3
-    let (r, iv) = compute_seed_iv(secret, &mu);
+        // Line 3: Compute the seed and IV from the secret and the hash of the
+        // statement.
+        let (seed, iv) = compute_seed_iv(secret, &hash_of_stmt);
 
-    // lines 4-5
-    let t = std::time::Instant::now();
-    let Commit {
-        h_com,
-        decom,
-        corrections,
-        u,
-        v,
-    } = vole_commit(r, iv, l_hat(l));
-    log::info!("vole_commit running time: {:?}", t.elapsed());
+        // Line 5: Commit to the VOLEs.
+        let t = Instant::now();
+        let VoleCommitment {
+            h_com,
+            decom,
+            corrections,
+            u,
+            v,
+        } = VoleCommitment::create(seed, iv, l_hat(extended_witness_len));
+        log::info!("vole_commit running time: {:?}", t.elapsed());
 
-    // lines 6
-    let chall1 = compute_chall_1(&mu, &h_com, &corrections, &iv);
+        // Line 6: Compute first challenge.
+        let t = Instant::now();
+        let chall1 = compute_chall_1(&hash_of_stmt, &h_com, &corrections, &iv);
+        log::info!("compute_chall_1 running time: {:?}", t.elapsed());
 
-    // line 7-8
-    // hash u
-    let t = std::time::Instant::now();
-    let hasher = VoleHasher::from_seed(chall1, l);
-    let u_tilda = hasher.hash(&u);
-    log::info!("vole_hash(u) running time: {:?}", t.elapsed());
+        let t = Instant::now();
+        let hasher = VoleHasher::from_seed(chall1, extended_witness_len);
+        log::info!("VoleHasher::from_seed running time: {:?}", t.elapsed());
 
-    // line 9
-    // hash v column-wise
-    let t = std::time::Instant::now();
-    let mut v_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
-    let tmp = hasher.hash_matrix(&v);
-    for newt in tmp {
-        v_tilda.extend(&newt);
+        // Line 8: Hash `u` --> `u~`.
+        let t = Instant::now();
+        let u_tilda = hasher.hash(&u);
+        log::info!("vole_hash(u) running time: {:?}", t.elapsed());
+
+        // Line 9: Hash `V` column-wise --> `V~`.
+        let t = Instant::now();
+        let v_tilda = hasher.hash_matrix(&v).iter().flatten().collect::<Vec<_>>();
+        assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
+        log::info!("vole_hash(V) running time: {:?}", t.elapsed());
+
+        // Line 10: Hash `V~` in column-major order.
+        let h_v = H1::hash(&bits_to_u8_many(&v_tilda));
+
+        // Line 15: Truncate `u`.
+        let mut u_mut = u;
+        u_mut.truncate(extended_witness_len + SECURITY_PARAM);
+
+        // Line 16 and FAEST.AES.AESProve Line 2.
+        let t = std::time::Instant::now();
+        // NOTE: using `into_par_iter` from rayon here brings a 10x perf improvement on this part.
+        let v_lifted = v
+            .into_par_iter()
+            .take(extended_witness_len + SECURITY_PARAM)
+            .map(|vi| F8b::form_superfield(&vi.into()))
+            .collect();
+        log::info!("v_lifted running time: {:?}", t.elapsed());
+
+        Self {
+            iv,
+            decom,
+            corrections,
+            u: u_mut,
+            v: v_lifted,
+            chall1,
+            u_tilda,
+            h_v,
+            extended_witness_len,
+        }
     }
-    assert_eq!(v_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
-    log::info!("vole_hash(V) running time: {:?}", t.elapsed());
 
-    // line 10
-    let h_v = H1::from_bytes(&bits_to_u8_many(&v_tilda));
+    /// Implements get for the functionality on the prover side
+    pub(crate) fn decommit(self, chall3: &Chall3) -> PartialDecommitment {
+        let t = std::time::Instant::now();
+        let pdecom = vole_open(chall3, &self.decom);
+        log::info!("vole_open running time: {:?}", t.elapsed());
 
-    // Truncate `u` and `v`.
-    let mut u_mut = u;
-    u_mut.truncate(l + SECURITY_PARAM);
-
-    // Line 16 and FAEST.AES.AESProve Line 2.
-    let t = std::time::Instant::now();
-    // NOTE: using `into_par_iter` from rayon here brings a 10x perf improvement on this part.
-    let v_lifted = v
-        .into_par_iter()
-        .take(l + SECURITY_PARAM)
-        .map(|vi| F8b::form_superfield(&vi.into()))
-        .collect();
-    log::info!("v_lifted running time: {:?}", t.elapsed());
-
-    VoleProver {
-        iv,
-        decom,
-        corrections,
-        u: u_mut,
-        v: v_lifted,
-        chall1,
-        u_tilda,
-        h_v,
-        l,
+        PartialDecommitment {
+            pdecom,
+            corrections: self.corrections,
+            iv: self.iv,
+            u_tilda: self.u_tilda,
+            extended_witness_len: self.extended_witness_len,
+        }
     }
 }
 
@@ -181,9 +205,10 @@ pub struct PartialDecommitment {
     pdecom: [Pdecom; REPETITION_PARAM],
     corrections: Corrections,
     iv: IV,
+    /// VOLE hash of `u`.
     u_tilda: HashConsistency,
-    /// Size of extended witness. `ell` in the paper.
-    l: usize,
+    /// Length of the extended witness. `ℓ` in the paper.
+    extended_witness_len: usize,
 }
 
 impl DecommitmentSerde for PartialDecommitment {
@@ -198,21 +223,6 @@ impl DecommitmentSerde for PartialDecommitment {
         let u_tilda_bytes = SECURITY_PARAM + B / 8;
 
         pdecom_bytes + corrections_bytes + iv_bytes + u_tilda_bytes
-    }
-}
-
-/// Implements get for the functionality on the prover side
-pub(crate) fn decommit(vole: VoleProver, chall3: &Chall3) -> PartialDecommitment {
-    let t = std::time::Instant::now();
-    let pdecom = vole_open(chall3, &vole.decom);
-    log::info!("vole_open running time: {:?}", t.elapsed());
-
-    PartialDecommitment {
-        pdecom,
-        corrections: vole.corrections,
-        iv: vole.iv,
-        u_tilda: vole.u_tilda,
-        l: vole.l,
     }
 }
 
@@ -232,90 +242,90 @@ pub struct VoleVerifier {
 }
 
 impl VoleVerifier {
+    /// Create VOLEs given a statement signature and a proof, on the verifier side.
+    ///
+    /// Adapted from parts of FAEST.verify from Fig. 8.2
+    #[inline(never)]
+    pub(crate) fn create(
+        statement_sig: &[u8],
+        decommitment_prover: &PartialDecommitment,
+        chall3: &Chall3,
+    ) -> Self {
+        // line 1
+        let PartialDecommitment {
+            corrections,
+            u_tilda,
+            pdecom,
+            iv,
+            extended_witness_len,
+        } = decommitment_prover;
+
+        // line 2
+        let mu: H1 = H1::hash(statement_sig);
+
+        // lines 3-4
+        let t = std::time::Instant::now();
+        let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(*extended_witness_len));
+        log::info!("vole_reconstruct running time: {:?}", t.elapsed());
+
+        // line 5
+        let chall1 = compute_chall_1(&mu, &h, corrections, iv);
+
+        // lines 6-14
+        let t = std::time::Instant::now();
+        let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*extended_witness_len));
+        log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
+
+        // line 15
+        // hash column-wise Q\tilda + D\tilda
+        let t = std::time::Instant::now();
+        let hasher = VoleHasher::from_seed(chall1, *extended_witness_len);
+        let q_tilda = hasher
+            .hash_matrix(&q_f8arrs)
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
+
+        log::info!("vole_hash(Q) running time: {:?}", t.elapsed());
+
+        // line 11
+        let t = std::time::Instant::now();
+        let big_d = recompose_d(chall3, u_tilda);
+        log::info!("recompose_d running time: {:?}", t.elapsed());
+
+        // line 16
+        let t = std::time::Instant::now();
+        let q_xor_d: Vec<F2> = q_tilda
+            .iter()
+            .zip(big_d.iter())
+            .map(|(a, b)| *a + *b)
+            .collect();
+        log::info!("Q + D running time: {:?}", t.elapsed());
+
+        let h_v = H1::hash(&bits_to_u8_many(&q_xor_d));
+
+        // compute the secret key (AESVerify, line 1)
+        let delta = compute_secret_key(chall3);
+
+        // Truncate the qs (part of line 19)
+        let mut q = q_f8arrs;
+        q.truncate(extended_witness_len + SECURITY_PARAM);
+
+        Self {
+            q,
+            u_tilda: *u_tilda,
+            h_v,
+            delta,
+            l: *extended_witness_len,
+        }
+    }
+
     pub(crate) fn u_tilda(&self) -> &HashConsistency {
         &self.u_tilda
     }
     pub(crate) fn h_v(&self) -> &H1 {
         &self.h_v
-    }
-}
-
-/// Create VOLEs given a statement signature and a proof, on the verifier side.
-///
-/// Adapted from parts of FAEST.verify from Fig. 8.2
-#[inline(never)]
-pub(crate) fn create_vole_verifier(
-    statement_sig: &[u8],
-    decommitment_prover: &PartialDecommitment,
-    chall3: &Chall3,
-) -> VoleVerifier {
-    // line 1
-    let PartialDecommitment {
-        corrections,
-        u_tilda,
-        pdecom,
-        iv,
-        l,
-    } = decommitment_prover;
-
-    // line 2
-    let mu: H1 = H1::from_bytes(statement_sig);
-
-    // lines 3-4
-    let t = std::time::Instant::now();
-    let (h, q) = vole_reconstruct(chall3, pdecom, *iv, l_hat(*l));
-    log::info!("vole_reconstruct running time: {:?}", t.elapsed());
-
-    // line 5
-    let chall1 = compute_chall_1(&mu, &h, corrections, iv);
-
-    // lines 6-14
-    let t = std::time::Instant::now();
-    let q_f8arrs = apply_corrections_to_q(q, chall3, corrections, l_hat(*l));
-    log::info!("apply_corrections_to_q running time: {:?}", t.elapsed());
-
-    // line 15
-    // hash column-wise Q\tilda + D\tilda
-    let t = std::time::Instant::now();
-    let mut q_tilda: Vec<F2> = Vec::with_capacity((SECURITY_PARAM + B) * SECURITY_PARAM);
-    let hasher = VoleHasher::from_seed(chall1, *l);
-    let tmp = hasher.hash_matrix(&q_f8arrs);
-    for newt in tmp {
-        q_tilda.extend(&newt);
-    }
-    assert_eq!(q_tilda.len(), (SECURITY_PARAM + B) * SECURITY_PARAM);
-
-    log::info!("vole_hash(Q) running time: {:?}", t.elapsed());
-
-    // line 11
-    let t = std::time::Instant::now();
-    let big_d = recompose_d(chall3, u_tilda);
-    log::info!("recompose_d running time: {:?}", t.elapsed());
-
-    // line 16
-    let t = std::time::Instant::now();
-    let q_xor_d: Vec<F2> = q_tilda
-        .iter()
-        .zip(big_d.iter())
-        .map(|(a, b)| *a + *b)
-        .collect();
-    log::info!("Q + D running time: {:?}", t.elapsed());
-
-    let h_v = H1::from_bytes(&bits_to_u8_many(&q_xor_d));
-
-    // compute the secret key (AESVerify, line 1)
-    let delta = compute_secret_key(chall3);
-
-    // Truncate the qs (part of line 19)
-    let mut q = q_f8arrs;
-    q.truncate(l + SECURITY_PARAM);
-
-    VoleVerifier {
-        q,
-        u_tilda: *u_tilda,
-        h_v,
-        delta,
-        l: *l,
     }
 }
 
@@ -334,7 +344,7 @@ mod test {
     use std::sync::Once;
 
     use super::{Chall1, Chall2, H1, HashConsistency};
-    use super::{create_vole_prover, create_vole_verifier, decommit, verify};
+    use super::{VoleProver, VoleVerifier, verify};
     use crate::parameters::SECURITY_PARAM;
     use crate::vole::crypto_primitives::CHALL2_LENGTH;
     use crate::vole::functionality::compute_chall_3;
@@ -398,7 +408,7 @@ mod test {
             .collect::<Vec<F2>>();
 
         let t_create_vole_prover = std::time::Instant::now();
-        let vole_prover = create_vole_prover(&statement_sig, &secret, how_many);
+        let vole_prover = VoleProver::create(&statement_sig, &secret, how_many);
         log::info!(
             "1: t_create_vole_prover: {:?}",
             t_create_vole_prover.elapsed()
@@ -422,11 +432,11 @@ mod test {
         log::info!("2: t_copy_challenges: {:?}", t_copy_challenges.elapsed());
 
         let t_decommit_prover = std::time::Instant::now();
-        let decommitment_prover = decommit(vole_prover, &chall3);
+        let decommitment_prover = vole_prover.decommit(&chall3);
         log::info!("3: t_decommit_prover: {:?}", t_decommit_prover.elapsed());
 
         let t_vole_verifier = std::time::Instant::now();
-        let vole_v = create_vole_verifier(&statement_sig, &decommitment_prover, &chall3);
+        let vole_v = VoleVerifier::create(&statement_sig, &decommitment_prover, &chall3);
         log::info!("4: t_vole_verifier: {:?}", t_vole_verifier.elapsed());
 
         assert_eq!(vole_v.q.len(), vole_v.l + SECURITY_PARAM);
