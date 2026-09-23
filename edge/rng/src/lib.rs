@@ -10,9 +10,7 @@
 use rand_core::Infallible;
 
 mod aesrng;
-pub use aesrng::AesRng;
-mod aes256rng;
-pub use aes256rng::Aes256Rng;
+pub use aesrng::{Aes128Rng, Aes128Rng as AesRng, Aes256Rng};
 mod vectorized;
 use rand::{SeedableRng, TryCryptoRng, TryRng};
 pub use vectorized::UniformIntegersUnderBound;
