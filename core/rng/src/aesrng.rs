@@ -75,7 +75,9 @@ macro_rules! make_aes_rng {
                 Self(BlockRng::new(<$core>::from_seed_and_iv(seed, iv)))
             }
 
-            /// Generate [`Aes128EncryptOnly::BLOCK_COUNT_HINT`] random [`U8x16`]s.
+            #[doc = concat!(
+                "Generate [`", stringify!($aes), "::BLOCK_COUNT_HINT`] random [`U8x16`]s."
+            )]
             #[inline(always)]
             pub fn random_u8x16s(&mut self) -> [U8x16; <$aes>::BLOCK_COUNT_HINT] {
                 self.0.core.gen_rand_bits()
@@ -103,8 +105,8 @@ macro_rules! make_aes_rng {
     }
 }
 
-/// Create the core of an AES-based using [`BlockRng`] that implements Generator and SeedableRng.
-/// The `aes` parameter must implement [`aes::cipher::BlockCipherEncrypt`].
+/// Create the core of an AES-based using [`BlockRng`] that implements [`Generator`] and
+/// [`SeedableRng`]. The `aes` parameter must implement [`aes::cipher::BlockCipherEncrypt`].
 macro_rules! make_aes_rng_core {
     (
         $(#[$doc:meta])*
