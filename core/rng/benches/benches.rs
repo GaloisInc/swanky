@@ -4,7 +4,7 @@ use rand::{
     distr::{Distribution, Uniform},
 };
 use std::hint::black_box;
-use swanky_rng::{Aes128Rng, UniformIntegersUnderBound};
+use swanky_rng::{Aes128Rng, Aes256Rng, UniformIntegersUnderBound};
 use vectoreyes::U8x16;
 
 mod measurement {
@@ -50,6 +50,38 @@ fn bench_aes_rand_random(c: &mut Criterion<Measurement>) {
             black_box(result);
         });
     });
+
+    c.bench_function("Aes256Rng::random::<[u8; 16]>", |b| {
+        let mut rng = Aes256Rng::new();
+        b.iter(|| {
+            let result = rng.random::<[u8; 16]>();
+            black_box(result);
+        });
+    });
+
+    c.bench_function("Aes256Rng::random::<u64>", |b| {
+        let mut rng = Aes256Rng::new();
+        b.iter(|| {
+            let result = rng.random::<u64>();
+            black_box(result);
+        });
+    });
+
+    c.bench_function("Aes256Rng::random::<u128>", |b| {
+        let mut rng = Aes256Rng::new();
+        b.iter(|| {
+            let result = rng.random::<u128>();
+            black_box(result);
+        });
+    });
+
+    c.bench_function("Aes256Rng::random::<U8x16>", |b| {
+        let mut rng = Aes256Rng::new();
+        b.iter(|| {
+            let result = rng.random::<U8x16>();
+            black_box(result);
+        });
+    });
 }
 
 fn bench_aes_rand_fill_bytes(c: &mut Criterion<Measurement>) {
@@ -64,6 +96,24 @@ fn bench_aes_rand_fill_bytes(c: &mut Criterion<Measurement>) {
 
     c.bench_function("Aes128Rng::fill_bytes (u64)", |b| {
         let mut rng = Aes128Rng::new();
+        let mut bytes = [0u8; 8];
+        b.iter(|| {
+            rng.fill_bytes(&mut bytes);
+            black_box(bytes);
+        });
+    });
+
+    c.bench_function("Aes256Rng::fill_bytes ([u8; 16])", |b| {
+        let mut rng = Aes256Rng::new();
+        let mut bytes = [0u8; 16];
+        b.iter(|| {
+            rng.fill_bytes(&mut bytes);
+            black_box(bytes);
+        });
+    });
+
+    c.bench_function("Aes256Rng::fill_bytes (u64)", |b| {
+        let mut rng = Aes256Rng::new();
         let mut bytes = [0u8; 8];
         b.iter(|| {
             rng.fill_bytes(&mut bytes);
