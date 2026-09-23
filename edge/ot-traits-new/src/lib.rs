@@ -1,5 +1,22 @@
 #![deny(missing_docs)]
-//! Base traits for Oblivious Transfer protocols
+//! Base traits for 1-out-of-2 _oblivious transfer_ protocols.
+//!
+//! Oblivious transfer (OT) protocols allow a sender to transfer one
+//! of some number of pieces of information to a receiver while
+//! remaining oblivious to which piece of information was transferred.
+//! Furthermore, the receiver does not get to learn anything about the
+//! information that _wasn't_ transferred.
+//!
+//! OT is _complete_ for secure multi-party computation: Given an
+//! implementation of OT, any poly-time computable function can be
+//! securely evaluated without additional primitives.
+//!
+//! The traits in this module define the structure of any 1-out-of-2
+//! (that is: 1 message out of 2 possible messages) OT protocol.
+//! The [`swanky_party`] crate is used to enforce privacy boundaries
+//! on the various components at the type level, so that OT senders
+//! can never access information private to OT receivers (and
+//! vice-versa).
 
 use rand::CryptoRng;
 
