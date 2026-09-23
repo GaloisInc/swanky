@@ -178,7 +178,7 @@ make_aes_rng! {
     /// # Performance considerations
     /// If needing to generate an array of `u8`s, it is significantly more
     /// performant (around 2x) to use `Aes128Rng::fill_bytes` over `Aes128Rng::random`.
-    /// This is because `AesRng::random::<[u8; N]>` consumes `N` `u32`s, whereas
+    /// This is because `Aes128Rng::random::<[u8; N]>` consumes `N` `u32`s, whereas
     /// `Aes128Rng::fill_bytes` consumes `N / 4` `u32`s.
     ///
     /// If needing to generate a [`U8x16`], `Aes128Rng::random::<U8x16>` is the most
@@ -207,7 +207,7 @@ make_aes_rng! {
     /// # Performance considerations
     /// If needing to generate an array of `u8`s, it is significantly more
     /// performant (around 2x) to use `Aes256Rng::fill_bytes` over `Aes256Rng::random`.
-    /// This is because `AesRng::random::<[u8; N]>` consumes `N` `u32`s, whereas
+    /// This is because `Aes256Rng::random::<[u8; N]>` consumes `N` `u32`s, whereas
     /// `Aes256Rng::fill_bytes` consumes `N / 4` `u32`s.
     ///
     /// If needing to generate a [`U8x16`], `Aes256Rng::random::<U8x16>` is the most

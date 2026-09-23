@@ -4,30 +4,32 @@
 //! change depending on the platform and/or future changes to this library. If
 //! you need a _specific_ PRNG, these can be accessed as well. Currently, there
 //! are two:
-//! - [`AesRng`]: A PRNG based on AES128-CTR mode.
+//! - [`Aes128Rng`]: A PRNG based on AES128-CTR mode.
 //! - [`Aes256Rng`]: A PRNG based on AES256-CTR mode.
 #![deny(missing_docs)]
 
 use rand_core::Infallible;
 
 mod aesrng;
-pub use aesrng::{Aes128Rng, Aes128Rng as AesRng, Aes256Rng};
+#[deprecated(note = "use Aes128Rng or Aes256Rng instead")]
+pub use aesrng::Aes128Rng as AesRng;
+pub use aesrng::{Aes128Rng, Aes256Rng};
 mod vectorized;
 use rand::{SeedableRng, TryCryptoRng, TryRng};
 pub use vectorized::UniformIntegersUnderBound;
 
 /// Swanky's preferred pseudorandom number generator.
 ///
-/// This is currently a thin wrapper around [`AesRng`], although that is subject
+/// This is currently a thin wrapper around [`Aes128Rng`], although that is subject
 /// to change in the future and/or depending on the platform. See the
-/// documentation of [`AesRng`] for any performance considerations.
+/// documentation of [`Aes128Rng`] for any performance considerations.
 #[derive(Default)]
-pub struct SwankyRng(AesRng);
+pub struct SwankyRng(Aes128Rng);
 
 impl SwankyRng {
     /// Create a new [`SwankyRng`] using a random seed from [`rand::random`].
     pub fn new() -> Self {
-        Self(AesRng::new())
+        Self(Aes128Rng::new())
     }
 }
 
@@ -55,10 +57,10 @@ impl TryRng for SwankyRng {
 }
 
 impl SeedableRng for SwankyRng {
-    type Seed = <AesRng as SeedableRng>::Seed;
+    type Seed = <Aes128Rng as SeedableRng>::Seed;
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self(AesRng::from_seed(seed))
+        Self(Aes128Rng::from_seed(seed))
     }
 }
 
