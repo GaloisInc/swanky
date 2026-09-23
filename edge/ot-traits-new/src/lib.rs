@@ -38,7 +38,7 @@ pub trait OTRandom<P: Party>: OTInit<P> {
     ///            For the receiver, the selection bits.
     /// `outputs`: For the sender, the pairs of messages (as arrays).
     ///            For the receiver, the selected messages.
-    fn random_ot<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
+    fn ot_random<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         self,
         inputs: PartyEither<P, usize, I>,
         outputs: &mut O,
