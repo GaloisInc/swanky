@@ -6,19 +6,17 @@ use rand::{
     },
 };
 use vectoreyes::{
-    Aes128EncryptOnly, Aes256EncryptOnly, AesBlockCipher, U8x16, U8x32,
+    Aes128EncryptOnly, Aes256EncryptOnly, AesBlockCipher, U8x16,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
 /// Construct an AES-based RNG using [`BlockRng`]. The `aes` parameter should be an implementer of
-/// `AesBlockCipher`, `seed` should be its associated key type, and `core` should be
-/// constructed with `make_aes_rng_core` using the same `aes` and `seed`.
+/// `AesBlockCipher` and `core` should be constructed with `make_aes_rng_core` using the same `aes`.
 macro_rules! make_aes_rng {
     (
         $(#[$doc:meta])*
         $name:ident {
             aes = $aes:ty,
-            seed = $seed:ty,
             core = $core:ty $(,)?
         }
     ) => {
@@ -63,7 +61,7 @@ macro_rules! make_aes_rng {
             /// Create a new [`Self`] using a random seed from [`rand::random`].
             #[inline]
             pub fn new() -> Self {
-                let seed: $seed = rand::random();
+                let seed: <$aes as AesBlockCipher>::Key = rand::random();
                 $name::from_seed(seed)
             }
 
@@ -73,7 +71,7 @@ macro_rules! make_aes_rng {
             /// One must be careful to avoid situations where the same seed is used, and
             /// the IVs either match or are sufficiently close, as this could produce
             /// identical RNG outputs!
-            pub fn from_seed_and_iv(seed: $seed, iv: u128) -> Self {
+            pub fn from_seed_and_iv(seed: <$aes as AesBlockCipher>::Key, iv: u128) -> Self {
                 Self(BlockRng::new(<$core>::from_seed_and_iv(seed, iv)))
             }
 
@@ -106,14 +104,12 @@ macro_rules! make_aes_rng {
 }
 
 /// Create the core of an AES-based using [`BlockRng`] that implements Generator and SeedableRng.
-/// The `aes` parameter must implement [`aes::cipher::BlockCipherEncrypt`], and `seed` must be it's
-/// associate `Key` type.
+/// The `aes` parameter must implement [`aes::cipher::BlockCipherEncrypt`].
 macro_rules! make_aes_rng_core {
     (
         $(#[$doc:meta])*
         $name:ident {
             aes = $aes:ty,
-            seed = $seed:ty $(,)?
         }
     ) => {
         $(#[$doc])*
@@ -123,7 +119,7 @@ macro_rules! make_aes_rng_core {
         }
 
         impl $name {
-            fn from_seed_and_iv(seed: $seed, iv: u128) -> Self {
+            fn from_seed_and_iv(seed: <$aes as AesBlockCipher>::Key, iv: u128) -> Self {
                 let mut rng = Self::from_seed(seed);
                 rng.counter = iv;
                 rng
@@ -157,7 +153,7 @@ macro_rules! make_aes_rng_core {
         }
 
         impl SeedableRng for $name {
-            type Seed = $seed;
+            type Seed = <$aes as AesBlockCipher>::Key;
 
             #[inline]
             fn from_seed(seed: Self::Seed) -> Self {
@@ -188,7 +184,6 @@ make_aes_rng! {
     /// conversion.
     Aes128Rng {
         aes = Aes128EncryptOnly,
-        seed = U8x16,
         core = Aes128RngCore,
     }
 }
@@ -197,7 +192,6 @@ make_aes_rng_core! {
     /// The core of [`Aes128Rng`], used with [`BlockRng`].
     Aes128RngCore {
         aes = Aes128EncryptOnly,
-        seed = U8x16,
     }
 }
 
@@ -219,7 +213,6 @@ make_aes_rng! {
     /// conversion.
     Aes256Rng {
         aes = Aes256EncryptOnly,
-        seed = U8x32,
         core = Aes256RngCore,
     }
 }
@@ -228,7 +221,6 @@ make_aes_rng_core! {
     /// The core of [`Aes256Rng`], used with [`BlockRng`].
     Aes256RngCore {
         aes = Aes256EncryptOnly,
-        seed = U8x32,
     }
 }
 
@@ -246,7 +238,6 @@ mod tests {
             mod $name:ident {
                 aes_rng = $aes_rng:ty,
                 aes_enc = $aes_enc:ty,
-                seed_ty = $seed_ty:ty,
                 seed_bytes = $seed_bytes:literal $(,)?
             }
         ) => {
@@ -314,7 +305,6 @@ mod tests {
         mod aes_128_rng {
             aes_rng = Aes128Rng,
             aes_enc = Aes128Enc,
-            seed_ty = U8x16,
             seed_bytes = 16,
         }
     }
@@ -323,7 +313,6 @@ mod tests {
         mod aes_256_rng {
             aes_rng = Aes256Rng,
             aes_enc = Aes256Enc,
-            seed_ty = U8x32,
             seed_bytes = 32,
         }
     }
