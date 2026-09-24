@@ -79,17 +79,17 @@ pub trait OTCorrelated<P: Party>: OTInit<P> {
 /// constructed using protocols implementing this trait via a standard
 /// construction.
 /// For the sake of discussion, assume the [`Receiver`] has a
-/// selection bit $`c`$, the [`Sender`] has messages $`m_0`$ and
-/// $`m_1`$, and the `Receiver` wants to learn $`m_c`$.
+/// selection bit $`b`$, the [`Sender`] has messages $`m_0`$ and
+/// $`m_1`$, and the `Receiver` wants to learn $`m_b`$.
 ///
 /// 1. Run [`OTRandom::ot_random`] with the given selection bit.
 ///    The `Sender` generates and saves two values, $`x_0`$ and
-///    $`x_1`$, the `Receiver` learns $`x_c`$.
+///    $`x_1`$, the `Receiver` learns $`x_b`$.
 /// 2. `Sender` computes and sends $`\text{Enc}_{x_0}(m_0)`$ and
 ///    $`\text{Enc}_{x_1}(m_1)`$.
 ///    $`\text{Enc}`$ is agreed upon ahead of time.
-/// 3. `Receiver` can only decrypt the message encrypted with $`x_c`$,
-///    which is $`m_c`$.
+/// 3. `Receiver` can only decrypt the message encrypted with $`x_b`$,
+///    which is $`m_b`$.
 pub trait OTRandom<P: Party>: OTInit<P> {
     /// Run random OT.
     ///
