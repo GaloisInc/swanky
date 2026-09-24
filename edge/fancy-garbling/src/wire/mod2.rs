@@ -84,10 +84,11 @@ impl core::ops::MulAssign<u16> for WireMod2 {
 
 impl ConditionallySelectable for WireMod2 {
     fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
-        WireMod2::from_repr(
-            U8x16::conditional_select(&a.to_repr(), &b.to_repr(), choice),
-            2,
-        )
+        WireMod2::from_repr(U8x16::conditional_select(
+            &a.to_repr(),
+            &b.to_repr(),
+            choice,
+        ))
     }
 }
 
@@ -113,13 +114,10 @@ impl WireLabel<F2> for WireMod2 {
         (self.val.extract::<0>() & 1) as u16
     }
 
-    fn from_repr(inp: U8x16, q: u16) -> Self {
+    fn from_repr(inp: U8x16) -> Self {
         // This function converts a Block into its WireLabel representation
         // by just setting the value of WireMod2 to the Block (i.e. the
         // wire's 128b value).
-        if q != 2 {
-            panic!("[WireMod2::from_block] Expected modulo 2. Got {}", q);
-        }
         Self { val: inp }
     }
 
@@ -135,7 +133,7 @@ impl WireLabel<F2> for WireMod2 {
         if q != 2 {
             panic!("[WireMod2::hash_to_mod] Expected modulo 2. Got {}", q);
         }
-        Self::from_repr(hash, q)
+        Self::from_repr(hash)
     }
 }
 
@@ -191,16 +189,18 @@ impl BinaryWireLabel for WireMod2 {
         let [hashA, hashB] = hash_wires([A, B], g);
 
         // garbler's half gate
-        let L = Self::from_repr(
-            U8x16::conditional_select(&hashA, &(hashA ^ *gate0), (A.color() as u8).into()),
-            2,
-        );
+        let L = Self::from_repr(U8x16::conditional_select(
+            &hashA,
+            &(hashA ^ *gate0),
+            (A.color() as u8).into(),
+        ));
 
         // evaluator's half gate
-        let R = Self::from_repr(
-            U8x16::conditional_select(&hashB, &(hashB ^ *gate1), (B.color() as u8).into()),
-            2,
-        );
+        let R = Self::from_repr(U8x16::conditional_select(
+            &hashB,
+            &(hashB ^ *gate1),
+            (B.color() as u8).into(),
+        ));
 
         L + R + *A * B.color()
     }

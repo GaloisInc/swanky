@@ -94,8 +94,8 @@ where
 
         Ok(Self {
             circuit,
-            delta: WireMod2::from_repr(delta, 2),
-            zero: WireMod2::from_repr(zero, 2),
+            delta: WireMod2::from_repr(delta),
+            zero: WireMod2::from_repr(zero),
             and_gate_index: 0,
             auth_shares,
             and_auth_shares: VecWrapper::new(and_auth_shares),
@@ -234,7 +234,7 @@ impl<'a, C> FancyBinary for GarblerOffline<'a, C> {
         self.gates.push((gate0, gate1));
         self.gate_bits.push(bit_c);
 
-        Ok(OfflineWire::new(WireMod2::from_repr(lc0, 2), lc_share))
+        Ok(OfflineWire::new(WireMod2::from_repr(lc0), lc_share))
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -246,7 +246,7 @@ impl<'a, C> FancyBinary for GarblerOffline<'a, C> {
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         OfflineWire::new(
-            WireMod2::from_repr(x.wirelabel().to_repr() ^ self.zero.to_repr(), 2),
+            WireMod2::from_repr(x.wirelabel().to_repr() ^ self.zero.to_repr()),
             x.auth_share(),
         )
     }

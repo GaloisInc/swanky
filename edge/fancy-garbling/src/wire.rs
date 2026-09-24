@@ -67,13 +67,8 @@ pub trait WireLabel<FF: FiniteField>:
     /// The color digit of the wire.
     fn color(&self) -> u16;
 
-    /// Converts a [`U8x16`] into its [`WireLabel`] representation, based on the
-    /// modulus `q`.
-    ///
-    /// # Panics
-    /// This panics if `q` does not align with the modulus supported by the
-    /// [`WireLabel`].
-    fn from_repr(inp: U8x16, q: u16) -> Self;
+    /// Converts a [`U8x16`] into its [`WireLabel`] representation.
+    fn from_repr(inp: U8x16) -> Self;
 
     /// A random [`WireLabel`] `mod q`, with the first digit set to `1`.
     ///

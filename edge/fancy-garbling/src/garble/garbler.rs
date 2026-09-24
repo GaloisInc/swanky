@@ -38,7 +38,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
         let delta = Wire::rand_delta(&mut rng, 2);
         // We fix the constant `1` value to `1`, and derive the zero wirelabel
         // as that value XORed with `Δ`.
-        let one = Wire::from_repr(U8x16::from(1u128), 2);
+        let one = Wire::from_repr(U8x16::from(1u128));
         let zero = delta.clone() + one;
         Garbler {
             zero,

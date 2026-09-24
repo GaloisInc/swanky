@@ -70,10 +70,9 @@ impl<'a, C> GarblerOnline<'a, C> {
                 // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
                 // wirelabels `L_{x_w + λ_w}`, and send these to the evaluator.
                 let wirelabel = wire.wirelabel()
-                    + WireMod2::from_repr(
-                        U8x16::from(*masked_value * F128b::from(self.delta.to_repr())),
-                        2,
-                    );
+                    + WireMod2::from_repr(U8x16::from(
+                        *masked_value * F128b::from(self.delta.to_repr()),
+                    ));
                 channel.write(&wirelabel.to_repr())?;
                 Ok(ValidatorWire::new(*masked_value, wire.auth_share()))
             })

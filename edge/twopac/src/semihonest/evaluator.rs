@@ -89,7 +89,7 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F
             .wrap_err(ErrorKind::OtherError, "Failed to run oblivious transfer.")?;
         Ok(wires
             .into_iter()
-            .map(|wire| Wire::from_repr(wire, 2))
+            .map(Wire::from_repr)
             .collect::<Vec<Wire>>())
     }
 }

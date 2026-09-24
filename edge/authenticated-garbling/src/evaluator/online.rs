@@ -61,7 +61,7 @@ impl<'a, C> EvaluatorOnline<'a, C> {
         let num_and_gates = and_auth_shares.len();
         // The constant one wirelabel is set to the value `1`.
         // TODO: Make `const` once `From` is const-compatible.
-        let one = WireMod2::from_repr(U8x16::from(F128b::ONE), 2);
+        let one = WireMod2::from_repr(U8x16::from(F128b::ONE));
         Self {
             circuit,
             delta,
@@ -89,7 +89,7 @@ impl<'a, C> EvaluatorOnline<'a, C> {
         let mut wires: Vec<EvaluatorWire> = Vec::with_capacity(masked_values.len());
         for (masked_value, auth_share) in masked_values.into_iter().zip(auth_shares) {
             // The Evaluator retrieves the wire labels for their own input
-            let wire_label = WireMod2::from_repr(channel.read()?, 2);
+            let wire_label = WireMod2::from_repr(channel.read()?);
             // The Evaluator constructs authenticated values for all their input wires
             wires.push(EvaluatorWire::new(masked_value, wire_label, auth_share));
         }
@@ -244,7 +244,7 @@ impl<'a, C> FancyBinary for EvaluatorOnline<'a, C> {
 
         Ok(EvaluatorWire::new(
             lc_value,
-            WireMod2::from_repr(lc_label, 2),
+            WireMod2::from_repr(lc_label),
             lc_share,
         ))
     }

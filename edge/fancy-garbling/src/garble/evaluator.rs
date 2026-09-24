@@ -19,7 +19,7 @@ impl<Wire: WireLabel<F2>> Evaluator<Wire> {
     /// Create a new [`Evaluator`].
     pub fn new() -> Self {
         // We set the constant `1` wirelabel to simply be `1`.
-        let one = Wire::from_repr(U8x16::from(1u128), 2);
+        let one = Wire::from_repr(U8x16::from(1u128));
         Evaluator {
             one,
             current_gate: 0,
@@ -98,7 +98,7 @@ impl<Wire: WireLabel<F2>> FancyEncode<F2> for Evaluator<Wire> {
         (0..n)
             .map(|_| {
                 let block = channel.read()?;
-                Ok(Wire::from_repr(block, 2))
+                Ok(Wire::from_repr(block))
             })
             .collect()
     }
