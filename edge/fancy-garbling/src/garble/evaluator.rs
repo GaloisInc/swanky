@@ -1,7 +1,5 @@
 use crate::{BinaryWireLabel, util::output_tweak, wire::WireLabel};
-use fancy_traits::{
-    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
-};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 use swanky_field_binary::F2;
@@ -76,13 +74,7 @@ impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
     type Item = Wire;
 }
 
-impl<Wire: WireLabel> FancyConstant for Evaluator<Wire> {
-    fn constant(&mut self, _: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        Ok(Wire::from_repr(channel.read()?, q))
-    }
-}
-
-impl<Wire: WireLabel> FancyBinaryConstant for Evaluator<Wire> {
+impl<Wire: WireLabel> FancyConstant<F2> for Evaluator<Wire> {
     fn constant(&mut self, x: F2) -> Self::Item {
         if x.into() {
             self.one.clone()

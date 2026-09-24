@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -48,7 +48,7 @@ impl<'a> MuxConstants<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for MuxConstants<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for MuxConstants<'a>
 where
     F::Item: 'a,
 {

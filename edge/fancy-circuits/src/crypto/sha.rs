@@ -1,9 +1,7 @@
 //! SHA circuits.
 
 use crate::{binary::BinaryConstant, bristol::BristolFashionCircuit};
-use fancy_traits::{
-    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
-};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -34,7 +32,7 @@ impl Default for Sha256CompressionFunction {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
     type Input = ([F::Item; 512], [F::Item; 256]);
     type Output = [F::Item; 256];
 
@@ -56,7 +54,7 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunct
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 768);
         let (block, chain) = inputs.split_at(512);
@@ -81,7 +79,7 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Sha256Compr
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> CircuitOutputMapper<F> for Sha256CompressionFunction {
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.to_vec()
     }
@@ -121,7 +119,7 @@ impl Default for Sha256 {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
+impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for Sha256 {
     type Input = Vec<F::Item>;
     type Output = [F::Item; 256];
 

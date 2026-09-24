@@ -1,5 +1,5 @@
 use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
@@ -177,7 +177,7 @@ impl Fancy for VerifierTraverser {
     type Item = Wire;
 }
 
-impl FancyBinaryConstant for VerifierTraverser {
+impl FancyConstant<F2> for VerifierTraverser {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let value = if constant.into() {
             F128b::ONE

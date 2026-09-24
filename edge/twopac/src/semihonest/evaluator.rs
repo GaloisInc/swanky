@@ -1,7 +1,5 @@
 use fancy_garbling::{Evaluator as Ev, WireLabel, WireMod2};
-use fancy_traits::{
-    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
-};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::CryptoRng;
 use swanky_adversary::SemiHonest;
 use swanky_block::Block;
@@ -73,24 +71,11 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> 
     type Item = Wire;
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyConstant
-    for Evaluator<RNG, OT, Wire>
-{
-    fn constant(
-        &mut self,
-        x: u16,
-        q: u16,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        FancyConstant::constant(&mut self.evaluator, x, q, channel)
-    }
-}
-
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyBinaryConstant
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyConstant<F2>
     for Evaluator<RNG, OT, Wire>
 {
     fn constant(&mut self, x: F2) -> Self::Item {
-        FancyBinaryConstant::constant(&mut self.evaluator, x)
+        self.evaluator.constant(x)
     }
 }
 

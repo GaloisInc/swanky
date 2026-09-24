@@ -5,7 +5,7 @@
 
 use crate::{binary::PairwiseXor, crypto::sha::Sha256};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -48,7 +48,7 @@ impl<'a> HmacSha256<'a> {
     const OPAD_BYTE: &'static str = "01011100";
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for HmacSha256<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for HmacSha256<'a>
 where
     F::Item: 'a,
 {

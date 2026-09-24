@@ -1,5 +1,5 @@
 use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
@@ -217,7 +217,7 @@ impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
     type Item = Wire;
 }
 
-impl<VOLE: RandomVoleP> FancyBinaryConstant for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP> FancyConstant<F2> for ProverTraverser<VOLE> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         Wire(constant, F128b::ZERO)
     }

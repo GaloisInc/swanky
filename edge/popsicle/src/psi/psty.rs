@@ -11,13 +11,14 @@ use fancy_circuits::{
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
 use fancy_garbling::WireMod2;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyOutput};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field_binary::F2;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -432,7 +433,7 @@ fn fancy_compute_intersection<F: FancyBinary>(
 }
 
 /// Fancy function to compute the cardinality
-fn fancy_compute_cardinality<F: FancyBinary + FancyBinaryConstant>(
+fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],

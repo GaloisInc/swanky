@@ -7,9 +7,7 @@ use crate::{
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
-use fancy_traits::{
-    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
-};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -26,7 +24,7 @@ impl<'a> BinaryMultiplication<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -83,7 +81,7 @@ impl<'a> BinaryMultiplicationLowerHalf<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryMultiplicationLowerHalf<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplicationLowerHalf<'a>
 where
     F::Item: 'a,
 {
@@ -133,7 +131,7 @@ impl<'a> BinaryConstantMultiplication<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryConstantMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryConstantMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -169,7 +167,7 @@ impl<'a> TestBinaryMultiplication<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -186,8 +184,7 @@ where
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F>
-    for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryMultiplication<'a>
 where
     F::Item: 'a,
 {
@@ -211,8 +208,7 @@ where
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F>
-    for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryMultiplication<'a>
 where
     F::Item: 'a,
 {

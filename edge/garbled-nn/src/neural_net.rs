@@ -14,7 +14,7 @@ use fancy_garbling::{
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
-use fancy_traits::{FancyBinary, FancyBinaryConstant, HasModulus};
+use fancy_traits::{FancyBinary, FancyConstant, HasModulus};
 use ndarray::Array3;
 use rand::CryptoRng;
 #[cfg(feature = "serde")]
@@ -28,6 +28,7 @@ use std::{
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
+use swanky_field_binary::F2;
 use swanky_ot_alsz_kos::alsz;
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
@@ -866,7 +867,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: FancyBinary + FancyBinaryConstant + BinaryGadgets,
+        F: FancyBinary + FancyConstant<F2> + BinaryGadgets,
     {
         let mut errors = 0;
 

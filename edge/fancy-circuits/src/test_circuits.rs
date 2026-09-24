@@ -3,7 +3,7 @@
 pub mod fancy_binary_constant {
     //! Circuits that test [`FancyBinaryConstant`].
 
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinaryConstant};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyConstant};
     use swanky_channel::Channel;
     use swanky_error::Result;
     use swanky_field::FiniteRing;
@@ -11,7 +11,7 @@ pub mod fancy_binary_constant {
 
     /// Circuit for testing [`FancyBinaryConstant::constant`].
     pub struct TestBinaryConstant;
-    impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> Circuit<F> for TestBinaryConstant {
         type Input = ();
         type Output = Vec<F::Item>;
 
@@ -25,7 +25,7 @@ pub mod fancy_binary_constant {
             Ok(outputs)
         }
     }
-    impl<F: FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryConstant {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }
@@ -38,7 +38,7 @@ pub mod fancy_binary_constant {
             2
         }
     }
-    impl<F: FancyBinaryConstant> CircuitOutputMapper<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryConstant {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output
         }

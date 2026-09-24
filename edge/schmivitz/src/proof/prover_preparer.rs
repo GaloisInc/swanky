@@ -1,5 +1,5 @@
 use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
@@ -134,7 +134,7 @@ impl<'a> Fancy for ProverPreparer<'a> {
     type Item = Wire;
 }
 
-impl<'a> FancyBinaryConstant for ProverPreparer<'a> {
+impl<'a> FancyConstant<F2> for ProverPreparer<'a> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         Wire(constant)
     }

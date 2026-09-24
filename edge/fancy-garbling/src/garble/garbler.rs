@@ -1,7 +1,5 @@
 use crate::{BinaryWireLabel, WireLabel, util::output_tweak};
-use fancy_traits::{
-    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
-};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::CryptoRng;
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
@@ -125,15 +123,7 @@ impl<RNG: CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant for Garbler<RNG, Wire> {
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        let (zero, wire) = Wire::constant(x, q, &self.delta(q), &mut self.rng);
-        channel.write(&wire.to_repr())?;
-        Ok(zero)
-    }
-}
-
-impl<RNG: CryptoRng, Wire: WireLabel> FancyBinaryConstant for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant<F2> for Garbler<RNG, Wire> {
     fn constant(&mut self, x: F2) -> Self::Item {
         if x.into() {
             // `self.zero` corresponds to the zero wirelabel associated with the

@@ -7,7 +7,7 @@
 use crate::parameters::FIELD_SIZE;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
 use fancy_traits::{
-    Circuit as FancyCircuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge,
+    Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge,
 };
 use std::{
     cmp::max,
@@ -392,7 +392,7 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
+impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
     for CircuitInterpreter<'a>
 {
     type Input = ();

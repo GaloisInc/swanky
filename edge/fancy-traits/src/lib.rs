@@ -11,7 +11,7 @@ use swanky_error::Result;
 mod circuit;
 pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;
-use swanky_field_binary::F2;
+use swanky_field::FiniteField;
 pub use zk::FancyZeroKnowledge;
 
 /// An object that has a modulus.
@@ -35,16 +35,9 @@ pub trait Fancy {
 }
 
 /// Extension trait for [`Fancy`] that provides the ability to encode public constants.
-pub trait FancyConstant: Fancy {
-    /// Encode a constant value `x % q`.
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
-}
-
-/// Extension trait for [`Fancy`] that provides the ability to encode public
-/// constants, optimized for the binary setting.
-pub trait FancyBinaryConstant: Fancy {
-    /// Encode a binary constant value.
-    fn constant(&mut self, x: F2) -> Self::Item;
+pub trait FancyConstant<FF: FiniteField>: Fancy {
+    /// Encode a constant value `x`.
+    fn constant(&mut self, x: FF) -> Self::Item;
 }
 
 /// Extension trait for [`Fancy`] that provides encoding and receiving operations.

@@ -1,6 +1,6 @@
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{
-    CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode,
+    CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode,
 };
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -140,7 +140,7 @@ impl<'a, C> Fancy for EvaluatorOnline<'a, C> {
     type Item = EvaluatorWire;
 }
 
-impl<'a, C> FancyBinaryConstant for EvaluatorOnline<'a, C> {
+impl<'a, C> FancyConstant<F2> for EvaluatorOnline<'a, C> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 

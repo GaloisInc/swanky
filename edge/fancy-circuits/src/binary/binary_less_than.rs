@@ -3,7 +3,7 @@ use crate::{
     binary::{BinarySubtraction, Mux, OrMany},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -22,7 +22,7 @@ impl<'a> BinaryLessThan<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryLessThan<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryLessThan<'a>
 where
     F::Item: 'a,
 {
@@ -80,7 +80,7 @@ impl<'a> BinaryLessThanSigned<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryLessThanSigned<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryLessThanSigned<'a>
 where
     F::Item: 'a,
 {
@@ -125,7 +125,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryLessThan`].
     pub struct TestBinaryLessThan(pub usize);
-    impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryLessThan {
+    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryLessThan {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
         type Output = F::Item;
 
@@ -139,7 +139,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryLessThan {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryLessThan {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);
@@ -157,7 +157,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryLessThanSigned`].
     pub struct TestBinaryLessThanSigned(pub usize);
-    impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryLessThanSigned {
+    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryLessThanSigned {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
         type Output = F::Item;
 
@@ -171,7 +171,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryLessThanSigned {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryLessThanSigned {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);

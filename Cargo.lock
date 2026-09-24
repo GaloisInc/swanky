@@ -880,6 +880,7 @@ version = "0.6.0"
 dependencies = [
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
 ]
 
@@ -1870,6 +1871,7 @@ dependencies = [
  "swanky-cointoss",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-oprf-kkrt",
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
@@ -2779,6 +2781,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ot-alsz-kos",
  "swanky-rng",
  "swanky-twopac",

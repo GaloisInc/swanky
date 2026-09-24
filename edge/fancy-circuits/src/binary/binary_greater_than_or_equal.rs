@@ -1,8 +1,9 @@
 use crate::{BinaryBundle, binary::BinaryLessThan};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Binary greater than or equal.
 ///
@@ -17,7 +18,7 @@ impl<'a> BinaryGreaterThanOrEqual<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryGreaterThanOrEqual<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryGreaterThanOrEqual<'a>
 where
     F::Item: 'a,
 {
@@ -41,7 +42,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryGreaterThanOrEqual`].
     pub struct TestBinaryGreaterThanOrEqual(pub usize);
-    impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for TestBinaryGreaterThanOrEqual {
+    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryGreaterThanOrEqual {
         type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
         type Output = F::Item;
 
@@ -55,7 +56,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryGreaterThanOrEqual {
+    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryGreaterThanOrEqual {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert_eq!(inputs.len(), self.0 * 2);
             let (x, y) = inputs.split_at(self.0);

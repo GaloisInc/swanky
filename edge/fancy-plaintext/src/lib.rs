@@ -2,8 +2,7 @@
 #![deny(missing_docs)]
 
 use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
-    HasModulus,
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput, HasModulus,
 };
 use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
@@ -110,16 +109,10 @@ impl Fancy for Dummy {
     type Item = DummyVal;
 }
 
-impl FancyConstant for Dummy {
-    fn constant(&mut self, val: u16, modulus: u16, _: &mut Channel) -> Result<DummyVal> {
-        Ok(DummyVal { val, modulus })
-    }
-}
-
-impl FancyBinaryConstant for Dummy {
-    fn constant(&mut self, x: F2) -> Self::Item {
+impl FancyConstant<F2> for Dummy {
+    fn constant(&mut self, val: F2) -> DummyVal {
         DummyVal {
-            val: x.into(),
+            val: val.into(),
             modulus: 2,
         }
     }

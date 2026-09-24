@@ -1,5 +1,5 @@
 use crate::vec_wrapper::VecWrapper;
-use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyBinaryConstant, HasModulus};
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyConstant, HasModulus};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -119,7 +119,7 @@ impl<P: GenericParty> Fancy for WirePreProcessor<P> {
     type Item = Wire<P>;
 }
 
-impl<P: GenericParty> FancyBinaryConstant for WirePreProcessor<P> {
+impl<P: GenericParty> FancyConstant<F2> for WirePreProcessor<P> {
     fn constant(&mut self, _: F2) -> Self::Item {
         let authshare = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
         Wire::new(authshare)

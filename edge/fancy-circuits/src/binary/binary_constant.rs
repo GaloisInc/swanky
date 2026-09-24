@@ -1,5 +1,5 @@
 use crate::{BinaryBundle, util::u128_to_bits};
-use fancy_traits::{Circuit, Fancy, FancyBinaryConstant};
+use fancy_traits::{Circuit, Fancy, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -20,7 +20,7 @@ impl BinaryConstant {
     }
 }
 
-impl<F: FancyBinaryConstant> Circuit<F> for BinaryConstant {
+impl<F: FancyConstant<F2>> Circuit<F> for BinaryConstant {
     type Input = ();
     type Output = BinaryBundle<F::Item>;
 
@@ -40,7 +40,7 @@ pub mod test {
 
     /// Circuit for testing [`BinaryConstant`].
     pub struct TestBinaryConstant(pub u128, pub usize);
-    impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> Circuit<F> for TestBinaryConstant {
         type Input = <BinaryConstant as Circuit<F>>::Input;
         type Output = <BinaryConstant as Circuit<F>>::Output;
 
@@ -54,7 +54,7 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryConstant {
         fn map(&self, inputs: Vec<<F as Fancy>::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }
