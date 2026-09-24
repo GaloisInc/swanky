@@ -823,7 +823,7 @@ impl NeuralNet {
             let mut nn = BinaryNeuralNet::new(&mut garbler, bitwidths, true);
             let outputs = nn.eval(self, &inputs, secret_weights, channel)?;
 
-            let delta = garbler.delta(2);
+            let delta = garbler.delta();
             Ok((inputs, outputs, delta))
         })?;
         let encoder = InputEncoder::new(inputs, delta);

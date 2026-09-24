@@ -119,7 +119,7 @@ impl<
         let mut inputs = Vec::with_capacity(n);
 
         for _ in 0..n {
-            let delta = self.garbler.delta(2);
+            let delta = self.garbler.delta();
             let (wire, input) = self._evaluator_input(&delta, 2);
             wires.push(wire);
             for i in input.into_iter() {

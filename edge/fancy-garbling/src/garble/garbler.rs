@@ -1,9 +1,6 @@
 use crate::{BinaryWireLabel, WireLabel, util::output_tweak};
 use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::CryptoRng;
-#[cfg(feature = "serde")]
-use serde::de::DeserializeOwned;
-use std::collections::HashMap;
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
@@ -12,24 +9,10 @@ use vectoreyes::U8x16;
 pub struct Garbler<RNG, Wire> {
     // Zero wirelabel used for binary negation.
     zero: Wire,
-    delta_mod_2: Wire,
-    // Map from modulus to associated delta wirelabel.
-    deltas: HashMap<u16, Wire>,
+    delta: Wire,
     current_output: usize,
     current_gate: usize,
     rng: RNG,
-}
-
-#[cfg(feature = "serde")]
-impl<RNG: CryptoRng, Wire: WireLabel<F2> + DeserializeOwned> Garbler<RNG, Wire> {
-    /// Load pre-chosen deltas from a file
-    pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let f = std::fs::File::open(filename)?;
-        let reader = std::io::BufReader::new(f);
-        let deltas: HashMap<u16, Wire> = serde_json::from_reader(reader)?;
-        self.deltas.extend(deltas);
-        Ok(())
-    }
 }
 
 impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
@@ -42,8 +25,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
         let zero = delta.clone() + one;
         Garbler {
             zero,
-            delta_mod_2: delta,
-            deltas: HashMap::new(),
+            delta,
             current_gate: 0,
             current_output: 0,
             rng,
@@ -57,18 +39,9 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
         current
     }
 
-    /// Create a delta if it has not been created yet for this modulus, otherwise just
-    /// return the existing one.
-    pub fn delta(&mut self, q: u16) -> Wire {
-        if q == 2 {
-            self.delta_mod_2.clone()
-        } else if let Some(delta) = self.deltas.get(&q) {
-            delta.clone()
-        } else {
-            let w = Wire::rand_delta(&mut self.rng);
-            self.deltas.insert(q, w.clone());
-            w
-        }
+    /// The `Δ` wirelabel.
+    pub fn delta(&mut self) -> Wire {
+        self.delta.clone()
     }
 
     /// The current output index of the garbling computation.
@@ -76,13 +49,6 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
         let current = self.current_output;
         self.current_output += 1;
         current
-    }
-
-    /// Get the deltas, consuming the [`Garbler`].
-    pub fn get_deltas(mut self) -> HashMap<u16, Wire> {
-        // Put `delta_mod_2` in the `HashMap` before returning it.
-        self.deltas.insert(2, self.delta_mod_2);
-        self.deltas
     }
 
     /// Output a fresh zero wirelabel associated with the provided modulus.
@@ -98,9 +64,8 @@ impl<RNG: CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
         B: &Self::Item,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
-        let delta = self.delta(2);
         let gate_num = self.current_gate();
-        let (gate0, gate1, C) = W::garble_and_gate(gate_num, A, B, &delta);
+        let (gate0, gate1, C) = W::garble_and_gate(gate_num, A, B, &self.delta);
         channel.write(&gate0)?;
         channel.write(&gate1)?;
         Ok(C)
@@ -144,9 +109,8 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire>
     ) -> swanky_error::Result<Vec<Self::Item>> {
         let mut zeros = Vec::with_capacity(values.len());
         for x in values.iter() {
-            let delta = self.delta(2);
             let zero = self.encode_zero();
-            let encoded = zero.clone() + delta * (*x).into();
+            let encoded = zero.clone() + self.delta.clone() * (*x).into();
             channel.write(&encoded.to_repr())?;
             zeros.push(zero);
         }
@@ -161,9 +125,8 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire>
 impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyOutput for Garbler<RNG, Wire> {
     fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let i = self.current_output();
-        let D = self.delta(2);
         for k in 0..2 {
-            let block = (X.clone() + D.clone() * k).hash(output_tweak(i, k));
+            let block = (X.clone() + self.delta().clone() * k).hash(output_tweak(i, k));
             channel.write(&block)?;
         }
         Ok(None)

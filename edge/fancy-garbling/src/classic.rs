@@ -8,7 +8,6 @@ use crate::{
 };
 use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyOutput};
 use rand::CryptoRng;
-use std::collections::HashMap;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 use swanky_field_binary::F2;
@@ -70,9 +69,8 @@ impl GarbledCircuit {
             // contain that mapping, which is what the below does.
             garbler.outputs(&zeros, channel)?;
 
-            let deltas = garbler.get_deltas();
-            let en = Encoder::new(inputs, deltas.clone());
-            let output_mapping = OutputMapping::new(&zeros, &deltas);
+            let en = Encoder::new(inputs, garbler.delta().clone());
+            let output_mapping = OutputMapping::new(&zeros, garbler.delta().clone());
 
             Ok((en, output_mapping))
         })?;
@@ -111,14 +109,14 @@ impl GarbledCircuit {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder<Wire> {
     inputs: Vec<Wire>,
-    deltas: HashMap<u16, Wire>,
+    delta: Wire,
 }
 
 impl<Wire: WireLabel<F2>> Encoder<Wire> {
     /// Make a new [`Encoder`] from lists of inputs, alongside a map of
     /// moduli-to-wire-offsets.
-    pub fn new(inputs: Vec<Wire>, deltas: HashMap<u16, Wire>) -> Self {
-        Encoder { inputs, deltas }
+    pub fn new(inputs: Vec<Wire>, delta: Wire) -> Self {
+        Encoder { inputs, delta }
     }
 
     /// Encode input values into their associated wirelabels.
@@ -131,7 +129,7 @@ impl<Wire: WireLabel<F2>> Encoder<Wire> {
         self.inputs
             .iter()
             .zip(inputs)
-            .map(|(zero, x)| zero.clone() + self.deltas[&2].clone() * (*x).into())
+            .map(|(zero, x)| zero.clone() + self.delta.clone() * (*x).into())
             .collect()
     }
 }
@@ -143,12 +141,12 @@ pub struct OutputMapping(Vec<Vec<U8x16>>);
 impl OutputMapping {
     /// Construct a new [`OutputMapping`] from a set of zero wirelabels and
     /// their associated deltas.
-    pub fn new<Wire: WireLabel<F2>>(zeros: &[Wire], deltas: &HashMap<u16, Wire>) -> Self {
+    pub fn new<Wire: WireLabel<F2>>(zeros: &[Wire], delta: Wire) -> Self {
         let mut outputs = Vec::with_capacity(zeros.len());
         for (i, zero) in zeros.iter().enumerate() {
             let mut wirelabels = Vec::with_capacity(2);
             for k in 0..2 {
-                let wirelabel = zero.clone() + deltas[&2].clone() * k;
+                let wirelabel = zero.clone() + delta.clone() * k;
                 let hashed = wirelabel.hash(output_tweak(i, k));
                 wirelabels.push(hashed);
             }
