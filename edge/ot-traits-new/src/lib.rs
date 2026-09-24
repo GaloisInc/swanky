@@ -44,6 +44,35 @@ pub trait OTInit<P: Party>: Sized {
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self>;
 }
 
+/// OT protocols where the messages are random, but _correlated_ via
+/// $`\Delta`$ (which gives the offset between the zero and one
+/// message).
+///
+/// In this setting, the [`Sender`] only has to keep track of _one_
+/// set of random outputs, since the second set can be recovered using
+/// the $`\Delta`$ value.
+pub trait OTCorrelated<P: Party>: OTInit<P> {
+    /// Run correlated OT.
+    ///
+    /// Note that protocols implementing this method typically require
+    /// some 'preliminary' OT where the roles of [`Sender`] and
+    /// [`Receiver`] are switched (i.e. an [`OTCorrelated`] `Sender`
+    /// must temporarily act as some [`ObliviousTransfer`] `Receiver`,
+    /// and vice-versa).
+    /// When implementing this functionality,
+    /// [`swanky_party::OppositeParty`] may be useful.
+    fn ot_correlated<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, U8x16, U8x16>>>(
+        self,
+        inputs: PartyEither<P, usize, I>,
+        delta: PartyPrivate<P, Sender, U8x16>,
+        outputs: &mut O,
+        channel: &mut Channel,
+        rng: &mut impl CryptoRng,
+    ) -> Result<Self>
+    where
+        I::IntoIter: ExactSizeIterator;
+}
+
 /// OT protocols where the messages are random.
 ///
 /// 'Standard' 1-out-of-2 protocols (see [`ObliviousTransfer`]) can be
