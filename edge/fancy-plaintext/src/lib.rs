@@ -1,9 +1,7 @@
 //! Plaintext implementation of [`Fancy`].
 #![deny(missing_docs)]
 
-use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput, HasModulus,
-};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -17,12 +15,6 @@ pub struct Dummy;
 pub struct DummyVal {
     val: u16,
     modulus: u16,
-}
-
-impl HasModulus for DummyVal {
-    fn modulus(&self) -> u16 {
-        self.modulus
-    }
 }
 
 impl DummyVal {

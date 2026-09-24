@@ -14,12 +14,6 @@ mod zk;
 use swanky_field::FiniteField;
 pub use zk::FancyZeroKnowledge;
 
-/// An object that has a modulus.
-pub trait HasModulus {
-    /// The modulus of the wire.
-    fn modulus(&self) -> u16;
-}
-
 /// The `Fancy` trait is the core trait for writing circuits.
 ///
 /// The trait contains an associated type, [`Fancy::Item`], which defines the

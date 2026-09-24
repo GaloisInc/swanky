@@ -1,6 +1,6 @@
 use crate::{AnalyzerItem, CircuitAnalyzer};
 use core::fmt::Debug;
-use fancy_traits::{Fancy, FancyBinary, FancyConstant, HasModulus};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant};
 use std::ops::Deref;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -10,10 +10,9 @@ use swanky_field_binary::F2;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire<W>(W, AnalyzerItem);
 
-impl<W: HasModulus> Wire<W> {
+impl<W> Wire<W> {
     pub fn new(value: W) -> Self {
-        let modulus = value.modulus();
-        Self(value, AnalyzerItem::new(modulus))
+        Self(value, AnalyzerItem::new())
     }
 }
 
@@ -22,12 +21,6 @@ impl<W> Deref for Wire<W> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl<W: HasModulus> HasModulus for Wire<W> {
-    fn modulus(&self) -> u16 {
-        self.0.modulus()
     }
 }
 

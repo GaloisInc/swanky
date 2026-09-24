@@ -1,6 +1,4 @@
-use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
-};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -74,12 +72,6 @@ impl<'a> ProverPreparer<'a> {
 /// Wrapper around the [`F2`] type to make it compatible with [`Fancy::Item`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire(F2);
-
-impl HasModulus for Wire {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
 
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.

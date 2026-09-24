@@ -5,7 +5,6 @@
 //! in garbled circuits, and represents an encoding of the value on any given
 //! wire of the circuit.
 
-use fancy_traits::HasModulus;
 use rand::CryptoRng;
 use subtle::ConditionallySelectable;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
@@ -52,7 +51,6 @@ pub trait WireLabel<FF: FiniteField>:
     Clone
     + core::fmt::Debug
     + core::default::Default
-    + HasModulus
     + core::ops::Add<Output = Self>
     + core::ops::AddAssign
     + core::ops::Sub<Output = Self>

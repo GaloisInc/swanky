@@ -160,10 +160,9 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire>
 
 impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyOutput for Garbler<RNG, Wire> {
     fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        let q = X.modulus();
         let i = self.current_output();
-        let D = self.delta(q);
-        for k in 0..q {
+        let D = self.delta(2);
+        for k in 0..2 {
             let block = (X.clone() + D.clone() * k).hash(output_tweak(i, k));
             channel.write(&block)?;
         }

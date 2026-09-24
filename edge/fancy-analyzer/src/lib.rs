@@ -4,7 +4,7 @@
 
 use core::cmp::max;
 use fancy_traits::{
-    CircuitInputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput, HasModulus,
+    CircuitInputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -16,20 +16,13 @@ pub use wrapper::CircuitAnalyzerWrapper;
 /// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AnalyzerItem {
-    modulus: u16,
     depth: usize,
 }
 
 impl AnalyzerItem {
     /// Create a new [`AnalyzerItem`] with the provided modulus.
-    pub fn new(modulus: u16) -> Self {
-        Self { modulus, depth: 0 }
-    }
-}
-
-impl HasModulus for AnalyzerItem {
-    fn modulus(&self) -> u16 {
-        self.modulus
+    pub fn new() -> Self {
+        Self { depth: 0 }
     }
 }
 
@@ -115,34 +108,22 @@ impl CircuitAnalyzer {
 
 impl FancyBinary for CircuitAnalyzer {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert_eq!(x.modulus, 2);
-        assert_eq!(y.modulus, 2);
         self.nxors += 1;
         AnalyzerItem {
-            modulus: x.modulus,
             depth: max(x.depth, y.depth),
         }
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        assert_eq!(x.modulus, 2);
-        assert_eq!(y.modulus, 2);
         self.nands += 1;
         let depth = max(x.depth, y.depth) + 1;
         self.mul_depth = max(self.mul_depth, depth);
-        Ok(AnalyzerItem {
-            modulus: x.modulus,
-            depth,
-        })
+        Ok(AnalyzerItem { depth })
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        assert_eq!(x.modulus, 2);
         self.nnegs += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: x.depth,
-        }
+        AnalyzerItem { depth: x.depth }
     }
 }
 
@@ -153,17 +134,14 @@ impl Fancy for CircuitAnalyzer {
 impl FancyConstant<F2> for CircuitAnalyzer {
     fn constant(&mut self, _: F2) -> Self::Item {
         self.nconstants += 1;
-        AnalyzerItem {
-            modulus: 2,
-            depth: 0,
-        }
+        AnalyzerItem { depth: 0 }
     }
 }
 
 impl FancyEncode<F2> for CircuitAnalyzer {
     fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
         self.ninputs += n;
-        Ok((0..n).map(|_| AnalyzerItem::new(2)).collect())
+        Ok((0..n).map(|_| AnalyzerItem::new()).collect())
     }
 
     fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {

@@ -2,7 +2,6 @@
 
 use crate::{PartyEvaluator, PartyGarbler};
 use fancy_garbling::WireMod2;
-use fancy_traits::HasModulus;
 use swanky_authenticated_bits::authshares::AuthShare;
 use swanky_field_binary::F2;
 
@@ -27,12 +26,6 @@ impl OfflineWire {
 
     pub(crate) fn auth_share(&self) -> AuthShare<PartyGarbler> {
         self.auth_share
-    }
-}
-
-impl HasModulus for OfflineWire {
-    fn modulus(&self) -> u16 {
-        2
     }
 }
 
@@ -66,12 +59,6 @@ impl ValidatorWire {
 
     pub(crate) fn auth_share(&self) -> AuthShare<PartyGarbler> {
         self.auth_share
-    }
-}
-
-impl HasModulus for ValidatorWire {
-    fn modulus(&self) -> u16 {
-        2
     }
 }
 
@@ -129,12 +116,6 @@ impl EvaluatorWire {
     /// wire.
     pub(crate) fn auth_share(&self) -> AuthShare<PartyEvaluator> {
         self.auth_share
-    }
-}
-
-impl HasModulus for EvaluatorWire {
-    fn modulus(&self) -> u16 {
-        2
     }
 }
 

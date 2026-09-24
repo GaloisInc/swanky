@@ -1,6 +1,4 @@
-use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
-};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
@@ -148,12 +146,6 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 /// An [`F2`] element alongside its associated VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire(F2, F128b);
-
-impl HasModulus for Wire {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
 
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.

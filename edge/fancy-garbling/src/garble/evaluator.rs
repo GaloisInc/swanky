@@ -106,19 +106,18 @@ impl<Wire: WireLabel<F2>> FancyEncode<F2> for Evaluator<Wire> {
 
 impl<Wire: WireLabel<F2>> FancyOutput for Evaluator<Wire> {
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
-        let q = x.modulus();
         let i = self.current_output();
 
         // Receive the output ciphertext from the garbler
-        let mut ct = Vec::with_capacity(q as usize);
-        for _ in 0..q {
+        let mut ct = Vec::with_capacity(2);
+        for _ in 0..2 {
             let block = channel.read()?;
             ct.push(block);
         }
 
         // Attempt to brute force x using the output ciphertext
         let mut decoded = None;
-        for k in 0..q {
+        for k in 0..2 {
             let hashed_wire = x.hash(output_tweak(i, k));
             if hashed_wire == ct[k as usize] {
                 decoded = Some(k);

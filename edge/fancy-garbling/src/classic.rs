@@ -168,9 +168,8 @@ impl OutputMapping {
     ) -> swanky_error::Result<Vec<u16>> {
         let mut outputs = Vec::new();
         for (i, wirelabel) in wirelabels.iter().enumerate() {
-            let q = wirelabel.modulus();
             let mut decoded = None;
-            for k in 0..q {
+            for k in 0..2 {
                 let hashed = wirelabel.hash(output_tweak(i, k));
                 if hashed == self.0[i][k as usize] {
                     decoded = Some(k);
