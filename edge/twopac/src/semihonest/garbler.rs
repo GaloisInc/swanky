@@ -43,20 +43,6 @@ impl<
         let garbler = Gb::new(RNG::from_seed(rng.random()));
         Ok(Garbler { garbler, ot, rng })
     }
-
-    fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
-        let len = f32::from(q).log(2.0).ceil() as u16;
-        let mut inputs = Vec::with_capacity(len as usize);
-        let (zero, one) = Wire::constant(F2::ONE, delta, &mut self.rng);
-        let mut wire = zero;
-        inputs.push((zero.to_repr(), one.to_repr()));
-        for i in 1..len {
-            let (zero, one) = Wire::constant(F2::ONE, delta, &mut self.rng);
-            wire += zero * (1 << i);
-            inputs.push((zero.to_repr(), one.to_repr()))
-        }
-        (wire, inputs)
-    }
 }
 
 impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest> FancyBinary
@@ -120,11 +106,9 @@ impl<
 
         for _ in 0..n {
             let delta = self.garbler.delta();
-            let (wire, input) = self._evaluator_input(&delta, 2);
-            wires.push(wire);
-            for i in input.into_iter() {
-                inputs.push(i);
-            }
+            let (zero, one) = Wire::constant(F2::ONE, &delta, &mut self.rng);
+            wires.push(zero);
+            inputs.push((zero.to_repr(), one.to_repr()));
         }
         self.ot
             .send(channel, &inputs, &mut self.rng)
