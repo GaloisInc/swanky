@@ -814,7 +814,7 @@ impl NeuralNet {
             let inputs = (0..self.ninputs())
                 .map(|_| {
                     let zeros = (0..bitwidths[0])
-                        .map(|_| garbler.encode_zero(2))
+                        .map(|_| garbler.encode_zero())
                         .collect::<Vec<_>>();
                     BinaryBundle::new(zeros)
                 })

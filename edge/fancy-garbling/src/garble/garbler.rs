@@ -35,7 +35,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2> + DeserializeOwned> Garbler<RNG, Wire> 
 impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
     pub fn new(mut rng: RNG) -> Self {
-        let delta = Wire::rand_delta(&mut rng, 2);
+        let delta = Wire::rand_delta(&mut rng);
         // We fix the constant `1` value to `1`, and derive the zero wirelabel
         // as that value XORed with `Δ`.
         let one = Wire::from_repr(U8x16::from(1u128));
@@ -65,7 +65,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
         } else if let Some(delta) = self.deltas.get(&q) {
             delta.clone()
         } else {
-            let w = Wire::rand_delta(&mut self.rng, q);
+            let w = Wire::rand_delta(&mut self.rng);
             self.deltas.insert(q, w.clone());
             w
         }
@@ -86,8 +86,8 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
     }
 
     /// Output a fresh zero wirelabel associated with the provided modulus.
-    pub fn encode_zero(&mut self, modulus: u16) -> Wire {
-        Wire::rand(&mut self.rng, modulus)
+    pub fn encode_zero(&mut self) -> Wire {
+        Wire::rand(&mut self.rng)
     }
 }
 
@@ -145,7 +145,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire>
         let mut zeros = Vec::with_capacity(values.len());
         for x in values.iter() {
             let delta = self.delta(2);
-            let zero = self.encode_zero(2);
+            let zero = self.encode_zero();
             let encoded = zero.clone() + delta * (*x).into();
             channel.write(&encoded.to_repr())?;
             zeros.push(zero);

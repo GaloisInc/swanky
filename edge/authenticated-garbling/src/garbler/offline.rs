@@ -89,7 +89,7 @@ where
         // channel.write(&one.to_repr())?;
 
         let inputs = (0..ninputs)
-            .map(|_| OfflineWire::new(WireMod2::rand(rng, 2), auth_shares.next()))
+            .map(|_| OfflineWire::new(WireMod2::rand(rng), auth_shares.next()))
             .collect::<Vec<_>>();
 
         Ok(Self {

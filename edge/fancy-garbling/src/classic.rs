@@ -55,10 +55,7 @@ impl GarbledCircuit {
 
         // Produce zero wirelabels for the inputs.
         let inputs = (0..circuit.ninputs())
-            .map(|i| {
-                let q = circuit.modulus(i);
-                garbler.encode_zero(q)
-            })
+            .map(|_| garbler.encode_zero())
             .collect::<Vec<_>>();
 
         let mut channel = GarbledChannel::new_writer(None);

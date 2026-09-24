@@ -93,11 +93,8 @@ impl ConditionallySelectable for WireMod2 {
 }
 
 impl WireLabel<F2> for WireMod2 {
-    fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
-        if q != 2 {
-            panic!("[WireMod2::rand_delta] Expected modulo 2. Got {}", q);
-        }
-        let mut w = Self::rand(rng, q);
+    fn rand_delta<R: CryptoRng>(rng: &mut R) -> Self {
+        let mut w = Self::rand(rng);
         w.val |= U8x16::set_lo(1);
         w
     }
@@ -121,25 +118,23 @@ impl WireLabel<F2> for WireMod2 {
         Self { val: inp }
     }
 
-    fn rand<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
-        if q != 2 {
-            panic!("[WireMod2::rand] Expected modulo 2. Got {}", q);
-        }
-
+    fn rand<R: CryptoRng>(rng: &mut R) -> Self {
         Self { val: rng.random() }
     }
 
-    fn hash_to_mod(hash: U8x16, q: u16) -> Self {
-        if q != 2 {
-            panic!("[WireMod2::hash_to_mod] Expected modulo 2. Got {}", q);
-        }
+    fn hash_to_mod(hash: U8x16) -> Self {
         Self::from_repr(hash)
+    }
+
+    fn constant<RNG: CryptoRng>(x: F2, delta: &Self, rng: &mut RNG) -> (Self, Self) {
+        let zero = Self::rand(rng);
+        let wire = zero + *delta * x.into();
+        (zero, wire)
     }
 }
 
 impl BinaryWireLabel for WireMod2 {
     fn garble_and_gate(gate_num: usize, A: &Self, B: &Self, delta: &Self) -> (U8x16, U8x16, Self) {
-        let q = A.modulus();
         let D = delta;
 
         let r = B.color(); // secret value known only to the garbler (ev knows r+b)
@@ -151,7 +146,7 @@ impl BinaryWireLabel for WireMod2 {
         let X1 = *A + *D * alpha;
 
         // Y = H(B + bD) + (b + r)A such that b + B.color == 0
-        let beta = (q - B.color()) % q;
+        let beta = (2 - B.color()) % 2;
         let Y1 = *B + *D * beta;
 
         let AD = *A + *D;
@@ -167,8 +162,8 @@ impl BinaryWireLabel for WireMod2 {
 
         let [hashA, hashB, hashX, hashY] = hash_wires([&newA, &B, &X1, &Y1], g);
 
-        let X = Self::hash_to_mod(hashX, q) + *D * (alpha * r % q);
-        let Y = Self::hash_to_mod(hashY, q);
+        let X = Self::hash_to_mod(hashX) + *D * (alpha * r % 2);
+        let Y = Self::hash_to_mod(hashY);
 
         let gate0 =
             hashA ^ U8x16::conditional_select(&X.to_repr(), &(X + *D).to_repr(), idx.into());
@@ -215,7 +210,7 @@ mod tests {
         use rand::rng;
 
         let mut rng = rng();
-        let w = WireMod2::rand(&mut rng, 2);
+        let w = WireMod2::rand(&mut rng);
         let serialized = serde_json::to_string(&w).unwrap();
 
         let deserialized: WireMod2 = serde_json::from_str(&serialized).unwrap();

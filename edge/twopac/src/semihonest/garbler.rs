@@ -5,6 +5,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_ot_traits::Sender as OtSender;
 
@@ -46,11 +47,11 @@ impl<
     fn _evaluator_input(&mut self, delta: &Wire, q: u16) -> (Wire, Vec<(Block, Block)>) {
         let len = f32::from(q).log(2.0).ceil() as u16;
         let mut inputs = Vec::with_capacity(len as usize);
-        let (zero, one) = Wire::constant(1, q, delta, &mut self.rng);
+        let (zero, one) = Wire::constant(F2::ONE, delta, &mut self.rng);
         let mut wire = zero.clone();
         inputs.push((zero.to_repr(), one.to_repr()));
         for i in 1..len {
-            let (zero, one) = Wire::constant(1, q, delta, &mut self.rng);
+            let (zero, one) = Wire::constant(F2::ONE, delta, &mut self.rng);
             wire += zero.clone() * (1 << i);
             inputs.push((zero.to_repr(), one.to_repr()))
         }

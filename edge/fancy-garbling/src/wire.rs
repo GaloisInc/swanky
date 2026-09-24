@@ -70,37 +70,21 @@ pub trait WireLabel<FF: FiniteField>:
     /// Converts a [`U8x16`] into its [`WireLabel`] representation.
     fn from_repr(inp: U8x16) -> Self;
 
-    /// A random [`WireLabel`] `mod q`, with the first digit set to `1`.
-    ///
-    /// # Panics
-    /// This panics if `q` does not align with the modulus supported by the
-    /// [`WireLabel`].
-    fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self;
+    /// A random `Δ` [`WireLabel`].
+    fn rand_delta<R: CryptoRng>(rng: &mut R) -> Self;
 
-    /// A random [`WireLabel`] `mod q`.
-    ///
-    /// # Panics
-    /// This panics if `q` does not align with the modulus supported by the
-    /// [`WireLabel`].
-    fn rand<R: CryptoRng>(rng: &mut R, q: u16) -> Self;
+    /// A random [`WireLabel`].
+    fn rand<R: CryptoRng>(rng: &mut R) -> Self;
 
-    /// Converts a hashed block into a valid wire of the given modulus `q`.
-    ///
-    /// # Panics
-    /// This panics if `q` does not align with the modulus supported by the
-    /// [`WireLabel`].
-    fn hash_to_mod(hash: U8x16, q: u16) -> Self;
+    /// Converts a hashed block into a valid [`WireLabel`].
+    fn hash_to_mod(hash: U8x16) -> Self;
 
     /// Computes the hash of the [`WireLabel`].
     fn hash(&self, tweak: u128) -> U8x16 {
         TweakableCircularCorrelationRobustHash::fixed_key().hash(self.to_repr(), tweak)
     }
 
-    /// Computes a [`WireLabel`] for `x % q`, returning both the zero
-    /// [`WireLabel`] as well as the [`WireLabel`] for `x % q`.
-    fn constant<RNG: CryptoRng>(x: u16, q: u16, delta: &Self, rng: &mut RNG) -> (Self, Self) {
-        let zero = Self::rand(rng, q);
-        let wire = zero.clone() + delta.clone() * x;
-        (zero, wire)
-    }
+    /// Computes a [`WireLabel`] for `x`, returning both the zero
+    /// [`WireLabel`] as well as the [`WireLabel`] for `x`.
+    fn constant<RNG: CryptoRng>(x: FF, delta: &Self, rng: &mut RNG) -> (Self, Self);
 }
