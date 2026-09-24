@@ -168,7 +168,7 @@ impl OutputMap {
                     }
                 }
                 if let Some(bit) = decoded {
-                    bits.push(bit);
+                    bits.push(F2::from(bit != 0));
                 } else {
                     swanky_error::bail!(
                         ErrorKind::OtherError,

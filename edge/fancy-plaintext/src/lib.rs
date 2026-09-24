@@ -118,22 +118,12 @@ impl FancyConstant<F2> for Dummy {
     }
 }
 
-impl FancyEncode for Dummy {
-    fn encode_many(
-        &mut self,
-        xs: &[u16],
-        moduli: &[u16],
-        _: &mut Channel,
-    ) -> Result<Vec<DummyVal>> {
-        assert_eq!(xs.len(), moduli.len());
-        Ok(xs
-            .iter()
-            .zip(moduli.iter())
-            .map(|(x, q)| DummyVal::new(*x, *q))
-            .collect())
+impl FancyEncode<F2> for Dummy {
+    fn encode_many(&mut self, xs: &[F2], _: &mut Channel) -> Result<Vec<DummyVal>> {
+        Ok(xs.iter().map(|x| DummyVal::new((*x).into(), 2)).collect())
     }
 
-    fn receive_many(&mut self, _moduli: &[u16], _: &mut Channel) -> Result<Vec<DummyVal>> {
+    fn receive_many(&mut self, _: usize, _: &mut Channel) -> Result<Vec<DummyVal>> {
         // Receive is undefined for Dummy which is a single party "protocol"
         swanky_error::bail!(
             ErrorKind::UnsupportedError,

@@ -16,6 +16,7 @@ use fancy_circuits::test_circuits::fancy_binary_constant::TestBinaryConstant;
 use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
 use rand::RngExt;
+use swanky_field_binary::F2;
 use swanky_rng::SwankyRng;
 
 #[test]
@@ -59,16 +60,16 @@ fn test_circuit<
     );
 
     let mut rng = SwankyRng::new();
-    let inputs_gb: Vec<u16> = (0..ninputs_gb).map(|_| rng.random::<u16>() % 2).collect();
-    let inputs_ev: Vec<u16> = (0..ninputs_ev).map(|_| rng.random::<u16>() % 2).collect();
+    let inputs_gb: Vec<F2> = (0..ninputs_gb).map(|_| rng.random()).collect();
+    let inputs_ev: Vec<F2> = (0..ninputs_ev).map(|_| rng.random()).collect();
 
     let dummy_inputs_gb = inputs_gb
         .iter()
-        .map(|x| DummyVal::new(*x, 2))
+        .map(|x| DummyVal::new((*x).into(), 2))
         .collect::<Vec<_>>();
     let dummy_inputs_ev = inputs_ev
         .iter()
-        .map(|x| DummyVal::new(*x, 2))
+        .map(|x| DummyVal::new((*x).into(), 2))
         .collect::<Vec<_>>();
 
     let dummy_inputs = [dummy_inputs_gb, dummy_inputs_ev].concat();
@@ -89,8 +90,8 @@ fn test_circuit<
             let (outputs, gb) = gb.execute()?;
             let mut gb = gb.finalize(c)?;
 
-            let mut inputs = gb.encode_many(&inputs_gb, &vec![2; ninputs_gb], c)?;
-            let their = gb.receive_many(&vec![2; ninputs_ev], c)?;
+            let mut inputs = gb.encode_many(&inputs_gb, c)?;
+            let their = gb.receive_many(ninputs_ev, c)?;
             inputs.extend(their);
             let gb = gb.finalize(c)?;
             let mut gb = gb.validate(inputs, c)?;
@@ -103,8 +104,8 @@ fn test_circuit<
             let ev = EvaluatorOffline::initialize(circuit, c, &mut rng)?;
             let mut ev = ev.finalize(c)?;
 
-            let mut inputs = ev.receive_many(&vec![2; ninputs_gb], c)?;
-            let mine = ev.encode_many(&inputs_ev, &vec![2; ninputs_ev], c)?;
+            let mut inputs = ev.receive_many(ninputs_gb, c)?;
+            let mine = ev.encode_many(&inputs_ev, c)?;
             inputs.extend(mine);
             let (outputs, ev) = ev.execute(inputs)?;
             let ev = ev.finalize(c)?;

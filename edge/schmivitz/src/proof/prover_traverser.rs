@@ -223,17 +223,17 @@ impl<VOLE: RandomVoleP> FancyConstant<F2> for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> FancyEncode for ProverTraverser<VOLE> {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+impl<VOLE: RandomVoleP> FancyEncode<F2> for ProverTraverser<VOLE> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head does not support encode"
         )
     }
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(n);
+        for _ in 0..n {
             let f = self.next_witness_value()?;
             let vole = self.next_vole()?;
 
@@ -279,7 +279,7 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP> FancyZeroKnowledge<F2> for ProverTraverser<VOLE> {
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * value.1;

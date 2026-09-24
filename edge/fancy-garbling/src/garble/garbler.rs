@@ -136,31 +136,24 @@ impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant<F2> for Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> FancyEncode<F2> for Garbler<RNG, Wire> {
     fn encode_many(
         &mut self,
-        values: &[u16],
-        moduli: &[u16],
+        values: &[F2],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        assert_eq!(values.len(), moduli.len());
-
         let mut zeros = Vec::with_capacity(values.len());
-        for (x, q) in values.iter().zip(moduli.iter()) {
-            let delta = self.delta(*q);
-            let zero = self.encode_zero(*q);
-            let encoded = zero.clone() + delta * *x;
+        for x in values.iter() {
+            let delta = self.delta(2);
+            let zero = self.encode_zero(2);
+            let encoded = zero.clone() + delta * (*x).into();
             channel.write(&encoded.to_repr())?;
             zeros.push(zero);
         }
         Ok(zeros)
     }
 
-    fn receive_many(
-        &mut self,
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
+    fn receive_many(&mut self, _: usize, _: &mut Channel) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Garbler cannot receive values")
     }
 }

@@ -188,17 +188,17 @@ impl FancyConstant<F2> for VerifierTraverser {
     }
 }
 
-impl FancyEncode for VerifierTraverser {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+impl FancyEncode<F2> for VerifierTraverser {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head verifier does not support encode"
         )
     }
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(n);
+        for _ in 0..n {
             // Assign a fresh masked witness to the wire
             let res = self.next_masked_witness()?;
 
@@ -233,7 +233,7 @@ impl FancyBinary for VerifierTraverser {
     }
 }
 
-impl FancyZeroKnowledge for VerifierTraverser {
+impl FancyZeroKnowledge<F2> for VerifierTraverser {
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
 

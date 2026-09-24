@@ -149,7 +149,7 @@ where
         u128_to_bits(c, nbits)
             .into_iter()
             .enumerate()
-            .filter_map(|(i, b)| if b > 0 { Some(i) } else { None })
+            .filter_map(|(i, b)| if b == F2::ONE { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
                 let s = BinaryLeftShift::new().execute(backend, (x, shift_amt), channel)?;
                 BinaryAdditionNoCarry::new().execute(backend, (&z, &s), channel)

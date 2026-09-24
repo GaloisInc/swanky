@@ -6,6 +6,7 @@ use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 
 /// Turn a vector of bits represented as u16 into a decimal
 /// value represented as a u128.
@@ -167,12 +168,17 @@ pub fn bin_encode_many_block512<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<Vec<F::Item>>
 where
-    F: FancyEncode,
+    F: FancyEncode<F2>,
 {
     let bits = encode_binary(values, size);
     // Then specify the moduli of the wires
-    let moduli = vec![2; bits.len()];
-    gc_party.encode_many(&bits, &moduli, channel)
+    gc_party.encode_many(
+        &bits
+            .into_iter()
+            .map(|bit| F2::from(bit != 0))
+            .collect::<Vec<_>>(),
+        channel,
+    )
 }
 
 /// A wrapper function that encodes `Block512` as garbled
@@ -183,9 +189,8 @@ pub fn bin_receive_many_block512<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<Vec<F::Item>>
 where
-    F: FancyEncode,
+    F: FancyEncode<F2>,
 {
     // Specify the moduli of the wires
-    let moduli = vec![2; size];
-    gc_party.receive_many(&moduli, channel)
+    gc_party.receive_many(size, channel)
 }

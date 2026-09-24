@@ -200,7 +200,7 @@ impl BasePsi for OpprfSender {
         channel: &mut Channel,
     ) -> swanky_error::Result<CircuitInputs<F::Item>>
     where
-        F: FancyEncode,
+        F: FancyEncode<F2>,
     {
         let sender_primary_keys = bin_encode_many_block512(
             gc_party,

@@ -52,7 +52,7 @@ impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for MuxConstants<'a>
 where
     F::Item: 'a,
 {
-    type Input = (&'a F::Item, bool, bool);
+    type Input = (&'a F::Item, F2, F2);
     type Output = F::Item;
 
     fn execute(
@@ -62,7 +62,7 @@ where
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, c1, c2) = inputs;
-        Ok(match (c1, c2) {
+        Ok(match (c1.into(), c2.into()) {
             (false, true) => b.clone(),
             (true, false) => backend.negate(b),
             (false, false) => backend.constant(F2::ZERO),
@@ -76,6 +76,7 @@ mod test {
     use super::Mux;
     use crate::binary::mux::MuxConstants;
     use fancy_plaintext::{Dummy, DummyVal};
+    use swanky_field_binary::F2;
 
     #[test]
     fn mux() {
@@ -98,8 +99,11 @@ mod test {
             for x in 0..=1 {
                 for y in 0..=1 {
                     let b_val = DummyVal::new(b, 2);
-                    let output =
-                        Dummy::eval(&MuxConstants::new(), (&b_val, x != 0, y != 0)).unwrap();
+                    let output = Dummy::eval(
+                        &MuxConstants::new(),
+                        (&b_val, F2::from(x != 0), F2::from(y != 0)),
+                    )
+                    .unwrap();
                     assert_eq!(output.val(), if b == 0 { x } else { y });
                 }
             }

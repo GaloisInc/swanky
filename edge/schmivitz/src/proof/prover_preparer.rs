@@ -140,17 +140,17 @@ impl<'a> FancyConstant<F2> for ProverPreparer<'a> {
     }
 }
 
-impl<'a> FancyEncode for ProverPreparer<'a> {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+impl<'a> FancyEncode<F2> for ProverPreparer<'a> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head prover does not support encode"
         )
     }
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(n);
+        for _ in 0..n {
             let f2 = self.private_input[self.priv_input_pos as usize];
             self.priv_input_pos += 1;
 
@@ -183,7 +183,7 @@ impl<'a> FancyBinary for ProverPreparer<'a> {
     }
 }
 
-impl<'a> FancyZeroKnowledge for ProverPreparer<'a> {
+impl<'a> FancyZeroKnowledge<F2> for ProverPreparer<'a> {
     fn assert_zero(&mut self, _: &Self::Item, _: &mut Channel) -> Result<()> {
         self.challenge_count += 1;
         Ok(())

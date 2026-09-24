@@ -35,15 +35,6 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel>
     }
 }
 
-fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
-    assert!(!wires.is_empty());
-    let acc = Wire::from_repr(wires[0], q);
-    wires[1..].iter().enumerate().fold(acc, |acc, (i, w)| {
-        let w = Wire::from_repr(*w, q);
-        acc + w * (1 << (i + 1))
-    })
-}
-
 impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     for Evaluator<RNG, OT, WireMod2>
 {
@@ -79,47 +70,26 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> 
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyEncode
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel> FancyEncode<F2>
     for Evaluator<RNG, OT, Wire>
 {
     /// Receive garbler input wires.
-    fn receive_many(
-        &mut self,
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Wire>> {
-        self.evaluator.receive_many(moduli, channel)
+    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> swanky_error::Result<Vec<Wire>> {
+        self.evaluator.receive_many(n, channel)
     }
 
     /// Perform OT and obtain wires for the evaluator's inputs.
     fn encode_many(
         &mut self,
-        inputs: &[u16],
-        moduli: &[u16],
+        inputs: &[F2],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Wire>> {
-        let mut lens = Vec::new();
-        let mut bs = Vec::new();
-        for (x, q) in inputs.iter().zip(moduli.iter()) {
-            let len = f32::from(*q).log(2.0).ceil() as usize;
-            for b in (0..len).map(|i| x & (1 << i) != 0) {
-                bs.push(b.into());
-            }
-            lens.push(len);
-        }
         let wires = self
-            .run_ot(&bs, channel)
+            .run_ot(inputs, channel)
             .wrap_err(ErrorKind::OtherError, "Failed to run oblivious transfer.")?;
-        let mut start = 0;
-        Ok(lens
+        Ok(wires
             .into_iter()
-            .zip(moduli.iter())
-            .map(|(len, q)| {
-                let range = start..start + len;
-                let chunk = &wires[range];
-                start += len;
-                combine(chunk, *q)
-            })
+            .map(|wire| Wire::from_repr(wire, 2))
             .collect::<Vec<Wire>>())
     }
 }

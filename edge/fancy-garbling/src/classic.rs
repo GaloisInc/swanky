@@ -11,6 +11,7 @@ use rand::CryptoRng;
 use std::collections::HashMap;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
+use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
 /// A garbled circuit.
@@ -128,14 +129,14 @@ impl<Wire: WireLabel> Encoder<Wire> {
     /// # Panics
     /// This panics if `inputs.len()` does not equal the expected number of
     /// garbler inputs.
-    pub fn encode_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+    pub fn encode_inputs(&self, inputs: &[F2]) -> Vec<Wire> {
         assert_eq!(inputs.len(), self.inputs.len());
         self.inputs
             .iter()
             .zip(inputs)
             .map(|(zero, x)| {
                 let q = zero.modulus();
-                zero.clone() + self.deltas[&q].clone() * *x
+                zero.clone() + self.deltas[&q].clone() * (*x).into()
             })
             .collect()
     }

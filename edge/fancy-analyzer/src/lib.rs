@@ -105,7 +105,7 @@ impl CircuitAnalyzer {
     pub fn eval<C: CircuitInputMapper<CircuitAnalyzer>>(&mut self, circuit: &C) -> Result<()> {
         Channel::with(std::io::empty(), |channel| {
             let inputs = (0..circuit.ninputs())
-                .map(|i| self.receive(circuit.modulus(i), channel))
+                .map(|_| self.receive(channel))
                 .collect::<Result<Vec<_>>>()?;
             circuit.execute(self, circuit.map(inputs), channel)?;
             Ok(())
@@ -160,13 +160,13 @@ impl FancyConstant<F2> for CircuitAnalyzer {
     }
 }
 
-impl FancyEncode for CircuitAnalyzer {
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        self.ninputs += moduli.len();
-        Ok(moduli.iter().map(|q| AnalyzerItem::new(*q)).collect())
+impl FancyEncode<F2> for CircuitAnalyzer {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        self.ninputs += n;
+        Ok((0..n).map(|_| AnalyzerItem::new(2)).collect())
     }
 
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         swanky_error::bail!(
             ErrorKind::UnsupportedError,
             "Encoding values is unsupported"

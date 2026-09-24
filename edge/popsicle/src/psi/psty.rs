@@ -149,9 +149,14 @@ impl SenderState {
                 "Failed to initialize garbler during setup.",
             )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
-        let receiver_inputs = gb.receive_many(&mods, channel)?;
+        let sender_inputs = gb.encode_many(
+            &my_input_bits
+                .iter()
+                .map(|bit| F2::from(*bit != 0))
+                .collect::<Vec<_>>(),
+            channel,
+        )?;
+        let receiver_inputs = gb.receive_many(my_input_bits.len(), channel)?;
         Ok((gb, sender_inputs, receiver_inputs))
     }
 
@@ -293,9 +298,14 @@ impl ReceiverState {
                 "Failed to initialize receiver during setup.",
             )?;
 
-        let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.receive_many(&mods, channel)?;
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods, channel)?;
+        let sender_inputs = ev.receive_many(nbins * HASH_SIZE * 8, channel)?;
+        let receiver_inputs = ev.encode_many(
+            &my_input_bits
+                .iter()
+                .map(|bit| F2::from(*bit != 0))
+                .collect::<Vec<_>>(),
+            channel,
+        )?;
         Ok((ev, sender_inputs, receiver_inputs))
     }
 

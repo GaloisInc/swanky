@@ -81,6 +81,9 @@ impl<F: FancyBinary> CircuitOutputMapper<F> for Aes128 {
 
 #[cfg(test)]
 mod test {
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+
     use super::*;
 
     #[test]
@@ -147,7 +150,7 @@ mod test {
 
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();
-        let inputs = encoder.encode_inputs(&vec![0u16; 256]);
+        let inputs = encoder.encode_inputs(&vec![F2::ZERO; 256]);
         let key = inputs[..128].try_into().unwrap();
         let block = inputs[128..].try_into().unwrap();
         gc.eval_to_wirelabels(&aes, (key, block)).unwrap();

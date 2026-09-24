@@ -85,26 +85,20 @@ impl<Wire: WireLabel> FancyConstant<F2> for Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel> FancyEncode for Evaluator<Wire> {
-    fn encode_many(
-        &mut self,
-        _values: &[u16],
-        _moduli: &[u16],
-        _: &mut Channel,
-    ) -> swanky_error::Result<Vec<Self::Item>> {
+impl<Wire: WireLabel> FancyEncode<F2> for Evaluator<Wire> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Evaluator cannot encode values")
     }
 
     fn receive_many(
         &mut self,
-        moduli: &[u16],
+        n: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Self::Item>> {
-        moduli
-            .iter()
-            .map(|q| {
+        (0..n)
+            .map(|_| {
                 let block = channel.read()?;
-                Ok(Wire::from_repr(block, *q))
+                Ok(Wire::from_repr(block, 2))
             })
             .collect()
     }

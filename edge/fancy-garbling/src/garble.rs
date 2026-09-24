@@ -11,23 +11,23 @@ mod helpers {
 
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
+    use swanky_field_binary::F2;
 
     pub(crate) fn plaintext<C: CircuitInputMapper<Dummy> + CircuitOutputMapper<Dummy>>(
         circuit: &C,
-    ) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
+    ) -> (Vec<F2>, Vec<u16>) {
         let mut rng = rng();
 
-        let moduli = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
-            .map(|i| <C as CircuitInputMapper<Dummy>>::modulus(circuit, i))
-            .collect::<Vec<_>>();
-        let inputs = moduli
-            .iter()
-            .map(|q| {
-                let x = rng.random::<u16>() % q;
-                DummyVal::new(x, *q)
+        let inputs = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
+            .map(|_| {
+                let x = rng.random::<u16>() % 2;
+                DummyVal::new(x, 2)
             })
             .collect::<Vec<_>>();
-        let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
+        let plaintext = inputs
+            .iter()
+            .map(|x| F2::from(x.val() != 0))
+            .collect::<Vec<_>>();
 
         let expected = Dummy::eval(
             circuit,
@@ -39,7 +39,7 @@ mod helpers {
             .map(|x| x.val())
             .collect::<Vec<_>>();
 
-        (plaintext, moduli, expected)
+        (plaintext, expected)
     }
 }
 
@@ -65,7 +65,7 @@ mod nonstreaming {
         circuit: &Ex,
     ) {
         for _ in 0..16 {
-            let (inputs, _, expected) = super::helpers::plaintext(circuit);
+            let (inputs, expected) = super::helpers::plaintext(circuit);
 
             let (en, ev, output_mapping) =
                 GarbledCircuit::garble::<W, _, _>(circuit, SwankyRng::new()).unwrap();
@@ -118,13 +118,13 @@ mod streaming {
     ) {
         let rng = SwankyRng::new();
 
-        let (inputs, moduli, expected) = super::helpers::plaintext(circuit);
+        let (inputs, expected) = super::helpers::plaintext(circuit);
 
         let mut gb = Garbler::new(rng);
         let mut ev = Evaluator::new();
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let zeros = gb.encode_many(&inputs, &moduli, channel)?;
+                let zeros = gb.encode_many(&inputs, channel)?;
                 let outputs = circuit.execute(
                     &mut gb,
                     <Ex as CircuitInputMapper<Garbler<_, _>>>::map(circuit, zeros),
@@ -137,7 +137,7 @@ mod streaming {
                 Ok(())
             },
             |channel| {
-                let wires = ev.receive_many(&moduli, channel)?;
+                let wires = ev.receive_many(inputs.len(), channel)?;
                 let outputs = circuit.execute(
                     &mut ev,
                     <Ex as CircuitInputMapper<Evaluator<_>>>::map(circuit, wires),

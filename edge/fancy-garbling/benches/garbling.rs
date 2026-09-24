@@ -39,10 +39,8 @@ fn bench_eval_binary<
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(circuit, SwankyRng::new()).unwrap();
         let inputs = (0..<C as CircuitInputMapper<Garbler<_, _>>>::ninputs(circuit))
-            .map(|i| {
-                rng.random::<u16>() % <C as CircuitInputMapper<Garbler<_, _>>>::modulus(circuit, i)
-            })
-            .collect::<Vec<u16>>();
+            .map(|_| rng.random())
+            .collect::<Vec<_>>();
         let xs = encoder.encode_inputs(&inputs);
         bench.iter(|| {
             let ys = gc

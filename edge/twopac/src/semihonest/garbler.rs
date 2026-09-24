@@ -103,30 +103,23 @@ impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel,
-> FancyEncode for Garbler<RNG, OT, Wire>
+> FancyEncode<F2> for Garbler<RNG, OT, Wire>
 {
     fn encode_many(
         &mut self,
-        vals: &[u16],
-        moduli: &[u16],
+        vals: &[F2],
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<Wire>> {
-        self.garbler.encode_many(vals, moduli, channel)
+        self.garbler.encode_many(vals, channel)
     }
 
-    fn receive_many(
-        &mut self,
-        qs: &[u16],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Vec<Wire>> {
-        let n = qs.len();
-        let lens = qs.iter().map(|q| f32::from(*q).log(2.0).ceil() as usize);
+    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> swanky_error::Result<Vec<Wire>> {
         let mut wires = Vec::with_capacity(n);
-        let mut inputs = Vec::with_capacity(lens.sum());
+        let mut inputs = Vec::with_capacity(n);
 
-        for q in qs.iter() {
-            let delta = self.garbler.delta(*q);
-            let (wire, input) = self._evaluator_input(&delta, *q);
+        for _ in 0..n {
+            let delta = self.garbler.delta(2);
+            let (wire, input) = self._evaluator_input(&delta, 2);
             wires.push(wire);
             for i in input.into_iter() {
                 inputs.push(i);

@@ -14,6 +14,8 @@ mod tests {
     use fancy_garbling::{WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
     use swanky_rng::SwankyRng;
 
@@ -41,8 +43,8 @@ mod tests {
             |channel| {
                 let rng = SwankyRng::new();
                 let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, Wire>::new(channel, rng)?;
-                let mut xs = gb.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
-                let ys = gb.receive_many(&vec![2; 128], channel)?;
+                let mut xs = gb.encode_many(&[F2::ZERO; 128], channel)?;
+                let ys = gb.receive_many(128, channel)?;
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
@@ -58,8 +60,8 @@ mod tests {
             |channel| {
                 let rng = SwankyRng::new();
                 let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, Wire>::new(channel, rng)?;
-                let mut xs = ev.receive_many(&vec![2; 128], channel)?;
-                let ys = ev.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
+                let mut xs = ev.receive_many(128, channel)?;
+                let ys = ev.encode_many(&[F2::ZERO; 128], channel)?;
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,

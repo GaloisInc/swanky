@@ -143,7 +143,7 @@ fn codegen_impls<T: Read + Seek>(
     // JP: Hard coding F2 for now.
     let main = codegen.main;
     quote! {
-        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
+        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge<F2> + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
             type Input = ();
             type Output = Vec<F::Item>; // TODO: should be `()`.
 
@@ -345,7 +345,7 @@ impl FunctionBodyVisitor for Codegen {
             .map(|wid| {
                 let var = self.to_wire_ident(wid);
                 quote! {
-                    let #var = backend.receive(2, channel)?;
+                    let #var = backend.receive(channel)?;
                 }
             })
             .collect::<Vec<_>>();

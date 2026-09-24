@@ -28,7 +28,7 @@ impl<F: FancyConstant<F2>> Circuit<F> for BinaryConstant {
         let xs = u128_to_bits(self.value, self.nbits);
         Ok(BinaryBundle::new(
             xs.into_iter()
-                .map(|x| backend.constant(F2::from(x != 0)))
+                .map(|x| backend.constant(x))
                 .collect::<Vec<_>>(),
         ))
     }

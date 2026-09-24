@@ -85,7 +85,14 @@ impl<'a, F: FancyBinary + FancyConstant<F2> + BinaryGadgets> BinaryNeuralNet<'a,
                 .map(|v| self.backend.output(v, channel))
                 .collect::<Result<Vec<_>>>()?;
             let vals = vals.into_iter().collect::<Option<Vec<_>>>();
-            let val = vals.map(|vals| i64_from_bits(&vals));
+            let val = vals.map(|vals| {
+                i64_from_bits(
+                    &vals
+                        .into_iter()
+                        .map(|bit| F2::from(bit != 0))
+                        .collect::<Vec<_>>(),
+                )
+            });
             result.push(val);
         }
         // We need to do the conversion from `Vec<Option>` to `Option<Vec>`

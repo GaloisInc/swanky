@@ -1,6 +1,7 @@
 //! Utility functions for working with [`NeuralNet`](crate::NeuralNet)s.
 
 use fancy_circuits::util::{modulus_with_width, u128_from_bits};
+use swanky_field_binary::F2;
 
 /// Convert a list of bitwidths to their associated moduli.
 pub fn bitwidths_to_moduli(bitwidths: &[usize]) -> Vec<u128> {
@@ -47,7 +48,7 @@ pub fn i64_from_twos_complement(x: u128, nbits: usize) -> i64 {
 }
 
 /// Convert a sequence of bits into its `i64` representation.
-pub fn i64_from_bits(bits: &[u16]) -> i64 {
+pub fn i64_from_bits(bits: &[F2]) -> i64 {
     let x = u128_from_bits(bits);
     i64_from_twos_complement(x, bits.len())
 }

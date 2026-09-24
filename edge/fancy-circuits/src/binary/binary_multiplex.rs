@@ -64,14 +64,8 @@ impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplexConstantB
     ) -> Result<Self::Output> {
         let (b, c1, c2, nbits) = inputs;
 
-        let c1_bs = u128_to_bits(c1, nbits)
-            .into_iter()
-            .map(|x: u16| x > 0)
-            .collect::<Vec<_>>();
-        let c2_bs = u128_to_bits(c2, nbits)
-            .into_iter()
-            .map(|x: u16| x > 0)
-            .collect::<Vec<_>>();
+        let c1_bs = u128_to_bits(c1, nbits);
+        let c2_bs = u128_to_bits(c2, nbits);
         c1_bs
             .into_iter()
             .zip(c2_bs)

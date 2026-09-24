@@ -27,6 +27,7 @@ rand.workspace = true
 fancy-analyzer.workspace = true
 fancy-circuits.workspace = true
 fancy-plaintext.workspace = true
+swanky-field.workspace = true
 swanky-ot-chou-orlandi.workspace = true
 swanky-ot-alsz-kos.workspace = true
 

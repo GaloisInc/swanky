@@ -37,6 +37,7 @@ swanky-field-binary.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
+swanky-field.workspace = true
 swanky-rng.workspace = true
 criterion.workspace = true
 

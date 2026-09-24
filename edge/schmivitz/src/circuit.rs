@@ -392,8 +392,8 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
-    for CircuitInterpreter<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2> + FancyEncode<F2>>
+    FancyCircuit<F> for CircuitInterpreter<'a>
 {
     type Input = ();
     type Output = Vec<F::Item>; // TODO: This should be `()`.
@@ -453,7 +453,7 @@ impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge + FancyEncode> 
                     assert_eq!(*ty, 0);
 
                     for wid in dst.start..=dst.end {
-                        let res = backend.receive(2, channel)?;
+                        let res = backend.receive(channel)?;
 
                         memory.insert(wid, res);
                     }
