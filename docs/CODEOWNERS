@@ -147,7 +147,7 @@
 /.github
 /.github/
 /.gitlab-ci.yml
-/CODEOWNERS
+/docs/CODEOWNERS
 /etc/
 /etc
 /rust-toolchain

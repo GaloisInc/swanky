@@ -98,7 +98,7 @@ Ask questions of the code author in comments! If you have a question about the c
 
 ## `CODEOWNERS`
 
-We aspire to have each component (i.e. crate) of Swanky owned by a team of at least _two_ people. This information is recorded in our [`CODEOWNERS`](../CODEOWNERS) file.
+We aspire to have each component (i.e. crate) of Swanky owned by a team of at least _two_ people. This information is recorded in our [`CODEOWNERS`](CODEOWNERS) file.
 
 The code owners are responsible for shepherding the components that they own, including:
 

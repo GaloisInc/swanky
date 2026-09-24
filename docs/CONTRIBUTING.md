@@ -29,11 +29,11 @@ Because Swanky is a research and prototyping platform, we prioritize work which 
 
 ## Swanky Development Process
 
-See the [Swanky Development Process](CONTRIBUTING/swanky-development-process.md) document for details.
+See the [Swanky Development Process](swanky-development-process.md) document for details.
 
 ## Swanky Implementation Information
 
-See the [Swanky Implementation Information](CONTRIBUTING/swanky-implementation-info.md) document for details.
+See the [Swanky Implementation Information](swanky-implementation-info.md) document for details.
 
 ## Swanky and AI Tools
 
