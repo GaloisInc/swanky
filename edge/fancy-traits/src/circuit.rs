@@ -18,13 +18,13 @@ use swanky_error::Result;
 /// # Example
 /// Below is a simple circuit computing an add gate. The computation is defined
 /// in `execute` by directly calling operations on the underlying [`Fancy`]
-/// backend ([`crate::FancyArithmetic`] in this example).
+/// backend ([`crate::FancyBinary`] in this example).
 /// ```
-/// # use fancy_traits::{FancyArithmetic, Circuit};
+/// # use fancy_traits::{FancyBinary, Circuit};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
 /// struct AddCircuit;
-/// impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
+/// impl<F: FancyBinary> Circuit<F> for AddCircuit {
 ///     type Input = (F::Item, F::Item);
 ///     type Output = F::Item;
 ///
@@ -34,12 +34,12 @@ use swanky_error::Result;
 ///         inputs: Self::Input,
 ///         channel: &mut Channel,
 ///     ) -> Result<Self::Output> {
-///         Ok(backend.add(&inputs.0, &inputs.1))
+///         Ok(backend.xor(&inputs.0, &inputs.1))
 ///     }
 /// }
 /// ```
 /// Given `AddCircuit`, any object instantiating the required [`Fancy`] traits
-/// can evaluate the circuit by calling `AddMany.execute(...)`.
+/// can evaluate the circuit by calling `AddCircuit.execute(...)`.
 pub trait Circuit<F: Fancy> {
     /// The input type of the circuit.
     type Input;
@@ -78,11 +78,11 @@ pub trait Circuit<F: Fancy> {
 /// documentation to support mapping a vector of inputs into the appropriate
 /// input type for the given circuit.
 /// ```
-/// # use fancy_traits::{FancyArithmetic, Circuit, CircuitInputMapper};
+/// # use fancy_traits::{FancyBinary, Circuit, CircuitInputMapper};
 /// # use swanky_channel::Channel;
 /// # use swanky_error::Result;
 /// # struct AddCircuit;
-/// # impl<F: FancyArithmetic> Circuit<F> for AddCircuit {
+/// # impl<F: FancyBinary> Circuit<F> for AddCircuit {
 /// #     type Input = (F::Item, F::Item);
 /// #     type Output = F::Item;
 /// #
@@ -92,10 +92,10 @@ pub trait Circuit<F: Fancy> {
 /// #         inputs: Self::Input,
 /// #         channel: &mut Channel,
 /// #     ) -> Result<Self::Output> {
-/// #         Ok(backend.add(&inputs.0, &inputs.1))
+/// #         Ok(backend.xor(&inputs.0, &inputs.1))
 /// #     }
 /// # }
-/// impl<F: FancyArithmetic> CircuitInputMapper<F> for AddCircuit {
+/// impl<F: FancyBinary> CircuitInputMapper<F> for AddCircuit {
 ///     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
 ///         assert_eq!(inputs.len(), 2);
 ///         (inputs[0].clone(), inputs[1].clone())
