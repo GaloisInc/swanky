@@ -1,7 +1,7 @@
 //! A collection of test circuits.
 
 pub mod fancy_binary_constant {
-    //! Circuits that test [`FancyBinaryConstant`].
+    //! Circuits that test [`FancyConstant`].
 
     use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyConstant};
     use swanky_channel::Channel;
@@ -9,7 +9,7 @@ pub mod fancy_binary_constant {
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
-    /// Circuit for testing [`FancyBinaryConstant::constant`].
+    /// Circuit for testing [`FancyConstant::constant`].
     pub struct TestBinaryConstant;
     impl<F: FancyConstant<F2>> Circuit<F> for TestBinaryConstant {
         type Input = ();
