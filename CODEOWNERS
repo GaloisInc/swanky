@@ -146,9 +146,8 @@
 /.cargo/
 /.github
 /.github/
-/.gitlab
-/.gitlab/
 /.gitlab-ci.yml
+/CODEOWNERS
 /etc/
 /etc
 /rust-toolchain
