@@ -9,6 +9,8 @@ use fancy_traits::HasModulus;
 use rand::CryptoRng;
 use subtle::ConditionallySelectable;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
+use swanky_field::FiniteField;
+use swanky_field_binary::F2;
 use vectoreyes::{
     U8x16,
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
@@ -18,7 +20,7 @@ mod mod2;
 pub use mod2::WireMod2;
 
 /// Hash a batch of wires, using the same tweak for each wire.
-pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> [U8x16; Q]
+pub fn hash_wires<const Q: usize, W: WireLabel<F2>>(wires: [&W; Q], tweak: u128) -> [U8x16; Q]
 where
     ArrayUnrolledOps: UnrollableArraySize<Q>,
 {
@@ -28,7 +30,7 @@ where
 
 /// The [`BinaryWireLabel`] provides the subroutines to implement AND gates
 /// for the garbler and evaluator in [`fancy_traits::FancyBinary`].
-pub trait BinaryWireLabel: WireLabel + ConditionallySelectable {
+pub trait BinaryWireLabel: WireLabel<F2> + ConditionallySelectable {
     /// Garbles an 'and' gate given two input wires and the delta.
     ///
     /// Outputs a tuple consisting of the two gates (that should be transfered to the evaluator)
@@ -46,7 +48,7 @@ pub trait BinaryWireLabel: WireLabel + ConditionallySelectable {
 ///
 /// At its core, a [`WireLabel`] is a way of encoding values, and operating on
 /// those encoded values.
-pub trait WireLabel:
+pub trait WireLabel<FF: FiniteField>:
     Clone
     + core::fmt::Debug
     + core::default::Default

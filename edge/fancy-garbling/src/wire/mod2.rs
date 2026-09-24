@@ -2,6 +2,7 @@ use crate::{BinaryWireLabel, WireLabel, util::tweak2, wire::hash_wires};
 use fancy_traits::HasModulus;
 use rand::{CryptoRng, RngExt};
 use subtle::ConditionallySelectable;
+use swanky_field_binary::F2;
 use vectoreyes::{SimdBase, U8x16};
 
 impl HasModulus for WireMod2 {
@@ -90,7 +91,7 @@ impl ConditionallySelectable for WireMod2 {
     }
 }
 
-impl WireLabel for WireMod2 {
+impl WireLabel<F2> for WireMod2 {
     fn rand_delta<R: CryptoRng>(rng: &mut R, q: u16) -> Self {
         if q != 2 {
             panic!("[WireMod2::rand_delta] Expected modulo 2. Got {}", q);

@@ -31,7 +31,7 @@ impl<OT, RNG, Wire> std::ops::DerefMut for Garbler<RNG, OT, Wire> {
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel,
+    Wire: WireLabel<F2>,
 > Garbler<RNG, OT, Wire>
 {
     /// Make a new `Garbler`.
@@ -82,7 +82,7 @@ impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + Sem
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel,
+    Wire: WireLabel<F2>,
 > Fancy for Garbler<RNG, OT, Wire>
 {
     type Item = Wire;
@@ -91,7 +91,7 @@ impl<
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel,
+    Wire: WireLabel<F2>,
 > FancyConstant<F2> for Garbler<RNG, OT, Wire>
 {
     fn constant(&mut self, x: F2) -> Self::Item {
@@ -102,7 +102,7 @@ impl<
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel,
+    Wire: WireLabel<F2>,
 > FancyEncode<F2> for Garbler<RNG, OT, Wire>
 {
     fn encode_many(
@@ -135,7 +135,7 @@ impl<
 impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel,
+    Wire: WireLabel<F2>,
 > FancyOutput for Garbler<RNG, OT, Wire>
 {
     fn output(

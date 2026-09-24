@@ -44,7 +44,7 @@ impl GarbledCircuit {
     /// 3. An [`OutputMapping`] mapping for mapping output wirelabels to their
     ///    associated underlying values.
     pub fn garble<
-        Wire: WireLabel,
+        Wire: WireLabel<F2>,
         C: CircuitInputMapper<Garbler<RNG, Wire>> + CircuitOutputMapper<Garbler<RNG, Wire>>,
         RNG: CryptoRng,
     >(
@@ -85,7 +85,7 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, mapping the output
     /// wirelabels to their associated values.
-    pub fn eval<Wire: WireLabel, C: CircuitOutputMapper<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel<F2>, C: CircuitOutputMapper<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: C::Input,
@@ -97,7 +97,7 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
     /// output wirelabels.
-    pub fn eval_to_wirelabels<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
+    pub fn eval_to_wirelabels<Wire: WireLabel<F2>, C: Circuit<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: C::Input,
@@ -117,7 +117,7 @@ pub struct Encoder<Wire> {
     deltas: HashMap<u16, Wire>,
 }
 
-impl<Wire: WireLabel> Encoder<Wire> {
+impl<Wire: WireLabel<F2>> Encoder<Wire> {
     /// Make a new [`Encoder`] from lists of inputs, alongside a map of
     /// moduli-to-wire-offsets.
     pub fn new(inputs: Vec<Wire>, deltas: HashMap<u16, Wire>) -> Self {
@@ -134,10 +134,7 @@ impl<Wire: WireLabel> Encoder<Wire> {
         self.inputs
             .iter()
             .zip(inputs)
-            .map(|(zero, x)| {
-                let q = zero.modulus();
-                zero.clone() + self.deltas[&q].clone() * (*x).into()
-            })
+            .map(|(zero, x)| zero.clone() + self.deltas[&2].clone() * (*x).into())
             .collect()
     }
 }
@@ -149,13 +146,12 @@ pub struct OutputMapping(Vec<Vec<U8x16>>);
 impl OutputMapping {
     /// Construct a new [`OutputMapping`] from a set of zero wirelabels and
     /// their associated deltas.
-    pub fn new<Wire: WireLabel>(zeros: &[Wire], deltas: &HashMap<u16, Wire>) -> Self {
+    pub fn new<Wire: WireLabel<F2>>(zeros: &[Wire], deltas: &HashMap<u16, Wire>) -> Self {
         let mut outputs = Vec::with_capacity(zeros.len());
         for (i, zero) in zeros.iter().enumerate() {
-            let q = zero.modulus();
-            let mut wirelabels = Vec::with_capacity(q as usize);
-            for k in 0..q {
-                let wirelabel = zero.clone() + deltas[&q].clone() * k;
+            let mut wirelabels = Vec::with_capacity(2);
+            for k in 0..2 {
+                let wirelabel = zero.clone() + deltas[&2].clone() * k;
                 let hashed = wirelabel.hash(output_tweak(i, k));
                 wirelabels.push(hashed);
             }
@@ -169,7 +165,7 @@ impl OutputMapping {
     /// # Errors
     /// This returns an error if it is unable to find a valid mapping for a
     /// given output wirelabel.
-    pub fn to_outputs<Wire: WireLabel>(
+    pub fn to_outputs<Wire: WireLabel<F2>>(
         &self,
         wirelabels: &[Wire],
     ) -> swanky_error::Result<Vec<u16>> {

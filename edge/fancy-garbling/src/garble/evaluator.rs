@@ -15,7 +15,7 @@ pub struct Evaluator<Wire> {
     current_output: usize,
 }
 
-impl<Wire: WireLabel> Evaluator<Wire> {
+impl<Wire: WireLabel<F2>> Evaluator<Wire> {
     /// Create a new [`Evaluator`].
     pub fn new() -> Self {
         // We set the constant `1` wirelabel to simply be `1`.
@@ -42,7 +42,7 @@ impl<Wire: WireLabel> Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel> Default for Evaluator<Wire> {
+impl<Wire: WireLabel<F2>> Default for Evaluator<Wire> {
     fn default() -> Self {
         Self::new()
     }
@@ -70,11 +70,11 @@ impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
     }
 }
 
-impl<Wire: WireLabel> Fancy for Evaluator<Wire> {
+impl<Wire: WireLabel<F2>> Fancy for Evaluator<Wire> {
     type Item = Wire;
 }
 
-impl<Wire: WireLabel> FancyConstant<F2> for Evaluator<Wire> {
+impl<Wire: WireLabel<F2>> FancyConstant<F2> for Evaluator<Wire> {
     fn constant(&mut self, x: F2) -> Self::Item {
         if x.into() {
             self.one.clone()
@@ -85,7 +85,7 @@ impl<Wire: WireLabel> FancyConstant<F2> for Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel> FancyEncode<F2> for Evaluator<Wire> {
+impl<Wire: WireLabel<F2>> FancyEncode<F2> for Evaluator<Wire> {
     fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> swanky_error::Result<Vec<Self::Item>> {
         unimplemented!("Evaluator cannot encode values")
     }
@@ -104,7 +104,7 @@ impl<Wire: WireLabel> FancyEncode<F2> for Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel> FancyOutput for Evaluator<Wire> {
+impl<Wire: WireLabel<F2>> FancyOutput for Evaluator<Wire> {
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = x.modulus();
         let i = self.current_output();

@@ -22,7 +22,7 @@ mod tests {
     type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
     type EV<Wire> = Evaluator<SwankyRng, ChouOrlandiReceiver, Wire>;
 
-    fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
+    fn test_aes<C, Wire: WireLabel<F2> + Send>(circ: &C)
     where
         C: CircuitInputMapper<Dummy>
             + CircuitOutputMapper<Dummy>

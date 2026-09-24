@@ -49,12 +49,13 @@ mod nonstreaming {
     use fancy_circuits::test_circuits::binary::TestOrGateFanN;
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
+    use swanky_field_binary::F2;
     use swanky_rng::SwankyRng;
 
     // Check that non-streaming evaluation of a circuit execution equals the
     // dummy evaluation of the same function.
     fn garble_test_helper<
-        W: WireLabel,
+        W: WireLabel<F2>,
         Ex: CircuitInputMapper<Dummy>
             + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<Garbler<SwankyRng, W>>
@@ -99,12 +100,13 @@ mod streaming {
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
     use fancy_traits::{FancyEncode, FancyOutput};
+    use swanky_field_binary::F2;
     use swanky_rng::SwankyRng;
 
     // Check that streaming evaluation of a circuit execution equals the dummy
     // evaluation of the same function.
     fn streaming_test_helper<
-        W: WireLabel + Send,
+        W: WireLabel<F2> + Send,
         Ex: CircuitInputMapper<Dummy>
             + CircuitOutputMapper<Dummy>
             + CircuitInputMapper<Garbler<SwankyRng, W>>

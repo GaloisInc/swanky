@@ -21,7 +21,7 @@ pub struct Garbler<RNG, Wire> {
 }
 
 #[cfg(feature = "serde")]
-impl<RNG: CryptoRng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel<F2> + DeserializeOwned> Garbler<RNG, Wire> {
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         let f = std::fs::File::open(filename)?;
@@ -32,7 +32,7 @@ impl<RNG: CryptoRng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
     pub fn new(mut rng: RNG) -> Self {
         let delta = Wire::rand_delta(&mut rng, 2);
@@ -119,11 +119,11 @@ impl<RNG: CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel<F2>> Fancy for Garbler<RNG, Wire> {
     type Item = Wire;
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant<F2> for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyConstant<F2> for Garbler<RNG, Wire> {
     fn constant(&mut self, x: F2) -> Self::Item {
         if x.into() {
             // `self.zero` corresponds to the zero wirelabel associated with the
@@ -136,7 +136,7 @@ impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant<F2> for Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> FancyEncode<F2> for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire> {
     fn encode_many(
         &mut self,
         values: &[F2],
@@ -158,7 +158,7 @@ impl<RNG: CryptoRng, Wire: WireLabel> FancyEncode<F2> for Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: CryptoRng, Wire: WireLabel> FancyOutput for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyOutput for Garbler<RNG, Wire> {
     fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = X.modulus();
         let i = self.current_output();
