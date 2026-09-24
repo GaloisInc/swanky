@@ -9,5 +9,5 @@ pub mod util;
 mod wire;
 
 pub use crate::garble::{Evaluator, Garbler};
-pub use crate::wire::{ArithmeticWireLabel, BinaryWireLabel, WireLabel};
-pub use crate::wire::{WireMod2, WireMod3, WireModQ};
+pub use crate::wire::WireMod2;
+pub use crate::wire::{BinaryWireLabel, WireLabel};

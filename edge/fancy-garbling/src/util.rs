@@ -4,7 +4,6 @@
 
 use rand::RngExt as _;
 
-use fancy_circuits::util::as_mixed_radix;
 use vectoreyes::U8x16;
 
 /// Tweak function for two items.
@@ -47,28 +46,6 @@ pub(crate) fn digits_per_u128(modulus: u16) -> usize {
     }
 }
 
-/// Convert little-endian base `q` digits into `u128`.
-pub(crate) fn from_base_q(ds: &[u16], q: u16) -> u128 {
-    let mut x = 0u128;
-    for &d in ds.iter().rev() {
-        let (xp, overflow) = x.overflowing_mul(q.into());
-        debug_assert!(!overflow, "overflow!!!! x={}", x);
-        x = xp + d as u128;
-    }
-    x
-}
-
-/// Convert `x` into base `q`, building a vector of length `n`.
-fn as_base_q(x: u128, q: u16, n: usize) -> Vec<u16> {
-    let ms = core::iter::repeat_n(q, n).collect::<Vec<_>>();
-    as_mixed_radix(x, &ms)
-}
-
-/// Convert `x` into base `q`.
-pub fn as_base_q_u128(x: u128, q: u16) -> Vec<u16> {
-    as_base_q(x, q, digits_per_u128(q))
-}
-
 /// Extra [`rand::Rng`] functionality, useful for testing.
 pub trait RngExt: rand::Rng + Sized {
     /// Randomly generate a valid `Block`.
@@ -86,22 +63,3 @@ pub trait RngExt: rand::Rng + Sized {
 }
 
 impl<R: rand::Rng + Sized> RngExt for R {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use fancy_circuits::util::RngExt as _;
-    use rand::rng;
-
-    #[test]
-    fn base_q_conversion() {
-        let mut rng = rng();
-        for _ in 0..1000 {
-            let q = rng.gen_modulus();
-            let x = u128::from(rng.gen_usable_block(q));
-            let y = as_base_q(x, q, digits_per_u128(q));
-            let z = from_base_q(&y, q);
-            assert_eq!(x, z);
-        }
-    }
-}

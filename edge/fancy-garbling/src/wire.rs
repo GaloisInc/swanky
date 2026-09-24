@@ -5,7 +5,6 @@
 //! in garbled circuits, and represents an encoding of the value on any given
 //! wire of the circuit.
 
-use crate::util;
 use fancy_traits::HasModulus;
 use rand::CryptoRng;
 use subtle::ConditionallySelectable;
@@ -17,11 +16,6 @@ use vectoreyes::{
 
 mod mod2;
 pub use mod2::WireMod2;
-mod mod3;
-pub use mod3::WireMod3;
-mod modq;
-pub use modq::WireModQ;
-mod npaths_tab;
 
 /// Hash a batch of wires, using the same tweak for each wire.
 pub fn hash_wires<const Q: usize, W: WireLabel>(wires: [&W; Q], tweak: u128) -> [U8x16; Q]
@@ -31,10 +25,6 @@ where
     let batch = wires.array_map(|x| x.to_repr());
     TweakableCircularCorrelationRobustHash::fixed_key().hash_many(batch, tweak)
 }
-
-/// A marker trait indicating that the given [`WireLabel`] instantiation
-/// supports arithmetic operations.
-pub trait ArithmeticWireLabel: WireLabel {}
 
 /// The [`BinaryWireLabel`] provides the subroutines to implement AND gates
 /// for the garbler and evaluator in [`fancy_traits::FancyBinary`].
@@ -116,56 +106,4 @@ pub trait WireLabel:
         let wire = zero.clone() + delta.clone() * x;
         (zero, wire)
     }
-}
-
-fn _unrank(inp: u128, q: u16) -> Vec<u16> {
-    let mut x = inp;
-    let ndigits = util::digits_per_u128(q);
-    let npaths_tab = npaths_tab::lookup(q);
-    x %= npaths_tab[ndigits - 1] * q as u128;
-
-    let mut ds = vec![0; ndigits];
-    for i in (0..ndigits).rev() {
-        let npaths = npaths_tab[i];
-
-        if q <= 23 {
-            // linear search
-            let mut acc = 0;
-            for j in 0..q {
-                acc += npaths;
-                if acc > x {
-                    x -= acc - npaths;
-                    ds[i] = j;
-                    break;
-                }
-            }
-        } else {
-            // naive division
-            let d = x / npaths;
-            ds[i] = d as u16;
-            x -= d * npaths;
-        }
-        // } else {
-        //     // binary search
-        //     let mut low = 0;
-        //     let mut high = q;
-        //     loop {
-        //         let cur = (low + high) / 2;
-        //         let l = npaths * cur as u128;
-        //         let r = npaths * (cur as u128 + 1);
-        //         if x >= l && x < r {
-        //             x -= l;
-        //             ds[i] = cur;
-        //             break;
-        //         }
-        //         if x < l {
-        //             high = cur;
-        //         } else {
-        //             // x >= r
-        //             low = cur;
-        //         }
-        //     }
-        // }
-    }
-    ds
 }

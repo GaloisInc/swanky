@@ -32,25 +32,6 @@ pub fn u128_from_bits(bs: &[F2]) -> u128 {
     x
 }
 
-/// Convert `x` into mixed radix form using the provided `radii`.
-pub fn as_mixed_radix(x: u128, radii: &[u16]) -> Vec<u16> {
-    let mut x = x;
-    radii
-        .iter()
-        .map(|&m| {
-            if x >= m as u128 {
-                let d = x % m as u128;
-                x = (x - d) / m as u128;
-                d as u16
-            } else {
-                let d = x as u16;
-                x = 0;
-                d
-            }
-        })
-        .collect()
-}
-
 const NPRIMES: usize = 29;
 
 /// Supported primes.
