@@ -17,11 +17,12 @@
 //! # use fancy_traits::{FancyEncode, FancyOutput};
 //! # use rand::RngExt;
 //! # use swanky_authenticated_garbling::{GarblerOffline, EvaluatorOffline};
+//! # use swanky_field_binary::F2;
 //! # fn main() -> swanky_error::Result<()> {
 //! let mut rng = swanky_rng::SwankyRng::new();
 //! let circuit = fancy_circuits::crypto::aes::Aes128::new();
-//! let key: Vec<u16> = (0..128).map(|_| rng.random::<u16>() % 2).collect();
-//! let block: Vec<u16> = (0..128).map(|_| rng.random::<u16>() % 2).collect();
+//! let key: Vec<F2> = (0..128).map(|_| rng.random()).collect();
+//! let block: Vec<F2> = (0..128).map(|_| rng.random()).collect();
 //! let (_, outputs) = swanky_channel::local::local_channel_pair(
 //!     |channel| {
 //!         let mut rng = swanky_rng::SwankyRng::new();
@@ -33,8 +34,8 @@
 //!         // Finalize the offline phase, returning a `GarblerOnline`.
 //!         let mut gb = gb.finalize(channel)?;
 //!         // Encode inputs as needed.
-//!         let mut inputs = gb.encode_many(&key, &vec![2; 128], channel)?;
-//!         let their = gb.receive_many(&vec![2; 128], channel)?;
+//!         let mut inputs = gb.encode_many(&key, channel)?;
+//!         let their = gb.receive_many(128, channel)?;
 //!         inputs.extend(their);
 //!         // There's nothing for the garbler to run in the online phase, so the
 //!         //next step is to finalize the phase, returning a `GarblerValidator`.
@@ -55,8 +56,8 @@
 //!         // the next step is to finalize the phase, returning an `EvaluatorOnline`.
 //!         let mut ev = ev.finalize(channel)?;
 //!         // Encode inputs as needed.
-//!         let mut inputs = ev.receive_many(&vec![2; 128], channel)?;
-//!         let mine = ev.encode_many(&block, &vec![2; 128], channel)?;
+//!         let mut inputs = ev.receive_many(128, channel)?;
+//!         let mine = ev.encode_many(&block, channel)?;
 //!         inputs.extend(mine);
 //!         // Evaluate the circuit locally using the offline information.
 //!         let (outputs, ev) = ev.execute(inputs)?;
