@@ -46,8 +46,21 @@ pub trait OTInit<P: Party>: Sized {
 
 /// OT protocols where the messages are random.
 ///
-/// 1-out-of-2 protocols can be constructed using protocols
-/// implementing this trait using a standard OTP construction.
+/// 'Standard' 1-out-of-2 protocols (see [`ObliviousTransfer`]) can be
+/// constructed using protocols implementing this trait via a standard
+/// construction.
+/// For the sake of discussion, assume the [`Receiver`] has a
+/// selection bit $`c`$, the [`Sender`] has messages $`m_0`$ and
+/// $`m_1`$, and the `Receiver` wants to learn $`m_c`$.
+///
+/// 1. Run [`OTRandom::ot_random`] with the given selection bit.
+///    The `Sender` generates and saves two values, $`x_0`$ and
+///    $`x_1`$, the `Receiver` learns $`x_c`$.
+/// 2. `Sender` computes and sends $`\text{Enc}_{x_0}(m_0)`$ and
+///    $`\text{Enc}_{x_1}(m_1)`$.
+///    $`\text{Enc}`$ is agreed upon ahead of time.
+/// 3. `Receiver` can only decrypt the message encrypted with $`x_c`$,
+///    which is $`m_c`$.
 pub trait OTRandom<P: Party>: OTInit<P> {
     /// Run random OT.
     ///
