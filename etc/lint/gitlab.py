@@ -10,7 +10,7 @@ from etc.lint import LintResult
 
 def lint_codeowners_file(ctx: click.Context) -> LintResult:
     """
-    Lint .gitlab/CODEOWNERS
+    Lint CODEOWNERS
 
     Check that all CODEOWNERS paths exist
     Check that all CODEOWNERS entries for folders have one entry with a final slash and one without
@@ -19,7 +19,7 @@ def lint_codeowners_file(ctx: click.Context) -> LintResult:
     any_errors = False
     current_section = ""
     contents: DefaultDict[str, Dict[str, FrozenSet[str]]] = defaultdict(dict)
-    for i, line in enumerate((ROOT / ".gitlab/CODEOWNERS").read_text().splitlines()):
+    for i, line in enumerate((ROOT / "CODEOWNERS").read_text().splitlines()):
         line = line.strip()
         lineno = i + 1
         if line.startswith("#"):
