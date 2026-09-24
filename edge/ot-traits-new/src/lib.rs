@@ -90,7 +90,7 @@ pub trait OTRandom<P: Party>: OTInit<P> {
 ///
 /// A protocol implementing this trait should guarantee:
 ///
-/// - `Receiver` learned $`M_b`$
+/// - `Receiver` learns $`M_b`$
 /// - `Receiver` learns nothing about $`M_{1 - b}`$ (i.e. the other
 ///   message)
 /// - `Sender` learns nothing about $`b`$ (i.e. which message the
