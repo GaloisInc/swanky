@@ -34,10 +34,10 @@ If a project demands it, you can merge into a project-specific branch, before me
 
 We generate a lot of branches! In order to keep them tidy, it can be helpful to name branches like:
 
-* **Feature Branches:** `feature/<name>`
-* **Refactor Branches:** `refactor/<name>`
-* **Experimental Branches:** `experimental/<name>`
-* **Bugfix Branches:** `bugfix/<name>`
+* **Feature Branches:** `feature/<affected crate>/<name>`
+* **Refactor Branches:** `refactor/<affected crate>/<name>`
+* **Experimental Branches:** `experimental/<affected crate>/<name>`
+* **Bugfix Branches:** `bugfix/<affected crate>/<name>`
 
 ## Commit Practices / Invariants
 
