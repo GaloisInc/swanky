@@ -73,10 +73,6 @@ impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
     fn ninputs(&self) -> usize {
         768
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
 impl<F: FancyBinary> CircuitOutputMapper<F> for Sha256CompressionFunction {

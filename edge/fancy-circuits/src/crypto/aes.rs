@@ -67,10 +67,6 @@ impl<F: FancyBinary> CircuitInputMapper<F> for Aes128 {
     fn ninputs(&self) -> usize {
         256
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
 impl<F: FancyBinary> CircuitOutputMapper<F> for Aes128 {

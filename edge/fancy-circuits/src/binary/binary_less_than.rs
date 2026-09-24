@@ -149,10 +149,6 @@ pub mod test {
         fn ninputs(&self) -> usize {
             self.0 * 2
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
     /// Circuit for testing [`BinaryLessThanSigned`].
@@ -180,10 +176,6 @@ pub mod test {
 
         fn ninputs(&self) -> usize {
             self.0 * 2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
         }
     }
 

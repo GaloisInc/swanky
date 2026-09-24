@@ -65,10 +65,6 @@ impl<F: FancyBinary> CircuitInputMapper<F> for BristolFashionCircuit {
     fn ninputs(&self) -> usize {
         self.ninputs
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
 /// Binary gates used by [`BristolFashionCircuit`].

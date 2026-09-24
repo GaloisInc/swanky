@@ -46,10 +46,6 @@ impl<F: FancyBinary> CircuitInputMapper<F> for And {
     fn ninputs(&self) -> usize {
         2
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
 impl<F: FancyBinary> CircuitOutputMapper<F> for And {

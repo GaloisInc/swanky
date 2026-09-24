@@ -62,10 +62,6 @@ pub mod test {
         fn ninputs(&self) -> usize {
             0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
     #[test]

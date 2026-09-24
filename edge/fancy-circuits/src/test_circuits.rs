@@ -33,10 +33,6 @@ pub mod fancy_binary_constant {
         fn ninputs(&self) -> usize {
             0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryConstant {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
@@ -77,10 +73,6 @@ pub mod binary {
         fn ninputs(&self) -> usize {
             1
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestNegateGate {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
@@ -110,10 +102,6 @@ pub mod binary {
         }
 
         fn ninputs(&self) -> usize {
-            2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
             2
         }
     }
@@ -147,10 +135,6 @@ pub mod binary {
         fn ninputs(&self) -> usize {
             self.0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestAndGateFanN {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
@@ -182,10 +166,6 @@ pub mod binary {
         fn ninputs(&self) -> usize {
             self.0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestOrGateFanN {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
@@ -216,10 +196,6 @@ pub mod binary {
 
         fn ninputs(&self) -> usize {
             self.0
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
         }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestXorGateFanN {

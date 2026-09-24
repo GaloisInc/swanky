@@ -71,10 +71,6 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitInputMapper<F> f
     fn ninputs(&self) -> usize {
         (self.size + 1) * N
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
 impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitOutputMapper<F> for LinearOram<N> {

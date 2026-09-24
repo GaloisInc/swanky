@@ -74,10 +74,6 @@ pub mod test {
         fn ninputs(&self) -> usize {
             self.0 * 2
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
     impl<F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinarySubtraction {

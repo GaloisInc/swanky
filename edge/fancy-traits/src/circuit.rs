@@ -104,10 +104,6 @@ pub trait Circuit<F: Fancy> {
 ///     fn ninputs(&self) -> usize {
 ///         2
 ///     }
-///
-///     fn modulus(&self, _: usize) -> u16 {
-///         2
-///     }
 /// }
 /// ```
 pub trait CircuitInputMapper<F: Fancy>: Circuit<F> {
@@ -119,8 +115,6 @@ pub trait CircuitInputMapper<F: Fancy>: Circuit<F> {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input;
     /// The number of inputs to provide to [`CircuitInputMapper::map`].
     fn ninputs(&self) -> usize;
-    /// The modulus of the `i`th input.
-    fn modulus(&self, i: usize) -> u16;
 }
 
 /// Trait for mapping circuit outputs to a flat vector.

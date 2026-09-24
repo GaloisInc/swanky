@@ -88,10 +88,6 @@ impl<F: FancyBinary> CircuitInputMapper<F> for MixedOp {
     fn ninputs(&self) -> usize {
         1
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
 impl<F: FancyBinary> CircuitOutputMapper<F> for MixedOp {
