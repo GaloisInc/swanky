@@ -2,12 +2,7 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use popsicle::psz;
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-    time::Duration,
-};
-use swanky_channel_legacy::Channel;
+use std::time::Duration;
 use swanky_rng::SwankyRng;
 
 const SIZE: usize = 15;
@@ -21,39 +16,33 @@ fn rand_vec_vec(size: usize) -> Vec<Vec<u8>> {
 }
 
 fn _bench_psz_init() {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let _ = psz::Sender::init(&mut channel, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let _ = psz::Receiver::init(&mut channel, &mut rng).unwrap();
-    handle.join().unwrap();
+    swanky_channel::local::local_channel_pair(
+        |channel| {
+            let mut rng = SwankyRng::new();
+            psz::Sender::init(channel, &mut rng)
+        },
+        |channel| {
+            let mut rng = SwankyRng::new();
+            psz::Receiver::init(channel, &mut rng)
+        },
+    )
+    .unwrap();
 }
 
 fn _bench_psz(inputs1: Vec<Vec<u8>>, inputs2: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut psi = psz::Sender::init(&mut channel, &mut rng).unwrap();
-        psi.send(&inputs1, &mut channel, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut psi = psz::Receiver::init(&mut channel, &mut rng).unwrap();
-    let intersection = psi.receive(&inputs2, &mut channel, &mut rng).unwrap();
-    handle.join().unwrap();
+    let (_, intersection) = swanky_channel::local::local_channel_pair(
+        |channel| {
+            let mut rng = SwankyRng::new();
+            let mut psi = psz::Sender::init(channel, &mut rng)?;
+            psi.send(&inputs1, channel, &mut rng)
+        },
+        |channel| {
+            let mut rng = SwankyRng::new();
+            let mut psi = psz::Receiver::init(channel, &mut rng)?;
+            psi.receive(&inputs2, channel, &mut rng)
+        },
+    )
+    .unwrap();
     intersection
 }
 

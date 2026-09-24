@@ -4,8 +4,7 @@
 //! Implementations of private set intersection (PSI) protocols.
 
 mod cuckoo;
-pub mod errors;
 mod psi;
 pub mod utils;
 
-pub use crate::{errors::Error, psi::*};
+pub use crate::psi::*;

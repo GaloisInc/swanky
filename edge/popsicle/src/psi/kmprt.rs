@@ -1,11 +1,11 @@
 //! Implementation of the "Kolesnikov-Matania-Pinkas-Rosulek-Trieu" multi-party private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2017/799.pdf>).
 
-use crate::Error;
 use itertools::Itertools;
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use swanky_block::{Block, Block512};
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::Result;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 
 /// The party number for each party.
@@ -30,7 +30,7 @@ impl Sender {
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         Party::init(me, channels, rng).map(Self)
     }
 
@@ -40,7 +40,7 @@ impl Sender {
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         assert!(self.0.id != 0);
 
         let s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
@@ -58,7 +58,7 @@ impl Receiver {
     pub fn init<C: AbstractChannel, RNG: CryptoRng + SeedableRng>(
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         Party::init(0, channels, rng).map(Self)
     }
 
@@ -68,7 +68,7 @@ impl Receiver {
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<Vec<Block>, Error> {
+    ) -> Result<Vec<Block>> {
         let mut s_hat = self.0.conditional_secret_sharing(inputs, channels, rng)?;
 
         // conditional reconstruction
@@ -100,7 +100,7 @@ impl Party {
         me: PartyId,
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut opprf_senders = Vec::with_capacity(channels.len());
         let mut opprf_receivers = Vec::with_capacity(channels.len());
 
@@ -129,7 +129,7 @@ impl Party {
         inputs: &[Block],
         channels: &mut [(PartyId, C)],
         rng: &mut RNG,
-    ) -> Result<Vec<Block512>, Error> {
+    ) -> Result<Vec<Block512>> {
         let nparties = channels.len() + 1;
         let ninputs = inputs.len();
 
