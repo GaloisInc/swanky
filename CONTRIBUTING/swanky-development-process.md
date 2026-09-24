@@ -34,10 +34,15 @@ If a project demands it, you can merge into a project-specific branch, before me
 
 We generate a lot of branches! In order to keep them tidy, it can be helpful to name branches like:
 
-* **Feature Branches:** `feature/<affected crate>/<name>`
-* **Refactor Branches:** `refactor/<affected crate>/<name>`
-* **Experimental Branches:** `experimental/<affected crate>/<name>`
-* **Bugfix Branches:** `bugfix/<affected crate>/<name>`
+* **Feature Branches:** `feature/<core crate modified>/<name>`
+* **Refactor Branches:** `refactor/<core crate modified>/<name>`
+* **Experimental Branches:** `experimental/<core crate modified>/<name>`
+* **Bugfix Branches:** `bugfix/<core crate modified>/<name>`
+
+Here, "core crate modified" refers to the crate at the 'center' of the
+change encapsulated in the branch/associated MR; it's often the case
+that some change affects more than one crate, so use the name of the
+crate that instigated the change, if possible.
 
 ## Commit Practices / Invariants
 
