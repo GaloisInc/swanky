@@ -25,11 +25,10 @@ pub trait HasModulus {
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
 /// underlying wire representation.
 ///
-/// This trait can be further extended to support binary or arithmetic by using
-/// the [`FancyBinary`] or [`FancyArithmetic`] extension traits, respectively.
-/// The [`FancyEncode`] trait allows for encoding values into wires, and the
-/// [`FancyOutput`] trait allows for converting wires into their underlying
-/// plaintext representation.
+/// This trait can be further extended to support binary by using the
+/// [`FancyBinary`] extension trait. The [`FancyEncode`] trait allows for
+/// encoding values into wires, and the [`FancyOutput`] trait allows for
+/// converting wires into their underlying plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
     type Item: Clone + core::fmt::Debug + Default;
@@ -113,27 +112,6 @@ pub trait FancyBinary: Fancy {
         let z = self.and(&notx, &noty, channel)?;
         Ok(self.negate(&z))
     }
-}
-
-/// Extension trait for [`Fancy`] that provides arithmetic operations.
-pub trait FancyArithmetic: Fancy {
-    /// Add `x` and `y`.
-    ///
-    /// # Panics
-    /// This panics if `x` and `y` do not have equal moduli.
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-
-    /// Subtract `x` and `y`.
-    ///
-    /// # Panics
-    /// This panics if `x` and `y` do not have equal moduli.
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-
-    /// Multiply `x` with the constant `c`.
-    fn cmul(&mut self, x: &Self::Item, c: u16) -> Self::Item;
-
-    /// Multiply `x` and `y`.
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item>;
 }
 
 /// Utility macro for asserting that a wire is binary (i.e., has modulus two).

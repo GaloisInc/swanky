@@ -10,50 +10,12 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use fancy_analyzer::CircuitAnalyzer;
-    use fancy_circuits::{crypto::aes::Aes128, test_circuits::arithmetic::TestAddition};
+    use fancy_circuits::crypto::aes::Aes128;
     use fancy_garbling::{AllWire, WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
-    use fancy_traits::{
-        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput,
-    };
+    use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
     use swanky_rng::SwankyRng;
-
-    #[test]
-    fn test_addition() {
-        let modulus = 3;
-        let circuit = TestAddition(modulus);
-        for a in 0..2 {
-            for b in 0..2 {
-                let (_, output) = swanky_channel::local::local_channel_pair(
-                    |channel| {
-                        let rng = SwankyRng::new();
-                        let mut gb =
-                            Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
-                        let x = gb.encode(a, modulus, channel)?;
-                        let y = gb.receive(modulus, channel)?;
-                        let outputs = circuit.execute(&mut gb, (x, y), channel)?;
-                        let result = gb.output(&outputs, channel)?;
-                        assert!(result.is_none());
-                        Ok(())
-                    },
-                    |channel| {
-                        let rng = SwankyRng::new();
-                        let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(
-                            channel, rng,
-                        )?;
-                        let x = ev.receive(modulus, channel)?;
-                        let y = ev.encode(b, modulus, channel)?;
-                        let output = circuit.execute(&mut ev, (x, y), channel)?;
-                        let result = ev.output(&output, channel)?;
-                        Ok(result.unwrap())
-                    },
-                )
-                .unwrap();
-                assert_eq!((a + b) % modulus, output);
-            }
-        }
-    }
 
     type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
     type EV<Wire> = Evaluator<SwankyRng, ChouOrlandiReceiver, Wire>;

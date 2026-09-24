@@ -1,11 +1,7 @@
-use crate::{
-    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireMod2,
-    util::{output_tweak, tweak2},
-    wire::{WireLabel, hash_wires},
-};
+use crate::{AllWire, BinaryWireLabel, WireMod2, util::output_tweak, wire::WireLabel};
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput, HasModulus, is_binary,
+    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput, HasModulus,
+    is_binary,
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -89,7 +85,7 @@ impl FancyBinary for Evaluator<AllWire> {
         is_binary!(x);
         is_binary!(y);
 
-        self.add(x, y)
+        x.clone() + y.clone()
     }
 
     fn and(
@@ -113,73 +109,6 @@ impl FancyBinary for Evaluator<AllWire> {
 
         // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
         unreachable!()
-    }
-}
-
-impl<Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for Evaluator<Wire> {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
-        assert_eq!(x.modulus(), y.modulus());
-        x.clone() + y.clone()
-    }
-
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
-        assert_eq!(x.modulus(), y.modulus());
-        x.clone() - y.clone()
-    }
-
-    fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
-        x.clone() * c
-    }
-
-    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        if A.modulus() < B.modulus() {
-            return self.mul(B, A, channel);
-        }
-        let q = A.modulus();
-        let qb = B.modulus();
-        let unequal = q != qb;
-        let ngates = q as usize + qb as usize - 2 + unequal as usize;
-        let mut gate = Vec::with_capacity(ngates);
-        {
-            for _ in 0..ngates {
-                let block = channel.read::<U8x16>()?;
-                gate.push(block);
-            }
-        }
-        let gate_num = self.current_gate();
-        let g = tweak2(gate_num as u64, 0);
-
-        let [hashA, hashB] = hash_wires([A, B], g);
-
-        // garbler's half gate
-        let L = if A.color() == 0 {
-            Wire::hash_to_mod(hashA, q)
-        } else {
-            let ct_left = gate[A.color() as usize - 1];
-            Wire::from_repr(ct_left ^ hashA, q)
-        };
-
-        // evaluator's half gate
-        let R = if B.color() == 0 {
-            Wire::hash_to_mod(hashB, q)
-        } else {
-            let ct_right = gate[(q + B.color()) as usize - 2];
-            Wire::from_repr(ct_right ^ hashB, q)
-        };
-
-        // hack for unequal mods
-        // TODO: Batch this with original hash if unequal.
-        let new_b_color = if unequal {
-            let minitable = *gate.last().unwrap();
-            let ct = u128::from(minitable) >> (B.color() * 16);
-            let pt = u128::from(B.hash(tweak2(gate_num as u64, 1))) ^ ct;
-            pt as u16
-        } else {
-            B.color()
-        };
-
-        let res = L + R + A.clone() * new_b_color;
-        Ok(res)
     }
 }
 

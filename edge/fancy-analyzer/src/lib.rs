@@ -4,8 +4,8 @@
 
 use core::cmp::max;
 use fancy_traits::{
-    CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant,
-    FancyEncode, FancyOutput, HasModulus,
+    CircuitInputMapper, Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, HasModulus,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -144,42 +144,6 @@ impl FancyBinary for CircuitAnalyzer {
             modulus: x.modulus,
             depth: x.depth,
         }
-    }
-}
-
-impl FancyArithmetic for CircuitAnalyzer {
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.nadds += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: max(x.depth, y.depth),
-        }
-    }
-
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.nsubs += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: max(x.depth, y.depth),
-        }
-    }
-
-    fn cmul(&mut self, x: &Self::Item, _y: u16) -> Self::Item {
-        self.ncmuls += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: x.depth,
-        }
-    }
-
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        self.nmuls += 1;
-        let depth = max(x.depth, y.depth) + 1;
-        self.mul_depth = max(self.mul_depth, depth);
-        Ok(AnalyzerItem {
-            modulus: x.modulus,
-            depth: max(x.depth, y.depth) + 1,
-        })
     }
 }
 

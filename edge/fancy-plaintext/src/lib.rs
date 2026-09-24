@@ -2,8 +2,8 @@
 #![deny(missing_docs)]
 
 use fancy_traits::{
-    Circuit, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput, HasModulus, is_binary,
+    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
+    HasModulus, is_binary,
 };
 use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
@@ -83,60 +83,26 @@ impl FancyBinary for Dummy {
         is_binary!(x);
         is_binary!(y);
 
-        self.add(x, y)
-    }
-
-    fn and(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item> {
-        is_binary!(x);
-        is_binary!(y);
-
-        self.mul(x, y, channel)
-    }
-
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        is_binary!(x);
-
-        self.xor(x, &DummyVal::new(1, 2))
-    }
-}
-
-impl FancyArithmetic for Dummy {
-    fn add(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {
-        assert_eq!(x.modulus(), y.modulus());
         DummyVal {
             val: (x.val + y.val) % x.modulus,
             modulus: x.modulus,
         }
     }
 
-    fn sub(&mut self, x: &DummyVal, y: &DummyVal) -> DummyVal {
-        assert_eq!(x.modulus(), y.modulus());
-        DummyVal {
-            val: (x.modulus + x.val - y.val) % x.modulus,
-            modulus: x.modulus,
-        }
-    }
+    fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+        is_binary!(x);
+        is_binary!(y);
 
-    fn cmul(&mut self, x: &DummyVal, c: u16) -> DummyVal {
-        DummyVal {
-            val: (x.val * c) % x.modulus,
-            modulus: x.modulus,
-        }
-    }
-
-    fn mul(
-        &mut self,
-        x: &DummyVal,
-        y: &DummyVal,
-        _channel: &mut Channel,
-    ) -> swanky_error::Result<DummyVal> {
-        if x.modulus < y.modulus {
-            return self.mul(y, x, _channel);
-        }
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
             modulus: x.modulus,
         })
+    }
+
+    fn negate(&mut self, x: &Self::Item) -> Self::Item {
+        is_binary!(x);
+
+        self.xor(x, &DummyVal::new(1, 2))
     }
 }
 

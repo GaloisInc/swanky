@@ -1,7 +1,6 @@
-use fancy_garbling::{AllWire, ArithmeticWireLabel, Garbler as Gb, WireLabel, WireMod2};
+use fancy_garbling::{AllWire, Garbler as Gb, WireLabel, WireMod2};
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput,
+    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
 };
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -100,34 +99,6 @@ impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + Sem
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Item> {
         self.garbler.and(x, y, channel)
-    }
-}
-
-impl<
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-    OT: OtSender<Msg = Block> + SemiHonest,
-    Wire: WireLabel + ArithmeticWireLabel,
-> FancyArithmetic for Garbler<RNG, OT, Wire>
-{
-    fn add(&mut self, x: &Wire, y: &Wire) -> Self::Item {
-        self.garbler.add(x, y)
-    }
-
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Self::Item {
-        self.garbler.sub(x, y)
-    }
-
-    fn cmul(&mut self, x: &Wire, c: u16) -> Self::Item {
-        self.garbler.cmul(x, c)
-    }
-
-    fn mul(
-        &mut self,
-        x: &Wire,
-        y: &Wire,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.garbler.mul(x, y, channel)
     }
 }
 

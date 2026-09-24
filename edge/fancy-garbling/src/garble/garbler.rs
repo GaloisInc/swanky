@@ -1,13 +1,9 @@
-use crate::{
-    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireLabel, WireMod2,
-    util::{output_tweak, tweak2},
-    wire::hash_wires,
-};
+use crate::{AllWire, BinaryWireLabel, WireLabel, WireMod2, util::output_tweak};
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
-    FancyOutput, HasModulus, is_binary,
+    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput, HasModulus,
+    is_binary,
 };
-use rand::{CryptoRng, RngExt};
+use rand::CryptoRng;
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -143,7 +139,7 @@ impl<RNG: CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
         is_binary!(x);
         is_binary!(y);
 
-        self.add(x, y)
+        x.clone() + y.clone()
     }
 
     /// Use binary and_gate
@@ -168,139 +164,6 @@ impl<RNG: CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
 
         // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
         unreachable!()
-    }
-}
-
-impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for Garbler<RNG, Wire> {
-    fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
-        assert_eq!(x.modulus(), y.modulus());
-        x.clone() + y.clone()
-    }
-
-    fn sub(&mut self, x: &Wire, y: &Wire) -> Wire {
-        assert_eq!(x.modulus(), y.modulus());
-        x.clone() - y.clone()
-    }
-
-    fn cmul(&mut self, x: &Wire, c: u16) -> Wire {
-        x.clone() * c
-    }
-
-    fn mul(&mut self, A: &Wire, B: &Wire, channel: &mut Channel) -> swanky_error::Result<Wire> {
-        if A.modulus() < B.modulus() {
-            return self.mul(B, A, channel);
-        }
-
-        let q = A.modulus();
-        let qb = B.modulus();
-        let gate_num = self.current_gate();
-
-        let D = self.delta(q);
-        let Db = self.delta(qb);
-
-        let r;
-        let mut gate = vec![Default::default(); q as usize + qb as usize - 2];
-
-        // hack for unequal moduli
-        if q != qb {
-            // would need to pack minitable into more than one u128 to support qb > 8
-            assert!(
-                qb <= 8,
-                "`B.modulus()` with asymmetric moduli is capped at 8"
-            );
-
-            r = self.rng.random::<u16>() % q;
-            let t = tweak2(gate_num as u64, 1);
-
-            let mut minitable = vec![u128::default(); qb as usize];
-            let mut B_ = B.clone();
-            for b in 0..qb {
-                if b > 0 {
-                    B_ += Db.clone();
-                }
-                let new_color = ((r + b) % q) as u128;
-                let ct = (u128::from(B_.hash(t)) & 0xFFFF) ^ new_color;
-                minitable[B_.color() as usize] = ct;
-            }
-
-            let mut packed = 0;
-            for (i, item) in minitable.iter().enumerate().take(qb as usize) {
-                packed += item << (16 * i);
-            }
-            gate.push(packed.into());
-        } else {
-            r = B.color(); // secret value known only to the garbler (ev knows r+b)
-        }
-
-        let g = tweak2(gate_num as u64, 0);
-
-        // X = H(A+aD) + arD such that a + A.color == 0
-        let alpha = (q - A.color()) % q; // alpha = -A.color
-        let X1 = A.clone() + D.clone() * alpha;
-
-        // Y = H(B + bD) + (b + r)A such that b + B.color == 0
-        let beta = (qb - B.color()) % qb;
-        let Y1 = B.clone() + Db.clone() * beta;
-
-        let [hashX, hashY] = hash_wires([&X1, &Y1], g);
-
-        let X = Wire::hash_to_mod(hashX, q) + D.clone() * (alpha * r % q);
-        let Y = Wire::hash_to_mod(hashY, q) + A.clone() * ((beta + r) % q);
-
-        let mut precomp = Vec::with_capacity(q as usize);
-        // precompute a lookup table of X.minus(&D_cmul[(a * r % q)])
-        //                            = X.plus(&D_cmul[((q - (a * r % q)) % q)])
-        let mut X_ = X.clone();
-        precomp.push(X_.to_repr());
-        for _ in 1..q {
-            X_ += D.clone();
-            precomp.push(X_.to_repr());
-        }
-
-        // We can vectorize the hashes here too, but then we need to precompute all `q` sums of A
-        // with delta [A, A + D, A + D + D, etc.]
-        // Would probably need another alloc which isn't great
-        let mut A_ = A.clone();
-        for a in 0..q {
-            if a > 0 {
-                A_ += D.clone();
-            }
-            // garbler's half-gate: outputs X-arD
-            // G = H(A+aD) ^ X+a(-r)D = H(A+aD) ^ X-arD
-            if A_.color() != 0 {
-                gate[A_.color() as usize - 1] =
-                    A_.hash(g) ^ precomp[((q - (a * r % q)) % q) as usize];
-            }
-        }
-        precomp.clear();
-
-        // precompute a lookup table of Y.minus(&A_cmul[((b+r) % q)])
-        //                            = Y.plus(&A_cmul[((q - ((b+r) % q)) % q)])
-        let mut Y_ = Y.clone();
-        precomp.push(Y_.to_repr());
-        for _ in 1..q {
-            Y_ += A.clone();
-            precomp.push(Y_.to_repr());
-        }
-
-        // Same note about vectorization as A
-        let mut B_ = B.clone();
-        for b in 0..qb {
-            if b > 0 {
-                B_ += Db.clone();
-            }
-            // evaluator's half-gate: outputs Y-(b+r)D
-            // G = H(B+bD) + Y-(b+r)A
-            if B_.color() != 0 {
-                gate[q as usize - 1 + B_.color() as usize - 1] =
-                    B_.hash(g) ^ precomp[((q - ((b + r) % q)) % q) as usize];
-            }
-        }
-
-        for block in gate.iter() {
-            channel.write(block)?;
-        }
-        Ok(X + Y)
     }
 }
 
