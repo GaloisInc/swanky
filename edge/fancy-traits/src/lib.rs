@@ -113,11 +113,3 @@ pub trait FancyBinary: Fancy {
         Ok(self.negate(&z))
     }
 }
-
-/// Utility macro for asserting that a wire is binary (i.e., has modulus two).
-#[macro_export]
-macro_rules! is_binary {
-    ($x:ident) => {
-        assert_eq!($x.modulus(), 2);
-    };
-}

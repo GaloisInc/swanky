@@ -3,7 +3,7 @@
 
 use fancy_traits::{
     Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
-    HasModulus, is_binary,
+    HasModulus,
 };
 use rand::{CryptoRng, RngExt};
 use swanky_channel::Channel;
@@ -80,8 +80,8 @@ impl Default for Dummy {
 
 impl FancyBinary for Dummy {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        is_binary!(x);
-        is_binary!(y);
+        assert_eq!(x.modulus, 2);
+        assert_eq!(y.modulus, 2);
 
         DummyVal {
             val: (x.val + y.val) % x.modulus,
@@ -90,8 +90,8 @@ impl FancyBinary for Dummy {
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        is_binary!(x);
-        is_binary!(y);
+        assert_eq!(x.modulus, 2);
+        assert_eq!(y.modulus, 2);
 
         Ok(DummyVal {
             val: x.val * y.val % x.modulus,
@@ -100,7 +100,7 @@ impl FancyBinary for Dummy {
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        is_binary!(x);
+        assert_eq!(x.modulus, 2);
 
         self.xor(x, &DummyVal::new(1, 2))
     }
