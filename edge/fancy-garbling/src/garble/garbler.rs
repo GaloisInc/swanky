@@ -22,7 +22,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
         // We fix the constant `1` value to `1`, and derive the zero wirelabel
         // as that value XORed with `Δ`.
         let one = Wire::from_repr(U8x16::from(1u128));
-        let zero = delta.clone() + one;
+        let zero = delta + one;
         Garbler {
             zero,
             delta,
@@ -41,7 +41,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> Garbler<RNG, Wire> {
 
     /// The `Δ` wirelabel.
     pub fn delta(&mut self) -> Wire {
-        self.delta.clone()
+        self.delta
     }
 
     /// The current output index of the garbling computation.
@@ -93,7 +93,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyConstant<F2> for Garbler<RNG, Wir
         if x.into() {
             // `self.zero` corresponds to the zero wirelabel associated with the
             // "one" wirelabel set to `F128b::ONE`.
-            self.zero.clone()
+            self.zero
         } else {
             // Otherwise, the garbler uses the "null" wirelabel to represent zero.
             Default::default()
@@ -110,7 +110,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire>
         let mut zeros = Vec::with_capacity(values.len());
         for x in values.iter() {
             let zero = self.encode_zero();
-            let encoded = zero.clone() + self.delta.clone() * (*x).into();
+            let encoded = zero + self.delta * (*x).into();
             channel.write(&encoded.to_repr())?;
             zeros.push(zero);
         }
@@ -126,7 +126,7 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyOutput for Garbler<RNG, Wire> {
     fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let i = self.current_output();
         for k in 0..2 {
-            let block = (X.clone() + self.delta().clone() * k).hash(output_tweak(i, k));
+            let block = (*X + self.delta() * k).hash(output_tweak(i, k));
             channel.write(&block)?;
         }
         Ok(None)

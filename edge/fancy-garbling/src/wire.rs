@@ -48,7 +48,7 @@ pub trait BinaryWireLabel: WireLabel<F2> + ConditionallySelectable {
 /// At its core, a [`WireLabel`] is a way of encoding values, and operating on
 /// those encoded values.
 pub trait WireLabel<FF: FiniteField>:
-    Clone
+    Copy
     + core::fmt::Debug
     + core::default::Default
     + core::ops::Add<Output = Self>

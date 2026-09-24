@@ -69,8 +69,8 @@ impl GarbledCircuit {
             // contain that mapping, which is what the below does.
             garbler.outputs(&zeros, channel)?;
 
-            let en = Encoder::new(inputs, garbler.delta().clone());
-            let output_mapping = OutputMapping::new(&zeros, garbler.delta().clone());
+            let en = Encoder::new(inputs, garbler.delta());
+            let output_mapping = OutputMapping::new(&zeros, garbler.delta());
 
             Ok((en, output_mapping))
         })?;
@@ -129,7 +129,7 @@ impl<Wire: WireLabel<F2>> Encoder<Wire> {
         self.inputs
             .iter()
             .zip(inputs)
-            .map(|(zero, x)| zero.clone() + self.delta.clone() * (*x).into())
+            .map(|(zero, x)| *zero + self.delta * (*x).into())
             .collect()
     }
 }
@@ -146,7 +146,7 @@ impl OutputMapping {
         for (i, zero) in zeros.iter().enumerate() {
             let mut wirelabels = Vec::with_capacity(2);
             for k in 0..2 {
-                let wirelabel = zero.clone() + delta.clone() * k;
+                let wirelabel = *zero + delta * k;
                 let hashed = wirelabel.hash(output_tweak(i, k));
                 wirelabels.push(hashed);
             }

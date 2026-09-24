@@ -77,7 +77,7 @@ impl<Wire: WireLabel<F2>> Fancy for Evaluator<Wire> {
 impl<Wire: WireLabel<F2>> FancyConstant<F2> for Evaluator<Wire> {
     fn constant(&mut self, x: F2) -> Self::Item {
         if x.into() {
-            self.one.clone()
+            self.one
         } else {
             // We use the "null" wirelabel to represent zero.
             Default::default()

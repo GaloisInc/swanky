@@ -48,11 +48,11 @@ impl<
         let len = f32::from(q).log(2.0).ceil() as u16;
         let mut inputs = Vec::with_capacity(len as usize);
         let (zero, one) = Wire::constant(F2::ONE, delta, &mut self.rng);
-        let mut wire = zero.clone();
+        let mut wire = zero;
         inputs.push((zero.to_repr(), one.to_repr()));
         for i in 1..len {
             let (zero, one) = Wire::constant(F2::ONE, delta, &mut self.rng);
-            wire += zero.clone() * (1 << i);
+            wire += zero * (1 << i);
             inputs.push((zero.to_repr(), one.to_repr()))
         }
         (wire, inputs)
