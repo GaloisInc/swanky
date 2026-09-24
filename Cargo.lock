@@ -2920,6 +2920,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-ot-test-new"
+version = "0.6.0"
+
+[[package]]
 name = "swanky-ot-traits"
 version = "0.6.0"
 dependencies = [
