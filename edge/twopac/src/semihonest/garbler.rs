@@ -1,4 +1,4 @@
-use fancy_garbling::{AllWire, Garbler as Gb, WireLabel, WireMod2};
+use fancy_garbling::{Garbler as Gb, WireLabel, WireMod2};
 use fancy_traits::{
     Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
 };
@@ -62,27 +62,6 @@ impl<
 
 impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest> FancyBinary
     for Garbler<RNG, OT, WireMod2>
-{
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        self.garbler.negate(x)
-    }
-
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.garbler.xor(x, y)
-    }
-
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.garbler.and(x, y, channel)
-    }
-}
-
-impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest> FancyBinary
-    for Garbler<RNG, OT, AllWire>
 {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.garbler.negate(x)

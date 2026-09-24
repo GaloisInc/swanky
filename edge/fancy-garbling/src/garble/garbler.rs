@@ -1,7 +1,6 @@
-use crate::{AllWire, BinaryWireLabel, WireLabel, WireMod2, util::output_tweak};
+use crate::{BinaryWireLabel, WireLabel, util::output_tweak};
 use fancy_traits::{
-    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput, HasModulus,
-    is_binary,
+    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
 };
 use rand::CryptoRng;
 #[cfg(feature = "serde")]
@@ -119,51 +118,6 @@ impl<RNG: CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.zero + *x
-    }
-}
-
-impl<RNG: CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
-    /// We can negate by having garbler xor wire with Delta
-    ///
-    /// Since we treat all garbler wires as zero,
-    /// xoring with delta conceptually negates the value of the wire
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        is_binary!(x);
-
-        let zero = self.zero.clone();
-        self.xor(&zero, x)
-    }
-
-    /// Xor is just addition
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        is_binary!(x);
-        is_binary!(y);
-
-        x.clone() + y.clone()
-    }
-
-    /// Use binary and_gate
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        if let (AllWire::Mod2(A), AllWire::Mod2(B), AllWire::Mod2(ref delta)) =
-            (x, y, self.delta(2))
-        {
-            let gate_num = self.current_gate();
-            let (gate0, gate1, C) = WireMod2::garble_and_gate(gate_num, A, B, delta);
-            channel.write(&gate0)?;
-            channel.write(&gate1)?;
-            return Ok(AllWire::Mod2(C));
-        }
-        // If we got here, one of the wires isn't binary
-        is_binary!(x);
-        is_binary!(y);
-
-        // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
-        unreachable!()
     }
 }
 

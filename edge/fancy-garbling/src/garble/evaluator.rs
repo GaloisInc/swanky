@@ -1,7 +1,6 @@
-use crate::{AllWire, BinaryWireLabel, WireMod2, util::output_tweak, wire::WireLabel};
+use crate::{BinaryWireLabel, util::output_tweak, wire::WireLabel};
 use fancy_traits::{
-    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput, HasModulus,
-    is_binary,
+    Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
 };
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -70,45 +69,6 @@ impl<W: BinaryWireLabel> FancyBinary for Evaluator<W> {
         let gate0 = channel.read()?;
         let gate1 = channel.read()?;
         Ok(W::evaluate_and_gate(gate_num, A, B, &gate0, &gate1))
-    }
-}
-
-impl FancyBinary for Evaluator<AllWire> {
-    /// Overriding `negate` to be a noop: entirely handled on garbler's end
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        is_binary!(x);
-
-        x.clone() + self.one.clone()
-    }
-
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        is_binary!(x);
-        is_binary!(y);
-
-        x.clone() + y.clone()
-    }
-
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        if let (AllWire::Mod2(A), AllWire::Mod2(B)) = (x, y) {
-            let gate_num = self.current_gate();
-            let gate0 = channel.read()?;
-            let gate1 = channel.read()?;
-            return Ok(AllWire::Mod2(WireMod2::evaluate_and_gate(
-                gate_num, A, B, &gate0, &gate1,
-            )));
-        }
-
-        // If we got here, one of the wires isn't binary
-        is_binary!(x);
-        is_binary!(y);
-
-        // Shouldn't be reachable, unless the wire has modulus 2 but is not AllWire::Mod2()
-        unreachable!()
     }
 }
 

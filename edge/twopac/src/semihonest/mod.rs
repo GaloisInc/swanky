@@ -11,7 +11,7 @@ mod tests {
     use super::*;
     use fancy_analyzer::CircuitAnalyzer;
     use fancy_circuits::crypto::aes::Aes128;
-    use fancy_garbling::{AllWire, WireLabel, WireMod2};
+    use fancy_garbling::{WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
@@ -85,12 +85,6 @@ mod tests {
             .map(|x| x.val())
             .collect::<Vec<_>>();
         assert_eq!(out, target);
-    }
-
-    #[test]
-    fn test_aes_arithmetic() {
-        let aes = Aes128::new();
-        test_aes::<_, AllWire>(&aes);
     }
 
     #[test]

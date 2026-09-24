@@ -41,10 +41,6 @@ swanky-rng.workspace = true
 criterion.workspace = true
 
 [[bench]]
-name = "wire_operations"
-harness = false
-
-[[bench]]
 name = "garbling"
 harness = false
 

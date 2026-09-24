@@ -2,7 +2,6 @@
 //! using fancy-garbling.
 
 use fancy_circuits::{BinaryBundle, BinaryGadgets, binary::BinaryAdditionNoCarry};
-use fancy_garbling::AllWire;
 use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -13,7 +12,7 @@ use swanky_twopac::semihonest::{Evaluator, Garbler};
 const NBITS: usize = 128;
 
 fn gb_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
-    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng)?;
+    let mut gb = Garbler::<SwankyRng, OtSender, _>::new(channel, rng)?;
     let inputs = gb_set_inputs(&mut gb, input, channel)?;
     let sum = BinaryAdditionNoCarry::new().execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
     gb.bin_output(&sum, channel)?;
@@ -31,7 +30,7 @@ fn gb_set_inputs<F: BinaryGadgets>(
 }
 
 fn ev_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
-    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng)?;
+    let mut ev = Evaluator::<SwankyRng, OtReceiver, _>::new(channel, rng)?;
     let inputs = ev_set_inputs(&mut ev, input, channel)?;
     let sum = BinaryAdditionNoCarry::new().execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
     let output = ev

@@ -15,8 +15,6 @@ use vectoreyes::{
     array_utils::{ArrayUnrolledExt, ArrayUnrolledOps, UnrollableArraySize},
 };
 
-mod all;
-pub use all::AllWire;
 mod mod2;
 pub use mod2::WireMod2;
 mod mod3;

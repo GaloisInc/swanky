@@ -10,7 +10,7 @@ use fancy_circuits::{
     BinaryBundle,
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
-use fancy_garbling::AllWire;
+use fancy_garbling::WireMod2;
 use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyOutput};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
@@ -134,11 +134,15 @@ impl SenderState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>)>
+    ) -> swanky_error::Result<(
+        Garbler<RNG, OtSender, WireMod2>,
+        Vec<WireMod2>,
+        Vec<WireMod2>,
+    )>
     where
         RNG: CryptoRng + SeedableRng<Seed = Block>,
     {
-        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random()))
+        let mut gb = Garbler::<RNG, OtSender, _>::new(channel, RNG::from_seed(rng.random()))
             .wrap_err(
                 ErrorKind::InitializationError,
                 "Failed to initialize garbler during setup.",
@@ -272,9 +276,9 @@ impl ReceiverState {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<(
-        Evaluator<RNG, OtReceiver, AllWire>,
-        Vec<AllWire>,
-        Vec<AllWire>,
+        Evaluator<RNG, OtReceiver, WireMod2>,
+        Vec<WireMod2>,
+        Vec<WireMod2>,
     )>
     where
         RNG: CryptoRng + SeedableRng<Seed = Block>,
@@ -282,12 +286,11 @@ impl ReceiverState {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
-        let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
-                .wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize receiver during setup.",
-                )?;
+        let mut ev = Evaluator::<RNG, OtReceiver, _>::new(channel, RNG::from_seed(rng.random()))
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize receiver during setup.",
+            )?;
 
         let mods = vec![2; nbins * HASH_SIZE * 8];
         let sender_inputs = ev.receive_many(&mods, channel)?;

@@ -3,7 +3,6 @@
 
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::{BinaryBundle, BinaryGadgets, LinearOram};
-use fancy_garbling::AllWire;
 use fancy_traits::{Circuit, FancyOutput};
 use rand::{CryptoRng, SeedableRng};
 use swanky_block::Block;
@@ -49,7 +48,7 @@ fn gb_linear_oram<RNG: CryptoRng + SeedableRng<Seed = Block>>(
     channel: &mut Channel,
     rng: RNG,
 ) -> Result<()> {
-    let mut gb = Garbler::<_, OtSender, AllWire>::new(channel, rng)?;
+    let mut gb = Garbler::<_, OtSender, _>::new(channel, rng)?;
     // The size of the RAM is assumed to be public. The garbler sends the RAM
     // size to the evaluator.
     channel.write(&inputs.len())?;
@@ -63,7 +62,7 @@ fn gb_linear_oram<RNG: CryptoRng + SeedableRng<Seed = Block>>(
 }
 
 fn ev_linear_oram<RNG: CryptoRng>(input: u128, channel: &mut Channel, rng: RNG) -> Result<u128> {
-    let mut ev = Evaluator::<_, OtReceiver, AllWire>::new(channel, rng)?;
+    let mut ev = Evaluator::<_, OtReceiver, _>::new(channel, rng)?;
     // The size of the RAM is assumed to be public. The evaluator receives this
     // size from the garbler.
     let size = channel.read::<usize>()?;

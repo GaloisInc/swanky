@@ -1,4 +1,4 @@
-use fancy_garbling::{AllWire, Evaluator as Ev, WireLabel, WireMod2};
+use fancy_garbling::{Evaluator as Ev, WireLabel, WireMod2};
 use fancy_traits::{
     Fancy, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode, FancyOutput,
 };
@@ -48,27 +48,6 @@ fn combine<Wire: WireLabel>(wires: &[Block], q: u16) -> Wire {
 
 impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     for Evaluator<RNG, OT, WireMod2>
-{
-    fn and(
-        &mut self,
-        x: &Self::Item,
-        y: &Self::Item,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Item> {
-        self.evaluator.and(x, y, channel)
-    }
-
-    fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.evaluator.xor(x, y)
-    }
-
-    fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        self.evaluator.negate(x)
-    }
-}
-
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
-    for Evaluator<RNG, OT, AllWire>
 {
     fn and(
         &mut self,
