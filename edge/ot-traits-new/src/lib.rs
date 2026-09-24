@@ -64,10 +64,13 @@ pub trait OTInit<P: Party>: Sized {
 pub trait OTRandom<P: Party>: OTInit<P> {
     /// Run random OT.
     ///
-    /// `inputs` : For the sender, the number of input values.
-    ///            For the receiver, the selection bits.
-    /// `outputs`: For the sender, the pairs of messages (as arrays).
-    ///            For the receiver, the selected messages.
+    /// The `inputs` and `outputs` are party-specific: The [`Sender`]
+    /// provides the number of selections, and receives the pairs of
+    /// generated messages (as arrays of length 2).
+    /// The [`Receiver`] provides the selection bits, and receives the
+    /// messages that they selected (i.e. the entries in the pairs
+    /// generated on the `Sender` side corresponding to their
+    /// selection bits).
     fn ot_random<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         self,
         inputs: PartyEither<P, usize, I>,
