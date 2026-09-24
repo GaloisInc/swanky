@@ -86,6 +86,8 @@ mod tests {
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::Circuit;
     use swanky_channel::Channel;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     use crate::{CircuitAnalyzerWrapper, wrapper::Wire};
 
@@ -93,8 +95,8 @@ mod tests {
     fn aes_128_bristol_format_is_correct() {
         let circuit = Aes128::new();
         let mut analyzer = CircuitAnalyzerWrapper::new(Dummy::new());
-        let key = [Wire::new(DummyVal::new_bool(false)); 128];
-        let block = [Wire::new(DummyVal::new_bool(false)); 128];
+        let key = [Wire::new(DummyVal::new(F2::ZERO)); 128];
+        let block = [Wire::new(DummyVal::new(F2::ZERO)); 128];
 
         let output = Channel::with(std::io::empty(), |channel| {
             circuit.execute(&mut analyzer, (key, block), channel)
@@ -105,7 +107,7 @@ mod tests {
         assert_eq!(
             output
                 .iter()
-                .map(|out| out.val().to_string())
+                .map(|out| u8::from(out.val()).to_string())
                 .collect::<String>(),
             "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
         );

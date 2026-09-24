@@ -81,6 +81,8 @@ mod test {
     use crate::{BinaryBundle, binary::BinaryMultiplexConstantBits};
     use fancy_plaintext::{Dummy, DummyVal};
     use rand::RngExt;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     #[test]
     fn binary_multiplex() {
@@ -91,13 +93,16 @@ mod test {
         let x_inputs = BinaryBundle::from((x, nbits));
         let y_inputs = BinaryBundle::from((y, nbits));
 
-        for b in 0..=1 {
+        for b in [F2::ZERO, F2::ONE] {
             let output = Dummy::eval(
                 &BinaryMultiplex::new(),
-                (DummyVal::new(b, 2), &x_inputs, &y_inputs),
+                (DummyVal::new(b), &x_inputs, &y_inputs),
             )
             .unwrap();
-            assert_eq!(Into::<u128>::into(output), if b == 0 { x } else { y });
+            assert_eq!(
+                Into::<u128>::into(output),
+                if b == F2::ZERO { x } else { y }
+            );
         }
     }
 
@@ -108,13 +113,16 @@ mod test {
         let x = rng.random::<u128>() % (nbits as u128);
         let y = rng.random::<u128>() % (nbits as u128);
 
-        for b in 0..=1 {
+        for b in [F2::ZERO, F2::ONE] {
             let output = Dummy::eval(
                 &BinaryMultiplexConstantBits,
-                (DummyVal::new(b, 2), x, y, nbits),
+                (DummyVal::new(b), x, y, nbits),
             )
             .unwrap();
-            assert_eq!(Into::<u128>::into(output), if b == 0 { x } else { y });
+            assert_eq!(
+                Into::<u128>::into(output),
+                if b == F2::ZERO { x } else { y }
+            );
         }
     }
 }

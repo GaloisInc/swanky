@@ -51,6 +51,10 @@ where
 pub mod test {
     use super::*;
     use fancy_traits::CircuitInputMapper;
+    #[cfg(test)]
+    use swanky_field::FiniteRing;
+    #[cfg(test)]
+    use swanky_field_binary::F2;
 
     /// Circuit for testing [`BinaryEquality`].
     pub struct TestBinaryEquality(pub usize);
@@ -96,7 +100,7 @@ pub mod test {
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
-            assert_eq!(output.val() > 0, x == y);
+            assert_eq!(output.val(), F2::from(x == y));
         }
 
         // Test specifically for equal values
@@ -104,7 +108,7 @@ pub mod test {
             let x = rng.random::<u128>() % q;
             let x_input = BinaryBundle::from((x, nbits));
             let output = Dummy::eval(&c, (x_input.clone(), x_input)).unwrap();
-            assert_eq!(output.val(), 1);
+            assert_eq!(output.val(), F2::ONE);
         }
     }
 }

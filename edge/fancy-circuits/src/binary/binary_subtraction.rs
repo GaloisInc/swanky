@@ -99,7 +99,7 @@ pub mod test {
             let y_input = BinaryBundle::from((y, nbits));
             let outputs = Dummy::eval(&c, (x_input, y_input)).unwrap();
             assert_eq!(Into::<u128>::into(outputs.0), x.overflowing_sub(y).0 % q);
-            assert_eq!(outputs.1.val(), (y != 0 && x >= y) as u16);
+            assert_eq!(outputs.1.val(), F2::from(y != 0 && x >= y));
         }
     }
 }

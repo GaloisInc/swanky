@@ -195,7 +195,7 @@ pub mod test {
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
-            assert_eq!(output.val() > 0, x < y);
+            assert_eq!(output.val(), F2::from(x < y));
         }
     }
 
@@ -215,7 +215,7 @@ pub mod test {
             let x_input = BinaryBundle::from((x, nbits));
             let y_input = BinaryBundle::from((y, nbits));
             let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
-            assert_eq!(output.val() > 0, (x as i64) < (y as i64));
+            assert_eq!(output.val(), F2::from((x as i64) < (y as i64)));
         }
     }
 }

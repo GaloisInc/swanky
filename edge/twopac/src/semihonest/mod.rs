@@ -79,12 +79,12 @@ mod tests {
 
         let target = Dummy::eval(
             circ,
-            <C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
+            <C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(F2::ZERO); 256]),
         )
         .unwrap();
         let target = <C as CircuitOutputMapper<Dummy>>::flatten(target)
             .into_iter()
-            .map(|x| F2::from(x.val() != 0))
+            .map(|x| x.val())
             .collect::<Vec<_>>();
         assert_eq!(out, target);
     }

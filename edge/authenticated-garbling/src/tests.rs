@@ -65,11 +65,11 @@ fn test_circuit<
 
     let dummy_inputs_gb = inputs_gb
         .iter()
-        .map(|x| DummyVal::new((*x).into(), 2))
+        .map(|x| DummyVal::new(*x))
         .collect::<Vec<_>>();
     let dummy_inputs_ev = inputs_ev
         .iter()
-        .map(|x| DummyVal::new((*x).into(), 2))
+        .map(|x| DummyVal::new(*x))
         .collect::<Vec<_>>();
 
     let dummy_inputs = [dummy_inputs_gb, dummy_inputs_ev].concat();
@@ -80,7 +80,7 @@ fn test_circuit<
     .unwrap();
     let expected = <C as CircuitOutputMapper<Dummy>>::flatten(expected)
         .into_iter()
-        .map(|x| F2::from(x.val() != 0))
+        .map(|x| x.val())
         .collect::<Vec<_>>();
 
     let (_, outputs) = swanky_channel::local::local_channel_pair(

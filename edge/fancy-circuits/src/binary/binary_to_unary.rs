@@ -62,6 +62,8 @@ mod test {
     use crate::{BinaryBundle, binary::BinaryToUnary};
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     #[test]
     fn binary_to_unary() {
@@ -75,9 +77,9 @@ mod test {
             let output = Dummy::eval(&BinaryToUnary::new(), &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
-                    assert_eq!(y.val(), 1);
+                    assert_eq!(y.val(), F2::ONE);
                 } else {
-                    assert_eq!(y.val(), 0);
+                    assert_eq!(y.val(), F2::ZERO);
                 }
             }
         }

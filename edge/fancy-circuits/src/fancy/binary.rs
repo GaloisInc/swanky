@@ -20,7 +20,7 @@ impl<W> BinaryBundle<W> {
     }
 }
 
-impl From<(u128, usize)> for BinaryBundle<DummyVal> {
+impl From<(u128, usize)> for BinaryBundle<DummyVal<F2>> {
     /// Generate a new [`BinaryBundle`] of `value.0` containing `value.1` bits.
     fn from(value: (u128, usize)) -> Self {
         let mut dummy = Dummy::new();
@@ -31,13 +31,9 @@ impl From<(u128, usize)> for BinaryBundle<DummyVal> {
     }
 }
 
-impl From<BinaryBundle<DummyVal>> for u128 {
-    fn from(value: BinaryBundle<DummyVal>) -> Self {
-        let bin = value
-            .wires()
-            .iter()
-            .map(|w| F2::from(w.val() != 0))
-            .collect::<Vec<_>>();
+impl From<BinaryBundle<DummyVal<F2>>> for u128 {
+    fn from(value: BinaryBundle<DummyVal<F2>>) -> Self {
+        let bin = value.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
         u128_from_bits(&bin)
     }
 }

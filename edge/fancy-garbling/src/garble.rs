@@ -7,7 +7,7 @@ pub use crate::garble::{evaluator::Evaluator, garbler::Garbler};
 
 #[cfg(test)]
 mod helpers {
-    use rand::{RngExt, rng};
+    use rand::rng;
 
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
@@ -19,15 +19,9 @@ mod helpers {
         let mut rng = rng();
 
         let inputs = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
-            .map(|_| {
-                let x = rng.random::<u16>() % 2;
-                DummyVal::new(x, 2)
-            })
+            .map(|_| DummyVal::rand(&mut rng))
             .collect::<Vec<_>>();
-        let plaintext = inputs
-            .iter()
-            .map(|x| F2::from(x.val() != 0))
-            .collect::<Vec<_>>();
+        let plaintext = inputs.iter().map(|x| x.val()).collect::<Vec<_>>();
 
         let expected = Dummy::eval(
             circuit,
@@ -36,7 +30,7 @@ mod helpers {
         .unwrap();
         let expected = C::flatten(expected)
             .iter()
-            .map(|x| F2::from(x.val() != 0))
+            .map(|x| x.val())
             .collect::<Vec<_>>();
 
         (plaintext, expected)

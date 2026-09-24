@@ -49,14 +49,16 @@ where
 #[cfg(test)]
 pub mod test {
     use super::BinaryAdder;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     #[test]
     fn binary_adder() {
         use fancy_plaintext::{Dummy, DummyVal};
 
         let circuit = BinaryAdder::new();
-        let zero = DummyVal::new(0, 2);
-        let one = DummyVal::new(1, 2);
+        let zero = DummyVal::new(F2::ZERO);
+        let one = DummyVal::new(F2::ONE);
 
         let output = Dummy::eval(&circuit, (&zero, &zero, None)).unwrap();
         assert_eq!(output.0, zero);

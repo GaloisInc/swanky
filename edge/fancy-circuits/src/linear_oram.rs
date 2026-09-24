@@ -82,7 +82,7 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitOutputMapper<F> 
 #[cfg(test)]
 pub mod test {
     use crate::{BinaryBundle, LinearOram};
-    use fancy_plaintext::{Dummy, DummyVal};
+    use fancy_plaintext::Dummy;
     use rand::RngExt;
 
     #[test]
@@ -96,7 +96,7 @@ pub mod test {
             let ram: Vec<u128> = (0..ram_size).map(|_| rng.random::<u128>()).collect();
             let index = rng.random_range(..ram_size);
 
-            let ram_input: Vec<BinaryBundle<DummyVal>> = ram
+            let ram_input: Vec<BinaryBundle<_>> = ram
                 .iter()
                 .map(|&val| BinaryBundle::from((val, N)))
                 .collect();

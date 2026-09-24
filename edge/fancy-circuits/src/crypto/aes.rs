@@ -88,50 +88,50 @@ mod test {
 
         let aes = Aes128::new();
 
-        let key = [DummyVal::new(0, 2); 128];
-        let block = [DummyVal::new(0, 2); 128];
+        let key = [DummyVal::new(F2::ZERO); 128];
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
         );
 
-        let key = [DummyVal::new(1, 2); 128];
-        let block = [DummyVal::new(0, 2); 128];
+        let key = [DummyVal::new(F2::ONE); 128];
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100"
         );
 
-        let mut key = [DummyVal::new(0, 2); 128];
+        let mut key = [DummyVal::new(F2::ZERO); 128];
         for key_part in key.iter_mut().take(8) {
-            *key_part = DummyVal::new(1, 2);
+            *key_part = DummyVal::new(F2::ONE);
         }
-        let block = [DummyVal::new(0, 2); 128];
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101"
         );
 
-        let mut key = [DummyVal::new(0, 2); 128];
-        key[7] = DummyVal::new(1, 2);
-        let block = [DummyVal::new(0, 2); 128];
+        let mut key = [DummyVal::new(F2::ZERO); 128];
+        key[7] = DummyVal::new(F2::ONE);
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110"
         );

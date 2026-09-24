@@ -823,6 +823,7 @@ dependencies = [
  "fancy-traits",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
 ]
 
@@ -872,6 +873,7 @@ dependencies = [
  "rand 0.10.2",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
 ]
 

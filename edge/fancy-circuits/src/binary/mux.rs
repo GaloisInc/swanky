@@ -76,18 +76,19 @@ mod test {
     use super::Mux;
     use crate::binary::mux::MuxConstants;
     use fancy_plaintext::{Dummy, DummyVal};
+    use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
     #[test]
     fn mux() {
-        for b in 0..=1 {
-            for x in 0..=1 {
-                for y in 0..=1 {
-                    let b_val = DummyVal::new(b, 2);
-                    let x_val = DummyVal::new(x, 2);
-                    let y_val = DummyVal::new(y, 2);
+        for b in [F2::ZERO, F2::ONE] {
+            for x in [F2::ZERO, F2::ONE] {
+                for y in [F2::ZERO, F2::ONE] {
+                    let b_val = DummyVal::new(b);
+                    let x_val = DummyVal::new(x);
+                    let y_val = DummyVal::new(y);
                     let output = Dummy::eval(&Mux::new(), (&b_val, &x_val, &y_val)).unwrap();
-                    assert_eq!(output.val(), if b == 0 { x } else { y });
+                    assert_eq!(output.val(), if b == F2::ZERO { x } else { y });
                 }
             }
         }
@@ -95,16 +96,12 @@ mod test {
 
     #[test]
     fn mux_constants() {
-        for b in 0..=1 {
-            for x in 0..=1 {
-                for y in 0..=1 {
-                    let b_val = DummyVal::new(b, 2);
-                    let output = Dummy::eval(
-                        &MuxConstants::new(),
-                        (&b_val, F2::from(x != 0), F2::from(y != 0)),
-                    )
-                    .unwrap();
-                    assert_eq!(output.val(), if b == 0 { x } else { y });
+        for b in [F2::ZERO, F2::ONE] {
+            for x in [F2::ZERO, F2::ONE] {
+                for y in [F2::ZERO, F2::ONE] {
+                    let b_val = DummyVal::new(b);
+                    let output = Dummy::eval(&MuxConstants::new(), (&b_val, x, y)).unwrap();
+                    assert_eq!(output.val(), if b == F2::ZERO { x } else { y });
                 }
             }
         }

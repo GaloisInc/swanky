@@ -63,7 +63,7 @@ mod test {
 
     use super::BinaryMax;
     use crate::BinaryBundle;
-    use fancy_plaintext::{Dummy, DummyVal};
+    use fancy_plaintext::Dummy;
 
     #[test]
     fn binary_max() {
@@ -75,7 +75,7 @@ mod test {
         for _ in 0..16 {
             let xs: Vec<u128> = (0..nitems).map(|_| rng.random::<u128>() % q).collect();
             let max = *xs.iter().max().unwrap();
-            let xs_input: Vec<BinaryBundle<DummyVal>> =
+            let xs_input: Vec<BinaryBundle<_>> =
                 xs.iter().map(|x| BinaryBundle::from((*x, nbits))).collect();
             let output = Dummy::eval(&BinaryMax::new(), xs_input.as_slice()).unwrap();
             assert_eq!(Into::<u128>::into(output), max);
