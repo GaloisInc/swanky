@@ -152,8 +152,8 @@ impl FancyEncode<F2> for CircuitAnalyzer {
     }
 }
 
-impl FancyOutput for CircuitAnalyzer {
-    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
+impl FancyOutput<F2> for CircuitAnalyzer {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<F2>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }

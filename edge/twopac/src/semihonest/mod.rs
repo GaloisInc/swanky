@@ -84,7 +84,7 @@ mod tests {
         .unwrap();
         let target = <C as CircuitOutputMapper<Dummy>>::flatten(target)
             .into_iter()
-            .map(|x| x.val())
+            .map(|x| F2::from(x.val() != 0))
             .collect::<Vec<_>>();
         assert_eq!(out, target);
     }

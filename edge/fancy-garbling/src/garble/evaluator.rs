@@ -104,8 +104,8 @@ impl<Wire: WireLabel<F2>> FancyEncode<F2> for Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel<F2>> FancyOutput for Evaluator<Wire> {
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+impl<Wire: WireLabel<F2>> FancyOutput<F2> for Evaluator<Wire> {
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<F2>> {
         let i = self.current_output();
 
         // Receive the output ciphertext from the garbler
@@ -126,7 +126,7 @@ impl<Wire: WireLabel<F2>> FancyOutput for Evaluator<Wire> {
         }
 
         if let Some(output) = decoded {
-            Ok(Some(output))
+            Ok(Some(F2::from(output != 0)))
         } else {
             swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
         }

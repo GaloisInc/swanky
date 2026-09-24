@@ -94,10 +94,10 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>> FancyOutput
+impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>> FancyOutput<F2>
     for Evaluator<RNG, OT, Wire>
 {
-    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
+    fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<F2>> {
         self.evaluator.output(x, channel)
     }
 }

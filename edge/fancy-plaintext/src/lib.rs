@@ -124,8 +124,8 @@ impl FancyEncode<F2> for Dummy {
     }
 }
 
-impl FancyOutput for Dummy {
-    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> Result<Option<u16>> {
-        Ok(Some(x.val))
+impl FancyOutput<F2> for Dummy {
+    fn output(&mut self, x: &DummyVal, _: &mut Channel) -> Result<Option<F2>> {
+        Ok(Some(F2::from(x.val != 0)))
     }
 }

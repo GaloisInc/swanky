@@ -1872,6 +1872,7 @@ dependencies = [
  "swanky-cointoss",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-oprf-kkrt",
  "swanky-oprf-kmprt",

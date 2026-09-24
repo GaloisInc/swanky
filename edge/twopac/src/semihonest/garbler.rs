@@ -121,13 +121,13 @@ impl<
     RNG: CryptoRng + SeedableRng<Seed = Block>,
     OT: OtSender<Msg = Block> + SemiHonest,
     Wire: WireLabel<F2>,
-> FancyOutput for Garbler<RNG, OT, Wire>
+> FancyOutput<F2> for Garbler<RNG, OT, Wire>
 {
     fn output(
         &mut self,
         x: &Self::Item,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Option<u16>> {
+    ) -> swanky_error::Result<Option<F2>> {
         self.garbler.output(x, channel)
     }
 }

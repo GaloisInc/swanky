@@ -15,7 +15,7 @@ mod helpers {
 
     pub(crate) fn plaintext<C: CircuitInputMapper<Dummy> + CircuitOutputMapper<Dummy>>(
         circuit: &C,
-    ) -> (Vec<F2>, Vec<u16>) {
+    ) -> (Vec<F2>, Vec<F2>) {
         let mut rng = rng();
 
         let inputs = (0..<C as CircuitInputMapper<Dummy>>::ninputs(circuit))
@@ -36,7 +36,7 @@ mod helpers {
         .unwrap();
         let expected = C::flatten(expected)
             .iter()
-            .map(|x| x.val())
+            .map(|x| F2::from(x.val() != 0))
             .collect::<Vec<_>>();
 
         (plaintext, expected)

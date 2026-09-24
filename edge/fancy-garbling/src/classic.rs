@@ -85,7 +85,7 @@ impl GarbledCircuit {
         circuit: &C,
         inputs: C::Input,
         output_mapping: &OutputMapping,
-    ) -> swanky_error::Result<Vec<u16>> {
+    ) -> swanky_error::Result<Vec<F2>> {
         let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
         output_mapping.to_outputs(&C::flatten(wirelabels))
     }
@@ -163,7 +163,7 @@ impl OutputMapping {
     pub fn to_outputs<Wire: WireLabel<F2>>(
         &self,
         wirelabels: &[Wire],
-    ) -> swanky_error::Result<Vec<u16>> {
+    ) -> swanky_error::Result<Vec<F2>> {
         let mut outputs = Vec::new();
         for (i, wirelabel) in wirelabels.iter().enumerate() {
             let mut decoded = None;
@@ -175,7 +175,7 @@ impl OutputMapping {
                 }
             }
             if let Some(output) = decoded {
-                outputs.push(output);
+                outputs.push(F2::from(output != 0));
             } else {
                 swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
             }

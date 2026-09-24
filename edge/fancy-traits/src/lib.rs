@@ -56,18 +56,18 @@ pub trait FancyEncode<FF: FiniteField>: Fancy {
 }
 
 /// Extension trait for [`Fancy`] that provides output operations.
-pub trait FancyOutput: Fancy {
+pub trait FancyOutput<FF: FiniteField>: Fancy {
     /// Output the value associated with wire `x`.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
-    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<u16>>;
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<FF>>;
 
     /// Output the values associated with a slice of wires.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
-    fn outputs(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Option<Vec<u16>>> {
+    fn outputs(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Option<Vec<FF>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.output(x, channel)?);

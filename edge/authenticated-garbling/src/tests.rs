@@ -80,7 +80,7 @@ fn test_circuit<
     .unwrap();
     let expected = <C as CircuitOutputMapper<Dummy>>::flatten(expected)
         .into_iter()
-        .map(|x| x.val())
+        .map(|x| F2::from(x.val() != 0))
         .collect::<Vec<_>>();
 
     let (_, outputs) = swanky_channel::local::local_channel_pair(

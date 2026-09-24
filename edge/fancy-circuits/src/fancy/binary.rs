@@ -56,7 +56,7 @@ impl<W> DerefMut for BinaryBundle<W> {
     }
 }
 
-impl<F: FancyBinary + FancyEncode<F2> + FancyOutput> BinaryGadgets for F {}
+impl<F: FancyBinary + FancyEncode<F2> + FancyOutput<F2>> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
 pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
@@ -124,9 +124,9 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
         x: &BinaryBundle<Self::Item>,
         channel: &mut Channel,
     ) -> swanky_error::Result<Option<u128>> {
-        Ok(self.output_bundle(x, channel)?.map(|bs| {
-            util::u128_from_bits(&bs.iter().map(|b| F2::from(*b != 0)).collect::<Vec<_>>())
-        }))
+        Ok(self
+            .output_bundle(x, channel)?
+            .map(|bs| util::u128_from_bits(&bs)))
     }
 
     /// Output a slice of binary bundles and interpret the results as a `u128`.

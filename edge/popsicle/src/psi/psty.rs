@@ -18,6 +18,7 @@ use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
@@ -327,7 +328,7 @@ impl ReceiverState {
         let mut intersection = Vec::new();
         for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs) {
             if let Some(item) = opt_item
-                && in_intersection == 1_u16
+                && in_intersection == F2::ONE
             {
                 intersection.push(self.inputs[item.input_index].clone());
             }
@@ -352,7 +353,7 @@ impl ReceiverState {
 
         let mut cardinality = 0;
         for (i, s) in cardinality_outs.into_iter().enumerate() {
-            cardinality += (s as usize) << i;
+            cardinality += (u16::from(s) as usize) << i;
         }
         Ok(cardinality)
     }

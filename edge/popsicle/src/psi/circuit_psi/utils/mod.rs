@@ -11,10 +11,10 @@ use swanky_field_binary::F2;
 /// Turn a vector of bits represented as u16 into a decimal
 /// value represented as a u128.
 /// We represent bits as u16 in accordance with fancy's representation
-pub fn binary_to_u128(bin: Vec<u16>) -> u128 {
+pub fn binary_to_u128(bin: Vec<F2>) -> u128 {
     let mut acc: u128 = 0;
     for (i, s) in bin.into_iter().enumerate() {
-        acc += (s as u128) << i;
+        acc += (u16::from(s) as u128) << i;
     }
     acc
 }
