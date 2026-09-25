@@ -2988,6 +2988,7 @@ name = "swanky-serialization"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "curve25519-dalek",
  "hybrid-array",
  "proptest",
  "serde",
