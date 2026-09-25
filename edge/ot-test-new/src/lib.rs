@@ -13,6 +13,8 @@ use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
+pub mod bench;
+
 fn rand_vec<T>(size: usize) -> Vec<T>
 where
     StandardUniform: Distribution<T>,

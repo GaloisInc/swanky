@@ -2923,6 +2923,7 @@ dependencies = [
 name = "swanky-ot-test-new"
 version = "0.6.0"
 dependencies = [
+ "criterion",
  "rand 0.10.2",
  "swanky-channel",
  "swanky-field-binary",

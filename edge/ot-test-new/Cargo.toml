@@ -11,6 +11,7 @@ version.workspace = true
 workspace = true
 
 [dependencies]
+criterion.workspace = true
 rand.workspace = true
 swanky-channel.workspace = true
 swanky-field-binary.workspace = true
