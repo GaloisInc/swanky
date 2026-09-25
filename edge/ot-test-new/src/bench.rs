@@ -8,8 +8,8 @@ use criterion::Criterion;
 
 use swanky_channel::local::local_channel_pair;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{ObliviousTransfer, Receiver, Sender};
-use swanky_party::{private::PartyPrivate, ty_eq::Witness};
+use swanky_ot_traits_new::{OTCorrelated, ObliviousTransfer, Receiver, Sender};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
@@ -75,6 +75,65 @@ pub fn bench_block_ot<S: ObliviousTransfer<Sender>, R: ObliviousTransfer<Receive
             let bs = rand_vec::<F2>(size);
 
             bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()))
+        },
+    );
+}
+
+fn bench_block_cot_inner<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Receiver>>(
+    bs: &[F2],
+    delta: U8x16,
+) {
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let ot = OTSender::init(c, &mut rng).unwrap();
+
+            ot.ot_correlated::<Vec<F2>, _>(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                PartyPrivate::new(delta),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let ot = OTReceiver::init(c, &mut rng).unwrap();
+
+            ot.ot_correlated(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                PartyPrivate::empty(Witness::EQUAL_TYPES),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+
+/// Benchmark a correlated OT protocol with `size` inputs.
+pub fn bench_correlated_ot<S: OTCorrelated<Sender>, R: OTCorrelated<Receiver>>(
+    c: &mut Criterion,
+    size: usize,
+) {
+    c.bench_function(
+        &format!(
+            "Correlated OT <{}, {}>",
+            std::any::type_name::<S>(),
+            std::any::type_name::<R>()
+        ),
+        move |bench| {
+            let delta = rand::random::<U8x16>();
+            let bs = rand_vec::<F2>(size);
+
+            bench.iter(|| bench_block_cot_inner::<S, R>(&bs, delta))
         },
     );
 }
