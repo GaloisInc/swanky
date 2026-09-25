@@ -8,7 +8,7 @@ use rand::{
 
 use swanky_channel::local::local_channel_pair;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{OTCorrelated, ObliviousTransfer, Receiver, Sender};
+use swanky_ot_traits_new::{OTCorrelated, OTRandom, ObliviousTransfer, Receiver, Sender};
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
@@ -129,6 +129,60 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
                 *out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES) ^ delta
             } else {
                 *out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES)
+            }
+        );
+    }
+}
+
+/// Test the functionality of a Random OT protocol by OT-int `ninputs`
+/// blocks.
+pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(ninputs: usize) {
+    let bs = rand_vec::<F2>(ninputs);
+
+    let mut out_s: Vec<PartyEither<Sender, [U8x16; 2], U8x16>> = Vec::with_capacity(ninputs);
+    let mut out_r: Vec<PartyEither<Receiver, [U8x16; 2], U8x16>> = Vec::with_capacity(ninputs);
+
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let otext = OTSender::init(c, &mut rng).unwrap();
+
+            otext
+                .ot_random::<Vec<F2>, _>(
+                    PartyEither::new(Witness::EQUAL_TYPES, ninputs),
+                    &mut out_s,
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let otext = OTReceiver::init(c, &mut rng).unwrap();
+
+            otext
+                .ot_random(
+                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                    &mut out_r,
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
+
+    for i in 0..ninputs {
+        assert_eq!(
+            *out_r[i].as_ref().into_inner(Witness::EQUAL_TYPES),
+            if bs[i].into() {
+                out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES)[1]
+            } else {
+                out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES)[0]
             }
         );
     }
