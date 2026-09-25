@@ -11,11 +11,11 @@ version.workspace = true
 workspace = true
 
 [dependencies]
+bytemuck.workspace = true
+hybrid-array.workspace = true
 # serde, itself, is a small crate. We just don't want to require the derive feature.
 serde.workspace = true
-hybrid-array.workspace = true
 vectoreyes.workspace = true
-bytemuck.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
