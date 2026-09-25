@@ -8,7 +8,7 @@ use criterion::Criterion;
 
 use swanky_channel::local::local_channel_pair;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{OTCorrelated, ObliviousTransfer, Receiver, Sender};
+use swanky_ot_traits_new::{OTCorrelated, OTRandom, ObliviousTransfer, Receiver, Sender};
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
@@ -135,5 +135,51 @@ pub fn bench_correlated_ot<S: OTCorrelated<Sender>, R: OTCorrelated<Receiver>>(
 
             bench.iter(|| bench_block_cot_inner::<S, R>(&bs, delta))
         },
+    );
+}
+
+fn bench_block_rot_inner<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(bs: &[F2]) {
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let ot = OTSender::init(c, &mut rng).unwrap();
+
+            ot.ot_random::<Vec<F2>, _>(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let ot = OTReceiver::init(c, &mut rng).unwrap();
+
+            ot.ot_random(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
+}
+
+/// Benchmark a random OT protocol with `size` inputs.
+pub fn bench_random_ot<S: OTRandom<Sender>, R: OTRandom<Receiver>>(c: &mut Criterion, size: usize) {
+    c.bench_function(
+        &format!(
+            "Random OT <{}, {}>",
+            std::any::type_name::<S>(),
+            std::any::type_name::<R>()
+        ),
+        |bench| bench.iter(|| bench_block_rot_inner::<S, R>(&rand_vec::<F2>(size))),
     );
 }
