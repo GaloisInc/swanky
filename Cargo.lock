@@ -2872,6 +2872,22 @@ dependencies = [
 [[package]]
 name = "swanky-ot-chou-orlandi-new"
 version = "0.6.0"
+dependencies = [
+ "blake3",
+ "curve25519-dalek",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "swanky-rng",
+ "vectoreyes",
+]
 
 [[package]]
 name = "swanky-ot-dummy"
