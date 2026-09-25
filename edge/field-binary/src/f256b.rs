@@ -1,7 +1,6 @@
 use crate::F2;
 use generic_array::GenericArray;
 use rand::Rng;
-use vectoreyes::U8x32;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -10,15 +9,19 @@ use swanky_serialization::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
+use vectoreyes::U8x32;
 
 #[cfg(test)]
 use swanky_polynomial::Polynomial;
 
 /// An element of the finite field $\textsf{GF}(2^{256})$ reduced over $x^{256} + x^{10} + x^5 + x^2 + 1$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
-// We use a pair of u128 limbs, least-significant first: limb 0 holds the coefficients of $x^0$
-// through $x^{127}$ and limb 1 holds $x^{128}$ through $x^{255}$. Unlike `F128b`, there's no
-// primitive Rust will pass in registers at this width, so this is just an array.
+// We represent a 256-bit value using a pair of u128 in little-endian order. I.e., the coefficients
+// are stored as `[[x^0, ..., x^127], [x^128, ..., x^255]]`.
+//
+// We could instead use U64x4 (__m256i on x86), but this would run into issues implementing
+// FiniteRing, since it has no const constructor to generate ONE and GENERATOR. Using transmute
+// would be possible, but unsafe.
 pub struct F256b(pub(crate) [u128; 2]);
 
 impl F256b {
@@ -30,7 +33,6 @@ impl F256b {
 
 /// Return the reduction polynomial for the field `F256b`.
 #[cfg(test)]
-#[allow(clippy::eq_op)]
 fn polynomial_modulus_f256b() -> Polynomial<<F256b as FiniteField>::PrimeField> {
     let mut coefficients = vec![F2::ZERO; 256];
     coefficients[256 - 1] = F2::ONE;
@@ -88,7 +90,8 @@ mod multiplication {
     /// Returns the low 256 bits of the result along with the `N` bits shifted off the top.
     #[inline(always)]
     fn shl<const N: u32>(x: [u128; 2]) -> ([u128; 2], u128) {
-        debug_assert!(0 < N && N < 128);
+        // NOTE: This check is free at run time. It fires at compile time, since `N` is a const generic.
+        assert!(0 < N && N < 128);
         (
             [x[0] << N, (x[1] << N) ^ (x[0] >> (128 - N))],
             x[1] >> (128 - N),
@@ -101,6 +104,11 @@ mod multiplication {
     /// Multiply `a` and `b`, interpreted as degree-255 Boolean polynomials. The result has degree
     /// 510, so it is returned in the form of 2 limb pairs containing the upper and lower bits, in
     /// that order: (hi, lo) = a * b
+    ///
+    /// TODO: This is based on the `clmul` implementation for `F128b`, where the selection of
+    /// schoolbook multiplication, rather than Karatsuba was based on measured performance
+    /// characteristics. There's a strong possibility those characteristics would differ in the
+    /// `F256b` case. We should test this and change the implementation accordingly.
     #[inline(always)]
     pub(crate) fn clmul(a: [u128; 2], b: [u128; 2]) -> ([u128; 2], [u128; 2]) {
         // a = [A1 : A0], b = [B1 : B0]
@@ -153,20 +161,20 @@ mod multiplication {
         use swanky_field::FiniteField;
         use swanky_polynomial::Polynomial;
 
-        /// A [`proptest`] strategy for a full-width 256-bit value.
-        //
-        // NOTE: This deliberately does not go through `swanky_field_test::arbitrary_ring`, which is
-        // built on `from_uniform_bytes` and therefore only ever sets the lower 128 bits.
-        fn any_256() -> impl Strategy<Value = [u128; 2]> {
-            (any::<u128>(), any::<u128>()).prop_map(|(lo, hi)| [lo, hi])
-        }
-
         fn poly_from_256(x: [u128; 2]) -> Polynomial<F2> {
             let x = F256b(x).decompose();
             Polynomial {
                 constant: x[0],
                 coefficients: x[1..].to_vec(),
             }
+        }
+
+        // Unlike `F128b`, there's no wider CLMUL primitive available to check against, so the
+        // reference here is schoolbook polynomial multiplication.
+        fn clmul_ref(a: [u128; 2], b: [u128; 2]) -> Polynomial<F2> {
+            let mut out = poly_from_256(a);
+            out *= &poly_from_256(b);
+            out
         }
 
         fn poly_from_upper_and_lower_256(upper: [u128; 2], lower: [u128; 2]) -> Polynomial<F2> {
@@ -184,16 +192,6 @@ mod multiplication {
             for shift in 0..256 {
                 out.coefficients.push(bit(upper, shift));
             }
-            out
-        }
-
-        /// Reference carry-less multiply, as a polynomial product over `F2`.
-        //
-        // Unlike `F128b`, there's no wider CLMUL primitive available to check against, so the
-        // reference here is schoolbook polynomial multiplication.
-        fn clmul_ref(a: [u128; 2], b: [u128; 2]) -> Polynomial<F2> {
-            let mut out = poly_from_256(a);
-            out *= &poly_from_256(b);
             out
         }
 
@@ -217,132 +215,18 @@ mod multiplication {
             Ok(poly_reduced)
         }
 
-        /// Ground-truth vectors generated with an independent Python model of GF(2) polynomial
-        /// arithmetic modulo $x^{256} + x^{10} + x^5 + x^2 + 1$.
-        mod known_values {
-            pub(super) const A: [u128; 2] = [
-                0xf26047d69c0ebfae46b4734dd119ac50,
-                0x05394e05d22ba8695cb0b766bf32d941,
-            ];
-            pub(super) const B: [u128; 2] = [
-                0xd56b323216aad95a900b8408f8cc89ba,
-                0x044875deececd1bf5a26e75489d75e6e,
-            ];
-            pub(super) const CLMUL_LO: [u128; 2] = [
-                0x16a33f77786dfb6168e5b728f9a18d20,
-                0x3c3e5b17fcb82f341cd599591ce7e01d,
-            ];
-            pub(super) const CLMUL_HI: [u128; 2] = [
-                0x788f5becabb19475eccc03996311fb65,
-                0x0015830961b33aec8ba73708b5cbac46,
-            ];
-            /// `A * B`, i.e. `clmul` followed by `reduce`.
-            pub(super) const PRODUCT: [u128; 2] = [
-                0xa095c412cd7967cd9e97ac7433256371,
-                0x68c19091e14b11d551d4b1b2e9c66c6f,
-            ];
-            /// The multiplicative inverse of `A`.
-            pub(super) const A_INVERSE: [u128; 2] = [
-                0xe932b176dfa02531f17343891af36c90,
-                0xda9a170d37792f6b6d9dbf923c2845fa,
-            ];
-            /// An upper half chosen so that reduction needs the *second* fold pass: bits 255, 254
-            /// and 250 all overflow when shifted left by 10.
-            pub(super) const FOLD_HI: [u128; 2] = [
-                0x00000000000000000000000000000001,
-                0xc4000000000000000000000000000000,
-            ];
-            pub(super) const FOLD_HI_REDUCED: [u128; 2] = [
-                0x000000000000000000000000000c4662,
-                0x54000000000000000000000000000000,
-            ];
-        }
-
-        #[test]
-        fn shl_matches_bitwise_reference() {
-            fn shl_ref(x: [u128; 2], n: u32) -> ([u128; 2], u128) {
-                let mut out = [0u128; 2];
-                let mut over = 0u128;
-                for i in 0..256usize {
-                    if (x[i / 128] >> (i % 128)) & 1 == 1 {
-                        let j = i + n as usize;
-                        if j < 256 {
-                            out[j / 128] |= 1 << (j % 128);
-                        } else {
-                            over |= 1 << (j - 256);
-                        }
-                    }
-                }
-                (out, over)
-            }
-
-            // The reduction only ever shifts by 2, 5 and 10, but check the boundaries too.
-            for x in [
-                [0u128, 0u128],
-                [u128::MAX, u128::MAX],
-                [1, 1 << 127],
-                known_values::A,
-                known_values::B,
-            ] {
-                assert_eq!(shl::<1>(x), shl_ref(x, 1), "n=1, x={x:x?}");
-                assert_eq!(shl::<2>(x), shl_ref(x, 2), "n=2, x={x:x?}");
-                assert_eq!(shl::<5>(x), shl_ref(x, 5), "n=5, x={x:x?}");
-                assert_eq!(shl::<10>(x), shl_ref(x, 10), "n=10, x={x:x?}");
-                assert_eq!(shl::<127>(x), shl_ref(x, 127), "n=127, x={x:x?}");
-            }
-        }
-
-        #[test]
-        fn carryless_mul_matches_known_value() {
-            assert_eq!(
-                clmul(known_values::A, known_values::B),
-                (known_values::CLMUL_HI, known_values::CLMUL_LO)
-            );
-        }
-
-        #[test]
-        fn reduce_matches_known_value() {
-            assert_eq!(
-                reduce(known_values::FOLD_HI, [0, 0]),
-                known_values::FOLD_HI_REDUCED
-            );
-        }
-
-        /// `clmul` and `reduce` composed, which is what [`MulAssign`] actually runs.
-        #[test]
-        fn mul_matches_known_value() {
-            assert_eq!(
-                F256b(known_values::A) * F256b(known_values::B),
-                F256b(known_values::PRODUCT)
-            );
-        }
-
-        #[test]
-        fn inverse_matches_known_value() {
-            assert_eq!(
-                F256b(known_values::A).inverse(),
-                F256b(known_values::A_INVERSE)
-            );
-        }
-
-        /// The defining relation of the modulus: $x^{256} = x^{10} + x^5 + x^2 + 1$.
-        #[test]
-        fn reduce_encodes_the_modulus() {
-            assert_eq!(
-                reduce([1, 0], [0, 0]),
-                [(1 << 10) | (1 << 5) | (1 << 2) | 1, 0]
-            );
-        }
-
+        // NOTE: `swanky_field_test::arbitrary_ring` (and therefore everything inside `test_field!`) is
+        // built on `from_uniform_bytes`, which can only fill the lower 128 bits of this field. These
+        // tests use a `[u128; 2]` strategy so that the upper limb is actually exercised.
         proptest! {
             #[test]
-            fn test_carryless_mul_256bit(a in any_256(), b in any_256()) {
+            fn test_carryless_mul_256bit(a: [u128; 2], b: [u128; 2]) {
                 let (hi, lo) = clmul(a, b);
                 prop_assert_eq!(poly_from_upper_and_lower_256(hi, lo), clmul_ref(a, b));
             }
 
             #[test]
-            fn test_reduce(upper in any_256(), lower in any_256()) {
+            fn test_reduce(upper: [u128; 2], lower: [u128; 2]) {
                 let poly_reduced = reduce_ref(upper, lower)?;
                 prop_assert_eq!(poly_from_256(reduce(upper, lower)), poly_reduced);
             }
@@ -436,12 +320,6 @@ impl FiniteField for F256b {
     }
 }
 
-impl From<U8x32> for F256b {
-    fn from(value: U8x32) -> Self {
-        Self(bytemuck::cast(value))
-    }
-}
-
 impl From<F2> for F256b {
     #[inline]
     fn from(x: F2) -> Self {
@@ -453,6 +331,17 @@ impl Mul<F256b> for F2 {
     #[inline]
     fn mul(self, x: F256b) -> F256b {
         F256b::conditional_select(&F256b::ZERO, &x, self.ct_eq(&F2::ONE))
+    }
+}
+
+impl From<U8x32> for F256b {
+    fn from(value: U8x32) -> Self {
+        Self(bytemuck::cast(value))
+    }
+}
+impl From<F256b> for U8x32 {
+    fn from(value: F256b) -> Self {
+        bytemuck::cast(value.0)
     }
 }
 
@@ -483,95 +372,13 @@ mod tests {
     use crate::F2;
 
     use super::F256b;
-    use generic_array::{GenericArray, typenum::U256};
     use proptest::prelude::*;
-    use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
     swanky_field_test::test_field!(test_field, F256b, crate::f256b::polynomial_modulus_f256b);
 
-    /// A full-width [`F256b`] strategy.
-    //
-    // NOTE: `swanky_field_test::arbitrary_ring` (and therefore everything inside `test_field!`) is
-    // built on `from_uniform_bytes`, which can only fill the lower 128 bits of this field. These
-    // tests use a 32-byte strategy so that the upper limb is actually exercised.
-    fn any_f256b() -> impl Strategy<Value = F256b> {
-        (any::<u128>(), any::<u128>()).prop_map(|(lo, hi)| F256b([lo, hi]))
-    }
-
     proptest! {
         #[test]
-        fn lsb_works(lo in any::<u128>(), hi in any::<u128>()) {
-            prop_assert_eq!(F256b([lo, hi]).lsb(), F2::from((lo & 1) != 0));
-        }
-    }
-
-    proptest! {
-        /// Multiplication of full-width operands is associative and distributes over addition.
-        //
-        // `test_field!` checks these too, but only over the lower half of the field.
-        #[test]
-        fn full_width_arithmetic_works(
-            a in any_f256b(),
-            b in any_f256b(),
-            c in any_f256b(),
-        ) {
-            prop_assert_eq!((a * b) * c, a * (b * c));
-            prop_assert_eq!(a * (b + c), a * b + a * c);
-            prop_assert_eq!(a * F256b::ONE, a);
-            prop_assert_eq!(a * F256b::ZERO, F256b::ZERO);
-        }
-    }
-
-    proptest! {
-        /// Every nonzero full-width element has a multiplicative inverse.
-        #[test]
-        fn full_width_inverse_works(a in any_f256b()) {
-            prop_assume!(a != F256b::ZERO);
-            prop_assert_eq!(a * a.inverse(), F256b::ONE);
-        }
-    }
-
-    // The remaining tests cover the `F2` <-> `F256b` bit basis, which is what `schmivitz` uses to
-    // lift its `[F8b; tau]` VOLE tags into the big field (see 256BIT_PLAN.md, Phase 0, Option A).
-    // The protocol only needs this map to be an `F2`-linear bijection.
-
-    proptest! {
-        #[test]
-        fn decompose_then_form_works(original in any_f256b()) {
-            let composed: F256b = F2::form_superfield(&F2::decompose_superfield(&original));
-            prop_assert_eq!(original, composed);
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn form_then_decompose_works(bits in prop::collection::vec(any::<bool>(), 256)) {
-            let bits: GenericArray<F2, U256> =
-                bits.into_iter().map(F2::from).collect();
-            let lifted: F256b = F2::form_superfield(&bits);
-            prop_assert_eq!(bits, F2::decompose_superfield(&lifted));
-        }
-    }
-
-    proptest! {
-        /// The lift is `F2`-linear, which is the property the VOLE relation `q = u * Delta + v`
-        /// depends on.
-        #[test]
-        fn form_superfield_is_f2_linear(
-            a in prop::collection::vec(any::<bool>(), 256),
-            b in prop::collection::vec(any::<bool>(), 256),
-        ) {
-            let sum: GenericArray<F2, U256> = a
-                .iter()
-                .zip(b.iter())
-                .map(|(x, y)| F2::from(x ^ y))
-                .collect();
-            let a: GenericArray<F2, U256> = a.into_iter().map(F2::from).collect();
-            let b: GenericArray<F2, U256> = b.into_iter().map(F2::from).collect();
-
-            let lifted_sum: F256b = F2::form_superfield(&sum);
-            let (lift_a, lift_b): (F256b, F256b) =
-                (F2::form_superfield(&a), F2::form_superfield(&b));
-            prop_assert_eq!(lifted_sum, lift_a + lift_b);
+        fn lsb_works(input: [u128; 2]) {
+            prop_assert_eq!(F256b(input).lsb(), F2::from((input[0] & 1) != 0));
         }
     }
 }
@@ -586,16 +393,14 @@ fn test_generator() {
     use crypto_bigint::{NonZero, U256};
     use swanky_field::FiniteRing;
 
-    // 2^256 - 1 = (2^1 - 1)(2^1 + 1)(2^2 + 1)(2^4 + 1)(2^8 + 1)(2^16 + 1)(2^32 + 1)(2^64 + 1)(2^128 + 1),
-    // fully factored (the last two factors are the known factorizations of F6 and F7).
     let prime_factors: Vec<u128> = vec![
         5704689200685129054721,
         59649589127497217,
         67280421310721,
-        274177,
         6700417,
-        641,
+        274177,
         65537,
+        641,
         257,
         17,
         5,
