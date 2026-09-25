@@ -643,6 +643,7 @@ dependencies = [
  "fiat-crypto",
  "rand_core 0.10.1",
  "rustc_version",
+ "serde",
  "subtle",
  "zeroize",
 ]
