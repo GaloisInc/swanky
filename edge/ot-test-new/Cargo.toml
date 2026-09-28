@@ -1,0 +1,21 @@
+[package]
+name = "swanky-ot-test-new"
+description = "Testing utilities for oblivious transfer protocols"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+criterion.workspace = true
+rand.workspace = true
+swanky-channel.workspace = true
+swanky-field-binary.workspace = true
+swanky-ot-traits-new.workspace = true
+swanky-party.workspace = true
+swanky-rng.workspace = true
+vectoreyes.workspace = true
