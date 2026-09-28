@@ -85,18 +85,6 @@ fn bench_hash(c: &mut Criterion, p: u16) {
     });
 }
 
-fn bench_hashback(c: &mut Criterion, q: u16) {
-    c.bench_function(&format!("wire::hashback ({})", q), move |b| {
-        let rng = &mut rand::rng();
-        let tweak = rand::random::<u128>();
-        let wire = AllWire::rand(rng, q);
-        b.iter(|| {
-            let z = wire.hashback(tweak, q);
-            std::hint::black_box(z);
-        });
-    });
-}
-
 fn bench_rand(c: &mut Criterion, p: u16) {
     c.bench_function(&format!("wire::rand ({})", p), move |b| {
         let rng = &mut SwankyRng::new();
@@ -160,12 +148,6 @@ fn hash(c: &mut Criterion) {
     bench_hash(c, 5);
     bench_hash(c, 17);
 }
-fn hashback(c: &mut Criterion) {
-    bench_hashback(c, 2);
-    bench_hashback(c, 3);
-    bench_hashback(c, 5);
-    bench_hashback(c, 17);
-}
 fn rand(c: &mut Criterion) {
     bench_rand(c, 2);
     bench_rand(c, 3);
@@ -182,7 +164,7 @@ fn rand_delta(c: &mut Criterion) {
 criterion_group! {
     name = wire_benches;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = unpack, pack, plus, minus, cmul, negate, hash, hashback, rand, rand_delta
+    targets = unpack, pack, plus, minus, cmul, negate, hash, rand, rand_delta
 }
 
 criterion_main!(wire_benches);

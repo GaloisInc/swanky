@@ -13,20 +13,28 @@ use swanky_channel::Channel;
 #[derive(Clone)]
 pub struct CrtBundle<W>(Bundle<W>);
 
-impl<W: Clone + HasModulus> CrtBundle<W> {
+impl<W> CrtBundle<W> {
     /// Create a new CRT bundle from a vector of wires.
     pub fn new(ws: Vec<W>) -> CrtBundle<W> {
         CrtBundle(Bundle::new(ws))
     }
+}
 
-    /// Extract the underlying bundle from this CRT bundle.
-    pub fn extract(self) -> Bundle<W> {
-        self.0
+impl<W: Clone + HasModulus> CrtBundle<W> {
+    // /// Return the moduli of all the wires in the bundle.
+    pub(crate) fn moduli(&self) -> Vec<u16> {
+        self.wires().iter().map(HasModulus::modulus).collect()
     }
 
     /// Return the product of all the wires' moduli.
     pub fn composite_modulus(&self) -> u128 {
-        util::product(&self.iter().map(HasModulus::modulus).collect::<Vec<_>>())
+        util::product(
+            &self
+                .wires()
+                .iter()
+                .map(HasModulus::modulus)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -74,7 +82,7 @@ impl CrtBundle<DummyVal> {
     }
 }
 
-impl<W: Clone + HasModulus> Deref for CrtBundle<W> {
+impl<W> Deref for CrtBundle<W> {
     type Target = Bundle<W>;
 
     fn deref(&self) -> &Bundle<W> {
@@ -82,22 +90,22 @@ impl<W: Clone + HasModulus> Deref for CrtBundle<W> {
     }
 }
 
-impl<W: Clone + HasModulus> DerefMut for CrtBundle<W> {
+impl<W> DerefMut for CrtBundle<W> {
     fn deref_mut(&mut self) -> &mut Bundle<W> {
         &mut self.0
     }
 }
 
-impl<W: Clone + HasModulus> From<Bundle<W>> for CrtBundle<W> {
-    fn from(b: Bundle<W>) -> CrtBundle<W> {
-        CrtBundle(b)
-    }
+impl<F: FancyArithmetic + FancyBinary + FancyEncode + FancyOutput> CrtGadgets for F where
+    F::Item: Clone + HasModulus
+{
 }
 
-impl<F: FancyArithmetic + FancyBinary + FancyEncode + FancyOutput> CrtGadgets for F {}
-
 /// Extension trait for `Fancy` providing advanced CRT gadgets based on bundles of wires.
-pub trait CrtGadgets: BundleGadgets + FancyEncode {
+pub trait CrtGadgets: BundleGadgets + FancyEncode
+where
+    Self::Item: HasModulus,
+{
     /// Encode a CRT input bundle.
     fn crt_encode(
         &mut self,

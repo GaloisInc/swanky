@@ -1,5 +1,5 @@
 use crate::{CrtBundle, util::factor};
-use fancy_traits::{Circuit, Fancy};
+use fancy_traits::{Circuit, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -24,7 +24,7 @@ impl Constant {
     }
 }
 
-impl<F: Fancy> Circuit<F> for Constant {
+impl<F: FancyConstant> Circuit<F> for Constant {
     type Input = ();
     type Output = CrtBundle<F::Item>;
 

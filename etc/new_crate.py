@@ -3,7 +3,7 @@ from pathlib import Path
 from string import Template
 from typing import Sequence
 
-import click
+import rich_click as click
 
 from etc import ROOT, readme
 from etc.rust import CrateDir, crate_path

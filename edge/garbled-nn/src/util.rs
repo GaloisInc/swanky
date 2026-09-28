@@ -1,6 +1,6 @@
 //! Utility functions for working with [`NeuralNet`](crate::NeuralNet)s.
 
-use fancy_circuits::util::{crt, crt_inv_factor, factor, modulus_with_width, u128_from_bits};
+use fancy_circuits::util::{modulus_with_width, u128_from_bits};
 
 /// Convert a list of bitwidths to their associated moduli.
 pub fn bitwidths_to_moduli(bitwidths: &[usize]) -> Vec<u128> {
@@ -18,47 +18,6 @@ pub fn index_of_max(xs: &[i64]) -> usize {
         }
     }
     max_ix
-}
-
-/// The value `x % q`.
-///
-/// # Panics
-/// Panics if the value `x` is too large/small for `q`.
-pub fn to_mod_q(x: i64, q: u128) -> u128 {
-    assert!(
-        ((x as i128) >= 0 && (x as i128) < q as i128 / 2)
-            || ((x as i128) < 0 && (x as i128) >= -(q as i128 / 2)),
-        "x={x} is too large/small for q={q}",
-    );
-    ((q as i128 + x as i128) % q as i128) as u128
-}
-
-/// The value `x % q` as a `i64`.
-pub fn from_mod_q(x: u128, q: u128) -> i64 {
-    if x >= q / 2 {
-        (x as i128 - q as i128) as i64
-    } else {
-        x as i64
-    }
-}
-
-/// Compute the CRT representation of `x` with respect to the factorization of
-/// `q`.
-fn crt_factor(x: u128, q: u128) -> Vec<u16> {
-    crt(x, &factor(q))
-}
-
-/// The value `x % q` in CRT form.
-///
-/// # Panics
-/// Panics if the value `x` is too large/small for `q`.
-pub fn to_mod_q_crt(x: i64, q: u128) -> Vec<u16> {
-    crt_factor(to_mod_q(x, q), q)
-}
-
-/// The value `x % q` as a `i64`, where `x` is provided in CRT form.
-pub fn from_mod_q_crt(xs: &[u16], q: u128) -> i64 {
-    from_mod_q(crt_inv_factor(xs, q), q)
 }
 
 /// Negate `x` using two's complement.
@@ -96,24 +55,7 @@ pub fn i64_from_bits(bits: &[u16]) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fancy_circuits::util::{PRIMES, product};
     use rand::{RngExt, rng};
-
-    /// Generate a CRT modulus using the `n` smallest primes in [`PRIMES`].
-    fn modulus_with_nprimes(n: usize) -> u128 {
-        product(&PRIMES[0..n])
-    }
-
-    #[test]
-    fn convert_crt() {
-        let mut rng = rng();
-        for _ in 0..1024 {
-            let nprimes = 2 + rng.random_range(..16usize);
-            let q = modulus_with_nprimes(nprimes);
-            let x = rng.random::<i64>() % (q / 2) as i64;
-            assert_eq!(x, from_mod_q_crt(&to_mod_q_crt(x, q), q));
-        }
-    }
 
     #[test]
     fn convert_binary() {

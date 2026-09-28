@@ -1,22 +1,22 @@
 use crate::{
     layer::{
-        Accuracy, ActivationFunction, Layer, Layers, activation::LayerActivation,
+        ActivationFunction, Layer, Layers, activation::LayerActivation,
         convolutional::LayerConvolutional, dense::LayerDense, flatten::LayerFlatten,
         max_pooling_2d::LayerMaxPooling2D,
     },
-    neural_net::{arithmetic::ArithmeticNeuralNet, binary::BinaryNeuralNet},
+    neural_net::binary::BinaryNeuralNet,
     util,
 };
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_circuits::{BinaryBundle, BinaryGadgets, CrtGadgets};
+use fancy_circuits::{BinaryBundle, BinaryGadgets};
 use fancy_garbling::{
-    AllWire, BinaryWireLabel, WireMod2,
+    BinaryWireLabel, WireMod2,
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
-use fancy_traits::{FancyArithmetic, FancyBinary, FancyProj, HasModulus};
+use fancy_traits::{FancyBinary, FancyBinaryConstant, HasModulus};
 use ndarray::Array3;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Map, Value};
@@ -78,7 +78,6 @@ pub trait FancyNeuralNet {
     fn nn_zero(&mut self, channel: &mut Channel) -> Result<Self::Item>;
 }
 
-pub(crate) mod arithmetic;
 pub(crate) mod binary;
 pub(crate) mod bitwidth;
 pub(crate) mod plaintext;
@@ -157,7 +156,7 @@ impl OutputMap {
     pub fn to_outputs<W: BinaryWireLabel>(&self, bundles: &[BinaryBundle<W>]) -> Result<Vec<i64>> {
         let mut outputs = Vec::with_capacity(bundles.len());
         for (i, bundle) in bundles.iter().enumerate() {
-            let mut bits = Vec::with_capacity(bundle.size());
+            let mut bits = Vec::with_capacity(bundle.len());
             for (j, wire) in bundle.wires().iter().enumerate() {
                 let mut decoded = None;
                 for k in 0..2 {
@@ -799,48 +798,8 @@ impl NeuralNet {
         Ok(outputs)
     }
 
-    /// Evaluate [`NeuralNet`] between an arithmetic [`Garbler`] and [`Evaluator`].
-    ///
-    /// # Panics
-    /// This panics if `input.len() ≠ self.ninputs()`.
-    pub fn eval_roundtrip_arith(
-        &self,
-        input: &Array3<i64>,
-        moduli: &[u128],
-        secret_weights: bool,
-        accuracy: &Accuracy,
-    ) -> Result<Vec<i64>> {
-        assert_eq!(input.len(), self.ninputs());
-        let (_, outputs) = swanky_channel::local::local_channel_pair(
-            |channel| {
-                let mut gb: Garbler<_, alsz::Sender, AllWire> =
-                    Garbler::new(channel, SwankyRng::new())?;
-                let mut nn = ArithmeticNeuralNet::new(&mut gb, moduli, true);
-                let inps = nn.encode_input(input, channel)?;
-                let outputs = nn.eval(self, &inps, secret_weights, accuracy, channel)?;
-                let outputs = nn.decode_output(&outputs, channel)?;
-                // The garbler receives no outputs.
-                debug_assert_eq!(outputs, None);
-                Ok(())
-            },
-            |channel| {
-                let mut ev: Evaluator<SwankyRng, alsz::Receiver, AllWire> =
-                    Evaluator::new(channel, SwankyRng::new())?;
-                let mut nn = ArithmeticNeuralNet::new(&mut ev, moduli, true);
-                let inps = nn.receive_input(input, channel)?;
-                let outputs = nn.eval(self, &inps, secret_weights, accuracy, channel)?;
-                let outputs = nn.decode_output(&outputs, channel)?;
-                // The evaluator receives the outputs, so the `unwrap` should
-                // never fail here.
-                debug_assert!(outputs.is_some());
-                Ok(outputs.unwrap())
-            },
-        )?;
-        Ok(outputs)
-    }
-
     /// Output a boolean garbling of [`NeuralNet`].
-    pub fn gc_garble_boolean<W: BinaryWireLabel, RNG: CryptoRng + Rng>(
+    pub fn gc_garble_boolean<W: BinaryWireLabel, RNG: CryptoRng>(
         &self,
         bitwidths: &[usize],
         secret_weights: bool,
@@ -848,7 +807,7 @@ impl NeuralNet {
     ) -> Result<(InputEncoder<W>, GarbledCircuit, OutputMap)> {
         let mut channel = GarbledChannel::new_writer(None);
         let (inputs, outputs, delta) = Channel::with(&mut channel, |channel| {
-            let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng, channel)?;
+            let mut garbler = fancy_garbling::Garbler::<_, W>::new(rng);
 
             // Construct the zero wires for the input.
             let inputs = (0..self.ninputs())
@@ -885,7 +844,7 @@ impl NeuralNet {
     ) -> Result<Vec<BinaryBundle<W>>> {
         // Evaluate the garbled circuit on the input wirelabels.
         Channel::with(GarbledChannel::from(gc), |channel| {
-            let mut evaluator = fancy_garbling::Evaluator::<W>::new(channel)?;
+            let mut evaluator = fancy_garbling::Evaluator::<W>::new();
             let mut nn = BinaryNeuralNet::new(&mut evaluator, bitwidth, false);
             nn.eval(self, inputs, secret_weights, channel)
         })
@@ -907,7 +866,7 @@ impl NeuralNet {
     ) -> Result<()>
     where
         W: Clone + HasModulus,
-        F: FancyBinary + BinaryGadgets,
+        F: FancyBinary + FancyBinaryConstant + BinaryGadgets,
     {
         let mut errors = 0;
 
@@ -927,58 +886,6 @@ impl NeuralNet {
             let mut nn = BinaryNeuralNet::new(f, bitwidth, true);
             let inp = nn.encode_input(img, channel)?;
             let outs = nn.eval(self, &inp, secret_weights, channel)?;
-            let res = nn.decode_output(&outs, channel)?.unwrap();
-
-            if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
-                errors += 1;
-            }
-        }
-
-        println!(
-            "errors: {}/{}. accuracy: {:.2}%",
-            errors,
-            images.len(),
-            100.0 * (1.0 - errors as f32 / images.len() as f32)
-        );
-        Ok(())
-    }
-
-    /// Evaluate the [`NeuralNet`] over all the provided arithmetic inputs and
-    /// track the accuracy of the evaluations.
-    #[allow(clippy::too_many_arguments)]
-    pub fn arith_accuracy_test<W, F>(
-        &self,
-        f: &mut F,
-        images: &[Array3<i64>],
-        labels: &[Vec<i64>],
-        bitwidth: &[usize],
-        secret_weights: bool,
-        accuracy: &Accuracy,
-        channel: &mut Channel,
-    ) -> Result<()>
-    where
-        W: Clone + HasModulus,
-        F: FancyBinary + FancyArithmetic + FancyProj + CrtGadgets,
-    {
-        let moduli = util::bitwidths_to_moduli(bitwidth);
-
-        let mut errors = 0;
-        let total_time = Instant::now();
-
-        for (img_num, img) in images.iter().enumerate() {
-            println!(
-                "(avg {:?}) [{} errors ({:.2}%)] ",
-                if img_num > 0 {
-                    total_time.elapsed() / img_num as u32
-                } else {
-                    Duration::ZERO
-                },
-                errors,
-                100.0 * (1.0 - errors as f32 / img_num as f32)
-            );
-            let mut nn = ArithmeticNeuralNet::new(f, &moduli, true);
-            let inp = nn.encode_input(img, channel)?;
-            let outs = nn.eval(self, &inp, secret_weights, accuracy, channel)?;
             let res = nn.decode_output(&outs, channel)?.unwrap();
 
             if util::index_of_max(&res) != util::index_of_max(&labels[img_num]) {
@@ -1047,26 +954,6 @@ impl NeuralNet {
         println!("{analyzer}");
         Ok(())
     }
-
-    /// Run [`CircuitAnalyzer`] in arithmetic mode.
-    pub fn analyze_arith(
-        &self,
-        moduli: &[u128],
-        secret_weights: bool,
-        accuracy: &Accuracy,
-    ) -> Result<()> {
-        let mut analyzer = CircuitAnalyzer::new();
-
-        Channel::with(std::io::empty(), |channel| {
-            let inps = (0..self.ninputs())
-                .map(|_| analyzer.crt_receive(moduli[0], channel))
-                .collect::<Result<Vec<_>>>()?;
-            let mut nn = ArithmeticNeuralNet::new(&mut analyzer, moduli, true);
-            nn.eval(self, &inps, secret_weights, accuracy, channel)
-        })?;
-        println!("{analyzer}");
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -1074,7 +961,7 @@ mod tests {
     #![allow(non_upper_case_globals)]
     #![allow(non_snake_case)]
 
-    use crate::{Accuracy, NeuralNet, io::read_tests, neural_net::plaintext, util};
+    use crate::{NeuralNet, io::read_tests, neural_net::plaintext};
     use fancy_garbling::WireMod2;
     use ndarray::Array3;
     use std::path::Path;
@@ -1105,25 +992,6 @@ mod tests {
         let plaintext_output = plaintext::eval(&nn, &test).unwrap();
 
         let gc_output = nn.eval_roundtrip_binary(&test, bitwidths, false).unwrap();
-        for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
-            assert_eq!(a, b);
-        }
-    }
-
-    fn arithmetic_and_plaintext_match_for_dir(dir: &Path, moduli: &[u128]) {
-        let (nn, test) = get_nn_and_test(dir);
-        let accuracy = Accuracy {
-            relu: "100%".to_string(),
-            sign: "100%".to_string(),
-            max: "100%".to_string(),
-        };
-
-        println!("{nn:?}");
-
-        let plaintext_output = plaintext::eval(&nn, &test).unwrap();
-        let gc_output = nn
-            .eval_roundtrip_arith(&test, moduli, false, &accuracy)
-            .unwrap();
         for (a, b) in plaintext_output.iter().zip(gc_output.iter()) {
             assert_eq!(a, b);
         }
@@ -1166,22 +1034,9 @@ mod tests {
     }
 
     #[test]
-    fn arithmetic_and_plaintext_match_for_DINN_30() {
-        let moduli = util::bitwidths_to_moduli(&DINN_30_Bitwidths);
-        arithmetic_and_plaintext_match_for_dir(Path::new(DINN_30_DIR), &moduli);
-    }
-
-    #[test]
     #[ignore = "Slow"]
     fn binary_and_plaintext_match_for_DINN_100() {
         binary_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &DINN_100_Bitwidths);
-    }
-
-    #[test]
-    #[ignore = "Slow"]
-    fn arithmetic_and_plaintext_match_for_DINN_100() {
-        let moduli = util::bitwidths_to_moduli(&DINN_100_Bitwidths);
-        arithmetic_and_plaintext_match_for_dir(Path::new(DINN_100_DIR), &moduli);
     }
 
     #[test]
@@ -1192,22 +1047,8 @@ mod tests {
 
     #[test]
     #[ignore = "Slow"]
-    fn arithmetic_and_plaintext_match_for_CryptoNets() {
-        let moduli = util::bitwidths_to_moduli(&CryptoNets_Bitwidths);
-        arithmetic_and_plaintext_match_for_dir(Path::new(CryptoNets_DIR), &moduli);
-    }
-
-    #[test]
-    #[ignore = "Slow"]
     fn binary_and_plaintext_match_for_DeepSecure() {
         binary_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &DeepSecure_Bitwidths);
-    }
-
-    #[test]
-    #[ignore = "Slow"]
-    fn arithmetic_and_plaintext_match_for_DeepSecure() {
-        let moduli = util::bitwidths_to_moduli(&DeepSecure_Bitwidths);
-        arithmetic_and_plaintext_match_for_dir(Path::new(DeepSecure_DIR), &moduli);
     }
 
     // This one almost certainly will take too long.

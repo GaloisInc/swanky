@@ -15,6 +15,7 @@ rand.workspace = true
 swanky-ot-traits.workspace = true
 swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
+swanky-field-binary.workspace = true
 swanky-rng.workspace = true
 criterion.workspace = true
 

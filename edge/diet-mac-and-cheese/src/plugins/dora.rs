@@ -2,8 +2,8 @@ use super::{Plugin, PluginExecution};
 use crate::circuit_ir::{
     FunStore, FunctionBody, GateM, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount,
 };
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use swanky_error::{ErrorKind, Result, bail, ensure, swanky_error};
+use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 

@@ -8,81 +8,69 @@ use rand_core::{Rng, SeedableRng};
 
 use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
+use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_rng::SwankyRng;
-
-/// Errors produced by the coin tossing protocol.
-#[derive(Debug)]
-pub enum Error {
-    /// An I/O error occurred.
-    IoError(std::io::Error),
-    /// The commitment check failed.
-    CommitmentCheckFailed,
-}
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::IoError(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::IoError(e)
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Error::IoError(e) => write!(f, "IO error: {e}"),
-            Error::CommitmentCheckFailed => "committment check failed".fmt(f),
-        }
-    }
-}
 
 /// Coin tossing sender.
 #[inline]
-pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>, Error> {
+pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>> {
     let mut out = Vec::with_capacity(seeds.len());
     for seed in seeds.iter() {
         let mut rng = SwankyRng::from_seed(*seed);
         let mut com = Block::default();
         rng.fill_bytes(com.as_mut());
-        channel.write_block(&com)?;
+        channel
+            .write_block(&com)
+            .wrap_err(ErrorKind::NetworkError, "Failed to write block")?;
     }
-    channel.flush()?;
+    channel
+        .flush()
+        .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
     for seed in seeds.iter() {
-        let seed_ = channel.read_block()?;
+        let seed_ = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         out.push(*seed ^ seed_);
     }
     for seed in seeds.iter() {
-        channel.write_block(seed)?;
+        channel
+            .write_block(seed)
+            .wrap_err(ErrorKind::NetworkError, "Failed to write block")?;
     }
-    channel.flush()?;
+    channel
+        .flush()
+        .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
     Ok(out)
 }
 
 /// Coin tossing receiver.
 #[inline]
-pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>, Error> {
+pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>> {
     let mut coms = Vec::with_capacity(seeds.len());
     let mut out = Vec::with_capacity(seeds.len());
     for _ in 0..seeds.len() {
-        let com = channel.read_block()?;
+        let com = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         coms.push(com);
     }
     for seed in seeds.iter() {
-        channel.write_block(seed)?;
+        channel
+            .write_block(seed)
+            .wrap_err(ErrorKind::NetworkError, "Failed to write block")?;
     }
-    channel.flush()?;
+    channel
+        .flush()
+        .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
     for (seed, com) in seeds.iter().zip(coms) {
-        let seed_ = channel.read_block()?;
+        let seed_ = channel
+            .read_block()
+            .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         let mut rng_ = SwankyRng::from_seed(seed_);
         let mut check = Block::default();
         rng_.fill_bytes(check.as_mut());
         if check != com {
-            return Err(Error::CommitmentCheckFailed);
+            bail!(ErrorKind::OtherError, "Commitment check failed");
         }
         out.push(*seed ^ seed_)
     }

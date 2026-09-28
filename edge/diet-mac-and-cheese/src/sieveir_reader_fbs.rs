@@ -22,12 +22,12 @@ use crate::{
 };
 use flatbuffers::{SIZE_UOFFSET, UOffsetT, read_scalar_at};
 use log::info;
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg, ValueStreamKind};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
+use swanky_sieve_ir_parser::{Number, PluginTypeArg, ValueStreamKind};
 
 fn bigint_from_bytes(bytes: &[u8]) -> Number {
     assert!(bytes.len() <= Number::BYTES, "number too big",);

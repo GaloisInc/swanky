@@ -4,7 +4,7 @@ use fancy_circuits::{
     BinaryBundle,
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
-use fancy_traits::{Circuit, Fancy, FancyBinary};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyBinaryConstant};
 use itertools::Itertools;
 use swanky_channel::Channel;
 
@@ -78,17 +78,17 @@ where
 /// Fancy function which computes the cardinality of the intersection
 pub fn fancy_cardinality<F>(
     f: &mut F,
-    intersect_bitvec: &[<F as Fancy>::Item],
+    intersect_bitvec: &[F::Item],
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<<F as Fancy>::Item>>
+) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: FancyBinary + Fancy<Item = WireMod2>,
+    F: FancyBinary + FancyBinaryConstant,
 {
     let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let one = BinaryConstant::new(1, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
-        let mux = BinaryMultiplex::new().execute(f, (*bit, &zero, &one), channel)?;
+        let mux = BinaryMultiplex::new().execute(f, (bit.clone(), &zero, &one), channel)?;
         acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mux), channel)?;
     }
     Ok(acc)
@@ -99,21 +99,21 @@ where
 /// together and returned
 pub fn fancy_payload_sum<F>(
     f: &mut F,
-    intersect_bitvec: &[<F as Fancy>::Item],
-    payload_a: &[BinaryBundle<<F as Fancy>::Item>],
-    payload_b: &[BinaryBundle<<F as Fancy>::Item>],
+    intersect_bitvec: &[F::Item],
+    payload_a: &[BinaryBundle<F::Item>],
+    payload_b: &[BinaryBundle<F::Item>],
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<<F as Fancy>::Item>>
+) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: FancyBinary + Fancy<Item = WireMod2>,
+    F: FancyBinary + FancyBinaryConstant,
 {
     let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let mut acc = zero.clone();
     let multiplex = BinaryMultiplex::new();
 
     for (i, bit) in intersect_bitvec.iter().enumerate() {
-        let mux_a = multiplex.execute(f, (*bit, &zero, &payload_a[i]), channel)?;
-        let mux_b = multiplex.execute(f, (*bit, &zero, &payload_b[i]), channel)?;
+        let mux_a = multiplex.execute(f, (bit.clone(), &zero, &payload_a[i]), channel)?;
+        let mux_b = multiplex.execute(f, (bit.clone(), &zero, &payload_b[i]), channel)?;
         let mul = BinaryAdditionNoCarry::new().execute(f, (&mux_a, &mux_b), channel)?;
         acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mul), channel)?;
     }

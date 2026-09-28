@@ -17,8 +17,7 @@ workspace = true
 fancy-traits.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
-
-rand.workspace = true
+swanky-field-binary.workspace = true
 
 [dev-dependencies]
 fancy-circuits.workspace = true

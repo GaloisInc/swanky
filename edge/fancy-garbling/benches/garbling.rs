@@ -2,7 +2,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_circuits::LinearOram;
 use fancy_garbling::{Evaluator, Garbler, WireMod2, WireModQ, classic::GarbledCircuit};
 use fancy_traits::{
-    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyBinary, FancyProj,
+    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyBinary,
 };
 use rand::RngExt;
 use std::{hint::black_box, time::Duration};
@@ -153,45 +153,6 @@ impl<F: FancyBinary> CircuitOutputMapper<F> for MixedOp {
     }
 }
 
-struct Proj(u16, Vec<u16>);
-impl<F: FancyProj> Circuit<F> for Proj {
-    type Input = F::Item;
-    type Output = Vec<F::Item>;
-
-    fn execute(
-        &self,
-        backend: &mut F,
-        input: Self::Input,
-        channel: &mut Channel,
-    ) -> Result<Self::Output> {
-        for _ in 0..1000 {
-            let _ = backend.proj(&input, self.0, Some(self.1.clone()), channel)?;
-        }
-        Ok(vec![])
-    }
-}
-
-impl<F: FancyProj> CircuitInputMapper<F> for Proj {
-    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-        assert_eq!(inputs.len(), 1);
-        inputs[0].clone()
-    }
-
-    fn ninputs(&self) -> usize {
-        1
-    }
-
-    fn modulus(&self, _: usize) -> u16 {
-        self.0
-    }
-}
-
-impl<F: FancyProj> CircuitOutputMapper<F> for Proj {
-    fn flatten(output: Self::Output) -> Vec<F::Item> {
-        output
-    }
-}
-
 struct Mul(u16);
 impl<F: FancyArithmetic> Circuit<F> for Mul {
     type Input = F::Item;
@@ -231,17 +192,6 @@ impl<F: FancyArithmetic> CircuitOutputMapper<F> for Mul {
     }
 }
 
-fn proj(c: &mut Criterion) {
-    let tt = (0..2).map(|i| (i + 1) % 2).collect::<Vec<_>>();
-    let circuit = Proj(2, tt);
-    bench_garble_arith(c, "proj", &circuit, 2);
-    bench_eval_arith(c, "proj", &circuit, 2);
-    let tt = (0..17).map(|i| (i + 1) % 17).collect::<Vec<_>>();
-    let circuit = Proj(17, tt);
-    bench_garble_arith(c, "proj", &circuit, 17);
-    bench_eval_arith(c, "proj", &circuit, 17);
-}
-
 fn mul(c: &mut Criterion) {
     let circuit = Mul(2);
     bench_garble_arith(c, "mul", &circuit, 2);
@@ -265,7 +215,7 @@ fn linear_oram(c: &mut Criterion) {
 criterion_group! {
     name = garbling;
     config = Criterion::default().warm_up_time(Duration::from_millis(100));
-    targets = proj, mul, mixed_op, linear_oram
+    targets = mul, mixed_op, linear_oram
 }
 
 criterion_main!(garbling);

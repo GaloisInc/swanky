@@ -29,7 +29,7 @@ where
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.size(), y.size(), "`x` and `y` must be the same length");
+        assert_eq!(x.len(), y.len(), "`x` and `y` must be the same length");
         Ok(CrtBundle::new(
             x.wires()
                 .iter()

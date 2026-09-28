@@ -1,0 +1,21 @@
+[package]
+name = "swanky-sieve-ir-parser"
+description = "A parser for SIEVE IR (a zero knowledge proof circuit format)"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+flatbuffers.workspace = true
+crypto-bigint.workspace = true
+memchr.workspace = true
+flume.workspace = true
+swanky-error.workspace = true
+
+[build-dependencies]
+swanky-flatbuffer-build.workspace = true

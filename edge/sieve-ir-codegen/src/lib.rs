@@ -5,16 +5,16 @@
 
 extern crate proc_macro;
 
-use mac_n_cheese_sieve_parser::{
-    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
-    TypeId, TypedCount, TypedWireRange, WireId, WireRange, text_parser::RelationReader,
-};
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 use std::io::{Read, Seek};
 use std::path::PathBuf;
 use swanky_field::PrimeFiniteField;
 use swanky_serialization::CanonicalSerialize;
+use swanky_sieve_ir_parser::{
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
+    TypeId, TypedCount, TypedWireRange, WireId, WireRange, text_parser::RelationReader,
+};
 use syn::{
     LitStr, Token,
     parse::{Parse, ParseStream},
@@ -162,10 +162,10 @@ fn codegen_impls<T: Read + Seek>(
     }
 }
 
-type SIEVEType = mac_n_cheese_sieve_parser::Type;
+type SIEVEType = swanky_sieve_ir_parser::Type;
 
 fn modulus_to_type_var(modulus: &Number) -> TokenStream {
-    if *modulus == mac_n_cheese_sieve_parser::Number::from_u64(2) {
+    if *modulus == swanky_sieve_ir_parser::Number::from_u64(2) {
         // TODO: Is there a way to reify types?
         quote! {swanky_field_binary::F2}
     } else {
@@ -235,7 +235,7 @@ impl Codegen {
         let ty = &self.types[tid as usize];
         match ty {
             SIEVEType::Field { modulus } => {
-                if modulus == &mac_n_cheese_sieve_parser::Number::from_u64(2) {
+                if modulus == &swanky_sieve_ir_parser::Number::from_u64(2) {
                     let f = swanky_field_binary::F2::try_from_int(number)
                         .expect("Invalid constant for field");
                     let bytes = f.to_bytes();

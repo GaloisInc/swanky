@@ -13,7 +13,6 @@ workspace = true
 [dependencies]
 swanky-serialization.workspace = true
 swanky-field.workspace = true
-swanky-error.workspace = true
 vectoreyes.workspace = true
 subtle.workspace = true
 generic-array.workspace = true

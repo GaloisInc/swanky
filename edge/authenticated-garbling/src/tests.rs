@@ -5,14 +5,14 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator};
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_circuits::aes::AesNonExpanded;
 use fancy_circuits::binary::{
     TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
 };
+use fancy_circuits::crypto::aes::Aes128;
 use fancy_circuits::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
 };
-use fancy_circuits::test_circuits::fancy::TestBinaryConstant;
+use fancy_circuits::test_circuits::fancy_binary_constant::TestBinaryConstant;
 use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
 use rand::RngExt;
@@ -212,7 +212,7 @@ fn test_binary_multiplication() {
 
 #[test]
 fn test_aes() {
-    let circuit = AesNonExpanded::new();
+    let circuit = Aes128::new();
 
     test_circuit(128, 128, &circuit);
 }

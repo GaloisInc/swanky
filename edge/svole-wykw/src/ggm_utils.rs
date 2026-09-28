@@ -331,10 +331,10 @@ pub fn ggm_prime<
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use swanky_bytearray_utils::unpack_bits;
     use swanky_field::FiniteField;
-    use swanky_field_binary::{F2, F63b, F128b};
+    use swanky_field_binary::{F2, F2BitDeserializer, F63b, F128b};
     use swanky_field_f61p::F61p;
+    use swanky_serialization::SequenceDeserializer;
 
     fn test_ggm_<VF: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
         depth: usize,
@@ -361,12 +361,15 @@ mod tests {
             &mut keys,
             &mut vec![U8x16::ZERO; ggm_temporary_storage_size(depth)],
         );
-        let mut alpha_bits = unpack_bits(&alpha.to_le_bytes(), keys.len());
+        let mut alpha_bits = F2BitDeserializer::new(&mut std::io::empty())
+            .unwrap()
+            .read_vec(&mut &alpha.to_le_bytes()[..], keys.len())
+            .unwrap();
         alpha_bits.reverse();
         let alpha_keys: Vec<U8x16> = alpha_bits
             .iter()
             .zip(keys.iter())
-            .map(|(b, k)| if !*b { k.1 } else { k.0 })
+            .map(|(&b, k)| if !bool::from(b) { k.1 } else { k.0 })
             .collect();
         let mut vs_ = vec![(VF::ZERO, FE::ZERO); exp];
         let sum = ggm_prime::<VF, FE, (VF, FE)>(

@@ -1,5 +1,5 @@
-use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
 use swanky_error::{ErrorKind, Result, bail, ensure};
+use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
 use crate::circuit_ir::{
     FunStore, GateM, GatesBody, TypeId, TypeSpecification, TypeStore, WireCount,
@@ -413,8 +413,8 @@ mod tests {
         fields::F61P_MODULUS,
         plugins::Plugin,
     };
-    use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use swanky_field_f61p::F61p;
+    use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
     #[test]
     fn test_vector_add() {

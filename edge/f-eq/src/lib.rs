@@ -27,7 +27,7 @@
 //!    $`\mathcal{F}_{\mathsf{eq}}(0x1234 || 0x5678)`$ is the same as $`\mathcal{F}_{\mathsf{eq}}(0x12 || 0x345678)`$.
 //!    This is not a concern for our use cases.
 
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 use sha2::{Digest, Sha256};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
@@ -45,7 +45,7 @@ impl<P: GenericParty> EqualityFunctionality<P> {
     /// Create a new [`EqualityFunctionality`].
     pub fn new<RNG>(rng: &mut RNG) -> Self
     where
-        RNG: CryptoRng + Rng,
+        RNG: CryptoRng,
     {
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(_e) => EqualityFunctionality {

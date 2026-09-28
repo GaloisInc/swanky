@@ -25,7 +25,7 @@ pub struct PsiEvaluator<RNG, B> {
 
 impl<RNG, B> PsiEvaluator<RNG, B>
 where
-    RNG: Rng + CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
 {
     /// Creates a PsiEvaluator from a dedicated channel and rng
     pub fn new(channel: &mut Channel, seed: RNG::Seed) -> swanky_error::Result<Self>
@@ -48,7 +48,7 @@ impl<RNG, B> SemiHonest for PsiEvaluator<RNG, B> {}
 
 impl<RNG, B> CircuitPsi for PsiEvaluator<RNG, B>
 where
-    RNG: Rng + CryptoRng + Rng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = Block>,
     B: BasePsi,
 {
     /// Computes the Circuit PSI on the evaluator's inputs.

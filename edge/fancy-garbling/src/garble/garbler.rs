@@ -1,24 +1,25 @@
 use crate::{
-    AllWire, ArithmeticWire, WireLabel, WireMod2,
-    garble::binary_and::BinaryWireLabel,
-    hash_wires,
-    util::{output_tweak, tweak, tweak2},
+    AllWire, ArithmeticWireLabel, BinaryWireLabel, WireLabel, WireMod2,
+    util::{output_tweak, tweak2},
+    wire::hash_wires,
 };
 use fancy_traits::{
-    Fancy, FancyArithmetic, FancyBinary, FancyEncode, FancyOutput, FancyProj, HasModulus, is_binary,
+    Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant, FancyEncode,
+    FancyOutput, HasModulus, is_binary,
 };
-use rand::{CryptoRng, Rng, RngExt};
+use rand::{CryptoRng, RngExt};
 #[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use swanky_channel::Channel;
-
-use super::security_warning::warn_proj;
+use swanky_field_binary::F2;
+use vectoreyes::U8x16;
 
 /// Streams garbled circuit ciphertexts through a callback.
 pub struct Garbler<RNG, Wire> {
     // Zero wirelabel used for binary negation.
     zero: Wire,
+    delta_mod_2: Wire,
     // Map from modulus to associated delta wirelabel.
     deltas: HashMap<u16, Wire>,
     current_output: usize,
@@ -27,7 +28,7 @@ pub struct Garbler<RNG, Wire> {
 }
 
 #[cfg(feature = "serde")]
-impl<RNG: CryptoRng + Rng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire> {
     /// Load pre-chosen deltas from a file
     pub fn load_deltas(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         let f = std::fs::File::open(filename)?;
@@ -38,24 +39,22 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel + DeserializeOwned> Garbler<RNG, Wire
     }
 }
 
-impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a new [`Garbler`].
-    pub fn new(mut rng: RNG, channel: &mut Channel) -> swanky_error::Result<Self> {
-        let zero = Wire::rand(&mut rng, 2);
+    pub fn new(mut rng: RNG) -> Self {
         let delta = Wire::rand_delta(&mut rng, 2);
-        let one = zero.clone() + delta.clone();
-        let mut deltas = HashMap::new();
-        deltas.insert(2, delta);
-        // Send the one wirelabel to the evaluator. This is used to make binary
-        // negation free.
-        channel.write(&one.to_repr())?;
-        Ok(Garbler {
+        // We fix the constant `1` value to `1`, and derive the zero wirelabel
+        // as that value XORed with `Δ`.
+        let one = Wire::from_repr(U8x16::from(1u128), 2);
+        let zero = delta.clone() + one;
+        Garbler {
             zero,
-            deltas,
+            delta_mod_2: delta,
+            deltas: HashMap::new(),
             current_gate: 0,
             current_output: 0,
             rng,
-        })
+        }
     }
 
     /// The current non-free gate index of the garbling computation
@@ -68,12 +67,15 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
     /// Create a delta if it has not been created yet for this modulus, otherwise just
     /// return the existing one.
     pub fn delta(&mut self, q: u16) -> Wire {
-        if let Some(delta) = self.deltas.get(&q) {
-            return delta.clone();
+        if q == 2 {
+            self.delta_mod_2.clone()
+        } else if let Some(delta) = self.deltas.get(&q) {
+            delta.clone()
+        } else {
+            let w = Wire::rand_delta(&mut self.rng, q);
+            self.deltas.insert(q, w.clone());
+            w
         }
-        let w = Wire::rand_delta(&mut self.rng, q);
-        self.deltas.insert(q, w.clone());
-        w
     }
 
     /// The current output index of the garbling computation.
@@ -83,10 +85,10 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
         current
     }
 
-    /// Get the deltas, consuming the Garbler.
-    ///
-    /// This is useful for reusing wires in multiple garbled circuit instances.
-    pub fn get_deltas(self) -> HashMap<u16, Wire> {
+    /// Get the deltas, consuming the [`Garbler`].
+    pub fn get_deltas(mut self) -> HashMap<u16, Wire> {
+        // Put `delta_mod_2` in the `HashMap` before returning it.
+        self.deltas.insert(2, self.delta_mod_2);
         self.deltas
     }
 
@@ -96,7 +98,7 @@ impl<RNG: CryptoRng + Rng, Wire: WireLabel> Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
+impl<RNG: CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     fn and(
         &mut self,
         A: &Self::Item,
@@ -120,12 +122,11 @@ impl<RNG: Rng + CryptoRng, W: BinaryWireLabel> FancyBinary for Garbler<RNG, W> {
     /// Since we treat all garbler wires as zero,
     /// xoring with delta conceptually negates the value of the wire
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        let zero = self.zero;
-        self.xor(&zero, x)
+        self.zero + *x
     }
 }
 
-impl<RNG: Rng + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
+impl<RNG: CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     /// We can negate by having garbler xor wire with Delta
     ///
     /// Since we treat all garbler wires as zero,
@@ -170,9 +171,7 @@ impl<RNG: Rng + CryptoRng> FancyBinary for Garbler<RNG, AllWire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
-    for Garbler<RNG, Wire>
-{
+impl<RNG: CryptoRng, Wire: WireLabel + ArithmeticWireLabel> FancyArithmetic for Garbler<RNG, Wire> {
     fn add(&mut self, x: &Wire, y: &Wire) -> Wire {
         assert_eq!(x.modulus(), y.modulus());
         x.clone() + y.clone()
@@ -305,70 +304,11 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyArithmetic
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel + ArithmeticWire> FancyProj for Garbler<RNG, Wire> {
-    fn proj(
-        &mut self,
-        A: &Wire,
-        q_out: u16,
-        tt: Option<Vec<u16>>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Wire> {
-        warn_proj();
-        assert!(tt.is_some(), "`tt` must not be `None`");
-        let tt = tt.unwrap();
-
-        let q_in = A.modulus();
-        let mut gate = vec![Default::default(); q_in as usize - 1];
-
-        let tao = A.color();
-        let g = tweak(self.current_gate());
-
-        let Din = self.delta(q_in);
-        let Dout = self.delta(q_out);
-
-        // output zero-wire
-        // W_g^0 <- -H(g, W_{a_1}^0 - \tao\Delta_m) - \phi(-\tao)\Delta_n
-        let C = (A.clone() + Din.clone() * ((q_in - tao) % q_in)).hashback(g, q_out)
-            + Dout.clone() * ((q_out - tt[((q_in - tao) % q_in) as usize]) % q_out);
-
-        // precompute `let C_ = C.plus(&Dout.cmul(tt[x as usize]))`
-        let C_precomputed = {
-            let mut C_ = C.clone();
-            (0..q_out)
-                .map(|x| {
-                    if x > 0 {
-                        C_ += Dout.clone();
-                    }
-                    C_.to_repr()
-                })
-                .collect::<Vec<_>>()
-        };
-
-        let mut A_ = A.clone();
-        for x in 0..q_in {
-            if x > 0 {
-                A_ += Din.clone(); // avoiding expensive cmul for `A_ = A.plus(&Din.cmul(x))`
-            }
-
-            let ix = (tao as usize + x as usize) % q_in as usize;
-            if ix == 0 {
-                continue;
-            }
-
-            let ct = A_.hash(g) ^ C_precomputed[tt[x as usize] as usize];
-            gate[ix - 1] = ct;
-        }
-
-        for block in gate.iter() {
-            channel.write(block)?;
-        }
-        Ok(C)
-    }
+impl<RNG: CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
+    type Item = Wire;
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
-    type Item = Wire;
-
+impl<RNG: CryptoRng, Wire: WireLabel> FancyConstant for Garbler<RNG, Wire> {
     fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> swanky_error::Result<Wire> {
         let (zero, wire) = Wire::constant(x, q, &self.delta(q), &mut self.rng);
         channel.write(&wire.to_repr())?;
@@ -376,7 +316,20 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel> Fancy for Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> FancyBinaryConstant for Garbler<RNG, Wire> {
+    fn constant(&mut self, x: F2) -> Self::Item {
+        if x.into() {
+            // `self.zero` corresponds to the zero wirelabel associated with the
+            // "one" wirelabel set to `F128b::ONE`.
+            self.zero.clone()
+        } else {
+            // Otherwise, the garbler uses the "null" wirelabel to represent zero.
+            Default::default()
+        }
+    }
+}
+
+impl<RNG: CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
     fn encode_many(
         &mut self,
         values: &[u16],
@@ -405,7 +358,7 @@ impl<RNG: Rng + CryptoRng, Wire: WireLabel> FancyEncode for Garbler<RNG, Wire> {
     }
 }
 
-impl<RNG: Rng + CryptoRng, Wire: WireLabel> FancyOutput for Garbler<RNG, Wire> {
+impl<RNG: CryptoRng, Wire: WireLabel> FancyOutput for Garbler<RNG, Wire> {
     fn output(&mut self, X: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<u16>> {
         let q = X.modulus();
         let i = self.current_output();

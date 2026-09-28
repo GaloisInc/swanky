@@ -9,24 +9,13 @@ pub use garbler::Garbler;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::marker::PhantomData;
     use fancy_analyzer::CircuitAnalyzer;
-    use fancy_circuits::{
-        CrtBundle, CrtGadgets,
-        aes::AesNonExpanded,
-        arithmetic::{Constant, Multiplication, ReLU},
-        test_circuits::arithmetic::TestAddition,
-        util::{primes_with_width, product},
-    };
+    use fancy_circuits::{crypto::aes::Aes128, test_circuits::arithmetic::TestAddition};
     use fancy_garbling::{AllWire, WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
-        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyEncode,
-        FancyOutput, FancyProj,
+        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput,
     };
-    use rand::RngExt;
-    use swanky_channel::Channel;
-    use swanky_error::Result;
     use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
     use swanky_rng::SwankyRng;
 
@@ -64,80 +53,6 @@ mod tests {
                 assert_eq!((a + b) % modulus, output);
             }
         }
-    }
-
-    struct TestCircuit<'a>(PhantomData<&'a ()>);
-    impl<'a> TestCircuit<'a> {
-        fn new() -> Self {
-            TestCircuit(PhantomData)
-        }
-    }
-    impl<'a, F: FancyArithmetic + FancyProj> Circuit<F> for TestCircuit<'a>
-    where
-        F::Item: 'a,
-    {
-        type Input = &'a [CrtBundle<F::Item>];
-        type Output = Vec<CrtBundle<F::Item>>;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            let mut outputs = Vec::with_capacity(inputs.len());
-            for x in inputs.iter() {
-                let q = x.composite_modulus();
-                let c = Constant::new(1, q).execute(backend, (), channel)?;
-                let y = Multiplication::new().execute(backend, (x, &c), channel)?;
-                let z = ReLU::new().execute(backend, (&y, "100%", None), channel)?;
-                outputs.push(z);
-            }
-            Ok(outputs)
-        }
-    }
-
-    #[test]
-    fn test_relu() {
-        let mut rng = rand::rng();
-        let n = 10;
-        let ps = primes_with_width(10);
-        let q = product(&ps);
-
-        let plaintext = (0..n).map(|_| rng.random::<u128>() % q).collect::<Vec<_>>();
-
-        // Run dummy version.
-        let inputs = plaintext
-            .iter()
-            .map(|x| CrtBundle::from((*x, q)))
-            .collect::<Vec<_>>();
-        let output = Dummy::eval(&TestCircuit::new(), &inputs).unwrap();
-        let expected = output
-            .iter()
-            .map(|x| CrtBundle::from_crt(x, q))
-            .collect::<Vec<_>>();
-
-        // Run 2PC version.
-        let (_, result) = swanky_channel::local::local_channel_pair(
-            |channel| {
-                let rng = SwankyRng::new();
-                let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
-                let xs = gb.crt_encode_many(&plaintext, q, channel)?;
-                let result = TestCircuit::new().execute(&mut gb, &xs, channel)?;
-                gb.crt_outputs(&result, channel)?;
-                Ok(())
-            },
-            |channel| {
-                let rng = SwankyRng::new();
-                let mut ev =
-                    Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(channel, rng)?;
-                let xs = ev.crt_receive_many(n, q, channel)?;
-                let result = TestCircuit::new().execute(&mut ev, &xs, channel)?;
-                Ok(ev.crt_outputs(&result, channel)?.unwrap())
-            },
-        )
-        .unwrap();
-        assert_eq!(result, expected);
     }
 
     type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
@@ -212,13 +127,13 @@ mod tests {
 
     #[test]
     fn test_aes_arithmetic() {
-        let aes = AesNonExpanded::new();
+        let aes = Aes128::new();
         test_aes::<_, AllWire>(&aes);
     }
 
     #[test]
     fn test_aes_binary() {
-        let aes = AesNonExpanded::new();
+        let aes = Aes128::new();
         test_aes::<_, WireMod2>(&aes);
     }
 }

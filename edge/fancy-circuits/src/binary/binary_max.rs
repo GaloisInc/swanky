@@ -1,6 +1,6 @@
 use crate::{BinaryBundle, binary::BinaryLessThan};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -20,7 +20,7 @@ impl<'a> BinaryMax<'a> {
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryMax<'a>
+impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryMax<'a>
 where
     F::Item: 'a,
 {

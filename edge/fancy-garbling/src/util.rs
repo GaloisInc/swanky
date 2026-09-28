@@ -7,11 +7,6 @@ use rand::RngExt as _;
 use fancy_circuits::util::as_mixed_radix;
 use vectoreyes::U8x16;
 
-/// Tweak function for a single item.
-pub(crate) fn tweak(i: usize) -> u128 {
-    i as u128
-}
-
 /// Tweak function for two items.
 pub(crate) fn tweak2(i: u64, j: u64) -> u128 {
     (j as u128) << 64 | (i as u128)

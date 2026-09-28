@@ -28,9 +28,9 @@ use crate::{
     mac::MacT,
     number_to_u64,
 };
-use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field_binary::F2;
+use swanky_sieve_ir_parser::PluginTypeArg;
 
 /// The permutation check plugin.
 #[derive(Clone, Debug)]
@@ -196,12 +196,12 @@ mod tests {
         fields::{F2_MODULUS, F61P_MODULUS},
         plugins::Plugin,
     };
-    use mac_n_cheese_sieve_parser::{Number, PluginTypeArg};
     use rand::seq::SliceRandom;
     use swanky_field::PrimeFiniteField;
     use swanky_field_binary::F2;
     use swanky_field_f61p::F61p;
     use swanky_rng::SwankyRng;
+    use swanky_sieve_ir_parser::{Number, PluginTypeArg};
 
     fn create_gates(ntuples: u64, tuple_size: u64, modulus: Number) -> (FunStore, Vec<GateM>) {
         let total = ntuples * tuple_size;

@@ -3,7 +3,10 @@ use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// Pairwise AND of two bitvectors.
+/// For wire slices `x` and `y`, output `x & y`.
+///
+/// # Panics
+/// This panics if `x.len() ≠ y.len()`.
 #[derive(Default)]
 pub struct PairwiseAnd<'a>(PhantomData<&'a ()>);
 
@@ -18,7 +21,7 @@ impl<'a, F: FancyBinary> Circuit<F> for PairwiseAnd<'a>
 where
     F::Item: 'a,
 {
-    type Input = (&'a Vec<F::Item>, &'a Vec<F::Item>);
+    type Input = (&'a [F::Item], &'a [F::Item]);
     type Output = Vec<F::Item>;
 
     fn execute(
@@ -28,6 +31,8 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
+        assert_eq!(x.len(), y.len());
+
         x.iter()
             .zip(y.iter())
             .map(|(x, y)| backend.and(x, y, channel))

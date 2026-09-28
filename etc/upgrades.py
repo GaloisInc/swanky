@@ -6,9 +6,9 @@ import tempfile
 from pathlib import Path
 from typing import List
 
-import click
 import rich
 import rich.panel
+import rich_click as click
 
 from etc import ROOT
 

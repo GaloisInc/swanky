@@ -23,7 +23,6 @@ serde = ["dep:serde", "dep:serde_json"]
 [dependencies]
 itertools.workspace = true
 rand.workspace = true
-regex.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 subtle.workspace = true
@@ -31,19 +30,15 @@ subtle.workspace = true
 fancy-circuits.workspace = true
 fancy-plaintext.workspace = true
 fancy-traits.workspace = true
-swanky-adversary.workspace = true
 swanky-channel.workspace = true
 swanky-cr-hash.workspace = true
 swanky-error.workspace = true
+swanky-field-binary.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
 swanky-rng.workspace = true
 criterion.workspace = true
-
-[[bin]]
-name = "gen-deltas"
-required-features = ["serde"]
 
 [[bench]]
 name = "wire_operations"

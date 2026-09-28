@@ -1,6 +1,6 @@
 import subprocess
 
-import click
+import rich_click as click
 
 from etc import ROOT
 from etc.lint import LintResult

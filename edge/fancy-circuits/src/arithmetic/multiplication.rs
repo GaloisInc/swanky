@@ -1,6 +1,6 @@
 use crate::{CrtBundle, util::crt};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyArithmetic};
+use fancy_traits::{Circuit, FancyArithmetic, HasModulus};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -29,7 +29,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.size(), y.size());
+        assert_eq!(x.len(), y.len());
         let bundle = x
             .wires()
             .iter()
@@ -53,7 +53,7 @@ impl<'a> ConstantMultiplication<'a> {
 
 impl<'a, F: FancyArithmetic> Circuit<F> for ConstantMultiplication<'a>
 where
-    F::Item: 'a,
+    F::Item: HasModulus + 'a,
 {
     type Input = (&'a CrtBundle<F::Item>, u128);
     type Output = CrtBundle<F::Item>;

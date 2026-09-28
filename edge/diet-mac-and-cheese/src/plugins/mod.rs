@@ -1,6 +1,6 @@
 use crate::circuit_ir::{FunStore, GatesBody, TypeId, TypeIdMapping, TypeStore, WireCount};
-use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_error::Result;
+use swanky_sieve_ir_parser::PluginTypeArg;
 
 #[derive(Clone, Debug)]
 pub struct PluginType {
@@ -19,8 +19,8 @@ impl PluginType {
     }
 }
 
-impl From<mac_n_cheese_sieve_parser::PluginType> for PluginType {
-    fn from(ty: mac_n_cheese_sieve_parser::PluginType) -> Self {
+impl From<swanky_sieve_ir_parser::PluginType> for PluginType {
+    fn from(ty: swanky_sieve_ir_parser::PluginType) -> Self {
         Self {
             name: ty.name,
             operation: ty.operation,

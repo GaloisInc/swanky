@@ -1,6 +1,6 @@
-use mac_n_cheese_sieve_parser::PluginTypeArg;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field_binary::F2;
+use swanky_sieve_ir_parser::PluginTypeArg;
 
 use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCount};
 use crate::number_to_u64;

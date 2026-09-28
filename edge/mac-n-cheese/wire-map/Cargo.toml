@@ -12,7 +12,6 @@ workspace = true
 
 [dependencies]
 vectoreyes.workspace = true
-bytemuck.workspace = true
 swanky-error.workspace = true
 
 [dev-dependencies]

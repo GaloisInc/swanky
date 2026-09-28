@@ -1,7 +1,7 @@
 from typing import Any, Callable, List
 
-import click
 import rich
+import rich_click as click
 
 from core.vectoreyes.cmd import generate as vectoreyes_generate
 from etc.fmt import fmt

@@ -10,17 +10,17 @@ of the extra memory cost from storing the 'main' relation gates!
 use crate::circuit_ir::TapeT;
 use crate::circuit_ir::{FunStore, FuncDecl, GateM, TypeStore};
 use log::info;
-use mac_n_cheese_sieve_parser::ValueStreamKind;
-use mac_n_cheese_sieve_parser::ValueStreamReader as VSR;
-use mac_n_cheese_sieve_parser::text_parser::ValueStreamReader;
-use mac_n_cheese_sieve_parser::{
-    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
-    TypeId, TypedCount, TypedWireRange, WireId, WireRange,
-};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
+use swanky_sieve_ir_parser::ValueStreamKind;
+use swanky_sieve_ir_parser::ValueStreamReader as VSR;
+use swanky_sieve_ir_parser::text_parser::ValueStreamReader;
+use swanky_sieve_ir_parser::{
+    ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
+    TypeId, TypedCount, TypedWireRange, WireId, WireRange,
+};
 
 /// SIEVE IR inputs (public instances or private witnesses) from text.
 ///
