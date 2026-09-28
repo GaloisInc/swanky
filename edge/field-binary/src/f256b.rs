@@ -1,6 +1,6 @@
 use crate::F2;
 use generic_array::GenericArray;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use std::iter::FromIterator;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -205,9 +205,6 @@ mod multiplication {
             Ok(poly_reduced)
         }
 
-        // NOTE: `swanky_field_test::arbitrary_ring` (and therefore everything inside `test_field!`) is
-        // built on `from_uniform_bytes`, which can only fill the lower 128 bits of this field. These
-        // tests use a `[u128; 2]` strategy so that the upper limb is actually exercised.
         proptest! {
             #[test]
             fn test_carryless_mul_256bit(a: [u128; 2], b: [u128; 2]) {
@@ -234,14 +231,14 @@ impl<'a> MulAssign<&'a F256b> for F256b {
 }
 
 impl FiniteRing for F256b {
-    // FIXME: FiniteRing does not nicely support fields larger than 128-bit nicely, since
-    // from_uniform_bytes takes at most 128-bits of randomness. We should decide how to fix this.
     fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        // NOTE: The trait fixes this input at 16 bytes, which is only half the width of this field,
-        // so the upper limb is left zero. The result is therefore *not* uniform over `F256b`, and
-        // this must not be used to derive Fiat-Shamir challenges: use `from_bytes` with 32 bytes of
-        // randomness instead.
-        F256b([u128::from_le_bytes(*x), 0])
+        // NOTE: The trait fixes this input at 16 bytes.Therefore we populate the full width of the
+        // field element using ChaCha20.
+        let mut seed = [0; 32];
+        seed[0..16].copy_from_slice(x);
+        // AES key scheduling is slower than ChaCha20
+        // TODO: this is still quite slow.
+        Self::random(&mut rand_chacha::ChaCha20Rng::from_seed(seed))
     }
 
     fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
@@ -363,12 +360,18 @@ mod tests {
 
     use super::F256b;
     use proptest::prelude::*;
-    swanky_field_test::test_field!(test_field, F256b, crate::f256b::polynomial_modulus_f256b);
+    use swanky_field_test::{arbitrary_ring, test_field};
+
+    test_field! {
+        test_field,
+        F256b,
+        crate::f256b::polynomial_modulus_f256b
+    }
 
     proptest! {
         #[test]
-        fn lsb_works(input: [u128; 2]) {
-            prop_assert_eq!(F256b(input).lsb(), F2::from((input[0] & 1) != 0));
+        fn lsb_works(input in arbitrary_ring::<F256b>()) {
+            prop_assert_eq!(input.lsb(), F2::from((input.0[0] & 1) != 0));
         }
     }
 }
