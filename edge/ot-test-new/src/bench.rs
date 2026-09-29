@@ -88,7 +88,7 @@ fn bench_block_cot_inner<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelate
             let mut rng = SwankyRng::new();
             let ot = OTSender::init(c, &mut rng).unwrap();
 
-            ot.ot_correlated::<Vec<F2>, _>(
+            ot.ot_correlated(
                 PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
                 PartyPrivate::new(delta),
                 &mut Vec::with_capacity(bs.len()),
@@ -104,7 +104,7 @@ fn bench_block_cot_inner<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelate
             let ot = OTReceiver::init(c, &mut rng).unwrap();
 
             ot.ot_correlated(
-                PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                PartyEither::new(Witness::EQUAL_TYPES, bs),
                 PartyPrivate::empty(Witness::EQUAL_TYPES),
                 &mut Vec::with_capacity(bs.len()),
                 c,

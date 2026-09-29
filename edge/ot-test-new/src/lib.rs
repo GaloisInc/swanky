@@ -94,7 +94,7 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
             let otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot_correlated::<Vec<F2>, _>(
+                .ot_correlated(
                     PartyEither::new(Witness::EQUAL_TYPES, ninputs),
                     PartyPrivate::new(delta),
                     &mut out_s,
@@ -111,7 +111,7 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
 
             otext
                 .ot_correlated(
-                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     &mut out_r,
                     c,

@@ -61,16 +61,14 @@ pub trait OTCorrelated<P: Party>: OTInit<P> {
     /// and vice-versa).
     /// When implementing this functionality,
     /// [`swanky_party::OppositeParty`] may be useful.
-    fn ot_correlated<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, U8x16, U8x16>>>(
+    fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
         self,
-        inputs: PartyEither<P, usize, I>,
+        inputs: PartyEither<P, usize, &[F2]>,
         delta: PartyPrivate<P, Sender, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>
-    where
-        I::IntoIter: ExactSizeIterator;
+    ) -> Result<Self>;
 }
 
 /// OT protocols where the messages are random.
