@@ -122,19 +122,12 @@ pub trait OTRandom<P: Party>: OTInit<P> {
 ///   `Receiver` chooses)
 pub trait ObliviousTransfer<P: Party>: OTInit<P> {
     /// Run OT.
-    fn ot<
-        I: IntoIterator<Item = F2>,
-        V: IntoIterator<Item = [T; 2]>,
-        T: CanonicalSerialize,
-        O: Extend<T>,
-    >(
+    fn ot<T: CanonicalSerialize, O: Extend<T>>(
         self,
-        inputs: PartyEither<P, usize, I>,
-        values: PartyPrivate<Sender, P, V>,
+        inputs: PartyEither<P, usize, &[F2]>,
+        values: PartyPrivate<Sender, P, &[[T; 2]]>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>
-    where
-        I::IntoIter: ExactSizeIterator;
+    ) -> Result<Self>;
 }

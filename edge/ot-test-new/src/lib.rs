@@ -30,6 +30,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
 ) {
     let m0s = rand_vec::<U8x16>(ninputs);
     let m1s = rand_vec::<U8x16>(ninputs);
+    let ms: Vec<[U8x16; 2]> = m0s.iter().zip(m1s.iter()).map(|(&x, &y)| [x, y]).collect();
 
     let bs = rand_vec::<F2>(ninputs);
 
@@ -41,9 +42,9 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
             let otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot::<Vec<F2>, _, _, Vec<U8x16>>(
+                .ot::<_, Vec<U8x16>>(
                     PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
-                    PartyPrivate::new(m0s.iter().zip(m1s.iter()).map(|(&x, &y)| [x, y])),
+                    PartyPrivate::new(&ms),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     c,
                     &mut rng,
@@ -57,8 +58,8 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
             let otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
-                .ot::<_, Vec<[U8x16; 2]>, _, _>(
-                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                .ot::<U8x16, _>(
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::new(&mut res),
                     c,
