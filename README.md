@@ -68,6 +68,7 @@ have a lesser stability guarantee.
 - **`swanky-ot-dummy`**: Implementation of an insecure OT protocol for testing purposes
 - **`swanky-ot-noar-pinkas`**: An implementation of the Noar-Pinkas OT protocol
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
+- **`swanky-ot-test-new`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
 - **`swanky-ot-traits-new`**: Base traits for Oblivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields

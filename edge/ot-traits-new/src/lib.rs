@@ -138,5 +138,7 @@ pub trait ObliviousTransfer<P: Party>: OTInit<P> {
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>;
+    ) -> Result<Self>
+    where
+        I::IntoIter: ExactSizeIterator;
 }
