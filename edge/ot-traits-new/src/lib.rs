@@ -133,7 +133,7 @@ pub trait ObliviousTransfer<P: Party>: OTInit<P> {
         O: Extend<T>,
     >(
         self,
-        inputs: PartyPrivate<Receiver, P, I>,
+        inputs: PartyEither<P, usize, I>,
         values: PartyPrivate<Sender, P, V>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,

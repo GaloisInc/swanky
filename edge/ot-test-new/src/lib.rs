@@ -42,7 +42,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
 
             otext
                 .ot::<Vec<F2>, _, _, Vec<U8x16>>(
-                    PartyPrivate::empty(Witness::EQUAL_TYPES),
+                    PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
                     PartyPrivate::new(m0s.iter().zip(m1s.iter()).map(|(&x, &y)| [x, y])),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     c,
@@ -58,7 +58,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
 
             otext
                 .ot::<_, Vec<[U8x16; 2]>, _, _>(
-                    PartyPrivate::new(bs.iter().copied()),
+                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::new(&mut res),
                     c,

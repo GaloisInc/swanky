@@ -28,7 +28,7 @@ fn bench_block_ot_inner<
             let ot = OTSender::init(c, &mut rng).unwrap();
 
             ot.ot::<Vec<F2>, _, _, Vec<U8x16>>(
-                PartyPrivate::empty(Witness::EQUAL_TYPES),
+                PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
                 PartyPrivate::new(ms.into_iter()),
                 PartyPrivate::empty(Witness::EQUAL_TYPES),
                 c,
@@ -43,7 +43,7 @@ fn bench_block_ot_inner<
             let ot = OTReceiver::init(c, &mut rng).unwrap();
 
             ot.ot::<_, Vec<[U8x16; 2]>, _, _>(
-                PartyPrivate::new(bs.iter().copied()),
+                PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
                 PartyPrivate::empty(Witness::EQUAL_TYPES),
                 PartyPrivate::new(&mut Vec::with_capacity(bs.len())),
                 c,
