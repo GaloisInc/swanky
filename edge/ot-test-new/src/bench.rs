@@ -144,7 +144,7 @@ fn bench_block_rot_inner<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiv
             let mut rng = SwankyRng::new();
             let ot = OTSender::init(c, &mut rng).unwrap();
 
-            ot.ot_random::<Vec<F2>, _>(
+            ot.ot_random(
                 PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
                 &mut Vec::with_capacity(bs.len()),
                 c,
@@ -159,7 +159,7 @@ fn bench_block_rot_inner<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiv
             let ot = OTReceiver::init(c, &mut rng).unwrap();
 
             ot.ot_random(
-                PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                PartyEither::new(Witness::EQUAL_TYPES, bs),
                 &mut Vec::with_capacity(bs.len()),
                 c,
                 &mut rng,

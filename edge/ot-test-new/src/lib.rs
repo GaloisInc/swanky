@@ -150,7 +150,7 @@ pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(n
             let otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot_random::<Vec<F2>, _>(
+                .ot_random(
                     PartyEither::new(Witness::EQUAL_TYPES, ninputs),
                     &mut out_s,
                     c,
@@ -166,7 +166,7 @@ pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(n
 
             otext
                 .ot_random(
-                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     &mut out_r,
                     c,
                     &mut rng,

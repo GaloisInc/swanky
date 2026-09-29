@@ -98,15 +98,13 @@ pub trait OTRandom<P: Party>: OTInit<P> {
     /// messages that they selected (i.e. the entries in the pairs
     /// generated on the `Sender` side corresponding to their
     /// selection bits).
-    fn ot_random<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
+    fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         self,
-        inputs: PartyEither<P, usize, I>,
+        inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>
-    where
-        I::IntoIter: ExactSizeIterator;
+    ) -> Result<Self>;
 }
 
 /// 1-out-of-2 OT protocols.

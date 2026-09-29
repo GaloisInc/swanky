@@ -61,9 +61,9 @@ impl<P: Party> OTInit<P> for ChouOrlandi<P> {
 }
 
 impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
-    fn ot_random<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
+    fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         mut self,
-        inputs: PartyEither<P, usize, I>,
+        inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
@@ -71,7 +71,7 @@ impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
         let zero = self.s.as_ref().map(|s| &Scalar::ZERO * s);
         let one = self.s.as_ref().map(|s| &Scalar::ONE * s);
 
-        for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.into_iter()) {
+        for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
             self.counter += 1;
 
             let input: PartyPrivate<Receiver, P, _> = input.into();
