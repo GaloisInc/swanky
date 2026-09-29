@@ -16,6 +16,7 @@ use curve25519_dalek::{
     RistrettoPoint, Scalar, constants::RISTRETTO_BASEPOINT_TABLE,
     ristretto::RistrettoBasepointTable,
 };
+use rand::CryptoRng;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 use swanky_adversary::{Malicious, SemiHonest};
@@ -46,10 +47,7 @@ pub struct ChouOrlandi<P: Party> {
 }
 
 impl<P: Party> OTInit<P> for ChouOrlandi<P> {
-    fn init(
-        channel: &mut Channel,
-        rng: &mut impl rand::prelude::CryptoRng,
-    ) -> swanky_error::Result<Self> {
+    fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> swanky_error::Result<Self> {
         let y = PartyPrivateCopy::new_with(|| Scalar::random(rng));
         let s = channel.communicate(y.map(|y| &y * RISTRETTO_BASEPOINT_TABLE))?;
 
@@ -68,7 +66,7 @@ impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
         inputs: PartyEither<P, usize, I>,
         outputs: &mut O,
         channel: &mut Channel,
-        rng: &mut impl rand::prelude::CryptoRng,
+        rng: &mut impl CryptoRng,
     ) -> swanky_error::Result<Self> {
         let zero = self.s.as_ref().map(|s| &Scalar::ZERO * s);
         let one = self.s.as_ref().map(|s| &Scalar::ONE * s);
