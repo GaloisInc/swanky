@@ -3,7 +3,7 @@
 //! Note: Any fields added here need to also be added to
 //! `backend_multifield::load_backend`!
 
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use std::any::{TypeId, type_name};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::PrimeFiniteField;
@@ -188,9 +188,9 @@ macro_rules! impl_sieve_ir_deserialize_binary_ext_field {
         $( impl SieveIrDeserialize for $t {
             fn from_number(val: &Number) -> Result<Self> {
                 let val = number_to_u64(val)?;
-                <$t>::from_bytes(GenericArray::from_slice(
+                <$t>::from_bytes(&Array::try_from(
                     &val.to_le_bytes()[0..<$t as CanonicalSerialize>::ByteReprLen::USIZE],
-                )).wrap_err(
+                ).expect("slice is correct size")).wrap_err(
                     ErrorKind::SerializationError,
                     "Failed to convert number to field element."
                 )

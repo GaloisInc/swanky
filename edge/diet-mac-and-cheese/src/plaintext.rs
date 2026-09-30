@@ -10,7 +10,7 @@ use crate::{
     plugins::DisjunctionBody,
 };
 
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use std::marker::PhantomData;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
@@ -66,7 +66,7 @@ impl<V: IsSubFieldOf<T>, T: FiniteField> MacT for WirePlaintext<V, T> {
     type Value = V;
     type Tag = T;
     type LiftedMac = WirePlaintext<T, T>;
-    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
+    fn lift(xs: &Array<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
         let mut value = T::ZERO;
         for (i, x) in xs.iter().enumerate() {
             let x_i: T = make_x_i::<V, T>(i);

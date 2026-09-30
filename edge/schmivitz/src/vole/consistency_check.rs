@@ -8,10 +8,8 @@ use std::iter::repeat_n;
 use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::CHALL1_LENGTH;
-use generic_array::sequence::Concat;
-use generic_array::{
-    GenericArray,
-    sequence::Split,
+use hybrid_array::{
+    Array,
     typenum::{U16, U96},
 };
 use itertools::izip;
@@ -265,13 +263,13 @@ pub(crate) struct VoleHasher {
 impl VoleHasher {
     pub(crate) fn from_seed(seed: [u8; CHALL1_LENGTH], ell: usize) -> Self {
         // Line 2.
-        let seed_ga: GenericArray<u8, U96> = GenericArray::from(seed);
-        let (r0_bytes, rest): (GenericArray<u8, U16>, _) = seed_ga.split();
-        let (r1_bytes, rest): (GenericArray<u8, U16>, _) = rest.split();
-        let (r2_bytes, rest): (GenericArray<u8, U16>, _) = rest.split();
-        let (r3_bytes, rest): (GenericArray<u8, U16>, _) = rest.split();
+        let seed_ga: Array<u8, U96> = Array::from(seed);
+        let (r0_bytes, rest): (Array<u8, U16>, _) = seed_ga.split();
+        let (r1_bytes, rest): (Array<u8, U16>, _) = rest.split();
+        let (r2_bytes, rest): (Array<u8, U16>, _) = rest.split();
+        let (r3_bytes, rest): (Array<u8, U16>, _) = rest.split();
         // Note: In the spec, `t` is 64 bits; here it's called `s1` and has 128 bits.
-        let (s_bytes, t_bytes): (GenericArray<u8, U16>, GenericArray<u8, U16>) = rest.split();
+        let (s_bytes, t_bytes): (Array<u8, U16>, Array<u8, U16>) = rest.split();
 
         // Lines 3 - 5.
         let r0 = F128b::from_bytes(&r0_bytes).unwrap();
@@ -326,7 +324,7 @@ impl VoleHasher {
 
         // Line 14 (call ToBits and truncate).
         let h2_bits = h2.bit_decomposition();
-        let (h3_bits, _unused): (GenericArray<bool, U16>, _) = h3.bit_decomposition().split();
+        let (h3_bits, _unused): (Array<bool, U16>, _) = h3.bit_decomposition().split();
 
         // Line 14 (append).
         let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();
@@ -529,8 +527,7 @@ impl VoleHasher {
         for j in 0..SECURITY_PARAM {
             // Line 14 (call ToBits and truncate).
             let h2_bits = h2[j].bit_decomposition();
-            let (h3_bits, _unused): (GenericArray<bool, U16>, _) =
-                h3[j].bit_decomposition().split();
+            let (h3_bits, _unused): (Array<bool, U16>, _) = h3[j].bit_decomposition().split();
 
             // Line 14 (append).
             let all_bits: [bool; SECURITY_PARAM + B] = h2_bits.concat(h3_bits).into();

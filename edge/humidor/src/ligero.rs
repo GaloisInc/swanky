@@ -63,7 +63,7 @@
 // TODO: Implement repetitions to achieve soundness with smaller field sizes.
 
 use digest::Digest as CryptoDigest;
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
 use rand::{CryptoRng, SeedableRng};
 use sprs::{CsMat, TriMat};

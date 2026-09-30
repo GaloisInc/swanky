@@ -1,7 +1,7 @@
 use crate::task_framework::{GlobalVolesNeeded, NoContinuation, TaskDefinition, TaskResult};
 use crate::types::RandomMac;
-use generic_array::GenericArray;
-use generic_array::typenum::Unsigned;
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 use mac_n_cheese_ir::compilation_format::FieldMacType;
 use mac_n_cheese_ir::compilation_format::wire_format::{
     AssertMultiplyPrototypeNoSpecWireFormat, AssertMultiplyPrototypeSmallBinaryWireFormat,
@@ -34,9 +34,9 @@ mod vope {
 
     /// The vector needed to lift `DegreeModulo<T::VF, T::TF>` `T::VF` macs into a single `T::TF`
     /// mac.
-    fn lifting_vector<T: MacTypes>() -> GenericArray<T::TF, DegreeModulo<T::VF, T::TF>> {
-        GenericArray::from_iter((0..DegreeModulo::<T::VF, T::TF>::USIZE).map(|i| {
-            let mut out = GenericArray::<T::VF, DegreeModulo<T::VF, T::TF>>::default();
+    fn lifting_vector<T: MacTypes>() -> Array<T::TF, DegreeModulo<T::VF, T::TF>> {
+        Array::from_iter((0..DegreeModulo::<T::VF, T::TF>::USIZE).map(|i| {
+            let mut out = Array::<T::VF, DegreeModulo<T::VF, T::TF>>::default();
             out[i] = T::VF::ONE;
             <T::VF as IsSubFieldOf<T::TF>>::form_superfield(&out)
         }))
@@ -337,7 +337,7 @@ impl<P: Party, T: MacTypes> TaskDefinition<P> for AssertMultiplyNoSpec<P, T> {
             }
             WhichParty::Verifier(e) => {
                 let alpha = self.ctx.into_inner(e);
-                let mut buf: GenericArray<u8, <T::TF as CanonicalSerialize>::ByteReprLen> =
+                let mut buf: Array<u8, <T::TF as CanonicalSerialize>::ByteReprLen> =
                     Default::default();
                 conn.read_exact(&mut buf).wrap_err(
                     ErrorKind::NetworkError,

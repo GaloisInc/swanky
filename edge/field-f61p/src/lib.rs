@@ -2,7 +2,7 @@
 
 #![deny(missing_docs)]
 use crypto_bigint::Uint;
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use rand::Rng;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess, CtOption};
@@ -51,13 +51,11 @@ impl FiniteRing for F61p {
 impl CanonicalSerialize for F61p {
     type Serializer = swanky_serialization::ByteElementSerializer<Self>;
     type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
-    type ByteReprLen = generic_array::typenum::U8;
+    type ByteReprLen = hybrid_array::typenum::U8;
     type FromBytesError = BiggerThanModulus;
 
     #[inline]
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         let buf = <[u8; 8]>::from(*bytes);
         let raw = u64::from_le_bytes(buf);
         if raw < MODULUS {
@@ -68,7 +66,7 @@ impl CanonicalSerialize for F61p {
     }
 
     #[inline]
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         self.0.to_le_bytes().into()
     }
 }
@@ -78,9 +76,9 @@ impl FiniteField for F61p {
 
     const GENERATOR: Self = F61p(37);
 
-    type NumberOfBitsInBitDecomposition = generic_array::typenum::U61;
+    type NumberOfBitsInBitDecomposition = hybrid_array::typenum::U61;
 
-    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
         swanky_field::standard_bit_decomposition(u128::from(self.0))
     }
     fn inverse(&self) -> Self {

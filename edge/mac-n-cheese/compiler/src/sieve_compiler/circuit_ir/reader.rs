@@ -5,6 +5,7 @@ use std::{
 
 use rustc_hash::FxHashMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
+use swanky_field::FiniteField;
 use swanky_sieve_ir_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, PluginType,
     PluginTypeArg, RelationReader, RelationVisitor, TypeId, TypedWireRange, ValueStreamKind,
@@ -158,7 +159,7 @@ impl<S: InstructionSink> Visitor<S> {
                     fn visit<FE: crate::sieve_compiler::supported_fields::CompilerField>(
                         self,
                         (): (),
-                    ) -> swanky_error::Result<()> {
+                    ) -> swanky_error::Result<()> where <<<FE as FiniteField>::NumberOfBitsInBitDecomposition as hybrid_array::ArraySize>::ArrayType<bool> as IntoIterator>::IntoIter: DoubleEndedIterator{
                         let fi = match self.0.last_mut() {
                             Some(Instruction::FieldInstructions(fi))
                                 if fi.as_ref().get::<FE>().is_some() =>

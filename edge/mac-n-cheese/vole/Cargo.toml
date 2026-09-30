@@ -15,7 +15,7 @@ swanky-ot-alsz-kos.workspace = true
 swanky-svole-wykw.workspace = true
 
 vectoreyes.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 bytemuck.workspace = true
 rand.workspace = true
 keyed_arena.workspace = true

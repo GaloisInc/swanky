@@ -719,7 +719,7 @@ dependencies = [
  "clap",
  "crypto-bigint",
  "flatbuffers",
- "generic-array",
+ "hybrid-array",
  "jemallocator",
  "log",
  "pretty_env_logger",
@@ -1007,17 +1007,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generic-array"
-version = "1.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "337d46834ee672ab3e48caca2cb0c78cc174fb12b3a68d0d88f99a0519a5e36e"
-dependencies = [
- "rustversion",
- "serde_core",
- "typenum",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1127,7 +1116,7 @@ dependencies = [
  "bincode",
  "criterion",
  "digest",
- "generic-array",
+ "hybrid-array",
  "merkle-cbt",
  "ndarray",
  "num-traits",
@@ -1147,10 +1136,11 @@ dependencies = [
 
 [[package]]
 name = "hybrid-array"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "707114b52a152fa7bdb290cd7cd5912d9467273b6d74e21b8d81aca1f8533f6b"
+checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
 dependencies = [
+ "serde",
  "subtle",
  "typenum",
 ]
@@ -1174,7 +1164,7 @@ dependencies = [
  "clap",
  "criterion",
  "env_logger 0.11.11",
- "generic-array",
+ "hybrid-array",
  "log",
  "parking_lot",
  "proptest",
@@ -1421,6 +1411,7 @@ dependencies = [
  "clap",
  "crossbeam",
  "flume",
+ "hybrid-array",
  "mac-n-cheese-ir",
  "mac-n-cheese-vole",
  "mac-n-cheese-wire-map",
@@ -1476,7 +1467,7 @@ dependencies = [
  "bumpalo",
  "bytemuck",
  "flatbuffers",
- "generic-array",
+ "hybrid-array",
  "lz4",
  "mac-n-cheese-vole",
  "proptest",
@@ -1509,7 +1500,7 @@ dependencies = [
  "crossbeam-queue",
  "dhat",
  "flatbuffers",
- "generic-array",
+ "hybrid-array",
  "jemallocator",
  "keyed_arena",
  "libc",
@@ -1546,7 +1537,7 @@ dependencies = [
  "arrayvec",
  "blake3",
  "bytemuck",
- "generic-array",
+ "hybrid-array",
  "keyed_arena",
  "mimalloc",
  "rand 0.10.2",
@@ -2285,7 +2276,7 @@ dependencies = [
  "env_logger 0.11.11",
  "fancy-circuits",
  "fancy-traits",
- "generic-array",
+ "hybrid-array",
  "itertools 0.15.0",
  "log",
  "merlin",
@@ -2588,7 +2579,7 @@ name = "swanky-channel"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
- "generic-array",
+ "hybrid-array",
  "proptest",
  "swanky-error",
  "swanky-party",
@@ -2600,7 +2591,7 @@ name = "swanky-channel-legacy"
 version = "0.6.0"
 dependencies = [
  "curve25519-dalek",
- "generic-array",
+ "hybrid-array",
  "sha2",
  "swanky-block",
  "swanky-channel",
@@ -2668,7 +2659,7 @@ name = "swanky-field"
 version = "0.6.0"
 dependencies = [
  "crypto-bigint",
- "generic-array",
+ "hybrid-array",
  "num-traits",
  "rand 0.10.2",
  "subtle",
@@ -2682,7 +2673,7 @@ dependencies = [
  "bytemuck",
  "criterion",
  "crypto-bigint",
- "generic-array",
+ "hybrid-array",
  "proptest",
  "rand 0.10.2",
  "subtle",
@@ -2699,7 +2690,7 @@ version = "0.6.0"
 dependencies = [
  "bytemuck",
  "crypto-bigint",
- "generic-array",
+ "hybrid-array",
  "proptest",
  "rand 0.10.2",
  "subtle",
@@ -2716,7 +2707,7 @@ dependencies = [
  "crypto-bigint",
  "ff",
  "ff_codegen",
- "generic-array",
+ "hybrid-array",
  "ndarray",
  "num-bigint 0.5.1",
  "num-traits",
@@ -2745,7 +2736,7 @@ dependencies = [
 name = "swanky-field-test"
 version = "0.6.0"
 dependencies = [
- "generic-array",
+ "hybrid-array",
  "proptest",
  "swanky-field",
  "swanky-polynomial",
@@ -2991,7 +2982,7 @@ name = "swanky-serialization"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
- "generic-array",
+ "hybrid-array",
  "proptest",
  "serde",
  "vectoreyes",
@@ -3039,7 +3030,7 @@ dependencies = [
  "blake3",
  "bytemuck",
  "criterion",
- "generic-array",
+ "hybrid-array",
  "proptest",
  "rand 0.10.2",
  "subtle",
