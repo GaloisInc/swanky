@@ -7,14 +7,19 @@
 //!
 //! Pass `--no-default-features` to measure the $`\lambda = 128`$ variant instead.
 
+use hybrid_array::typenum::Unsigned;
 use merlin::Transcript;
 use schmivitz::{
     Proof,
     circuit::load_circuit_from_strings_prover,
     circuit_validator::validate_circuit,
-    parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM},
+    parameters::{P, RepetitionParam, SecurityParam, VoleSizeParam},
     vole::functionality::{VoleProver, VoleVerifier},
 };
+
+const SECURITY_PARAM: usize = <SecurityParam<P> as Unsigned>::USIZE;
+const VOLE_SIZE_PARAM: usize = <VoleSizeParam as Unsigned>::USIZE;
+const REPETITION_PARAM: usize = <RepetitionParam<P> as Unsigned>::USIZE;
 use std::time::Instant;
 
 /// The circuit and its witness are compiled in so the example needs no arguments.
@@ -40,7 +45,7 @@ fn main() -> swanky_error::Result<()> {
     println!("parsed and validated circuit in {:?}", t.elapsed());
 
     let t = Instant::now();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit(
         &circuit,
         &mut transcript(),
         &mut rand::rng(),

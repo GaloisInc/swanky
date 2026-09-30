@@ -5,6 +5,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 use merlin::Transcript;
 use rand::rng as thread_rng;
+use schmivitz::parameters::P;
 use schmivitz::{
     Proof,
     circuit::load_circuit_from_strings_prover,
@@ -39,7 +40,7 @@ fn benchmark_aes256(c: &mut Criterion) {
     c.bench_function("aes256_prove_interp", |b| {
         b.iter(|| {
             let rng = &mut thread_rng();
-            let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+            let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
                 &circuit,
                 &mut transcript(),
                 rng,
@@ -50,7 +51,7 @@ fn benchmark_aes256(c: &mut Criterion) {
     });
 
     let rng = &mut thread_rng();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
         &circuit,
         &mut transcript(),
         rng,
@@ -68,7 +69,7 @@ fn benchmark_aes256(c: &mut Criterion) {
     // c.bench_function("aes256_prove", |b| {
     //     b.iter(|| {
     //         let rng = &mut thread_rng();
-    //         let proof = Proof::<VoleProver, VoleVerifier>::prove(
+    //         let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
     //             AES256,
     //             &circuit.private_inputs,
     //             circuit.max_wire_id,
@@ -106,7 +107,7 @@ fn benchmark_example_10000(c: &mut Criterion) {
     c.bench_function("example_prove_interp", |b| {
         b.iter(|| {
             let rng = &mut thread_rng();
-            let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+            let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
                 &circuit,
                 &mut transcript(),
                 rng,
@@ -117,7 +118,7 @@ fn benchmark_example_10000(c: &mut Criterion) {
     });
 
     let rng = &mut thread_rng();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
         &circuit,
         &mut transcript(),
         rng,
@@ -135,7 +136,7 @@ fn benchmark_example_10000(c: &mut Criterion) {
     c.bench_function("example_prove", |b| {
         b.iter(|| {
             let rng = &mut thread_rng();
-            let proof = Proof::<VoleProver, VoleVerifier>::prove(
+            let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
                 &ExampleCircuit::<10000>,
                 &circuit.private_inputs,
                 Some(circuit.max_wire_id as usize),
@@ -173,7 +174,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
     c.bench_function("example_100000_prove_interp", |b| {
         b.iter(|| {
             let rng = &mut thread_rng();
-            let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+            let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
                 &circuit,
                 &mut transcript(),
                 rng,
@@ -184,7 +185,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
     });
 
     let rng = &mut thread_rng();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
         &circuit,
         &mut transcript(),
         rng,
@@ -202,7 +203,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
     c.bench_function("example_100000_prove", |b| {
         b.iter(|| {
             let rng = &mut thread_rng();
-            let proof = Proof::<VoleProver, VoleVerifier>::prove(
+            let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
                 &ExampleCircuit::<100000>,
                 &circuit.private_inputs,
                 Some(circuit.max_wire_id as usize),
@@ -214,7 +215,7 @@ fn benchmark_example_100000(c: &mut Criterion) {
         })
     });
 
-    let proof = Proof::<VoleProver, VoleVerifier>::prove(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
         &ExampleCircuit::<100000>,
         &circuit.private_inputs,
         Some(circuit.max_wire_id as usize),
@@ -250,7 +251,7 @@ fn benchmark_sha256(c: &mut Criterion) {
     c.bench_function("sha256_prove", |b| {
         b.iter(|| {
             let rng = &mut thread_rng();
-            let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+            let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
                 &circuit,
                 &mut transcript(),
                 rng,
@@ -261,7 +262,7 @@ fn benchmark_sha256(c: &mut Criterion) {
     });
 
     let rng = &mut thread_rng();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit::<_>(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit::<_>(
         &circuit,
         &mut transcript(),
         rng,

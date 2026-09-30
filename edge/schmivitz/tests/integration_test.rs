@@ -11,6 +11,7 @@ mod test {
     };
     use merlin::Transcript;
     use rand::rng;
+    use schmivitz::parameters::P;
     use schmivitz::{
         Proof,
         circuit::{Circuit, load_circuit_from_strings_prover},
@@ -44,7 +45,7 @@ mod test {
     fn create_proof(
         circuit_bytes: &'static str,
         private_input_bytes: &'static str,
-    ) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
+    ) -> (Result<Proof<VoleProver<P>, VoleVerifier<P>>>, Circuit) {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
         let rng = &mut rng();
@@ -120,7 +121,7 @@ mod test {
 
         // Verify the compiled circuit with the dynamic circuit.
         let rng = &mut rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
             &DoesntExplode,
             &mini_circuit.private_inputs,
             None,
@@ -176,7 +177,7 @@ mod test {
         assert!(verif.is_ok());
 
         let rng = &mut rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
             &AssertZero,
             &mini_circuit.private_inputs,
             None,

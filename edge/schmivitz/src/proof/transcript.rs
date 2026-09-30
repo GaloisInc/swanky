@@ -3,7 +3,11 @@ use swanky_field_binary::F2;
 use swanky_serialization::CanonicalSerialize;
 use swanky_sieve_ir_parser::WireId;
 
-use crate::parameters::{FIELD_SIZE, FLambda, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{
+    FLambda, FieldSize, Params, RepetitionParam, SecurityParam, SecurityParamBytes, VoleSizeParam,
+};
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 
 pub(crate) struct Transcript<'a>(&'a mut merlin::Transcript);
 
@@ -23,16 +27,20 @@ impl Transcript<'_> {
     /// Put all the known public values into the transcript!
     ///
     /// This doesn't incorporate any representation of the circuit itself.
-    pub(crate) fn append_public_values(&mut self) {
+    pub(crate) fn append_public_values<P: Params>(&mut self) {
+        self.0.append_message(
+            b"lambda: security parameter",
+            &SecurityParam::<P>::USIZE.to_le_bytes(),
+        );
         self.0
-            .append_message(b"lambda: security parameter", &SECURITY_PARAM.to_le_bytes());
-        self.0
-            .append_message(b"p: field size", &FIELD_SIZE.to_le_bytes());
-        self.0
-            .append_message(b"r: VOLE size parameter", &VOLE_SIZE_PARAM.to_le_bytes());
+            .append_message(b"p: field size", &FieldSize::USIZE.to_le_bytes());
+        self.0.append_message(
+            b"r: VOLE size parameter",
+            &VoleSizeParam::USIZE.to_le_bytes(),
+        );
         self.0.append_message(
             b"tau: repetition parameter",
-            &REPETITION_PARAM.to_le_bytes(),
+            &RepetitionParam::<P>::USIZE.to_le_bytes(),
         );
     }
 
@@ -64,25 +72,23 @@ impl Transcript<'_> {
     ///
     /// Use the transcript to extract a seed challenge and use exponentiation to
     /// derive a vector of random values.
-    pub(crate) fn extract_challenge(&mut self) -> ChiGenerator {
-        let mut bytes = [0u8; SECURITY_PARAM / 8];
+    pub(crate) fn extract_challenge<P: Params>(&mut self) -> ChiGenerator<P> {
+        // NOTE: We use a 16 byte challenge here regardless of the security parameter. This is
+        // because [`FiniteField::from_random_bytes`] always takes 16 bytes of entropy. In the
+        // 256-bit case, this is internally passed through a PRNG to get a full field element.
+        let mut bytes = [0u8; 16];
         self.0
             .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
-        // NOTE: Normally, it would be desirable to use `from_uniform_bytes`. However, this is
-        // hardcoded to provide a maximum of 128 bits of entropy, which is insufficient for the
-        // $`\lambda = 256`$ case. Using `from_bytes` is fine as long as we continue to use binary
-        // fields with bit widths congruent to 0 mod 8.
-        let seed = FLambda::from_bytes(&bytes.into())
-            .unwrap_or_else(|_| panic!("Constructing seed from {} bytes failed", bytes.len()));
+        let seed = FLambda::<P>::from_uniform_bytes(&bytes);
         ChiGenerator::new(seed)
     }
 
     /// Adds the commitment to the aggregated polynomial coefficients to the transcript.
-    pub(crate) fn append_polynomial_commitments(
+    pub(crate) fn append_polynomial_commitments<P: Params>(
         &mut self,
-        degree_0_commitment: &FLambda,
-        degree_1_commitment: &FLambda,
-        assert_zero_commitment: &FLambda,
+        degree_0_commitment: &FLambda<P>,
+        degree_1_commitment: &FLambda<P>,
+        assert_zero_commitment: &FLambda<P>,
     ) {
         self.0
             .append_message(b"b~: degree 0 commitment", &degree_0_commitment.to_bytes());
@@ -94,8 +100,10 @@ impl Transcript<'_> {
         );
     }
 
-    pub(crate) fn extract_decommitment_challenge(&mut self) -> [u8; SECURITY_PARAM / 8] {
-        let mut challenge = [0u8; SECURITY_PARAM / 8];
+    pub(crate) fn extract_decommitment_challenge<P: Params>(
+        &mut self,
+    ) -> Array<u8, SecurityParamBytes<P>> {
+        let mut challenge = Array::default();
         self.0
             .challenge_bytes(b"decommitment challenge", &mut challenge);
         challenge
@@ -103,20 +111,20 @@ impl Transcript<'_> {
 }
 
 /// Iterator that generates powers of chi challenges.
-pub(crate) struct ChiGenerator {
-    chi: FLambda,
-    power_of_chi: FLambda,
+pub(crate) struct ChiGenerator<P: Params> {
+    chi: FLambda<P>,
+    power_of_chi: FLambda<P>,
 }
 
-impl ChiGenerator {
-    pub(crate) fn new(chi: FLambda) -> ChiGenerator {
+impl<P: Params> ChiGenerator<P> {
+    pub(crate) fn new(chi: FLambda<P>) -> Self {
         ChiGenerator {
             chi,
-            power_of_chi: FLambda::ONE,
+            power_of_chi: FLambda::<P>::ONE,
         }
     }
 
-    pub(crate) fn next(&mut self) -> FLambda {
+    pub(crate) fn next(&mut self) -> FLambda<P> {
         self.power_of_chi *= self.chi;
         self.power_of_chi
     }

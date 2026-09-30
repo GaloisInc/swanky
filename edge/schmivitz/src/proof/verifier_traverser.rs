@@ -7,7 +7,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
 
-use crate::parameters::FLambda;
+use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
@@ -16,19 +16,19 @@ use crate::proof::ChiGenerator;
 /// The primary steps in circuit traversal are assigning masked witnesses to each
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
-pub struct VerifierTraverser {
+pub struct VerifierTraverser<P: Params> {
     /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
-    chi_challenge: ChiGenerator,
+    chi_challenge: ChiGenerator<P>,
 
     /// Verifier's chosen random VOLE key ($`\Delta`$ in the paper).
-    verifier_key: FLambda,
+    verifier_key: FLambda<P>,
 
     /// The masked witness commitments ($`\bf q'`$ in the paper).
     ///
     /// There should be one of these for each extended witness.
     /// Note that these are a function of the random VOLEs correlated with the witness, the
     /// commitment to the witness itself, and the verifier's VOLE key.
-    masked_witnesses: Vec<FLambda>,
+    masked_witnesses: Vec<FLambda<P>>,
 
     /// Count of how many of the provided masked witnesses have been assigned.
     assigned_witness_count: usize,
@@ -37,18 +37,18 @@ pub struct VerifierTraverser {
     ///
     /// After traversal, this should have the value
     /// $`\sum_{i \in [t]} \chi_i \cdot c_i(\Delta)`$.
-    aggregate: FLambda,
+    aggregate: FLambda<P>,
 
     /// Partial aggregation of the assert zero check.
     /// TODO: Add this to the specification and reference it.
-    aggregate_assert_zero: FLambda,
+    aggregate_assert_zero: FLambda<P>,
 }
 
-impl VerifierTraverser {
+impl<P: Params> VerifierTraverser<P> {
     pub(crate) fn new(
-        chi_challenge: ChiGenerator,
-        verifier_key: FLambda,
-        masked_witnesses: Vec<FLambda>,
+        chi_challenge: ChiGenerator<P>,
+        verifier_key: FLambda<P>,
+        masked_witnesses: Vec<FLambda<P>>,
     ) -> Result<Self> {
         // TODO: Add additional asserts here?
         Ok(Self {
@@ -56,8 +56,8 @@ impl VerifierTraverser {
             verifier_key,
             masked_witnesses,
             assigned_witness_count: 0,
-            aggregate: FLambda::ZERO,
-            aggregate_assert_zero: FLambda::ZERO,
+            aggregate: FLambda::<P>::ZERO,
+            aggregate_assert_zero: FLambda::<P>::ZERO,
         })
     }
 
@@ -69,7 +69,7 @@ impl VerifierTraverser {
     ///
     /// Fails if there aren't enough unused witnesses or if the [`WireId`] is already assigned to
     /// a masked witness.
-    fn next_masked_witness(&mut self) -> Result<FLambda> {
+    fn next_masked_witness(&mut self) -> Result<FLambda<P>> {
         let next_index = self.assigned_witness_count;
         self.assigned_witness_count += 1;
 
@@ -91,7 +91,7 @@ impl VerifierTraverser {
     /// during full circuit traversal.
     ///
     /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<(FLambda, FLambda)> {
+    pub(crate) fn into_parts(self) -> Result<(FLambda<P>, FLambda<P>)> {
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -114,9 +114,9 @@ impl VerifierTraverser {
 
 /// An [`FLambda`] element representing a VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Wire(FLambda);
+pub struct Wire<P: Params>(FLambda<P>);
 
-impl HasModulus for Wire {
+impl<P: Params> HasModulus for Wire<P> {
     fn modulus(&self) -> u16 {
         2
     }
@@ -124,8 +124,8 @@ impl HasModulus for Wire {
 
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
-impl FieldBackend<F2> for VerifierTraverser {
-    type Wire = FLambda;
+impl<P: Params> FieldBackend<F2> for VerifierTraverser<P> {
+    type Wire = FLambda<P>;
 
     fn input_public(&mut self) -> Result<Self::Wire> {
         unimplemented!("VOLE-in-the-head does not support `input_public`")
@@ -136,17 +136,17 @@ impl FieldBackend<F2> for VerifierTraverser {
     }
 
     fn add(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
-        Ok(lhs + rhs)
+        Ok(*lhs + *rhs)
     }
 
     fn addc(&mut self, lhs: &Self::Wire, rhs: F2) -> Result<Self::Wire> {
         // Compute the correct masked witness for the output wire
         let t = if rhs == F2::ZERO {
-            FLambda::ZERO
+            FLambda::<P>::ZERO
         } else {
-            FLambda::ONE
+            FLambda::<P>::ONE
         };
-        Ok(lhs - t * self.verifier_key)
+        Ok(*lhs - t * self.verifier_key)
     }
 
     fn mul(&mut self, lhs: &Self::Wire, rhs: &Self::Wire) -> Result<Self::Wire> {
@@ -155,7 +155,7 @@ impl FieldBackend<F2> for VerifierTraverser {
         let challenge = self.chi_challenge.next();
 
         // Compute the contibution to the aggregate: ci​(Δ) = q_left * ​q_right ​− q_dst * ​Δ
-        let eval = lhs * rhs - (res * self.verifier_key);
+        let eval = *lhs * *rhs - (res * self.verifier_key);
 
         self.aggregate += challenge * eval;
 
@@ -169,27 +169,27 @@ impl FieldBackend<F2> for VerifierTraverser {
     fn assert_zero(&mut self, arg: &Self::Wire) -> Result<()> {
         let challenge = self.chi_challenge.next();
 
-        self.aggregate_assert_zero += challenge * arg;
+        self.aggregate_assert_zero += challenge * *arg;
         Ok(())
     }
 }
 
-impl Fancy for VerifierTraverser {
-    type Item = Wire;
+impl<P: Params> Fancy for VerifierTraverser<P> {
+    type Item = Wire<P>;
 }
 
-impl FancyBinaryConstant for VerifierTraverser {
+impl<P: Params> FancyBinaryConstant for VerifierTraverser<P> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let value = if constant.into() {
-            FLambda::ONE
+            FLambda::<P>::ONE
         } else {
-            FLambda::ZERO
+            FLambda::<P>::ZERO
         };
         Wire(-value * self.verifier_key)
     }
 }
 
-impl FancyEncode for VerifierTraverser {
+impl<P: Params> FancyEncode for VerifierTraverser<P> {
     fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
@@ -211,7 +211,7 @@ impl FancyEncode for VerifierTraverser {
     }
 }
 
-impl FancyBinary for VerifierTraverser {
+impl<P: Params> FancyBinary for VerifierTraverser<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         Wire(x.0 + y.0)
     }
@@ -230,11 +230,11 @@ impl FancyBinary for VerifierTraverser {
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        Wire(x.0 - FLambda::ONE * self.verifier_key)
+        Wire(x.0 - FLambda::<P>::ONE * self.verifier_key)
     }
 }
 
-impl FancyZeroKnowledge for VerifierTraverser {
+impl<P: Params> FancyZeroKnowledge for VerifierTraverser<P> {
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
 
