@@ -16,8 +16,8 @@ use crate::vole::commit_reconstruct::{
 };
 use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{Chall1, Chall3, Com, H1, H3, IV, Seed, h2_chall1};
-use generic_array::GenericArray;
-use generic_array::typenum::U16;
+use hybrid_array::Array;
+use hybrid_array::typenum::U16;
 use rayon::prelude::*;
 use sha3::digest::Update;
 use shake::Shake128;
@@ -236,7 +236,7 @@ pub struct VoleVerifier {
     /// Consistency check. TODO: update challenge appropriately!!
     h_v: H1,
     /// secret key
-    pub(crate) delta: GenericArray<F8b, U16>,
+    pub(crate) delta: Array<F8b, U16>,
     /// Size of extended witness. `ell` in the paper.
     pub(crate) l: usize,
 }

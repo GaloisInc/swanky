@@ -16,7 +16,7 @@ vectoreyes.workspace = true
 bytemuck.workspace = true
 rustc-hash.workspace = true
 smallvec = { workspace = true, features = ["serde"] }
-generic-array.workspace = true
+hybrid-array.workspace = true
 flatbuffers.workspace = true
 lz4.workspace = true
 rand.workspace = true

@@ -27,7 +27,7 @@ use std::{
 };
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use generic_array::GenericArray;
+use hybrid_array::Array;
 
 use swanky_block::{Block, Block512};
 use swanky_serialization::CanonicalSerialize;
@@ -207,7 +207,7 @@ pub trait AbstractChannel {
 
     /// Read a `CanonicalSerialize` object from the channel.
     fn read_serializable<E: CanonicalSerialize>(&mut self) -> Result<E> {
-        let mut buf = GenericArray::<u8, E::ByteReprLen>::default();
+        let mut buf = Array::<u8, E::ByteReprLen>::default();
         self.read_bytes(&mut buf[..])?;
         let fe = match E::from_bytes(&buf) {
             Ok(fe) => fe,

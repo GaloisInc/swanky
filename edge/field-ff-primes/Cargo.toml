@@ -11,7 +11,7 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-generic-array.workspace = true
+hybrid-array.workspace = true
 swanky-field.workspace = true
 swanky-serialization.workspace = true
 rand_core.workspace = true

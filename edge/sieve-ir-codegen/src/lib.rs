@@ -244,7 +244,7 @@ impl Codegen {
                         .map(Literal::u8_suffixed)
                         .collect::<Vec<_>>();
                     quote! {
-                        swanky_field_binary::F2::from_bytes(&generic_array::GenericArray::<u8, <swanky_field_binary::F2 as CanonicalSerialize>::ByteReprLen>::from_array([#(#arr,)*])).unwrap()
+                        swanky_field_binary::F2::from_bytes(&hybrid_array::Array::<u8, <swanky_field_binary::F2 as CanonicalSerialize>::ByteReprLen>([#(#arr,)*])).unwrap()
                     }
                 } else {
                     panic!(

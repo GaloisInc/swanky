@@ -1,6 +1,6 @@
 use crate::F2;
 use bytemuck::{TransparentWrapper, Zeroable};
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use std::iter::FromIterator;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -104,14 +104,14 @@ macro_rules! small_binary_field {
             type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
             // ceil($num_bits / 8) = ($num_bits + 8 - 1) / 8 = ($num_bits + 7) / 8
             type ByteReprLen = <
-                <generic_array::typenum::U7 as std::ops::Add<$num_bits>>::Output as
-                std::ops::Div<generic_array::typenum::U8>
+                <hybrid_array::typenum::U7 as std::ops::Add<$num_bits>>::Output as
+                std::ops::Div<hybrid_array::typenum::U8>
             >::Output;
             type FromBytesError = swanky_field::BiggerThanModulus;
 
             #[inline]
             fn from_bytes(
-                bytes: &GenericArray<u8, Self::ByteReprLen>,
+                bytes: &Array<u8, Self::ByteReprLen>,
             ) -> Result<Self, Self::FromBytesError> {
                 let mut buf = [0; 8];
                 buf[0..Self::ByteReprLen::USIZE].copy_from_slice(&bytes);
@@ -124,14 +124,14 @@ macro_rules! small_binary_field {
             }
 
             #[inline]
-            fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+            fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
                 #[cfg(debug_assertions)]
                 {
                     for x in self.0.to_le_bytes()[Self::ByteReprLen::USIZE..].iter().copied() {
                         debug_assert_eq!(x, 0);
                     }
                 }
-                GenericArray::from_slice(&self.0.to_le_bytes()[0..Self::ByteReprLen::USIZE]).clone()
+                Array::try_from(&self.0.to_le_bytes()[0..Self::ByteReprLen::USIZE]).expect("slice is correct size").clone()
             }
 
         }
@@ -158,7 +158,7 @@ macro_rules! small_binary_field {
 
             type NumberOfBitsInBitDecomposition = $num_bits;
 
-            fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+            fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
                 swanky_field::standard_bit_decomposition(u128::from(self.0))
             }
 
@@ -172,15 +172,15 @@ macro_rules! small_binary_field {
         impl swanky_field::IsSubRingOf<$name> for F2 {}
         impl swanky_field::IsSubFieldOf<$name> for F2 {
             type DegreeModulo = $num_bits;
-            fn decompose_superfield(fe: &$name) -> generic_array::GenericArray<Self, $num_bits> {
+            fn decompose_superfield(fe: &$name) -> hybrid_array::Array<Self, $num_bits> {
                 let x = fe.0;
-                GenericArray::from_iter(
+                Array::from_iter(
                     (0..<$num_bits as Unsigned>::U64).map(
                         |shift| F2::try_from(((x >> shift) & 1) as u8).unwrap()
                     ),
                 )
             }
-            fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> $name {
+            fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> $name {
                 let mut out = 0;
                 for x in components.iter().rev() {
                     out <<= 1;
@@ -320,7 +320,7 @@ small_binary_field!(
     /// An element of the finite field $`\textsf{GF}(2^{63})`$ reduced over $`x^{63} + x + 1`$
     F63b,
     f63b,
-    num_bits = generic_array::typenum::U63,
+    num_bits = hybrid_array::typenum::U63,
     polynomial_modulus = crate::small_binary_fields::polynomial_modulus_f63b,
     reduce = reduce_f63b,
     reduce_vectored = reduce_vectored_f63b
@@ -368,7 +368,7 @@ small_binary_field!(
     /// An element of the finite field $`\textsf{GF}(2^{56})`$ reduced over $`x^{56} + x^8 + x^3 + x^2 + 1`$
     F56b,
     f56b,
-    num_bits = generic_array::typenum::U56,
+    num_bits = hybrid_array::typenum::U56,
     polynomial_modulus = crate::small_binary_fields::polynomial_modulus_f56b,
     reduce = reduce_f56b,
 );
@@ -406,7 +406,7 @@ small_binary_field!(
     /// An element of the finite field $`\textsf{GF}(2^{40})`$ reduced over $`x^{40} + x^5 + x^4 + x^3 + 1`$
     F40b,
     f40b,
-    num_bits = generic_array::typenum::U40,
+    num_bits = hybrid_array::typenum::U40,
     polynomial_modulus = crate::small_binary_fields::polynomial_modulus_f40b,
     reduce = reduce_f40b,
 );
@@ -451,7 +451,7 @@ small_binary_field!(
     /// An element of the finite field $`\textsf{GF}(2^{45})`$ reduced over $`x^{45} + x^{28} + x^{17} + x^{11} + 1`$
     F45b,
     f45b,
-    num_bits = generic_array::typenum::U45,
+    num_bits = hybrid_array::typenum::U45,
     polynomial_modulus = crate::small_binary_fields::polynomial_modulus_f45b,
     reduce = reduce_f45b,
 );

@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use bytemuck::TransparentWrapper;
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use keyed_arena::{AllocationKey, KeyedArena};
 use rand::prelude::Distribution;
 use rand::{CryptoRng, RngExt, SeedableRng, distr::Uniform};
@@ -57,13 +57,13 @@ fn lpn_rng_from_seed(selector: u64, lpn_seeds: &Aes128EncryptOnly) -> AesRng {
 /// Generates powers of `FE::GENERATOR`.
 #[derive(Clone)]
 pub struct Powers<FE: FiniteField> {
-    powers: GenericArray<FE, Degree<FE>>,
+    powers: Array<FE, Degree<FE>>,
 }
 
 impl<FE: FiniteField> Default for Powers<FE> {
     fn default() -> Self {
         let mut acc = FE::ONE;
-        let mut powers: GenericArray<FE, Degree<FE>> = Default::default();
+        let mut powers: Array<FE, Degree<FE>> = Default::default();
         for item in powers.iter_mut() {
             *item = acc;
             acc *= FE::GENERATOR;
@@ -73,8 +73,8 @@ impl<FE: FiniteField> Default for Powers<FE> {
 }
 
 impl<FE: FiniteField> Deref for Powers<FE> {
-    type Target = GenericArray<FE, Degree<FE>>;
-    fn deref(&self) -> &GenericArray<FE, Degree<FE>> {
+    type Target = Array<FE, Degree<FE>>;
+    fn deref(&self) -> &Array<FE, Degree<FE>> {
         &self.powers
     }
 }
@@ -275,8 +275,7 @@ impl<T: MacTypes> VoleSenderStep3<T> {
                 &mut result[i * m..(i + 1) * m],
                 &mut ggm_temporary_storage,
             );
-            let mut d: GenericArray<u8, <T::TF as CanonicalSerialize>::ByteReprLen> =
-                Default::default();
+            let mut d: Array<u8, <T::TF as CanonicalSerialize>::ByteReprLen> = Default::default();
             d.copy_from_slice(
                 &incoming_bytes[0..<T::TF as CanonicalSerialize>::ByteReprLen::USIZE],
             );
@@ -433,7 +432,7 @@ impl<T: MacTypes> VoleReceiver<T> {
         assert_eq!(T::LPN.weight, lpn_params::LPN_EXTEND_PARAMS_WEIGHT);
         debug_assert_eq!(gammas.len(), T::VS.base_uws_size);
         for (gamma, v) in gammas.iter_mut().zip(base_voles.sps_base_voles().iter()) {
-            let mut bytes: GenericArray<u8, <T::VF as CanonicalSerialize>::ByteReprLen> =
+            let mut bytes: Array<u8, <T::VF as CanonicalSerialize>::ByteReprLen> =
                 Default::default();
             bytes.copy_from_slice(
                 &incoming_bytes[0..<T::VF as CanonicalSerialize>::ByteReprLen::USIZE],
@@ -544,9 +543,9 @@ impl<T: MacTypes> VoleReceiverStep4<T> {
             .stage2(arena, &incoming_bytes[0..KosSenderStage2::INCOMING_BYTES])
             .wrap_err(ErrorKind::OtherError, "Failed to run KOS sender stage two.")?;
         incoming_bytes = &incoming_bytes[KosSenderStage2::INCOMING_BYTES..];
-        let mut x_stars: GenericArray<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
+        let mut x_stars: Array<T::VF, DegreeModulo<T::VF, T::TF>> = Default::default();
         for x_star in x_stars.iter_mut() {
-            let mut bytes: GenericArray<u8, <T::VF as CanonicalSerialize>::ByteReprLen> =
+            let mut bytes: Array<u8, <T::VF as CanonicalSerialize>::ByteReprLen> =
                 Default::default();
             bytes.copy_from_slice(
                 &incoming_bytes[0..<T::VF as CanonicalSerialize>::ByteReprLen::USIZE],

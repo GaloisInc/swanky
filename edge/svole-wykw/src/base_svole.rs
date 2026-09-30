@@ -5,7 +5,7 @@ use super::{
     copee::{CopeeReceiver, CopeeSender},
     utils::Powers,
 };
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};

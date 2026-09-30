@@ -1,5 +1,5 @@
 use crate::F2;
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use rand::Rng;
 use std::iter::FromIterator;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
@@ -429,16 +429,14 @@ impl FiniteRing for F128b {
 impl CanonicalSerialize for F128b {
     type Serializer = ByteElementSerializer<Self>;
     type Deserializer = ByteElementDeserializer<Self>;
-    type ByteReprLen = generic_array::typenum::U16;
+    type ByteReprLen = hybrid_array::typenum::U16;
     type FromBytesError = BytesDeserializationCannotFail;
 
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         Ok(F128b(u128::from_le_bytes(*bytes.as_ref())))
     }
 
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         self.0.to_le_bytes().into()
     }
 }
@@ -448,9 +446,9 @@ impl FiniteField for F128b {
 
     const GENERATOR: Self = F128b(2);
 
-    type NumberOfBitsInBitDecomposition = generic_array::typenum::U128;
+    type NumberOfBitsInBitDecomposition = hybrid_array::typenum::U128;
 
-    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
         swanky_field::standard_bit_decomposition(self.0)
     }
 
@@ -489,14 +487,12 @@ impl From<F128b> for U8x16 {
 
 impl IsSubRingOf<F128b> for F2 {}
 impl IsSubFieldOf<F128b> for F2 {
-    type DegreeModulo = generic_array::typenum::U128;
-    fn decompose_superfield(fe: &F128b) -> GenericArray<Self, Self::DegreeModulo> {
-        GenericArray::from_iter(
-            (0..128).map(|shift| F2::try_from(((fe.0 >> shift) & 1) as u8).unwrap()),
-        )
+    type DegreeModulo = hybrid_array::typenum::U128;
+    fn decompose_superfield(fe: &F128b) -> Array<Self, Self::DegreeModulo> {
+        Array::from_iter((0..128).map(|shift| F2::try_from(((fe.0 >> shift) & 1) as u8).unwrap()))
     }
 
-    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F128b {
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> F128b {
         let mut out = 0;
         for x in components.iter().rev() {
             out <<= 1;

@@ -71,8 +71,8 @@ pub(crate) use try_from_helper;
 /// * `$actual_limbs`: The number of `u64`s required to fit values of size `$modulus`. This'll
 ///    generally be the same as `$limbs` except in certain edge cases where `$modulus * 2`
 ///    overflows `[u64; $actual_limbs]`.
-/// * `$num_bytes`: The number of bytes required to store `$modulus`, given as a `generic_array::typenum`.
-/// * `$num_bits`: The number of bits required to store `$modulus`, given as a `generic_array::typenum`.
+/// * `$num_bytes`: The number of bytes required to store `$modulus`, given as a `hybrid_array::typenum`.
+/// * `$num_bits`: The number of bits required to store `$modulus`, given as a `hybrid_array::typenum`.
 /// * \[Optional\] `$single_limb_modulus`: If `$limbs` is one, then this can contain `$modulus`
 ///    (given as an _integer_ not a string!) to enable faster random value generation.
 macro_rules! prime_field_using_ff {
@@ -92,7 +92,7 @@ macro_rules! prime_field_using_ff {
             use swanky_field::{BiggerThanModulus, FiniteField, PrimeFiniteField, FiniteRing};
             use swanky_serialization::{CanonicalSerialize};
             use ff::{Field, PrimeField};
-            use generic_array::{typenum::Unsigned, GenericArray};
+            use hybrid_array::{typenum::Unsigned, Array};
             use rand_core::{Rng, SeedableRng};
             use std::hash::{Hash, Hasher};
             use std::ops::{AddAssign, MulAssign, SubAssign};
@@ -164,16 +164,16 @@ macro_rules! prime_field_using_ff {
                 type ByteReprLen = $num_bytes;
                 type FromBytesError = BiggerThanModulus;
 
-                fn from_bytes(buf: &GenericArray<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
+                fn from_bytes(buf: &Array<u8, Self::ByteReprLen>) -> Result<Self, BiggerThanModulus> {
                     let mut bytes = [0u8; $limbs * 8];
                     bytes[..Self::ByteReprLen::USIZE].copy_from_slice(buf.as_ref());
                     $name::from_bytes_array(bytes)
                 }
 
                 /// Return the canonical byte representation (byte representation of the reduced field element).
-                fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+                fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
                     let repr = self.internal.to_repr();
-                    *GenericArray::from_slice(&repr.0[..Self::ByteReprLen::USIZE])
+                    Array::try_from(&repr.0[..Self::ByteReprLen::USIZE]).expect("slice is correct size")
                 }
             }
 
@@ -211,8 +211,8 @@ macro_rules! prime_field_using_ff {
 
                 type NumberOfBitsInBitDecomposition = $num_bits;
 
-                fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
-                    let mut out: GenericArray<bool, Self::NumberOfBitsInBitDecomposition> = Default::default();
+                fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
+                    let mut out: Array<bool, Self::NumberOfBitsInBitDecomposition> = Default::default();
                     let bytes = self.to_bytes();
                     for (i, dst) in out.iter_mut().enumerate() {
                         let bits = bytes[i / 8];
@@ -262,9 +262,9 @@ macro_rules! prime_field_using_ff {
                         // first Self::ByteReprLen (and not do anything with
                         // them due to the modulus Choice.)
                         Self::from_bytes(
-                            &GenericArray::from_slice(
+                            &Array::try_from(
                                 &bytemuck::bytes_of(x.as_words())[..Self::ByteReprLen::USIZE]
-                            )
+                            ).expect("slice is correct size")
                         )
                         .unwrap(),
                         x_lt_modulus,
@@ -298,7 +298,7 @@ macro_rules! prime_field_using_ff {
             #[cfg(test)]
             mod tests {
                 use super::*;
-                use generic_array::typenum::Unsigned;
+                use hybrid_array::typenum::Unsigned;
                 use num_bigint::BigUint;
                 use proptest::prelude::*;
 
@@ -364,8 +364,8 @@ prime_field_using_ff!(
     generator = "19",
     limbs = 7,
     actual_limbs = 6,
-    num_bytes = generic_array::typenum::U48,
-    num_bits = generic_array::typenum::U384,
+    num_bytes = hybrid_array::typenum::U48,
+    num_bits = hybrid_array::typenum::U384,
 );
 
 prime_field_using_ff!(
@@ -377,8 +377,8 @@ prime_field_using_ff!(
     generator = "19",
     limbs = 7,
     actual_limbs = 6,
-    num_bytes = generic_array::typenum::U48,
-    num_bits = generic_array::typenum::U384,
+    num_bytes = hybrid_array::typenum::U48,
+    num_bits = hybrid_array::typenum::U384,
 );
 
 prime_field_using_ff!(
@@ -390,8 +390,8 @@ prime_field_using_ff!(
     generator = "43",
     limbs = 2,
     actual_limbs = 2,
-    num_bytes = generic_array::typenum::U16,
-    num_bits = generic_array::typenum::U127,
+    num_bytes = hybrid_array::typenum::U16,
+    num_bits = hybrid_array::typenum::U127,
 );
 
 prime_field_using_ff!(
@@ -403,8 +403,8 @@ prime_field_using_ff!(
     generator = "5",
     limbs = 3,
     actual_limbs = 2,
-    num_bytes = generic_array::typenum::U16,
-    num_bits = generic_array::typenum::U128,
+    num_bytes = hybrid_array::typenum::U16,
+    num_bits = hybrid_array::typenum::U128,
 );
 
 prime_field_using_ff!(
@@ -417,8 +417,8 @@ prime_field_using_ff!(
     generator = "6",
     limbs = 5,
     actual_limbs = 4,
-    num_bytes = generic_array::typenum::U32,
-    num_bits = generic_array::typenum::U256,
+    num_bytes = hybrid_array::typenum::U32,
+    num_bits = hybrid_array::typenum::U256,
 );
 
 prime_field_using_ff!(
@@ -432,8 +432,8 @@ prime_field_using_ff!(
     generator = "3",
     limbs = 5,
     actual_limbs = 4,
-    num_bytes = generic_array::typenum::U32,
-    num_bits = generic_array::typenum::U256,
+    num_bytes = hybrid_array::typenum::U32,
+    num_bits = hybrid_array::typenum::U256,
 );
 
 prime_field_using_ff!(
@@ -446,8 +446,8 @@ prime_field_using_ff!(
     generator = "7",
     limbs = 5,
     actual_limbs = 4,
-    num_bytes = generic_array::typenum::U32,
-    num_bits = generic_array::typenum::U256,
+    num_bytes = hybrid_array::typenum::U32,
+    num_bits = hybrid_array::typenum::U256,
 );
 
 prime_field_using_ff!(
@@ -458,8 +458,8 @@ prime_field_using_ff!(
     generator = "7",
     limbs = 4,
     actual_limbs = 4,
-    num_bytes = generic_array::typenum::U32,
-    num_bits = generic_array::typenum::U255,
+    num_bytes = hybrid_array::typenum::U32,
+    num_bits = hybrid_array::typenum::U255,
 );
 
 prime_field_using_ff!(
@@ -470,8 +470,8 @@ prime_field_using_ff!(
     generator = "5",
     limbs = 4,
     actual_limbs = 4,
-    num_bytes = generic_array::typenum::U32,
-    num_bits = generic_array::typenum::U254,
+    num_bytes = hybrid_array::typenum::U32,
+    num_bits = hybrid_array::typenum::U254,
 );
 
 prime_field_using_ff!(
@@ -482,6 +482,6 @@ prime_field_using_ff!(
     generator = "5",
     limbs = 7,
     actual_limbs = 7,
-    num_bytes = generic_array::typenum::U50,
-    num_bits = generic_array::typenum::U400,
+    num_bytes = hybrid_array::typenum::U50,
+    num_bits = hybrid_array::typenum::U400,
 );
