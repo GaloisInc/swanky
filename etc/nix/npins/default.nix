@@ -43,8 +43,8 @@ let
     if ersatz == "" then
       path
     else
-      # this turns the string into an actual Nix path (for both absolute and
-      # relative paths)
+    # this turns the string into an actual Nix path (for both absolute and
+    # relative paths)
       builtins.trace "Overriding path of \"${name}\" with \"${ersatz}\" due to set \"${envVarName}\"" (
         if builtins.substring 0 1 ersatz == "/" then
           /. + ersatz
@@ -54,127 +54,125 @@ let
 
   mkSource =
     name: spec:
-    {
-      pkgs ? null,
+    { pkgs ? null
+    ,
     }:
-    assert spec ? type;
-    let
-      # Unify across builtin and pkgs fetchers.
-      # `fetchGit` requires a wrapper because of slight API differences.
-      fetchers =
-        if pkgs == null then
-          {
-            inherit (builtins) fetchTarball fetchurl;
-            # Frustratingly, due to flakes and `fetchTree`, `fetchGit`
-            # has a different signature than the other builtin
-            # fetchers
-            fetchGit = args: (builtins.fetchGit args).outPath;
-          }
-        else
-          {
-            fetchTarball =
-              {
-                url,
-                sha256,
-              }:
-              pkgs.fetchzip {
-                inherit url sha256;
-                extension = "tar";
-              };
-            inherit (pkgs) fetchurl;
-            fetchGit =
-              {
-                url,
-                submodules,
-                rev,
-                name,
-                narHash,
-              }:
-              pkgs.fetchgit {
-                inherit url rev name;
-                fetchSubmodules = submodules;
-                hash = narHash;
-              };
-          };
+      assert spec ? type;
+      let
+        # Unify across builtin and pkgs fetchers.
+        # `fetchGit` requires a wrapper because of slight API differences.
+        fetchers =
+          if pkgs == null then
+            {
+              inherit (builtins) fetchTarball fetchurl;
+              # Frustratingly, due to flakes and `fetchTree`, `fetchGit`
+              # has a different signature than the other builtin
+              # fetchers
+              fetchGit = args: (builtins.fetchGit args).outPath;
+            }
+          else
+            {
+              fetchTarball =
+                { url
+                , sha256
+                ,
+                }:
+                pkgs.fetchzip {
+                  inherit url sha256;
+                  extension = "tar";
+                };
+              inherit (pkgs) fetchurl;
+              fetchGit =
+                { url
+                , submodules
+                , rev
+                , name
+                , narHash
+                ,
+                }:
+                pkgs.fetchgit {
+                  inherit url rev name;
+                  fetchSubmodules = submodules;
+                  hash = narHash;
+                };
+            };
 
-      path =
-        if spec.type == "Git" then
-          mkGitSource fetchers spec
-        else if spec.type == "GitRelease" then
-          mkGitSource fetchers spec
-        else if spec.type == "PyPi" then
-          mkPyPiSource fetchers spec
-        else if spec.type == "Channel" then
-          mkChannelSource fetchers spec
-        else if spec.type == "Tarball" then
-          mkTarballSource fetchers spec
-        else if spec.type == "Container" then
-          mkContainerSource pkgs spec
-        else
-          builtins.throw "Unknown source type ${spec.type}";
-    in
-    spec // { outPath = mayOverride name path; };
+        path =
+          if spec.type == "Git" then
+            mkGitSource fetchers spec
+          else if spec.type == "GitRelease" then
+            mkGitSource fetchers spec
+          else if spec.type == "PyPi" then
+            mkPyPiSource fetchers spec
+          else if spec.type == "Channel" then
+            mkChannelSource fetchers spec
+          else if spec.type == "Tarball" then
+            mkTarballSource fetchers spec
+          else if spec.type == "Container" then
+            mkContainerSource pkgs spec
+          else
+            builtins.throw "Unknown source type ${spec.type}";
+      in
+      spec // { outPath = mayOverride name path; };
 
   mkGitSource =
-    {
-      fetchTarball,
-      fetchGit,
-      ...
+    { fetchTarball
+    , fetchGit
+    , ...
     }:
-    {
-      repository,
-      revision,
-      url ? null,
-      submodules,
-      hash,
-      ...
+    { repository
+    , revision
+    , url ? null
+    , submodules
+    , hash
+    , ...
     }:
-    assert repository ? type;
-    # At the moment, either it is a plain git repository (which has an url), or it is a GitHub/GitLab repository
-    # In the latter case, there we will always be an url to the tarball
-    if url != null && !submodules then
-      fetchTarball {
-        inherit url;
-        sha256 = hash;
-      }
-    else
-      let
-        url =
-          if repository.type == "Git" then
-            repository.url
-          else if repository.type == "GitHub" then
-            "https://github.com/${repository.owner}/${repository.repo}.git"
-          else if repository.type == "GitLab" then
-            "${repository.server}/${repository.repo_path}.git"
-          else if repository.type == "Forgejo" then
-            "${repository.server}/${repository.owner}/${repository.repo}.git"
-          else
-            throw "Unrecognized repository type ${repository.type}";
-        urlToName =
-          url: rev:
-          let
-            matched = builtins.match "^.*/([^/]*)(\\.git)?$" url;
+      assert repository ? type;
+      # At the moment, either it is a plain git repository (which has an url), or it is a GitHub/GitLab repository
+      # In the latter case, there we will always be an url to the tarball
+      if url != null && !submodules then
+        fetchTarball
+          {
+            inherit url;
+            sha256 = hash;
+          }
+      else
+        let
+          url =
+            if repository.type == "Git" then
+              repository.url
+            else if repository.type == "GitHub" then
+              "https://github.com/${repository.owner}/${repository.repo}.git"
+            else if repository.type == "GitLab" then
+              "${repository.server}/${repository.repo_path}.git"
+            else if repository.type == "Forgejo" then
+              "${repository.server}/${repository.owner}/${repository.repo}.git"
+            else
+              throw "Unrecognized repository type ${repository.type}";
+          urlToName =
+            url: rev:
+            let
+              matched = builtins.match "^.*/([^/]*)(\\.git)?$" url;
 
-            short = builtins.substring 0 7 rev;
+              short = builtins.substring 0 7 rev;
 
-            appendShort = if (builtins.match "[a-f0-9]*" rev) != null then "-${short}" else "";
-          in
-          "${if matched == null then "source" else builtins.head matched}${appendShort}";
-        name = urlToName url revision;
-      in
-      fetchGit {
-        rev = revision;
-        narHash = hash;
+              appendShort = if (builtins.match "[a-f0-9]*" rev) != null then "-${short}" else "";
+            in
+            "${if matched == null then "source" else builtins.head matched}${appendShort}";
+          name = urlToName url revision;
+        in
+        fetchGit {
+          rev = revision;
+          narHash = hash;
 
-        inherit name submodules url;
-      };
+          inherit name submodules url;
+        };
 
   mkPyPiSource =
     { fetchurl, ... }:
-    {
-      url,
-      hash,
-      ...
+    { url
+    , hash
+    , ...
     }:
     fetchurl {
       inherit url;
@@ -183,10 +181,9 @@ let
 
   mkChannelSource =
     { fetchTarball, ... }:
-    {
-      url,
-      hash,
-      ...
+    { url
+    , hash
+    , ...
     }:
     fetchTarball {
       inherit url;
@@ -195,11 +192,10 @@ let
 
   mkTarballSource =
     { fetchTarball, ... }:
-    {
-      url,
-      locked_url ? url,
-      hash,
-      ...
+    { url
+    , locked_url ? url
+    , hash
+    , ...
     }:
     fetchTarball {
       url = locked_url;
@@ -208,12 +204,11 @@ let
 
   mkContainerSource =
     pkgs:
-    {
-      image_name,
-      image_tag,
-      image_digest,
-      hash,
-      ...
+    { image_name
+    , image_tag
+    , image_digest
+    , hash
+    , ...
     }:
     if pkgs == null then
       builtins.throw "container sources require passing in a Nixpkgs value: https://github.com/andir/npins/blob/master/README.md#using-the-nixpkgs-fetchers"
@@ -226,15 +221,15 @@ let
       };
 in
 mkFunctor (
-  {
-    input ? ./sources.json,
+  { input ? ./sources.json
+  ,
   }:
   let
     data =
       if builtins.isPath input then
-        # while `readFile` will throw an error anyways if the path doesn't exist,
-        # we still need to check beforehand because *our* error can be caught but not the one from the builtin
-        # See: <https://git.lix.systems/lix-project/lix/issues/1098>
+      # while `readFile` will throw an error anyways if the path doesn't exist,
+      # we still need to check beforehand because *our* error can be caught but not the one from the builtin
+      # See: <https://git.lix.systems/lix-project/lix/issues/1098>
         if builtins.pathExists input then
           builtins.fromJSON (builtins.readFile input)
         else
