@@ -113,8 +113,8 @@ pub struct Encoder<Wire> {
 }
 
 impl<Wire: WireLabel<F2>> Encoder<Wire> {
-    /// Make a new [`Encoder`] from lists of inputs, alongside a map of
-    /// moduli-to-wire-offsets.
+    /// Make a new [`Encoder`] from a vector of zero wirelabels and the `Δ`
+    /// wirelabel.
     pub fn new(inputs: Vec<Wire>, delta: Wire) -> Self {
         Encoder { inputs, delta }
     }
@@ -136,22 +136,21 @@ impl<Wire: WireLabel<F2>> Encoder<Wire> {
 
 /// A mapping of output wirelabels to their associated underlying values.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OutputMapping(Vec<Vec<U8x16>>);
+pub struct OutputMapping(Vec<[U8x16; 2]>);
 
 impl OutputMapping {
-    /// Construct a new [`OutputMapping`] from a set of zero wirelabels and
-    /// their associated deltas.
+    /// Construct a new [`OutputMapping`] from a slice of zero wirelabels and
+    /// the `Δ` wirelabel.
     pub fn new<Wire: WireLabel<F2>>(zeros: &[Wire], delta: Wire) -> Self {
-        let mut outputs = Vec::with_capacity(zeros.len());
-        for (i, zero) in zeros.iter().enumerate() {
-            let mut wirelabels = Vec::with_capacity(2);
-            for k in 0..2 {
-                let wirelabel = *zero + delta * k;
-                let hashed = wirelabel.hash(output_tweak(i, k));
-                wirelabels.push(hashed);
-            }
-            outputs.push(wirelabels);
-        }
+        let outputs = zeros
+            .iter()
+            .enumerate()
+            .map(|(i, zero)| {
+                core::array::from_fn(|j| {
+                    (*zero + delta * (j as u16)).hash(output_tweak(i, j as u16))
+                })
+            })
+            .collect::<Vec<_>>();
         Self(outputs)
     }
 
@@ -164,23 +163,25 @@ impl OutputMapping {
         &self,
         wirelabels: &[Wire],
     ) -> swanky_error::Result<Vec<F2>> {
-        let mut outputs = Vec::new();
-        for (i, wirelabel) in wirelabels.iter().enumerate() {
-            let mut decoded = None;
-            for k in 0..2 {
-                let hashed = wirelabel.hash(output_tweak(i, k));
-                if hashed == self.0[i][k as usize] {
-                    decoded = Some(k);
-                    break;
+        wirelabels
+            .iter()
+            .enumerate()
+            .map(|(i, wirelabel)| {
+                let mut decoded = None;
+                for k in 0..2 {
+                    let hashed = wirelabel.hash(output_tweak(i, k));
+                    if hashed == self.0[i][k as usize] {
+                        decoded = Some(k);
+                        break;
+                    }
                 }
-            }
-            if let Some(output) = decoded {
-                outputs.push(F2::from(output != 0));
-            } else {
-                swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
-            }
-        }
-        Ok(outputs)
+                if let Some(output) = decoded {
+                    Ok(F2::from(output != 0))
+                } else {
+                    swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
+                }
+            })
+            .collect()
     }
 }
 
