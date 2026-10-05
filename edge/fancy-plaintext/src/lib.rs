@@ -5,7 +5,7 @@ use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, Fanc
 use rand::CryptoRng;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
-use swanky_field::FiniteField;
+use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F2;
 
 /// Plaintext implementation of [`Fancy`].
@@ -61,7 +61,7 @@ impl FancyBinary for Dummy {
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        DummyVal(-x.val())
+        DummyVal(x.val() + F2::ONE)
     }
 }
 
