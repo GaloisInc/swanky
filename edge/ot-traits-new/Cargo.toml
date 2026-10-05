@@ -1,0 +1,21 @@
+[package]
+name = "swanky-ot-traits-new"
+description = "Base traits for Oblivious Transfer protocols"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+swanky-channel.workspace = true
+swanky-error.workspace = true
+swanky-field-binary.workspace = true
+swanky-party.workspace = true
+swanky-serialization.workspace = true
+vectoreyes.workspace = true
+
+rand.workspace = true
