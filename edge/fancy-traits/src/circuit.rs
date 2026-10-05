@@ -64,9 +64,7 @@ pub trait Circuit<F: Fancy> {
 /// comes in: it provides a [`CircuitInputMapper::map`] method for mapping
 /// vectors of inputs to the appropriate input type as required to run
 /// [`Circuit::execute`], alongside [`CircuitInputMapper::ninputs`] for
-/// determining the number of inputs for the circuit. Finally,
-/// [`CircuitInputMapper::modulus`] outputs the particular modulus required for
-/// the `i`th input wire.
+/// determining the number of inputs for the circuit.
 ///
 /// While certain [`Fancy`] instantiations can evaluate [`Circuit`]s directly,
 /// several, including garbled circuits and zero knowledge protocols, operate
