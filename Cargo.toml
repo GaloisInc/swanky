@@ -184,7 +184,7 @@ digest = "0.11.3"
 env_logger = "0.11.11"
 flatbuffers = "25.12.19" # Keep this version in sync with edge/flatbuffer-build/src/flatc-ver.txt
 flume = "0.12.0"
-generic-array = { version = "1.4.5", features = ["serde"] }
+hybrid-array = { version = "0.4.15", features = ["serde"] }
 itertools = "0.15.0"
 jemallocator = "0.5.4"
 libc = "0.2.189"

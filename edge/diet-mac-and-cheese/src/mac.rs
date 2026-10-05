@@ -1,6 +1,6 @@
 use crate::party::{Party, Prover, WhichParty};
 
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use std::{
     fmt::Debug,
     ops::{Add, Mul, Neg, Sub},
@@ -15,7 +15,7 @@ use swanky_party::{
 };
 
 pub(crate) fn make_x_i<V: IsSubFieldOf<T>, T: FiniteField>(i: usize) -> T {
-    let mut v: GenericArray<V, DegreeModulo<V, T>> = GenericArray::default();
+    let mut v: Array<V, DegreeModulo<V, T>> = Array::default();
     v[i] = V::ONE;
     T::from_subfield(&v)
 }
@@ -30,7 +30,7 @@ pub trait MacT: Clone + Copy + Debug + Default {
     type LiftedMac: MacT<Value = Self::Tag, Tag = Self::Tag>;
 
     /// Lift an array of MACs from the value field to the tag field.
-    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac;
+    fn lift(xs: &Array<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac;
 }
 
 impl<T: FiniteField> MacT for T {
@@ -38,7 +38,7 @@ impl<T: FiniteField> MacT for T {
     type Tag = T;
     type LiftedMac = Self;
 
-    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
+    fn lift(xs: &Array<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
         debug_assert!(xs.len() == 1);
         xs[0]
     }
@@ -114,7 +114,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> Mac<P, V, T> {
     }
 
     /// Lift an array of MACs from the value field to the tag field.
-    pub fn lift(xs: &GenericArray<Self, DegreeModulo<V, T>>) -> Mac<P, T, T> {
+    pub fn lift(xs: &Array<Self, DegreeModulo<V, T>>) -> Mac<P, T, T> {
         let mut value = PartyPrivateCopy::new(T::ZERO);
         let mut mac = T::ZERO;
 
@@ -136,7 +136,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MacT for Mac<P, V, T> {
     type Tag = T;
     type LiftedMac = Mac<P, Self::Tag, Self::Tag>;
 
-    fn lift(xs: &GenericArray<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
+    fn lift(xs: &Array<Self, DegreeModulo<Self::Value, Self::Tag>>) -> Self::LiftedMac {
         Self::lift(xs)
     }
 }
@@ -208,7 +208,7 @@ pub(crate) fn validate<V: IsSubFieldOf<T>, T: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
     use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
@@ -239,8 +239,8 @@ mod tests {
         let mut rng = SwankyRng::new();
         for _ in 0..10 {
             let delta = F40b::random(&mut rng);
-            let mut provers = GenericArray::default();
-            let mut verifiers = GenericArray::default();
+            let mut provers = Array::default();
+            let mut verifiers = Array::default();
             let (prover, verifier) = generate::<F2, F40b>(true, delta, &mut rng);
             provers[0] = prover;
             verifiers[0] = verifier;

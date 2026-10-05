@@ -4,7 +4,7 @@ use crate::{
     backend_multifield::BackendLiftT, backend_trait::BackendT,
     gadgets::dotproduct_with_public_powers, mac::MacT,
 };
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 
@@ -54,7 +54,7 @@ pub(crate) fn permutation_check<B: BackendT>(
 struct Packer<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> {
     xs: Peekable<I>,
     tuple_size: usize,
-    array: GenericArray<M, DegreeModulo<M::Value, M::Tag>>,
+    array: Array<M, DegreeModulo<M::Value, M::Tag>>,
     nbits: usize,
     nbits_count: usize,
     tuple_count: usize,
@@ -67,7 +67,7 @@ impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Packer<M, 
         Self {
             xs: xs.peekable(),
             tuple_size,
-            array: GenericArray::default(),
+            array: Array::default(),
             nbits: <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE,
             nbits_count: 0,
             tuple_count: 0,
@@ -89,7 +89,7 @@ impl<M: MacT, B: BackendLiftT<Wire = M>, I: Iterator<Item = B::Wire>> Iterator f
             // 2. We are out of space in the tuple itself (i.e., `tuple_count == tuple_size`)
             if self.nbits_count == self.nbits || self.tuple_count == self.tuple_size {
                 let elem = M::lift(&self.array);
-                self.array = GenericArray::default();
+                self.array = Array::default();
                 self.nbits_count = 0;
                 // Only reset `tuple_count` if we've hit `tuple_size`.
                 if self.tuple_count == self.tuple_size {

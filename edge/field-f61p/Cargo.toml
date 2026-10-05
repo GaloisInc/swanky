@@ -15,7 +15,7 @@ rand.workspace = true
 swanky-serialization.workspace = true
 swanky-field.workspace = true
 subtle.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 crypto-bigint.workspace = true
 bytemuck.workspace = true
 

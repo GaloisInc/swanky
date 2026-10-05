@@ -68,7 +68,7 @@
 use std::io::{Read, Write};
 
 use bytemuck::TransparentWrapper;
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_party::GenericParty;
 use swanky_serialization::CanonicalSerialize;
@@ -399,7 +399,7 @@ impl<'inner> Channel<'inner> {
     /// ```
     #[inline]
     pub fn read<T: CanonicalSerialize>(&mut self) -> swanky_error::Result<T> {
-        let mut buf = GenericArray::<u8, T::ByteReprLen>::default();
+        let mut buf = Array::<u8, T::ByteReprLen>::default();
         self.read_bytes(&mut buf)?;
         T::from_bytes(&buf).wrap_err(
             ErrorKind::SerializationError,

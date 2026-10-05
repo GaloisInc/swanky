@@ -3,7 +3,7 @@ use super::{
     spsvole::{SpsReceiver, SpsSender},
     utils::Powers,
 };
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use rand::{
     RngExt, SeedableRng,
     distr::{Distribution, Uniform},

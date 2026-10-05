@@ -17,7 +17,7 @@ use crate::{
     ram::BooleanRam,
     svole_trait::SvoleT,
 };
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use rand::SeedableRng;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::Result;
@@ -172,7 +172,7 @@ impl<
             inputs: &[Mac<P, F2, F40b>],
             num_cond: usize,
         ) -> Mac<P, F40b, F40b> {
-            Mac::lift(&GenericArray::from_iter(
+            Mac::lift(&Array::from_iter(
                 inputs[inputs.len() - num_cond..]
                     .iter()
                     .copied()

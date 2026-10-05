@@ -15,7 +15,7 @@ bytemuck.workspace = true
 swanky-error.workspace = true
 swanky-serialization.workspace = true
 swanky-party.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
