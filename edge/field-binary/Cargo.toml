@@ -19,7 +19,7 @@ generic-array.workspace = true
 rand.workspace = true
 bytemuck.workspace = true
 crypto-bigint.workspace = true
-rand_chacha.workspace = true
+swanky-rng.workspace = true
 
 [dev-dependencies]
 swanky-field-test.workspace = true

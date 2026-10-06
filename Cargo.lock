@@ -2685,11 +2685,11 @@ dependencies = [
  "generic-array",
  "proptest",
  "rand 0.10.2",
- "rand_chacha 0.10.0",
  "subtle",
  "swanky-field",
  "swanky-field-test",
  "swanky-polynomial",
+ "swanky-rng",
  "swanky-serialization",
  "vectoreyes",
 ]

@@ -231,14 +231,8 @@ impl<'a> MulAssign<&'a F256b> for F256b {
 }
 
 impl FiniteRing for F256b {
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        // NOTE: The trait fixes this input at 16 bytes.Therefore we populate the full width of the
-        // field element using ChaCha20.
-        let mut seed = [0; 32];
-        seed[0..16].copy_from_slice(x);
-        // AES key scheduling is slower than ChaCha20
-        // TODO: this is still quite slow.
-        Self::random(&mut rand_chacha::ChaCha20Rng::from_seed(seed))
+    fn from_uniform_bytes(seed: &[u8; 16]) -> Self {
+        Self::random(&mut swanky_rng::Aes128Rng::from_seed(U8x16::from(*seed)))
     }
 
     fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
