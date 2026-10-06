@@ -251,7 +251,10 @@ mod move_to_vectoreyes {
 //
 // NOTE This contains no architecture-specific code except what's encapsulated in functions from
 // `vectoreyes` and `move_to_vectoreyes`.
-mod multiplication {
+//
+// This is `pub(crate)` because `F256b` reuses `clmul`: a carry-less multiply is independent of the
+// polynomial modulus, so the 256-bit version is the same schoolbook product one level up.
+pub(crate) mod multiplication {
     use super::move_to_vectoreyes::*;
     use vectoreyes::U64x2;
 

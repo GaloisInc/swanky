@@ -19,6 +19,7 @@ hybrid-array.workspace = true
 rand.workspace = true
 bytemuck.workspace = true
 crypto-bigint.workspace = true
+swanky-rng.workspace = true
 
 [dev-dependencies]
 swanky-field-test.workspace = true
@@ -28,4 +29,8 @@ criterion.workspace = true
 
 [[bench]]
 name = "f128b"
+harness = false
+
+[[bench]]
+name = "f256b"
 harness = false
