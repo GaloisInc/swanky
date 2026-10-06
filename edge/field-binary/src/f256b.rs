@@ -1,5 +1,5 @@
 use crate::F2;
-use generic_array::GenericArray;
+use hybrid_array::{Array, typenum};
 use rand::{Rng, SeedableRng};
 use std::iter::FromIterator;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
@@ -259,12 +259,10 @@ impl FiniteRing for F256b {
 impl CanonicalSerialize for F256b {
     type Serializer = ByteElementSerializer<Self>;
     type Deserializer = ByteElementDeserializer<Self>;
-    type ByteReprLen = generic_array::typenum::U32;
+    type ByteReprLen = typenum::U32;
     type FromBytesError = BytesDeserializationCannotFail;
 
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         Ok(F256b([
             u128::from_le_bytes(
                 bytes[0..16]
@@ -279,8 +277,8 @@ impl CanonicalSerialize for F256b {
         ]))
     }
 
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
-        let mut out = GenericArray::default();
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
+        let mut out = Array::default();
         out[..16].copy_from_slice(&self.0[0].to_le_bytes());
         out[16..].copy_from_slice(&self.0[1].to_le_bytes());
         out
@@ -292,13 +290,11 @@ impl FiniteField for F256b {
 
     const GENERATOR: Self = F256b([2, 0]);
 
-    type NumberOfBitsInBitDecomposition = generic_array::typenum::U256;
+    type NumberOfBitsInBitDecomposition = typenum::U256;
 
-    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
         // `swanky_field::standard_bit_decomposition` only accepts a `u128`, so we walk the limbs.
-        GenericArray::from_iter(
-            (0..256).map(|shift| (self.0[shift / 128] >> (shift % 128)) & 1 == 1),
-        )
+        Array::from_iter((0..256).map(|shift| (self.0[shift / 128] >> (shift % 128)) & 1 == 1))
     }
 
     fn inverse(&self) -> Self {
@@ -343,15 +339,15 @@ impl From<F256b> for U8x32 {
 
 impl IsSubRingOf<F256b> for F2 {}
 impl IsSubFieldOf<F256b> for F2 {
-    type DegreeModulo = generic_array::typenum::U256;
-    fn decompose_superfield(fe: &F256b) -> GenericArray<Self, Self::DegreeModulo> {
-        GenericArray::from_iter((0..256).map(|shift| {
+    type DegreeModulo = typenum::U256;
+    fn decompose_superfield(fe: &F256b) -> Array<Self, Self::DegreeModulo> {
+        Array::from_iter((0..256).map(|shift| {
             F2::try_from(((fe.0[shift / 128] >> (shift % 128)) & 1) as u8)
                 .expect("unreachable: failed to form F2 from 0 or 1")
         }))
     }
 
-    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F256b {
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> F256b {
         let mut out = [0u128; 2];
         for (i, x) in components.iter().enumerate() {
             out[i / 128] |= u128::from(u8::from(*x)) << (i % 128);
