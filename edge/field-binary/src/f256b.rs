@@ -9,12 +9,12 @@ use swanky_serialization::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use vectoreyes::U8x32;
+use vectoreyes::{U8x16, U8x32};
 
 #[cfg(test)]
 use swanky_polynomial::Polynomial;
 
-/// An element of the finite field $\textsf{GF}(2^{256})$ reduced over $x^{256} + x^{10} + x^5 + x^2 + 1$
+/// An element of the finite field $`\textsf{GF}(2^{256})`$ reduced over $`x^{256} + x^{10} + x^5 + x^2 + 1`$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 // We represent a 256-bit value using a pair of u128 in little-endian order. I.e., the coefficients
 // are stored as `[[x^0, ..., x^127], [x^128, ..., x^255]]`.
