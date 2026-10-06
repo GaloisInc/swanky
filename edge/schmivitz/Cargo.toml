@@ -17,9 +17,6 @@ edition.workspace = true
 publish.workspace = true
 version.workspace = true
 
-[features]
-256bit = []
-
 [dependencies]
 diet-mac-and-cheese.workspace = true
 fancy-traits.workspace = true

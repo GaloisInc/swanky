@@ -368,149 +368,168 @@ pub(crate) fn verify<P: Params>(
 
 #[cfg(test)]
 mod test {
-    use std::iter::repeat_with;
-    use std::sync::Once;
+    use crate::parameters::{Binary128Bit, Binary256Bit};
 
-    use super::{Chall1, Chall2, H1, HashConsistency};
-    use super::{VoleProver, VoleVerifier, verify};
-    use crate::parameters::{FLambda, P, SecurityParam, SecurityParamBytes, Xof};
-    use crate::vole::consistency_check::flambda_from_bytes_array;
-    use crate::vole::functionality::compute_chall_3;
-    use crate::vole::lift;
-    use hybrid_array::{Array, typenum::Unsigned};
-    use rand::rng;
-    use rayon::prelude::*;
-    use sha3::digest::{ExtendableOutput, Update, XofReader};
-    use swanky_field::FiniteRing;
-    use swanky_field_binary::{F2, F8b};
-    use swanky_serialization::CanonicalSerialize;
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
 
-    static INIT: Once = Once::new();
+                #[allow(dead_code)]
+                type P = $params;
 
-    fn init_logger() {
-        INIT.call_once(|| {
-            let _ =
-                env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-                    .try_init();
-        });
-    }
+                use std::iter::repeat_with;
+                use std::sync::Once;
 
-    /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
-    pub(crate) fn compute_chall_2(
-        chall1: &Chall1<P>,
-        u_tilda: HashConsistency<P>,
-        h_v: H1<P>,
-        masked_witnesses: &[F2],
-    ) -> Chall2<P> {
-        let mut out = Chall2::<P>::default();
+                use super::super::{Chall1, Chall2, H1, HashConsistency};
+                use super::super::{VoleProver, VoleVerifier, verify};
+                use crate::parameters::{FLambda, SecurityParam, SecurityParamBytes, Xof};
+                use crate::vole::consistency_check::flambda_from_bytes_array;
+                use crate::vole::functionality::compute_chall_3;
+                use crate::vole::lift;
+                use hybrid_array::{Array, typenum::Unsigned};
+                use rand::rng;
+                use rayon::prelude::*;
+                use sha3::digest::{ExtendableOutput, Update, XofReader};
+                use swanky_field::FiniteRing;
+                use swanky_field_binary::{F2, F8b};
+                use swanky_serialization::CanonicalSerialize;
 
-        let mut hasher = Xof::<P>::default();
-        hasher.update(chall1);
-        hasher.update(u_tilda.pack_to_bytes().as_slice());
-        hasher.update(h_v.as_ref());
+                static INIT: Once = Once::new();
 
-        // pack the binary field values into bytes
-        for chunk in masked_witnesses.chunks(8) {
-            let mut byte = 0u8;
-            for (i, &b) in chunk.iter().enumerate() {
-                if b == F2::ONE {
-                    byte |= 1 << i;
+                fn init_logger() {
+                    INIT.call_once(|| {
+                        let _ = env_logger::Builder::from_env(
+                            env_logger::Env::default().default_filter_or("info"),
+                        )
+                        .try_init();
+                    });
+                }
+
+                /// Compute second challenge as seen in FAEST spec Fig 8.2 and Fig 8.3.
+                pub(crate) fn compute_chall_2(
+                    chall1: &Chall1<P>,
+                    u_tilda: HashConsistency<P>,
+                    h_v: H1<P>,
+                    masked_witnesses: &[F2],
+                ) -> Chall2<P> {
+                    let mut out = Chall2::<P>::default();
+
+                    let mut hasher = Xof::<P>::default();
+                    hasher.update(chall1);
+                    hasher.update(u_tilda.pack_to_bytes().as_slice());
+                    hasher.update(h_v.as_ref());
+
+                    // pack the binary field values into bytes
+                    for chunk in masked_witnesses.chunks(8) {
+                        let mut byte = 0u8;
+                        for (i, &b) in chunk.iter().enumerate() {
+                            if b == F2::ONE {
+                                byte |= 1 << i;
+                            }
+                        }
+                        // TODO: for performance, accumulate the bytes in say 64 and hash that.
+                        hasher.update(&[byte]);
+                    }
+
+                    hasher.update(&[2u8]);
+                    let mut reader = hasher.finalize_xof();
+                    reader.read(&mut out);
+                    out
+                }
+
+                fn test_vole_prover_and_verifier(how_many: usize) {
+                    let rng = &mut rng();
+
+                    let statement_sig = vec![1u8];
+                    let secret = repeat_with(|| F2::random(rng))
+                        .take(1000)
+                        .collect::<Vec<F2>>();
+
+                    let t_create_vole_prover = std::time::Instant::now();
+                    let vole_prover = VoleProver::create(&statement_sig, &secret, how_many);
+                    log::info!(
+                        "1: t_create_vole_prover: {:?}",
+                        t_create_vole_prover.elapsed()
+                    );
+
+                    // Let's clone u and v so that we can test the VOLE fundamental equality at the end.
+                    let t_copy_challenges = std::time::Instant::now();
+                    let u = vole_prover.u.clone();
+                    let v = vole_prover.v.clone();
+
+                    let dummy_masked = vec![];
+                    let chall2 = compute_chall_2(
+                        &vole_prover.chall1,
+                        vole_prover.u_tilda.clone(),
+                        vole_prover.h_v.clone(),
+                        &dummy_masked,
+                    );
+                    let dummy_a_tilda = FLambda::<P>::ZERO;
+                    let dummy_b_tilda = FLambda::<P>::ZERO;
+                    let chall3 = compute_chall_3::<P>(&chall2, dummy_a_tilda, dummy_b_tilda);
+                    log::info!("2: t_copy_challenges: {:?}", t_copy_challenges.elapsed());
+
+                    let t_decommit_prover = std::time::Instant::now();
+                    let decommitment_prover = vole_prover.decommit(&chall3);
+                    log::info!("3: t_decommit_prover: {:?}", t_decommit_prover.elapsed());
+
+                    let t_vole_verifier = std::time::Instant::now();
+                    let vole_v =
+                        VoleVerifier::create(&statement_sig, &decommitment_prover, &chall3);
+                    log::info!("4: t_vole_verifier: {:?}", t_vole_verifier.elapsed());
+
+                    assert_eq!(vole_v.q.len(), vole_v.l + SecurityParam::<P>::USIZE);
+
+                    let t_verify = std::time::Instant::now();
+                    let b = verify::<P>(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
+                    log::info!("5: t_verify: {:?}", t_verify.elapsed());
+
+                    let t_finalcheck = std::time::Instant::now();
+                    let delta_lifted: FLambda<P> = lift::<P>(&vole_v.delta);
+                    let q_lifted: Vec<FLambda<P>> =
+                        vole_v.q.into_par_iter().map(|qi| lift::<P>(&qi)).collect();
+                    for pos in 0..how_many {
+                        assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
+                    }
+                    log::info!("6: t_finalcheck: {:?}", t_finalcheck.elapsed());
+
+                    assert!(b);
+                }
+
+                #[test]
+                fn test_vole_prover_verifier() {
+                    let perf = false; // toggle to true for using this test for performance testing the generation of VOLEs
+                    if !perf {
+                        test_vole_prover_and_verifier(100);
+                    } else {
+                        // Same test but more voles drawn and printing the logs to monitor the timing of the different components
+
+                        // if log-level `RUST_LOG` not already set, then set to info
+                        init_logger();
+
+                        let t = std::time::Instant::now();
+                        test_vole_prover_and_verifier(10_000_000);
+                        log::info!("VOLE-it-Head completed in: {:?}", t.elapsed());
+                    }
+                }
+
+                #[test]
+                fn test_form() {
+                    let v: Array<_, SecurityParamBytes<P>> = Array::from_fn(|_| 27u8);
+                    let t: FLambda<P> = flambda_from_bytes_array::<P>(v.as_slice()).unwrap();
+                    assert_eq!(t.to_bytes()[0], 27u8);
+                    assert_eq!(t.to_bytes()[1], 27u8);
+
+                    let v = 43u8;
+                    let v_f8b: F8b = F8b::from_bytes(&[v].into()).unwrap();
+                    let v_back: u8 = v_f8b.to_bytes()[0];
+                    assert_eq!(v_back, 43u8);
                 }
             }
-            // TODO: for performance, accumulate the bytes in say 64 and hash that.
-            hasher.update(&[byte]);
-        }
-
-        hasher.update(&[2u8]);
-        let mut reader = hasher.finalize_xof();
-        reader.read(&mut out);
-        out
+        };
     }
 
-    fn test_vole_prover_and_verifier(how_many: usize) {
-        let rng = &mut rng();
-
-        let statement_sig = vec![1u8];
-        let secret = repeat_with(|| F2::random(rng))
-            .take(1000)
-            .collect::<Vec<F2>>();
-
-        let t_create_vole_prover = std::time::Instant::now();
-        let vole_prover = VoleProver::create(&statement_sig, &secret, how_many);
-        log::info!(
-            "1: t_create_vole_prover: {:?}",
-            t_create_vole_prover.elapsed()
-        );
-
-        // Let's clone u and v so that we can test the VOLE fundamental equality at the end.
-        let t_copy_challenges = std::time::Instant::now();
-        let u = vole_prover.u.clone();
-        let v = vole_prover.v.clone();
-
-        let dummy_masked = vec![];
-        let chall2 = compute_chall_2(
-            &vole_prover.chall1,
-            vole_prover.u_tilda.clone(),
-            vole_prover.h_v.clone(),
-            &dummy_masked,
-        );
-        let dummy_a_tilda = FLambda::<P>::ZERO;
-        let dummy_b_tilda = FLambda::<P>::ZERO;
-        let chall3 = compute_chall_3::<P>(&chall2, dummy_a_tilda, dummy_b_tilda);
-        log::info!("2: t_copy_challenges: {:?}", t_copy_challenges.elapsed());
-
-        let t_decommit_prover = std::time::Instant::now();
-        let decommitment_prover = vole_prover.decommit(&chall3);
-        log::info!("3: t_decommit_prover: {:?}", t_decommit_prover.elapsed());
-
-        let t_vole_verifier = std::time::Instant::now();
-        let vole_v = VoleVerifier::create(&statement_sig, &decommitment_prover, &chall3);
-        log::info!("4: t_vole_verifier: {:?}", t_vole_verifier.elapsed());
-
-        assert_eq!(vole_v.q.len(), vole_v.l + SecurityParam::<P>::USIZE);
-
-        let t_verify = std::time::Instant::now();
-        let b = verify::<P>(&chall3, chall2, dummy_a_tilda, dummy_b_tilda);
-        log::info!("5: t_verify: {:?}", t_verify.elapsed());
-
-        let t_finalcheck = std::time::Instant::now();
-        let delta_lifted: FLambda<P> = lift::<P>(&vole_v.delta);
-        let q_lifted: Vec<FLambda<P>> = vole_v.q.into_par_iter().map(|qi| lift::<P>(&qi)).collect();
-        for pos in 0..how_many {
-            assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
-        }
-        log::info!("6: t_finalcheck: {:?}", t_finalcheck.elapsed());
-
-        assert!(b);
-    }
-
-    #[test]
-    fn test_vole_prover_verifier() {
-        let perf = false; // toggle to true for using this test for performance testing the generation of VOLEs
-        if !perf {
-            test_vole_prover_and_verifier(100);
-        } else {
-            // Same test but more voles drawn and printing the logs to monitor the timing of the different components
-
-            // if log-level `RUST_LOG` not already set, then set to info
-            init_logger();
-
-            let t = std::time::Instant::now();
-            test_vole_prover_and_verifier(10_000_000);
-            log::info!("VOLE-it-Head completed in: {:?}", t.elapsed());
-        }
-    }
-
-    #[test]
-    fn test_form() {
-        let v: Array<_, SecurityParamBytes<P>> = Array::from_fn(|_| 27u8);
-        let t: FLambda<P> = flambda_from_bytes_array::<P>(v.as_slice()).unwrap();
-        assert_eq!(t.to_bytes()[0], 27u8);
-        assert_eq!(t.to_bytes()[1], 27u8);
-
-        let v = 43u8;
-        let v_f8b: F8b = F8b::from_bytes(&[v].into()).unwrap();
-        let v_back: u8 = v_f8b.to_bytes()[0];
-        assert_eq!(v_back, 43u8);
-    }
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }

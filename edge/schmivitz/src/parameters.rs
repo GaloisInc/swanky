@@ -102,9 +102,6 @@ pub type SecurityParam<P> = <P as Params>::SecurityParam;
 /// Convenience type to access [`Params::SecurityParamBytes`].
 pub(crate) type SecurityParamBytes<P> = <P as Params>::SecurityParamBytes;
 
-/// NOTE: [`SecurityParamBytes`] must equal $`\lceil \lambda / 8 \rceil`$.
-const _: () = assert!(SecurityParamBytes::<P>::USIZE * 8 == SecurityParam::<P>::USIZE);
-
 /// The field size ($`r`$ in the paper) for the generated VOLEs, relative to [`FieldSize`].
 ///
 /// Specifically, this defines the modulus for the extension field $`\mathbb F_q`$, where
@@ -200,6 +197,11 @@ macro_rules! declare_binary_extension_params {
                 bit.into()
             }
         }
+
+        /// NOTE: [`SecurityParamBytes`] must equal $`\lceil \lambda / 8 \rceil`$.
+        const _: () = assert!(
+            SecurityParamBytes::<$name>::USIZE * 8 == SecurityParam::<$name>::USIZE
+        );
     }
 }
 
@@ -229,10 +231,3 @@ pub(crate) type Prng<P> = <P as Params>::Prng;
 
 /// Convenience type to access [`Params::Xof`].
 pub(crate) type Xof<P> = <P as Params>::Xof;
-
-/// todo
-#[cfg(not(feature = "256bit"))]
-pub type P = Binary128Bit;
-/// todo
-#[cfg(feature = "256bit")]
-pub type P = Binary256Bit;

@@ -210,71 +210,86 @@ fn convert_to_vole_verifier_naive<P: Params>(
 
 #[cfg(test)]
 mod test {
-    use super::{convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
-    use crate::parameters::P;
-    use crate::vole::{
-        convert_to_vole::convert_to_vole_prover,
-        crypto_primitives::{IV, Seed},
-    };
-    use rand::{RngExt, rng};
-    use swanky_field_binary::F8b;
+    use crate::parameters::{Binary128Bit, Binary256Bit};
 
-    #[test]
-    fn test_convert_to_vole_naive() {
-        let rng = &mut rng();
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
 
-        let seeds: [_; 256] = core::array::from_fn(|_| Seed::<P>::from_fn(|_| rng.random()));
-        let iv = rng.random();
+                #[allow(dead_code)]
+                type P = $params;
 
-        let delta = 3u8;
-        let how_many = 1027;
-        let (u, vs) = convert_to_vole_prover_naive::<P>(seeds, iv, how_many);
+            use super::super::{convert_to_vole_prover_naive, convert_to_vole_verifier_naive};
+                use crate::vole::{
+                    convert_to_vole::convert_to_vole_prover,
+                    crypto_primitives::{IV, Seed},
+                };
+                use rand::{RngExt, rng};
+                use swanky_field_binary::F8b;
 
-        let mut seeds_verifier = [Default::default(); 256];
-        for i in 0..256 {
-            if i != (delta as usize) {
-                seeds_verifier[i] = seeds[i];
+                #[test]
+                fn test_convert_to_vole_naive() {
+                    let rng = &mut rng();
+
+                    let seeds: [_; 256] = core::array::from_fn(|_| Seed::<P>::from_fn(|_| rng.random()));
+                    let iv = rng.random();
+
+                    let delta = 3u8;
+                    let how_many = 1027;
+                    let (u, vs) = convert_to_vole_prover_naive::<P>(seeds, iv, how_many);
+
+                    let mut seeds_verifier = [Default::default(); 256];
+                    for i in 0..256 {
+                        if i != (delta as usize) {
+                            seeds_verifier[i] = seeds[i];
+                        }
+                    }
+                    let qs = convert_to_vole_verifier_naive::<P>(seeds_verifier, iv, how_many, delta);
+
+                    for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
+                        let delta_f8b = F8b::from(delta);
+                        assert_eq!(*q, (*u * delta_f8b) - *v);
+                    }
+                }
+
+                #[test]
+                fn test_convert_to_vole() {
+                    let rng = &mut rng();
+
+                    let seeds: [_; 256] = core::array::from_fn(|_| Seed::<P>::from_fn(|_| rng.random()));
+                    let iv = rng.random::<IV>();
+
+                    let delta = 3u8;
+                    let how_many = 1027;
+                    let (u, vs) = convert_to_vole_prover_naive::<P>(seeds, iv, how_many);
+
+                    /* This test checks the equivalence between convert_to_vole and its naive version */
+                    let (u_xor, v_xor) = convert_to_vole_prover::<P>(seeds, iv, how_many);
+                    assert_eq!(u_xor, u);
+                    assert_eq!(v_xor, vs);
+
+                    let mut seeds_verifier = [Default::default(); 256];
+                    for i in 0..256 {
+                        if i != (delta as usize) {
+                            seeds_verifier[i] = seeds[i];
+                        }
+                    }
+                    let qs = convert_to_vole_verifier_naive::<P>(seeds_verifier, iv, how_many, delta);
+
+                    /* This test was to test the correspondance between the two functions */
+                    let qs_xor = super::super::convert_to_vole_verifier::<P>(seeds, iv, how_many, delta);
+                    assert_eq!(qs, qs_xor);
+
+                    for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
+                        let delta_f8b = F8b::from(delta);
+                        assert_eq!(*q, (*u * delta_f8b) - *v);
+                    }
+                }
             }
-        }
-        let qs = convert_to_vole_verifier_naive::<P>(seeds_verifier, iv, how_many, delta);
-
-        for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
-            let delta_f8b = F8b::from(delta);
-            assert_eq!(*q, (*u * delta_f8b) - *v);
-        }
+        };
     }
 
-    #[test]
-    fn test_convert_to_vole() {
-        let rng = &mut rng();
-
-        let seeds: [_; 256] = core::array::from_fn(|_| Seed::<P>::from_fn(|_| rng.random()));
-        let iv = rng.random::<IV>();
-
-        let delta = 3u8;
-        let how_many = 1027;
-        let (u, vs) = convert_to_vole_prover_naive::<P>(seeds, iv, how_many);
-
-        /* This test checks the equivalence between convert_to_vole and its naive version */
-        let (u_xor, v_xor) = convert_to_vole_prover::<P>(seeds, iv, how_many);
-        assert_eq!(u_xor, u);
-        assert_eq!(v_xor, vs);
-
-        let mut seeds_verifier = [Default::default(); 256];
-        for i in 0..256 {
-            if i != (delta as usize) {
-                seeds_verifier[i] = seeds[i];
-            }
-        }
-        let qs = convert_to_vole_verifier_naive::<P>(seeds_verifier, iv, how_many, delta);
-
-        /* This test was to test the correspondance between the two functions */
-        let qs_xor = super::convert_to_vole_verifier::<P>(seeds, iv, how_many, delta);
-        assert_eq!(qs, qs_xor);
-
-        for ((u, v), q) in u.iter().zip(vs.iter()).zip(qs.iter()) {
-            let delta_f8b = F8b::from(delta);
-            assert_eq!(*q, (*u * delta_f8b) - *v);
-        }
-    }
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }

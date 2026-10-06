@@ -4,8 +4,6 @@
 //! ```text
 //! cargo run --release -p schmivitz --example aes_proof_size
 //! ```
-//!
-//! Pass `--no-default-features` to measure the $`\lambda = 128`$ variant instead.
 
 use hybrid_array::typenum::Unsigned;
 use merlin::Transcript;
@@ -13,19 +11,18 @@ use schmivitz::{
     Proof,
     circuit::load_circuit_from_strings_prover,
     circuit_validator::validate_circuit,
-    parameters::{P, RepetitionParam, SecurityParam, VoleSizeParam},
+    parameters::{
+        Binary128Bit, Binary256Bit, Params, RepetitionParam, SecurityParam, VoleSizeParam,
+    },
     vole::functionality::{VoleProver, VoleVerifier},
 };
 
-const SECURITY_PARAM: usize = <SecurityParam<P> as Unsigned>::USIZE;
-const VOLE_SIZE_PARAM: usize = <VoleSizeParam as Unsigned>::USIZE;
-const REPETITION_PARAM: usize = <RepetitionParam<P> as Unsigned>::USIZE;
 use std::time::Instant;
 
 /// The circuit and its witness are compiled in so the example needs no arguments.
 ///
 /// Note that the "256" here is the AES key size, and is unrelated to the
-/// [security parameter](SECURITY_PARAM).
+/// [security parameter](SecurityParam).
 const CIRCUIT: &str = include_str!("../circuits/aes_256_conv.sieve");
 const PRIVATE_INPUT: &str = include_str!("../circuits/aes_256_conv_private.sieve");
 
@@ -34,9 +31,12 @@ fn transcript() -> Transcript {
     Transcript::new(b"schmivitz aes_proof_size example")
 }
 
-fn main() -> swanky_error::Result<()> {
+fn run<P: Params>() -> swanky_error::Result<()> {
+    let security_param = <SecurityParam<P> as Unsigned>::USIZE;
+    let vole_size_param = <VoleSizeParam as Unsigned>::USIZE;
+    let repetition_param = <RepetitionParam<P> as Unsigned>::USIZE;
     println!(
-        "parameters: lambda = {SECURITY_PARAM}, r = {VOLE_SIZE_PARAM}, tau = {REPETITION_PARAM}"
+        "parameters: lambda = {security_param}, r = {vole_size_param}, tau = {repetition_param}"
     );
 
     let t = Instant::now();
@@ -65,8 +65,13 @@ fn main() -> swanky_error::Result<()> {
 
     // `proof_size_estimate` is an estimate, and currently an imprecise one: it omits
     // `assert_zero_commitment`, hardcodes the degree-1 commitment at 16 bytes rather than
-    // `SECURITY_PARAM / 8`, and computes `u_tilda` as `SECURITY_PARAM + B / 8` where
-    // `(SECURITY_PARAM + B) / 8` was intended. It is also not a serialized length, since the
+    // `SecurityParam / 8`, and computes `u_tilda` as `SecurityParam + B / 8` where
+    // `(SecurityParam + B) / 8` was intended. It is also not a serialized length, since the
     // proof has no serialization yet.
     Ok(())
+}
+
+fn main() -> swanky_error::Result<()> {
+    run::<Binary128Bit>()?;
+    run::<Binary256Bit>()
 }

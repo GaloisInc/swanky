@@ -53,48 +53,63 @@ impl<P: Params> TryRng for Prg<P> {
 
 #[cfg(test)]
 mod tests {
-    use super::{IV, Params, Seed};
-    use crate::parameters::P;
-    use rand::RngExt;
-    use swanky_field_binary::F2;
+    use crate::parameters::{Binary128Bit, Binary256Bit};
 
-    #[test]
-    fn swanky_prg_matches_stream_bits() {
-        let seed: Seed<P> = Seed::<P>::from_fn(|_| 5u8);
-        let iv: IV = [11u8; 16];
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
 
-        let lengths = [
-            1, 7, 8, 63, 64, 65, 127, 128, 129, 511, 512, 513, 1023, 1024, 1025, 2047, 2048, 2049,
-            100000, 1048575, 1048576, 1048577,
-        ];
-        for &l in &lengths {
-            let mut rng = P::new_prng_with_iv(&seed, iv);
-            let randoms = (0..l / 64 + 1)
-                .map(|_| rng.random::<u64>())
-                .collect::<Vec<_>>();
-            let mut expected_bits = Vec::with_capacity(l);
-            for block in randoms {
-                for i in 0..64 {
-                    let bit = ((block >> i) & 1) == 1;
-                    expected_bits.push(F2::from(bit));
-                }
-            }
-            expected_bits.truncate(l);
-            let mut stream = P::new_prng_with_iv(&seed, iv);
-            let mut stream_bits = Vec::with_capacity(l);
-            while stream_bits.len() < l {
-                let block = stream.random::<u64>();
-                for i in 0..64 {
-                    if stream_bits.len() == l {
-                        break;
+                #[allow(dead_code)]
+                type P = $params;
+
+                use super::super::{IV, Params, Seed};
+                use rand::RngExt;
+                use swanky_field_binary::F2;
+
+                #[test]
+                fn swanky_prg_matches_stream_bits() {
+                    let seed: Seed<P> = Seed::<P>::from_fn(|_| 5u8);
+                    let iv: IV = [11u8; 16];
+
+                    let lengths = [
+                        1, 7, 8, 63, 64, 65, 127, 128, 129, 511, 512, 513, 1023, 1024, 1025, 2047,
+                        2048, 2049, 100000, 1048575, 1048576, 1048577,
+                    ];
+                    for &l in &lengths {
+                        let mut rng = P::new_prng_with_iv(&seed, iv);
+                        let randoms = (0..l / 64 + 1)
+                            .map(|_| rng.random::<u64>())
+                            .collect::<Vec<_>>();
+                        let mut expected_bits = Vec::with_capacity(l);
+                        for block in randoms {
+                            for i in 0..64 {
+                                let bit = ((block >> i) & 1) == 1;
+                                expected_bits.push(F2::from(bit));
+                            }
+                        }
+                        expected_bits.truncate(l);
+                        let mut stream = P::new_prng_with_iv(&seed, iv);
+                        let mut stream_bits = Vec::with_capacity(l);
+                        while stream_bits.len() < l {
+                            let block = stream.random::<u64>();
+                            for i in 0..64 {
+                                if stream_bits.len() == l {
+                                    break;
+                                }
+                                let bit = ((block >> i) & 1) == 1;
+                                stream_bits.push(F2::from(bit));
+                            }
+                        }
+                        assert_eq!(expected_bits, stream_bits, "bit mismatch for l={}", l);
                     }
-                    let bit = ((block >> i) & 1) == 1;
-                    stream_bits.push(F2::from(bit));
                 }
             }
-            assert_eq!(expected_bits, stream_bits, "bit mismatch for l={}", l);
-        }
+        };
     }
+
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }
 
 fn hash<P: Params>(bytes: &[u8], domain_seperator: u8, output: &mut [u8]) {
