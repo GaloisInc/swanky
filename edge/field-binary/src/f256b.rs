@@ -239,8 +239,16 @@ impl FiniteRing for F256b {
         let mut bytes = [0; 32];
         rng.fill_bytes(&mut bytes[..]);
         F256b([
-            u128::from_le_bytes(bytes[..16].try_into().unwrap()),
-            u128::from_le_bytes(bytes[16..].try_into().unwrap()),
+            u128::from_le_bytes(
+                bytes[0..16]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
+            u128::from_le_bytes(
+                bytes[16..32]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
         ])
     }
 
@@ -257,10 +265,17 @@ impl CanonicalSerialize for F256b {
     fn from_bytes(
         bytes: &GenericArray<u8, Self::ByteReprLen>,
     ) -> Result<Self, Self::FromBytesError> {
-        // These unwraps are safe because `ByteReprLen` fixes the length at 32.
         Ok(F256b([
-            u128::from_le_bytes(bytes[..16].try_into().unwrap()),
-            u128::from_le_bytes(bytes[16..].try_into().unwrap()),
+            u128::from_le_bytes(
+                bytes[0..16]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
+            u128::from_le_bytes(
+                bytes[16..32]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
         ]))
     }
 
@@ -330,11 +345,10 @@ impl IsSubRingOf<F256b> for F2 {}
 impl IsSubFieldOf<F256b> for F2 {
     type DegreeModulo = generic_array::typenum::U256;
     fn decompose_superfield(fe: &F256b) -> GenericArray<Self, Self::DegreeModulo> {
-        GenericArray::from_iter(
-            (0..256).map(|shift| {
-                F2::try_from(((fe.0[shift / 128] >> (shift % 128)) & 1) as u8).unwrap()
-            }),
-        )
+        GenericArray::from_iter((0..256).map(|shift| {
+            F2::try_from(((fe.0[shift / 128] >> (shift % 128)) & 1) as u8)
+                .expect("unreachable: failed to form F2 from 0 or 1")
+        }))
     }
 
     fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F256b {
