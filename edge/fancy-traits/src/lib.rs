@@ -1,17 +1,51 @@
-//! Traits for representing circuit computations.
+//! Traits for writing and evaluating circuits.
 //!
-//! The core trait of this module is [`Fancy`], which represents the basic set
-//! of operations possible in a circuit. There are also extension traits that
-//! further extend the core [`Fancy`] trait to provide additional capabilities.
+//! The core trait of this crate is [`Fancy`], which defines the circuit's wire
+//! representation. In addition, there are several extension traits that extend
+//! the capabilities of a [`Fancy`] object, such as to support encoding
+//! constants (through the [`FancyConstant`] trait) or enabling binary operators
+//! (through the [`FancyBinary`] trait).
+//!
+//! Circuits are defined using the [`Circuit`] trait, which is generic over some
+//! [`Fancy`] object. Any [`Fancy`] object can then execute the defined
+//! [`Circuit`] object, and other circuits may call [`Circuit`] implementations
+//! as subcomponents.
+//!
+//! # Example
+//! Below, we define a simple "plaintext" evaluator over `bool`s, and implement
+//! [`Fancy`] and [`FancyBinary`] for this evaluator.
+//! ```
+//! # use fancy_traits::{Fancy, FancyBinary};
+//! # use swanky_channel::Channel;
+//! # use swanky_error::Result;
+//! struct BooleanEvaluator;
+//!
+//! impl Fancy for BooleanEvaluator {
+//!     type Item = bool;
+//! }
+//! impl FancyBinary for BooleanEvaluator {
+//!     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+//!         x ^ y
+//!     }
+//!     fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+//!         Ok(x & y)
+//!     }
+//!     fn negate(&mut self, x: &Self::Item) -> Self::Item {
+//!         !x
+//!     }
+//! }
+//! ```
+//! We can then use this evaluator to a [`Circuit`] by calling
+//! [`Circuit::execute`] with the backend set to `BooleanEvaluator`.
 #![deny(missing_docs)]
 
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteField;
 
 mod circuit;
 pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;
-use swanky_field::FiniteField;
 pub use zk::FancyZeroKnowledge;
 
 /// The `Fancy` trait is the core trait for writing circuits.
