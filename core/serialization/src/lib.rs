@@ -29,12 +29,12 @@
 //!
 //! This crate provides implementations for all fixed-width integer
 //! types, `isize` and `usize`, `()`, [`vectoreyes`] vectors,
-//! [`GenericArray`], and `[T; N]` for `N <= 32` (a bound inherited
+//! [`Array`], and `[T; N]` for `N <= 32` (a bound inherited
 //! from [`serde`]), and all `FiniteRing`s require `CanonicalSerialize`.
 //! See the field crates for details on these implementations.
 
-use generic_array::typenum::Unsigned;
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::typenum::Unsigned;
+use hybrid_array::{Array, ArraySize};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
     io::{Read, Write},
@@ -60,7 +60,7 @@ pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
 
     /// The number of bytes in the byte representation for this
     /// element.
-    type ByteReprLen: ArrayLength;
+    type ByteReprLen: ArraySize;
     /// The error that can result from trying to decode an invalid
     /// byte sequence.
     type FromBytesError: std::error::Error + Send + Sync + 'static;
@@ -68,14 +68,12 @@ pub trait CanonicalSerialize: 'static + Copy + Serialize + DeserializeOwned {
     ///
     /// NOTE: for security purposes, this function will accept exactly
     /// one byte sequence for each element.
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError>;
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError>;
     /// Serialize an element into a byte array.
     ///
     /// Consider using [`Self::Serializer`] if you need to serialize
     /// several elements.
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen>;
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen>;
 }
 
 /// A way to serialize a sequence of elements.
@@ -144,7 +142,7 @@ impl<E: CanonicalSerialize> SequenceDeserializer<E> for ByteElementDeserializer<
     }
 
     fn read<R: Read>(&mut self, src: &mut R) -> std::io::Result<E> {
-        let mut buf: GenericArray<u8, E::ByteReprLen> = Default::default();
+        let mut buf: Array<u8, E::ByteReprLen> = Default::default();
         src.read_exact(&mut buf)?;
         E::from_bytes(&buf).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
@@ -177,22 +175,22 @@ pub use serde as __serde_for_macro;
 /// # Example
 /// ```
 /// use swanky_serialization::*;
-/// use generic_array::GenericArray;
+/// use hybrid_array::Array;
 /// #[derive(Clone, Copy)]
 /// pub struct Foo;
 /// impl CanonicalSerialize for Foo {
 ///     type Serializer = ByteElementSerializer<Self>;
 ///     type Deserializer = ByteElementDeserializer<Self>;
-///     type ByteReprLen = generic_array::typenum::U0;
+///     type ByteReprLen = hybrid_array::typenum::U0;
 ///     type FromBytesError = BytesDeserializationCannotFail;
 ///
 ///     fn from_bytes(
-///         _bytes: &GenericArray<u8, Self::ByteReprLen>,
+///         _bytes: &Array<u8, Self::ByteReprLen>,
 ///     ) -> Result<Self, Self::FromBytesError> {
 ///         Ok(Foo)
 ///     }
 ///
-///     fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+///     fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
 ///         Default::default()
 ///     }
 /// }
@@ -221,7 +219,7 @@ macro_rules! derive_serde_via_canonical_serialize {
                     type Value = $f;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        use generic_array::typenum::Unsigned;
+                        use hybrid_array::typenum::Unsigned;
                         write!(
                             formatter,
                             "a field element {} ({} bytes)",
@@ -234,11 +232,12 @@ macro_rules! derive_serde_via_canonical_serialize {
                         self,
                         v: &'de [u8],
                     ) -> Result<Self::Value, E> {
-                        use generic_array::typenum::Unsigned;
+                        use hybrid_array::typenum::Unsigned;
                         if v.len() != <$f as $crate::CanonicalSerialize>::ByteReprLen::USIZE {
                             return Err(E::invalid_length(v.len(), &self));
                         }
-                        let bytes = generic_array::GenericArray::from_slice(v);
+                        let bytes =
+                            hybrid_array::Array::try_from(v).expect("slice is correct size");
                         <$f as $crate::CanonicalSerialize>::from_bytes(&bytes)
                             .map_err($crate::__serde_for_macro::de::Error::custom)
                     }
@@ -248,7 +247,7 @@ macro_rules! derive_serde_via_canonical_serialize {
                         A: $crate::__serde_for_macro::de::SeqAccess<'de>,
                     {
                         use $crate::__serde_for_macro::de::Error;
-                        let mut bytes = generic_array::GenericArray::<
+                        let mut bytes = hybrid_array::Array::<
                             u8,
                             <$f as $crate::CanonicalSerialize>::ByteReprLen,
                         >::default();

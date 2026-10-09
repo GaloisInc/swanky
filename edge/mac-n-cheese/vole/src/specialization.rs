@@ -1,5 +1,5 @@
-use generic_array::GenericArray;
-use generic_array::typenum::Unsigned;
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 use swanky_field::{Degree, DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, SmallBinaryField};
 use swanky_rng::AesRng;
@@ -41,7 +41,7 @@ pub trait FiniteFieldSpecialization<VF: FiniteField + IsSubFieldOf<FE>, FE: Fini
     fn spsvole_sender_compute_va(
         rng_chi: &mut AesRng,
         spsvole_result: &[Self::SenderPairContents],
-    ) -> (FE, GenericArray<VF, DegreeModulo<VF, FE>>) {
+    ) -> (FE, Array<VF, DegreeModulo<VF, FE>>) {
         generic_spsvole_sender_compute_va::<VF, FE, Self>(rng_chi, spsvole_result)
     }
 }
@@ -105,8 +105,8 @@ fn generic_spsvole_sender_compute_va<
 >(
     rng_chi: &mut AesRng,
     spsvole_result: &[S::SenderPairContents],
-) -> (FE, GenericArray<VF, DegreeModulo<VF, FE>>) {
-    let mut x_stars: GenericArray<VF, DegreeModulo<VF, FE>> = Default::default();
+) -> (FE, Array<VF, DegreeModulo<VF, FE>>) {
+    let mut x_stars: Array<VF, DegreeModulo<VF, FE>> = Default::default();
     let mut va = FE::ZERO;
     for (u, w) in spsvole_result.iter().copied().map(S::extract_sender_pair) {
         let chi = FE::random(rng_chi);
@@ -275,7 +275,7 @@ where
     fn spsvole_sender_compute_va(
         rng_chi: &mut AesRng,
         spsvole_result: &[Self::SenderPairContents],
-    ) -> (FE, GenericArray<F2, Degree<FE>>) {
+    ) -> (FE, Array<F2, Degree<FE>>) {
         let mut x_stars = U64x2::ZERO;
         let mut acu = U64x2::ZERO;
         // 8 was choesn since the latency of a CLMUL on Skylake is 7 cycles

@@ -7,7 +7,7 @@ use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
 use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
 use crate::vole::convert_to_vole::{convert_to_vole_prover, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, Prg, Seed};
-use generic_array::{GenericArray, arr, typenum::U16};
+use hybrid_array::{Array, typenum::U16};
 use rand::RngExt;
 use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
@@ -298,14 +298,14 @@ pub(crate) fn vole_reconstruct(
 }
 
 // Compute the secret key delta from a challenge
-pub(crate) fn compute_secret_key(chall3: &Chall3) -> GenericArray<F8b, U16> {
+pub(crate) fn compute_secret_key(chall3: &Chall3) -> Array<F8b, U16> {
     // compute the big delta
     (0..REPETITION_PARAM)
         .map(|tau| {
             let delta_i = chal_dec(chall3, tau);
-            F8b::from_bytes(&arr![bools_to_u8(&delta_i)])
+            F8b::from_bytes(&Array([bools_to_u8(&delta_i)]))
         })
-        .collect::<Result<GenericArray<F8b, U16>, _>>()
+        .collect::<Result<Array<F8b, U16>, _>>()
         .unwrap()
 }
 

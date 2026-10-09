@@ -9,7 +9,7 @@ use crate::{
     party::{Party, Prover, Verifier, WhichParty},
     svole_trait::SvoleT,
 };
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use log::{debug, warn};
 use rand::{RngExt, SeedableRng};
 use swanky_block::Block;
@@ -674,7 +674,7 @@ where
                     chi_power *= chi;
                 }
 
-                let mut us = GenericArray::<_, DegreeModulo<V, T>>::default();
+                let mut us = Array::<_, DegreeModulo<V, T>>::default();
                 for u in us.iter_mut() {
                     *u = self.random(channel, rng)?;
                 }
@@ -714,7 +714,7 @@ where
                     chi_power *= chi;
                 }
 
-                let mut vs = GenericArray::<_, DegreeModulo<V, T>>::default();
+                let mut vs = Array::<_, DegreeModulo<V, T>>::default();
                 for v in vs.iter_mut() {
                     *v = self.random(channel, rng)?;
                 }
@@ -760,7 +760,7 @@ where
         channel: &mut C,
         rng: &mut SwankyRng,
     ) -> Result<Mac<P, T, T>> {
-        let mut macs = GenericArray::<_, DegreeModulo<V, T>>::default();
+        let mut macs = Array::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
             *mac = self.random(channel, rng)?;
         }

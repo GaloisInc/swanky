@@ -28,7 +28,7 @@ use crate::{
     dora::{Disjunction, Dora},
     gadgets::less_than_eq_with_public,
 };
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use log::{debug, info, warn};
 use rand::SeedableRng;
 use std::collections::hash_map::Entry;

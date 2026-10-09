@@ -4,10 +4,9 @@ use super::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use generic_array::functional::FunctionalSequence;
-use generic_array::sequence::Flatten;
-use generic_array::typenum::{self, Const, Prod, ToUInt, U, Unsigned};
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::Flatten;
+use hybrid_array::typenum::{self, Const, Prod, ToUInt, U, Unsigned};
+use hybrid_array::{Array, ArraySize};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -19,14 +18,14 @@ macro_rules! pod_impl {
             type ByteReprLen = U<{ std::mem::size_of::<$ty>() }>;
             type FromBytesError = BytesDeserializationCannotFail;
             fn from_bytes(
-                bytes: &GenericArray<u8, Self::ByteReprLen>,
+                bytes: &Array<u8, Self::ByteReprLen>,
             ) -> Result<Self, Self::FromBytesError> {
-                let arr: [u8; std::mem::size_of::<$ty>()] = bytes.into_array();
+                let arr: [u8; std::mem::size_of::<$ty>()] = bytes.0;
                 Ok(bytemuck::cast(arr))
             }
-            fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+            fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
                 let arr: [u8; std::mem::size_of::<$ty>()] = bytemuck::cast(*self);
-                GenericArray::from_array(arr)
+                Array(arr)
             }
         }
     )*};
@@ -75,9 +74,7 @@ impl CanonicalSerialize for usize {
     type Deserializer = ByteElementDeserializer<Self>;
     type ByteReprLen = <u64 as CanonicalSerialize>::ByteReprLen;
     type FromBytesError = ValueTooBigForUsize;
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         match u64::from_bytes(bytes) {
             Ok(x) => Self::try_from(x).map_err(|_| ValueTooBigForUsize),
             Err(e) => {
@@ -86,7 +83,7 @@ impl CanonicalSerialize for usize {
             }
         }
     }
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         ((*self) as u64).to_bytes()
     }
 }
@@ -106,9 +103,7 @@ impl CanonicalSerialize for isize {
     type Deserializer = ByteElementDeserializer<Self>;
     type ByteReprLen = <i64 as CanonicalSerialize>::ByteReprLen;
     type FromBytesError = ValueTooBigForIsize;
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         match i64::from_bytes(bytes) {
             Ok(x) => Self::try_from(x).map_err(|_| ValueTooBigForIsize),
             Err(e) => {
@@ -117,7 +112,7 @@ impl CanonicalSerialize for isize {
             }
         }
     }
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         ((*self) as i64).to_bytes()
     }
 }
@@ -128,34 +123,28 @@ impl CanonicalSerialize for () {
     type ByteReprLen = typenum::U0;
     type FromBytesError = BytesDeserializationCannotFail;
 
-    fn from_bytes(
-        _bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(_bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         Ok(())
     }
 
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         Default::default()
     }
 }
 
-impl<T: CanonicalSerialize, N: ArrayLength> CanonicalSerialize for GenericArray<T, N>
+impl<T: CanonicalSerialize, N: ArraySize> CanonicalSerialize for Array<T, N>
 where
-    <N as ArrayLength>::ArrayType<T>: Copy,
+    <N as ArraySize>::ArrayType<T>: Copy,
     <T as CanonicalSerialize>::ByteReprLen: std::ops::Mul<N>,
-    <<T as CanonicalSerialize>::ByteReprLen as std::ops::Mul<N>>::Output: ArrayLength,
+    <<T as CanonicalSerialize>::ByteReprLen as std::ops::Mul<N>>::Output: ArraySize,
 {
     type Serializer = ByteElementSerializer<Self>;
     type Deserializer = ByteElementDeserializer<Self>;
     type ByteReprLen = Prod<T::ByteReprLen, N>;
     type FromBytesError = T::FromBytesError;
 
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
-        let (chunks, remainder) = GenericArray::<u8, T::ByteReprLen>::chunks_from_slice(bytes);
-        let mut out: GenericArray<MaybeUninit<T>, N> = GenericArray::uninit();
-        debug_assert!(remainder.is_empty());
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
+        let mut out: Array<MaybeUninit<T>, N> = Array::uninit();
         if bytes.is_empty() {
             // We need to handle zero bytes separately. This only
             // occurs if:
@@ -172,6 +161,9 @@ where
                 dst.write(T::from_bytes(&Default::default())?);
             }
         } else {
+            let (chunks, remainder) = Array::<u8, T::ByteReprLen>::slice_as_chunks(bytes);
+            debug_assert!(remainder.is_empty());
+
             debug_assert_eq!(chunks.len(), N::USIZE);
             for (dst, chunk) in out.iter_mut().zip(chunks.iter()) {
                 dst.write(T::from_bytes(chunk)?);
@@ -179,11 +171,11 @@ where
         }
         Ok(unsafe {
             // SAFETY: we've initialized every element of the array.
-            GenericArray::assume_init(out)
+            Array::assume_init(out)
         })
     }
 
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         self.map(|x| x.to_bytes()).flatten()
     }
 }
@@ -194,25 +186,27 @@ where
 impl<T: CanonicalSerialize, const N: usize> CanonicalSerialize for [T; N]
 where
     Const<N>: ToUInt,
-    U<N>: ArrayLength,
-    <U<N> as ArrayLength>::ArrayType<T>: Copy,
+    U<N>: ArraySize,
+    <U<N> as ArraySize>::ArrayType<T>: Copy,
     <T as CanonicalSerialize>::ByteReprLen: std::ops::Mul<U<N>>,
-    <<T as CanonicalSerialize>::ByteReprLen as std::ops::Mul<U<N>>>::Output: ArrayLength,
+    <<T as CanonicalSerialize>::ByteReprLen as std::ops::Mul<U<N>>>::Output: ArraySize,
     [T; N]: Serialize + DeserializeOwned,
 {
     type Serializer = ByteElementSerializer<Self>;
     type Deserializer = ByteElementDeserializer<Self>;
-    type ByteReprLen = <GenericArray<T, U<N>> as CanonicalSerialize>::ByteReprLen;
-    type FromBytesError = <GenericArray<T, U<N>> as CanonicalSerialize>::FromBytesError;
+    type ByteReprLen = <Array<T, U<N>> as CanonicalSerialize>::ByteReprLen;
+    type FromBytesError = <Array<T, U<N>> as CanonicalSerialize>::FromBytesError;
 
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
-        Ok(GenericArray::<T, U<N>>::from_bytes(bytes)?.into_array())
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
+        Ok(*Array::<T, U<N>>::from_bytes(bytes)?
+            .as_array()
+            .expect("array is correct size"))
     }
 
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
-        GenericArray::<T, U<N>>::from_slice(self.as_slice()).to_bytes()
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
+        Array::<T, U<N>>::try_from(self.as_slice())
+            .expect("slice is correct size")
+            .to_bytes()
     }
 }
 

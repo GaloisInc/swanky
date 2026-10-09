@@ -94,7 +94,11 @@ pub trait CompilerFieldVisitor<Arg: FieldGenericType = ()> {
     fn visit<FE: CompilerField>(
         self,
         arg: Arg::Out<FE>,
-    ) -> <Self::Output as FieldGenericType>::Out<FE>;
+    ) -> <Self::Output as FieldGenericType>::Out<FE>
+    where
+        <<<FE as FiniteField>::NumberOfBitsInBitDecomposition as hybrid_array::ArraySize>::ArrayType<
+            bool,
+        > as IntoIterator>::IntoIter: DoubleEndedIterator;
 }
 
 // TODO: we can probably speed things up with a SmallFieldGenericProduct which contains Option<T>

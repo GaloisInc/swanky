@@ -32,7 +32,7 @@ swanky-serialization.workspace = true
 swanky-sieve-ir-api.workspace = true
 
 env_logger.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 itertools.workspace = true
 log.workspace = true
 merlin.workspace = true
