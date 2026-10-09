@@ -42,7 +42,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
             let otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot::<_, Vec<U8x16>>(
+                .ot::<Vec<U8x16>>(
                     PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
                     PartyPrivate::new(&ms),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
@@ -58,7 +58,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
             let otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
-                .ot::<U8x16, _>(
+                .ot(
                     PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::new(&mut res),

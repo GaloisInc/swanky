@@ -2967,7 +2967,6 @@ dependencies = [
  "swanky-error",
  "swanky-field-binary",
  "swanky-party",
- "swanky-serialization",
  "vectoreyes",
 ]
 

@@ -24,7 +24,6 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 use swanky_party::{either::PartyEither, private::PartyPrivate};
-use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
 swanky_party::party_system! {
@@ -122,10 +121,10 @@ pub trait OTRandom<P: Party>: OTInit<P> {
 ///   `Receiver` chooses)
 pub trait ObliviousTransfer<P: Party>: OTInit<P> {
     /// Run OT.
-    fn ot<T: CanonicalSerialize, O: Extend<T>>(
+    fn ot<O: Extend<U8x16>>(
         self,
         inputs: PartyEither<P, usize, &[F2]>,
-        values: PartyPrivate<Sender, P, &[[T; 2]]>,
+        values: PartyPrivate<Sender, P, &[[U8x16; 2]]>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,

@@ -27,7 +27,7 @@ fn bench_block_ot_inner<
             let mut rng = SwankyRng::new();
             let ot = OTSender::init(c, &mut rng).unwrap();
 
-            ot.ot::<_, Vec<U8x16>>(
+            ot.ot::<Vec<U8x16>>(
                 PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
                 PartyPrivate::new(&ms),
                 PartyPrivate::empty(Witness::EQUAL_TYPES),
@@ -42,7 +42,7 @@ fn bench_block_ot_inner<
             let mut rng = SwankyRng::new();
             let ot = OTReceiver::init(c, &mut rng).unwrap();
 
-            ot.ot::<U8x16, _>(
+            ot.ot(
                 PartyEither::new(Witness::EQUAL_TYPES, bs),
                 PartyPrivate::empty(Witness::EQUAL_TYPES),
                 PartyPrivate::new(&mut Vec::with_capacity(bs.len())),
