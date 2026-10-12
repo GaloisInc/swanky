@@ -23,9 +23,7 @@ use swanky_adversary::{Malicious, SemiHonest};
 use swanky_channel::Channel;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{
-    OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
-};
+use swanky_ot_traits_new::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
 use swanky_party::{
     either::PartyEither,
     private::{PartyPrivate, PartyPrivateCopy},
@@ -116,56 +114,6 @@ impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
         }
 
         Ok(self)
-    }
-}
-
-impl<P: Party> ObliviousTransfer<P> for ChouOrlandi<P> {
-    fn ot<O: Extend<U8x16>>(
-        self,
-        inputs: PartyEither<P, usize, &[F2]>,
-        values: PartyPrivate<Sender, P, &[[U8x16; 2]]>,
-        mut outputs: PartyPrivate<Receiver, P, &mut O>,
-        channel: &mut Channel,
-        rng: &mut impl CryptoRng,
-    ) -> swanky_error::Result<Self> {
-        let mut keys = Vec::with_capacity(
-            inputs
-                .clone()
-                .map(std::convert::identity, |bs| bs.len())
-                .into_inner_same(),
-        );
-
-        let ot = self.ot_random(inputs.clone(), &mut keys, channel, rng)?;
-
-        let keys = PartyEither::pull_either_outside(&keys);
-
-        let ot_inputs: PartyEither<P, &[[U8x16; 2]], &[F2]> = match P::WHICH {
-            WhichParty::Sender(ev) => PartyEither::new(ev, values.into_inner(ev)),
-            WhichParty::Receiver(ev) => PartyEither::new(ev, inputs.into_inner(ev)),
-        };
-
-        for ot_input in ot_inputs.zip(keys).map(
-            |(values, keys)| values.iter().zip(keys.iter()),
-            |(inputs, keys)| inputs.iter().zip(keys.iter()),
-        ) {
-            match P::WHICH {
-                WhichParty::Sender(ev) => {
-                    let (values, keys) = ot_input.into_inner(ev);
-                    let (c0, c1) = (keys[0] ^ values[0], keys[1] ^ values[1]);
-                    channel.write(&c0)?;
-                    channel.write(&c1)?;
-                }
-                WhichParty::Receiver(ev) => {
-                    let (&input, &key) = ot_input.into_inner(ev);
-                    let c0 = channel.read::<U8x16>()?;
-                    let c1 = channel.read::<U8x16>()?;
-                    let c = key ^ if input.into() { c1 } else { c0 };
-                    outputs.as_mut().into_inner(ev).extend(std::iter::once(c));
-                }
-            }
-        }
-
-        Ok(ot)
     }
 }
 
