@@ -42,8 +42,13 @@ fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
 
 /// The Chou-Orlandi (random) OT protocol.
 ///
-/// See the module-level documentation for more information / the
-/// paper this implementation is based on.
+/// Original paper: <https://eprint.iacr.org/2015/267>
+///
+/// This protocol is based on tweaking Diffie-Hellman key exchange,
+/// which takes advantage of the symmetry in group operations (and the
+/// hardness of the computational Diffie-Hellman problem) to securely
+/// communicate shared values between two parties, without having to
+/// communicate any private data directly.
 pub struct ChouOrlandi<P: Party> {
     counter: u128,
     y: PartyPrivateCopy<Sender, P, Scalar>,
