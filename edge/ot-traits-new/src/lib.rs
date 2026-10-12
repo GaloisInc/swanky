@@ -134,6 +134,25 @@ pub trait ObliviousTransfer<P: Party>: OTInit<P> {
 }
 
 impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
+    /// Standard construction of 1-out-of-2 OT from an [`OTRandom`]
+    /// protocol.
+    ///
+    /// For the sake of discussion, assume the [`Receiver`] has a
+    /// selection bit $`b`$, the [`Sender`] has messages $`m_0`$ and
+    /// $`m_1`$, and the `Receiver` wants to learn $`m_b`$.
+    ///
+    /// 1. Run [`OTRandom::ot_random`] with the given selection bit.
+    ///    The `Sender` generates and saves two values, $`x_0`$ and
+    ///    $`x_1`$, the `Receiver` learns $`x_b`$.
+    /// 2. `Sender` computes and sends $`\text{Enc}_{x_0}(m_0)`$ and
+    ///    $`\text{Enc}_{x_1}(m_1)`$.
+    ///    $`\text{Enc}`$ is agreed upon ahead of time.
+    /// 3. `Receiver` can only decrypt the message encrypted with $`x_b`$,
+    ///    which is $`m_b`$.
+    ///
+    /// In this implementation, multiple bits/message pairs are
+    /// supported, and the encryption scheme is a one-time pad (since
+    /// the messages and random keys are [`U8x16`]).
     fn ot<O: Extend<U8x16>>(
         self,
         inputs: PartyEither<P, usize, &[F2]>,
