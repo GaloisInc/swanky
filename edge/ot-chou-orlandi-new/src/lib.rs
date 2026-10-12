@@ -54,18 +54,26 @@ pub struct ChouOrlandi<P: Party> {
     y: PartyPrivateCopy<Sender, P, Scalar>,
     ys: PartyPrivateCopy<Sender, P, RistrettoPoint>,
     s: PartyPrivate<Receiver, P, RistrettoBasepointTable>,
+    zero: PartyPrivate<Receiver, P, RistrettoPoint>,
+    one: PartyPrivate<Receiver, P, RistrettoPoint>,
 }
 
 impl<P: Party> OTInit<P> for ChouOrlandi<P> {
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> swanky_error::Result<Self> {
         let y = PartyPrivateCopy::new_with(|| Scalar::random(rng));
         let s = channel.communicate(y.map(|y| &y * RISTRETTO_BASEPOINT_TABLE))?;
+        let ys = y.map(|y| y * s);
+        let s = PartyPrivate::new_with(|| RistrettoBasepointTable::create(&s));
+        let zero = s.as_ref().map(|s| &Scalar::ZERO * s);
+        let one = s.as_ref().map(|s| &Scalar::ONE * s);
 
         Ok(Self {
             counter: 0,
             y,
-            ys: y.map(|y| y * s),
-            s: PartyPrivate::new_with(|| RistrettoBasepointTable::create(&s)),
+            ys,
+            s,
+            zero,
+            one,
         })
     }
 }
@@ -78,9 +86,6 @@ impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
     ) -> swanky_error::Result<Self> {
-        let zero = self.s.as_ref().map(|s| &Scalar::ZERO * s);
-        let one = self.s.as_ref().map(|s| &Scalar::ONE * s);
-
         for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
             self.counter += 1;
 
@@ -89,8 +94,8 @@ impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
             let r = channel.communicate(
                 input
                     .zip(x.as_ref())
-                    .zip(zero.as_ref())
-                    .zip(one.as_ref())
+                    .zip(self.zero.as_ref())
+                    .zip(self.one.as_ref())
                     .map(|(((input, x), zero), one)| {
                         let c = ConditionallySelectable::conditional_select(
                             one,
