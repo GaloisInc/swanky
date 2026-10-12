@@ -32,7 +32,7 @@ use vectoreyes::U8x16;
 
 fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
-    U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+    U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).expect("The slice is exactly 16 bytes"))
 }
 
 /// The Chou-Orlandi (random) OT protocol.
