@@ -2963,8 +2963,10 @@ name = "swanky-ot-traits-new"
 version = "0.6.0"
 dependencies = [
  "rand 0.10.3",
+ "subtle",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-party",
  "vectoreyes",

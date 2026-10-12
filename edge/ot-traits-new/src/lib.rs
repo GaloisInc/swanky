@@ -19,9 +19,11 @@
 //! vice-versa).
 
 use rand::CryptoRng;
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_party::{either::PartyEither, private::PartyPrivate};
 use vectoreyes::U8x16;
@@ -171,7 +173,12 @@ impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
                     let (&input, &key) = ot_input.into_inner(ev);
                     let c0 = channel.read::<U8x16>()?;
                     let c1 = channel.read::<U8x16>()?;
-                    let c = key ^ if input.into() { c1 } else { c0 };
+                    let c = key
+                        ^ ConditionallySelectable::conditional_select(
+                            &c1,
+                            &c0,
+                            input.ct_eq(&F2::ZERO),
+                        );
                     outputs.as_mut().into_inner(ev).extend(std::iter::once(c));
                 }
             }
