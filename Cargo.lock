@@ -2905,6 +2905,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-ot-dummy-new"
+version = "0.6.0"
+
+[[package]]
 name = "swanky-ot-noar-pinkas"
 version = "0.6.0"
 dependencies = [
