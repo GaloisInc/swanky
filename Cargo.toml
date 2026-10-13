@@ -49,6 +49,7 @@ members = [
   "edge/oprf-traits",
   "edge/ot-alsz-kos",
   "edge/ot-chou-orlandi",
+  "edge/ot-chou-orlandi-new",
   "edge/ot-dummy",
   "edge/ot-noar-pinkas",
   "edge/ot-test",
@@ -127,6 +128,7 @@ swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
 swanky-oprf-traits = { path = "edge/oprf-traits" }
 swanky-ot-alsz-kos = { path = "edge/ot-alsz-kos" }
 swanky-ot-chou-orlandi = { path = "edge/ot-chou-orlandi" }
+swanky-ot-chou-orlandi-new = { path = "edge/ot-chou-orlandi-new" }
 swanky-ot-dummy = { path = "edge/ot-dummy" }
 swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
@@ -178,7 +180,7 @@ criterion = "0.8.2"
 crossbeam = "0.8.5"
 crossbeam-queue = "0.3.14"
 crypto-bigint = { version = "0.7.5", features = ["hybrid-array", "subtle"] }
-curve25519-dalek = { version = "5.0.0", features = ["rand_core"] }
+curve25519-dalek = { version = "5.0.0", features = ["rand_core", "serde"] }
 dhat = "0.3.3"
 digest = "0.11.3"
 env_logger = "0.11.11"

@@ -4,6 +4,7 @@ use super::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use hybrid_array::Flatten;
 use hybrid_array::typenum::{self, Const, Prod, ToUInt, U, Unsigned};
 use hybrid_array::{Array, ArraySize};
@@ -207,6 +208,51 @@ where
         Array::<T, U<N>>::try_from(self.as_slice())
             .expect("slice is correct size")
             .to_bytes()
+    }
+}
+
+impl CanonicalSerialize for CompressedRistretto {
+    type Serializer = ByteElementSerializer<Self>;
+    type Deserializer = ByteElementDeserializer<Self>;
+    type ByteReprLen = U<32>;
+    type FromBytesError = BytesDeserializationCannotFail;
+
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
+        Ok(CompressedRistretto::from_slice(bytes).expect("there are exactly 32 bytes"))
+    }
+
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
+        Array(self.to_bytes())
+    }
+}
+
+/// Non-canonical Ristretto point representation.
+#[derive(Debug, Clone, Copy)]
+pub struct NonCanonicalRistrettoEncoding;
+impl std::fmt::Display for NonCanonicalRistrettoEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A compressed Ristretto point was not the canonical encoding of the point"
+        )
+    }
+}
+impl std::error::Error for NonCanonicalRistrettoEncoding {}
+impl CanonicalSerialize for RistrettoPoint {
+    type Serializer = ByteElementSerializer<Self>;
+    type Deserializer = ByteElementDeserializer<Self>;
+    type ByteReprLen = U<32>;
+    type FromBytesError = NonCanonicalRistrettoEncoding;
+
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
+        CompressedRistretto::from_bytes(bytes)
+            .expect("byte deserialization cannot fail")
+            .decompress()
+            .ok_or(NonCanonicalRistrettoEncoding)
+    }
+
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
+        Array(self.compress().to_bytes())
     }
 }
 

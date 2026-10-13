@@ -643,6 +643,7 @@ dependencies = [
  "fiat-crypto",
  "rand_core 0.10.1",
  "rustc_version",
+ "serde",
  "subtle",
  "zeroize",
 ]
@@ -2869,6 +2870,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-ot-chou-orlandi-new"
+version = "0.6.0"
+dependencies = [
+ "blake3",
+ "criterion",
+ "curve25519-dalek",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "swanky-rng",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-ot-dummy"
 version = "0.6.0"
 dependencies = [
@@ -2941,11 +2963,12 @@ name = "swanky-ot-traits-new"
 version = "0.6.0"
 dependencies = [
  "rand 0.10.3",
+ "subtle",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-party",
- "swanky-serialization",
  "vectoreyes",
 ]
 
@@ -2984,6 +3007,7 @@ name = "swanky-serialization"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "curve25519-dalek",
  "hybrid-array",
  "proptest",
  "serde",
