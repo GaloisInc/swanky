@@ -46,25 +46,19 @@ where
 
 /// Fancy function that turns a slice of binary wires into a vector of BinaryBundle
 /// by grouping wires together according to the size of the element being bundled.
-pub fn wires_to_bundle<F>(x: &[F::Item], size: usize) -> Vec<BinaryBundle<F::Item>>
-where
-    F: Fancy + FancyBinary,
-{
+pub fn wires_to_bundle<F: Fancy>(x: &[F::Item], size: usize) -> Vec<BinaryBundle<F::Item>> {
     x.chunks(size)
         .map(|x_chunk| BinaryBundle::new(x_chunk.to_vec()))
         .collect()
 }
 
 /// Obliviously unmasks data by subtracting each mask from each element
-pub fn fancy_unmask<F>(
+pub fn fancy_unmask<F: FancyBinary>(
     f: &mut F,
     elements: &[BinaryBundle<F::Item>],
     masks: &[BinaryBundle<F::Item>],
     channel: &mut Channel,
-) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>>
-where
-    F: Fancy + FancyBinary,
-{
+) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>> {
     let mut res = Vec::new();
 
     for i in 0..elements.len() {
