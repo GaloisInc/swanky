@@ -299,6 +299,23 @@ mod tests {
                         );
                     }
                 }
+
+                #[test]
+                fn forked_rngs_are_not_the_same() {
+                    let seed = rng().random::<[u8; $seed_bytes]>();
+
+                    let mut rng_a = <$aes_rng>::from_seed(seed.into());
+                    let mut rng_b = rng_a.fork();
+                    let mut rng_c = rng_a.fork();
+
+                    let a = rng_a.random::<U8x16>();
+                    let b = rng_b.random::<U8x16>();
+                    let c = rng_c.random::<U8x16>();
+
+                    assert_ne!(a, b);
+                    assert_ne!(a, c);
+                    assert_ne!(b, c);
+                }
             }
         };
     }
