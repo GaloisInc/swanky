@@ -25,20 +25,19 @@ pub struct PsiEvaluator<RNG, B> {
 
 impl<RNG, B> PsiEvaluator<RNG, B>
 where
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng,
 {
     /// Creates a PsiEvaluator from a dedicated channel and rng
-    pub fn new(channel: &mut Channel, seed: RNG::Seed) -> swanky_error::Result<Self>
+    pub fn new(channel: &mut Channel, rng: &mut RNG) -> swanky_error::Result<Self>
     where
         Self: Sized,
     {
         Ok(PsiEvaluator {
-            ev: Evaluator::<RNG, OtReceiver, WireMod2>::new(channel, RNG::from_seed(seed))
-                .wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to create fancy evaluator.",
-                )?,
-            rng: RNG::from_seed(seed),
+            ev: Evaluator::<RNG, OtReceiver, WireMod2>::new(channel, rng.fork()).wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to create fancy evaluator.",
+            )?,
+            rng: rng.fork(),
             _base_psi: PhantomData,
         })
     }

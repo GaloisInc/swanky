@@ -19,15 +19,12 @@ const HASH_SIZE: usize = 8;
 /// The sender and receiver slices are assumed to be of the same size
 /// and ordered in such a way that if elements are shared between them
 /// then they will be in the same position.
-pub fn fancy_intersection_bit_vector<F>(
+pub fn fancy_intersection_bit_vector<F: FancyBinary>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> swanky_error::Result<Vec<F::Item>>
-where
-    F: Fancy + FancyBinary,
-{
+) -> swanky_error::Result<Vec<F::Item>> {
     sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))

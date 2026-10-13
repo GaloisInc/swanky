@@ -3,8 +3,7 @@ use popsicle::circuit_psi::{
     CircuitPsi, PAYLOAD_SIZE, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler,
     utils::*,
 };
-use rand::RngExt;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_rng::SwankyRng;
 
 const SET_SIZE: usize = 1 << 8;
@@ -18,9 +17,7 @@ pub fn psty_payload_sum(
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
             let mut rng = SwankyRng::new();
-            let mut gb_psi =
-                OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(rng.random::<u128>()))
-                    .unwrap();
+            let mut gb_psi = OpprfPsiGarbler::new(channel, &mut rng).unwrap();
 
             let intersection_results = gb_psi
                 .intersect_with_payloads(set_a, Some(payload_a), channel)
@@ -39,9 +36,7 @@ pub fn psty_payload_sum(
         |channel| {
             let mut rng = SwankyRng::new();
 
-            let mut ev_psi =
-                OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(rng.random::<u128>()))
-                    .unwrap();
+            let mut ev_psi = OpprfPsiEvaluator::<SwankyRng>::new(channel, &mut rng).unwrap();
             let intersection_results = ev_psi
                 .intersect_with_payloads(set_b, Some(payload_b), channel)
                 .unwrap();

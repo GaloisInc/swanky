@@ -24,19 +24,13 @@ pub struct PsiGarbler<RNG, B> {
     _base_psi: PhantomData<B>,
 }
 
-impl<RNG, B> PsiGarbler<RNG, B>
-where
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-{
+impl<RNG: CryptoRng + SeedableRng, B> PsiGarbler<RNG, B> {
     /// Creates a PsiGarbler from a dedicated channel and rng
-    pub fn new(channel: &mut Channel, seed: RNG::Seed) -> swanky_error::Result<Self>
-    where
-        Self: Sized,
-    {
+    pub fn new(channel: &mut Channel, rng: &mut RNG) -> swanky_error::Result<Self> {
         Ok(PsiGarbler {
-            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, RNG::from_seed(seed))
+            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, rng.fork())
                 .wrap_err(ErrorKind::InitializationError, "Failed to create garbler.")?,
-            rng: RNG::from_seed(seed),
+            rng: rng.fork(),
             _base_psi: PhantomData,
         })
     }
