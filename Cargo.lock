@@ -2905,6 +2905,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-ot-dummy-new"
+version = "0.6.0"
+dependencies = [
+ "rand 0.10.3",
+ "subtle",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-ot-noar-pinkas"
 version = "0.6.0"
 dependencies = [
