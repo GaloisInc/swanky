@@ -61,14 +61,17 @@ impl<P: Party> OTRandom<P> for Dummy<P> {
 }
 
 #[cfg(test)]
-use swanky_ot_traits_new::Sender;
+mod tests {
+    use super::*;
+    use swanky_ot_traits_new::Sender;
 
-#[test]
-fn test_random_functionality() {
-    swanky_ot_test_new::test_rotext::<Dummy<Sender>, Dummy<Receiver>>(128);
-}
+    #[test]
+    fn test_random_functionality() {
+        swanky_ot_test_new::test_rotext::<Dummy<Sender>, Dummy<Receiver>>(128);
+    }
 
-#[test]
-fn test_standard_functionality() {
-    swanky_ot_test_new::test_otext::<Dummy<Sender>, Dummy<Receiver>>(128);
+    #[test]
+    fn test_standard_functionality() {
+        swanky_ot_test_new::test_otext::<Dummy<Sender>, Dummy<Receiver>>(128);
+    }
 }
