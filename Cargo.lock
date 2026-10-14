@@ -2926,6 +2926,7 @@ version = "0.6.0"
 dependencies = [
  "blake3",
  "curve25519-dalek",
+ "swanky-ot-traits-new",
  "vectoreyes",
 ]
 

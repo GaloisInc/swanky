@@ -13,4 +13,5 @@ workspace = true
 [dependencies]
 blake3.workspace = true
 curve25519-dalek.workspace = true
+swanky-ot-traits-new.workspace = true
 vectoreyes.workspace = true
