@@ -18,7 +18,7 @@ use vectoreyes::U8x16;
 ///
 /// This implementation intentionally does not have desirable
 /// properties of an OT protocol; in particular, the choice bit is
-/// revealed to the [`Sender`].
+/// revealed to the `Sender`.
 pub struct Dummy<P: Party>(PhantomData<P>);
 
 impl<P: Party> OTInit<P> for Dummy<P> {
