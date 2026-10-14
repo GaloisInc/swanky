@@ -2908,7 +2908,6 @@ dependencies = [
 name = "swanky-ot-dummy-new"
 version = "0.6.0"
 dependencies = [
- "criterion",
  "rand 0.10.3",
  "subtle",
  "swanky-channel",
