@@ -2923,6 +2923,11 @@ dependencies = [
 [[package]]
 name = "swanky-ot-naor-pinkas-new"
 version = "0.6.0"
+dependencies = [
+ "blake3",
+ "curve25519-dalek",
+ "vectoreyes",
+]
 
 [[package]]
 name = "swanky-ot-noar-pinkas"
