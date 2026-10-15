@@ -23,10 +23,9 @@ use swanky_party::{
 };
 use vectoreyes::U8x16;
 
-/// Compute $`H(K, T)`$, where $`K`$ is a Ristretto point and $`T`$ is
-/// a tweak value.
-fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
-    let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
+/// Compute $`H(K)`$, where $`K`$ is a Ristretto point.
+fn hash_pt(pt: &RistrettoPoint) -> U8x16 {
+    let h = blake3::hash(pt.compress().as_bytes());
     U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).expect("The slice is exactly 16 bytes"))
 }
 
@@ -42,30 +41,24 @@ fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
 /// In contrast with the Chou-Orlandi protocol, however, Naor-Pinkas
 /// is semihonest (rather than malicious) secure.
 pub struct NaorPinkas<P: Party> {
-    counter: u128,
     pd: PhantomData<P>,
 }
 
 impl<P: Party> OTInit<P> for NaorPinkas<P> {
     fn init(_channel: &mut Channel, _rng: &mut impl CryptoRng) -> Result<Self> {
-        Ok(Self {
-            counter: 0,
-            pd: PhantomData,
-        })
+        Ok(Self { pd: PhantomData })
     }
 }
 
 impl<P: Party> OTRandom<P> for NaorPinkas<P> {
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
-        mut self,
+        self,
         inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         mut rng: &mut impl CryptoRng,
     ) -> Result<Self> {
         for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
-            self.counter += 1;
-
             let input: PartyPrivate<Receiver, P, _> = input.into();
 
             let c = channel.communicate::<Sender, P, _>(PartyPrivateCopy::new_with(|| {
@@ -96,14 +89,14 @@ impl<P: Party> OTRandom<P> for NaorPinkas<P> {
 
             match P::WHICH {
                 WhichParty::Sender(ev) => {
-                    let k0 = hash_pt(self.counter, &(pk.0 * r.into_inner(ev)));
-                    let k1 = hash_pt(self.counter, &(pk.1 * r.into_inner(ev)));
+                    let k0 = hash_pt(&(pk.0 * r.into_inner(ev)));
+                    let k1 = hash_pt(&(pk.1 * r.into_inner(ev)));
 
                     outputs.extend(std::iter::once(PartyEither::new(ev, [k0, k1])));
                 }
                 WhichParty::Receiver(ev) => outputs.extend(std::iter::once(PartyEither::new(
                     ev,
-                    hash_pt(self.counter, &(ei0 * k.as_ref().into_inner(ev))),
+                    hash_pt(&(ei0 * k.as_ref().into_inner(ev))),
                 ))),
             }
         }
