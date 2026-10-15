@@ -121,4 +121,9 @@ mod tests {
     fn test_random_functionality() {
         swanky_ot_test_new::test_rotext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
     }
+
+    #[test]
+    fn test_standard_functionality() {
+        swanky_ot_test_new::test_otext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
+    }
 }
