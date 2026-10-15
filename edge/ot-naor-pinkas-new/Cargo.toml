@@ -25,4 +25,9 @@ swanky-party.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 swanky-ot-test-new.workspace = true
+
+[[bench]]
+name = "ot"
+harness = false

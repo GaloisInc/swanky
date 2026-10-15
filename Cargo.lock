@@ -2925,6 +2925,7 @@ name = "swanky-ot-naor-pinkas-new"
 version = "0.6.0"
 dependencies = [
  "blake3",
+ "criterion",
  "curve25519-dalek",
  "rand 0.10.3",
  "subtle",
