@@ -2927,9 +2927,14 @@ dependencies = [
  "blake3",
  "curve25519-dalek",
  "rand 0.10.3",
+ "subtle",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-test-new",
  "swanky-ot-traits-new",
+ "swanky-party",
  "vectoreyes",
 ]
 

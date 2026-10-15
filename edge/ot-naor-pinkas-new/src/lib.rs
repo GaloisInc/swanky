@@ -7,12 +7,19 @@
 
 use std::marker::PhantomData;
 
-use curve25519_dalek::RistrettoPoint;
+use curve25519_dalek::{RistrettoPoint, Scalar, constants::RISTRETTO_BASEPOINT_TABLE};
 use rand::CryptoRng;
 
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_channel::Channel;
 use swanky_error::Result;
-use swanky_ot_traits_new::{OTInit, Party};
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
+use swanky_ot_traits_new::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
+use swanky_party::{
+    either::PartyEither,
+    private::{PartyPrivate, PartyPrivateCopy},
+};
 use vectoreyes::U8x16;
 
 /// Compute `$H(K, T)$`, where `$K$` is a Ristretto point and `$T$` is
@@ -48,5 +55,70 @@ impl<P: Party> OTInit<P> for NaorPinkas<P> {
         })
     }
 }
+
+impl<P: Party> OTRandom<P> for NaorPinkas<P> {
+    fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
+        mut self,
+        inputs: PartyEither<P, usize, &[F2]>,
+        outputs: &mut O,
+        channel: &mut Channel,
+        mut rng: &mut impl CryptoRng,
+    ) -> Result<Self> {
+        for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
+            self.counter += 1;
+
+            let input: PartyPrivate<Receiver, P, _> = input.into();
+
+            let c = channel.communicate::<Sender, P, _>(PartyPrivateCopy::new_with(|| {
+                RistrettoPoint::random(&mut rng)
+            }))?;
+
+            let k: PartyPrivate<Receiver, P, _> =
+                PartyPrivate::new_with(|| Scalar::random(&mut rng));
+            let pk0 = channel.communicate(
+                input
+                    .zip(k.as_ref())
+                    .map(|(input, k)| {
+                        let pk = k * RISTRETTO_BASEPOINT_TABLE;
+                        let pk_ = c - pk;
+                        ConditionallySelectable::conditional_select(
+                            &pk_,
+                            &pk,
+                            input.ct_eq(&F2::ZERO),
+                        )
+                    })
+                    .into(),
+            )?;
+            let pk = (pk0, c - pk0);
+
+            let r: PartyPrivateCopy<Sender, P, _> =
+                PartyPrivateCopy::new_with(|| Scalar::random(&mut rng));
+            let ei0 = channel.communicate(r.map(|r| &r * RISTRETTO_BASEPOINT_TABLE))?;
+
+            match P::WHICH {
+                WhichParty::Sender(ev) => {
+                    let k0 = hash_pt(self.counter, &(pk.0 * r.into_inner(ev)));
+                    let k1 = hash_pt(self.counter, &(pk.1 * r.into_inner(ev)));
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, [k0, k1])));
+                }
+                WhichParty::Receiver(ev) => outputs.extend(std::iter::once(PartyEither::new(
+                    ev,
+                    hash_pt(self.counter, &(ei0 * k.as_ref().into_inner(ev))),
+                ))),
+            }
+        }
+
+        Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_random_functionality() {
+        swanky_ot_test_new::test_rotext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
     }
 }
