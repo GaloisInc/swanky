@@ -1,2 +1,4 @@
 #![deny(missing_docs)]
-//! An implementation of the Asharov-Lindell-Schneider-Zohner OT protocol
+//! Implementation of the Asharov-Lindell-Schneider-Zohner oblivious
+//! transfer extension protocol (cf.
+//! <https://eprint.iacr.org/2016/602>, Protocol 4).
