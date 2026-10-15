@@ -34,10 +34,11 @@ fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
 ///
 /// Original paper: <https://dl.acm.org/citation.cfm?id=365502>
 ///
-/// This protocol is based on earlier work by Bellare and Micali,
-/// making a tradeoff between communication and computation that makes
-/// the protocol more suitable for situations where many oblivious
-/// transfers are required.
+/// This protocol is based on earlier work by Bellare and Micali (cf.
+/// https://cseweb.ucsd.edu/~mihir/papers/niot.pdf), making a tradeoff
+/// between communication and computation that makes the protocol more
+/// suitable for situations where many oblivious transfers are
+/// required.
 /// In contrast with the Chou-Orlandi protocol, however, Naor-Pinkas
 /// is semihonest (rather than malicious) secure.
 pub struct NaorPinkas<P: Party> {
