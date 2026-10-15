@@ -1,7 +1,7 @@
 use super::WireSize;
 use crate::circuit_builder::PrototypeBuilder;
-use generic_array::GenericArray;
-use generic_array::typenum::Unsigned;
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 use std::{io::Write, marker::PhantomData};
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_serialization::CanonicalSerialize;
@@ -172,7 +172,10 @@ pub mod simple {
                     Ok(ReadWire {
                         which_input: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[0..4]).unwrap()),
                         which_wire: u32::from_le_bytes(<[u8; 4]>::try_from(&arg[4..8]).unwrap()),
-                        data: T::from_bytes(GenericArray::from_slice(&arg[8..])).wrap_err(
+                        data: T::from_bytes(
+                            &Array::try_from(&arg[8..]).expect("slice is correct size"),
+                        )
+                        .wrap_err(
                             ErrorKind::SerializationError,
                             "Failed to decode data bytes.",
                         )?,

@@ -1,5 +1,5 @@
 use crate::F2;
-use generic_array::GenericArray;
+use hybrid_array::{Array, typenum};
 use rand::{Rng, SeedableRng};
 use std::iter::FromIterator;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
@@ -9,12 +9,12 @@ use swanky_serialization::{
     ByteElementDeserializer, ByteElementSerializer, BytesDeserializationCannotFail,
     CanonicalSerialize,
 };
-use vectoreyes::U8x32;
+use vectoreyes::{U8x16, U8x32};
 
 #[cfg(test)]
 use swanky_polynomial::Polynomial;
 
-/// An element of the finite field $\textsf{GF}(2^{256})$ reduced over $x^{256} + x^{10} + x^5 + x^2 + 1$
+/// An element of the finite field $`\textsf{GF}(2^{256})`$ reduced over $`x^{256} + x^{10} + x^5 + x^2 + 1`$
 #[derive(Debug, Clone, Copy, Hash, Eq)]
 // We represent a 256-bit value using a pair of u128 in little-endian order. I.e., the coefficients
 // are stored as `[[x^0, ..., x^127], [x^128, ..., x^255]]`.
@@ -231,22 +231,24 @@ impl<'a> MulAssign<&'a F256b> for F256b {
 }
 
 impl FiniteRing for F256b {
-    fn from_uniform_bytes(x: &[u8; 16]) -> Self {
-        // NOTE: The trait fixes this input at 16 bytes.Therefore we populate the full width of the
-        // field element using ChaCha20.
-        let mut seed = [0; 32];
-        seed[0..16].copy_from_slice(x);
-        // AES key scheduling is slower than ChaCha20
-        // TODO: this is still quite slow.
-        Self::random(&mut rand_chacha::ChaCha20Rng::from_seed(seed))
+    fn from_uniform_bytes(seed: &[u8; 16]) -> Self {
+        Self::random(&mut swanky_rng::Aes128Rng::from_seed(U8x16::from(*seed)))
     }
 
     fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
         let mut bytes = [0; 32];
         rng.fill_bytes(&mut bytes[..]);
         F256b([
-            u128::from_le_bytes(bytes[..16].try_into().unwrap()),
-            u128::from_le_bytes(bytes[16..].try_into().unwrap()),
+            u128::from_le_bytes(
+                bytes[0..16]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
+            u128::from_le_bytes(
+                bytes[16..32]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
         ])
     }
 
@@ -257,21 +259,26 @@ impl FiniteRing for F256b {
 impl CanonicalSerialize for F256b {
     type Serializer = ByteElementSerializer<Self>;
     type Deserializer = ByteElementDeserializer<Self>;
-    type ByteReprLen = generic_array::typenum::U32;
+    type ByteReprLen = typenum::U32;
     type FromBytesError = BytesDeserializationCannotFail;
 
-    fn from_bytes(
-        bytes: &GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
-        // These unwraps are safe because `ByteReprLen` fixes the length at 32.
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         Ok(F256b([
-            u128::from_le_bytes(bytes[..16].try_into().unwrap()),
-            u128::from_le_bytes(bytes[16..].try_into().unwrap()),
+            u128::from_le_bytes(
+                bytes[0..16]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
+            u128::from_le_bytes(
+                bytes[16..32]
+                    .try_into()
+                    .expect("unreachable: failed to form u128 from 16 bytes"),
+            ),
         ]))
     }
 
-    fn to_bytes(&self) -> GenericArray<u8, Self::ByteReprLen> {
-        let mut out = GenericArray::default();
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
+        let mut out = Array::default();
         out[..16].copy_from_slice(&self.0[0].to_le_bytes());
         out[16..].copy_from_slice(&self.0[1].to_le_bytes());
         out
@@ -283,13 +290,11 @@ impl FiniteField for F256b {
 
     const GENERATOR: Self = F256b([2, 0]);
 
-    type NumberOfBitsInBitDecomposition = generic_array::typenum::U256;
+    type NumberOfBitsInBitDecomposition = typenum::U256;
 
-    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
         // `swanky_field::standard_bit_decomposition` only accepts a `u128`, so we walk the limbs.
-        GenericArray::from_iter(
-            (0..256).map(|shift| (self.0[shift / 128] >> (shift % 128)) & 1 == 1),
-        )
+        Array::from_iter((0..256).map(|shift| (self.0[shift / 128] >> (shift % 128)) & 1 == 1))
     }
 
     fn inverse(&self) -> Self {
@@ -334,16 +339,15 @@ impl From<F256b> for U8x32 {
 
 impl IsSubRingOf<F256b> for F2 {}
 impl IsSubFieldOf<F256b> for F2 {
-    type DegreeModulo = generic_array::typenum::U256;
-    fn decompose_superfield(fe: &F256b) -> GenericArray<Self, Self::DegreeModulo> {
-        GenericArray::from_iter(
-            (0..256).map(|shift| {
-                F2::try_from(((fe.0[shift / 128] >> (shift % 128)) & 1) as u8).unwrap()
-            }),
-        )
+    type DegreeModulo = typenum::U256;
+    fn decompose_superfield(fe: &F256b) -> Array<Self, Self::DegreeModulo> {
+        Array::from_iter((0..256).map(|shift| {
+            F2::try_from(((fe.0[shift / 128] >> (shift % 128)) & 1) as u8)
+                .expect("unreachable: failed to form F2 from 0 or 1")
+        }))
     }
 
-    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F256b {
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> F256b {
         let mut out = [0u128; 2];
         for (i, x) in components.iter().enumerate() {
             out[i / 128] |= u128::from(u8::from(*x)) << (i % 128);

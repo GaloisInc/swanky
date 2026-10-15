@@ -13,7 +13,7 @@ workspace = true
 [dependencies]
 blake3.workspace = true
 bytemuck.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 rand.workspace = true
 subtle.workspace = true
 swanky-adversary.workspace = true

@@ -8,7 +8,6 @@
 pub(crate) mod insecure;
 
 use crypto_primitives::Chall3;
-use generic_array::GenericArray;
 use hybrid_array::Array;
 use merlin::Transcript;
 use rand::CryptoRng;
@@ -53,7 +52,7 @@ pub(crate) fn lift<P: Params>(tags: &Array<F8b, RepetitionParam<P>>) -> FLambda<
 
     // This unwrap is safe because the length is fixed and deserializing a binary field element
     // cannot fail.
-    FLambda::<P>::from_bytes(GenericArray::<u8, SecurityParamBytes<P>>::from_slice(
+    FLambda::<P>::from_bytes(Array::<u8, SecurityParamBytes<P>>::from_slice(
         bytes.as_slice(),
     ))
     .unwrap()

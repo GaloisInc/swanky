@@ -2,8 +2,10 @@
 
 use crate::ring::{FiniteRing, IsSubRingOf};
 use crypto_bigint::{Limb, Uint};
-use generic_array::typenum;
-use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+use hybrid_array::{
+    Array, ArraySize,
+    typenum::{self, Unsigned},
+};
 use std::ops::{Div, DivAssign};
 use subtle::CtOption;
 
@@ -23,7 +25,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// ```
     ///
     /// See [`Self::bit_decomposition`] for the exact meaning of bit decomposition
-    type NumberOfBitsInBitDecomposition: ArrayLength;
+    type NumberOfBitsInBitDecomposition: ArraySize;
     /// Decompose the given field element into bits.
     ///
     /// This bit decomposition should be done according to [Weng et al., section 5](https://eprint.iacr.org/2020/925.pdf#section.5).
@@ -50,7 +52,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     ///
     /// Invoking the `bit_decomposition` function on `f` should yield the vector $`b`$ where a 0
     /// element of $`b`$ corresponds to `false` and a 1 element corresponds to `true`.
-    fn bit_decomposition(&self) -> GenericArray<bool, Self::NumberOfBitsInBitDecomposition>;
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition>;
     /// Compute the multiplicative inverse of self.
     ///
     /// # Panics
@@ -61,9 +63,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     ///
     /// See [`IsSubFieldOf`] for more info.
     #[inline]
-    fn decompose<T: FiniteField + IsSubFieldOf<Self>>(
-        &self,
-    ) -> GenericArray<T, DegreeModulo<T, Self>> {
+    fn decompose<T: FiniteField + IsSubFieldOf<Self>>(&self) -> Array<T, DegreeModulo<T, Self>> {
         T::decompose_superfield(self)
     }
     /// Create a field element from an array of subfield `T` elements.
@@ -71,7 +71,7 @@ pub trait FiniteField: FiniteRing + DivAssign<Self> + Div<Self, Output = Self> {
     /// See [`IsSubFieldOf`] for more info.
     #[inline]
     fn from_subfield<T: FiniteField + IsSubFieldOf<Self>>(
-        arr: &GenericArray<T, DegreeModulo<T, Self>>,
+        arr: &Array<T, DegreeModulo<T, Self>>,
     ) -> Self {
         T::form_superfield(arr)
     }
@@ -109,20 +109,20 @@ pub type DegreeModulo<A, B> = <A as IsSubFieldOf<B>>::DegreeModulo;
 /// [`FiniteField::decompose`], [`FiniteField::from_subfield`], or the type alias [`DegreeModulo`].
 pub trait IsSubFieldOf<FE: FiniteField>: FiniteField + IsSubRingOf<FE> {
     /// The value $`n`$ from above.
-    type DegreeModulo: ArrayLength;
+    type DegreeModulo: ArraySize;
     /// Turn `FE` into an array of `Self`, a subfield of `FE`.
-    fn decompose_superfield(fe: &FE) -> GenericArray<Self, Self::DegreeModulo>;
+    fn decompose_superfield(fe: &FE) -> Array<Self, Self::DegreeModulo>;
     /// Homomorphically lift an array of `Self` into an `FE`.
-    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> FE;
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> FE;
 }
 impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
-    type DegreeModulo = generic_array::typenum::U1;
+    type DegreeModulo = hybrid_array::typenum::U1;
     #[inline]
-    fn decompose_superfield(fe: &FE) -> GenericArray<Self, Self::DegreeModulo> {
-        GenericArray::from([*fe])
+    fn decompose_superfield(fe: &FE) -> Array<Self, Self::DegreeModulo> {
+        Array::from([*fe])
     }
     #[inline]
-    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> FE {
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> FE {
         components[0]
     }
 }
@@ -141,7 +141,7 @@ impl<FE: FiniteField> IsSubFieldOf<FE> for FE {
 /// All of the methods provided by this trait should run in constant time.
 pub trait PrimeFiniteField:
     FiniteField<PrimeField = Self>
-    + IsSubFieldOf<Self, DegreeModulo = generic_array::typenum::U1>
+    + IsSubFieldOf<Self, DegreeModulo = hybrid_array::typenum::U1>
     + std::convert::TryFrom<u128>
 {
     /// The minimum number of word-sized limbs needed to represent the modulus
@@ -202,8 +202,8 @@ macro_rules! field_ops {
 }
 
 /// Bit decomposition of `bits` into an array.
-pub fn standard_bit_decomposition<L: ArrayLength>(bits: u128) -> GenericArray<bool, L> {
-    let mut out: GenericArray<bool, L> = Default::default();
+pub fn standard_bit_decomposition<L: ArraySize>(bits: u128) -> Array<bool, L> {
+    let mut out: Array<bool, L> = Default::default();
     for (i, dst) in out.iter_mut().enumerate() {
         *dst = (bits & (1 << (i as u128))) != 0;
     }

@@ -9,7 +9,7 @@
 /// our macros need.
 #[doc(hidden)]
 pub mod __internal_macro_exports {
-    pub use generic_array;
+    pub use hybrid_array;
     pub use proptest;
     pub use swanky_field;
     pub use swanky_polynomial;

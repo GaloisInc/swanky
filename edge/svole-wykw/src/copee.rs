@@ -2,7 +2,7 @@
 //! <https://eprint.iacr.org/2020/925>, Figure 15).
 
 use super::utils::Powers;
-use generic_array::{GenericArray, functional::FunctionalSequence, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use rand::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
@@ -28,7 +28,7 @@ pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
 pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
-    choices: GenericArray<F2, FE::NumberOfBitsInBitDecomposition>,
+    choices: Array<F2, FE::NumberOfBitsInBitDecomposition>,
     aes_objs: Vec<Aes128EncryptOnly>,
     pows: Powers<FE>,
     twos: Vec<FE>,

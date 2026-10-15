@@ -33,7 +33,7 @@ macro_rules! test_field {
                 use super::FE;
                 use $crate::__internal_macro_exports::*;
                 use proptest::prelude::*;
-                use generic_array::{GenericArray, ArrayLength, typenum::Unsigned};
+                use hybrid_array::{Array, ArraySize, typenum::Unsigned};
                 use swanky_field::{Degree, FiniteField, FiniteRing, PrimeFiniteField};
                 use swanky_polynomial::Polynomial;
                 use swanky_serialization::CanonicalSerialize;
@@ -49,15 +49,15 @@ macro_rules! test_field {
                     }
                 }
 
-                fn make_polynomial_coefficients<L: ArrayLength>(
+                fn make_polynomial_coefficients<L: ArraySize>(
                     poly: &Polynomial<PF>,
-                ) -> GenericArray<PF, L> {
+                ) -> Array<PF, L> {
                     let mut slice = vec![PF::ZERO; L::USIZE];
                     slice[0] = poly.constant;
                     for (a, b) in slice[1..].iter_mut().zip(poly.coefficients.iter()) {
                         *a = *b;
                     }
-                    GenericArray::<PF, L>::from_slice(&slice[..]).clone()
+                    Array::<PF, L>::try_from(&slice[..]).expect("correct number of coefficients").clone()
                 }
 
                 fn any_fe() -> impl Strategy<Value = FE> {

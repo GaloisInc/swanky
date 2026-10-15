@@ -1,4 +1,4 @@
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use simple_arith_circuit::Circuit;
 use swanky_field::FiniteField;
 

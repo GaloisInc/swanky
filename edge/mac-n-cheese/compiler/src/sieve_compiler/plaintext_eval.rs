@@ -2,6 +2,7 @@ use std::{path::PathBuf, sync::Arc, time::Instant};
 
 use mac_n_cheese_wire_map::WireMap;
 use swanky_error::{ErrorKind, OptionExt, ResultExt, WrapErr};
+use swanky_field::FiniteField;
 use swanky_sieve_ir_parser::{RelationReader, ValueStreamKind, ValueStreamReader};
 
 use crate::sieve_compiler::{
@@ -36,7 +37,12 @@ impl<'a, 'b, 'c, VSR: ValueStreamReader> CompilerFieldVisitor<&'c FieldInstructi
     fn visit<FE: CompilerField>(
         self,
         instructions: &'c FieldInstructions<FE>,
-    ) -> swanky_error::Result<()> {
+    ) -> swanky_error::Result<()>
+    where
+        <<<FE as FiniteField>::NumberOfBitsInBitDecomposition as hybrid_array::ArraySize>::ArrayType<
+            bool,
+        > as IntoIterator>::IntoIter: DoubleEndedIterator,
+    {
         let mut witness_buf = Vec::<FE>::with_capacity(1);
         let wm = self.wm.as_mut().get::<FE>();
         let public_inputs = self.public_inputs.as_mut().get::<FE>();
@@ -279,7 +285,7 @@ fn eval<VSR: ValueStreamReader>(
                 }
                 impl<'a, 'b> CompilerFieldVisitor for &'_ mut V<'a, 'b> {
                     type Output = InvariantType<swanky_error::Result<()>>;
-                    fn visit<FE: CompilerField>(self, _arg: ()) -> swanky_error::Result<()> {
+                    fn visit<FE: CompilerField>(self, _arg: ()) -> swanky_error::Result<()> where <<<FE as FiniteField>::NumberOfBitsInBitDecomposition as hybrid_array::ArraySize>::ArrayType<bool> as IntoIterator>::IntoIter: DoubleEndedIterator{
                         let wm = self.wm.as_mut().get::<FE>();
 
                         for range in self.out_ranges.iter() {

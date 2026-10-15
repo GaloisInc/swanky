@@ -29,7 +29,7 @@ swanky-field.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-field-fft.workspace = true
 swanky-polynomial.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 digest.workspace = true
 simple-arith-circuit = { workspace = true, features = ["serde"] }
 bincode.workspace = true

@@ -1,4 +1,4 @@
-use generic_array::{GenericArray, typenum::U128};
+use hybrid_array::{Array, typenum::U128};
 use rand::RngExt;
 
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
@@ -82,18 +82,16 @@ impl<'a> MulAssign<&'a F8b> for F8b {
 }
 
 impl CanonicalSerialize for F8b {
-    type ByteReprLen = generic_array::typenum::U1;
+    type ByteReprLen = hybrid_array::typenum::U1;
     type FromBytesError = BytesDeserializationCannotFail;
     type Serializer = swanky_serialization::ByteElementSerializer<Self>;
     type Deserializer = swanky_serialization::ByteElementDeserializer<Self>;
 
-    fn from_bytes(
-        bytes: &generic_array::GenericArray<u8, Self::ByteReprLen>,
-    ) -> Result<Self, Self::FromBytesError> {
+    fn from_bytes(bytes: &Array<u8, Self::ByteReprLen>) -> Result<Self, Self::FromBytesError> {
         Ok(Self(bytes[0]))
     }
 
-    fn to_bytes(&self) -> generic_array::GenericArray<u8, Self::ByteReprLen> {
+    fn to_bytes(&self) -> Array<u8, Self::ByteReprLen> {
         [self.0].into()
     }
 }
@@ -113,11 +111,9 @@ impl FiniteField for F8b {
     type PrimeField = F2;
     /// The generator is $`g^4 + g + 1`$
     const GENERATOR: Self = Self(0b10011);
-    type NumberOfBitsInBitDecomposition = generic_array::typenum::U8;
+    type NumberOfBitsInBitDecomposition = hybrid_array::typenum::U8;
 
-    fn bit_decomposition(
-        &self,
-    ) -> generic_array::GenericArray<bool, Self::NumberOfBitsInBitDecomposition> {
+    fn bit_decomposition(&self) -> Array<bool, Self::NumberOfBitsInBitDecomposition> {
         swanky_field::standard_bit_decomposition(self.0 as u128)
     }
 
@@ -157,13 +153,13 @@ impl Mul<F8b> for F2 {
 }
 impl IsSubRingOf<F8b> for F2 {}
 impl IsSubFieldOf<F8b> for F2 {
-    type DegreeModulo = generic_array::typenum::U8;
+    type DegreeModulo = hybrid_array::typenum::U8;
 
-    fn decompose_superfield(fe: &F8b) -> GenericArray<Self, Self::DegreeModulo> {
-        GenericArray::from_iter((0..8).map(|shift| F2::try_from((fe.0 >> shift) & 1).unwrap()))
+    fn decompose_superfield(fe: &F8b) -> Array<Self, Self::DegreeModulo> {
+        Array::from_iter((0..8).map(|shift| F2::try_from((fe.0 >> shift) & 1).unwrap()))
     }
 
-    fn form_superfield(components: &GenericArray<Self, Self::DegreeModulo>) -> F8b {
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> F8b {
         let mut out = 0;
         for x in components.iter().rev() {
             out <<= 1;
@@ -177,7 +173,7 @@ impl IsSubFieldOf<F8b> for F2 {
 impl From<F8b> for F128b {
     fn from(value: F8b) -> Self {
         // TODO: performance optimize this
-        let mut arr: GenericArray<F8b, generic_array::typenum::U16> = Default::default();
+        let mut arr: Array<F8b, hybrid_array::typenum::U16> = Default::default();
         arr[0] = value;
         Self::from_subfield(&arr)
     }
@@ -192,9 +188,9 @@ impl Mul<F128b> for F8b {
 }
 impl IsSubRingOf<F128b> for F8b {}
 impl IsSubFieldOf<F128b> for F8b {
-    type DegreeModulo = generic_array::typenum::U16;
+    type DegreeModulo = hybrid_array::typenum::U16;
 
-    fn decompose_superfield(fe: &F128b) -> generic_array::GenericArray<Self, Self::DegreeModulo> {
+    fn decompose_superfield(fe: &F128b) -> Array<Self, Self::DegreeModulo> {
         // Bitwise multiply the conversion matrix with the input to ensure multiplication is
         // homomorphic between the types
         let converted_input = F128_TO_F8_16
@@ -202,7 +198,7 @@ impl IsSubFieldOf<F128b> for F8b {
             // This is a dot product!
             .map(|row| (row & fe.0).count_ones() % 2 == 1)
             .map(F2::from)
-            .collect::<GenericArray<_, U128>>();
+            .collect::<Array<_, U128>>();
 
         // Un-flatten the result
         // This unwrap is safe because the chunk size is hardcoded to 8 and the original array
@@ -213,9 +209,7 @@ impl IsSubFieldOf<F128b> for F8b {
             .collect()
     }
 
-    fn form_superfield(
-        components: &generic_array::GenericArray<Self, Self::DegreeModulo>,
-    ) -> F128b {
+    fn form_superfield(components: &Array<Self, Self::DegreeModulo>) -> F128b {
         // Flatten the input
         let mut input_bits = 0u128;
         for x in components.iter().rev() {
@@ -245,7 +239,7 @@ mod tests {
     use std::iter::zip;
 
     use super::*;
-    use generic_array::{GenericArray, typenum::U16};
+    use hybrid_array::{Array, typenum::U16};
     use proptest::{array::uniform16, prelude::*};
     use swanky_field::IsSubFieldOf;
     use swanky_field_test::arbitrary_ring;
@@ -270,10 +264,7 @@ mod tests {
         ];
         let expected: u128 = 219610548346926296185712982125207782468;
 
-        let components = a
-            .into_iter()
-            .map(u8_to_f8b)
-            .collect::<GenericArray<F8b, U16>>();
+        let components = a.into_iter().map(u8_to_f8b).collect::<Array<F8b, U16>>();
         let actual: F128b = F8b::form_superfield(&components);
 
         assert_eq!(actual.0, expected);
@@ -294,10 +285,7 @@ mod tests {
         }
     }
 
-    fn multiply_f8b_16_elements(
-        a: GenericArray<F8b, U16>,
-        b: GenericArray<F8b, U16>,
-    ) -> GenericArray<F8b, U16> {
+    fn multiply_f8b_16_elements(a: Array<F8b, U16>, b: Array<F8b, U16>) -> Array<F8b, U16> {
         // Represent the f8b_16 elements as coefficients for a polynomial
         let [a, b] = [a, b].array_map(|coeffs| Polynomial {
             constant: coeffs[0],
@@ -342,7 +330,7 @@ mod tests {
                 break;
             }
         }
-        let mut out: GenericArray<F8b, U16> = Default::default();
+        let mut out: Array<F8b, U16> = Default::default();
         out[0] = reduced_product.constant;
         out[1..1 + reduced_product.coefficients.len()]
             .copy_from_slice(&reduced_product.coefficients);
@@ -358,7 +346,7 @@ mod tests {
         let a = [0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
             .into_iter()
             .map(u8_to_f8b)
-            .collect::<GenericArray<F8b, U16>>();
+            .collect::<Array<F8b, U16>>();
 
         let a_squared = multiply_f8b_16_elements(a, a);
         for (e, a) in zip(expected_product, a_squared) {
@@ -410,8 +398,8 @@ mod tests {
     proptest! {
         #[test]
         fn superfield_homomorphism_works(a in uniform16(any_f8b()), b in uniform16(any_f8b())) {
-            let a: GenericArray<F8b, U16> = a.into();
-            let b: GenericArray<F8b, U16> = b.into();
+            let a: Array<F8b, U16> = a.into();
+            let b: Array<F8b, U16> = b.into();
 
             // superfield(a * b)
             let expected: F128b = F8b::form_superfield(&multiply_f8b_16_elements(a, b));

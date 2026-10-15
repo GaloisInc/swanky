@@ -19,12 +19,13 @@
 //! vice-versa).
 
 use rand::CryptoRng;
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_party::{either::PartyEither, private::PartyPrivate};
-use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
 swanky_party::party_system! {
@@ -61,16 +62,14 @@ pub trait OTCorrelated<P: Party>: OTInit<P> {
     /// and vice-versa).
     /// When implementing this functionality,
     /// [`swanky_party::OppositeParty`] may be useful.
-    fn ot_correlated<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, U8x16, U8x16>>>(
+    fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
         self,
-        inputs: PartyEither<P, usize, I>,
+        inputs: PartyEither<P, usize, &[F2]>,
         delta: PartyPrivate<P, Sender, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>
-    where
-        I::IntoIter: ExactSizeIterator;
+    ) -> Result<Self>;
 }
 
 /// OT protocols where the messages are random.
@@ -100,15 +99,13 @@ pub trait OTRandom<P: Party>: OTInit<P> {
     /// messages that they selected (i.e. the entries in the pairs
     /// generated on the `Sender` side corresponding to their
     /// selection bits).
-    fn ot_random<I: IntoIterator<Item = F2>, O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
+    fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         self,
-        inputs: PartyEither<P, usize, I>,
+        inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>
-    where
-        I::IntoIter: ExactSizeIterator;
+    ) -> Result<Self>;
 }
 
 /// 1-out-of-2 OT protocols.
@@ -126,19 +123,86 @@ pub trait OTRandom<P: Party>: OTInit<P> {
 ///   `Receiver` chooses)
 pub trait ObliviousTransfer<P: Party>: OTInit<P> {
     /// Run OT.
-    fn ot<
-        I: IntoIterator<Item = F2>,
-        V: IntoIterator<Item = [T; 2]>,
-        T: CanonicalSerialize,
-        O: Extend<T>,
-    >(
+    fn ot<O: Extend<U8x16>>(
         self,
-        inputs: PartyPrivate<Receiver, P, I>,
-        values: PartyPrivate<Sender, P, V>,
+        inputs: PartyEither<P, usize, &[F2]>,
+        values: PartyPrivate<Sender, P, &[[U8x16; 2]]>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>
-    where
-        I::IntoIter: ExactSizeIterator;
+    ) -> Result<Self>;
+}
+
+impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
+    /// Standard construction of 1-out-of-2 OT from an [`OTRandom`]
+    /// protocol.
+    ///
+    /// For the sake of discussion, assume the [`Receiver`] has a
+    /// selection bit $`b`$, the [`Sender`] has messages $`m_0`$ and
+    /// $`m_1`$, and the `Receiver` wants to learn $`m_b`$.
+    ///
+    /// 1. Run [`OTRandom::ot_random`] with the given selection bit.
+    ///    The `Sender` generates and saves two values, $`x_0`$ and
+    ///    $`x_1`$, the `Receiver` learns $`x_b`$.
+    /// 2. `Sender` computes and sends $`\text{Enc}_{x_0}(m_0)`$ and
+    ///    $`\text{Enc}_{x_1}(m_1)`$.
+    ///    $`\text{Enc}`$ is agreed upon ahead of time.
+    /// 3. `Receiver` can only decrypt the message encrypted with $`x_b`$,
+    ///    which is $`m_b`$.
+    ///
+    /// In this implementation, multiple bits/message pairs are
+    /// supported, and the encryption scheme is a one-time pad (since
+    /// the messages and random keys are [`U8x16`]).
+    fn ot<O: Extend<U8x16>>(
+        self,
+        inputs: PartyEither<P, usize, &[F2]>,
+        values: PartyPrivate<Sender, P, &[[U8x16; 2]]>,
+        mut outputs: PartyPrivate<Receiver, P, &mut O>,
+        channel: &mut Channel,
+        rng: &mut impl CryptoRng,
+    ) -> Result<Self> {
+        let mut keys = Vec::with_capacity(
+            inputs
+                .clone()
+                .map(std::convert::identity, |bs| bs.len())
+                .into_inner_same(),
+        );
+
+        let ot = self.ot_random(inputs.clone(), &mut keys, channel, rng)?;
+
+        let keys = PartyEither::pull_either_outside(&keys);
+
+        let ot_inputs: PartyEither<P, &[[U8x16; 2]], &[F2]> = match P::WHICH {
+            WhichParty::Sender(ev) => PartyEither::new(ev, values.into_inner(ev)),
+            WhichParty::Receiver(ev) => PartyEither::new(ev, inputs.into_inner(ev)),
+        };
+
+        for ot_input in ot_inputs.zip(keys).map(
+            |(values, keys)| values.iter().zip(keys.iter()),
+            |(inputs, keys)| inputs.iter().zip(keys.iter()),
+        ) {
+            match P::WHICH {
+                WhichParty::Sender(ev) => {
+                    let (values, keys) = ot_input.into_inner(ev);
+                    let (c0, c1) = (keys[0] ^ values[0], keys[1] ^ values[1]);
+                    channel.write(&c0)?;
+                    channel.write(&c1)?;
+                }
+                WhichParty::Receiver(ev) => {
+                    let (&input, &key) = ot_input.into_inner(ev);
+                    let c0 = channel.read::<U8x16>()?;
+                    let c1 = channel.read::<U8x16>()?;
+                    let c = key
+                        ^ ConditionallySelectable::conditional_select(
+                            &c1,
+                            &c0,
+                            input.ct_eq(&F2::ZERO),
+                        );
+                    outputs.as_mut().into_inner(ev).extend(std::iter::once(c));
+                }
+            }
+        }
+
+        Ok(ot)
+    }
 }

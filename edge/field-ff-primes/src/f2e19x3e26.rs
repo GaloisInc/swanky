@@ -12,8 +12,8 @@ crate::prime_field_using_ff::prime_field_using_ff!(
     generator = "7",
     limbs = 1,
     actual_limbs = 1,
-    num_bytes = generic_array::typenum::U8,
-    num_bits = generic_array::typenum::U61,
+    num_bytes = hybrid_array::typenum::U8,
+    num_bits = hybrid_array::typenum::U61,
     single_limb_modulus = 1332669751402954753
 );
 

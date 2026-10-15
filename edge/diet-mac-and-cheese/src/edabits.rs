@@ -4,7 +4,7 @@ use crate::homcom::{BATCH_SIZE, FCom, MultCheckState, ZeroCheckState};
 use crate::mac::Mac;
 use crate::party::{Party, Prover, Verifier, WhichParty};
 use crate::svole_trait::{SvoleT, field_name};
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use log::info;
 use rand::{RngExt, SeedableRng};
 use std::io::{BufReader, BufWriter};

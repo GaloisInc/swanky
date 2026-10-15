@@ -10,7 +10,6 @@
 //! The documentation references the shorthand names used in the paper; all these references are
 //! to [Baum et al.](https://eprint.iacr.org/2023/996.pdf).
 
-use generic_array::{ArrayLength, GenericArray};
 use hybrid_array::typenum::{PartialQuot, Prod, Sub1, Sum, U2, U3, U6, U8, U16, Unsigned};
 use hybrid_array::{Array, ArraySize};
 use rand::{CryptoRng, SeedableRng};
@@ -43,10 +42,10 @@ pub trait Params: Clone + Copy + core::fmt::Debug + Default + 'static {
     /// Section 6.2 actually allows the input polynomials to be defined over an extension field
     /// $`\mathbb F_{p^k}`$, for some $`k`$. For ease of implementation, we restrict the input
     /// polynomials to be over $`\mathbb F_p`$.
-    type SecurityParam: ArraySize + ArrayLength;
+    type SecurityParam: ArraySize;
 
     /// The size of an [`FLambda`] element in bytes.
-    type SecurityParamBytes: ArraySize + ArrayLength;
+    type SecurityParamBytes: ArraySize;
 
     /// The repetition parameter ($`\tau`$ in the paper).
     ///
@@ -87,7 +86,7 @@ pub trait Params: Clone + Copy + core::fmt::Debug + Default + 'static {
     fn new_prng(seed: &Array<u8, SecurityParamBytes<Self>>) -> Self::Prng;
 
     /// Homomorphically lift $`\lambda`$ [`F2`] values into a [`Params::FLambda`].
-    fn f2_form_superfield(bits: &GenericArray<F2, SecurityParam<Self>>) -> Self::FLambda;
+    fn f2_form_superfield(bits: &Array<F2, SecurityParam<Self>>) -> Self::FLambda;
 
     /// Multiply a [`Params::FLambda`] by an [`F2`] from its prime subfield.
     fn f2_scale(bit: F2, x: Self::FLambda) -> Self::FLambda;
@@ -185,7 +184,7 @@ macro_rules! declare_binary_extension_params {
                 Self::Prng::from_seed(seed.0.into())
             }
 
-            fn f2_form_superfield(bits: &GenericArray<F2, SecurityParam<Self>>) -> Self::FLambda {
+            fn f2_form_superfield(bits: &Array<F2, SecurityParam<Self>>) -> Self::FLambda {
                 F2::form_superfield(bits)
             }
 

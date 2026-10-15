@@ -10,9 +10,9 @@ use crate::parameters::{
 };
 use crate::vole::commit_reconstruct::{B, l_hat};
 use crate::vole::crypto_primitives::Chall1;
-use generic_array::GenericArray;
+use hybrid_array::ArraySize;
 use hybrid_array::typenum::{U2, Unsigned};
-use hybrid_array::{Array, ArraySize};
+use hybrid_array::Array;
 use itertools::izip;
 use rayon::prelude::*;
 use swanky_field::{FiniteField, FiniteRing};
@@ -27,8 +27,9 @@ type FLambdaFromBytesError<P> = <FLambda<P> as CanonicalSerialize>::FromBytesErr
 pub(crate) fn flambda_from_bytes_array<P: Params>(
     arr: &[u8],
 ) -> Result<FLambda<P>, FLambdaFromBytesError<P>> {
-    let garr = GenericArray::<u8, SecurityParamBytes<P>>::from_slice(arr);
-    FLambda::<P>::from_bytes(garr)
+    let garr = Array::<u8, SecurityParamBytes<P>>::try_from(arr)
+        .expect("wrong number of bytes to create an FLambda element");
+    FLambda::<P>::from_bytes(&garr)
 }
 
 /// Packs bits of the input into `FLambda<P>`s. This does not do a field-to-field transformation;
@@ -284,11 +285,13 @@ impl<P: Params> VoleHasher<P> {
         // Note: In the spec, `t` is 64 bits; here it's called `s1` and is a full field element,
         // which is why `CHALL1_LENGTH` is 6 * lambda bits rather than the spec's 5 * lambda + 64.
         let field_at = |i: usize| {
-            let bytes =
-                &seed[i * SecurityParamBytes::<P>::USIZE..(i + 1) * SecurityParamBytes::<P>::USIZE];
             // These panics/unwraps are unreachable: `CHALL1_LENGTH` is exactly six times the byte
             // length of an `FLambda<P>`, and deserializing a binary field element cannot fail.
-            FLambda::<P>::from_bytes(GenericArray::from_slice(bytes)).unwrap()
+            let bytes: Array<u8, SecurityParamBytes<P>> = Array::try_from(
+                &seed[i * SecurityParamBytes::<P>::USIZE..(i + 1) * SecurityParamBytes::<P>::USIZE],
+            )
+            .unwrap();
+            FLambda::<P>::from_bytes(&bytes).unwrap()
         };
         // Note: `s0` and `s1` are called `s` and `t` in the spec.
         let [r0, r1, r2, r3, s0, s1] = core::array::from_fn(field_at);
@@ -336,11 +339,11 @@ impl<P: Params> VoleHasher<P> {
         let h2 = self.r0 * h0 + self.r1 * h1;
         let h3 = self.r2 * h0 + self.r3 * h1;
 
-        // Line 14 (call ToBits and truncate).
+        // Line 14 (call ToBits).
         let h2_bits = h2.bit_decomposition();
         let h3_bits = h3.bit_decomposition();
 
-        // Line 14 (append).
+        // Line 14 (truncate and append).
         let all_bits: Array<bool, SecurityParamPadded<P>> = Array::try_from_iter(
             h2_bits
                 .iter()
@@ -559,11 +562,11 @@ impl<P: Params> VoleHasher<P> {
             }
         }
         for j in 0..SecurityParam::<P>::USIZE {
-            // Line 14 (call ToBits and truncate).
+            // Line 14 (call ToBits).
             let h2_bits = h2[j].bit_decomposition();
             let h3_bits = h3[j].bit_decomposition();
 
-            // Line 14 (append).
+            // Line 14 (truncate and append).
             let all_bits: Array<bool, SecurityParamPadded<P>> = Array::try_from_iter(
                 h2_bits
                     .iter()

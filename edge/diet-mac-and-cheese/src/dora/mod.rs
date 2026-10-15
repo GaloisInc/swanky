@@ -45,7 +45,7 @@ use crate::{
     svole_trait::SvoleT,
 };
 
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 
 // We periodically compact the trace to ensure a constant memory consumption.
 //

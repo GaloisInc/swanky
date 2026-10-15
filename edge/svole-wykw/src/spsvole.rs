@@ -4,7 +4,7 @@ use super::{
     ggm_utils::{ggm, ggm_prime, ggm_prime_temporary_storage_size, ggm_temporary_storage_size},
     utils::Powers,
 };
-use generic_array::typenum::Unsigned;
+use hybrid_array::typenum::Unsigned;
 use rand::{
     CryptoRng, RngExt, SeedableRng,
     distr::{Distribution, Uniform},
@@ -407,7 +407,7 @@ mod test {
         },
         SpsReceiver, SpsSender,
     };
-    use generic_array::typenum::Unsigned;
+    use hybrid_array::typenum::Unsigned;
     use std::{
         io::{BufReader, BufWriter},
         os::unix::net::UnixStream,

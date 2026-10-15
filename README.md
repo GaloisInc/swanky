@@ -65,7 +65,9 @@ have a lesser stability guarantee.
 - **`swanky-oprf-traits`**: Base traits impl-ed by all our OPRF implementations
 - **`swanky-ot-alsz-kos`**: Oblivious transfer implementations for the ALSZ and KOS protocols
 - **`swanky-ot-chou-orlandi`**: An implementation of the Chou-Orlandi OT protocol
+- **`swanky-ot-chou-orlandi-new`**: An implementation of the Chou-Orlandi OT protocol
 - **`swanky-ot-dummy`**: Implementation of an insecure OT protocol for testing purposes
+- **`swanky-ot-dummy-new`**: Implementation of an insecure OT protocol for testing purposes
 - **`swanky-ot-noar-pinkas`**: An implementation of the Noar-Pinkas OT protocol
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-test-new`**: Testing utilities for oblivious transfer protocols
