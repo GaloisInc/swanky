@@ -11,6 +11,7 @@ use curve25519_dalek::{RistrettoPoint, Scalar, constants::RISTRETTO_BASEPOINT_TA
 use rand::CryptoRng;
 
 use subtle::{ConditionallySelectable, ConstantTimeEq};
+use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -112,6 +113,8 @@ impl<P: Party> OTRandom<P> for NaorPinkas<P> {
         Ok(self)
     }
 }
+
+impl<P: Party> SemiHonest for NaorPinkas<P> {}
 
 #[cfg(test)]
 mod tests {

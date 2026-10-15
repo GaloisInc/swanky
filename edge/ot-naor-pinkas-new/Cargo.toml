@@ -15,6 +15,7 @@ blake3.workspace = true
 curve25519-dalek.workspace = true
 rand.workspace = true
 subtle.workspace = true
+swanky-adversary.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true

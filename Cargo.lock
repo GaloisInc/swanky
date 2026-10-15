@@ -2928,6 +2928,7 @@ dependencies = [
  "curve25519-dalek",
  "rand 0.10.3",
  "subtle",
+ "swanky-adversary",
  "swanky-channel",
  "swanky-error",
  "swanky-field",
