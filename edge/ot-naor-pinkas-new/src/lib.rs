@@ -41,12 +41,17 @@ fn hash_pt(pt: &RistrettoPoint) -> U8x16 {
 /// In contrast with the Chou-Orlandi protocol, however, Naor-Pinkas
 /// is semihonest (rather than malicious) secure.
 pub struct NaorPinkas<P: Party> {
+    c: RistrettoPoint,
     pd: PhantomData<P>,
 }
 
 impl<P: Party> OTInit<P> for NaorPinkas<P> {
-    fn init(_channel: &mut Channel, _rng: &mut impl CryptoRng) -> Result<Self> {
-        Ok(Self { pd: PhantomData })
+    fn init(channel: &mut Channel, mut rng: &mut impl CryptoRng) -> Result<Self> {
+        let c = channel.communicate::<Sender, P, _>(PartyPrivateCopy::new_with(|| {
+            RistrettoPoint::random(&mut rng)
+        }))?;
+
+        Ok(Self { c, pd: PhantomData })
     }
 }
 
@@ -61,10 +66,6 @@ impl<P: Party> OTRandom<P> for NaorPinkas<P> {
         for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
             let input: PartyPrivate<Receiver, P, _> = input.into();
 
-            let c = channel.communicate::<Sender, P, _>(PartyPrivateCopy::new_with(|| {
-                RistrettoPoint::random(&mut rng)
-            }))?;
-
             let k: PartyPrivate<Receiver, P, _> =
                 PartyPrivate::new_with(|| Scalar::random(&mut rng));
             let pk0 = channel.communicate(
@@ -72,7 +73,7 @@ impl<P: Party> OTRandom<P> for NaorPinkas<P> {
                     .zip(k.as_ref())
                     .map(|(input, k)| {
                         let pk = k * RISTRETTO_BASEPOINT_TABLE;
-                        let pk_ = c - pk;
+                        let pk_ = self.c - pk;
                         ConditionallySelectable::conditional_select(
                             &pk_,
                             &pk,
@@ -81,7 +82,7 @@ impl<P: Party> OTRandom<P> for NaorPinkas<P> {
                     })
                     .into(),
             )?;
-            let pk = (pk0, c - pk0);
+            let pk = (pk0, self.c - pk0);
 
             let r: PartyPrivateCopy<Sender, P, _> =
                 PartyPrivateCopy::new_with(|| Scalar::random(&mut rng));
