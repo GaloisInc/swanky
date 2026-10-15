@@ -35,10 +35,18 @@ fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
 /// transfers are required.
 /// In contrast with the Chou-Orlandi protocol, however, Naor-Pinkas
 /// is semihonest (rather than malicious) secure.
-pub struct NaorPinkas<P: Party>(PhantomData<P>);
+pub struct NaorPinkas<P: Party> {
+    counter: u128,
+    pd: PhantomData<P>,
+}
 
 impl<P: Party> OTInit<P> for NaorPinkas<P> {
     fn init(_channel: &mut Channel, _rng: &mut impl CryptoRng) -> Result<Self> {
-        Ok(Self(PhantomData))
+        Ok(Self {
+            counter: 0,
+            pd: PhantomData,
+        })
+    }
+}
     }
 }
