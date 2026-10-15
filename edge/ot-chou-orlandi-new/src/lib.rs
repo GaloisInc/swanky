@@ -30,7 +30,7 @@ use swanky_party::{
 };
 use vectoreyes::U8x16;
 
-/// Compute `$H(K, T)$`, where `$K$` is a Ristretto point and `$T$` is
+/// Compute $`H(K, T)`$, where $`K`$ is a Ristretto point and $`T`$ is
 /// a tweak value.
 ///
 /// This implementation is used to fix the bug referenced in the
