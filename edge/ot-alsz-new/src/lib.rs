@@ -10,7 +10,7 @@ use rand::{CryptoRng, SeedableRng};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
-use swanky_ot_traits_new::{ObliviousTransfer, Party, Receiver, Sender, WhichParty};
+use swanky_ot_traits_new::{OTInit, ObliviousTransfer, Party, Receiver, Sender, WhichParty};
 use swanky_party::{
     either::PartyEither,
     party_map::{PartyMap, map_evidence_party0, map_evidence_party1},
@@ -111,5 +111,13 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
             rngs,
             ot: PhantomData,
         })
+    }
+}
+
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for ALSZ<P, OT> {
+    fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self> {
+        let mut s_: PartyPrivate<Sender, P, _> = PartyPrivate::new([0u8; 16]);
+        s_.as_mut().map(|s_| rng.fill_bytes(s_));
+        ALSZ::init_fixed_key(s_, channel, rng)
     }
 }
