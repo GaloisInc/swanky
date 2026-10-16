@@ -23,7 +23,12 @@ use vectoreyes::U8x16;
 /// The Asharov-Lindell-Schneider-Zohner (random) OT protocol.
 ///
 /// Original paper: <https://eprint.iacr.org/2016/602>
-pub struct ALSZ<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> {
+pub struct ALSZ<
+    P: Party,
+    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi_new::ChouOrlandi<
+        PartyMap<P, Receiver, Sender>,
+    >,
+> {
     s: PartyPrivateCopy<Sender, P, [F2; 128]>,
     s_: PartyPrivateCopy<Sender, P, U8x16>,
     rngs: PartyEither<P, [SwankyRng; 128], [(SwankyRng, SwankyRng); 128]>,
