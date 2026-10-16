@@ -17,7 +17,7 @@ use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F8b};
 
-use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV, lift};
+use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV};
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -135,7 +135,7 @@ impl<P: Params> RandomVoleP for InsecureVole<P> {
         self.masks
             .iter()
             .skip(self.extended_witness_length)
-            .map(lift::<P>)
+            .map(P::f8_linear_bijection)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
@@ -150,7 +150,7 @@ impl<P: Params> RandomVoleP for InsecureVole<P> {
                 i
             );
         }
-        Ok(lift::<P>(&self.masks[i]))
+        Ok(P::f8_linear_bijection(&self.masks[i]))
     }
 
     fn decommit(self, _challenge: &Array<u8, SecurityParamBytes<P>>) -> Self::Decommitment {
@@ -248,7 +248,7 @@ impl<P: Params> RandomVoleV for InsecureCommitments<P> {
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
     fn verifier_key(&self) -> FLambda<P> {
-        lift::<P>(&self.verifier_key)
+        P::f8_linear_bijection(&self.verifier_key)
     }
 
     /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
@@ -266,7 +266,7 @@ impl<P: Params> RandomVoleV for InsecureCommitments<P> {
         self.verifier_commitments
             .iter()
             .skip(self.extended_witness_length)
-            .map(lift::<P>)
+            .map(P::f8_linear_bijection)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()

@@ -405,11 +405,10 @@ mod test {
                     VoleCommitment, apply_corrections_to_q, compute_secret_key, l_hat, vole_open,
                     vole_reconstruct,
                 };
-                use crate::parameters::FLambda;
+                use crate::parameters::{FLambda, Params};
                 use crate::vole::crypto_primitives::Chall3;
                 use crate::vole::crypto_primitives::H1;
                 use crate::vole::functionality::compute_seed_iv;
-                use crate::vole::lift;
                 use rand::rng;
                 use swanky_field::FiniteRing;
                 use swanky_field_binary::F2;
@@ -448,13 +447,13 @@ mod test {
 
                     // compute the big delta
                     let big_delta = compute_secret_key::<P>(&chall3);
-                    let big_delta_flambda: FLambda<P> = lift::<P>(&big_delta);
+                    let big_delta_flambda: FLambda<P> = P::f8_linear_bijection(&big_delta);
 
                     for pos in 0..how_many {
-                        let v_flambda: FLambda<P> = lift::<P>(&v[pos]);
+                        let v_flambda: FLambda<P> = P::f8_linear_bijection(&v[pos]);
                         assert_eq!(
                             v_flambda + u[pos] * big_delta_flambda,
-                            lift::<P>(&q_flambda[pos])
+                            P::f8_linear_bijection(&q_flambda[pos])
                         );
                     }
                 }

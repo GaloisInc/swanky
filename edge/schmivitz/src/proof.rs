@@ -25,7 +25,7 @@ use crate::{
         prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
         transcript::ChiGenerator,
     },
-    vole::{AsSecretBytes, RandomVoleP, RandomVoleV, lift},
+    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
@@ -277,7 +277,7 @@ where
                     .collect::<Vec<_>>()
                     .try_into()
                     .unwrap();
-                lift::<P>(&masked_witness)
+                P::f8_linear_bijection(&masked_witness)
             })
             .collect();
         log::info!("4: reconstructed voles with masks {:?}", t.elapsed());

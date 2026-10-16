@@ -18,7 +18,6 @@ use crate::vole::commit_reconstruct::{
 };
 use crate::vole::consistency_check::{HashConsistency, VoleHasher};
 use crate::vole::crypto_primitives::{Chall1, Chall3, Com, H1, H3, IV, Seed, h2_chall1};
-use crate::vole::lift;
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
 use rayon::prelude::*;
@@ -184,7 +183,7 @@ impl<P: Params> VoleProver<P> {
         let v_lifted = v
             .into_par_iter()
             .take(extended_witness_len + SecurityParam::<P>::USIZE)
-            .map(|vi| lift::<P>(&vi))
+            .map(|vi| P::f8_linear_bijection(&vi))
             .collect();
         log::info!("v_lifted running time: {:?}", t.elapsed());
 
@@ -383,10 +382,9 @@ mod test {
 
                 use super::super::{Chall1, Chall2, H1, HashConsistency};
                 use super::super::{VoleProver, VoleVerifier, verify};
-                use crate::parameters::{FLambda, SecurityParam, SecurityParamBytes, Xof};
+                use crate::parameters::{FLambda, Params, SecurityParam, SecurityParamBytes, Xof};
                 use crate::vole::consistency_check::flambda_from_bytes_array;
                 use crate::vole::functionality::compute_chall_3;
-                use crate::vole::lift;
                 use hybrid_array::{Array, typenum::Unsigned};
                 use rand::rng;
                 use rayon::prelude::*;
@@ -486,9 +484,12 @@ mod test {
                     log::info!("5: t_verify: {:?}", t_verify.elapsed());
 
                     let t_finalcheck = std::time::Instant::now();
-                    let delta_lifted: FLambda<P> = lift::<P>(&vole_v.delta);
-                    let q_lifted: Vec<FLambda<P>> =
-                        vole_v.q.into_par_iter().map(|qi| lift::<P>(&qi)).collect();
+                    let delta_lifted: FLambda<P> = P::f8_linear_bijection(&vole_v.delta);
+                    let q_lifted: Vec<FLambda<P>> = vole_v
+                        .q
+                        .into_par_iter()
+                        .map(|qi| P::f8_linear_bijection(&qi))
+                        .collect();
                     for pos in 0..how_many {
                         assert_eq!(v[pos] + u[pos] * delta_lifted, q_lifted[pos]);
                     }

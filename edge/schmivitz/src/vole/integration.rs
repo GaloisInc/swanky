@@ -1,5 +1,5 @@
 use super::crypto_primitives::Chall1;
-use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV, lift};
+use super::{AsSecretBytes, Chall3, RandomVoleP, RandomVoleV};
 use crate::parameters::{FLambda, Params, RepetitionParam, SecurityParam};
 use crate::vole::functionality::{PartialDecommitment, VoleProver, VoleVerifier};
 use crate::vole::{MaskLength, SecurityParamBytes};
@@ -121,7 +121,7 @@ impl<P: Params> RandomVoleV for VoleVerifier<P> {
     }
 
     fn verifier_key(&self) -> FLambda<P> {
-        lift::<P>(&self.delta)
+        P::f8_linear_bijection(&self.delta)
     }
 
     fn witness_voles(&self) -> &[Array<F8b, RepetitionParam<P>>] {
@@ -133,7 +133,7 @@ impl<P: Params> RandomVoleV for VoleVerifier<P> {
         let count = self.q.len();
         self.q[count - SecurityParam::<P>::USIZE..]
             .iter()
-            .map(lift::<P>)
+            .map(P::f8_linear_bijection)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()

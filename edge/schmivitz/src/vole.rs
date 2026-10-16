@@ -13,7 +13,6 @@ use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::Result;
 use swanky_field_binary::{F2, F8b};
-use swanky_serialization::CanonicalSerialize;
 
 use crate::parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes};
 
@@ -25,38 +24,6 @@ pub(crate) mod convert_to_vole;
 pub(crate) mod crypto_primitives;
 pub mod functionality;
 pub(crate) mod integration;
-
-/// Lift a $`\tau`$-length vector of [`F8b`] VOLE tags into a single [`FLambda`] element.
-///
-/// Each of the $`\tau`$ small-field VOLE instances contributes one [`F8b`] tag per correlation
-/// (see [`RandomVoleV::witness_voles()`]), but the degree-2 proof of Baum et al. Figure 7 works
-/// over $`\mathbb F_{2^\lambda}`$ and needs them as single elements.
-///
-/// Any $`\mathbb F_2`$-linear bijection is a valid choice here. The VOLE relation
-/// $`q = u \Delta + v`$ has $`u \in \mathbb F_2`$, so lifting each of $`u`$, $`v`$, $`q`$ and
-/// $`\Delta`$ with the same map preserves it; every later operation happens entirely inside
-/// [`FLambda`], identically on the prover's and the verifier's side.
-///
-/// We use the map that reads the $`\tau`$ tags as the low-to-high polynomial coefficients of the
-/// result, which makes the lift a byte copy: byte `i` of an [`FLambda`] holds exactly the
-/// coefficients of the `i`th [`F8b`].
-///
-/// Note that this is deliberately *not* the $`\mathbb F_{2^8}`$-tower isomorphism that
-/// [`swanky_field::IsSubFieldOf`] provides via `F8b::form_superfield`. That map is additionally a
-/// *ring* homomorphism, which this protocol never needs, and it costs a change-of-basis matrix
-/// multiply per lift rather than a copy.
-pub(crate) fn lift<P: Params>(tags: &Array<F8b, RepetitionParam<P>>) -> FLambda<P> {
-    // Since `REPETITION_PARAM * VOLE_SIZE_PARAM == SECURITY_PARAM`, there is exactly one tag byte
-    // per byte of an `FLambda`.
-    let bytes: Array<u8, RepetitionParam<P>> = tags.clone().map(|tag| tag.to_bytes()[0]);
-
-    // This unwrap is safe because the length is fixed and deserializing a binary field element
-    // cannot fail.
-    FLambda::<P>::from_bytes(Array::<u8, SecurityParamBytes<P>>::from_slice(
-        bytes.as_slice(),
-    ))
-    .unwrap()
-}
 
 /// Trait capturing the interface of serializable/deserializable Decommitment
 pub trait DecommitmentSerde {

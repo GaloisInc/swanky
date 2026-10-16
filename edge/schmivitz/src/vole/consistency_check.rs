@@ -10,9 +10,9 @@ use crate::parameters::{
 };
 use crate::vole::commit_reconstruct::{B, l_hat};
 use crate::vole::crypto_primitives::Chall1;
+use hybrid_array::Array;
 use hybrid_array::ArraySize;
 use hybrid_array::typenum::{U2, Unsigned};
-use hybrid_array::Array;
 use itertools::izip;
 use rayon::prelude::*;
 use swanky_field::{FiniteField, FiniteRing};

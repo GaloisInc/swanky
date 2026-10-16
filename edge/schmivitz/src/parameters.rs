@@ -15,7 +15,7 @@ use hybrid_array::{Array, ArraySize};
 use rand::{CryptoRng, SeedableRng};
 use shake::{ExtendableOutput, Shake128, Shake256};
 use swanky_field::{FiniteField, IsSubFieldOf};
-use swanky_field_binary::{F2, F128b, F256b};
+use swanky_field_binary::{F2, F8b, F128b, F256b};
 use swanky_rng::{Aes128Rng, Aes256Rng};
 use swanky_serialization::CanonicalSerialize;
 
@@ -93,6 +93,19 @@ pub trait Params: Clone + Copy + core::fmt::Debug + Default + 'static {
 
     /// Embed an [`F2`] into [`Params::FLambda`] as an element of its prime subfield.
     fn f2_embed(bit: F2) -> Self::FLambda;
+
+    /// Lift a $`\tau`$-length vector of [`F8b`] VOLE tags into a single [`FLambda`] element.
+    ///
+    /// Each of the $`\tau`$ small-field VOLE instances contributes one [`F8b`] tag per correlation
+    /// (see [`crate::vole::RandomVoleV::witness_voles()`]), but the degree-2 proof of Baum et al.
+    /// Figure 7 works over $`\mathbb F_{2^\lambda}`$ and needs them as single elements.
+    ///
+    /// Note that this does *not* require an [`F8b`] ring homomorphism. Any $`\mathbb F_2`$-linear
+    /// bijection is a valid choice here. The VOLE relation $`q = u \Delta + v`$ has $`u \in \mathbb
+    /// F_2`$, so lifting each of $`u`$, $`v`$, $`q`$ and $`\Delta`$ with the same map preserves it;
+    /// every later operation happens entirely inside [`FLambda`], identically on the prover's and
+    /// the verifier's side.
+    fn f8_linear_bijection(tags: &Array<F8b, Self::RepetitionParam>) -> Self::FLambda;
 }
 
 /// Convenience type to access [`Params::SecurityParam`].
@@ -195,11 +208,33 @@ macro_rules! declare_binary_extension_params {
             fn f2_embed(bit: F2) -> Self::FLambda {
                 bit.into()
             }
+
+            /// We use the map that reads the $`\tau`$ tags as the low-to-high polynomial coefficients of the
+            /// result, which makes the lift a byte copy: byte `i` of an [`FLambda`] holds exactly the
+            /// coefficients of the `i`th [`F8b`].
+            ///
+            /// Note that this is deliberately *not* the $`\mathbb F_{2^8}`$-tower isomorphism that
+            /// [`swanky_field::IsSubFieldOf`] provides via `F8b::form_superfield`. That map is additionally a
+            /// *ring* homomorphism, which this protocol never needs, and it costs a change-of-basis matrix
+            /// multiply per lift rather than a copy.
+            fn f8_linear_bijection(tags: &Array<F8b, Self::RepetitionParam>) -> Self::FLambda {
+                // Since `REPETITION_PARAM * VOLE_SIZE_PARAM == SECURITY_PARAM`, there is exactly one tag byte
+                // per byte of an `FLambda`.
+                let bytes: Array<u8, Self::RepetitionParam> = tags.clone().map(|tag| tag.to_bytes()[0]);
+                Self::FLambda::from_bytes(&bytes).expect("unreachable: RepetitionParam must equal ByteReprLen")
+            }
         }
 
         /// NOTE: [`SecurityParamBytes`] must equal $`\lceil \lambda / 8 \rceil`$.
         const _: () = assert!(
             SecurityParamBytes::<$name>::USIZE * 8 == SecurityParam::<$name>::USIZE
+        );
+
+        /// NOTE: [`RepetitionParam`] must equal [`SecurityParamBytes`] in order to use our [`F8b`]
+        /// linear bijection. This is always true, since we hard-code [`VoleSizeParam`] to [`U8`].
+        /// If this changes in  future implementation, this assert will fail.
+        const _: () = assert!(
+            RepetitionParam::<$name>::USIZE == SecurityParamBytes::<$name>::USIZE
         );
     }
 }
