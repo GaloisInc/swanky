@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 rand.workspace = true
+swanky-bit-matrix-transpose.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true

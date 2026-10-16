@@ -5,7 +5,7 @@
 
 use std::marker::PhantomData;
 
-use rand::{CryptoRng, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -111,6 +111,80 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
             rngs,
             ot: PhantomData,
         })
+    }
+
+    /// Perform initial setup communication.
+    ///
+    /// This corresponds to substeps (a) - (c) in Protocol 4 of the
+    /// paper linked above (<https://eprint.iacr.org/2016/602>); the
+    /// return value is the matrix $`Q`$.
+    pub fn setup(
+        &mut self,
+        m: usize,
+        r: PartyPrivateCopy<Receiver, P, &[u8]>,
+        channel: &mut Channel,
+    ) -> Result<Vec<u8>> {
+        const NROWS: usize = 128;
+        let ncols = m + (8 - m % 8) % 8;
+
+        let mut u = vec![0u8; ncols / 8];
+
+        let res = match P::WHICH {
+            WhichParty::Sender(ev) => {
+                let mut qs = vec![0u8; NROWS * ncols / 8];
+                let zero = vec![0u8; ncols / 8];
+
+                for (j, (&b, rng)) in self
+                    .s
+                    .as_ref()
+                    .into_inner(ev)
+                    .iter()
+                    .zip(self.rngs.as_mut().into_inner(ev).iter_mut())
+                    .enumerate()
+                {
+                    let range = j * ncols / 8..(j + 1) * ncols / 8;
+                    let q = &mut qs[range];
+
+                    channel
+                        .read_bytes(&mut u)
+                        .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
+
+                    rng.fill_bytes(q);
+
+                    q.iter_mut()
+                        .zip(if b.into() { u.iter() } else { zero.iter() })
+                        .for_each(|(a, &b)| *a ^= b);
+                }
+
+                qs
+            }
+            WhichParty::Receiver(ev) => {
+                let mut ts = vec![0u8; NROWS * ncols / 8];
+
+                for j in 0..self.rngs.as_ref().into_inner(ev).len() {
+                    let range = j * ncols / 8..(j + 1) * ncols / 8;
+                    let t = &mut ts[range];
+
+                    self.rngs.as_mut().into_inner(ev)[j].0.fill_bytes(t);
+                    self.rngs.as_mut().into_inner(ev)[j].1.fill_bytes(&mut u);
+
+                    u.iter_mut()
+                        .zip(t.iter().zip(r.into_inner(ev).iter()))
+                        .for_each(|(a, (&b, &c))| {
+                            *a ^= b;
+                            *a ^= c;
+                        });
+
+                    channel
+                        .write_bytes(&u)
+                        .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
+                }
+
+                ts
+            }
+        };
+
+        Ok(swanky_bit_matrix_transpose::transpose(&res, NROWS, ncols))
     }
 }
 
