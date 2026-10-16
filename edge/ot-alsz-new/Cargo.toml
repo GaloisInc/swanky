@@ -14,6 +14,7 @@ workspace = true
 rand.workspace = true
 swanky-bit-matrix-transpose.workspace = true
 swanky-channel.workspace = true
+swanky-cr-hash.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true
 swanky-ot-chou-orlandi-new.workspace = true
@@ -22,3 +23,6 @@ swanky-party.workspace = true
 swanky-rng.workspace = true
 swanky-serialization.workspace = true
 vectoreyes.workspace = true
+
+[dev-dependencies]
+swanky-ot-test-new.workspace = true
