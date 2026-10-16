@@ -6,13 +6,15 @@
 use std::marker::PhantomData;
 
 use rand::{CryptoRng, Rng, SeedableRng};
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 use swanky_channel::Channel;
 use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_ot_traits_new::{
-    OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
+    OTCorrelated, OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
 };
 use swanky_party::{
     either::PartyEither,
@@ -262,6 +264,79 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
     }
 }
 
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelated<P>
+    for ALSZ<P, OT>
+{
+    fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
+        mut self,
+        inputs: PartyEither<P, usize, &[F2]>,
+        delta: PartyPrivate<P, Sender, U8x16>,
+        outputs: &mut O,
+        channel: &mut Channel,
+        _rng: &mut impl CryptoRng,
+    ) -> Result<Self> {
+        let m = inputs
+            .as_ref()
+            .map(|&sz| sz, |inputs| inputs.len())
+            .into_inner_same();
+        let inputs: PartyPrivate<Receiver, P, _> = inputs.as_ref().into();
+
+        let r: PartyPrivate<Receiver, P, _> = PartyPrivate::new_with(|| {
+            Vec::with_capacity((m / 8) + if m.is_multiple_of(8) { 0 } else { 1 })
+        })
+        .zip(inputs.as_ref())
+        .map(|(mut r, bits)| {
+            F2BitSerializer::new(&mut std::io::empty())
+                .wrap_err(
+                    ErrorKind::SerializationError,
+                    "Could not initialize bit serializer",
+                )?
+                .write_vec(&mut r, bits.iter().copied())
+                .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
+            Ok(r)
+        })
+        .lift_result()?;
+
+        // This is the T matrix for the Receiver, and the Q matrix for
+        // the Sender.
+        let mat = self.setup(m, r.as_ref().map(|r| &r[..]).into(), channel)?;
+
+        for j in 0..m {
+            let q = U8x16::from_array(
+                <[u8; 16]>::try_from(&mat[j * 16..(j + 1) * 16])
+                    .expect("The slice is exactly 16 bytes"),
+            );
+
+            match P::WHICH {
+                WhichParty::Sender(ev) => {
+                    let x0 = CorrelationRobustHash::fixed_key().hash(q);
+                    let x1 = x0 ^ *delta.as_ref().into_inner(ev);
+                    let y =
+                        CorrelationRobustHash::fixed_key().hash(q ^ self.s_.into_inner(ev)) ^ x1;
+
+                    channel.write(&y)?;
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, x0)));
+                }
+                WhichParty::Receiver(ev) => {
+                    let h = CorrelationRobustHash::fixed_key().hash(q);
+
+                    let y = channel.read::<U8x16>()?;
+                    let y = ConditionallySelectable::conditional_select(
+                        &y,
+                        &U8x16::default(),
+                        inputs.as_ref().into_inner(ev)[j].ct_eq(&F2::ZERO),
+                    );
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, y ^ h)))
+                }
+            }
+        }
+
+        Ok(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,6 +344,11 @@ mod tests {
     #[test]
     fn test_random_functionality() {
         swanky_ot_test_new::test_rotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
+    }
+
+    #[test]
+    fn test_correlated_functionality() {
+        swanky_ot_test_new::test_cotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
     }
 
     #[test]

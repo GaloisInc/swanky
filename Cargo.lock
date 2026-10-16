@@ -2857,10 +2857,12 @@ name = "swanky-ot-alsz-new"
 version = "0.6.0"
 dependencies = [
  "rand 0.10.3",
+ "subtle",
  "swanky-bit-matrix-transpose",
  "swanky-channel",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-ot-chou-orlandi-new",
  "swanky-ot-test-new",
