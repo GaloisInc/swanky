@@ -270,4 +270,9 @@ mod tests {
     fn test_random_functionality() {
         swanky_ot_test_new::test_rotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
     }
+
+    #[test]
+    fn test_standard_functionality() {
+        swanky_ot_test_new::test_otext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
+    }
 }
