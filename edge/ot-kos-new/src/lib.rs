@@ -1,2 +1,3 @@
 #![deny(missing_docs)]
-//! An implementation of the Keller-Orsini-Scholl OT protocol
+//! Implementation of the Keller-Orsini-Scholl oblivious transfer
+//! extension protocol (cf. <https://eprint.iacr.org/2015/546>).
