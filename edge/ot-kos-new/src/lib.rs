@@ -5,7 +5,7 @@
 use rand::{CryptoRng, Rng, SeedableRng};
 
 use subtle::{ConditionallySelectable, ConstantTimeEq};
-use swanky_adversary::Malicious;
+use swanky_adversary::{Malicious, SemiHonest};
 use swanky_channel::Channel;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
@@ -272,6 +272,16 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
 
         Ok(self)
     }
+}
+
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> SemiHonest
+    for KOS<P, OT>
+{
+}
+
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> Malicious
+    for KOS<P, OT>
+{
 }
 
 #[cfg(test)]
