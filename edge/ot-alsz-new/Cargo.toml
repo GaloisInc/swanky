@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 rand.workspace = true
 subtle.workspace = true
+swanky-adversary.workspace = true
 swanky-bit-matrix-transpose.workspace = true
 swanky-channel.workspace = true
 swanky-cr-hash.workspace = true

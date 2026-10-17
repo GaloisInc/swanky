@@ -2858,6 +2858,7 @@ version = "0.6.0"
 dependencies = [
  "rand 0.10.3",
  "subtle",
+ "swanky-adversary",
  "swanky-bit-matrix-transpose",
  "swanky-channel",
  "swanky-cr-hash",

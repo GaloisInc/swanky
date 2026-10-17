@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use rand::{CryptoRng, Rng, SeedableRng};
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 
+use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
 use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -327,6 +328,11 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
 
         Ok(self)
     }
+}
+
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + SemiHonest> SemiHonest
+    for ALSZ<P, OT>
+{
 }
 
 #[cfg(test)]
