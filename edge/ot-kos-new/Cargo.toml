@@ -15,6 +15,7 @@ rand.workspace = true
 subtle.workspace = true
 swanky-channel.workspace = true
 swanky-cointoss.workspace = true
+swanky-cr-hash.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
@@ -25,3 +26,6 @@ swanky-party.workspace = true
 swanky-rng.workspace = true
 swanky-serialization.workspace = true
 vectoreyes.workspace = true
+
+[dev-dependencies]
+swanky-ot-test-new.workspace = true
