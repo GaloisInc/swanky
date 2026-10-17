@@ -12,7 +12,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_ot_iknp::IKNP;
 use swanky_ot_traits_new::{
-    OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
+    OTCorrelated, OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
 };
 use swanky_party::{
     either::PartyEither,
@@ -212,6 +212,63 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
     }
 }
 
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelated<P>
+    for KOS<P, OT>
+{
+    fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
+        mut self,
+        inputs: PartyEither<P, usize, &[F2]>,
+        delta: PartyPrivate<Sender, P, U8x16>,
+        outputs: &mut O,
+        channel: &mut Channel,
+        rng: &mut impl CryptoRng,
+    ) -> Result<Self> {
+        let m = inputs
+            .as_ref()
+            .map(|&sz| sz, |inputs| inputs.len())
+            .into_inner_same();
+        let inputs: PartyPrivate<Receiver, P, _> = inputs.into();
+        let inputs: PartyPrivateCopy<Receiver, P, _> = inputs.into();
+
+        let mat = self.setup(m, inputs, channel, rng)?;
+
+        for j in 0..m {
+            let q = U8x16::from_array(
+                <[u8; 16]>::try_from(&mat[j * 16..(j + 1) * 16])
+                    .expect("The slice is exactly 16 bytes"),
+            );
+
+            match P::WHICH {
+                WhichParty::Sender(ev) => {
+                    let x0 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
+                    let x1 = x0 ^ *delta.as_ref().into_inner(ev);
+                    let y = TweakableCircularCorrelationRobustHash::fixed_key()
+                        .hash(q ^ self.0.base_ot_selection_block(ev), j as u128)
+                        ^ x1;
+
+                    channel.write(&y)?;
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, x0)));
+                }
+                WhichParty::Receiver(ev) => {
+                    let h = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
+
+                    let y = channel.read::<U8x16>()?;
+                    let y = ConditionallySelectable::conditional_select(
+                        &y,
+                        &U8x16::default(),
+                        inputs.into_inner(ev)[j].ct_eq(&F2::ZERO),
+                    );
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, y ^ h)));
+                }
+            }
+        }
+
+        Ok(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,6 +276,11 @@ mod tests {
     #[test]
     fn test_random_functionality() {
         swanky_ot_test_new::test_rotext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
+    }
+
+    #[test]
+    fn test_correlated_functionality() {
+        swanky_ot_test_new::test_cotext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
     }
 
     #[test]
