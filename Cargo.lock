@@ -2946,6 +2946,16 @@ dependencies = [
 [[package]]
 name = "swanky-ot-kos-new"
 version = "0.6.0"
+dependencies = [
+ "rand 0.10.3",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-ot-chou-orlandi-new",
+ "swanky-ot-iknp",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "vectoreyes",
+]
 
 [[package]]
 name = "swanky-ot-naor-pinkas-new"

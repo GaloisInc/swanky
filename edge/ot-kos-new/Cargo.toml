@@ -11,4 +11,11 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-# my_dependency.workspace = true
+rand.workspace = true
+swanky-channel.workspace = true
+swanky-error.workspace = true
+swanky-ot-chou-orlandi-new.workspace = true
+swanky-ot-iknp.workspace = true
+swanky-ot-traits-new.workspace = true
+swanky-party.workspace = true
+vectoreyes.workspace = true
