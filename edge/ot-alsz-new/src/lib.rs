@@ -106,7 +106,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
                     outputs.into_inner(map_evidence_party0::<P, _, _>(ev).sym()),
                 )
                 .expect("The Vec has exactly 128 elements")
-                .map(|output| SwankyRng::from_seed(output)),
+                .map(SwankyRng::from_seed),
             ),
             WhichParty::Receiver(ev) => PartyEither::new(
                 ev,
@@ -118,7 +118,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
 
         Ok(Self {
             s,
-            s_: s_.map(|s_| U8x16::from_array(s_)).into(),
+            s_: s_.map(U8x16::from_array).into(),
             rngs,
             ot: PhantomData,
         })
