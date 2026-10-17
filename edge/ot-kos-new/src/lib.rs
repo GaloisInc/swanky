@@ -5,6 +5,7 @@
 use rand::{CryptoRng, Rng, SeedableRng};
 
 use subtle::{ConditionallySelectable, ConstantTimeEq};
+use swanky_adversary::Malicious;
 use swanky_channel::Channel;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
@@ -31,12 +32,12 @@ const SSP: usize = 40;
 /// Original paper: <https://eprint.iacr.org/2015/546>
 pub struct KOS<
     P: Party,
-    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi_new::ChouOrlandi<
+    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious = swanky_ot_chou_orlandi_new::ChouOrlandi<
         PartyMap<P, Receiver, Sender>,
     >,
 >(IKNP<P, OT>);
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> KOS<P, OT> {
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> KOS<P, OT> {
     /// Initialize the KOS protocol using a fixed key, `s_`.
     pub fn init_fixed_key(
         s_: PartyPrivate<Sender, P, U8x16>,
@@ -164,13 +165,17 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> KOS<P, OT> 
     }
 }
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for KOS<P, OT> {
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> OTInit<P>
+    for KOS<P, OT>
+{
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self> {
         Ok(Self(IKNP::init(channel, rng)?))
     }
 }
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P> for KOS<P, OT> {
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> OTRandom<P>
+    for KOS<P, OT>
+{
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         mut self,
         inputs: PartyEither<P, usize, &[F2]>,
@@ -212,7 +217,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
     }
 }
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelated<P>
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> OTCorrelated<P>
     for KOS<P, OT>
 {
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
