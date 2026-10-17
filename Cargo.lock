@@ -2944,6 +2944,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-ot-kos-new"
+version = "0.6.0"
+
+[[package]]
 name = "swanky-ot-naor-pinkas-new"
 version = "0.6.0"
 dependencies = [
