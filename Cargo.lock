@@ -2948,12 +2948,18 @@ name = "swanky-ot-kos-new"
 version = "0.6.0"
 dependencies = [
  "rand 0.10.3",
+ "subtle",
  "swanky-channel",
+ "swanky-cointoss",
  "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
  "swanky-ot-chou-orlandi-new",
  "swanky-ot-iknp",
  "swanky-ot-traits-new",
  "swanky-party",
+ "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 
