@@ -2856,6 +2856,7 @@ dependencies = [
 name = "swanky-ot-alsz-new"
 version = "0.6.0"
 dependencies = [
+ "criterion",
  "rand 0.10.3",
  "subtle",
  "swanky-adversary",
