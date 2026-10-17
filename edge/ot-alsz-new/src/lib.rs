@@ -198,6 +198,38 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
     }
 }
 
+// Shared functionality between random / correlated OT.
+//
+// Returns the Q/T matrix.
+fn compute_mat<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>>(
+    alsz: &mut ALSZ<P, OT>,
+    m: usize,
+    inputs: PartyEither<P, usize, &[F2]>,
+    channel: &mut Channel,
+) -> Result<Vec<u8>> {
+    let inputs: PartyPrivate<Receiver, P, _> = inputs.into();
+
+    let r: PartyPrivate<Receiver, P, _> = PartyPrivate::new_with(|| {
+        Vec::with_capacity((m / 8) + if m.is_multiple_of(8) { 0 } else { 1 })
+    })
+    .zip(inputs.as_ref())
+    .map(|(mut r, bits)| {
+        F2BitSerializer::new(&mut std::io::empty())
+            .wrap_err(
+                ErrorKind::SerializationError,
+                "Could not initialize bit serializer",
+            )?
+            .write_vec(&mut r, bits.iter().copied())
+            .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
+        Ok(r)
+    })
+    .lift_result()?;
+
+    // This is the T matrix for the Receiver, and the Q matrix for
+    // the Sender.
+    alsz.setup(m, r.as_ref().map(|r| &r[..]).into(), channel)
+}
+
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for ALSZ<P, OT> {
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self> {
         let mut s_: PartyPrivate<Sender, P, _> = PartyPrivate::new([0u8; 16]);
@@ -218,27 +250,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
             .as_ref()
             .map(|&sz| sz, |inputs| inputs.len())
             .into_inner_same();
-        let inputs: PartyPrivate<Receiver, P, _> = inputs.into();
-
-        let r: PartyPrivate<Receiver, P, _> = PartyPrivate::new_with(|| {
-            Vec::with_capacity((m / 8) + if m.is_multiple_of(8) { 0 } else { 1 })
-        })
-        .zip(inputs)
-        .map(|(mut r, bits)| {
-            F2BitSerializer::new(&mut std::io::empty())
-                .wrap_err(
-                    ErrorKind::SerializationError,
-                    "Could not initialize bit serializer",
-                )?
-                .write_vec(&mut r, bits.iter().copied())
-                .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
-            Ok(r)
-        })
-        .lift_result()?;
-
-        // This is the T matrix for the Receiver, and the Q matrix for
-        // the Sender.
-        let mat = self.setup(m, r.as_ref().map(|r| &r[..]).into(), channel)?;
+        let mat = compute_mat(&mut self, m, inputs, channel)?;
 
         for j in 0..m {
             let q = U8x16::from_array(
@@ -279,27 +291,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
             .as_ref()
             .map(|&sz| sz, |inputs| inputs.len())
             .into_inner_same();
-        let inputs: PartyPrivate<Receiver, P, _> = inputs.as_ref().into();
-
-        let r: PartyPrivate<Receiver, P, _> = PartyPrivate::new_with(|| {
-            Vec::with_capacity((m / 8) + if m.is_multiple_of(8) { 0 } else { 1 })
-        })
-        .zip(inputs.as_ref())
-        .map(|(mut r, bits)| {
-            F2BitSerializer::new(&mut std::io::empty())
-                .wrap_err(
-                    ErrorKind::SerializationError,
-                    "Could not initialize bit serializer",
-                )?
-                .write_vec(&mut r, bits.iter().copied())
-                .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
-            Ok(r)
-        })
-        .lift_result()?;
-
-        // This is the T matrix for the Receiver, and the Q matrix for
-        // the Sender.
-        let mat = self.setup(m, r.as_ref().map(|r| &r[..]).into(), channel)?;
+        let mat = compute_mat(&mut self, m, inputs.clone(), channel)?;
 
         for j in 0..m {
             let q = U8x16::from_array(
