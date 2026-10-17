@@ -283,7 +283,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
         mut self,
         inputs: PartyEither<P, usize, &[F2]>,
-        delta: PartyPrivate<P, Sender, U8x16>,
+        delta: PartyPrivate<Sender, P, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         _rng: &mut impl CryptoRng,
