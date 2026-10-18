@@ -30,6 +30,9 @@ blake3.workspace = true
 bytemuck.workspace = true
 rand.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true, features = ["wasm_js"] }
+
 [dev-dependencies]
 swanky-ot-test.workspace = true
 criterion.workspace = true
