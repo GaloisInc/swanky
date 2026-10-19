@@ -360,17 +360,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_random_functionality() {
+    fn test_random_functionality_pow2() {
         swanky_ot_test_new::test_rotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
     }
 
     #[test]
-    fn test_correlated_functionality() {
+    fn test_random_functionality_non_pow2() {
+        swanky_ot_test_new::test_rotext::<ALSZ<Sender>, ALSZ<Receiver>>((1 << 10) + 1);
+    }
+
+    #[test]
+    fn test_correlated_functionality_pow2() {
         swanky_ot_test_new::test_cotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
     }
 
     #[test]
-    fn test_standard_functionality() {
+    fn test_correlated_functionality_non_pow2() {
+        swanky_ot_test_new::test_cotext::<ALSZ<Sender>, ALSZ<Receiver>>((1 << 10) + 1);
+    }
+
+    #[test]
+    fn test_standard_functionality_pow2() {
         swanky_ot_test_new::test_otext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
+    }
+
+    #[test]
+    fn test_standard_functionality_non_pow2() {
+        swanky_ot_test_new::test_otext::<ALSZ<Sender>, ALSZ<Receiver>>((1 << 10) + 1);
     }
 }
