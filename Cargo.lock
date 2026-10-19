@@ -2853,29 +2853,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-alsz-new"
-version = "0.6.0"
-dependencies = [
- "criterion",
- "rand 0.10.3",
- "subtle",
- "swanky-adversary",
- "swanky-bit-matrix-transpose",
- "swanky-channel",
- "swanky-cr-hash",
- "swanky-error",
- "swanky-field",
- "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
- "swanky-ot-test-new",
- "swanky-ot-traits-new",
- "swanky-party",
- "swanky-rng",
- "swanky-serialization",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-ot-chou-orlandi"
 version = "0.6.0"
 dependencies = [
@@ -2940,6 +2917,29 @@ dependencies = [
  "swanky-ot-test-new",
  "swanky-ot-traits-new",
  "swanky-party",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-ot-iknp"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
+ "swanky-bit-matrix-transpose",
+ "swanky-channel",
+ "swanky-cr-hash",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-chou-orlandi-new",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "swanky-rng",
+ "swanky-serialization",
  "vectoreyes",
 ]
 

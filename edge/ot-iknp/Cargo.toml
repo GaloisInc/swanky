@@ -1,6 +1,6 @@
 [package]
-name = "swanky-ot-alsz-new"
-description = "An implementation of the Asharov-Lindell-Schneider-Zohner OT protocol"
+name = "swanky-ot-iknp"
+description = "An implementation of the Asharov-Lindell-Schneider-Zohner optimzations to the IKNP OT protocol"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
