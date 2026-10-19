@@ -135,9 +135,10 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
 
     /// Perform initial setup communication.
     ///
-    /// This corresponds to substeps (a) - (c) in Protocol 4 of the
-    /// paper linked above (<https://eprint.iacr.org/2016/602>); the
-    /// return value is the matrix $`Q`$.
+    /// This corresponds to substeps (a) - (c) in the OT Extension
+    /// Phase of Protocol 4 of the paper linked above
+    /// (<https://eprint.iacr.org/2016/602>); the return value is the
+    /// matrix $`Q`$ (for the `Sender`) or $`T`$ (for the `Receiver`).
     pub fn setup(
         &mut self,
         n_ots: usize,
