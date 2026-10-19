@@ -30,8 +30,8 @@ use swanky_rng::SwankyRng;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
-/// The key size for ALSZ.
-const ALSZ_KEY_SIZE: usize = 128;
+/// The number of base OTs for IKNP.
+const N_BASE_OTS: usize = 128;
 
 /// The Ishai-Kilian-Nissim-Petrank (IKNP) semi-honest oblivious
 /// transfer protocol, with optimizations by
@@ -47,10 +47,10 @@ pub struct IKNP<
     >,
 > {
     // Corresponds to $`s`$ in the paper.
-    base_ot_selection_bits: PartyPrivateCopy<Sender, P, [F2; ALSZ_KEY_SIZE]>,
+    base_ot_selection_bits: PartyPrivateCopy<Sender, P, [F2; N_BASE_OTS]>,
     // Represents the same value as base_ot_selection_bits.
     base_ot_selection_block: PartyPrivateCopy<Sender, P, U8x16>,
-    rngs: PartyEither<P, [SwankyRng; ALSZ_KEY_SIZE], [(SwankyRng, SwankyRng); ALSZ_KEY_SIZE]>,
+    rngs: PartyEither<P, [SwankyRng; N_BASE_OTS], [(SwankyRng, SwankyRng); N_BASE_OTS]>,
     ot: PhantomData<OT>,
 }
 
@@ -66,13 +66,13 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
         let s: PartyPrivateCopy<Sender, _, _> = base_ot_selection_block
             .as_ref()
             .map(|s_| {
-                Ok(<[F2; ALSZ_KEY_SIZE]>::try_from(
+                Ok(<[F2; N_BASE_OTS]>::try_from(
                     F2BitDeserializer::new(&mut std::io::empty())
                         .wrap_err(
                             ErrorKind::SerializationError,
                             "Could not initialize bit deserializer",
                         )?
-                        .read_vec(&mut &s_.as_ref()[..], ALSZ_KEY_SIZE)
+                        .read_vec(&mut &s_.as_ref()[..], N_BASE_OTS)
                         .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?,
                 )
                 .expect("There are exactly 128 bits"))
@@ -86,26 +86,23 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
                 s.as_ref().into_inner(ev),
             ),
             WhichParty::Receiver(ev) => {
-                PartyEither::new::<Sender>(map_evidence_party1::<P, _, _>(ev), ALSZ_KEY_SIZE)
+                PartyEither::new::<Sender>(map_evidence_party1::<P, _, _>(ev), N_BASE_OTS)
             }
         };
 
-        let values: PartyPrivate<
-            Sender,
-            PartyMap<P, Receiver, Sender>,
-            [[U8x16; 2]; ALSZ_KEY_SIZE],
-        > = PartyPrivate::new_with(|| {
-            [0; ALSZ_KEY_SIZE].map(|_| {
-                let mut k0 = U8x16::default();
-                let mut k1 = U8x16::default();
-                rng.fill_bytes(k0.as_mut());
-                rng.fill_bytes(k1.as_mut());
-                [k0, k1]
-            })
-        });
+        let values: PartyPrivate<Sender, PartyMap<P, Receiver, Sender>, [[U8x16; 2]; N_BASE_OTS]> =
+            PartyPrivate::new_with(|| {
+                [0; N_BASE_OTS].map(|_| {
+                    let mut k0 = U8x16::default();
+                    let mut k1 = U8x16::default();
+                    rng.fill_bytes(k0.as_mut());
+                    rng.fill_bytes(k1.as_mut());
+                    [k0, k1]
+                })
+            });
 
         let mut outputs: PartyPrivate<Receiver, PartyMap<P, Receiver, Sender>, Vec<U8x16>> =
-            PartyPrivate::new_with(|| Vec::with_capacity(ALSZ_KEY_SIZE));
+            PartyPrivate::new_with(|| Vec::with_capacity(N_BASE_OTS));
 
         ot.ot(
             inputs,
@@ -118,7 +115,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
         let rngs = match P::WHICH {
             WhichParty::Sender(ev) => PartyEither::new(
                 ev,
-                <[U8x16; ALSZ_KEY_SIZE]>::try_from(
+                <[U8x16; N_BASE_OTS]>::try_from(
                     outputs.into_inner(map_evidence_party0::<P, _, _>(ev).sym()),
                 )
                 .expect("The Vec has exactly 128 elements")
