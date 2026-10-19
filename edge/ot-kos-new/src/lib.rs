@@ -38,13 +38,17 @@ pub struct KOS<
 >(IKNP<P, OT>);
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious> KOS<P, OT> {
-    /// Initialize the KOS protocol using a fixed key, `s_`.
+    /// Initialize the KOS protocol using a fixed key, `base_ot_selection_block`.
     pub fn init_fixed_key(
-        s_: PartyPrivate<Sender, P, U8x16>,
+        base_ot_selection_block: PartyPrivate<Sender, P, U8x16>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
     ) -> Result<Self> {
-        Ok(Self(IKNP::init_with_fixed_base_ots(s_, channel, rng)?))
+        Ok(Self(IKNP::init_with_fixed_base_ots(
+            base_ot_selection_block,
+            channel,
+            rng,
+        )?))
     }
 
     /// Perform initial setup communication.
