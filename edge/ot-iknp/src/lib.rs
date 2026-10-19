@@ -55,8 +55,9 @@ pub struct IKNP<
 }
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT> {
-    /// Initialize the ALSZ protocol using a fixed key, `base_ot_selection_block`.
-    pub fn init_fixed_key(
+    /// Initialize the IKNP protocol using a fixed number of base OTs,
+    /// with input bits from `base_ot_selection_block`.
+    pub fn init_with_fixed_base_ots(
         base_ot_selection_block: PartyPrivate<Sender, P, U8x16>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
@@ -257,7 +258,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> f
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self> {
         let mut s_: PartyPrivate<Sender, P, _> = PartyPrivate::new(U8x16::default());
         s_.as_mut().map(|s_| rng.fill_bytes(s_.as_mut()));
-        IKNP::init_fixed_key(s_, channel, rng)
+        IKNP::init_with_fixed_base_ots(s_, channel, rng)
     }
 }
 
