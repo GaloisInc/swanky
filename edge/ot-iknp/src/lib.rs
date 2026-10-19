@@ -222,14 +222,14 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
 // Returns the Q/T matrix.
 fn compute_mat<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>>(
     alsz: &mut ALSZ<P, OT>,
-    m: usize,
+    n_ots: usize,
     inputs: PartyEither<P, usize, &[F2]>,
     channel: &mut Channel,
 ) -> Result<Vec<u8>> {
     let inputs: PartyPrivate<Receiver, P, _> = inputs.into();
 
     let r: PartyPrivate<Receiver, P, _> = PartyPrivate::new_with(|| {
-        Vec::with_capacity((m / 8) + if m.is_multiple_of(8) { 0 } else { 1 })
+        Vec::with_capacity((n_ots / 8) + if n_ots.is_multiple_of(8) { 0 } else { 1 })
     })
     .zip(inputs.as_ref())
     .map(|(mut r, bits)| {
@@ -246,7 +246,7 @@ fn compute_mat<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>>(
 
     // This is the T matrix for the Receiver, and the Q matrix for
     // the Sender.
-    alsz.setup(m, r.as_ref().map(|r| &r[..]).into(), channel)
+    alsz.setup(n_ots, r.as_ref().map(|r| &r[..]).into(), channel)
 }
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for ALSZ<P, OT> {
