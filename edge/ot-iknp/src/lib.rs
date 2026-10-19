@@ -1,7 +1,10 @@
 #![deny(missing_docs)]
-//! Implementation of the Asharov-Lindell-Schneider-Zohner oblivious
-//! transfer extension protocol (cf.
-//! <https://eprint.iacr.org/2016/602>, Protocol 4).
+//! Implementation of the Ishai-Kilian-Nissim-Petrank (IKNP)
+//! semi-honest oblivious transfer extension protocol (cf.
+//! <https://link.springer.com/chapter/10.1007/978-3-540-45146-4_9>),
+//! using optimizations by Asharov, Lindell, Schneider, Zohner (cf.
+//! <https://eprint.iacr.org/2016/602>). In particular, this
+//! implements Protocol 4 from the aforementioned paper.
 
 use std::marker::PhantomData;
 
