@@ -39,7 +39,8 @@ pub struct ALSZ<
         PartyMap<P, Receiver, Sender>,
     >,
 > {
-    s: PartyPrivateCopy<Sender, P, [F2; ALSZ_KEY_SIZE]>,
+    // Corresponds to $`s`$ in the paper.
+    base_ot_selection_bits: PartyPrivateCopy<Sender, P, [F2; ALSZ_KEY_SIZE]>,
     s_: PartyPrivateCopy<Sender, P, U8x16>,
     rngs: PartyEither<P, [SwankyRng; ALSZ_KEY_SIZE], [(SwankyRng, SwankyRng); ALSZ_KEY_SIZE]>,
     ot: PhantomData<OT>,
@@ -124,7 +125,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
         };
 
         Ok(Self {
-            s,
+            base_ot_selection_bits: s,
             s_: s_.map(U8x16::from_array).into(),
             rngs,
             ot: PhantomData,
@@ -153,7 +154,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
                 let zero = vec![0u8; ncols / 8];
 
                 for (j, (&b, rng)) in self
-                    .s
+                    .base_ot_selection_bits
                     .as_ref()
                     .into_inner(ev)
                     .iter()
