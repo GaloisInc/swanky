@@ -76,7 +76,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
                         .read_vec(&mut &s_.as_ref()[..], N_BASE_OTS)
                         .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?,
                 )
-                .expect("There are exactly 128 bits"))
+                .expect("There are exactly N_BASE_OTS bits"))
             })
             .lift_result()?
             .into();
@@ -119,7 +119,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
                 <[U8x16; N_BASE_OTS]>::try_from(
                     outputs.into_inner(map_evidence_party0::<P, _, _>(ev).sym()),
                 )
-                .expect("The Vec has exactly 128 elements")
+                .expect("The Vec has exactly N_BASE_OTS elements")
                 .map(SwankyRng::from_seed),
             ),
             WhichParty::Receiver(ev) => PartyEither::new(
