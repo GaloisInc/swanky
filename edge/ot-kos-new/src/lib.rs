@@ -56,14 +56,14 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
     /// Runs a correlation check (Figure 7 in the linked paper).
     pub fn setup(
         &mut self,
-        m: usize,
+        n_ots: usize,
         inputs: PartyPrivateCopy<Receiver, P, &[F2]>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
     ) -> Result<Vec<u8>> {
-        let m = m + (8 - m % 8) % 8;
+        let n_ots = n_ots + (8 - n_ots % 8) % 8;
 
-        let ncols = m + 128 + SSP;
+        let ncols = n_ots + 128 + SSP;
 
         let mut r: PartyPrivate<Receiver, P, _> =
             PartyPrivate::new_with(|| Vec::with_capacity((ncols / 8) + (8 - (ncols / 8) % 8) % 8))
@@ -78,7 +78,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
                             &mut r,
                             bits.iter()
                                 .copied()
-                                .chain((0..(ncols - m)).map(|_| rand::random::<F2>())),
+                                .chain((0..(ncols - n_ots)).map(|_| rand::random::<F2>())),
                         )
                         .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
                     Ok(r)
