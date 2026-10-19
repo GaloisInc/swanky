@@ -141,7 +141,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
     pub fn setup(
         &mut self,
         n_ots: usize,
-        r: PartyPrivateCopy<Receiver, P, &[u8]>,
+        selection_bits: PartyPrivateCopy<Receiver, P, &[u8]>,
         channel: &mut Channel,
     ) -> Result<Vec<u8>> {
         const NROWS: usize = 128;
@@ -189,7 +189,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
                     self.rngs.as_mut().into_inner(ev)[j].1.fill_bytes(&mut u);
 
                     u.iter_mut()
-                        .zip(t.iter().zip(r.into_inner(ev).iter()))
+                        .zip(t.iter().zip(selection_bits.into_inner(ev).iter()))
                         .for_each(|(a, (&b, &c))| {
                             *a ^= b;
                             *a ^= c;
