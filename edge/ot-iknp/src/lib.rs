@@ -41,7 +41,8 @@ pub struct ALSZ<
 > {
     // Corresponds to $`s`$ in the paper.
     base_ot_selection_bits: PartyPrivateCopy<Sender, P, [F2; ALSZ_KEY_SIZE]>,
-    s_: PartyPrivateCopy<Sender, P, U8x16>,
+    // Represents the same value as base_ot_selection_bits.
+    base_ot_selection_block: PartyPrivateCopy<Sender, P, U8x16>,
     rngs: PartyEither<P, [SwankyRng; ALSZ_KEY_SIZE], [(SwankyRng, SwankyRng); ALSZ_KEY_SIZE]>,
     ot: PhantomData<OT>,
 }
@@ -126,7 +127,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
 
         Ok(Self {
             base_ot_selection_bits: s,
-            s_: s_.map(U8x16::from_array).into(),
+            base_ot_selection_block: s_.map(U8x16::from_array).into(),
             rngs,
             ot: PhantomData,
         })
@@ -206,9 +207,12 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
         Ok(swanky_bit_matrix_transpose::transpose(&res, NROWS, ncols))
     }
 
-    /// Get the key, `s_`, as the Sender.
-    pub fn s_(&self, ev: Witness<impl EqualityProposition<Sender, P>>) -> U8x16 {
-        self.s_.into_inner(ev)
+    /// Get the key, `base_ot_selection_block`, as the Sender.
+    pub fn base_ot_selection_block(
+        &self,
+        ev: Witness<impl EqualityProposition<Sender, P>>,
+    ) -> U8x16 {
+        self.base_ot_selection_block.into_inner(ev)
     }
 }
 
@@ -275,7 +279,8 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
             match P::WHICH {
                 WhichParty::Sender(ev) => {
                     let k0 = CorrelationRobustHash::fixed_key().hash(q);
-                    let k1 = CorrelationRobustHash::fixed_key().hash(q ^ self.s_.into_inner(ev));
+                    let k1 = CorrelationRobustHash::fixed_key()
+                        .hash(q ^ self.base_ot_selection_block.into_inner(ev));
 
                     outputs.extend(std::iter::once(PartyEither::new(ev, [k0, k1])));
                 }
@@ -317,8 +322,9 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
                 WhichParty::Sender(ev) => {
                     let x0 = CorrelationRobustHash::fixed_key().hash(q);
                     let x1 = x0 ^ *delta.as_ref().into_inner(ev);
-                    let y =
-                        CorrelationRobustHash::fixed_key().hash(q ^ self.s_.into_inner(ev)) ^ x1;
+                    let y = CorrelationRobustHash::fixed_key()
+                        .hash(q ^ self.base_ot_selection_block.into_inner(ev))
+                        ^ x1;
 
                     channel.write(&y)?;
 
