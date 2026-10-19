@@ -63,7 +63,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
                             ErrorKind::SerializationError,
                             "Could not initialize bit deserializer",
                         )?
-                        .read_vec(&mut &s_[..], 8 * 16)
+                        .read_vec(&mut &s_[..], ALSZ_KEY_SIZE)
                         .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?,
                 )
                 .expect("There are exactly 128 bits"))
