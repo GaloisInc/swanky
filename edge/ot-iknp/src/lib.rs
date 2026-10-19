@@ -33,10 +33,14 @@ use vectoreyes::U8x16;
 /// The key size for ALSZ.
 const ALSZ_KEY_SIZE: usize = 128;
 
-/// The Asharov-Lindell-Schneider-Zohner (random) OT protocol.
+/// The Ishai-Kilian-Nissim-Petrank (IKNP) semi-honest oblivious
+/// transfer protocol, with optimizations by
+/// Asharov-Lindell-Schneider-Zohner (ALSZ).
 ///
-/// Original paper: <https://eprint.iacr.org/2016/602>
-pub struct ALSZ<
+/// Original IKNP paper: <https://link.springer.com/chapter/10.1007/978-3-540-45146-4_9>
+///
+/// ALSZ paper: <https://eprint.iacr.org/2016/602>
+pub struct IKNP<
     P: Party,
     OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi_new::ChouOrlandi<
         PartyMap<P, Receiver, Sender>,
@@ -50,7 +54,7 @@ pub struct ALSZ<
     ot: PhantomData<OT>,
 }
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT> {
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT> {
     /// Initialize the ALSZ protocol using a fixed key, `base_ot_selection_block`.
     pub fn init_fixed_key(
         base_ot_selection_block: PartyPrivate<Sender, P, U8x16>,
@@ -224,7 +228,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
 //
 // Returns the Q/T matrix.
 fn compute_mat<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>>(
-    alsz: &mut ALSZ<P, OT>,
+    alsz: &mut IKNP<P, OT>,
     n_ots: usize,
     inputs: PartyEither<P, usize, &[F2]>,
     channel: &mut Channel,
@@ -252,15 +256,15 @@ fn compute_mat<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>>(
     alsz.setup(n_ots, r.as_ref().map(|r| &r[..]).into(), channel)
 }
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for ALSZ<P, OT> {
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for IKNP<P, OT> {
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self> {
         let mut s_: PartyPrivate<Sender, P, _> = PartyPrivate::new(U8x16::default());
         s_.as_mut().map(|s_| rng.fill_bytes(s_.as_mut()));
-        ALSZ::init_fixed_key(s_, channel, rng)
+        IKNP::init_fixed_key(s_, channel, rng)
     }
 }
 
-impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P> for ALSZ<P, OT> {
+impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P> for IKNP<P, OT> {
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         mut self,
         inputs: PartyEither<P, usize, &[F2]>,
@@ -300,7 +304,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
 }
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelated<P>
-    for ALSZ<P, OT>
+    for IKNP<P, OT>
 {
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
         mut self,
@@ -354,7 +358,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
 }
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + SemiHonest> SemiHonest
-    for ALSZ<P, OT>
+    for IKNP<P, OT>
 {
 }
 
@@ -364,31 +368,31 @@ mod tests {
 
     #[test]
     fn test_random_functionality_pow2() {
-        swanky_ot_test_new::test_rotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
+        swanky_ot_test_new::test_rotext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_random_functionality_non_pow2() {
-        swanky_ot_test_new::test_rotext::<ALSZ<Sender>, ALSZ<Receiver>>((1 << 10) + 1);
+        swanky_ot_test_new::test_rotext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
     }
 
     #[test]
     fn test_correlated_functionality_pow2() {
-        swanky_ot_test_new::test_cotext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
+        swanky_ot_test_new::test_cotext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_correlated_functionality_non_pow2() {
-        swanky_ot_test_new::test_cotext::<ALSZ<Sender>, ALSZ<Receiver>>((1 << 10) + 1);
+        swanky_ot_test_new::test_cotext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
     }
 
     #[test]
     fn test_standard_functionality_pow2() {
-        swanky_ot_test_new::test_otext::<ALSZ<Sender>, ALSZ<Receiver>>(1 << 10);
+        swanky_ot_test_new::test_otext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_standard_functionality_non_pow2() {
-        swanky_ot_test_new::test_otext::<ALSZ<Sender>, ALSZ<Receiver>>((1 << 10) + 1);
+        swanky_ot_test_new::test_otext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
     }
 }
