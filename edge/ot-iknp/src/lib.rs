@@ -140,12 +140,12 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
     /// return value is the matrix $`Q`$.
     pub fn setup(
         &mut self,
-        m: usize,
+        n_ots: usize,
         r: PartyPrivateCopy<Receiver, P, &[u8]>,
         channel: &mut Channel,
     ) -> Result<Vec<u8>> {
         const NROWS: usize = 128;
-        let ncols = m + (8 - m % 8) % 8;
+        let ncols = n_ots + (8 - n_ots % 8) % 8;
 
         let mut u = vec![0u8; ncols / 8];
 
