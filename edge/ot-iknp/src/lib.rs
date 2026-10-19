@@ -48,15 +48,15 @@ pub struct ALSZ<
 }
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT> {
-    /// Initialize the ALSZ protocol using a fixed key, `s_`.
+    /// Initialize the ALSZ protocol using a fixed key, `base_ot_selection_block`.
     pub fn init_fixed_key(
-        s_: PartyPrivate<Sender, P, [u8; 16]>,
+        base_ot_selection_block: PartyPrivate<Sender, P, U8x16>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
     ) -> Result<Self> {
         let ot = OT::init(channel, rng)?;
 
-        let s: PartyPrivateCopy<Sender, _, _> = s_
+        let s: PartyPrivateCopy<Sender, _, _> = base_ot_selection_block
             .as_ref()
             .map(|s_| {
                 Ok(<[F2; ALSZ_KEY_SIZE]>::try_from(
@@ -65,7 +65,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
                             ErrorKind::SerializationError,
                             "Could not initialize bit deserializer",
                         )?
-                        .read_vec(&mut &s_[..], ALSZ_KEY_SIZE)
+                        .read_vec(&mut &s_.as_ref()[..], ALSZ_KEY_SIZE)
                         .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?,
                 )
                 .expect("There are exactly 128 bits"))
@@ -127,7 +127,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> ALSZ<P, OT>
 
         Ok(Self {
             base_ot_selection_bits: s,
-            base_ot_selection_block: s_.map(U8x16::from_array).into(),
+            base_ot_selection_block: base_ot_selection_block.into(),
             rngs,
             ot: PhantomData,
         })
@@ -250,8 +250,8 @@ fn compute_mat<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>>(
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> for ALSZ<P, OT> {
     fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> Result<Self> {
-        let mut s_: PartyPrivate<Sender, P, _> = PartyPrivate::new([0u8; 16]);
-        s_.as_mut().map(|s_| rng.fill_bytes(s_));
+        let mut s_: PartyPrivate<Sender, P, _> = PartyPrivate::new(U8x16::default());
+        s_.as_mut().map(|s_| rng.fill_bytes(s_.as_mut()));
         ALSZ::init_fixed_key(s_, channel, rng)
     }
 }
