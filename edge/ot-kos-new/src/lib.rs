@@ -42,6 +42,9 @@ use swanky_rng::SwankyRng;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
+/// The computational security parameter.
+const SECPARAM: usize = 128;
+
 /// The statistical security parameter.
 const STATISTICAL_SECPARAM: usize = 40;
 
@@ -82,7 +85,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
     ) -> Result<Vec<u8>> {
         let n_ots = n_ots + (8 - n_ots % 8) % 8;
 
-        let ncols = n_ots + 128 + STATISTICAL_SECPARAM;
+        let ncols = n_ots + SECPARAM + STATISTICAL_SECPARAM;
 
         let mut r: PartyPrivate<Receiver, P, _> =
             PartyPrivate::new_with(|| Vec::with_capacity((ncols / 8) + (8 - (ncols / 8) % 8) % 8))
