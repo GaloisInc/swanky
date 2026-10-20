@@ -20,7 +20,7 @@
 //!
 //! </div>
 
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use swanky_adversary::{Malicious, SemiHonest};
@@ -111,8 +111,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
             .0
             .setup(ncols, r.as_ref().map(|r| &r[..]).into(), channel)?;
 
-        let mut seed = U8x16::default();
-        rng.fill_bytes(seed.as_mut());
+        let seed = rng.random::<U8x16>();
 
         match P::WHICH {
             WhichParty::Sender(ev) => {
