@@ -121,7 +121,6 @@ pub(crate) type SecurityParamBytes<P> = <P as Params>::SecurityParamBytes;
 ///
 /// This parameter needs to define a "small- to medium-sized" extension; other implementations
 /// vary this from 7 to 11 (see [Baum et al., Section 7.2](https://eprint.iacr.org/2023/996.pdf))
-#[allow(dead_code)]
 pub type FieldSize = U2;
 
 /// The field size ($`r`$ in the paper) for the generated VOLEs, relative to [`FieldSize`].
