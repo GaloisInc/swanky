@@ -275,55 +275,54 @@ impl<P: Params> RandomVoleV for InsecureCommitments<P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::{Binary128Bit, Binary256Bit};
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params};
+
+    use merlin::Transcript;
+    use rand::rng;
+    use swanky_field_binary::F2;
+
+    use crate::vole::{MaskLength, RandomVoleP, RandomVoleV, insecure::InsecureVole};
+    use hybrid_array::Array;
+    use hybrid_array::typenum::Unsigned;
+
+    fn everything_is_the_expected_size<P: Params>() {
+        let rng = &mut rng();
+        let transcript = &mut Transcript::new(b"testing");
+        let secret: Vec<F2> = Vec::new();
+
+        let witness = 100;
+        let (voles, _challenge) = InsecureVole::<P>::create(witness, transcript, &secret, rng);
+
+        assert_eq!(voles.count(), witness + MaskLength::<P>::USIZE);
+        assert_eq!(voles.witness_mask().len(), witness);
+        // These will panic if there's a length problem:
+        voles.aggregate_commitment_masks();
+        voles.aggregate_commitment_values();
+
+        for i in 0..voles.count() {
+            if i < witness {
+                assert!(voles.vole_mask(i).is_ok());
+            } else {
+                assert!(voles.vole_mask(i).is_err());
+            }
+        }
+
+        // Note: the challenge passed here is invalid because it's not drawn from transcript.
+        let decom = voles.decommit(&Array::default());
+
+        assert_eq!(decom.extended_witness_length(), witness);
+        assert_eq!(decom.witness_voles().len(), witness);
+        // This will panic if there's a length problem:
+        decom.mask_voles();
+    }
 
     macro_rules! make_tests {
         (mod $name:ident { params = $params:ty $(,)? }) => {
             mod $name {
                 use super::*;
-
-                #[allow(dead_code)]
-                type P = $params;
-
-                use merlin::Transcript;
-                use rand::rng;
-                use swanky_field_binary::F2;
-
-                use crate::vole::{MaskLength, RandomVoleP, RandomVoleV, insecure::InsecureVole};
-                use hybrid_array::Array;
-                use hybrid_array::typenum::Unsigned;
-
                 #[test]
                 fn everything_is_the_expected_size() {
-                    let rng = &mut rng();
-                    let transcript = &mut Transcript::new(b"testing");
-                    let secret: Vec<F2> = Vec::new();
-
-                    let witness = 100;
-                    let (voles, _challenge) =
-                        InsecureVole::<P>::create(witness, transcript, &secret, rng);
-
-                    assert_eq!(voles.count(), witness + MaskLength::<P>::USIZE);
-                    assert_eq!(voles.witness_mask().len(), witness);
-                    // These will panic if there's a length problem:
-                    voles.aggregate_commitment_masks();
-                    voles.aggregate_commitment_values();
-
-                    for i in 0..voles.count() {
-                        if i < witness {
-                            assert!(voles.vole_mask(i).is_ok());
-                        } else {
-                            assert!(voles.vole_mask(i).is_err());
-                        }
-                    }
-
-                    // Note: the challenge passed here is invalid because it's not drawn from transcript.
-                    let decom = voles.decommit(&Array::default());
-
-                    assert_eq!(decom.extended_witness_length(), witness);
-                    assert_eq!(decom.witness_voles().len(), witness);
-                    // This will panic if there's a length problem:
-                    decom.mask_voles();
+                    super::everything_is_the_expected_size::<$params>();
                 }
             }
         };

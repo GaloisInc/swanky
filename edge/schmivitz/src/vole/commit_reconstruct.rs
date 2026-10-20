@@ -391,71 +391,69 @@ pub(crate) fn l_hat<P: Params>(l: usize) -> usize {
 mod test {
     use crate::parameters::{Binary128Bit, Binary256Bit};
 
+    use super::*;
+
+    use std::iter::repeat_with;
+
+    use crate::parameters::{FLambda, Params};
+    use crate::vole::crypto_primitives::Chall3;
+    use crate::vole::crypto_primitives::H1;
+    use crate::vole::functionality::compute_seed_iv;
+    use rand::rng;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+
+    fn test_vole_commit_reconstruct<P: Params>() {
+        let rng = &mut rng();
+        let secret = repeat_with(|| F2::random(rng))
+            .take(100)
+            .collect::<Vec<F2>>();
+        let pk = vec![1u8];
+
+        let how_many = l_hat::<P>(1_000);
+
+        let mu: H1<P> = H1::hash(&pk);
+        let (r, iv) = compute_seed_iv::<P, _>(&secret, &mu);
+
+        let VoleCommitment {
+            h_com: _,
+            decom,
+            corrections,
+            u,
+            v,
+        } = VoleCommitment::<P>::create(r, iv, how_many);
+
+        let chall3 = Chall3::<P>::from_fn(|i| i as u8);
+
+        let pdecom = vole_open(&chall3, &decom);
+
+        let (_h_ver, q) = vole_reconstruct::<P>(&chall3, &pdecom, iv, how_many);
+
+        // Change Q_i with the corrections:
+        // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
+        // Q = (Q_0 ... Q_{tau-1})
+        let q_flambda = apply_corrections_to_q(q, &chall3, &corrections, how_many);
+
+        // compute the big delta
+        let big_delta = compute_secret_key::<P>(&chall3);
+        let big_delta_flambda: FLambda<P> = P::f8_linear_bijection(&big_delta);
+
+        for pos in 0..how_many {
+            let v_flambda: FLambda<P> = P::f8_linear_bijection(&v[pos]);
+            assert_eq!(
+                v_flambda + P::f2_scale(u[pos], big_delta_flambda),
+                P::f8_linear_bijection(&q_flambda[pos])
+            );
+        }
+    }
+
     macro_rules! make_tests {
-        (mod $name:ident { params = $params:ty $(,)? }) => {
+        (mod $name:ident { params = $params:ident $(,)? }) => {
             mod $name {
                 use super::*;
-
-                #[allow(dead_code)]
-                type P = $params;
-
-                use std::iter::repeat_with;
-
-                use super::super::{
-                    VoleCommitment, apply_corrections_to_q, compute_secret_key, l_hat, vole_open,
-                    vole_reconstruct,
-                };
-                use crate::parameters::{FLambda, Params};
-                use crate::vole::crypto_primitives::Chall3;
-                use crate::vole::crypto_primitives::H1;
-                use crate::vole::functionality::compute_seed_iv;
-                use rand::rng;
-                use swanky_field::FiniteRing;
-                use swanky_field_binary::F2;
-
                 #[test]
                 fn test_vole_commit_reconstruct() {
-                    let rng = &mut rng();
-                    let secret = repeat_with(|| F2::random(rng))
-                        .take(100)
-                        .collect::<Vec<F2>>();
-                    let pk = vec![1u8];
-
-                    let how_many = l_hat::<P>(1_000);
-
-                    let mu: H1<P> = H1::hash(&pk);
-                    let (r, iv) = compute_seed_iv::<P, _>(&secret, &mu);
-
-                    let VoleCommitment {
-                        h_com: _,
-                        decom,
-                        corrections,
-                        u,
-                        v,
-                    } = VoleCommitment::<P>::create(r, iv, how_many);
-
-                    let chall3 = Chall3::<P>::from_fn(|i| i as u8);
-
-                    let pdecom = vole_open(&chall3, &decom);
-
-                    let (_h_ver, q) = vole_reconstruct::<P>(&chall3, &pdecom, iv, how_many);
-
-                    // Change Q_i with the corrections:
-                    // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
-                    // Q = (Q_0 ... Q_{tau-1})
-                    let q_flambda = apply_corrections_to_q(q, &chall3, &corrections, how_many);
-
-                    // compute the big delta
-                    let big_delta = compute_secret_key::<P>(&chall3);
-                    let big_delta_flambda: FLambda<P> = P::f8_linear_bijection(&big_delta);
-
-                    for pos in 0..how_many {
-                        let v_flambda: FLambda<P> = P::f8_linear_bijection(&v[pos]);
-                        assert_eq!(
-                            v_flambda + u[pos] * big_delta_flambda,
-                            P::f8_linear_bijection(&q_flambda[pos])
-                        );
-                    }
+                    super::test_vole_commit_reconstruct::<$params>();
                 }
             }
         };

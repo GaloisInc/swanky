@@ -589,187 +589,195 @@ impl<P: Params> VoleHasher<P> {
 
 #[cfg(test)]
 mod test {
-    use crate::parameters::{Binary128Bit, Binary256Bit};
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params};
+
+    use std::iter::repeat_with;
+    use std::iter::zip;
+
+    use crate::parameters::{FLambda, SecurityParam, SecurityParamBytes};
+    use crate::vole::commit_reconstruct::{B, l_hat};
+    use crate::vole::consistency_check::VoleHasher;
+    use crate::vole::crypto_primitives::Chall1;
+    use hybrid_array::Array;
+    use hybrid_array::typenum::Unsigned;
+    use rand::rng;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+    use swanky_serialization::CanonicalSerialize;
+
+    fn test_padding_of_to_field_flambda_and_pad<P: Params>() {
+        // Called with an `ell`-length input, `to_field_lambda` pads up to a multiple of lambda and
+        // emits one field element per lambda-bit chunk, so there are `ceil(ell / lambda)` of them.
+        for ell in [
+            1000,
+            SecurityParam::<P>::USIZE,
+            SecurityParam::<P>::USIZE + 1,
+        ] {
+            let v = vec![F2::ZERO; ell];
+            let hasher = VoleHasher::<P>::from_seed(Chall1::<P>::default(), ell);
+            let t = hasher.to_field_lambda(&v);
+            assert_eq!(
+                t.len(),
+                ell.div_ceil(SecurityParam::<P>::USIZE),
+                "ell = {ell}"
+            );
+        }
+
+        // Bit `i` of the input becomes the coefficient of `x^(i mod lambda)` in chunk
+        // `i / lambda`, so bit 0 gives 1 in the first chunk and bit lambda+1 gives x in the second.
+        let mut v = vec![F2::ZERO; SecurityParam::<P>::USIZE + 2];
+        v[0] = F2::ONE;
+        v[SecurityParam::<P>::USIZE + 1] = F2::ONE;
+        let hasher =
+            VoleHasher::<P>::from_seed(Chall1::<P>::default(), SecurityParam::<P>::USIZE + 2);
+        let t = hasher.to_field_lambda(&v);
+        let mut res1 = Array::<u8, SecurityParamBytes<P>>::default();
+        res1[0] = 1u8;
+        assert_eq!(t[0], FLambda::<P>::from_bytes(&res1).unwrap());
+        let mut res2 = Array::<u8, SecurityParamBytes<P>>::default();
+        res2[0] = 2u8;
+        assert_eq!(t[1], FLambda::<P>::from_bytes(&res2).unwrap());
+        // TODO: Could generate random values and decompose the generated FLambda<P> and check the equivalence
+    }
+
+    // Test that [`vole_hash`] returns 0 when all the inputs are 0.
+    fn test_vole_hash_zero<P: Params>() {
+        let seeds = Chall1::<P>::default();
+
+        const HOW_MANY: usize = 1000;
+        let x = vec![F2::ZERO; HOW_MANY + 2 * SecurityParam::<P>::USIZE + B::USIZE];
+
+        let hasher = VoleHasher::<P>::from_seed(seeds, HOW_MANY);
+        let v = hasher.hash(&x);
+
+        for b in v.0.iter() {
+            assert_eq!(*b, F2::ZERO);
+        }
+    }
+
+    // Test the xor part at the end of [`vole_hash`]
+    fn test_vole_hash_last_xor<P: Params>() {
+        let seeds = Chall1::<P>::default();
+
+        const HOW_MANY: usize = 1000;
+        let mut x = vec![F2::ZERO; HOW_MANY + 2 * SecurityParam::<P>::USIZE + B::USIZE];
+        let pos = 13;
+        x[HOW_MANY + SecurityParam::<P>::USIZE + pos] = F2::ONE;
+
+        let hasher = VoleHasher::<P>::from_seed(seeds, HOW_MANY);
+        let v = hasher.hash(&x);
+
+        for (i, b) in v.0.iter().enumerate() {
+            if i == pos {
+                assert_eq!(*b, F2::ONE);
+            } else {
+                assert_eq!(*b, F2::ZERO);
+            }
+        }
+    }
+
+    // Test the xor part at the end of [`vole_hash`]
+    fn test_vole_hash_is_linear<P: Params>() {
+        let rng = &mut rng();
+
+        let seeds = Chall1::<P>::from_fn(|_| 1u8);
+
+        const HOW_MANY: usize = 1000;
+        let x0: Vec<F2> = repeat_with(|| F2::random(rng))
+            .take(l_hat::<P>(HOW_MANY))
+            .collect();
+        let x1: Vec<F2> = repeat_with(|| F2::random(rng))
+            .take(l_hat::<P>(HOW_MANY))
+            .collect();
+        let x2: Vec<F2> = zip(&x0, &x1).map(|(a, b)| a + b).collect();
+
+        let hasher = VoleHasher::<P>::from_seed(seeds, HOW_MANY);
+        let v0 = hasher.hash(&x0);
+        let v1 = hasher.hash(&x1);
+        let v2 = hasher.hash(&x2);
+
+        for ((a, b), c) in v0.0.iter().zip(v1.0.iter()).zip(v2.0.iter()) {
+            assert_eq!(*a + *b, *c);
+        }
+    }
+
+    fn test_transpose_lockstep_equals_enumerator<P: Params>() {
+        use super::{ColumnEnumState, pack_flambda, to_field_flambda_and_pad_lockstep};
+        use swanky_field_binary::F8b;
+
+        fn f8(x: u8) -> F8b {
+            F8b::from_bytes(&[x].into()).unwrap()
+        }
+
+        // Try different lengths
+        let lengths = [
+            0usize, 1, 15, 16, 17, 127, 128, 129, 200, 255, 256, 511, 512, 513,
+        ];
+
+        for &len in &lengths {
+            // Build len rows of 16 bytes each to pack into Flambda values
+            let mut rows: Vec<Array<F8b, crate::parameters::RepetitionParam<P>>> =
+                Vec::with_capacity(len);
+            for i in 0..len {
+                let mut row = Array::from_fn(|_| F8b::ZERO);
+                for (j, cell) in row.iter_mut().enumerate() {
+                    // Deterministic, non-trivial pattern
+                    let byte = (i as u8)
+                        .wrapping_mul(31)
+                        .wrapping_add(j as u8)
+                        .wrapping_mul(17);
+                    *cell = f8(byte);
+                }
+                rows.push(row);
+            }
+
+            let packed = pack_flambda::<P>(&rows);
+
+            let via_lockstep = to_field_flambda_and_pad_lockstep::<P>(&packed);
+            let via_enum: Vec<Array<FLambda<P>, SecurityParam<P>>> =
+                ColumnEnumState::<P>::new(&rows).collect();
+
+            assert_eq!(
+                via_lockstep.len(),
+                via_enum.len(),
+                "mismatched chunk count for len={}",
+                len
+            );
+            for (i, (a, b)) in via_lockstep.iter().zip(via_enum.iter()).enumerate() {
+                for j in 0..SecurityParam::<P>::USIZE {
+                    assert_eq!(
+                        a[j], b[j],
+                        "mismatch at len={}, chunk={}, col={} ",
+                        len, i, j
+                    );
+                }
+            }
+        }
+    }
 
     macro_rules! make_tests {
         (mod $name:ident { params = $params:ty $(,)? }) => {
             mod $name {
                 use super::*;
-
-                #[allow(dead_code)]
-                type P = $params;
-
-                use std::iter::repeat_with;
-                use std::iter::zip;
-
-                use crate::parameters::{FLambda, SecurityParam, SecurityParamBytes};
-                use crate::vole::commit_reconstruct::{B, l_hat};
-                use crate::vole::consistency_check::VoleHasher;
-                use crate::vole::crypto_primitives::Chall1;
-                use hybrid_array::typenum::Unsigned;
-                use rand::rng;
-                use swanky_field::FiniteRing;
-                use swanky_field_binary::F2;
-                use swanky_serialization::CanonicalSerialize;
-
                 #[test]
                 fn test_padding_of_to_field_flambda_and_pad() {
-                    // Called with an `ell`-length input, `to_field_lambda` pads up to a multiple of lambda and
-                    // emits one field element per lambda-bit chunk, so there are `ceil(ell / lambda)` of them.
-                    for ell in [
-                        1000,
-                        SecurityParam::<P>::USIZE,
-                        SecurityParam::<P>::USIZE + 1,
-                    ] {
-                        let v = vec![F2::ZERO; ell];
-                        let hasher = VoleHasher::<P>::from_seed(Chall1::<P>::default(), ell);
-                        let t = hasher.to_field_lambda(&v);
-                        assert_eq!(
-                            t.len(),
-                            ell.div_ceil(SecurityParam::<P>::USIZE),
-                            "ell = {ell}"
-                        );
-                    }
-
-                    // Bit `i` of the input becomes the coefficient of `x^(i mod lambda)` in chunk
-                    // `i / lambda`, so bit 0 gives 1 in the first chunk and bit lambda+1 gives x in the second.
-                    let mut v = vec![F2::ZERO; SecurityParam::<P>::USIZE + 2];
-                    v[0] = F2::ONE;
-                    v[SecurityParam::<P>::USIZE + 1] = F2::ONE;
-                    let hasher = VoleHasher::<P>::from_seed(
-                        Chall1::<P>::default(),
-                        SecurityParam::<P>::USIZE + 2,
-                    );
-                    let t = hasher.to_field_lambda(&v);
-                    let mut res1 = [0u8; SecurityParamBytes::<P>::USIZE];
-                    res1[0] = 1u8;
-                    assert_eq!(t[0], FLambda::<P>::from_bytes(&res1.into()).unwrap());
-                    let mut res2 = [0u8; SecurityParamBytes::<P>::USIZE];
-                    res2[0] = 2u8;
-                    assert_eq!(t[1], FLambda::<P>::from_bytes(&res2.into()).unwrap());
-                    // TODO: Could generate random values and decompose the generated FLambda<P> and check the equivalence
+                    super::test_padding_of_to_field_flambda_and_pad::<$params>();
                 }
-
-                // Test that [`vole_hash`] returns 0 when all the inputs are 0.
                 #[test]
                 fn test_vole_hash_zero() {
-                    let seeds = Chall1::<P>::default();
-
-                    const HOW_MANY: usize = 1000;
-                    let x = vec![F2::ZERO; HOW_MANY + 2 * SecurityParam::<P>::USIZE + B::USIZE];
-
-                    let hasher = VoleHasher::<P>::from_seed(seeds, HOW_MANY);
-                    let v = hasher.hash(&x);
-
-                    for b in v.0.iter() {
-                        assert_eq!(*b, F2::ZERO);
-                    }
+                    super::test_vole_hash_zero::<$params>();
                 }
-
-                // Test the xor part at the end of [`vole_hash`]
                 #[test]
                 fn test_vole_hash_last_xor() {
-                    let seeds = Chall1::<P>::default();
-
-                    const HOW_MANY: usize = 1000;
-                    let mut x = vec![F2::ZERO; HOW_MANY + 2 * SecurityParam::<P>::USIZE + B::USIZE];
-                    let pos = 13;
-                    x[HOW_MANY + SecurityParam::<P>::USIZE + pos] = F2::ONE;
-
-                    let hasher = VoleHasher::<P>::from_seed(seeds, HOW_MANY);
-                    let v = hasher.hash(&x);
-
-                    for (i, b) in v.0.iter().enumerate() {
-                        if i == pos {
-                            assert_eq!(*b, F2::ONE);
-                        } else {
-                            assert_eq!(*b, F2::ZERO);
-                        }
-                    }
+                    super::test_vole_hash_last_xor::<$params>();
                 }
-
-                // Test the xor part at the end of [`vole_hash`]
                 #[test]
                 fn test_vole_hash_is_linear() {
-                    let rng = &mut rng();
-
-                    let seeds = Chall1::<P>::from_fn(|_| 1u8);
-
-                    const HOW_MANY: usize = 1000;
-                    let x0: Vec<F2> = repeat_with(|| F2::random(rng))
-                        .take(l_hat::<P>(HOW_MANY))
-                        .collect();
-                    let x1: Vec<F2> = repeat_with(|| F2::random(rng))
-                        .take(l_hat::<P>(HOW_MANY))
-                        .collect();
-                    let x2: Vec<F2> = zip(&x0, &x1).map(|(a, b)| a + b).collect();
-
-                    let hasher = VoleHasher::<P>::from_seed(seeds, HOW_MANY);
-                    let v0 = hasher.hash(&x0);
-                    let v1 = hasher.hash(&x1);
-                    let v2 = hasher.hash(&x2);
-
-                    for ((a, b), c) in v0.0.iter().zip(v1.0.iter()).zip(v2.0.iter()) {
-                        assert_eq!(*a + *b, *c);
-                    }
+                    super::test_vole_hash_is_linear::<$params>();
                 }
-
                 #[test]
                 fn test_transpose_lockstep_equals_enumerator() {
-                    use super::super::{
-                        ColumnEnumState, pack_flambda, to_field_flambda_and_pad_lockstep,
-                    };
-                    use hybrid_array::Array;
-                    use swanky_field_binary::F8b;
-
-                    fn f8(x: u8) -> F8b {
-                        F8b::from_bytes(&[x].into()).unwrap()
-                    }
-
-                    // Try different lengths
-                    let lengths = [
-                        0usize, 1, 15, 16, 17, 127, 128, 129, 200, 255, 256, 511, 512, 513,
-                    ];
-
-                    for &len in &lengths {
-                        // Build len rows of 16 bytes each to pack into Flambda values
-                        let mut rows: Vec<Array<F8b, crate::parameters::RepetitionParam<P>>> =
-                            Vec::with_capacity(len);
-                        for i in 0..len {
-                            let mut row = Array::from_fn(|_| F8b::ZERO);
-                            for (j, cell) in row.iter_mut().enumerate() {
-                                // Deterministic, non-trivial pattern
-                                let byte = (i as u8)
-                                    .wrapping_mul(31)
-                                    .wrapping_add(j as u8)
-                                    .wrapping_mul(17);
-                                *cell = f8(byte);
-                            }
-                            rows.push(row);
-                        }
-
-                        let packed = pack_flambda::<P>(&rows);
-
-                        let via_lockstep = to_field_flambda_and_pad_lockstep::<P>(&packed);
-                        let via_enum: Vec<Array<FLambda<P>, SecurityParam<P>>> =
-                            ColumnEnumState::<P>::new(&rows).collect();
-
-                        assert_eq!(
-                            via_lockstep.len(),
-                            via_enum.len(),
-                            "mismatched chunk count for len={}",
-                            len
-                        );
-                        for (i, (a, b)) in via_lockstep.iter().zip(via_enum.iter()).enumerate() {
-                            for j in 0..SecurityParam::<P>::USIZE {
-                                assert_eq!(
-                                    a[j], b[j],
-                                    "mismatch at len={}, chunk={}, col={} ",
-                                    len, i, j
-                                );
-                            }
-                        }
-                    }
+                    super::test_transpose_lockstep_equals_enumerator::<$params>();
                 }
             }
         };

@@ -251,119 +251,124 @@ pub(crate) fn verify<P: Params>(
 
 #[cfg(test)]
 mod test {
-    use crate::parameters::{Binary128Bit, Binary256Bit};
+    use super::{IV, Key, commit, num_rec, open, reconstruct, verify};
+
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params, SecurityParamBytes};
+    use hybrid_array::typenum::Unsigned;
+
+    use proptest::prelude::{TestCaseError, prop_assert_eq};
+
+    #[test]
+    fn test_num_rec_at_len_4() {
+        let v = num_rec(&[false, false, false, false]);
+        assert_eq!(v, 0);
+        let v = num_rec(&[true, false, false, false]);
+        assert_eq!(v, 1);
+        let v = num_rec(&[true, true, true, true]);
+        assert_eq!(v, 15);
+        let v = num_rec(&[false, true, true, true]);
+        assert_eq!(v, 14);
+        let v = num_rec(&[true, false, true, true]);
+        assert_eq!(v, 13);
+    }
+
+    #[test]
+    fn test_num_rec_at_len_8() {
+        let v = num_rec(&[false, false, false, false, false, false, false, false]);
+        assert_eq!(v, 0);
+        let v = num_rec(&[true, false, false, false, false, false, false, false]);
+        assert_eq!(v, 1);
+        let v = num_rec(&[true, true, true, true, true, true, true, true]);
+        assert_eq!(v, 255);
+        let v = num_rec(&[false, true, true, true, true, true, true, true]);
+        assert_eq!(v, 254);
+        let v = num_rec(&[true, false, true, true, false, false, false, false]);
+        assert_eq!(v, 13);
+        let v = num_rec(&[true, false, true, true, false, true, false, true]);
+        assert_eq!(v, 173);
+    }
+
+    // Test the correctness of values computed by commit/open/verify/reconstruct
+    fn test_1_vc_correctness<P: Params>(
+        r: Key<P>,
+        iv: IV,
+        j: Vec<bool>,
+    ) -> Result<(), TestCaseError> {
+        let depth = j.len();
+        // prover side
+        let (h, decom, sd) = commit::<P>(r, iv, depth);
+        let (cop, com_j) = open(&decom, j.clone());
+
+        // verifier side
+        let j_num = num_rec(&j);
+        let r = verify::<P>(h, (cop.clone(), com_j.clone()), j.clone(), iv);
+        if r.is_err() {
+            return Err(TestCaseError::fail(r.err().unwrap().to_string()));
+        }
+
+        // test that the seeds from the prover are the same as the ones found by the verifier
+        let (_, seeds) = reconstruct::<P>((cop, com_j), j, iv);
+
+        for (i, seed) in seeds.iter().enumerate() {
+            if i != j_num {
+                prop_assert_eq!(&sd[i], seed);
+            }
+        }
+        Ok(())
+    }
+
+    fn test_1_vc_works_unit_depth_2<P: Params>() {
+        let iv = Default::default();
+        let r = Default::default();
+
+        let j = vec![false, true];
+        test_1_vc_correctness::<P>(r, iv, j).unwrap();
+    }
+
+    fn test_1_vc_works_unit_depth_3<P: Params>() {
+        let iv = Default::default();
+        let r = Default::default();
+
+        let j = vec![true, true, false];
+        test_1_vc_correctness::<P>(r, iv, j).unwrap();
+    }
+
+    fn test_1_vc_works_unit_depth_8<P: Params>() {
+        let iv = Default::default();
+        let r = Default::default();
+
+        let j = vec![false, true, true, false, false, true, true, true];
+        test_1_vc_correctness::<P>(r, iv, j).unwrap();
+    }
 
     macro_rules! make_tests {
         (mod $name:ident { params = $params:ty $(,)? }) => {
             mod $name {
                 use super::*;
-
-                #[allow(dead_code)]
-                type P = $params;
-
-                use super::super::{IV, Key, commit, num_rec, open, reconstruct, verify};
                 use proptest::prelude::*;
-
-                use crate::parameters::SecurityParamBytes;
-                use hybrid_array::typenum::Unsigned;
-
-                #[test]
-                fn test_num_rec_at_len_4() {
-                    let v = num_rec(&[false, false, false, false]);
-                    assert_eq!(v, 0);
-                    let v = num_rec(&[true, false, false, false]);
-                    assert_eq!(v, 1);
-                    let v = num_rec(&[true, true, true, true]);
-                    assert_eq!(v, 15);
-                    let v = num_rec(&[false, true, true, true]);
-                    assert_eq!(v, 14);
-                    let v = num_rec(&[true, false, true, true]);
-                    assert_eq!(v, 13);
-                }
-
-                #[test]
-                fn test_num_rec_at_len_8() {
-                    let v = num_rec(&[false, false, false, false, false, false, false, false]);
-                    assert_eq!(v, 0);
-                    let v = num_rec(&[true, false, false, false, false, false, false, false]);
-                    assert_eq!(v, 1);
-                    let v = num_rec(&[true, true, true, true, true, true, true, true]);
-                    assert_eq!(v, 255);
-                    let v = num_rec(&[false, true, true, true, true, true, true, true]);
-                    assert_eq!(v, 254);
-                    let v = num_rec(&[true, false, true, true, false, false, false, false]);
-                    assert_eq!(v, 13);
-                    let v = num_rec(&[true, false, true, true, false, true, false, true]);
-                    assert_eq!(v, 173);
-                }
-
-                // Test the correctness of values computed by commit/open/verify/reconstruct
-                fn test_1_vc_correctness(
-                    r: Key<P>,
-                    iv: IV,
-                    j: Vec<bool>,
-                ) -> Result<(), TestCaseError> {
-                    let depth = j.len();
-                    // prover side
-                    let (h, decom, sd) = commit::<P>(r, iv, depth);
-                    let (cop, com_j) = open(&decom, j.clone());
-
-                    // verifier side
-                    let j_num = num_rec(&j);
-                    let r = verify::<P>(h, (cop.clone(), com_j), j.clone(), iv);
-                    if r.is_err() {
-                        return Err(TestCaseError::fail(r.err().unwrap().to_string()));
-                    }
-
-                    // test that the seeds from the prover are the same as the ones found by the verifier
-                    let (_, seeds) = reconstruct::<P>((cop, com_j), j, iv);
-
-                    for (i, seed) in seeds.iter().enumerate() {
-                        if i != j_num {
-                            prop_assert_eq!(sd[i], *seed);
-                        }
-                    }
-                    Ok(())
-                }
-
                 #[test]
                 fn test_1_vc_works_unit_depth_2() {
-                    let iv = Default::default();
-                    let r = Default::default();
-
-                    let j = vec![false, true];
-                    test_1_vc_correctness(r, iv, j).unwrap();
+                    super::test_1_vc_works_unit_depth_2::<$params>();
                 }
-
                 #[test]
                 fn test_1_vc_works_unit_depth_3() {
-                    let iv = Default::default();
-                    let r = Default::default();
-
-                    let j = vec![true, true, false];
-                    test_1_vc_correctness(r, iv, j).unwrap();
+                    super::test_1_vc_works_unit_depth_3::<$params>();
                 }
-
                 #[test]
                 fn test_1_vc_works_unit_depth_8() {
-                    let iv = Default::default();
-                    let r = Default::default();
-
-                    let j = vec![false, true, true, false, false, true, true, true];
-                    test_1_vc_correctness(r, iv, j).unwrap();
+                    super::test_1_vc_works_unit_depth_8::<$params>();
                 }
-
                 proptest! {
                     #![proptest_config(ProptestConfig::with_cases(100))]
 
                     #[test]
                     fn test_1_vc_works_on_randomized_input(
-                        ref j in prop::collection::vec(any::<bool>(), 8),
+                        j in prop::collection::vec(any::<bool>(), 8),
                         iv in prop::array::uniform16(any::<u8>()),
-                        key in prop::collection::vec(any::<u8>(), SecurityParamBytes::<P>::USIZE),
+                        key in prop::collection::vec(any::<u8>(), SecurityParamBytes::<$params>::USIZE),
                     ) {
-                        let r = Key::<P>::try_from(key.as_slice()).unwrap();
-                        test_1_vc_correctness(r, iv, j.to_vec())?;
+                        let r = Key::<$params>::try_from(key.as_slice()).unwrap();
+                        super::test_1_vc_correctness::<$params>(r, iv, j)?;
                     }
                 }
             }

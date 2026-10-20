@@ -409,223 +409,227 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::{Binary128Bit, Binary256Bit};
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params};
+
+    use merlin::Transcript;
+    use rand::rng;
+    use std::io::Write;
+    use std::{fs::File, io::Cursor};
+    use swanky_error::{ErrorKind, Result, WrapErr};
+    use tempfile::tempdir;
+
+    use crate::{
+        circuit::load_circuit_prover,
+        vole::insecure::{InsecureCommitments, InsecureVole},
+    };
+
+    use super::{Circuit, Proof};
+
+    // Get a fresh transcript
+    fn transcript() -> Transcript {
+        Transcript::new(b"basic happy test transcript")
+    }
+
+    // Create a proof for the given circuit and input.
+    fn create_proof<P: Params>(
+        circuit_bytes: &'static str,
+        private_input_bytes: &'static str,
+    ) -> Result<(
+        Result<Proof<InsecureVole<P>, InsecureCommitments<P>>>,
+        Circuit,
+    )> {
+        let mut circuit_cursor = Cursor::new(circuit_bytes.as_bytes());
+
+        let dir = tempdir().unwrap();
+        let private_input_path = dir.path().join("schmivitz_private_inputs");
+        let mut private_input = File::create(private_input_path.clone()).unwrap();
+        writeln!(private_input, "{private_input_bytes}").unwrap();
+
+        let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
+        let rng = &mut rng();
+
+        let proof = Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_with_circuit(
+            &circuit,
+            &mut transcript(),
+            rng,
+        );
+        Ok((proof, circuit))
+    }
+
+    fn prove_doesnt_explode<P: Params>() -> Result<()> {
+        let mini_circuit_bytes = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 <- @private(0);
+              $1 <- @mul(0: $0, $0);
+              $2 <- @add(0: $0, $0);
+            @end ";
+        let private_input_bytes = "version 2.0.0;
+            private_input;
+            @type field 2;
+            @begin
+                < 1 >;
+            @end";
+
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes)?;
+        assert!(
+            proof?
+                .verify_with_circuit(&mini_circuit, &mut transcript())
+                .is_ok()
+        );
+
+        Ok(())
+    }
+
+    const SMALL_CIRCUIT: &str = "version 2.0.0;
+        circuit;
+        @type field 2;
+        @begin
+          $0 ... $4 <- @private(0);
+          $5 <- @add(0: $0, $0);
+          $6 <- @add(0: $0, $1);
+          $7 <- @add(0: $0, $2);
+          $8 <- @add(0: $0, $3);
+          $9 <- @add(0: $0, $4);
+          $10 <- @mul(0: $0, $5);
+          $11 <- @mul(0: $0, $6);
+          $12 <- @mul(0: $0, $7);
+          $13 <- @mul(0: $0, $8);
+          $14 <- @mul(0: $0, $9);
+        @end ";
+
+    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()> {
+        let private_input_bytes = "version 2.0.0;
+            private_input;
+            @type field 2;
+            @begin
+                < 1 >;
+                < 1 >;
+                < 1 >;
+                < 0 >;
+                < 0 >;
+            @end ";
+
+        let (proof, small_circuit) = create_proof::<P>(SMALL_CIRCUIT, private_input_bytes)?;
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, &mut transcript())
+                .is_ok()
+        );
+
+        Ok(())
+    }
+
+    fn prover_and_verifier_must_input_the_same_transcript<P: Params>() -> Result<()> {
+        let private_input_bytes = "version 2.0.0;
+        private_input;
+        @type field 2;
+        @begin
+            < 1 >;
+            < 0 >;
+            < 1 >;
+            < 0 >;
+            < 1 >;
+        @end ";
+
+        // This uses the output of `transcript()` as-is to prove. This should work
+        let (proof, small_circuit) = create_proof::<P>(SMALL_CIRCUIT, private_input_bytes)?;
+        assert!(proof.is_ok());
+
+        // If we use a different transcript to verify, it'll fail
+        let transcript = &mut transcript();
+        transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
+        assert!(
+            proof?
+                .verify_with_circuit(&small_circuit, transcript)
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    fn proof_requires_exact_number_of_challenges<P: Params>() -> Result<()> {
+        // Create a valid proof
+        let small_circuit_bytes = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 ... $4 <- @private(0);
+              $5 <- @add(0: $0, $0);
+              $6 <- @add(0: $0, $1);
+              $7 <- @add(0: $0, $2);
+              $8 <- @add(0: $0, $3);
+              $9 <- @add(0: $0, $4);
+              $10 <- @mul(0: $0, $5);
+              $11 <- @mul(0: $0, $6);
+              $12 <- @mul(0: $0, $7);
+              $13 <- @mul(0: $0, $8);
+              $14 <- @mul(0: $0, $9);
+            @end ";
+        let small_circuit_text = &mut Cursor::new(small_circuit_bytes.as_bytes());
+
+        let dir = tempdir().wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to create a temporary directory.",
+        )?;
+        let private_input_path = dir.path().join("basic_happy_small_test_path");
+        let mut private_input = File::create(private_input_path.clone()).wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to create private input file.",
+        )?;
+        let private_input_bytes = "version 2.0.0;
+            private_input;
+            @type field 2;
+            @begin
+                < 1 >;
+                < 0 >;
+                < 1 >;
+                < 0 >;
+                < 1 >;
+            @end ";
+        writeln!(private_input, "{private_input_bytes}").wrap_err(
+            ErrorKind::FilesystemError,
+            "Failed to write private input bytes to file.",
+        )?;
+
+        let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
+        let rng = &mut rng();
+
+        let proof = Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_with_circuit::<_>(
+            &small_circuit,
+            &mut transcript(),
+            rng,
+        )?;
+
+        assert!(
+            proof
+                .verify_with_circuit(&small_circuit, &mut transcript())
+                .is_ok()
+        );
+
+        Ok(())
+    }
 
     macro_rules! make_tests {
         (mod $name:ident { params = $params:ty $(,)? }) => {
             mod $name {
                 use super::*;
-
-                #[allow(dead_code)]
-                type P = $params;
-
-                use merlin::Transcript;
-                use rand::rng;
-                use std::io::Write;
-                use std::{fs::File, io::Cursor};
-                use swanky_error::{ErrorKind, Result, WrapErr};
-                use tempfile::tempdir;
-
-                use crate::{
-                    circuit::load_circuit_prover,
-                    vole::insecure::{InsecureCommitments, InsecureVole},
-                };
-
-                use super::super::{Circuit, Proof};
-
-                // Get a fresh transcript
-                fn transcript() -> Transcript {
-                    Transcript::new(b"basic happy test transcript")
-                }
-
-                // Create a proof for the given circuit and input.
-                fn create_proof(
-                    circuit_bytes: &'static str,
-                    private_input_bytes: &'static str,
-                ) -> Result<(
-                    Result<Proof<InsecureVole<P>, InsecureCommitments<P>>>,
-                    Circuit,
-                )> {
-                    let mut circuit_cursor = Cursor::new(circuit_bytes.as_bytes());
-
-                    let dir = tempdir().unwrap();
-                    let private_input_path = dir.path().join("schmivitz_private_inputs");
-                    let mut private_input = File::create(private_input_path.clone()).unwrap();
-                    writeln!(private_input, "{private_input_bytes}").unwrap();
-
-                    let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
-                    let rng = &mut rng();
-
-                    let proof =
-                        Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_with_circuit(
-                            &circuit,
-                            &mut transcript(),
-                            rng,
-                        );
-                    Ok((proof, circuit))
-                }
-
                 #[test]
                 fn prove_doesnt_explode() -> Result<()> {
-                    let mini_circuit_bytes = "version 2.0.0;
-                        circuit;
-                        @type field 2;
-                        @begin
-                          $0 <- @private(0);
-                          $1 <- @mul(0: $0, $0);
-                          $2 <- @add(0: $0, $0);
-                        @end ";
-                    let private_input_bytes = "version 2.0.0;
-                        private_input;
-                        @type field 2;
-                        @begin
-                            < 1 >;
-                        @end";
-
-                    let (proof, mini_circuit) =
-                        create_proof(mini_circuit_bytes, private_input_bytes)?;
-                    assert!(
-                        proof?
-                            .verify_with_circuit(&mini_circuit, &mut transcript())
-                            .is_ok()
-                    );
-
-                    Ok(())
+                    super::prove_doesnt_explode::<$params>()
                 }
-
-                const SMALL_CIRCUIT: &str = "version 2.0.0;
-                    circuit;
-                    @type field 2;
-                    @begin
-                      $0 ... $4 <- @private(0);
-                      $5 <- @add(0: $0, $0);
-                      $6 <- @add(0: $0, $1);
-                      $7 <- @add(0: $0, $2);
-                      $8 <- @add(0: $0, $3);
-                      $9 <- @add(0: $0, $4);
-                      $10 <- @mul(0: $0, $5);
-                      $11 <- @mul(0: $0, $6);
-                      $12 <- @mul(0: $0, $7);
-                      $13 <- @mul(0: $0, $8);
-                      $14 <- @mul(0: $0, $9);
-                    @end ";
-
                 #[test]
                 fn prove_works_on_slightly_larger_circuit() -> Result<()> {
-                    let private_input_bytes = "version 2.0.0;
-                        private_input;
-                        @type field 2;
-                        @begin
-                            < 1 >;
-                            < 1 >;
-                            < 1 >;
-                            < 0 >;
-                            < 0 >;
-                        @end ";
-
-                    let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
-                    assert!(
-                        proof?
-                            .verify_with_circuit(&small_circuit, &mut transcript())
-                            .is_ok()
-                    );
-
-                    Ok(())
+                    super::prove_works_on_slightly_larger_circuit::<$params>()
                 }
-
                 #[test]
                 fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
-                    let private_input_bytes = "version 2.0.0;
-                    private_input;
-                    @type field 2;
-                    @begin
-                        < 1 >;
-                        < 0 >;
-                        < 1 >;
-                        < 0 >;
-                        < 1 >;
-                    @end ";
-
-                    // This uses the output of `transcript()` as-is to prove. This should work
-                    let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
-                    assert!(proof.is_ok());
-
-                    // If we use a different transcript to verify, it'll fail
-                    let transcript = &mut transcript();
-                    transcript
-                        .append_message(b"I am but a simple verifier", b"trying to be secure");
-                    assert!(
-                        proof?
-                            .verify_with_circuit(&small_circuit, transcript)
-                            .is_err()
-                    );
-
-                    Ok(())
+                    super::prover_and_verifier_must_input_the_same_transcript::<$params>()
                 }
-
                 #[test]
                 fn proof_requires_exact_number_of_challenges() -> Result<()> {
-                    // Create a valid proof
-                    let small_circuit_bytes = "version 2.0.0;
-                        circuit;
-                        @type field 2;
-                        @begin
-                          $0 ... $4 <- @private(0);
-                          $5 <- @add(0: $0, $0);
-                          $6 <- @add(0: $0, $1);
-                          $7 <- @add(0: $0, $2);
-                          $8 <- @add(0: $0, $3);
-                          $9 <- @add(0: $0, $4);
-                          $10 <- @mul(0: $0, $5);
-                          $11 <- @mul(0: $0, $6);
-                          $12 <- @mul(0: $0, $7);
-                          $13 <- @mul(0: $0, $8);
-                          $14 <- @mul(0: $0, $9);
-                        @end ";
-                    let small_circuit_text = &mut Cursor::new(small_circuit_bytes.as_bytes());
-
-                    let dir = tempdir().wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Failed to create a temporary directory.",
-                    )?;
-                    let private_input_path = dir.path().join("basic_happy_small_test_path");
-                    let mut private_input = File::create(private_input_path.clone()).wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Failed to create private input file.",
-                    )?;
-                    let private_input_bytes = "version 2.0.0;
-                        private_input;
-                        @type field 2;
-                        @begin
-                            < 1 >;
-                            < 0 >;
-                            < 1 >;
-                            < 0 >;
-                            < 1 >;
-                        @end ";
-                    writeln!(private_input, "{private_input_bytes}").wrap_err(
-                        ErrorKind::FilesystemError,
-                        "Failed to write private input bytes to file.",
-                    )?;
-
-                    let small_circuit =
-                        load_circuit_prover(small_circuit_text, &private_input_path)?;
-                    let rng = &mut rng();
-
-                    let proof =
-                        Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_with_circuit::<_>(
-                            &small_circuit,
-                            &mut transcript(),
-                            rng,
-                        )?;
-
-                    assert!(
-                        proof
-                            .verify_with_circuit(&small_circuit, &mut transcript())
-                            .is_ok()
-                    );
-
-                    Ok(())
+                    super::proof_requires_exact_number_of_challenges::<$params>()
                 }
             }
         };
