@@ -2944,6 +2944,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-ot-kos-new"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
+ "swanky-channel",
+ "swanky-cointoss",
+ "swanky-cr-hash",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-chou-orlandi-new",
+ "swanky-ot-iknp",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "swanky-rng",
+ "swanky-serialization",
+ "vectoreyes",
+]
+
+[[package]]
 name = "swanky-ot-naor-pinkas-new"
 version = "0.6.0"
 dependencies = [
