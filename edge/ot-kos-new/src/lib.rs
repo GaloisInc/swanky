@@ -1,6 +1,24 @@
 #![deny(missing_docs)]
 //! Implementation of the Keller-Orsini-Scholl oblivious transfer
 //! extension protocol (cf. <https://eprint.iacr.org/2015/546>).
+//!
+//! <div class="warning">
+//!
+//! ## Security
+//!
+//! The KOS protocol has _not_ been proven secure.
+//! In particular, a core lemma regarding the KOS consistency check
+//! has no proof, and attacks (albeit currently impractical) exist.
+//! While we do not believe such existing attacks affect _this_
+//! implementation, the lack of a security proof suggests more
+//! feasible attacks could exist.
+//! Thus we believe it is best to avoid using KOS, instead using a
+//! protocol such as SoftSpokenOT (cf.
+//! <https://eprint.iacr.org/2022/192>).
+//! We are in the process of implementing SoftSpokenOT in Swanky, and
+//! once complete will remove KOS from the repository.
+//!
+//! </div>
 
 use rand::{CryptoRng, Rng, SeedableRng};
 
