@@ -43,7 +43,7 @@ use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
 use vectoreyes::U8x16;
 
 /// The statistical security parameter.
-const SSP: usize = 40;
+const STATISTICAL_SECPARAM: usize = 40;
 
 /// The Keller-Orsini-Scholl (random) OT protocol.
 ///
@@ -82,7 +82,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
     ) -> Result<Vec<u8>> {
         let n_ots = n_ots + (8 - n_ots % 8) % 8;
 
-        let ncols = n_ots + 128 + SSP;
+        let ncols = n_ots + 128 + STATISTICAL_SECPARAM;
 
         let mut r: PartyPrivate<Receiver, P, _> =
             PartyPrivate::new_with(|| Vec::with_capacity((ncols / 8) + (8 - (ncols / 8) % 8) % 8))
