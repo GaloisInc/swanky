@@ -63,11 +63,11 @@ fn run<P: Params>() -> swanky_error::Result<()> {
         bytes as f64 / 1024.0
     );
 
-    // `proof_size_estimate` is an estimate, and currently an imprecise one: it omits
+    // TODO: `proof_size_estimate` is an estimate, and currently an imprecise one: it omits
     // `assert_zero_commitment`, hardcodes the degree-1 commitment at 16 bytes rather than
-    // `SecurityParam / 8`, and computes `u_tilda` as `SecurityParam + B / 8` where
-    // `(SecurityParam + B) / 8` was intended. It is also not a serialized length, since the
-    // proof has no serialization yet.
+    // `SecurityParam / 8`, and computes `u_tilda` as `SecurityParam + B / 8` where `(SecurityParam
+    // + B) / 8` was intended. It is also not a serialized length, since the proof has no
+    // serialization yet.
     Ok(())
 }
 
