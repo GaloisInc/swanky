@@ -1,8 +1,0 @@
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-flamegraph-*.svg
-intel-advisor-roofline-*.html
-memory-dhat-*.json
-*.time.log
