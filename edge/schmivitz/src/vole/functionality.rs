@@ -375,7 +375,6 @@ mod test {
     use super::{Chall1, Chall2, H1, HashConsistency};
     use super::{VoleProver, VoleVerifier, verify};
     use crate::parameters::{FLambda, SecurityParam, SecurityParamBytes, Xof};
-    use crate::vole::consistency_check::flambda_from_bytes_array;
     use crate::vole::functionality::compute_chall_3;
     use hybrid_array::{Array, typenum::Unsigned};
     use rand::rng;
@@ -506,7 +505,7 @@ mod test {
 
     fn test_form<P: Params>() {
         let v: Array<_, SecurityParamBytes<P>> = Array::from_fn(|_| 27u8);
-        let t: FLambda<P> = flambda_from_bytes_array::<P>(v.as_slice()).unwrap();
+        let t: FLambda<P> = FLambda::<P>::from_bytes(&v).unwrap();
         assert_eq!(t.to_bytes()[0], 27u8);
         assert_eq!(t.to_bytes()[1], 27u8);
 

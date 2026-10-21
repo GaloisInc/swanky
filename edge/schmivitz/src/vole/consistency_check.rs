@@ -19,26 +19,13 @@ use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F8b};
 use swanky_serialization::CanonicalSerialize;
 
-type FLambdaFromBytesError<P> = <FLambda<P> as CanonicalSerialize>::FromBytesError;
-
-/// Form an [`FLambda`] value from an [`Array`] of bytes, rather than a [`GenericArray`].
-/// This is a wrapper around [`CanonicalSerialize::from_bytes`], since it currently uses
-/// `generic-array`.
-pub(crate) fn flambda_from_bytes_array<P: Params>(
-    arr: &[u8],
-) -> Result<FLambda<P>, FLambdaFromBytesError<P>> {
-    let garr = Array::<u8, SecurityParamBytes<P>>::try_from(arr)
-        .expect("wrong number of bytes to create an FLambda element");
-    FLambda::<P>::from_bytes(&garr)
-}
-
 /// Packs bits of the input into `FLambda<P>`s. This does not do a field-to-field transformation;
 /// it uses `FLambda<P>` as a representation of $`\lambda`$ bits, not as a polynomial!
 fn pack_flambda<P: Params>(arrs: &[Array<F8b, RepetitionParam<P>>]) -> Vec<FLambda<P>> {
     arrs.into_par_iter()
         .map(|xi| {
-            let xi_bytes: Array<_, RepetitionParam<P>> = Array::from_fn(|j| xi[j].to_bytes()[0]);
-            flambda_from_bytes_array::<P>(xi_bytes.as_slice())
+            let xi_bytes: Array<_, SecurityParamBytes<P>> = Array::from_fn(|j| xi[j].to_bytes()[0]);
+            FLambda::<P>::from_bytes(&xi_bytes)
         })
         .collect::<Result<_, _>>()
         .unwrap()
@@ -99,7 +86,7 @@ fn to_field_flambda_and_pad_lockstep<P: Params>(
                 transpose_u8_matrix(&b_128_alt, &mut b_128);
 
                 let arr: Array<FLambda<P>, SecurityParam<P>> =
-                    b_128.map(|v| flambda_from_bytes_array::<P>(v.as_slice()).unwrap());
+                    b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
                 out.push(arr);
 
                 // reset
@@ -121,7 +108,7 @@ fn to_field_flambda_and_pad_lockstep<P: Params>(
         transpose_u8_matrix(&b_128_alt, &mut b_128);
 
         let arr: Array<FLambda<P>, SecurityParam<P>> =
-            b_128.map(|v| flambda_from_bytes_array::<P>(v.as_slice()).unwrap());
+            b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
         out.push(arr);
     }
 
@@ -192,7 +179,7 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
                     transpose_u8_matrix(&b_128_alt, &mut b_128);
 
                     let arr: Array<FLambda<P>, SecurityParam<P>> =
-                        b_128.map(|v| flambda_from_bytes_array::<P>(v.as_slice()).unwrap());
+                        b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
                     out = arr;
                     break;
                 } else {
@@ -209,7 +196,7 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
                     transpose_u8_matrix(&b_128_alt, &mut b_128);
 
                     let arr: Array<FLambda<P>, SecurityParam<P>> =
-                        b_128.map(|v| flambda_from_bytes_array::<P>(v.as_slice()).unwrap());
+                        b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
                     out = arr;
                     break;
                 }
