@@ -2498,7 +2498,6 @@ dependencies = [
  "swanky-ot-test-new",
  "swanky-ot-traits-new",
  "swanky-party",
- "swanky-rng",
  "vectoreyes",
 ]
 
