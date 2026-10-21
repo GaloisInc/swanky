@@ -62,8 +62,8 @@ fn to_field_flambda_and_pad_lockstep<P: Params>(
         };
     let mut out = Vec::with_capacity(how_many);
 
-    let mut b_128: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> = Array::default();
-    let mut b_128_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> = Array::default();
+    let mut b_lambda: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> = Array::default();
+    let mut b_lambda_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> = Array::default();
     let mut byte_num = 0;
     let mut bit_num: usize = 0;
     for b in x.iter() {
@@ -74,26 +74,26 @@ fn to_field_flambda_and_pad_lockstep<P: Params>(
             *p = u8::from(*b).wrapping_neg() & hot_bit;
         }
 
-        let t = &mut b_128_alt[byte_num];
-        for (e, b_128_alt_byte_num_i) in t.iter_mut().enumerate() {
-            *b_128_alt_byte_num_i |= b_vec[e];
+        let t = &mut b_lambda_alt[byte_num];
+        for (e, b_lambda_alt_byte_num_i) in t.iter_mut().enumerate() {
+            *b_lambda_alt_byte_num_i |= b_vec[e];
         }
 
         if bit_num == 7 {
             bit_num = 0; // restart at the beginning of byte
             if byte_num == SecurityParamBytes::<P>::USIZE - 1 {
                 // NOTE: this loop is the bottle-neck in this function
-                transpose_u8_matrix(&b_128_alt, &mut b_128);
+                transpose_u8_matrix(&b_lambda_alt, &mut b_lambda);
 
                 let arr: Array<FLambda<P>, SecurityParam<P>> =
-                    b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
+                    b_lambda.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
                 out.push(arr);
 
                 // reset
                 byte_num = 0;
                 // reset
-                b_128 = Array::default();
-                b_128_alt = Array::default();
+                b_lambda = Array::default();
+                b_lambda_alt = Array::default();
             } else {
                 byte_num += 1;
             }
@@ -104,11 +104,11 @@ fn to_field_flambda_and_pad_lockstep<P: Params>(
 
     // Still have to push a last value if the previous loop terminated before processing `SecurityParam::<P>::USIZE` bits.
     if (bit_num != 0) | (byte_num != 0) {
-        // transpose from b_128_alt to b_128
-        transpose_u8_matrix(&b_128_alt, &mut b_128);
+        // transpose from b_lambda_alt to b_lambda
+        transpose_u8_matrix(&b_lambda_alt, &mut b_lambda);
 
         let arr: Array<FLambda<P>, SecurityParam<P>> =
-            b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
+            b_lambda.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
         out.push(arr);
     }
 
@@ -141,8 +141,8 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
             return None;
         }
 
-        let mut b_128: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> = Array::default();
-        let mut b_128_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> =
+        let mut b_lambda: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> = Array::default();
+        let mut b_lambda_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> =
             Array::default();
         let mut byte_num = 0;
         let mut bit_num: usize = 0;
@@ -165,9 +165,9 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
                 }
             }
 
-            let t = &mut b_128_alt[byte_num];
-            for (e, b_128_alt_byte_num_i) in t.iter_mut().enumerate() {
-                *b_128_alt_byte_num_i |= b_vec[e];
+            let t = &mut b_lambda_alt[byte_num];
+            for (e, b_lambda_alt_byte_num_i) in t.iter_mut().enumerate() {
+                *b_lambda_alt_byte_num_i |= b_vec[e];
             }
 
             if bit_num == 7 {
@@ -176,10 +176,10 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
                     // This double loop is optimal that way to maximize the cache hit for reads.
                     // The writes will be batched on write-back
                     // NOTE: this loop is the bottle-neck in this function
-                    transpose_u8_matrix(&b_128_alt, &mut b_128);
+                    transpose_u8_matrix(&b_lambda_alt, &mut b_lambda);
 
                     let arr: Array<FLambda<P>, SecurityParam<P>> =
-                        b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
+                        b_lambda.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
                     out = arr;
                     break;
                 } else {
@@ -192,11 +192,11 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
             if self.length == self.index {
                 // Still have to push a last value if the previous loop terminated before processing `SECURITY_PARAMETER` bits.
                 if (bit_num != 0) | (byte_num != 0) {
-                    // transpose from b_128_alt to b_128
-                    transpose_u8_matrix(&b_128_alt, &mut b_128);
+                    // transpose from b_lambda_alt to b_lambda
+                    transpose_u8_matrix(&b_lambda_alt, &mut b_lambda);
 
                     let arr: Array<FLambda<P>, SecurityParam<P>> =
-                        b_128.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
+                        b_lambda.map(|v| FLambda::<P>::from_bytes(&v).unwrap());
                     out = arr;
                     break;
                 }
