@@ -37,7 +37,7 @@ pub(crate) fn flambda_from_bytes_array<P: Params>(
 fn pack_flambda<P: Params>(arrs: &[Array<F8b, RepetitionParam<P>>]) -> Vec<FLambda<P>> {
     arrs.into_par_iter()
         .map(|xi| {
-            let xi_bytes = xi.clone().map(|xij| xij.to_bytes()[0]);
+            let xi_bytes: Array<_, RepetitionParam<P>> = Array::from_fn(|j| xi[j].to_bytes()[0]);
             flambda_from_bytes_array::<P>(xi_bytes.as_slice())
         })
         .collect::<Result<_, _>>()
