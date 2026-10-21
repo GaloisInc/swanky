@@ -36,13 +36,6 @@ members = [
   "edge/humidor",
   "edge/inferno",
   "edge/keyed_arena",
-  "edge/mac-n-cheese/compiler",
-  "edge/mac-n-cheese/event-log",
-  "edge/mac-n-cheese/inspector",
-  "edge/mac-n-cheese/ir",
-  "edge/mac-n-cheese/runner",
-  "edge/mac-n-cheese/vole",
-  "edge/mac-n-cheese/wire-map",
   "edge/malicious-hooks",
   "edge/oprf-kkrt",
   "edge/oprf-kmprt",
@@ -96,13 +89,6 @@ fancy-traits = { path = "edge/fancy-traits" }
 humidor = { path = "edge/humidor" }
 inferno = { path = "edge/inferno" }
 keyed_arena = { path = "edge/keyed_arena" }
-mac-n-cheese-compiler = { path = "edge/mac-n-cheese/compiler" }
-mac-n-cheese-event-log = { path = "edge/mac-n-cheese/event-log" }
-mac-n-cheese-inspector = { path = "edge/mac-n-cheese/inspector" }
-mac-n-cheese-ir = { path = "edge/mac-n-cheese/ir" }
-mac-n-cheese-runner = { path = "edge/mac-n-cheese/runner" }
-mac-n-cheese-vole = { path = "edge/mac-n-cheese/vole" }
-mac-n-cheese-wire-map = { path = "edge/mac-n-cheese/wire-map" }
 popsicle = { path = "edge/popsicle" }
 schmivitz = { path = "edge/schmivitz" }
 simple-arith-circuit = { path = "edge/simple-arith-circuit" }
