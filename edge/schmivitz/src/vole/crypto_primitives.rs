@@ -28,11 +28,6 @@ impl<P: Params> Prg<P> {
     pub(crate) fn new(seed: Seed<P>, iv: IV) -> Self {
         Self(P::new_prng_with_iv(&seed, iv))
     }
-
-    /// Create a new [`Prg`] using the provided [`Seed`].
-    pub(crate) fn new_no_iv(seed: Seed<P>) -> Self {
-        Self(P::new_prng(&seed))
-    }
 }
 
 impl<P: Params> TryRng for Prg<P> {
