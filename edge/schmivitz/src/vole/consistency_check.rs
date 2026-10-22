@@ -63,7 +63,8 @@ fn to_field_flambda_and_pad_lockstep<P: Params>(
     let mut out = Vec::with_capacity(how_many);
 
     let mut b_lambda: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> = Array::default();
-    let mut b_lambda_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> = Array::default();
+    let mut b_lambda_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> =
+        Array::default();
     let mut byte_num = 0;
     let mut bit_num: usize = 0;
     for b in x.iter() {
@@ -141,7 +142,8 @@ impl<P: Params> Iterator for ColumnEnumState<'_, P> {
             return None;
         }
 
-        let mut b_lambda: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> = Array::default();
+        let mut b_lambda: Array<Array<u8, SecurityParamBytes<P>>, SecurityParam<P>> =
+            Array::default();
         let mut b_lambda_alt: Array<Array<u8, SecurityParam<P>>, SecurityParamBytes<P>> =
             Array::default();
         let mut byte_num = 0;
