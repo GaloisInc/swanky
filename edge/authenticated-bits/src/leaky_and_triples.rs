@@ -140,12 +140,12 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
     /// Authenticated Garbling for Faster Secure Two-Party Computation".
     /// <https://eprint.iacr.org/2018/578.pdf>
     pub(crate) fn generate<RNG: CryptoRng>(
-        &mut self,
+        mut self,
         ntriples: usize,
         out: &mut Vec<LeakyAndTriple<P>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()> {
+    ) -> swanky_error::Result<Self> {
         // The protocol works as follows.
         //
         // The parties begin by generating random shares, and viewing them as an
@@ -207,8 +207,9 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
 
         // A and B obtain random authenticated shares `(⟨x₁|x₂⟩, ⟨y₁|y₂⟩,
         // ⟨z₁|r⟩)`.
-        self.auth_share_generator
-            .generate(nshares, &mut shares, channel, rng)?;
+        self.auth_share_generator =
+            self.auth_share_generator
+                .generate(nshares, &mut shares, channel, rng)?;
 
         // We need to compute `H(K[x])` twice below, so we cache the result to
         // save on hashing the same value twice.
@@ -350,7 +351,8 @@ impl<P: GenericParty> LeakyAndTripleGenerator<P> {
             }
         }
         // Check the equality on all the `L` values to enforce proper behavior.
-        feq.finalize(channel)
+        feq.finalize(channel)?;
+        Ok(self)
     }
 
     /// Open the (leaky) AND triples in `triples` using a supplied $`\Delta`$ value.
@@ -545,21 +547,24 @@ mod tests {
 
     fn generate_triples(
         ntriples: usize,
-        generator_a: &mut LeakyAndTripleGenerator<PartyA>,
-        generator_b: &mut LeakyAndTripleGenerator<PartyB>,
+        generator_a: LeakyAndTripleGenerator<PartyA>,
+        generator_b: LeakyAndTripleGenerator<PartyB>,
         mut rng_a: &mut SwankyRng,
         mut rng_b: &mut SwankyRng,
-    ) -> (Vec<LeakyAndTriple<PartyA>>, Vec<LeakyAndTriple<PartyB>>) {
+    ) -> (
+        (LeakyAndTripleGenerator<PartyA>, Vec<LeakyAndTriple<PartyA>>),
+        (LeakyAndTripleGenerator<PartyB>, Vec<LeakyAndTriple<PartyB>>),
+    ) {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut triples: Vec<LeakyAndTriple<PartyA>> = vec![];
-                generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
-                Ok(triples)
+                let generator_a = generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
+                Ok((generator_a, triples))
             },
             |c| {
                 let mut triples: Vec<LeakyAndTriple<PartyB>> = vec![];
-                generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
-                Ok(triples)
+                let generator_b = generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
+                Ok((generator_b, triples))
             },
         )
         .unwrap()
@@ -594,8 +599,8 @@ mod tests {
                                    seed_b in any::<u128>()) {
             let mut rng_a = SwankyRng::from_seed(seed_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_b.into());
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, triples_a), (generator_b, triples_b)) = generate_triples(ntriples, generator_a, generator_b, &mut rng_a, &mut rng_b);
             let (validation_a, validation_b) =
                 validate(&generator_a, &generator_b, triples_a, triples_b);
             prop_assert!(validation_a);
@@ -613,8 +618,8 @@ mod tests {
             let nleaky = ntriples * bucket_size;
             let mut rng_a = SwankyRng::from_seed(seed_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_b.into());
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (triples_a, triples_b) = generate_triples(nleaky, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, triples_a), (generator_b, triples_b)) = generate_triples(nleaky, generator_a, generator_b, &mut rng_a, &mut rng_b);
             swanky_channel::local::local_channel_pair(
                 |channel| {
                     let mut out = vec![];

@@ -37,7 +37,7 @@
 //!         let mut authshares: Vec<AuthShare<PartyA>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
-//!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
+//!         generator = generator.generate(nshares, &mut authshares, c, &mut rng)?;
 //!         generator.open(&authshares, &mut bits, c)?;
 //!         Ok(bits)
 //!     },
@@ -47,7 +47,7 @@
 //!         let mut authshares: Vec<AuthShare<PartyB>> = vec![];
 //!         let mut bits: Vec<F2> = vec![];
 //!         let mut generator: AuthShareGenerator<_> = AuthShareGenerator::new(c, &mut rng)?;
-//!         generator.generate(nshares, &mut authshares, c, &mut rng)?;
+//!         generator = generator.generate(nshares, &mut authshares, c, &mut rng)?;
 //!         generator.open(&authshares, &mut bits, c)?;
 //!         Ok(bits)
 //!     }
@@ -223,12 +223,12 @@ impl<P: GenericParty> AuthShareGenerator<P> {
     ///
     /// The `nshares` generated shares are [`Vec::extend`]ed into `shares`.
     pub fn generate<RNG: CryptoRng>(
-        &mut self,
+        mut self,
         nshares: usize,
         shares: &mut Vec<AuthShare<P>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()> {
+    ) -> swanky_error::Result<Self> {
         let bits: Vec<_> = (0..nshares).map(|_| rng.random::<F2>()).collect();
 
         let mut party_a_auth_bits = Vec::with_capacity(nshares);
@@ -239,11 +239,24 @@ impl<P: GenericParty> AuthShareGenerator<P> {
             PartyEither::new(Witness::EQUAL_TYPES, nshares);
         match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => {
-                let party_a = self.party_a.as_mut().into_inner(ev);
-                let party_b = self.party_b.as_mut().into_inner(ev);
-
-                party_a.generate(bits, &mut party_a_auth_bits, channel, rng)?;
-                party_b.generate(nshares, &mut party_b_auth_bits, channel, rng)?;
+                self.party_a = PartyEither::new(
+                    ev,
+                    self.party_a.into_inner(ev).generate(
+                        bits,
+                        &mut party_a_auth_bits,
+                        channel,
+                        rng,
+                    )?,
+                );
+                self.party_b = PartyEither::new(
+                    ev,
+                    self.party_b.into_inner(ev).generate(
+                        nshares,
+                        &mut party_b_auth_bits,
+                        channel,
+                        rng,
+                    )?,
+                );
 
                 shares.extend(party_a_auth_bits.into_iter().zip(party_b_auth_bits).map(
                     |(party_a_val, party_b_val)| AuthShare {
@@ -253,11 +266,24 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 ));
             }
             GenericWhichParty::Party1(ev) => {
-                let party_a = self.party_a.as_mut().into_inner(ev);
-                let party_b = self.party_b.as_mut().into_inner(ev);
-
-                party_a.generate(nshares, &mut party_b_auth_bits, channel, rng)?;
-                party_b.generate(bits, &mut party_a_auth_bits, channel, rng)?;
+                self.party_a = PartyEither::new(
+                    ev,
+                    self.party_a.into_inner(ev).generate(
+                        nshares,
+                        &mut party_b_auth_bits,
+                        channel,
+                        rng,
+                    )?,
+                );
+                self.party_b = PartyEither::new(
+                    ev,
+                    self.party_b.into_inner(ev).generate(
+                        bits,
+                        &mut party_a_auth_bits,
+                        channel,
+                        rng,
+                    )?,
+                );
 
                 shares.extend(party_a_auth_bits.into_iter().zip(party_b_auth_bits).map(
                     |(party_a_val, party_b_val)| AuthShare {
@@ -267,7 +293,7 @@ impl<P: GenericParty> AuthShareGenerator<P> {
                 ));
             }
         }
-        Ok(())
+        Ok(self)
     }
 
     /// Open the authenticated shares in `shares`.
@@ -562,19 +588,27 @@ mod tests {
     /// Generates `AuthShare`s.
     fn generate(
         nshares: usize,
-        generator_a: &mut AuthShareGenerator<PartyA>,
-        generator_b: &mut AuthShareGenerator<PartyB>,
+        generator_a: AuthShareGenerator<PartyA>,
+        generator_b: AuthShareGenerator<PartyB>,
         mut rng_a: &mut SwankyRng,
         mut rng_b: &mut SwankyRng,
-    ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
+    ) -> (
+        (AuthShareGenerator<PartyA>, Vec<AuthShare<PartyA>>),
+        (AuthShareGenerator<PartyB>, Vec<AuthShare<PartyB>>),
+    ) {
         let mut output_a: Vec<AuthShare<PartyA>> = vec![];
         let mut output_b: Vec<AuthShare<PartyB>> = vec![];
         swanky_channel::local::local_channel_pair(
-            |c| generator_a.generate(nshares, &mut output_a, c, &mut rng_a),
-            |c| generator_b.generate(nshares, &mut output_b, c, &mut rng_b),
+            |c| {
+                let generator_a = generator_a.generate(nshares, &mut output_a, c, &mut rng_a)?;
+                Ok((generator_a, output_a))
+            },
+            |c| {
+                let generator_b = generator_b.generate(nshares, &mut output_b, c, &mut rng_b)?;
+                Ok((generator_b, output_b))
+            },
         )
-        .unwrap();
-        (output_a, output_b)
+        .unwrap()
     }
 
     /// Open vectors of `AuthShare`s using their associated generators.
@@ -606,8 +640,8 @@ mod tests {
                                    seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (output_a, output_b) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, output_a), (generator_b, output_b)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
             let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(validation_a);
             prop_assert!(validation_b);
@@ -619,14 +653,9 @@ mod tests {
         let nshares = 1000usize;
         let mut rng_a = SwankyRng::new();
         let mut rng_b = SwankyRng::new();
-        let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-        let (shares_a, shares_b) = generate(
-            nshares,
-            &mut generator_a,
-            &mut generator_b,
-            &mut rng_a,
-            &mut rng_b,
-        );
+        let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+        let ((generator_a, shares_a), (generator_b, shares_b)) =
+            generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
         let (output_bits_a, output_bits_b) = swanky_channel::local::local_channel_pair(
             |channel| {
                 AuthShareGenerator::open_my_shares(&shares_a, channel).unwrap();
@@ -674,9 +703,9 @@ mod tests {
                               seed_party_a in any::<u128>(), seed_party_b in any::<u128>()) {
             let mut rng_a = SwankyRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (output_a, _) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
-            let (_, output_d) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, output_a), ( generator_b, _)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
+            let ((generator_a, _), (generator_b, output_d)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
             let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_d);
             prop_assert!(!validation_a);
             prop_assert!(!validation_b);
@@ -691,9 +720,9 @@ mod tests {
             let mut rng_a = SwankyRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
             let index = index.index(nshares);
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (output_a, mut output_b) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
-            let (_, output_d) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, output_a), (generator_b, mut output_b)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
+            let ((generator_a, _), (generator_b, output_d)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
             output_b[index] = output_d[index];
             let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(!validation_a);
@@ -709,9 +738,9 @@ mod tests {
             let mut rng_a = SwankyRng::from_seed(U8x16::from(seed_party_a));
             let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
             let index = index.index(nshares);
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (mut output_a, output_b) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
-            let (output_c, _) = generate(nshares, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, mut output_a), (generator_b, output_b)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
+            let ((generator_a, output_c), (generator_b, _)) = generate(nshares, generator_a, generator_b, &mut rng_a, &mut rng_b);
             output_a[index] = output_c[index];
             let ((validation_a, _), (validation_b, _)) = open(&generator_a, &generator_b, output_a, output_b);
             prop_assert!(!validation_a);
@@ -728,8 +757,8 @@ mod tests {
             let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
             let constants: Vec<F2> = constants.into_iter().map(F2::from).collect();
             let count = constants.len();
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (output_a, output_b) = generate(count, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, output_a), (generator_b, output_b)) = generate(count, generator_a, generator_b, &mut rng_a, &mut rng_b);
             for ((a, b), bit) in output_a
                 .into_iter()
                 .zip(output_b.into_iter())
@@ -756,8 +785,8 @@ mod tests {
             let mut rng_b = SwankyRng::from_seed(U8x16::from(seed_party_b));
             let constants: Vec<F2> = constants.into_iter().map(F2::from).collect();
             let count = constants.len();
-            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
-            let (output_a, output_b) = generate(count, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
+            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
+            let ((generator_a, output_a), (generator_b, output_b)) = generate(count, generator_a, generator_b, &mut rng_a, &mut rng_b);
             for ((a, b), bit) in output_a
                 .into_iter()
                 .zip(output_b.into_iter())
