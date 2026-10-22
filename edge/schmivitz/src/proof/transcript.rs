@@ -4,7 +4,7 @@ use swanky_serialization::CanonicalSerialize;
 use swanky_sieve_ir_parser::WireId;
 
 use crate::parameters::{
-    FLambda, FieldSize, Params, RepetitionParam, SecurityParam, SecurityParamBytes, VoleSizeParam,
+    FLambda, FieldSize, Params, RepetitionParam, SecurityParam, SecurityParamBytes, SmallVoleSize,
 };
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
@@ -36,7 +36,7 @@ impl Transcript<'_> {
             .append_message(b"p: field size", &FieldSize::USIZE.to_le_bytes());
         self.0.append_message(
             b"r: VOLE size parameter",
-            &VoleSizeParam::USIZE.to_le_bytes(),
+            &SmallVoleSize::USIZE.to_le_bytes(),
         );
         self.0.append_message(
             b"tau: repetition parameter",

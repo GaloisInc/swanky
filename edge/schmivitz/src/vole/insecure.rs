@@ -28,7 +28,7 @@ pub(crate) struct InsecureVole<P: Params> {
     /// Random values $`\bf u`$ that were committed to.
     ///
     /// Guarantee: This has length `extended_witness_length` + r\tau `$, where $`r`$ is the
-    /// [`VoleSizeParam`] and $`\tau`$ is the [`RepetitionParam`].
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize) and $`\tau`$ is the [`RepetitionParam`].
     values: Vec<F2>,
 
     /// Verifier's chosen random key $`\bf \Delta`$.
@@ -37,7 +37,7 @@ pub(crate) struct InsecureVole<P: Params> {
     /// Masks for the random values $`\bf V`$.
     ///
     /// Guarantee: This has length `extended_witness_length` $`+ r\tau `$, where $`r`$ is the
-    /// [`VoleSizeParam`] and $`\tau`$ is the [`RepetitionParam`].
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize) and $`\tau`$ is the [`RepetitionParam`].
     masks: Vec<Array<F8b, RepetitionParam<P>>>,
 }
 
@@ -192,7 +192,7 @@ pub(crate) struct InsecureCommitments<P: Params> {
     /// Commitments $`\bf Q`$ to the random values using the specified key and masks.
     ///
     /// Guarantee: This has length `extended_witness_length` $`+ r\tau `$, where $`r`$ is the
-    /// [`VoleSizeParam`] and $`\tau`$ is the [`RepetitionParam`].
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize) and $`\tau`$ is the [`RepetitionParam`].
     verifier_commitments: Vec<Array<F8b, RepetitionParam<P>>>,
 }
 

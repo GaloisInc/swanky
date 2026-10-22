@@ -3,7 +3,7 @@
 //! This records all the fixed parameters we've chosen. Some of these may not be used directly in
 //! the protocol execution, but we record them for posterity. We also fix the following parameters:
 //! - The small-domain paramter $`S_\Delta`$ for the sVOLE functionality is set to $`\mathbb F_q`$
-//!   where [$`q`$ is the VOLE field size](VoleSizeParam).
+//!   where [$`q`$ is the VOLE field size](SmallVoleSize).
 //! - The leakage parameter $`\mathcal L`$ for the sVOLE functionality is set to
 //!   $`\{2^{S_\Delta}\}`$, which does not permit any leakage (see Baum et al., Section 5.1).
 //!
@@ -56,7 +56,7 @@ pub trait Params: Clone + Copy + core::fmt::Debug + Default + 'static {
     ///
     /// This maintains the property that $`\lambda \approx r\tau`$, for the
     /// [security parameter $`\lambda`$](SecurityParam) and the
-    /// [VOLE size parameter $`r`$](VoleSizeParam).
+    /// [small-VOLE size parameter $`r`$](SmallVoleSize).
     type RepetitionParam: ArraySize;
 
     /// The size of a `Com`mitment in bytes.
@@ -131,7 +131,7 @@ pub type FieldSize = U2;
 ///
 /// This parameter needs to define a "small- to medium-sized" extension; other implementations
 /// vary this from 7 to 11 (see [Baum et al., Section 7.2](https://eprint.iacr.org/2023/996.pdf))
-pub type VoleSizeParam = U8;
+pub type SmallVoleSize = U8;
 
 /// Parameter used for padding for the security of the consistency check
 pub type B = U16;
@@ -190,8 +190,8 @@ macro_rules! declare_binary_extension_params {
             type SecurityParamBytes = <$flambda as CanonicalSerialize>::ByteReprLen;
 
             // NOTE: We use [`PartialQuot`] here rather than [`hybrid_array::typenum::Quot`] to
-            // ensure that [`VoleSizeParam`] divides [`SecurityParam`].
-            type RepetitionParam = PartialQuot<Self::SecurityParam, VoleSizeParam>;
+            // ensure that [`SmallVoleSize`] divides [`SecurityParam`].
+            type RepetitionParam = PartialQuot<Self::SecurityParam, SmallVoleSize>;
 
             type ComBytes = Prod<Self::SecurityParamBytes, U2>;
             type Chall1Bytes = Prod<Self::SecurityParamBytes, U6>;
@@ -199,7 +199,7 @@ macro_rules! declare_binary_extension_params {
             type H3Bytes = Sum<Self::SecurityParamBytes, U16>;
             type CorrectionsCount = Sub1<Self::RepetitionParam>;
             type SecurityParamPadded = Sum<Self::SecurityParam, B>;
-            type MaskLength = Prod<Self::RepetitionParam, VoleSizeParam>;
+            type MaskLength = Prod<Self::RepetitionParam, SmallVoleSize>;
 
             fn new_prng_with_iv(seed: &Array<u8, SecurityParamBytes<Self>>, iv: IV) -> Self::Prng {
                 Self::Prng::from_seed_and_iv(seed.0.into(), u128::from_le_bytes(iv))
@@ -243,7 +243,7 @@ macro_rules! declare_binary_extension_params {
         );
 
         /// NOTE: [`RepetitionParam`] must equal [`SecurityParamBytes`] in order to use our [`F8b`]
-        /// linear bijection. This is always true, since we hard-code [`VoleSizeParam`] to [`U8`].
+        /// linear bijection. This is always true, since we hard-code [`SmallVoleSize`] to [`U8`].
         /// If this changes in  future implementation, this assert will fail.
         const _: () = assert!(
             RepetitionParam::<$name>::USIZE == SecurityParamBytes::<$name>::USIZE

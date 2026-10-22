@@ -224,7 +224,7 @@ pub(crate) fn vole_open<P: Params>(
 /// Function to reconstruct voles from a challenge and partial decommitments.
 ///
 /// This implements Figure 5.5 in FAEST spec v1.1. The parameter `k_b` in that
-/// spec is always our [`parameters::VoleSizeParam`].
+/// spec is always our [`parameters::SmallVoleSize`].
 #[inline(never)]
 pub(crate) fn vole_reconstruct<P: Params>(
     chal: &[u8], // bytes from fiat-shamir challenge

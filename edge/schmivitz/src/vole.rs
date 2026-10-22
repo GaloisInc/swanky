@@ -79,8 +79,9 @@ where
     /// Create a set of random VOLEs.
     ///
     /// This is particular to the protocol by Baum et al., so the total number of VOLEs created
-    /// should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length`;
-    /// $`r`$ is the [`VoleSizeParam`](crate::parameters::VoleSizeParam); and $`\tau`$ is the [`RepetitionParam`].
+    /// should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length`; $`r`$ is the
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize); and $`\tau`$ is the
+    /// [`RepetitionParam`].
     ///
     /// The [`Transcript`] passed here must already incorporate all public information known to
     /// both parties at the beginning of the proof, including
@@ -104,7 +105,7 @@ where
     ///
     /// This should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length` parameter
     /// passed to [`RandomVoleP::create()`];
-    /// $`r`$ is the [`VoleSizeParam`](crate::parameters::VoleSizeParam); and $`\tau`$ is the [`RepetitionParam`].
+    /// $`r`$ is the [`SmallVoleSize`](crate::parameters::SmallVoleSize); and $`\tau`$ is the [`RepetitionParam`].
     fn count(&self) -> usize;
 
     /// Get the number of extended witness elements supported by this random VOLE instance.
@@ -209,6 +210,6 @@ pub trait RandomVoleV {
     /// Get the value tags corresponding to the mask
     /// $`\mathbf Q_{[\ell..\ell + \lambda)}`$, where $`\ell`$ is the
     /// [`Self::extended_witness_length`] and $`\lambda`$ is the security
-    /// parameter (and equal to [`RepetitionParam`]` * `[`VoleSizeParam`](crate::parameters::VoleSizeParam)).
+    /// parameter (and equal to [`RepetitionParam`]` * `[`SmallVoleSize`](crate::parameters::SmallVoleSize)).
     fn mask_voles(&self) -> Array<FLambda<Self::Params>, MaskLength<Self::Params>>;
 }

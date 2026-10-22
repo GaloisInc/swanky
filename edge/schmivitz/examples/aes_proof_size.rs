@@ -12,7 +12,7 @@ use schmivitz::{
     circuit::load_circuit_from_strings_prover,
     circuit_validator::validate_circuit,
     parameters::{
-        Binary128Bit, Binary256Bit, Params, RepetitionParam, SecurityParam, VoleSizeParam,
+        Binary128Bit, Binary256Bit, Params, RepetitionParam, SecurityParam, SmallVoleSize,
     },
     vole::functionality::{VoleProver, VoleVerifier},
 };
@@ -33,7 +33,7 @@ fn transcript() -> Transcript {
 
 fn run<P: Params>() -> swanky_error::Result<()> {
     let security_param = <SecurityParam<P> as Unsigned>::USIZE;
-    let vole_size_param = <VoleSizeParam as Unsigned>::USIZE;
+    let vole_size_param = <SmallVoleSize as Unsigned>::USIZE;
     let repetition_param = <RepetitionParam<P> as Unsigned>::USIZE;
     println!(
         "parameters: lambda = {security_param}, r = {vole_size_param}, tau = {repetition_param}"
