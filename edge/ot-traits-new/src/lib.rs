@@ -65,7 +65,7 @@ pub trait OTCorrelated<P: Party>: OTInit<P> {
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
         self,
         inputs: PartyEither<P, usize, &[F2]>,
-        delta: PartyPrivate<P, Sender, U8x16>,
+        delta: PartyPrivate<Sender, P, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,

@@ -167,14 +167,6 @@ MISNAMED_CRATES = {
     "fancy-garbling",
     "fancy-plaintext",
     "fancy-traits",
-    "mac-n-cheese-compiler",
-    "mac-n-cheese-event-log",
-    "mac-n-cheese-inspector",
-    "mac-n-cheese-ir",
-    "mac-n-cheese-runner",
-    "mac-n-cheese-sieve-parser",
-    "mac-n-cheese-vole",
-    "mac-n-cheese-wire-map",
     "popsicle",
     "schmivitz",
     "simple-arith-circuit",
@@ -321,11 +313,6 @@ LIBS_NOT_YET_DOCUMENTED = {
     "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket/src/lib.rs",
     "edge/sieve-ir-parser/src/lib.rs",
     "edge/keyed_arena/src/lib.rs",
-    "edge/mac-n-cheese/event-log/src/lib.rs",
-    "edge/mac-n-cheese/ir/src/lib.rs",
-    "edge/mac-n-cheese/sieve-parser/src/lib.rs",
-    "edge/mac-n-cheese/vole/src/lib.rs",
-    "edge/mac-n-cheese/wire-map/src/lib.rs",
 }
 
 

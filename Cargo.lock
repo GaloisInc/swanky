@@ -14,21 +14,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "addr2line"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b5d307320b3181d6d7954e663bd7c774a838b8220fe0593c86d9fb09f498b4b"
-dependencies = [
- "gimli",
-]
-
-[[package]]
-name = "adler2"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
-
-[[package]]
 name = "aead"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -158,15 +143,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arc-swap"
-version = "1.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c049c0be4daef0b145cb3555416b3b8ef5b7888a38aea1a3a155801fe7b0810b"
-dependencies = [
- "rustversion",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -177,21 +153,6 @@ name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
-
-[[package]]
-name = "backtrace"
-version = "0.3.76"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb531853791a215d7c62a30daf0dde835f381ab5de4589cfe7c649d2cbe92bd6"
-dependencies = [
- "addr2line",
- "cfg-if",
- "libc",
- "miniz_oxide",
- "object",
- "rustc-demangle",
- "windows-link",
-]
 
 [[package]]
 name = "bincode"
@@ -262,12 +223,6 @@ checksum = "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
 dependencies = [
  "hybrid-array",
 ]
-
-[[package]]
-name = "bufstream"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40e38929add23cdf8a366df9b0e088953150724bcbe5fc330b0d8eb3b328eec8"
 
 [[package]]
 name = "bumpalo"
@@ -525,28 +480,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e71406cd8807725f7ac2f999a4cdd32e98f829fdf65f528343cebf945e41df1e"
-dependencies = [
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-epoch",
- "crossbeam-queue",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-channel"
-version = "0.5.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98b0cc327b5bc766e7fda9c9260cc0fa81b43a8e240440422dff70788e3f9ef1"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
 name = "crossbeam-deque"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -697,22 +630,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dhat"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98cd11d84628e233de0ce467de10b8633f4ddaecafadefc86e13b84b8739b827"
-dependencies = [
- "backtrace",
- "lazy_static",
- "mintex",
- "parking_lot",
- "rustc-hash 1.1.0",
- "serde",
- "serde_json",
- "thousands",
-]
-
-[[package]]
 name = "diet-mac-and-cheese"
 version = "0.6.0"
 dependencies = [
@@ -726,7 +643,7 @@ dependencies = [
  "pretty_env_logger",
  "proptest",
  "rand 0.10.3",
- "rustc-hash 2.1.3",
+ "rustc-hash",
  "serde",
  "subtle",
  "swanky-block",
@@ -1054,12 +971,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gimli"
-version = "0.32.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
-
-[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1340,12 +1251,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazy_static"
-version = "1.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
-
-[[package]]
 name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1356,15 +1261,6 @@ name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
-
-[[package]]
-name = "libmimalloc-sys"
-version = "0.1.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a45a52f43e1c16f667ccfe4dd8c85b7f7c204fd5e3bf46c5b0db9a5c3c0b8e9"
-dependencies = [
- "cc",
-]
 
 [[package]]
 name = "linux-raw-sys"
@@ -1386,187 +1282,6 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
-
-[[package]]
-name = "lz4"
-version = "1.28.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20b523e860d03443e98350ceaac5e71c6ba89aea7d960769ec3ce37f4de5af4"
-dependencies = [
- "lz4-sys",
-]
-
-[[package]]
-name = "lz4-sys"
-version = "1.11.1+lz4-1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
-name = "mac-n-cheese-compiler"
-version = "0.6.0"
-dependencies = [
- "clap",
- "crossbeam",
- "flume",
- "hybrid-array",
- "mac-n-cheese-ir",
- "mac-n-cheese-vole",
- "mac-n-cheese-wire-map",
- "mimalloc",
- "num_cpus",
- "proptest",
- "rand 0.10.3",
- "rustc-hash 2.1.3",
- "smallvec",
- "swanky-error",
- "swanky-field",
- "swanky-field-binary",
- "swanky-field-f61p",
- "swanky-field-ff-primes",
- "swanky-party",
- "swanky-sieve-ir-parser",
- "vectoreyes",
-]
-
-[[package]]
-name = "mac-n-cheese-event-log"
-version = "0.6.0"
-dependencies = [
- "bytemuck",
- "ciborium",
- "crossbeam-queue",
- "lz4",
- "parking_lot",
- "serde",
- "smallvec",
- "swanky-error",
- "tempfile",
-]
-
-[[package]]
-name = "mac-n-cheese-inspector"
-version = "0.6.0"
-dependencies = [
- "bytemuck",
- "ciborium",
- "clap",
- "mac-n-cheese-event-log",
- "mac-n-cheese-ir",
- "serde",
- "swanky-error",
-]
-
-[[package]]
-name = "mac-n-cheese-ir"
-version = "0.6.0"
-dependencies = [
- "arrayvec",
- "bumpalo",
- "bytemuck",
- "flatbuffers",
- "hybrid-array",
- "lz4",
- "mac-n-cheese-vole",
- "proptest",
- "rand 0.10.3",
- "rustc-hash 2.1.3",
- "smallvec",
- "swanky-error",
- "swanky-field",
- "swanky-field-binary",
- "swanky-field-f61p",
- "swanky-field-ff-primes",
- "swanky-flatbuffer-build",
- "swanky-serialization",
- "tempfile",
- "twox-hash",
- "vectoreyes",
-]
-
-[[package]]
-name = "mac-n-cheese-runner"
-version = "0.6.0"
-dependencies = [
- "aes-gcm",
- "arc-swap",
- "blake3",
- "bufstream",
- "bumpalo",
- "bytemuck",
- "clap",
- "crossbeam-queue",
- "dhat",
- "flatbuffers",
- "hybrid-array",
- "jemallocator",
- "keyed_arena",
- "libc",
- "mac-n-cheese-event-log",
- "mac-n-cheese-ir",
- "mac-n-cheese-vole",
- "mimalloc",
- "moka",
- "num_cpus",
- "parking_lot",
- "rand 0.10.3",
- "rpmalloc",
- "rustc-hash 2.1.3",
- "rustls",
- "rustls-pemfile",
- "smallvec",
- "snmalloc-rs",
- "swanky-block",
- "swanky-channel-legacy",
- "swanky-error",
- "swanky-field",
- "swanky-field-binary",
- "swanky-party",
- "swanky-rng",
- "swanky-serialization",
- "swanky-svole-wykw",
- "vectoreyes",
-]
-
-[[package]]
-name = "mac-n-cheese-vole"
-version = "0.6.0"
-dependencies = [
- "arrayvec",
- "blake3",
- "bytemuck",
- "hybrid-array",
- "keyed_arena",
- "mimalloc",
- "rand 0.10.3",
- "swanky-block",
- "swanky-channel-legacy",
- "swanky-cointoss",
- "swanky-error",
- "swanky-field",
- "swanky-field-binary",
- "swanky-field-f61p",
- "swanky-field-ff-primes",
- "swanky-ot-alsz-kos",
- "swanky-party",
- "swanky-rng",
- "swanky-serialization",
- "swanky-svole-wykw",
- "vectoreyes",
-]
-
-[[package]]
-name = "mac-n-cheese-wire-map"
-version = "0.6.0"
-dependencies = [
- "rand 0.10.3",
- "swanky-error",
- "vectoreyes",
-]
 
 [[package]]
 name = "matrixmultiply"
@@ -1603,47 +1318,6 @@ dependencies = [
  "keccak 0.1.6",
  "rand_core 0.6.4",
  "zeroize",
-]
-
-[[package]]
-name = "mimalloc"
-version = "0.1.52"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d4139bb28d14ad1facf21d5eb8825051b326e172d216b39f6d31df53cc97862"
-dependencies = [
- "libmimalloc-sys",
-]
-
-[[package]]
-name = "miniz_oxide"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
-dependencies = [
- "adler2",
-]
-
-[[package]]
-name = "mintex"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c505b3e17ed6b70a7ed2e67fbb2c560ee327353556120d6e72f5232b6880d536"
-
-[[package]]
-name = "moka"
-version = "0.12.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4293f18e7567a1caf3c584855554377025c65e0aa445344d04171f5ad63d19b9"
-dependencies = [
- "crossbeam-channel",
- "crossbeam-epoch",
- "crossbeam-utils",
- "equivalent",
- "parking_lot",
- "portable-atomic",
- "smallvec",
- "tagptr",
- "uuid",
 ]
 
 [[package]]
@@ -1728,15 +1402,6 @@ checksum = "91df4bbde75afed763b708b7eee1e8e7651e02d97f6d5dd763e89367e957b23b"
 dependencies = [
  "hermit-abi",
  "libc",
-]
-
-[[package]]
-name = "object"
-version = "0.37.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
-dependencies = [
- "memchr",
 ]
 
 [[package]]
@@ -2140,38 +1805,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rpmalloc"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86179c13cdc0bcedbb60e63c1aebe3bac82162ddfa746320de6dcea31ebe2b06"
-dependencies = [
- "rpmalloc-sys",
-]
-
-[[package]]
-name = "rpmalloc-sys"
-version = "0.2.3+b097fd0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d4b7d5e225a53887ee57fcec492eaf114b8e290f7072d035adc6ddd6810b67b"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
-]
-
-[[package]]
-name = "rustc-demangle"
-version = "0.1.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b74b56ffa8bb2830709a538c2cbcae9aa062db0d2a42563bfb09bdaae44020eb"
-
-[[package]]
-name = "rustc-hash"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
 name = "rustc-hash"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2442,27 +2075,6 @@ name = "smallvec"
 version = "1.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "snmalloc-rs"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50071c36c95c01969e0f7d8cc7ed98bfdeeef4b527de391308635b52096f24a1"
-dependencies = [
- "snmalloc-sys",
-]
-
-[[package]]
-name = "snmalloc-sys"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fcaa86cecb1b1ccc4f4e7c7af6f675b79ca0be0e2a03f8ea690a97c756f7a72"
-dependencies = [
- "cc",
-]
 
 [[package]]
 name = "spin"
@@ -2886,7 +2498,6 @@ dependencies = [
  "swanky-ot-test-new",
  "swanky-ot-traits-new",
  "swanky-party",
- "swanky-rng",
  "vectoreyes",
 ]
 
@@ -2910,6 +2521,73 @@ version = "0.6.0"
 dependencies = [
  "rand 0.10.3",
  "subtle",
+ "swanky-channel",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-ot-iknp"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
+ "swanky-bit-matrix-transpose",
+ "swanky-channel",
+ "swanky-cr-hash",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-chou-orlandi-new",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "swanky-rng",
+ "swanky-serialization",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-ot-kos-new"
+version = "0.6.0"
+dependencies = [
+ "criterion",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
+ "swanky-channel",
+ "swanky-cointoss",
+ "swanky-cr-hash",
+ "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
+ "swanky-ot-chou-orlandi-new",
+ "swanky-ot-iknp",
+ "swanky-ot-test-new",
+ "swanky-ot-traits-new",
+ "swanky-party",
+ "swanky-rng",
+ "swanky-serialization",
+ "vectoreyes",
+]
+
+[[package]]
+name = "swanky-ot-naor-pinkas-new"
+version = "0.6.0"
+dependencies = [
+ "blake3",
+ "criterion",
+ "curve25519-dalek",
+ "rand 0.10.3",
+ "subtle",
+ "swanky-adversary",
  "swanky-channel",
  "swanky-error",
  "swanky-field",
@@ -3148,12 +2826,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tagptr"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b2093cf4c8eb1e67749a6762251bc9cd836b6fc171623bd0a9d324d37af2417"
-
-[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3200,12 +2872,6 @@ dependencies = [
  "quote",
  "syn 3.0.6",
 ]
-
-[[package]]
-name = "thousands"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
 
 [[package]]
 name = "tinytemplate"
@@ -3274,15 +2940,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "twox-hash"
-version = "2.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5283634e518fe9e82c7b20520bb4bc209009fd16c82077c802f8111ecbb0117a"
-dependencies = [
- "rand 0.10.3",
-]
-
-[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3321,17 +2978,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "uuid"
-version = "1.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
-dependencies = [
- "getrandom 0.4.3",
- "js-sys",
- "wasm-bindgen",
-]
 
 [[package]]
 name = "vectoreyes"
