@@ -50,7 +50,7 @@ pub struct IKNP<
     base_ot_selection_bits: PartyPrivateCopy<Sender, P, [F2; N_BASE_OTS]>,
     // Represents the same value as base_ot_selection_bits.
     base_ot_selection_block: PartyPrivateCopy<Sender, P, U8x16>,
-    rngs: PartyEither<P, [SwankyRng; N_BASE_OTS], [(SwankyRng, SwankyRng); N_BASE_OTS]>,
+    rngs: PartyEither<P, Vec<SwankyRng>, Vec<(SwankyRng, SwankyRng)>>,
     ot: PhantomData<OT>,
 }
 
@@ -91,15 +91,18 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
             }
         };
 
-        let values: PartyPrivate<Sender, PartyMap<P, Receiver, Sender>, [[U8x16; 2]; N_BASE_OTS]> =
+        let values: PartyPrivate<Sender, PartyMap<P, Receiver, Sender>, Vec<[U8x16; 2]>> =
             PartyPrivate::new_with(|| {
-                [0; N_BASE_OTS].map(|_| {
-                    let mut k0 = U8x16::default();
-                    let mut k1 = U8x16::default();
-                    rng.fill_bytes(k0.as_mut());
-                    rng.fill_bytes(k1.as_mut());
-                    [k0, k1]
-                })
+                (0..N_BASE_OTS)
+                    .into_iter()
+                    .map(|_| {
+                        let mut k0 = U8x16::default();
+                        let mut k1 = U8x16::default();
+                        rng.fill_bytes(k0.as_mut());
+                        rng.fill_bytes(k1.as_mut());
+                        [k0, k1]
+                    })
+                    .collect()
             });
 
         let mut outputs: PartyPrivate<Receiver, PartyMap<P, Receiver, Sender>, Vec<U8x16>> =
@@ -116,17 +119,19 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
         let rngs = match P::WHICH {
             WhichParty::Sender(ev) => PartyEither::new(
                 ev,
-                <[U8x16; N_BASE_OTS]>::try_from(
-                    outputs.into_inner(map_evidence_party0::<P, _, _>(ev).sym()),
-                )
-                .expect("The Vec has exactly N_BASE_OTS elements")
-                .map(SwankyRng::from_seed),
+                outputs
+                    .into_inner(map_evidence_party0::<P, _, _>(ev).sym())
+                    .into_iter()
+                    .map(SwankyRng::from_seed)
+                    .collect(),
             ),
             WhichParty::Receiver(ev) => PartyEither::new(
                 ev,
                 values
                     .into_inner(map_evidence_party1::<P, _, _>(ev).sym())
-                    .map(|ks| (SwankyRng::from_seed(ks[0]), SwankyRng::from_seed(ks[1]))),
+                    .into_iter()
+                    .map(|ks| (SwankyRng::from_seed(ks[0]), SwankyRng::from_seed(ks[1])))
+                    .collect(),
             ),
         };
 
