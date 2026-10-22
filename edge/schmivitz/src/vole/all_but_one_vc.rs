@@ -83,9 +83,9 @@ fn tree<P: Params>(iv: IV, r: Key<P>, depth: usize) -> (Keys<P>, Vec<Seed<P>>, V
     for d in 1..depth + 1 {
         let n_previous_level = 1 << (d - 1);
         for j in 0..n_previous_level {
-            // FIXME(hamlinb): Why does the IV not get used here? The PRG calls in VC.Commit l. 3
-            // and VC.Reconstruct l. 9 both use IV.
-            let mut prg = Prg::<P>::new_no_iv(ks.get(d - 1, j));
+            // This corresponds to the PRG calls in VC.Commit l. 3 and VC.Reconstruct l. 9 from the
+            // paper. Note that the IV is given as PRG input.
+            let mut prg = Prg::<P>::new(ks.get(d - 1, j), iv);
             // FIXME(hamlinb): This likely generates more bits than necessary (by 4x, since
             // generating `[u8; N]` generates N u64s). Additionally, skipping PRG bits does not
             // match the spec (see v1.1, Fig. 5.1). See the note about `[T; n]` here:
