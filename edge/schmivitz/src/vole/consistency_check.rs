@@ -6,9 +6,9 @@ Implementation of algorithms related to consistency checks.
 use std::iter::repeat_n;
 
 use crate::parameters::{
-    FLambda, Params, RepetitionParam, SecurityParam, SecurityParamBytes, SecurityParamPadded,
+    B, FLambda, Params, RepetitionParam, SecurityParam, SecurityParamBytes, SecurityParamPadded,
 };
-use crate::vole::commit_reconstruct::{B, l_hat};
+use crate::vole::commit_reconstruct::l_hat;
 use crate::vole::crypto_primitives::Chall1;
 use hybrid_array::Array;
 use hybrid_array::ArraySize;
@@ -581,8 +581,8 @@ mod test {
     use std::iter::repeat_with;
     use std::iter::zip;
 
-    use crate::parameters::{FLambda, SecurityParam, SecurityParamBytes};
-    use crate::vole::commit_reconstruct::{B, l_hat};
+    use crate::parameters::{B, FLambda, SecurityParam, SecurityParamBytes};
+    use crate::vole::commit_reconstruct::l_hat;
     use crate::vole::consistency_check::VoleHasher;
     use crate::vole::crypto_primitives::Chall1;
     use hybrid_array::Array;

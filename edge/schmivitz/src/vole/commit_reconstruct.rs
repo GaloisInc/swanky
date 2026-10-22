@@ -3,12 +3,12 @@ Implementation of algorithms to commit, open and reconstruct VOLEs.
  *
  */
 #![allow(clippy::needless_range_loop)]
-use crate::parameters::{ComBytes, CorrectionsCount, Params, RepetitionParam, SecurityParam};
+use crate::parameters::{B, ComBytes, CorrectionsCount, Params, RepetitionParam, SecurityParam};
 use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
 use crate::vole::convert_to_vole::{convert_to_vole_prover, convert_to_vole_verifier};
 use crate::vole::crypto_primitives::{Chall3, Com, H1, IV, Prg, Seed};
 use hybrid_array::Array;
-use hybrid_array::typenum::{U16, Unsigned};
+use hybrid_array::typenum::Unsigned;
 use rand::RngExt;
 use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
@@ -16,9 +16,6 @@ use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b};
 
 use super::consistency_check::HashConsistency;
-
-/// Parameter used for padding for the security of the consistency check
-pub(crate) type B = U16;
 
 /// Function mapping 8 booleans to [`u8`].
 pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {

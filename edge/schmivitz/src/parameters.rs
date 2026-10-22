@@ -19,7 +19,6 @@ use swanky_field_binary::{F2, F8b, F128b, F256b};
 use swanky_rng::{Aes128Rng, Aes256Rng};
 use swanky_serialization::CanonicalSerialize;
 
-use crate::vole::commit_reconstruct::B;
 use crate::vole::crypto_primitives::IV;
 
 /// Finite field, crypto primitives, and constants associated with a Schmivitz for a given security
@@ -133,6 +132,9 @@ pub type FieldSize = U2;
 /// This parameter needs to define a "small- to medium-sized" extension; other implementations
 /// vary this from 7 to 11 (see [Baum et al., Section 7.2](https://eprint.iacr.org/2023/996.pdf))
 pub type VoleSizeParam = U8;
+
+/// Parameter used for padding for the security of the consistency check
+pub type B = U16;
 
 /// Convenience type to access [`Params::RepetitionParam`].
 pub type RepetitionParam<P> = <P as Params>::RepetitionParam;
