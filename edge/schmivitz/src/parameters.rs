@@ -160,6 +160,15 @@ pub type SecurityParamPadded<P> = <P as Params>::SecurityParamPadded;
 /// Convenience type to access [`Params::MaskLength`].
 pub type MaskLength<P> = <P as Params>::MaskLength;
 
+/// Convenience type to access [`Params::FLambda`].
+pub type FLambda<P> = <P as Params>::FLambda;
+
+/// Convenience type to access [`Params::Prng`].
+pub(crate) type Prng<P> = <P as Params>::Prng;
+
+/// Convenience type to access [`Params::Xof`].
+pub(crate) type Xof<P> = <P as Params>::Xof;
+
 macro_rules! declare_binary_extension_params {
     ( $(#[$doc:meta])*
         $name:ident {
@@ -259,12 +268,3 @@ declare_binary_extension_params! {
         xof = Shake256,
     }
 }
-
-/// Convenience type to access [`Params::FLambda`].
-pub type FLambda<P> = <P as Params>::FLambda;
-
-/// Convenience type to access [`Params::Prng`].
-pub(crate) type Prng<P> = <P as Params>::Prng;
-
-/// Convenience type to access [`Params::Xof`].
-pub(crate) type Xof<P> = <P as Params>::Xof;
