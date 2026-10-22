@@ -25,7 +25,9 @@ use crate::vole::crypto_primitives::IV;
 /// Finite field, crypto primitives, and constants associated with a Schmivitz for a given security
 /// parameter.
 pub trait Params: Clone + Copy + core::fmt::Debug + Default + 'static {
-    /// The binary field used throughout the protocol.
+    /// The field used for VOLE tags and proof arithmetic. The field size must be at least
+    /// $`2^\lambda`$, where $`\lambda`$ is the security parameter (a.k.a.,
+    /// [`Params::SecurityParam`]).
     type FLambda: FiniteField<PrimeField = F2>
         + CanonicalSerialize<ByteReprLen = Self::SecurityParamBytes>;
 
