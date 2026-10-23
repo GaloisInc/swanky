@@ -53,7 +53,7 @@
 //!         let bits = rng.random::<[F2; 10]>();
 //!         let mut authbits: Vec<AuthBit<Prover>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
-//!         generator = generator.generate(PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()), &mut authbits, c, &mut rng)?;
+//!         generator.generate(PartyEither::new(Witness::EQUAL_TYPES, bits.iter().copied()), &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, PartyPrivate::empty(Witness::EQUAL_TYPES), c)?;
 //!         Ok(bits.to_vec())
 //!     },
@@ -65,7 +65,7 @@
 //!         let mut authbits: Vec<AuthBit<Verifier>> = vec![];
 //!         let mut generator: AuthBitGenerator<_> = AuthBitGenerator::new(c, &mut rng)?;
 //!         let input: PartyEither<_, Copied<Iter<'_, F2>>, _> = PartyEither::new(Witness::EQUAL_TYPES, count);
-//!         generator = generator.generate(input, &mut authbits, c, &mut rng)?;
+//!         generator.generate(input, &mut authbits, c, &mut rng)?;
 //!         generator.open(&authbits, PartyPrivate::new(&mut bits), c)?;
 //!         Ok(bits)
 //!     }
@@ -279,12 +279,12 @@ impl<P: GenericParty> AuthBitGenerator<P> {
     /// the number of bits. The resulting authenticated bits are
     /// [`Vec::extend`]ed into `out`.
     pub fn generate<RNG: CryptoRng, I: Iterator<Item = F2>>(
-        mut self,
+        &mut self,
         bits_in: PartyEither<P, I, usize>,
         out: &mut Vec<AuthBit<P>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<Self> {
+    ) -> swanky_error::Result<()> {
         let inputs: PartyEither<PartyMap<P, Receiver, Sender>, _, _> = match P::GENERIC_WHICH {
             GenericWhichParty::Party0(ev) => PartyEither::new(
                 map_evidence_party0::<P, _, _>(ev),
@@ -309,7 +309,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
                 .into_inner_same(),
         );
 
-        self.ot = self.ot.ot_correlated(
+        self.ot.ot_correlated(
             inputs.as_ref().map(|&s| s, |bits| &bits[..]),
             delta,
             &mut outputs,
@@ -347,7 +347,7 @@ impl<P: GenericParty> AuthBitGenerator<P> {
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 
     /// Open the authenticated bits in `authbits`.
@@ -579,23 +579,19 @@ mod tests {
     /// MAC. If `tamper_key` is true, tamper with `PartyB`'s key.
     fn generate(
         bits_in: &[F2],
-        generator_a: AuthBitGenerator<PartyA>,
-        generator_b: AuthBitGenerator<PartyB>,
+        generator_a: &mut AuthBitGenerator<PartyA>,
+        generator_b: &mut AuthBitGenerator<PartyB>,
         mut rng_a: &mut SwankyRng,
         mut rng_b: &mut SwankyRng,
         tamper_mac: bool,
         tamper_key: bool,
-    ) -> (
-        (AuthBitGenerator<PartyA>, Vec<AuthBit<PartyA>>),
-        (AuthBitGenerator<PartyB>, Vec<AuthBit<PartyB>>),
-    ) {
+    ) -> (Vec<AuthBit<PartyA>>, Vec<AuthBit<PartyB>>) {
         assert!(!bits_in.is_empty());
         swanky_channel::local::local_channel_pair(
             |channel_pr| {
                 let mut outputs = vec![];
                 let bits = PartyEither::new(Witness::EQUAL_TYPES, bits_in.iter().copied());
-                let generator_a =
-                    generator_a.generate(bits, &mut outputs, channel_pr, &mut rng_a)?;
+                generator_a.generate(bits, &mut outputs, channel_pr, &mut rng_a)?;
                 if tamper_mac {
                     // Tamper the MAC of the first `AuthBit`.
                     outputs[0] = AuthBit(PartyEitherCopy::new(
@@ -611,14 +607,13 @@ mod tests {
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     channel_pr,
                 )?;
-                Ok((generator_a, outputs))
+                Ok(outputs)
             },
             |channel_vr| {
                 let mut outputs = vec![];
                 let count: PartyEither<_, Copied<Iter<'_, F2>>, _> =
                     PartyEither::new(Witness::EQUAL_TYPES, bits_in.len());
-                let generator_b =
-                    generator_b.generate(count, &mut outputs, channel_vr, &mut rng_b)?;
+                generator_b.generate(count, &mut outputs, channel_vr, &mut rng_b)?;
                 if tamper_key {
                     // Tamper the key of the first `AuthBit`.
                     outputs[0] = AuthBit(PartyEitherCopy::new(
@@ -637,7 +632,7 @@ mod tests {
                 } else {
                     assert!(validation.is_err());
                 }
-                Ok((generator_b, outputs))
+                Ok(outputs)
             },
         )
         .unwrap()
@@ -654,8 +649,8 @@ mod tests {
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((generator_a, output_a), (generator_b, output_b)) = generate(&bits, generator_a, generator_b, &mut rng_a, &mut rng_b, false, false);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, false);
             for ((authbit_a, authbit_b), public_bit) in output_a
                 .into_iter()
                 .zip(output_b.into_iter())
@@ -690,8 +685,8 @@ mod tests {
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
             let public_bits: Vec<F2> = public_bits.into_iter().map(F2::from).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((_, output_a), (generator_b, output_b)) = generate(&bits, generator_a, generator_b, &mut rng_a, &mut rng_b, false, false);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, false);
             for ((authbit_a, authbit_b), public_bit) in output_a
                 .into_iter()
                 .zip(output_b.into_iter())
@@ -753,8 +748,8 @@ mod tests {
             let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((_, output_a), (generator_b, output_b)) = generate(&bits, generator_a, generator_b, &mut rng_a, &mut rng_b, false, false);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, false);
             let validation = validate(
                 &output_a,
                 &output_b,
@@ -773,8 +768,8 @@ mod tests {
             let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((_, output_a), (generator_b, output_b)) = generate(&bits, generator_a, generator_b, &mut rng_a, &mut rng_b, true, false);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, true, false);
             let validation = validate(
                 &output_a,
                 &output_b,
@@ -793,8 +788,8 @@ mod tests {
             let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((_, output_a), (generator_b, output_b)) = generate(&bits, generator_a, generator_b, &mut rng_a, &mut rng_b, false, true);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, true);
             let validation = validate(
                 &output_a,
                 &output_b,
@@ -814,8 +809,8 @@ mod tests {
             let mut rng_a = SwankyRng::from_seed(seed_party_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits: Vec<F2> = bits.into_iter().map(F2::from).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((_, output_a), (_, output_b)) = generate(&bits, generator_a, generator_b, &mut rng_a, &mut rng_b, false, true);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (output_a, output_b) = generate(&bits, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b, false, true);
             let validation = validate(&output_a, &output_b, U8x16::from(delta));
             // If all bits are 0, then `delta` never comes into play, so
             // validation "succeeds". Hence, only assert if this is not the case.
@@ -835,20 +830,20 @@ mod tests {
             let mut rng_b = SwankyRng::from_seed(seed_party_b.into());
             let bits1: Vec<_> = (0..nbits).map(|_| rng_a.random::<F2>()).collect();
             let bits2: Vec<_> = (0..nbits).map(|_| rng_a.random::<F2>()).collect();
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((generator_a, mut output_a), (generator_b, mut output_b)) = generate(
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (mut output_a, mut output_b) = generate(
                 &bits1,
-                generator_a,
-                generator_b,
+                &mut generator_a,
+                &mut generator_b,
                 &mut rng_a,
                 &mut rng_b,
                 false,
                 false,
             );
-            let ((_, output_c), (_, output_d)) = generate(
+            let (output_c, output_d) = generate(
                 &bits2,
-                generator_a,
-                generator_b,
+                &mut generator_a,
+                &mut generator_b,
                 &mut rng_a,
                 &mut rng_b,
                 false,

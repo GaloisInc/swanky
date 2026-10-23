@@ -63,13 +63,13 @@ pub trait OTCorrelated<P: Party>: OTInit<P> {
     /// When implementing this functionality,
     /// [`swanky_party::OppositeParty`] may be useful.
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
-        self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         delta: PartyPrivate<Sender, P, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>;
+    ) -> Result<()>;
 }
 
 /// OT protocols where the messages are random.
@@ -100,12 +100,12 @@ pub trait OTRandom<P: Party>: OTInit<P> {
     /// generated on the `Sender` side corresponding to their
     /// selection bits).
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
-        self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>;
+    ) -> Result<()>;
 }
 
 /// 1-out-of-2 OT protocols.
@@ -124,13 +124,13 @@ pub trait OTRandom<P: Party>: OTInit<P> {
 pub trait ObliviousTransfer<P: Party>: OTInit<P> {
     /// Run OT.
     fn ot<O: Extend<U8x16>>(
-        self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         values: PartyPrivate<Sender, P, &[[U8x16; 2]]>,
         outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self>;
+    ) -> Result<()>;
 }
 
 impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
@@ -154,13 +154,13 @@ impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
     /// supported, and the encryption scheme is a one-time pad (since
     /// the messages and random keys are [`U8x16`]).
     fn ot<O: Extend<U8x16>>(
-        self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         values: PartyPrivate<Sender, P, &[[U8x16; 2]]>,
         mut outputs: PartyPrivate<Receiver, P, &mut O>,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         let mut keys = Vec::with_capacity(
             inputs
                 .clone()
@@ -168,7 +168,7 @@ impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
                 .into_inner_same(),
         );
 
-        let ot = self.ot_random(inputs.clone(), &mut keys, channel, rng)?;
+        self.ot_random(inputs.clone(), &mut keys, channel, rng)?;
 
         let keys = PartyEither::pull_either_outside(&keys);
 
@@ -203,6 +203,6 @@ impl<T: OTRandom<P>, P: Party> ObliviousTransfer<P> for T {
             }
         }
 
-        Ok(ot)
+        Ok(())
     }
 }

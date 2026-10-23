@@ -39,7 +39,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTSender::init(c, &mut rng).unwrap();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
                 .ot::<Vec<U8x16>>(
@@ -55,7 +55,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTReceiver::init(c, &mut rng).unwrap();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
                 .ot(
@@ -92,7 +92,7 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTSender::init(c, &mut rng).unwrap();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
                 .ot_correlated(
@@ -108,7 +108,7 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTReceiver::init(c, &mut rng).unwrap();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
                 .ot_correlated(
@@ -148,7 +148,7 @@ pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(n
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTSender::init(c, &mut rng).unwrap();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
                 .ot_random(
@@ -163,7 +163,7 @@ pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(n
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTReceiver::init(c, &mut rng).unwrap();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
                 .ot_random(

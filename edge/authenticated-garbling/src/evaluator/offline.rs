@@ -48,9 +48,9 @@ where
     ) -> Result<Self> {
         let delta = AndTripleGenerator::<PartyEvaluator>::generate_valid_delta(rng);
 
-        let and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
-        let (_, auth_shares, and_auth_shares) =
-            f_preprocessing(circuit, and_generator, channel, rng)?;
+        let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
+        let (auth_shares, and_auth_shares) =
+            f_preprocessing(circuit, &mut and_generator, channel, rng)?;
         Ok(Self {
             circuit,
             delta,

@@ -29,12 +29,12 @@ impl<P: Party> OTInit<P> for Dummy<P> {
 
 impl<P: Party> OTRandom<P> for Dummy<P> {
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
-        self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter().copied()) {
             let b: PartyPrivate<Receiver, P, _> = input.into();
             let b = channel.communicate(b.into())?;
@@ -56,7 +56,7 @@ impl<P: Party> OTRandom<P> for Dummy<P> {
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 

@@ -202,12 +202,12 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
     for KOS<P, OT>
 {
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
-        mut self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         let m = inputs
             .as_ref()
             .map(|&sz| sz, |inputs| inputs.len())
@@ -238,7 +238,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 
@@ -246,13 +246,13 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
     for KOS<P, OT>
 {
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
-        mut self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         delta: PartyPrivate<Sender, P, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         let m = inputs
             .as_ref()
             .map(|&sz| sz, |inputs| inputs.len())
@@ -295,7 +295,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious>
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 
