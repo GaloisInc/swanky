@@ -39,14 +39,15 @@ pub use crate::preprocesser::wire::WirePreProcessor;
 ///
 /// Authenticated garbling utilizes pre-computed
 /// [`AndTriple`](swanky_authenticated_bits::and_triples::AndTriple)s and
-/// [`AuthShare`]s in its "online" portion. This function returns the (1) wire
-/// shares and (2) triple output shares for the given circuit of interest.
+/// [`AuthShare`]s in its "online" portion. This function returns the
+/// (1) and triple generator, (2) wire shares and (3) triple output
+/// shares for the given circuit of interest.
 pub(crate) fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng>(
     circuit: &C,
-    and_generator: &mut AndTripleGenerator<P>,
+    mut and_generator: AndTripleGenerator<P>,
     channel: &mut Channel,
     rng: &mut RNG,
-) -> swanky_error::Result<(Vec<AuthShare<P>>, Vec<AuthShare<P>>)>
+) -> swanky_error::Result<(AndTripleGenerator<P>, Vec<AuthShare<P>>, Vec<AuthShare<P>>)>
 where
     C: CircuitInputMapper<CircuitAnalyzer> + CircuitInputMapper<WirePreProcessor<P>>,
 {
@@ -67,12 +68,13 @@ where
     // We only generate AND triples if there are any AND gates in the circuit
     // to begin with
     if nands > 0 {
-        and_generator.generate(nand_triples, &mut rand_and_triples, channel, rng)?;
+        and_generator =
+            and_generator.generate(nand_triples, &mut rand_and_triples, channel, rng)?;
     }
 
     // Create as many authenticated shares as there are AND, Constant and Input gates.
     let mut auth_shares = Vec::with_capacity(nands + ninputs + nconstants);
-    and_generator.auth_share_generator_mut().generate(
+    and_generator = and_generator.generate_auth_shares(
         nands + ninputs + nconstants,
         &mut auth_shares,
         channel,
@@ -94,7 +96,7 @@ where
         )?;
     }
 
-    Ok((auth_shares, known_triples))
+    Ok((and_generator, auth_shares, known_triples))
 }
 
 #[cfg(test)]
@@ -111,22 +113,20 @@ mod tests {
         let (_shares_gb, _shares_ev) = swanky_channel::local::local_channel_pair(
             |c| {
                 let mut rng = SwankyRng::new();
-                let mut generator_and_triples =
-                    AndTripleGenerator::<PartyGarbler>::new(c, &mut rng)?;
+                let generator_and_triples = AndTripleGenerator::<PartyGarbler>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     &circuit,
-                    &mut generator_and_triples,
+                    generator_and_triples,
                     c,
                     &mut rng,
                 ))
             },
             |c| {
                 let mut rng = SwankyRng::new();
-                let mut generator_and_triples =
-                    AndTripleGenerator::<PartyEvaluator>::new(c, &mut rng)?;
+                let generator_and_triples = AndTripleGenerator::<PartyEvaluator>::new(c, &mut rng)?;
                 Ok(f_preprocessing(
                     &circuit,
-                    &mut generator_and_triples,
+                    generator_and_triples,
                     c,
                     &mut rng,
                 ))
