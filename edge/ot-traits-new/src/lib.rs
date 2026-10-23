@@ -17,6 +17,22 @@
 //! on the various components at the type level, so that OT senders
 //! can never access information private to OT receivers (and
 //! vice-versa).
+//!
+//! <div class="warning">
+//!
+//! The traits in this library operate on mutable references to values
+//! of types implementing them.
+//! While this is typical for Rust APIs that change state, it has a
+//! particular downside that requires care: If an error _does_ occur
+//! while running OT, the use of a reference allows the caller to
+//! re-use the protocol object, which may have been left in a bad
+//! state when the error occurred.
+//!
+//! When using this crate to implement applications/protocols that
+//! require oblivious transfer, take care to avoid re-use of objects
+//! when an error occurs.
+//!
+//! </div>
 
 use rand::CryptoRng;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
