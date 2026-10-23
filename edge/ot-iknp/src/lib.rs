@@ -50,6 +50,11 @@ pub struct IKNP<
     base_ot_selection_bits: PartyPrivateCopy<Sender, P, [F2; N_BASE_OTS]>,
     // Represents the same value as base_ot_selection_bits.
     base_ot_selection_block: PartyPrivateCopy<Sender, P, U8x16>,
+    // We use `Vec` instead of arrays here to avoid stack overflows.
+    // A `SwankyRng` is 256 bytes, so storing 256 of them requires
+    // 64KB; by using a `Vec`, we avoid this massive storage
+    // requirement, since a `Vec` only requires three words (i.e. 24
+    // bytes at most) of stack space, regardless of the element size.
     rngs: PartyEither<P, Vec<SwankyRng>, Vec<(SwankyRng, SwankyRng)>>,
     ot: PhantomData<OT>,
 }
