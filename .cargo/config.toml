@@ -1,6 +1,9 @@
 [build]
+# Pass --html-in-header flags to rustdoc. See the script for details.
+rustdoc = "./etc/rustdoc-wrapper.sh"
+
+# rust-lld rejects -flto when linking wasm32, and target-cpu=native means nothing there.
+[target.'cfg(not(target_arch = "wasm32"))']
 rustflags = [
     "-C", "target-cpu=native", "--cfg", "vectoreyes_target_cpu_native", "-C", "link-args=-flto"
 ]
-# Pass --html-in-header flags to rustdoc. See the script for details.
-rustdoc = "./etc/rustdoc-wrapper.sh"
