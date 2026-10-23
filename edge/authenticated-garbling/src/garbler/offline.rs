@@ -80,9 +80,9 @@ where
         // wirelabel is simply the one wirelabel XORed with Δ.
         let zero = U8x16::from(F128b::ONE) ^ delta;
 
-        let mut and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
-        let (auth_shares, and_auth_shares) =
-            f_preprocessing(circuit, &mut and_generator, channel, rng)?;
+        let and_generator = AndTripleGenerator::new_with_delta(delta, channel, rng)?;
+        let (_, auth_shares, and_auth_shares) =
+            f_preprocessing(circuit, and_generator, channel, rng)?;
         let nands = and_auth_shares.len();
         let mut auth_shares = VecWrapper::new(auth_shares);
 
