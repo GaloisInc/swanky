@@ -1531,7 +1531,8 @@ dependencies = [
  "swanky-oprf-kkrt",
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
- "swanky-ot-alsz-kos",
+ "swanky-ot-iknp",
+ "swanky-ot-traits-new",
  "swanky-rng",
  "swanky-twopac",
  "vectoreyes",
@@ -2382,12 +2383,13 @@ dependencies = [
  "rand 0.10.3",
  "serde",
  "serde_json",
- "swanky-block",
  "swanky-channel",
  "swanky-error",
- "swanky-ot-alsz-kos",
+ "swanky-ot-iknp",
+ "swanky-ot-traits-new",
  "swanky-rng",
  "swanky-twopac",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2782,14 +2784,15 @@ dependencies = [
  "fancy-traits",
  "rand 0.10.3",
  "swanky-adversary",
- "swanky-block",
  "swanky-channel",
  "swanky-error",
  "swanky-field-binary",
- "swanky-ot-alsz-kos",
- "swanky-ot-chou-orlandi",
- "swanky-ot-traits",
+ "swanky-ot-chou-orlandi-new",
+ "swanky-ot-iknp",
+ "swanky-ot-traits-new",
+ "swanky-party",
  "swanky-rng",
+ "vectoreyes",
 ]
 
 [[package]]

@@ -5,13 +5,14 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunction};
 use fancy_garbling::WireMod2;
 use fancy_traits::{CircuitInputMapper, FancyEncode};
-use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn bench_circuit<
-    C: CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>
-        + CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>
+    C: CircuitInputMapper<Garbler<SwankyRng, IKNP<Sender>, WireMod2>>
+        + CircuitInputMapper<Evaluator<SwankyRng, IKNP<Receiver>, WireMod2>>
         + Sync
         + Send,
 >(
@@ -24,7 +25,7 @@ fn bench_circuit<
     swanky_channel::local::local_channel_pair(
         |channel| {
             let rng = SwankyRng::new();
-            let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng).unwrap();
+            let mut gb = Garbler::<SwankyRng, IKNP<Sender>, WireMod2>::new(channel, rng).unwrap();
             let mut xs = gb
                 .encode_many(&gb_inputs, &vec![2; n_gb_inputs], channel)
                 .unwrap();
@@ -32,7 +33,9 @@ fn bench_circuit<
             xs.extend(ys);
             circ.execute(
                 &mut gb,
-                <C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                <C as CircuitInputMapper<Garbler<SwankyRng, IKNP<Sender>, WireMod2>>>::map(
+                    circ, xs,
+                ),
                 channel,
             )
             .unwrap();
@@ -40,7 +43,8 @@ fn bench_circuit<
         },
         |channel| {
             let rng = SwankyRng::new();
-            let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
+            let mut ev =
+                Evaluator::<SwankyRng, IKNP<Receiver>, WireMod2>::new(channel, rng).unwrap();
             let mut xs = ev.receive_many(&vec![2; n_gb_inputs], channel).unwrap();
             let ys = ev
                 .encode_many(&ev_inputs, &vec![2; n_ev_inputs], channel)
@@ -48,7 +52,7 @@ fn bench_circuit<
             xs.extend(ys);
             circ.execute(
                 &mut ev,
-                <C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
+                <C as CircuitInputMapper<Evaluator<SwankyRng, IKNP<Receiver>, WireMod2>>>::map(
                     circ, xs,
                 ),
                 channel,
