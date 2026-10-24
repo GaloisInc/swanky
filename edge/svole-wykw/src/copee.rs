@@ -7,8 +7,8 @@ use rand::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 use swanky_adversary::Malicious;
-use swanky_channel_legacy::AbstractChannel;
-use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_field_binary::F2;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
@@ -45,8 +45,8 @@ fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: U8x16) -> FE::PrimeField {
 }
 
 impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
+    pub(super) fn init<RNG: CryptoRng>(
+        channel: &mut Channel,
         pows: Powers<FE>,
         mut rng: &mut RNG,
     ) -> Result<Self> {
@@ -80,11 +80,7 @@ impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
         })
     }
 
-    pub(super) fn send<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        input: &FE::PrimeField,
-    ) -> Result<FE> {
+    pub(super) fn send(&mut self, channel: &mut Channel, input: &FE::PrimeField) -> Result<FE> {
         let pt = U8x16::from(self.counter as u128);
         let mut w = FE::ZERO;
         for (i, pow) in self.pows.get().iter().enumerate() {
@@ -94,9 +90,7 @@ impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
                 let w0 = prf::<FE>(prf0, pt);
                 let w1 = prf::<FE>(prf1, pt);
                 sum += w0 * *two;
-                channel
-                    .write_serializable(&(w0 - w1 - *input))
-                    .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
+                channel.write(&(w0 - w1 - *input))?;
             }
             w += sum * *pow;
         }
@@ -106,8 +100,8 @@ impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
 }
 
 impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
-    pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
+    pub(super) fn init_with_picked_delta<RNG: CryptoRng>(
+        channel: &mut Channel,
         pows: Powers<FE>,
         mut rng: &mut RNG,
         delta: FE,
@@ -138,8 +132,8 @@ impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
             counter: 0,
         })
     }
-    pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
+    pub(super) fn init<RNG: CryptoRng>(
+        channel: &mut Channel,
         pows: Powers<FE>,
         mut rng: &mut RNG,
     ) -> Result<Self> {
@@ -151,16 +145,14 @@ impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
         self.delta
     }
 
-    pub(super) fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE> {
+    pub(super) fn receive(&mut self, channel: &mut Channel) -> Result<FE> {
         let pt = U8x16::from(self.counter as u128);
         let mut res = FE::ZERO;
         for (j, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;
             for (k, two) in self.twos.iter().enumerate() {
                 let w = prf::<FE>(&self.aes_objs[j * self.nbits + k], pt);
-                let mut tau = channel
-                    .read_serializable::<FE::PrimeField>()
-                    .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
+                let mut tau = channel.read::<FE::PrimeField>()?;
                 let choice = Choice::from(u8::from(self.choices[j + k]));
                 tau += w;
                 let v = FE::PrimeField::conditional_select(&w, &tau, choice);
@@ -176,11 +168,7 @@ impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, CopeeReceiver, CopeeSender};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::FiniteField as FF;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F128b};
@@ -188,30 +176,29 @@ mod tests {
     use swanky_rng::SwankyRng;
 
     fn test_copee_<FE: FF>(len: usize) {
-        let mut rng = SwankyRng::new();
-        let input = FE::PrimeField::random(&mut rng);
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let pows = <Powers<_> as Default>::default();
-            let mut copee_sender = CopeeSender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
-            let ws: Vec<FE> = (0..len)
-                .map(|_| copee_sender.send(&mut channel, &input).unwrap())
-                .collect();
-            ws
-        });
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let pows = <Powers<_> as Default>::default();
-        let mut copee_receiver = CopeeReceiver::<FE>::init(&mut channel, pows, &mut rng).unwrap();
-        let vs: Vec<FE> = (0..len)
-            .map(|_| copee_receiver.receive(&mut channel).unwrap())
-            .collect();
-        let ws = handle.join().unwrap();
+        let ((input, ws), (copee_receiver, vs)) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let input = FE::PrimeField::random(&mut rng);
+                let pows = <Powers<_> as Default>::default();
+                let mut copee_sender = CopeeSender::<FE>::init(c, pows, &mut rng).unwrap();
+                let ws: Vec<FE> = (0..len)
+                    .map(|_| copee_sender.send(c, &input).unwrap())
+                    .collect();
+                Ok((input, ws))
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                let pows = <Powers<_> as Default>::default();
+                let mut copee_receiver = CopeeReceiver::<FE>::init(c, pows, &mut rng).unwrap();
+                let vs: Vec<FE> = (0..len)
+                    .map(|_| copee_receiver.receive(c).unwrap())
+                    .collect();
+                Ok((copee_receiver, vs))
+            },
+        )
+        .unwrap();
+
         for (w, v) in ws.iter().zip(vs.iter()) {
             let mut delta = input * copee_receiver.delta();
             delta += *v;

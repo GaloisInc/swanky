@@ -7,12 +7,10 @@ use swanky_svole_wykw::{Receiver, Sender};
 
 use std::{
     hint::black_box,
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
     sync::{Arc, Mutex},
     time::Duration,
 };
-use swanky_channel_legacy::Channel;
+use swanky_channel::local::local_channel_pair;
 use swanky_field::FiniteField;
 use swanky_field_binary::F128b;
 use swanky_field_f61p::F61p;
@@ -23,27 +21,18 @@ use swanky_rng::SwankyRng;
 mod ggm_utils;*/
 
 fn svole_init<F: FiniteField>() -> (Arc<Mutex<Sender<F>>>, Arc<Mutex<Receiver<F>>>) {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        Sender::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap()
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let vole_receiver = Receiver::init(
-        &mut channel,
-        &mut rng,
-        LPN_SETUP_MEDIUM,
-        LPN_EXTEND_MEDIUM,
-        None,
+    let (vole_sender, vole_receiver) = local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            Ok(Sender::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            Ok(Receiver::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM, None).unwrap())
+        },
     )
     .unwrap();
-    let vole_sender = handle.join().unwrap();
+
     let vole_sender = Arc::new(Mutex::new(vole_sender));
     let vole_receiver = Arc::new(Mutex::new(vole_receiver));
     (vole_sender, vole_receiver)
@@ -53,29 +42,27 @@ fn bench_svole<F: FiniteField>(
     vole_sender: &Arc<Mutex<Sender<F>>>,
     vole_receiver: &Arc<Mutex<Receiver<F>>>,
 ) {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let vole_sender = vole_sender.clone();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut vole_sender = vole_sender.lock().unwrap();
-        let mut out: Vec<(F::PrimeField, F)> = Vec::new();
-        vole_sender.send(&mut channel, &mut rng, &mut out).unwrap();
-        black_box(out);
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut vole_receiver = vole_receiver.lock().unwrap();
-    let mut out = Vec::new();
-    vole_receiver
-        .receive::<_, F::PrimeField>(&mut channel, &mut rng, &mut out)
-        .unwrap();
-    black_box(out);
-    handle.join().unwrap();
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut vole_sender = vole_sender.lock().unwrap();
+            let mut out: Vec<(F::PrimeField, F)> = Vec::new();
+            vole_sender.send(c, &mut rng, &mut out).unwrap();
+            black_box(out);
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut vole_receiver = vole_receiver.lock().unwrap();
+            let mut out = Vec::new();
+            vole_receiver
+                .receive::<F::PrimeField>(c, &mut rng, &mut out)
+                .unwrap();
+            black_box(out);
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn bench_svole_gf128(c: &mut Criterion) {
@@ -96,31 +83,22 @@ fn bench_svole_f61p(c: &mut Criterion) {
     });
 }
 fn bench_svole_init<F: FiniteField>() {
-    let mut rng = SwankyRng::new();
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        black_box(
-            Sender::<F>::init(&mut channel, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap(),
-        )
-    });
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    black_box(
-        Receiver::<F>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_MEDIUM,
-            LPN_EXTEND_MEDIUM,
-            None,
-        )
-        .unwrap(),
-    );
-    handle.join().unwrap();
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            black_box(Sender::<F>::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap());
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            black_box(
+                Receiver::<F>::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM, None)
+                    .unwrap(),
+            );
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn bench_svole_init_gf128(c: &mut Criterion) {

@@ -2764,7 +2764,7 @@ dependencies = [
  "rand",
  "subtle",
  "swanky-adversary",
- "swanky-channel-legacy",
+ "swanky-channel",
  "swanky-cointoss",
  "swanky-error",
  "swanky-field",
