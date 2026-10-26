@@ -14,19 +14,21 @@ use rayon::iter::*;
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field::{FiniteField, FiniteRing};
+use swanky_field_binary::{F2, F8b};
 
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    parameters::SECURITY_PARAM,
+    parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes},
     proof::{
         prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
         transcript::ChiGenerator,
     },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 
 use self::verifier_traverser::VerifierTraverser;
 
@@ -42,11 +44,11 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     witness_commitment: Vec<F2>,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
-    degree_1_commitment: F128b,
+    degree_1_commitment: FLambda<Vole::Params>,
     /// Aggregated commitment to the assert_zero gates.
-    assert_zero_commitment: F128b,
+    assert_zero_commitment: FLambda<Vole::Params>,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
-    decommitment_challenge: [u8; SECURITY_PARAM / 8],
+    decommitment_challenge: Array<u8, SecurityParamBytes<Vole::Params>>,
     /// Partial decommitment of the VOLEs.
     partial_decommitment: VoleV::Decommitment,
 
@@ -54,17 +56,18 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     vole: PhantomData<Vole>,
 }
 
-impl<VoleP, VoleV> Proof<VoleP, VoleV>
+impl<VoleP, VoleV, P> Proof<VoleP, VoleV>
 where
-    VoleP: RandomVoleP,
-    VoleV: RandomVoleV<Decommitment = VoleP::Decommitment>,
+    P: Params,
+    VoleP: RandomVoleP<Params = P>,
+    VoleV: RandomVoleV<Params = P, Decommitment = VoleP::Decommitment>,
 {
     /// An estimate of the proof size, in bytes.
     pub fn proof_size_estimate(&self) -> usize {
         // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
         let witness_commitment_bytes = self.witness_commitment.len() / 8;
-        let degree_1_commitment_bytes = 16;
-        let decommitment_challenge_bytes = SECURITY_PARAM / 8;
+        let degree_1_commitment_bytes = SecurityParamBytes::<P>::USIZE;
+        let decommitment_challenge_bytes = SecurityParamBytes::<P>::USIZE;
 
         let partial_decommitment_size = self.partial_decommitment.proof_size_estimate();
 
@@ -104,7 +107,7 @@ where
     // TODO: Get rid of max_wire_id
     where
         C: FancyCircuit<ProverPreparer<'a>, Input = ()>
-            + FancyCircuit<ProverTraverser<VoleP>, Input = ()>,
+            + FancyCircuit<ProverTraverser<VoleP, P>, Input = ()>,
         RNG: CryptoRng,
     {
         let t = std::time::Instant::now();
@@ -121,7 +124,7 @@ where
 
         let t = std::time::Instant::now();
         // Update transcript with general public information
-        transcript.append_public_values();
+        transcript.append_public_values::<P>();
 
         // Get a set of (l + SECURITY_PARAM) random VOLEs
         let (voles, _vole_challenge) =
@@ -161,20 +164,20 @@ where
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
-        let degree_0_mask = combine(voles.aggregate_commitment_masks());
-        let degree_1_mask = combine(voles.aggregate_commitment_values());
+        let degree_0_mask = combine::<P>(voles.aggregate_commitment_masks());
+        let degree_1_mask = combine::<P>(voles.aggregate_commitment_values());
 
         // Finish computing aggregated responses (`a~`, `b~` in the paper)
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
 
         // Add aggregated responses to transcript
-        transcript.append_polynomial_commitments(
+        transcript.append_polynomial_commitments::<P>(
             &degree_0_commitment,
             &degree_1_commitment,
             &assert_zero_commitment,
         );
-        let decommitment_challenge = transcript.extract_decommitment_challenge();
+        let decommitment_challenge = transcript.extract_decommitment_challenge::<P>();
 
         // Decommit the VOLEs
         let partial_decommitment = voles.decommit(&decommitment_challenge);
@@ -222,10 +225,10 @@ where
     ///
     pub fn verify<C>(&self, circuit: &C, transcript: &mut Transcript) -> Result<()>
     where
-        C: FancyCircuit<VerifierTraverser, Input = ()>,
+        C: FancyCircuit<VerifierTraverser<P>, Input = ()>,
     {
         let mut transcript = transcript::Transcript::from(transcript);
-        transcript.append_public_values();
+        transcript.append_public_values::<P>();
 
         let t = std::time::Instant::now();
         // Reconstruct VOLEs and update transcript with any necessary components.
@@ -260,28 +263,28 @@ where
             .par_iter()
             .map(|e| {
                 let witness_com = F8b::from(*e);
-                verifier_key.map(|key| witness_com * key)
+                verifier_key.clone().map(|key| witness_com * key)
             })
             .collect::<Vec<_>>();
 
         let witness_voles = reconstructed_voles.witness_voles();
-        let masked_witnesses: Vec<F128b> = witness_voles
+        let masked_witnesses: Vec<FLambda<P>> = witness_voles
             .par_iter()
             .zip(d_delta.par_iter())
             .map(|(qs, dds)| {
-                let masked_witness: [F8b; 16] = zip(qs, dds)
+                let masked_witness: Array<F8b, RepetitionParam<P>> = zip(qs, dds)
                     .map(|(q, dd)| q + dd)
                     .collect::<Vec<_>>()
                     .try_into()
                     .unwrap();
-                F8b::form_superfield(&masked_witness.into())
+                P::f8_linear_bijection(&masked_witness)
             })
             .collect();
         log::info!("4: reconstructed voles with masks {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
-        let validation_mask = combine(reconstructed_voles.mask_voles());
+        let validation_mask = combine::<P>(reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let mut verifier_traverser = VerifierTraverser::new(
@@ -301,14 +304,14 @@ where
             validation - self.degree_1_commitment * reconstructed_voles.verifier_key();
 
         // Add aggregated responses to the transcript
-        transcript.append_polynomial_commitments(
+        transcript.append_polynomial_commitments::<P>(
             &degree_0_commitment,
             &self.degree_1_commitment,
             &self.assert_zero_commitment,
         );
 
         // Get the VOLE decommitment challenge and make sure it's valid
-        let decommitment_challenge = transcript.extract_decommitment_challenge();
+        let decommitment_challenge = transcript.extract_decommitment_challenge::<P>();
         if self.decommitment_challenge != decommitment_challenge {
             bail!(
                 ErrorKind::OtherError,
@@ -334,15 +337,15 @@ where
 ///
 /// Specifically, we compute
 /// $` \sum_{i = 0}^{128} v_i X^i`$,
-/// where $`X`$ is [`F128b::GENERATOR`], the generator for the field.
-fn combine(values: [F128b; 128]) -> F128b {
+/// where $`X`$ is the generator for the field.
+fn combine<P: Params>(values: Array<FLambda<P>, MaskLength<P>>) -> FLambda<P> {
     // Start with `X^0 = 1`
-    let mut power = F128b::ONE;
-    let mut acc = F128b::ZERO;
+    let mut power = FLambda::<P>::ONE;
+    let mut acc = FLambda::<P>::ZERO;
 
     for vi in values {
         acc += vi * power;
-        power *= F128b::GENERATOR;
+        power *= FLambda::<P>::GENERATOR;
     }
     acc
 }
@@ -355,11 +358,11 @@ impl AsSecretBytes for Vec<F2> {
 }
 
 /// Test proof generation and verification of a given [`Circuit`].
-pub fn test_sieveir(circuit: &Circuit) -> Result<()> {
+pub fn test_sieveir<P: Params>(circuit: &Circuit) -> Result<()> {
     let rng = &mut rng();
 
     let t = std::time::Instant::now();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove_with_circuit(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_with_circuit(
         circuit,
         &mut Transcript::new(b""),
         rng,
@@ -380,15 +383,15 @@ pub fn test_sieveir(circuit: &Circuit) -> Result<()> {
 }
 
 /// Test proof generation and verification of a given [`FancyCircuit`].
-pub fn test_circuit<'a, C>(circuit: &C, private_input: &'a [F2]) -> Result<()>
+pub fn test_circuit<'a, C, P: Params>(circuit: &C, private_input: &'a [F2]) -> Result<()>
 where
     C: FancyCircuit<ProverPreparer<'a>, Input = ()>
-        + FancyCircuit<ProverTraverser<VoleProver>, Input = ()>
-        + FancyCircuit<VerifierTraverser, Input = ()>,
+        + FancyCircuit<ProverTraverser<VoleProver<P>, P>, Input = ()>
+        + FancyCircuit<VerifierTraverser<P>, Input = ()>,
 {
     let rng = &mut rng();
     let t = Instant::now();
-    let proof = Proof::<VoleProver, VoleVerifier>::prove(
+    let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
         circuit,
         private_input,
         None,
@@ -406,6 +409,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params};
+
     use merlin::Transcript;
     use rand::rng;
     use std::io::Write;
@@ -426,10 +431,13 @@ mod tests {
     }
 
     // Create a proof for the given circuit and input.
-    fn create_proof(
+    fn create_proof<P: Params>(
         circuit_bytes: &'static str,
         private_input_bytes: &'static str,
-    ) -> Result<(Result<Proof<InsecureVole, InsecureCommitments>>, Circuit)> {
+    ) -> Result<(
+        Result<Proof<InsecureVole<P>, InsecureCommitments<P>>>,
+        Circuit,
+    )> {
         let mut circuit_cursor = Cursor::new(circuit_bytes.as_bytes());
 
         let dir = tempdir().unwrap();
@@ -440,7 +448,7 @@ mod tests {
         let circuit = load_circuit_prover(&mut circuit_cursor, &private_input_path)?;
         let rng = &mut rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit(
+        let proof = Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_with_circuit(
             &circuit,
             &mut transcript(),
             rng,
@@ -448,8 +456,7 @@ mod tests {
         Ok((proof, circuit))
     }
 
-    #[test]
-    fn prove_doesnt_explode() -> Result<()> {
+    fn prove_doesnt_explode<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
             circuit;
             @type field 2;
@@ -465,7 +472,7 @@ mod tests {
                 < 1 >;
             @end";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes)?;
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes)?;
         assert!(
             proof?
                 .verify_with_circuit(&mini_circuit, &mut transcript())
@@ -492,8 +499,7 @@ mod tests {
           $14 <- @mul(0: $0, $9);
         @end ";
 
-    #[test]
-    fn prove_works_on_slightly_larger_circuit() -> Result<()> {
+    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
             private_input;
             @type field 2;
@@ -505,7 +511,7 @@ mod tests {
                 < 0 >;
             @end ";
 
-        let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
+        let (proof, small_circuit) = create_proof::<P>(SMALL_CIRCUIT, private_input_bytes)?;
         assert!(
             proof?
                 .verify_with_circuit(&small_circuit, &mut transcript())
@@ -515,8 +521,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
+    fn prover_and_verifier_must_input_the_same_transcript<P: Params>() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
@@ -529,7 +534,7 @@ mod tests {
         @end ";
 
         // This uses the output of `transcript()` as-is to prove. This should work
-        let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes)?;
+        let (proof, small_circuit) = create_proof::<P>(SMALL_CIRCUIT, private_input_bytes)?;
         assert!(proof.is_ok());
 
         // If we use a different transcript to verify, it'll fail
@@ -544,8 +549,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn proof_requires_exact_number_of_challenges() -> Result<()> {
+    fn proof_requires_exact_number_of_challenges<P: Params>() -> Result<()> {
         // Create a valid proof
         let small_circuit_bytes = "version 2.0.0;
             circuit;
@@ -592,7 +596,7 @@ mod tests {
         let small_circuit = load_circuit_prover(small_circuit_text, &private_input_path)?;
         let rng = &mut rng();
 
-        let proof = Proof::<InsecureVole, InsecureCommitments>::prove_with_circuit::<_>(
+        let proof = Proof::<InsecureVole<P>, InsecureCommitments<P>>::prove_with_circuit::<_>(
             &small_circuit,
             &mut transcript(),
             rng,
@@ -606,4 +610,31 @@ mod tests {
 
         Ok(())
     }
+
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
+                #[test]
+                fn prove_doesnt_explode() -> Result<()> {
+                    super::prove_doesnt_explode::<$params>()
+                }
+                #[test]
+                fn prove_works_on_slightly_larger_circuit() -> Result<()> {
+                    super::prove_works_on_slightly_larger_circuit::<$params>()
+                }
+                #[test]
+                fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
+                    super::prover_and_verifier_must_input_the_same_transcript::<$params>()
+                }
+                #[test]
+                fn proof_requires_exact_number_of_challenges() -> Result<()> {
+                    super::proof_requires_exact_number_of_challenges::<$params>()
+                }
+            }
+        };
+    }
+
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }

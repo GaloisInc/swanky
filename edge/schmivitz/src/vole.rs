@@ -8,12 +8,13 @@
 pub(crate) mod insecure;
 
 use crypto_primitives::Chall3;
+use hybrid_array::Array;
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::Result;
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field_binary::{F2, F8b};
 
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes};
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;
@@ -63,6 +64,9 @@ pub trait RandomVoleP
 where
     Self: Sized,
 {
+    /// The protocol parameters this VOLE is instantiated at.
+    type Params: Params;
+
     /// Decommitment information for the random VOLE.
     ///
     /// This must only contain information that is safe to be sent to the verifier at the end of
@@ -75,8 +79,9 @@ where
     /// Create a set of random VOLEs.
     ///
     /// This is particular to the protocol by Baum et al., so the total number of VOLEs created
-    /// should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length`;
-    /// $`r`$ is the [`VOLE_SIZE_PARAM`]; and $`\tau`$ is the [`REPETITION_PARAM`].
+    /// should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length`; $`r`$ is the
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize); and $`\tau`$ is the
+    /// [`RepetitionParam`].
     ///
     /// The [`Transcript`] passed here must already incorporate all public information known to
     /// both parties at the beginning of the proof, including
@@ -100,7 +105,7 @@ where
     ///
     /// This should be $`\ell + r\tau`$, where $`\ell`$ is the `extended_witness_length` parameter
     /// passed to [`RandomVoleP::create()`];
-    /// $`r`$ is the [`VOLE_SIZE_PARAM`]; and $`\tau`$ is the [`REPETITION_PARAM`].
+    /// $`r`$ is the [`SmallVoleSize`](crate::parameters::SmallVoleSize); and $`\tau`$ is the [`RepetitionParam`].
     fn count(&self) -> usize;
 
     /// Get the number of extended witness elements supported by this random VOLE instance.
@@ -116,34 +121,35 @@ where
     fn witness_mask(&self) -> &[F2];
 
     /// Gets the VOLE values ($`u_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// embedded into [`F128b`] from [`F2`].
+    /// embedded into [`FLambda`] from [`F2`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde a`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVoleP::witness_mask()`].
-    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+    fn aggregate_commitment_values(&self)
+    -> Array<FLambda<Self::Params>, MaskLength<Self::Params>>;
 
     /// Gets the VOLE masks ($`v_i \text{ for } i \in [\ell + 1..\ell + r\tau]`$ in the paper),
-    /// lifted into [`F128b`] from `[`[`F8b`]`; 16]`.
+    /// lifted into [`FLambda`] from `[`[`F8b`]`; `SecurityParam`]`.
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 2 and used in Round 3, step 2.
     /// These are combined into a mask for the aggregated commitment $`\tilde b`$.
     ///
     /// Important: the values returned from this method must not overlap with those returned by
     /// [`RandomVoleP::witness_mask()`].
-    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+    fn aggregate_commitment_masks(&self) -> Array<FLambda<Self::Params>, MaskLength<Self::Params>>;
 
-    /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`F128b`] from
-    /// a [$`\tau`$](crate::parameters::REPETITION_PARAM)-length vector in [`F8b`].
+    /// Get the `i`th component of the VOLE mask (`v` in the paper), lifted into [`FLambda`] from
+    /// a [$`\tau`$](crate::parameters::RepetitionParam)-length vector in [`F8b`].
     ///
     /// In the paper, this is defined in Figure 7, Round 1, step 3 and used in Round 3, steps 1
     /// and 2.
     ///
     /// The index `i` must be in the range $`[0, \ell)`$, where $`\ell`$ is the
     /// value returned by [`RandomVoleP::extended_witness_length()`].
-    fn vole_mask(&self, i: usize) -> Result<F128b>;
+    fn vole_mask(&self, i: usize) -> Result<FLambda<Self::Params>>;
 
     /// Compute a partial decommitment to this set of random VOLEs.
     ///
@@ -158,11 +164,17 @@ where
     ///
     /// The challenge must incorporate all public information, including the degree 0 and 1
     /// commitments and all previous challenges.
-    fn decommit(self, decom_challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment;
+    fn decommit(
+        self,
+        decom_challenge: &Array<u8, SecurityParamBytes<Self::Params>>,
+    ) -> Self::Decommitment;
 }
 
 /// Methods for a verifier to reconstruct / verify and use an instance of VOLE.
 pub trait RandomVoleV {
+    /// The protocol parameters this VOLE is instantiated at.
+    type Params: Params;
+
     /// Decommitment information for the random VOLE.
     ///
     /// This must only contain information that is safe to be sent to the verifier at the end of
@@ -178,7 +190,7 @@ pub trait RandomVoleV {
     /// are computed.
     fn reconstruct(
         decom: &Self::Decommitment,
-        chall3: &Chall3,
+        chall3: &Chall3<Self::Params>,
         transcript: &mut Transcript,
     ) -> Self;
 
@@ -186,18 +198,18 @@ pub trait RandomVoleV {
     fn extended_witness_length(&self) -> usize;
 
     /// Get the verifier key array $`\mathbf \Delta`$.
-    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM];
+    fn verifier_key_array(&self) -> &Array<F8b, RepetitionParam<Self::Params>>;
 
     /// Get the lifted verifier key $`\Delta`$.
-    fn verifier_key(&self) -> F128b;
+    fn verifier_key(&self) -> FLambda<Self::Params>;
 
     /// Get the value tags corresponding to the witness $`\mathbf Q_{[0..\ell)}`$,
     /// where $`\ell`$ is the [`Self::extended_witness_length`].
-    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]];
+    fn witness_voles(&self) -> &[Array<F8b, RepetitionParam<Self::Params>>];
 
     /// Get the value tags corresponding to the mask
     /// $`\mathbf Q_{[\ell..\ell + \lambda)}`$, where $`\ell`$ is the
     /// [`Self::extended_witness_length`] and $`\lambda`$ is the security
-    /// parameter (and equal to [`REPETITION_PARAM`]` * `[`VOLE_SIZE_PARAM`]).
-    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM];
+    /// parameter (and equal to [`RepetitionParam`]` * `[`SmallVoleSize`](crate::parameters::SmallVoleSize)).
+    fn mask_voles(&self) -> Array<FLambda<Self::Params>, MaskLength<Self::Params>>;
 }

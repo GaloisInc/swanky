@@ -6,35 +6,39 @@
 
 use std::iter::{repeat_with, zip};
 
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
+use crate::parameters::{FLambda, Params, RepetitionParam};
+use crate::vole::{MaskLength, SecurityParamBytes};
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
+
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F2, F8b, F128b};
+use swanky_field::FiniteRing;
+use swanky_field_binary::{F2, F8b};
 
 use super::{AsSecretBytes, Chall3, DecommitmentSerde, RandomVoleP, RandomVoleV};
 
 #[allow(dead_code)]
 #[derive(Clone)]
-pub(crate) struct InsecureVole {
+pub(crate) struct InsecureVole<P: Params> {
     /// Number of VOLEs requested.
     extended_witness_length: usize,
 
     /// Random values $`\bf u`$ that were committed to.
     ///
     /// Guarantee: This has length `extended_witness_length` + r\tau `$, where $`r`$ is the
-    /// [`VOLE_SIZE_PARAM`] and $`\tau`$ is the [`REPETITION_PARAM`].
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize) and $`\tau`$ is the [`RepetitionParam`].
     values: Vec<F2>,
 
     /// Verifier's chosen random key $`\bf \Delta`$.
-    verifier_key: [F8b; REPETITION_PARAM],
+    verifier_key: Array<F8b, RepetitionParam<P>>,
 
     /// Masks for the random values $`\bf V`$.
     ///
     /// Guarantee: This has length `extended_witness_length` $`+ r\tau `$, where $`r`$ is the
-    /// [`VOLE_SIZE_PARAM`] and $`\tau`$ is the [`REPETITION_PARAM`].
-    masks: Vec<[F8b; REPETITION_PARAM]>,
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize) and $`\tau`$ is the [`RepetitionParam`].
+    masks: Vec<Array<F8b, RepetitionParam<P>>>,
 }
 
 /// Updates transcript with public material available at VOLE creation and VOLE reconstruction
@@ -53,8 +57,9 @@ fn update_transcript(transcript: &mut Transcript, extended_witness_length: usize
     challenge
 }
 
-impl RandomVoleP for InsecureVole {
-    type Decommitment = InsecureCommitments;
+impl<P: Params> RandomVoleP for InsecureVole<P> {
+    type Params = P;
+    type Decommitment = InsecureCommitments<P>;
     type VoleChallenge = [u8; 16];
 
     fn create<Secret: AsSecretBytes>(
@@ -67,7 +72,7 @@ impl RandomVoleP for InsecureVole {
         // or relevant context about the VOLE instantiation.
         let challenge = update_transcript(transcript, extended_witness_length);
 
-        let total_vole_count = extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
+        let total_vole_count = extended_witness_length + MaskLength::<P>::USIZE;
 
         // Choose random values for everything.
         // NB: This will fail on a 32-bit target if the witness length is > 2^32
@@ -77,7 +82,7 @@ impl RandomVoleP for InsecureVole {
 
         // This unwrap is safe because we hardcoded the length
         let verifier_key = repeat_with(|| F8b::random(rng))
-            .take(REPETITION_PARAM)
+            .take(RepetitionParam::<P>::USIZE)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
@@ -85,7 +90,7 @@ impl RandomVoleP for InsecureVole {
         // This unwrap is safe because we hardcoded the length
         let masks = repeat_with(|| {
             repeat_with(|| F8b::random(rng))
-                .take(REPETITION_PARAM)
+                .take(RepetitionParam::<P>::USIZE)
                 .collect::<Vec<_>>()
                 .try_into()
                 .unwrap()
@@ -105,7 +110,7 @@ impl RandomVoleP for InsecureVole {
     }
 
     fn count(&self) -> usize {
-        self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM
+        self.extended_witness_length + MaskLength::<P>::USIZE
     }
 
     fn extended_witness_length(&self) -> usize {
@@ -116,27 +121,27 @@ impl RandomVoleP for InsecureVole {
         &self.values[0..self.extended_witness_length]
     }
 
-    fn aggregate_commitment_values(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn aggregate_commitment_values(&self) -> Array<FLambda<P>, MaskLength<P>> {
         self.values
             .iter()
             .skip(self.extended_witness_length)
-            .map(|f2| F128b::from(*f2))
+            .map(|f2| P::f2_embed(*f2))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }
 
-    fn aggregate_commitment_masks(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn aggregate_commitment_masks(&self) -> Array<FLambda<P>, MaskLength<P>> {
         self.masks
             .iter()
             .skip(self.extended_witness_length)
-            .map(|mask| F8b::form_superfield(mask.into()))
+            .map(P::f8_linear_bijection)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }
 
-    fn vole_mask(&self, i: usize) -> Result<F128b> {
+    fn vole_mask(&self, i: usize) -> Result<FLambda<P>> {
         if i >= self.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -145,15 +150,15 @@ impl RandomVoleP for InsecureVole {
                 i
             );
         }
-        Ok(F8b::form_superfield(&self.masks[i].into()))
+        Ok(P::f8_linear_bijection(&self.masks[i]))
     }
 
-    fn decommit(self, _challenge: &[u8; SECURITY_PARAM / 8]) -> Self::Decommitment {
+    fn decommit(self, _challenge: &Array<u8, SecurityParamBytes<P>>) -> Self::Decommitment {
         // Compute uΔ^T (where Δ^T is the transpose of the verifier key)
         let u_delta = self
             .values
             .iter()
-            .map(|ui| self.verifier_key.map(|delta| *ui * delta))
+            .map(|ui| self.verifier_key.clone().map(|delta| *ui * delta))
             .collect::<Vec<_>>();
 
         // Add V + uΔ^T
@@ -177,27 +182,26 @@ impl RandomVoleP for InsecureVole {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct InsecureCommitments {
+pub(crate) struct InsecureCommitments<P: Params> {
     /// Number of VOLEs requested.
     extended_witness_length: usize,
 
     /// Verifier's chosen random key $`\bf \Delta`$.
-    verifier_key: [F8b; REPETITION_PARAM],
+    verifier_key: Array<F8b, RepetitionParam<P>>,
 
     /// Commitments $`\bf Q`$ to the random values using the specified key and masks.
     ///
     /// Guarantee: This has length `extended_witness_length` $`+ r\tau `$, where $`r`$ is the
-    /// [`VOLE_SIZE_PARAM`] and $`\tau`$ is the [`REPETITION_PARAM`].
-    verifier_commitments: Vec<[F8b; REPETITION_PARAM]>,
+    /// [`SmallVoleSize`](crate::parameters::SmallVoleSize) and $`\tau`$ is the [`RepetitionParam`].
+    verifier_commitments: Vec<Array<F8b, RepetitionParam<P>>>,
 }
 
-impl InsecureCommitments {
+impl<P: Params> InsecureCommitments<P> {
     /// Validate that the partial decommitment is correctly formed with respect to itself.
     /// TODO: put this inline somewhere -- maybe in `reconstruct`.
     #[allow(unused)]
     pub(crate) fn validate_commitments(&self) -> Result<()> {
-        let expected_num_commitments =
-            self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
+        let expected_num_commitments = self.extended_witness_length + MaskLength::<P>::USIZE;
         if self.verifier_commitments.len() != expected_num_commitments {
             bail!(
                 ErrorKind::OtherError,
@@ -211,18 +215,19 @@ impl InsecureCommitments {
     }
 }
 
-impl DecommitmentSerde for InsecureCommitments {
+impl<P: Params> DecommitmentSerde for InsecureCommitments<P> {
     fn proof_size_estimate(&self) -> usize {
         unimplemented!()
     }
 }
 
-impl RandomVoleV for InsecureCommitments {
-    type Decommitment = InsecureCommitments;
+impl<P: Params> RandomVoleV for InsecureCommitments<P> {
+    type Params = P;
+    type Decommitment = InsecureCommitments<P>;
 
     fn reconstruct(
         decom: &Self::Decommitment,
-        _chall3: &Chall3,
+        _chall3: &Chall3<P>,
         transcript: &mut Transcript,
     ) -> Self {
         // The output of this function is ignored since, in this insecure implementation,
@@ -237,31 +242,31 @@ impl RandomVoleV for InsecureCommitments {
     }
 
     /// Get verifier key ($`\bf\Delta`$ in the paper).
-    fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
+    fn verifier_key_array(&self) -> &Array<F8b, RepetitionParam<P>> {
         &self.verifier_key
     }
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
-    fn verifier_key(&self) -> F128b {
-        F8b::form_superfield(&self.verifier_key.into())
+    fn verifier_key(&self) -> FLambda<P> {
+        P::f8_linear_bijection(&self.verifier_key)
     }
 
     /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
     ///
     /// The output is guaranteed to be [`Self::extended_witness_length()`].
-    fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
+    fn witness_voles(&self) -> &[Array<F8b, RepetitionParam<P>>] {
         &self.verifier_commitments[0..self.extended_witness_length]
     }
 
     /// Get the lifted VOLEs corresponding to the mask for the aggregate commitment
     /// ($`q_{\ell+1}, \dots, q_{\ell + r\tau}`$ in the paper).
-    fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    fn mask_voles(&self) -> Array<FLambda<P>, MaskLength<P>> {
         // Lift the commitments -- we only want the last $`r\tau`$ of them, so we skip the first ones.
         // This will panic if we constructed the type with the wrong length.
         self.verifier_commitments
             .iter()
             .skip(self.extended_witness_length)
-            .map(|q| -> F128b { F8b::form_superfield(q.into()) })
+            .map(P::f8_linear_bijection)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
@@ -270,25 +275,25 @@ impl RandomVoleV for InsecureCommitments {
 
 #[cfg(test)]
 mod tests {
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params};
+
     use merlin::Transcript;
     use rand::rng;
     use swanky_field_binary::F2;
 
-    use crate::{
-        parameters::{REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM},
-        vole::{RandomVoleP, RandomVoleV, insecure::InsecureVole},
-    };
+    use crate::vole::{MaskLength, RandomVoleP, RandomVoleV, insecure::InsecureVole};
+    use hybrid_array::Array;
+    use hybrid_array::typenum::Unsigned;
 
-    #[test]
-    fn everything_is_the_expected_size() {
+    fn everything_is_the_expected_size<P: Params>() {
         let rng = &mut rng();
         let transcript = &mut Transcript::new(b"testing");
         let secret: Vec<F2> = Vec::new();
 
         let witness = 100;
-        let (voles, _challenge) = InsecureVole::create(witness, transcript, &secret, rng);
+        let (voles, _challenge) = InsecureVole::<P>::create(witness, transcript, &secret, rng);
 
-        assert_eq!(voles.count(), witness + REPETITION_PARAM * VOLE_SIZE_PARAM);
+        assert_eq!(voles.count(), witness + MaskLength::<P>::USIZE);
         assert_eq!(voles.witness_mask().len(), witness);
         // These will panic if there's a length problem:
         voles.aggregate_commitment_masks();
@@ -303,11 +308,26 @@ mod tests {
         }
 
         // Note: the challenge passed here is invalid because it's not drawn from transcript.
-        let decom = voles.decommit(&[0; SECURITY_PARAM / 8]);
+        let decom = voles.decommit(&Array::default());
 
         assert_eq!(decom.extended_witness_length(), witness);
         assert_eq!(decom.witness_voles().len(), witness);
         // This will panic if there's a length problem:
         decom.mask_voles();
     }
+
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
+                #[test]
+                fn everything_is_the_expected_size() {
+                    super::everything_is_the_expected_size::<$params>();
+                }
+            }
+        };
+    }
+
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }

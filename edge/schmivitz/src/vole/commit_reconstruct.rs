@@ -3,22 +3,19 @@ Implementation of algorithms to commit, open and reconstruct VOLEs.
  *
  */
 #![allow(clippy::needless_range_loop)]
-use crate::parameters::{REPETITION_PARAM, SECURITY_PARAM};
+use crate::parameters::{B, ComBytes, CorrectionsCount, Params, RepetitionParam, SecurityParam};
 use crate::vole::all_but_one_vc::{Decom, Pdecom, commit, open, reconstruct};
 use crate::vole::convert_to_vole::{convert_to_vole_prover, convert_to_vole_verifier};
-use crate::vole::crypto_primitives::{Chall3, Com, H1, H1_LENGTH, IV, Prg, Seed};
-use hybrid_array::{Array, typenum::U16};
+use crate::vole::crypto_primitives::{Chall3, Com, H1, IV, Prg, Seed};
+use hybrid_array::Array;
+use hybrid_array::typenum::Unsigned;
 use rand::RngExt;
 use rayon::iter::*;
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b};
-use swanky_serialization::CanonicalSerialize;
 
 use super::consistency_check::HashConsistency;
-
-/// Parameter used for padding for the security of the consistency check
-pub(crate) const B: usize = 16;
 
 /// Function mapping 8 booleans to [`u8`].
 pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
@@ -33,9 +30,9 @@ pub(crate) fn bools_to_u8(d: &[bool]) -> u8 {
 
 /// VOLE correction values.
 #[derive(Clone, Default)]
-pub(crate) struct Corrections([Vec<F2>; REPETITION_PARAM - 1]);
+pub(crate) struct Corrections<P: Params>(Array<Vec<F2>, CorrectionsCount<P>>);
 
-impl Corrections {
+impl<P: Params> Corrections<P> {
     pub(crate) fn length(&self) -> usize {
         let s = self.0[0].len();
         for v in self.0.iter() {
@@ -71,44 +68,44 @@ impl Corrections {
 }
 
 /// hash the commitments coming from the small-domain VOLE
-fn hash_commitments(com: &[Com]) -> Com {
-    assert_eq!(com.len(), REPETITION_PARAM);
-    let mut com_bytes = Vec::with_capacity(H1_LENGTH * REPETITION_PARAM);
-    for i in 0..REPETITION_PARAM {
+fn hash_commitments<P: Params>(com: &[Com<P>]) -> Com<P> {
+    assert_eq!(com.len(), RepetitionParam::<P>::USIZE);
+    let mut com_bytes = Vec::with_capacity(ComBytes::<P>::USIZE * RepetitionParam::<P>::USIZE);
+    for i in 0..RepetitionParam::<P>::USIZE {
         com_bytes.extend::<&[u8]>(com[i].as_ref());
     }
-    H1::hash(&com_bytes).into()
+    H1::<P>::hash(&com_bytes).into()
 }
 
 /// VOLEs alongside their associated commitments.
 ///
 /// This type is constructed in `FAEST.VOLECommit` (Figure 5.4 of the FAEST spec
 /// v1.1).
-pub(crate) struct VoleCommitment {
+pub(crate) struct VoleCommitment<P: Params> {
     /// Hash of the commitments from all the small domain VOLEs.
-    pub(crate) h_com: Com,
+    pub(crate) h_com: Com<P>,
     /// Decommitment from all the small domain VOLEs.
-    pub(crate) decom: [Decom; REPETITION_PARAM],
+    pub(crate) decom: Array<Decom<P>, RepetitionParam<P>>,
     /// Correction values. These correspond to `c` in the Figure.
-    pub(crate) corrections: Corrections,
+    pub(crate) corrections: Corrections<P>,
     /// Random masks associated with VOLEs.
     pub(crate) u: Vec<F2>,
     /// Commitments associated to `u`. These are "packed" bit vectors.
-    pub(crate) v: Vec<[F8b; REPETITION_PARAM]>,
+    pub(crate) v: Vec<Array<F8b, RepetitionParam<P>>>,
 }
 
-impl VoleCommitment {
+impl<P: Params> VoleCommitment<P> {
     /// Generate the VOLEs alongside associated commitments.
     ///
     /// This corresponds to Figure 5.4 of the FAEST spec (v1.1). It uses
     /// multithreading to improve performance.
     #[inline(never)]
-    pub(crate) fn create(seed: Seed, iv: IV, l_hat: usize) -> VoleCommitment {
-        let mut rng = Prg::new(seed, iv);
-        let mut u: Vec<Vec<F2>> = Vec::with_capacity(REPETITION_PARAM);
-        let mut v = Vec::with_capacity(REPETITION_PARAM);
-        let mut decom: [Decom; REPETITION_PARAM] = Default::default();
-        let mut com = Vec::with_capacity(REPETITION_PARAM);
+    pub(crate) fn create(seed: Seed<P>, iv: IV, l_hat: usize) -> Self {
+        let mut rng = Prg::<P>::new(seed, iv);
+        let mut u: Vec<Vec<F2>> = Vec::with_capacity(RepetitionParam::<P>::USIZE);
+        let mut v = Vec::with_capacity(RepetitionParam::<P>::USIZE);
+        let mut decom: Array<Decom<P>, RepetitionParam<P>> = Default::default();
+        let mut com = Vec::with_capacity(RepetitionParam::<P>::USIZE);
 
         let t = std::time::Instant::now();
 
@@ -125,14 +122,14 @@ impl VoleCommitment {
 
         // With multithreading.
         // Lines 3-7.
-        let handles: [_; REPETITION_PARAM] = core::array::from_fn(|_| {
-            let seed = rng.random::<Seed>();
+        let handles: Array<_, RepetitionParam<P>> = Array::from_fn(|_| {
+            let seed = Seed::<P>::from_fn(|_| rng.random());
             thread::spawn(move || {
                 // for smaller circuits the `commit/reconstruct` part is not negligible compared to the
                 // `convert_to_vole` part, therefore it is more efficient to execute both in
                 // threads
                 let (com_i, decom_i, seeds) = commit(seed, iv, 8);
-                let (u_i, v_i) = convert_to_vole_prover(
+                let (u_i, v_i) = convert_to_vole_prover::<P>(
                     seeds
                         .try_into()
                         .expect("depth in `commit` hardcoded to 8, so this should never fail"),
@@ -160,8 +157,8 @@ impl VoleCommitment {
         // Lines 10-11: Compute the corrections `cᵢ`.
         let t = std::time::Instant::now();
         let u_0 = u[0].clone(); // TODO: opt transmute here
-        let mut corrections: [Vec<F2>; REPETITION_PARAM - 1] = Default::default();
-        for i in 1..REPETITION_PARAM {
+        let mut corrections: Array<Vec<F2>, CorrectionsCount<P>> = Default::default();
+        for i in 1..RepetitionParam::<P>::USIZE {
             debug_assert_eq!(l_hat, u_0.len());
             let ci: Vec<F2> = (0..l_hat)
                 .into_par_iter()
@@ -173,14 +170,14 @@ impl VoleCommitment {
 
         // Line 8: Convert to a row-wise, fixed-size representation.
         let t = std::time::Instant::now();
-        let v_out: Vec<[F8b; REPETITION_PARAM]> = (0..l_hat)
+        let v_out: Vec<Array<F8b, RepetitionParam<P>>> = (0..l_hat)
             .into_par_iter()
-            .map(|i| core::array::from_fn(|tau| v[tau][i]))
+            .map(|i| Array::from_fn(|tau| v[tau][i]))
             .collect();
         log::info!("pack to F8b running time: {:?}", t.elapsed());
 
         // Line 12: Hash the commitments.
-        let h_com = hash_commitments(&com);
+        let h_com = hash_commitments::<P>(&com);
 
         Self {
             h_com,
@@ -211,9 +208,12 @@ pub(crate) fn chal_dec(chal: &[u8], i: usize) -> Vec<bool> {
 /// Function to open voles and return the associated partial decommitment.
 ///
 /// This function implements steps 20-22 of Fig 8.2
-pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> [Pdecom; REPETITION_PARAM] {
-    let mut pdecom: [Pdecom; REPETITION_PARAM] = Default::default();
-    for i in 0..REPETITION_PARAM {
+pub(crate) fn vole_open<P: Params>(
+    chal: &[u8],
+    decom: &[Decom<P>],
+) -> Array<Pdecom<P>, RepetitionParam<P>> {
+    let mut pdecom: Array<Pdecom<P>, RepetitionParam<P>> = Default::default();
+    for i in 0..RepetitionParam::<P>::USIZE {
         let delta_i = chal_dec(chal, i);
         let pdecom_i = open(&decom[i], delta_i);
         pdecom[i] = pdecom_i;
@@ -224,22 +224,22 @@ pub(crate) fn vole_open(chal: &[u8], decom: &[Decom]) -> [Pdecom; REPETITION_PAR
 /// Function to reconstruct voles from a challenge and partial decommitments.
 ///
 /// This implements Figure 5.5 in FAEST spec v1.1. The parameter `k_b` in that
-/// spec is always our [`parameters::VOLE_SIZE_PARAM`].
+/// spec is always our [`parameters::SmallVoleSize`].
 #[inline(never)]
-pub(crate) fn vole_reconstruct(
+pub(crate) fn vole_reconstruct<P: Params>(
     chal: &[u8], // bytes from fiat-shamir challenge
-    pdecom: &[Pdecom],
+    pdecom: &[Pdecom<P>],
     iv: IV,
     l_hat: usize,
-) -> (Com, Vec<Vec<F8b>>) {
-    assert_eq!(pdecom.len(), REPETITION_PARAM);
-    assert_eq!(chal.len(), REPETITION_PARAM);
-    let mut qs = Vec::with_capacity(REPETITION_PARAM);
-    let mut com = Vec::with_capacity(REPETITION_PARAM);
+) -> (Com<P>, Vec<Vec<F8b>>) {
+    assert_eq!(pdecom.len(), RepetitionParam::<P>::USIZE);
+    assert_eq!(chal.len(), RepetitionParam::<P>::USIZE);
+    let mut qs = Vec::with_capacity(RepetitionParam::<P>::USIZE);
+    let mut com = Vec::with_capacity(RepetitionParam::<P>::USIZE);
 
     // Without multithreading:
     /*
-    for i in 0..REPETITION_PARAM {
+    for i in 0..RepetitionParam::<P>::USIZE {
         let delta = chal_dec(chal, i);
         let (com_i, seeds) = reconstruct(pdecom[i].clone(), delta.clone(), iv);
         com.push(com_i);
@@ -250,16 +250,16 @@ pub(crate) fn vole_reconstruct(
 
     // With multithreading:
     let t = std::time::Instant::now();
-    let mut txs = Vec::with_capacity(REPETITION_PARAM);
-    let mut rxs = Vec::with_capacity(REPETITION_PARAM);
-    for _ in 0..REPETITION_PARAM {
+    let mut txs = Vec::with_capacity(RepetitionParam::<P>::USIZE);
+    let mut rxs = Vec::with_capacity(RepetitionParam::<P>::USIZE);
+    for _ in 0..RepetitionParam::<P>::USIZE {
         let (tx, rx) = channel();
         txs.push(tx);
         rxs.push(rx);
     }
     let mut handles = Vec::new();
 
-    for i in 0..REPETITION_PARAM {
+    for i in 0..RepetitionParam::<P>::USIZE {
         let delta = chal_dec(chal, i);
         let pdecom = pdecom[i].clone();
 
@@ -268,8 +268,8 @@ pub(crate) fn vole_reconstruct(
             // for smaller circuits the `commit/reconstruct` part is not negligeable compared to the
             // `convert_to_vole` part, therefore it is more efficient to execute both in
             // threads
-            let (com_i, seeds) = reconstruct(pdecom, delta.clone(), iv);
-            let q_i = convert_to_vole_verifier(
+            let (com_i, seeds) = reconstruct::<P>(pdecom, delta.clone(), iv);
+            let q_i = convert_to_vole_verifier::<P>(
                 seeds.try_into().unwrap(), // The depth is hardcoded to 8, so this will never fail.
                 iv,
                 l_hat,
@@ -280,7 +280,7 @@ pub(crate) fn vole_reconstruct(
         handles.push(handle);
     }
 
-    for i in 0..REPETITION_PARAM {
+    for i in 0..RepetitionParam::<P>::USIZE {
         let (com_i, q_i) = rxs[i].recv().unwrap();
         qs.push(q_i);
         com.push(com_i);
@@ -292,21 +292,15 @@ pub(crate) fn vole_reconstruct(
     // End multithreading
 
     // hash the commitments
-    let h_com = hash_commitments(&com);
+    let h_com = hash_commitments::<P>(&com);
 
     (h_com, qs)
 }
 
 // Compute the secret key delta from a challenge
-pub(crate) fn compute_secret_key(chall3: &Chall3) -> Array<F8b, U16> {
+pub(crate) fn compute_secret_key<P: Params>(chall3: &Chall3<P>) -> Array<F8b, RepetitionParam<P>> {
     // compute the big delta
-    (0..REPETITION_PARAM)
-        .map(|tau| {
-            let delta_i = chal_dec(chall3, tau);
-            F8b::from_bytes(&Array([bools_to_u8(&delta_i)]))
-        })
-        .collect::<Result<Array<F8b, U16>, _>>()
-        .unwrap()
+    Array::from_fn(|tau| F8b::from(bools_to_u8(&chal_dec(chall3, tau))))
 }
 
 /// This function applies corrections to the verifier part of voles `q` using a challenge.
@@ -314,14 +308,14 @@ pub(crate) fn compute_secret_key(chall3: &Chall3) -> Array<F8b, U16> {
 /// This function implements Lines 7-14 of Figure 8.3 of the FAEST spec.
 /// `how_many` must be $`\hat \ell = \ell + B + 2\lambda`$.
 #[inline(never)]
-pub(crate) fn apply_corrections_to_q(
+pub(crate) fn apply_corrections_to_q<P: Params>(
     q: Vec<Vec<F8b>>,
-    chall3: &Chall3,
-    corrections: &Corrections,
+    chall3: &Chall3<P>,
+    corrections: &Corrections<P>,
     how_many: usize,
-) -> Vec<[F8b; REPETITION_PARAM]> {
+) -> Vec<Array<F8b, RepetitionParam<P>>> {
     // Dimensions of `q`: \tau x l_hat x r = 16 x l_hat x 8.
-    debug_assert!(q.len() == REPETITION_PARAM && q[0].len() == how_many);
+    debug_assert!(q.len() == RepetitionParam::<P>::USIZE && q[0].len() == how_many);
 
     // Q_0 is the same
     // Change Q_i with the corrections:
@@ -329,14 +323,14 @@ pub(crate) fn apply_corrections_to_q(
     // Q = (Q_0 ... Q_{tau-1})
     let mut qs = Vec::with_capacity(how_many);
     for _ in 0..how_many {
-        qs.push([F8b::default(); REPETITION_PARAM]);
+        qs.push(Array::default());
     }
     for pos in 0..how_many {
         qs[pos][0] = q[0][pos];
     }
 
     // Apply the corrections. This also transposes the output relative to `q`.
-    for tau in 1..REPETITION_PARAM {
+    for tau in 1..RepetitionParam::<P>::USIZE {
         // Get challenge, and convert bools into `F2`. The unwrap should be safe because `chal_dec`
         // is supposed to return an 8-bit decomposition.
         let delta: [F2; 8] = chal_dec(chall3, tau)
@@ -362,12 +356,12 @@ pub(crate) fn apply_corrections_to_q(
 ///
 /// This function implements lines 8-11 in Fig 8.3 in the FAEST spec.
 #[inline(never)]
-pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2> {
-    assert_eq!(u_tilda.len(), SECURITY_PARAM + B);
+pub(crate) fn recompose_d<P: Params>(chall3: &Chall3<P>, u_tilda: &HashConsistency<P>) -> Vec<F2> {
+    assert_eq!(u_tilda.len(), SecurityParam::<P>::USIZE + B::USIZE);
     let how_many = u_tilda.len();
-    let mut qs = Vec::with_capacity(how_many * REPETITION_PARAM * 8);
+    let mut qs = Vec::with_capacity(how_many * RepetitionParam::<P>::USIZE * 8);
 
-    for i in 0..REPETITION_PARAM {
+    for i in 0..RepetitionParam::<P>::USIZE {
         // Length of this must be $r$ = `VOLE_SIZE_PARAM`.
         let delta = chal_dec(chall3, i);
         let delta_f2: Vec<_> = delta.iter().map(|b| F2::from(*b)).collect();
@@ -377,7 +371,7 @@ pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2>
             }
         }
     }
-    assert_eq!(qs.len(), how_many * REPETITION_PARAM * 8);
+    assert_eq!(qs.len(), how_many * RepetitionParam::<P>::USIZE * 8);
 
     qs
 }
@@ -386,36 +380,37 @@ pub(crate) fn recompose_d(chall3: &Chall3, u_tilda: &HashConsistency) -> Vec<F2>
 ///
 /// This function takes the size of the extended witness as input and returns
 /// that many more elements necessary based on the parameters of the protocol.
-pub(crate) fn l_hat(l: usize) -> usize {
-    l + B + 2 * SECURITY_PARAM
+pub(crate) fn l_hat<P: Params>(l: usize) -> usize {
+    l + B::USIZE + 2 * SecurityParam::<P>::USIZE
 }
 
 #[cfg(test)]
 mod test {
+    use crate::parameters::{Binary128Bit, Binary256Bit};
+
+    use super::*;
+
     use std::iter::repeat_with;
 
-    use super::{
-        VoleCommitment, apply_corrections_to_q, compute_secret_key, l_hat, vole_open,
-        vole_reconstruct,
-    };
+    use crate::parameters::{FLambda, Params};
+    use crate::vole::crypto_primitives::Chall3;
     use crate::vole::crypto_primitives::H1;
     use crate::vole::functionality::compute_seed_iv;
     use rand::rng;
-    use swanky_field::{FiniteRing, IsSubFieldOf};
-    use swanky_field_binary::{F2, F8b, F128b};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
-    #[test]
-    fn test_vole_commit_reconstruct() {
+    fn test_vole_commit_reconstruct<P: Params>() {
         let rng = &mut rng();
         let secret = repeat_with(|| F2::random(rng))
             .take(100)
             .collect::<Vec<F2>>();
         let pk = vec![1u8];
 
-        let how_many = l_hat(1_000);
+        let how_many = l_hat::<P>(1_000);
 
-        let mu: H1 = H1::hash(&pk);
-        let (r, iv) = compute_seed_iv(&secret, &mu);
+        let mu: H1<P> = H1::hash(&pk);
+        let (r, iv) = compute_seed_iv::<P, _>(&secret, &mu);
 
         let VoleCommitment {
             h_com: _,
@@ -423,29 +418,44 @@ mod test {
             corrections,
             u,
             v,
-        } = VoleCommitment::create(r, iv, how_many);
+        } = VoleCommitment::<P>::create(r, iv, how_many);
 
-        let chall3 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let chall3 = Chall3::<P>::from_fn(|i| i as u8);
 
         let pdecom = vole_open(&chall3, &decom);
 
-        let (_h_ver, q) = vole_reconstruct(&chall3, &pdecom, iv, how_many);
+        let (_h_ver, q) = vole_reconstruct::<P>(&chall3, &pdecom, iv, how_many);
 
         // Change Q_i with the corrections:
         // loop Q_i xor (\delta_0 c_i ... \delta_7 c_7)
         // Q = (Q_0 ... Q_{tau-1})
-        let q_f128b = apply_corrections_to_q(q, &chall3, &corrections, how_many);
+        let q_flambda = apply_corrections_to_q(q, &chall3, &corrections, how_many);
 
         // compute the big delta
-        let big_delta = compute_secret_key(&chall3);
-        let big_delta_f128b: F128b = F8b::form_superfield(&big_delta);
+        let big_delta = compute_secret_key::<P>(&chall3);
+        let big_delta_flambda: FLambda<P> = P::f8_linear_bijection(&big_delta);
 
         for pos in 0..how_many {
-            let v_f128b: F128b = F8b::form_superfield(&v[pos].into());
+            let v_flambda: FLambda<P> = P::f8_linear_bijection(&v[pos]);
             assert_eq!(
-                v_f128b + u[pos] * big_delta_f128b,
-                F8b::form_superfield(&q_f128b[pos].into())
+                v_flambda + P::f2_scale(u[pos], big_delta_flambda),
+                P::f8_linear_bijection(&q_flambda[pos])
             );
         }
     }
+
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ident $(,)? }) => {
+            mod $name {
+                use super::*;
+                #[test]
+                fn test_vole_commit_reconstruct() {
+                    super::test_vole_commit_reconstruct::<$params>();
+                }
+            }
+        };
+    }
+
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }
