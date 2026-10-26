@@ -25,12 +25,13 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
-use swanky_ot_alsz_kos::alsz;
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
+use vectoreyes::U8x16;
 
 pub(crate) trait NeuralNetExecutor<F: FancyNeuralNet> {
     fn execute(
@@ -130,7 +131,7 @@ impl<W: BinaryWireLabel> InputEncoder<W> {
 pub struct OutputMap {
     // The first entry is the zero wirelabel, and the second entry is the one
     // wirelabel for that bundle.
-    outputs: Vec<Vec<[Block; 2]>>,
+    outputs: Vec<Vec<[U8x16; 2]>>,
 }
 
 impl OutputMap {
@@ -772,7 +773,7 @@ impl NeuralNet {
         assert_eq!(input.len(), self.ninputs());
         let (_, outputs) = swanky_channel::local::local_channel_pair(
             |channel| {
-                let mut garbler: Garbler<_, alsz::Sender, WireMod2> =
+                let mut garbler: Garbler<_, IKNP<Sender>, WireMod2> =
                     Garbler::new(channel, SwankyRng::new())?;
                 let mut nn = BinaryNeuralNet::new(&mut garbler, bitwidths, true);
                 let inputs = nn.encode_input(input, channel)?;
@@ -783,7 +784,7 @@ impl NeuralNet {
                 Ok(())
             },
             |channel| {
-                let mut evaluator: Evaluator<SwankyRng, alsz::Receiver, WireMod2> =
+                let mut evaluator: Evaluator<SwankyRng, IKNP<Receiver>, WireMod2> =
                     Evaluator::new(channel, SwankyRng::new())?;
                 let mut nn = BinaryNeuralNet::new(&mut evaluator, bitwidths, false);
                 let inputs = nn.receive_input(input, channel)?;

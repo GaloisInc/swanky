@@ -16,7 +16,8 @@ mod tests {
     use fancy_traits::{
         Circuit, CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput,
     };
-    use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
+    use swanky_ot_chou_orlandi_new::ChouOrlandi;
+    use swanky_ot_traits_new::{Receiver, Sender};
     use swanky_rng::SwankyRng;
 
     #[test]
@@ -29,7 +30,7 @@ mod tests {
                     |channel| {
                         let rng = SwankyRng::new();
                         let mut gb =
-                            Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
+                            Garbler::<SwankyRng, ChouOrlandi<Sender>, AllWire>::new(channel, rng)?;
                         let x = gb.encode(a, modulus, channel)?;
                         let y = gb.receive(modulus, channel)?;
                         let outputs = circuit.execute(&mut gb, (x, y), channel)?;
@@ -39,7 +40,7 @@ mod tests {
                     },
                     |channel| {
                         let rng = SwankyRng::new();
-                        let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(
+                        let mut ev = Evaluator::<SwankyRng, ChouOrlandi<Receiver>, AllWire>::new(
                             channel, rng,
                         )?;
                         let x = ev.receive(modulus, channel)?;
@@ -55,8 +56,8 @@ mod tests {
         }
     }
 
-    type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
-    type EV<Wire> = Evaluator<SwankyRng, ChouOrlandiReceiver, Wire>;
+    type GB<Wire> = Garbler<SwankyRng, ChouOrlandi<Sender>, Wire>;
+    type EV<Wire> = Evaluator<SwankyRng, ChouOrlandi<Receiver>, Wire>;
 
     fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
     where
@@ -78,7 +79,7 @@ mod tests {
         let (_, out) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let rng = SwankyRng::new();
-                let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, Wire>::new(channel, rng)?;
+                let mut gb = Garbler::<SwankyRng, ChouOrlandi<Sender>, Wire>::new(channel, rng)?;
                 let mut xs = gb.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
                 let ys = gb.receive_many(&vec![2; 128], channel)?;
                 xs.extend(ys);
@@ -95,7 +96,8 @@ mod tests {
             },
             |channel| {
                 let rng = SwankyRng::new();
-                let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, Wire>::new(channel, rng)?;
+                let mut ev =
+                    Evaluator::<SwankyRng, ChouOrlandi<Receiver>, Wire>::new(channel, rng)?;
                 let mut xs = ev.receive_many(&vec![2; 128], channel)?;
                 let ys = ev.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
                 xs.extend(ys);

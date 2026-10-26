@@ -14,12 +14,13 @@ workspace = true
 fancy-garbling.workspace = true
 fancy-traits.workspace = true
 swanky-adversary.workspace = true
-swanky-rng.workspace = true
-swanky-block.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true
-swanky-ot-traits.workspace = true
+swanky-ot-traits-new.workspace = true
+swanky-party.workspace = true
+swanky-rng.workspace = true
+vectoreyes.workspace = true
 
 rand.workspace = true
 
@@ -27,8 +28,8 @@ rand.workspace = true
 fancy-analyzer.workspace = true
 fancy-circuits.workspace = true
 fancy-plaintext.workspace = true
-swanky-ot-chou-orlandi.workspace = true
-swanky-ot-alsz-kos.workspace = true
+swanky-ot-chou-orlandi-new.workspace = true
+swanky-ot-iknp.workspace = true
 
 clap.workspace = true
 criterion.workspace = true
