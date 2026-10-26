@@ -131,12 +131,12 @@ impl<P: GenericParty> AndTripleGenerator<P> {
     /// This panics if `ntriples < 320`, as 320 is the minimum number of triples
     /// that can be generated.
     pub fn generate<RNG: CryptoRng>(
-        mut self,
+        &mut self,
         ntriples: usize,
         out: &mut Vec<AndTriple<P>>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<Self> {
+    ) -> swanky_error::Result<()> {
         // See Table 4 from https://eprint.iacr.org/2017/030.pdf.
         //
         // These numbers are for a statistical security of 40 bits.
@@ -151,9 +151,8 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         };
         let nleaky = ntriples * bucket_size;
         let mut leaky_ands = Vec::with_capacity(nleaky);
-        self.leaky_generator =
-            self.leaky_generator
-                .generate(nleaky, &mut leaky_ands, channel, rng)?;
+        self.leaky_generator
+            .generate(nleaky, &mut leaky_ands, channel, rng)?;
         // Run a coin-tossing protocol to determine a seed for permuting the
         // generated leaky AND triples.
         let random = swanky_f_rand::random_seed::<P, _>(channel, rng)?;
@@ -162,24 +161,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         leaky_ands.shuffle(&mut shuffle_rng);
         // Bucket the leaky AND triples and combine them into (non-leaky) AND triples.
         self.leaky_generator
-            .combine(&leaky_ands, out, bucket_size, channel)?;
-        Ok(self)
-    }
-
-    /// Generate `AuthShare`s associated with this `AndTriple` generator.
-    ///
-    pub fn generate_auth_shares<RNG: CryptoRng>(
-        mut self,
-        nshares: usize,
-        shares: &mut Vec<AuthShare<P>>,
-        channel: &mut Channel,
-        rng: &mut RNG,
-    ) -> swanky_error::Result<Self> {
-        self.leaky_generator.auth_share_generator = self
-            .leaky_generator
-            .auth_share_generator
-            .generate(nshares, shares, channel, rng)?;
-        Ok(self)
+            .combine(&leaky_ands, out, bucket_size, channel)
     }
 
     /// Open the AND triples in `triples`.
@@ -474,24 +456,21 @@ mod tests {
 
     fn generate_triples(
         ntriples: usize,
-        generator_a: AndTripleGenerator<PartyA>,
-        generator_b: AndTripleGenerator<PartyB>,
+        generator_a: &mut AndTripleGenerator<PartyA>,
+        generator_b: &mut AndTripleGenerator<PartyB>,
         mut rng_a: &mut SwankyRng,
         mut rng_b: &mut SwankyRng,
-    ) -> (
-        (AndTripleGenerator<PartyA>, Vec<AndTriple<PartyA>>),
-        (AndTripleGenerator<PartyB>, Vec<AndTriple<PartyB>>),
-    ) {
+    ) -> (Vec<AndTriple<PartyA>>, Vec<AndTriple<PartyB>>) {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut triples: Vec<AndTriple<PartyA>> = vec![];
-                let generator_a = generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
-                Ok((generator_a, triples))
+                generator_a.generate(ntriples, &mut triples, c, &mut rng_a)?;
+                Ok(triples)
             },
             |c| {
                 let mut triples: Vec<AndTriple<PartyB>> = vec![];
-                let generator_b = generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
-                Ok((generator_b, triples))
+                generator_b.generate(ntriples, &mut triples, c, &mut rng_b)?;
+                Ok(triples)
             },
         )
         .unwrap()
@@ -499,30 +478,31 @@ mod tests {
 
     fn generate_shares(
         nshares: usize,
-        mut generator_a: AndTripleGenerator<PartyA>,
-        mut generator_b: AndTripleGenerator<PartyB>,
+        generator_a: &mut AndTripleGenerator<PartyA>,
+        generator_b: &mut AndTripleGenerator<PartyB>,
         mut rng_a: &mut SwankyRng,
         mut rng_b: &mut SwankyRng,
-    ) -> (
-        (AndTripleGenerator<PartyA>, Vec<AuthShare<PartyA>>),
-        (AndTripleGenerator<PartyB>, Vec<AuthShare<PartyB>>),
-    ) {
+    ) -> (Vec<AuthShare<PartyA>>, Vec<AuthShare<PartyB>>) {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut shares: Vec<AuthShare<PartyA>> = vec![];
-                generator_a.leaky_generator.auth_share_generator = generator_a
-                    .leaky_generator
-                    .auth_share_generator
-                    .generate(nshares, &mut shares, c, &mut rng_a)?;
-                Ok((generator_a, shares))
+                generator_a.leaky_generator.auth_share_generator.generate(
+                    nshares,
+                    &mut shares,
+                    c,
+                    &mut rng_a,
+                )?;
+                Ok(shares)
             },
             |c| {
                 let mut shares: Vec<AuthShare<PartyB>> = vec![];
-                generator_b.leaky_generator.auth_share_generator = generator_b
-                    .leaky_generator
-                    .auth_share_generator
-                    .generate(nshares, &mut shares, c, &mut rng_b)?;
-                Ok((generator_b, shares))
+                generator_b.leaky_generator.auth_share_generator.generate(
+                    nshares,
+                    &mut shares,
+                    c,
+                    &mut rng_b,
+                )?;
+                Ok(shares)
             },
         )
         .unwrap()
@@ -555,8 +535,8 @@ mod tests {
                                    seed_b in any::<u128>()) {
             let mut rng_a = SwankyRng::from_seed(seed_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_b.into());
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((generator_a, triples_a), (generator_b, triples_b)) = generate_triples(ntriples, generator_a, generator_b, &mut rng_a, &mut rng_b);
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(ntriples, &mut generator_a, &mut generator_b, &mut rng_a, &mut rng_b);
             let (validation_a, validation_b) =
                 validate_triples(&generator_a, &generator_b, triples_a, triples_b);
             prop_assert!(validation_a);
@@ -572,18 +552,18 @@ mod tests {
                                     seed_b in any::<u128>()) {
             let mut rng_a = SwankyRng::from_seed(seed_a.into());
             let mut rng_b = SwankyRng::from_seed(seed_b.into());
-            let (generator_a, generator_b) = generators(&mut rng_a, &mut rng_b);
-            let ((generator_a, triples_a), (generator_b, triples_b)) = generate_triples(
+            let (mut generator_a, mut generator_b) = generators(&mut rng_a, &mut rng_b);
+            let (triples_a, triples_b) = generate_triples(
                 ntriples,
-                generator_a,
-                generator_b,
+                &mut generator_a,
+                &mut generator_b,
                 &mut rng_a,
                 &mut rng_b,
             );
-            let ((generator_a, shares_a), (generator_b, shares_b)) = generate_shares(
+            let (shares_a, shares_b) = generate_shares(
                 2 * ntriples,
-                generator_a,
-                generator_b,
+                &mut generator_a,
+                &mut generator_b,
                 &mut rng_a,
                 &mut rng_b,
             );

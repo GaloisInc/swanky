@@ -15,12 +15,14 @@ use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant, FancyEncode, Fancy
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
-use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
+use vectoreyes::U8x16;
 
 const NHASHES: usize = 3;
 // How many bytes of the hash to use for the equality tests. This affects
@@ -87,7 +89,7 @@ impl Sender {
         rng: &mut RNG,
     ) -> swanky_error::Result<SenderState> {
         // receive cuckoo hash info from sender
-        let key = channel.read::<Block>()?;
+        let key = channel.read::<U8x16>()?;
         let hashes = utils::compress_and_hash_inputs(inputs, key);
 
         // map inputs to table using all hash functions
@@ -98,7 +100,7 @@ impl Sender {
             let mut bins = Vec::with_capacity(NHASHES);
             for h in 0..NHASHES {
                 let bin = CuckooHash::bin(x, h, nbins);
-                table[bin].push(x ^ Block::from(h as u128));
+                table[bin].push(x ^ U8x16::from(h as u128));
                 bins.push(bin);
             }
             // if j = H1(y) = H2(y) for some y, then P2 adds a uniformly random element to
@@ -134,15 +136,20 @@ impl SenderState {
         &self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<(Garbler<RNG, OtSender, AllWire>, Vec<AllWire>, Vec<AllWire>)>
+    ) -> swanky_error::Result<(
+        Garbler<RNG, IKNP<OtSender>, AllWire>,
+        Vec<AllWire>,
+        Vec<AllWire>,
+    )>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
-        let mut gb = Garbler::<RNG, OtSender, AllWire>::new(channel, RNG::from_seed(rng.random()))
-            .wrap_err(
-                ErrorKind::InitializationError,
-                "Failed to initialize garbler during setup.",
-            )?;
+        let mut gb =
+            Garbler::<RNG, IKNP<OtSender>, AllWire>::new(channel, RNG::from_seed(rng.random()))
+                .wrap_err(
+                    ErrorKind::InitializationError,
+                    "Failed to initialize garbler during setup.",
+                )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
         let mods = vec![2; my_input_bits.len()]; // all binary moduli
         let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
@@ -157,7 +164,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut gb, &x, &y, channel)?;
@@ -172,7 +179,7 @@ impl SenderState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
         let (mut gb, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut gb, &x, &y, channel)?;
@@ -250,7 +257,7 @@ impl Receiver {
                 Some(item) => item.entry_with_hindex(),
                 None => rng.random(),
             })
-            .collect::<Vec<Block>>();
+            .collect::<Vec<U8x16>>();
 
         let opprf_outputs = self
             .opprf
@@ -272,18 +279,18 @@ impl ReceiverState {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<(
-        Evaluator<RNG, OtReceiver, AllWire>,
+        Evaluator<RNG, IKNP<OtReceiver>, AllWire>,
         Vec<AllWire>,
         Vec<AllWire>,
     )>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
         let nbins = self.cuckoo.nbins;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
         let mut ev =
-            Evaluator::<RNG, OtReceiver, AllWire>::new(channel, RNG::from_seed(rng.random()))
+            Evaluator::<RNG, IKNP<OtReceiver>, AllWire>::new(channel, RNG::from_seed(rng.random()))
                 .wrap_err(
                     ErrorKind::InitializationError,
                     "Failed to initialize receiver during setup.",
@@ -302,7 +309,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<Vec<Msg>>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let outs = fancy_compute_intersection(&mut ev, &x, &y, channel)?;
@@ -328,7 +335,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<usize>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
         let (mut ev, x, y) = self.compute_setup(channel, rng)?;
         let result = fancy_compute_cardinality(&mut ev, &x, &y, channel)?;
@@ -352,7 +359,7 @@ impl ReceiverState {
         rng: &mut RNG,
     ) -> swanky_error::Result<()>
     where
-        RNG: CryptoRng + SeedableRng<Seed = Block>,
+        RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
         let payload_len = payloads[0].len();
         if !(payloads.iter().all(|p| p.len() == payload_len)) {

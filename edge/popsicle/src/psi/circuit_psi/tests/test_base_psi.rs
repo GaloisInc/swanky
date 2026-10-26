@@ -13,7 +13,8 @@ mod tests {
     use swanky_twopac::semihonest::{Evaluator, Garbler};
 
     use swanky_block::Block512;
-    use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+    use swanky_ot_iknp::IKNP;
+    use swanky_ot_traits_new::{Receiver, Sender};
     use swanky_rng::SwankyRng;
 
     // Run Base Psi
@@ -29,7 +30,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |channel| {
                 let mut rng = SwankyRng::seed_from_u64(seed_sx);
-                let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(
+                let mut gb = Garbler::<SwankyRng, IKNP<Sender>, WireMod2>::new(
                     channel,
                     SwankyRng::from_rng(&mut rng),
                 )
@@ -44,7 +45,7 @@ mod tests {
             },
             |channel| {
                 let mut rng = SwankyRng::seed_from_u64(seed_rx);
-                let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(
+                let mut ev = Evaluator::<SwankyRng, IKNP<Receiver>, WireMod2>::new(
                     channel,
                     SwankyRng::from_rng(&mut rng),
                 )

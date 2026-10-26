@@ -80,12 +80,12 @@ impl<P: Party> OTInit<P> for ChouOrlandi<P> {
 
 impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
-        mut self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
-    ) -> swanky_error::Result<Self> {
+    ) -> swanky_error::Result<()> {
         for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
             self.counter += 1;
 
@@ -128,7 +128,7 @@ impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 
