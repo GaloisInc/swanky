@@ -67,7 +67,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> IKNP<P, OT>
         channel: &mut Channel,
         rng: &mut impl CryptoRng,
     ) -> Result<Self> {
-        let ot = OT::init(channel, rng)?;
+        let mut ot = OT::init(channel, rng)?;
 
         let s: PartyPrivateCopy<Sender, _, _> = base_ot_selection_block
             .as_ref()
@@ -274,17 +274,17 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTInit<P> f
 
 impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P> for IKNP<P, OT> {
     fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
-        mut self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         outputs: &mut O,
         channel: &mut Channel,
         _rng: &mut impl CryptoRng,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         let m = inputs
             .as_ref()
             .map(|&sz| sz, |inputs| inputs.len())
             .into_inner_same();
-        let mat = compute_mat(&mut self, m, inputs, channel)?;
+        let mat = compute_mat(self, m, inputs, channel)?;
 
         for j in 0..m {
             let q = U8x16::from_array(
@@ -307,7 +307,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTRandom<P>
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 
@@ -315,18 +315,18 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
     for IKNP<P, OT>
 {
     fn ot_correlated<O: Extend<PartyEither<P, U8x16, U8x16>>>(
-        mut self,
+        &mut self,
         inputs: PartyEither<P, usize, &[F2]>,
         delta: PartyPrivate<Sender, P, U8x16>,
         outputs: &mut O,
         channel: &mut Channel,
         _rng: &mut impl CryptoRng,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         let m = inputs
             .as_ref()
             .map(|&sz| sz, |inputs| inputs.len())
             .into_inner_same();
-        let mat = compute_mat(&mut self, m, inputs.clone(), channel)?;
+        let mat = compute_mat(self, m, inputs.clone(), channel)?;
 
         for j in 0..m {
             let q = U8x16::from_array(
@@ -361,7 +361,7 @@ impl<P: Party, OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>>> OTCorrelate
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 
