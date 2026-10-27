@@ -143,7 +143,7 @@ fn codegen_impls<T: Read + Seek>(
     // JP: Hard coding F2 for now.
     let main = codegen.main;
     quote! {
-        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge<F2> + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
+        impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge<F2> + fancy_traits::FancyEncode<F2> + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
             type Input = ();
             type Output = Vec<F::Item>; // TODO: should be `()`.
 

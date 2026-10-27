@@ -8,7 +8,9 @@ mod test {
         crypto::hmac::HmacSha256,
         crypto::sha::{Sha256, Sha256CompressionFunction},
     };
-    use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyZeroKnowledge};
+    use fancy_traits::{
+        Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge,
+    };
     use merlin::Transcript;
     use rand::rng;
     use schmivitz::{
@@ -189,8 +191,8 @@ mod test {
 
     struct TestAssertZero;
 
-    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F>
-        for TestAssertZero
+    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2> + FancyEncode<F2>>
+        FancyCircuit<F> for TestAssertZero
     {
         type Input = ();
         type Output = ();
@@ -343,7 +345,9 @@ mod test {
 
     struct TestBinaryAddition<'a>(BinaryAddition<'a>, &'static str);
 
-    impl<'a, F: FancyBinary + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestBinaryAddition<'a> {
+    impl<'a, F: FancyBinary + FancyZeroKnowledge<F2> + FancyEncode<F2>> FancyCircuit<F>
+        for TestBinaryAddition<'a>
+    {
         type Input = ();
         type Output = ();
 
@@ -415,7 +419,9 @@ mod test {
 
     struct TestAes(Aes128);
 
-    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestAes {
+    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2> + FancyEncode<F2>>
+        FancyCircuit<F> for TestAes
+    {
         type Input = ();
         type Output = ();
 
@@ -480,8 +486,8 @@ mod test {
 
     struct TestSha256CompressionFunction(Sha256CompressionFunction);
 
-    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F>
-        for TestSha256CompressionFunction
+    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2> + FancyEncode<F2>>
+        FancyCircuit<F> for TestSha256CompressionFunction
     {
         type Input = ();
         type Output = ();
@@ -523,7 +529,7 @@ mod test {
 
     struct TestSha256(Sha256);
 
-    impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestSha256 {
+    impl<F: FancyBinary + FancyConstant<F2> + FancyEncode<F2>> FancyCircuit<F> for TestSha256 {
         type Input = ();
         type Output = ();
 
@@ -557,8 +563,8 @@ mod test {
 
     struct TestHmac<'a>(HmacSha256<'a>);
 
-    impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F>
-        for TestHmac<'a>
+    impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2> + FancyEncode<F2>>
+        FancyCircuit<F> for TestHmac<'a>
     {
         type Input = ();
         type Output = ();
