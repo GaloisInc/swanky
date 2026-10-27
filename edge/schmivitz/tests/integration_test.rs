@@ -193,7 +193,7 @@ mod test {
         for TestAssertZero
     {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -209,7 +209,7 @@ mod test {
             let y = backend.xor(&x, &one);
             let z = backend.xor(&y, &one);
             backend.assert_zero(&z, channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -345,7 +345,7 @@ mod test {
 
     impl<'a, F: FancyBinary + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestBinaryAddition<'a> {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -375,7 +375,7 @@ mod test {
                 }
             }
             backend.assert_zero(&carry, channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -417,7 +417,7 @@ mod test {
 
     impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestAes {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -447,7 +447,7 @@ mod test {
                     _ => panic!("Unexpected character in boolean string"),
                 }
             }
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -484,7 +484,7 @@ mod test {
         for TestSha256CompressionFunction
     {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -503,7 +503,7 @@ mod test {
                 .try_into()
                 .unwrap();
             let _ = self.0.execute(backend, (block, chain), channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -525,7 +525,7 @@ mod test {
 
     impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestSha256 {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -537,7 +537,7 @@ mod test {
                 .map(|_| backend.receive(channel))
                 .collect::<Result<Vec<_>>>()?;
             let _ = self.0.execute(backend, input, channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -561,7 +561,7 @@ mod test {
         for TestHmac<'a>
     {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -589,7 +589,7 @@ mod test {
                     _ => panic!("Unexpected character in boolean string"),
                 };
             }
-            Ok(vec![])
+            Ok(())
         }
     }
 
