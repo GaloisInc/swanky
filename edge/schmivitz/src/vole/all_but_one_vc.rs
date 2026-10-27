@@ -16,9 +16,10 @@
 //!
 //! It also implements the helper function `num_rec` Fig 3.2, page 16.
 //!
-//! We assume the $`\lambda`$ security parameter in the spec to be 128 as set in
-//! [`SECURITY_PARAM`](crate::parameters::SECURITY_PARAM).
+//! We assume the $`\lambda`$ security parameter in the spec to be 128 or 256 as set in
+//! [`SecurityParam`](crate::parameters::SecurityParam).
 
+use crate::parameters::Params;
 use crate::vole::crypto_primitives::{Com, H1, IV, Key, Prg, Seed, h0};
 use rand::RngExt;
 use swanky_error::{ErrorKind, Result, bail};
@@ -31,23 +32,23 @@ use swanky_error::{ErrorKind, Result, bail};
 /// and the underlying vector indexing follows a breadth-first traversal.
 /// That is the element at depth `d` and position `p`, corresponds to the vector index $`2^d + p-1`$.
 #[derive(Clone, Default)]
-pub(crate) struct Keys(Vec<Key>);
+pub(crate) struct Keys<P: Params>(Vec<Key<P>>);
 
-impl Keys {
+impl<P: Params> Keys<P> {
     /// Get a key in the tree at `depth` and index `idx` in the associated layer.
-    fn get(&self, depth: usize, idx: usize) -> Key {
+    fn get(&self, depth: usize, idx: usize) -> Key<P> {
         let layer_start = (1 << depth) - 1;
-        self.0[layer_start + idx]
+        self.0[layer_start + idx].clone()
     }
 
     /// Set a key in the tree at `depth` and index `idx` in the associated layer.
-    fn set(&mut self, depth: usize, idx: usize, k: Key) {
+    fn set(&mut self, depth: usize, idx: usize, k: Key<P>) {
         let layer_start = (1 << depth) - 1;
         self.0[layer_start + idx] = k;
     }
 
     /// Get a full layer as a slice of keys.
-    fn get_layer(&self, depth: usize) -> &[Key] {
+    fn get_layer(&self, depth: usize) -> &[Key<P>] {
         let layer_start = (1 << depth) - 1;
         let layer_end = (1 << (depth + 1)) - 1;
         &self.0[layer_start..layer_end]
@@ -58,32 +59,39 @@ impl Keys {
 ///
 /// It is a pair of Keys composing the GGM tree and the commitments associated with the leaves of the GGM tree.
 /// It corresponds to values like $`(k^i_j, com_j\in[0..n])`$ from the FAEST spec.
-pub(crate) type Decom = (Keys, Vec<Com>);
+pub(crate) type Decom<P> = (Keys<P>, Vec<Com<P>>);
 
 /// Partial decommitment as received by the verifier from the prover.
 ///
 /// It is a pair of Keys and a Commitment.
 /// The keys are the siblings keys collected on the path from the root of the GGM tree to a specific leaf.
 /// The commitment is the one associated with the specific leaf.
-pub(crate) type Pdecom = (Vec<Key>, Com);
+pub(crate) type Pdecom<P> = (Vec<Key<P>>, Com<P>);
 
 /// Compute all the internal keys, bottom seeds and commitments at a given depth.
 ///
 /// This function is not present in the FAEST spec but it is a code fragment identified in
 /// both VC.commmit and VC.reconstruct that can be factorized.
 /// This function is used in [`commit()`] and [`reconstruct`].
-fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
+fn tree<P: Params>(iv: IV, r: Key<P>, depth: usize) -> (Keys<P>, Vec<Seed<P>>, Vec<Com<P>>) {
     let n = 1 << depth;
 
-    let mut ks = Keys(vec![Key::default(); 2 * n - 1]);
+    let mut ks = Keys(vec![Default::default(); 2 * n - 1]);
     // initialize the first key
     ks.set(0, 0, r);
 
     for d in 1..depth + 1 {
         let n_previous_level = 1 << (d - 1);
         for j in 0..n_previous_level {
-            let mut prg = Prg::new_no_iv(ks.get(d - 1, j));
-            let (t1, t2) = prg.random();
+            // This corresponds to the PRG calls in VC.Commit l. 3 and VC.Reconstruct l. 9 from the
+            // paper. Note that the IV is given as PRG input.
+            let mut prg = Prg::<P>::new(ks.get(d - 1, j), iv);
+            // FIXME(hamlinb): This likely generates more bits than necessary (by 4x, since
+            // generating `[u8; N]` generates N u64s). Additionally, skipping PRG bits does not
+            // match the spec (see v1.1, Fig. 5.1). See the note about `[T; n]` here:
+            // https://docs.rs/rand/latest/rand/distr/struct.StandardUniform.html.
+            let t1 = Key::<P>::from_fn(|_| prg.random());
+            let t2 = Key::<P>::from_fn(|_| prg.random());
             ks.set(d, j * 2, t1);
             ks.set(d, j * 2 + 1, t2);
         }
@@ -93,7 +101,7 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
     let mut seeds = Vec::with_capacity(n);
     let mut coms = Vec::with_capacity(n);
     for k in ks.get_layer(depth) {
-        let (sd, com) = h0(*k, iv);
+        let (sd, com) = h0::<P>(k.clone(), iv);
         seeds.push(sd);
         coms.push(com);
     }
@@ -106,9 +114,13 @@ fn tree(iv: IV, r: Key, depth: usize) -> (Keys, Vec<Seed>, Vec<Com>) {
 /// Generates a hash for the vector commitment [`H1`] of length `2^depth` to the given seed `r`.
 /// This also produces the full decommitment information that a prover can later use to
 /// [`open()`] the commitment and the full set of [`Seed`]s.
-pub(crate) fn commit(r: Key, iv: IV, depth: usize) -> (Com, Decom, Vec<Seed>) {
+pub(crate) fn commit<P: Params>(
+    r: Key<P>,
+    iv: IV,
+    depth: usize,
+) -> (Com<P>, Decom<P>, Vec<Seed<P>>) {
     let (ks, seeds, coms) = tree(iv, r, depth);
-    let h = H1::hash_commitments(&coms).into();
+    let h = H1::<P>::hash_commitments(&coms).into();
     (h, (ks, coms), seeds)
 }
 
@@ -130,14 +142,14 @@ pub(crate) fn num_rec(j: &[bool]) -> usize {
 /// Generates a partial decommitment [`Pdecom`] given a full decommitment `decom`. This
 /// partial decommitment is produced by the prover and will be sent to the verifier to reconstruct
 /// all but one seeds using [`reconstruct`] and verify the commitment using [`verify`].
-pub(crate) fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
+pub(crate) fn open<P: Params>(decom: &Decom<P>, j: Vec<bool>) -> Pdecom<P> {
     assert_eq!(
         decom.1.len(),
         1 << j.len(),
         "Open function from all-but-one vector commitment scheme failed because of incompatible lengths of decommitment and index to open."
     );
     let j_num = num_rec(&j);
-    let mut cop: Vec<Key> = Vec::with_capacity(j.len());
+    let mut cop: Vec<Key<P>> = Vec::with_capacity(j.len());
 
     // The algorithm works by traversing the tree of keys from top to bottom, and collect
     // all the sibling keys along the path from the root to the bottom key associated with `j`.
@@ -157,7 +169,7 @@ pub(crate) fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
     }
     // At the end of the loop, it turns out that `a` is equal to `j_num`.
     debug_assert_eq!(j_num, a);
-    (cop, coms[j_num])
+    (cop, coms[j_num].clone())
 }
 
 /// Reconstruct algorithm for the 1-VC scheme (VC.Reconstruct from Fig. 5.1 in the spec).
@@ -165,7 +177,11 @@ pub(crate) fn open(decom: &Decom, j: Vec<bool>) -> Pdecom {
 /// Generates a full hash commitment [`Com`] and all-but-one seeds given a [`Pdecom`] and index `j` and
 /// an initial vector `iv`. The seeds are used later in the VOLE-it-HEAD protocol to generate VOLEs.
 /// This function is used by the verifier after receiving the [`Pdecom`] from the prover.
-pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<Seed>) {
+pub(crate) fn reconstruct<P: Params>(
+    pdecom: Pdecom<P>,
+    j: Vec<bool>,
+    iv: IV,
+) -> (Com<P>, Vec<Seed<P>>) {
     assert_eq!(
         pdecom.0.len(),
         j.len(),
@@ -175,21 +191,21 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<See
 
     let (cop, com_j) = pdecom;
 
-    let mut coms = vec![Com::default(); 1 << d];
+    let mut coms: Vec<Com<P>> = vec![Default::default(); 1 << d];
     // The seeds computed by `reconstruct` have one the same number of seeds with
     // a default seed in the delta position.
-    let mut seeds = vec![Seed::default(); 1 << d];
+    let mut seeds = vec![Default::default(); 1 << d];
 
     let mut pos = 0;
     for (i, (b, k)) in std::iter::zip(j.iter().rev(), cop).enumerate() {
         let how_many = 1 << (d - i - 1);
-        let (_keys, seeds_subtree, coms_subtree) = tree(iv, k, d - i - 1);
+        let (_keys, seeds_subtree, coms_subtree) = tree::<P>(iv, k, d - i - 1);
         let copy_start = if *b { pos } else { pos + how_many };
 
         // copy commitments from the subtree into the array of all coms
-        coms[copy_start..(copy_start + how_many)].copy_from_slice(&coms_subtree[..how_many]);
+        coms[copy_start..(copy_start + how_many)].clone_from_slice(&coms_subtree[..how_many]);
         // copy seeds from the subtree into the array of all seeds
-        seeds[copy_start..(copy_start + how_many)].copy_from_slice(&seeds_subtree[..how_many]);
+        seeds[copy_start..(copy_start + how_many)].clone_from_slice(&seeds_subtree[..how_many]);
 
         pos = if *b { pos + how_many } else { pos };
     }
@@ -199,7 +215,7 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<See
     coms[pos] = com_j;
 
     // compute the hash using H1
-    let h_computed = H1::hash_commitments(&coms).into();
+    let h_computed = H1::<P>::hash_commitments(&coms).into();
 
     debug_assert_eq!(seeds.len(), (1 << d));
     (h_computed, seeds)
@@ -211,13 +227,18 @@ pub(crate) fn reconstruct(pdecom: Pdecom, j: Vec<bool>, iv: IV) -> (Com, Vec<See
 /// at an index `j`, and the initial vector `iv`. This function is run by the verifier and relies on
 /// [`reconstruct`] for its internal computation.
 #[allow(unused)]
-pub(crate) fn verify(h_com: Com, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result<()> {
+pub(crate) fn verify<P: Params>(
+    h_com: Com<P>,
+    pdecom: Pdecom<P>,
+    j: Vec<bool>,
+    iv: IV,
+) -> Result<()> {
     assert_eq!(
         pdecom.0.len(),
         j.len(),
         "Incompatible length of partial decommitment with index binary decomposition length"
     );
-    let (reconstructed_hash, _seeds) = reconstruct(pdecom, j, iv);
+    let (reconstructed_hash, _seeds) = reconstruct::<P>(pdecom, j, iv);
     if h_com != reconstructed_hash {
         bail!(
             ErrorKind::OtherError,
@@ -230,8 +251,12 @@ pub(crate) fn verify(h_com: Com, pdecom: Pdecom, j: Vec<bool>, iv: IV) -> Result
 
 #[cfg(test)]
 mod test {
-    use super::{IV, Key, Seed, commit, num_rec, open, reconstruct, verify};
-    use proptest::prelude::*;
+    use super::{IV, Key, commit, num_rec, open, reconstruct, verify};
+
+    use crate::parameters::{Binary128Bit, Binary256Bit, Params, SecurityParamBytes};
+    use hybrid_array::typenum::Unsigned;
+
+    use proptest::prelude::{TestCaseError, prop_assert_eq};
 
     #[test]
     fn test_num_rec_at_len_4() {
@@ -264,71 +289,92 @@ mod test {
     }
 
     // Test the correctness of values computed by commit/open/verify/reconstruct
-    fn test_1_vc_correctness(r: Key, iv: IV, j: Vec<bool>) -> Result<(), TestCaseError> {
+    fn test_1_vc_correctness<P: Params>(
+        r: Key<P>,
+        iv: IV,
+        j: Vec<bool>,
+    ) -> Result<(), TestCaseError> {
         let depth = j.len();
         // prover side
-        let (h, decom, sd) = commit(r, iv, depth);
+        let (h, decom, sd) = commit::<P>(r, iv, depth);
         let (cop, com_j) = open(&decom, j.clone());
 
         // verifier side
         let j_num = num_rec(&j);
-        let r = verify(h, (cop.clone(), com_j), j.clone(), iv);
+        let r = verify::<P>(h, (cop.clone(), com_j.clone()), j.clone(), iv);
         if r.is_err() {
             return Err(TestCaseError::fail(r.err().unwrap().to_string()));
         }
 
         // test that the seeds from the prover are the same as the ones found by the verifier
-        let (_, seeds) = reconstruct((cop, com_j), j, iv);
+        let (_, seeds) = reconstruct::<P>((cop, com_j), j, iv);
 
         for (i, seed) in seeds.iter().enumerate() {
             if i != j_num {
-                prop_assert_eq!(sd[i], *seed);
+                prop_assert_eq!(&sd[i], seed);
             }
         }
         Ok(())
     }
 
-    #[test]
-    fn test_1_vc_works_unit_depth_2() {
-        let iv = IV::default();
-        let r = Key::default();
+    fn test_1_vc_works_unit_depth_2<P: Params>() {
+        let iv = Default::default();
+        let r = Default::default();
 
         let j = vec![false, true];
-        test_1_vc_correctness(r, iv, j).unwrap();
+        test_1_vc_correctness::<P>(r, iv, j).unwrap();
     }
 
-    #[test]
-    fn test_1_vc_works_unit_depth_3() {
-        let iv = IV::default();
-        let r = Key::default();
+    fn test_1_vc_works_unit_depth_3<P: Params>() {
+        let iv = Default::default();
+        let r = Default::default();
 
         let j = vec![true, true, false];
-        test_1_vc_correctness(r, iv, j).unwrap();
+        test_1_vc_correctness::<P>(r, iv, j).unwrap();
     }
 
-    #[test]
-    fn test_1_vc_works_unit_depth_8() {
-        let iv = IV::default();
-        let r = Key::default();
+    fn test_1_vc_works_unit_depth_8<P: Params>() {
+        let iv = Default::default();
+        let r = Default::default();
 
         let j = vec![false, true, true, false, false, true, true, true];
-        test_1_vc_correctness(r, iv, j).unwrap();
+        test_1_vc_correctness::<P>(r, iv, j).unwrap();
     }
 
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(100))]
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
+                use proptest::prelude::*;
+                #[test]
+                fn test_1_vc_works_unit_depth_2() {
+                    super::test_1_vc_works_unit_depth_2::<$params>();
+                }
+                #[test]
+                fn test_1_vc_works_unit_depth_3() {
+                    super::test_1_vc_works_unit_depth_3::<$params>();
+                }
+                #[test]
+                fn test_1_vc_works_unit_depth_8() {
+                    super::test_1_vc_works_unit_depth_8::<$params>();
+                }
+                proptest! {
+                    #![proptest_config(ProptestConfig::with_cases(100))]
 
-        #[test]
-        fn test_1_vc_works_on_randomized_input(
-            ref j in prop::collection::vec(any::<bool>(), 8),
-            ref rand_arr in prop::array::uniform32(any::<u8>()))
-        {
-            // setup random iv and r:
-            let iv : IV = rand_arr[0..16].try_into().unwrap() ;
-            let r : Seed = rand_arr[16..32].try_into().unwrap();
-
-            // Test
-            test_1_vc_correctness(r, iv, j.to_vec())?;
-        }
+                    #[test]
+                    fn test_1_vc_works_on_randomized_input(
+                        j in prop::collection::vec(any::<bool>(), 8),
+                        iv in prop::array::uniform16(any::<u8>()),
+                        key in prop::collection::vec(any::<u8>(), SecurityParamBytes::<$params>::USIZE),
+                    ) {
+                        let r = Key::<$params>::try_from(key.as_slice()).unwrap();
+                        super::test_1_vc_correctness::<$params>(r, iv, j)?;
+                    }
+                }
+            }
+        };
     }
+
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }

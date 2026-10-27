@@ -4,13 +4,14 @@ use fancy_traits::{CircuitInputMapper, FancyEncode};
 use std::time::SystemTime;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 fn run_circuit<
-    C: CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>
-        + CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>
+    C: CircuitInputMapper<Garbler<SwankyRng, IKNP<Sender>, WireMod2>>
+        + CircuitInputMapper<Evaluator<SwankyRng, IKNP<Receiver>, WireMod2>>
         + Sync
         + Send,
 >(
@@ -26,7 +27,7 @@ fn run_circuit<
         |channel| {
             let rng = SwankyRng::new();
             let start = SystemTime::now();
-            let mut gb = Garbler::<SwankyRng, OtSender, WireMod2>::new(channel, rng).unwrap();
+            let mut gb = Garbler::<SwankyRng, IKNP<Sender>, WireMod2>::new(channel, rng).unwrap();
             println!(
                 "Garbler :: Initialization: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -42,7 +43,9 @@ fn run_circuit<
             let start = SystemTime::now();
             circ.execute(
                 &mut gb,
-                <C as CircuitInputMapper<Garbler<SwankyRng, OtSender, WireMod2>>>::map(circ, xs),
+                <C as CircuitInputMapper<Garbler<SwankyRng, IKNP<Sender>, WireMod2>>>::map(
+                    circ, xs,
+                ),
                 channel,
             )
             .unwrap();
@@ -55,7 +58,8 @@ fn run_circuit<
         |channel| {
             let rng = SwankyRng::new();
             let start = SystemTime::now();
-            let mut ev = Evaluator::<SwankyRng, OtReceiver, WireMod2>::new(channel, rng).unwrap();
+            let mut ev =
+                Evaluator::<SwankyRng, IKNP<Receiver>, WireMod2>::new(channel, rng).unwrap();
             println!(
                 "Evaluator :: Initialization: {} ms",
                 start.elapsed().unwrap().as_millis()
@@ -71,7 +75,7 @@ fn run_circuit<
             let start = SystemTime::now();
             circ.execute(
                 &mut ev,
-                <C as CircuitInputMapper<Evaluator<SwankyRng, OtReceiver, WireMod2>>>::map(
+                <C as CircuitInputMapper<Evaluator<SwankyRng, IKNP<Receiver>, WireMod2>>>::map(
                     circ, xs,
                 ),
                 channel,

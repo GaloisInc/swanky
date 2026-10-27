@@ -3,10 +3,11 @@ use crate::psi::circuit_psi::*;
 use fancy_garbling::WireMod2;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_block::Block;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_ot_alsz_kos::alsz::Receiver as OtReceiver;
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::Receiver;
 use swanky_twopac::semihonest::Evaluator;
+use vectoreyes::U8x16;
 
 use self::receiver::OpprfReceiver;
 
@@ -16,7 +17,7 @@ pub type OpprfPsiEvaluator<RNG> = PsiEvaluator<RNG, OpprfReceiver>;
 /// A struct defining the Evaluating party in Circuit Psi
 pub struct PsiEvaluator<RNG, B> {
     /// The actual evaluator being called during the garbled circuit
-    pub ev: Evaluator<RNG, OtReceiver, WireMod2>,
+    pub ev: Evaluator<RNG, IKNP<Receiver>, WireMod2>,
     /// The evaluator's dedicated rng
     pub rng: RNG,
     /// A witness for the Base PSI protocol
@@ -25,7 +26,7 @@ pub struct PsiEvaluator<RNG, B> {
 
 impl<RNG, B> PsiEvaluator<RNG, B>
 where
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
 {
     /// Creates a PsiEvaluator from a dedicated channel and rng
     pub fn new(channel: &mut Channel, seed: RNG::Seed) -> swanky_error::Result<Self>
@@ -33,7 +34,7 @@ where
         Self: Sized,
     {
         Ok(PsiEvaluator {
-            ev: Evaluator::<RNG, OtReceiver, WireMod2>::new(channel, RNG::from_seed(seed))
+            ev: Evaluator::<RNG, IKNP<Receiver>, WireMod2>::new(channel, RNG::from_seed(seed))
                 .wrap_err(
                     ErrorKind::InitializationError,
                     "Failed to create fancy evaluator.",
@@ -48,7 +49,7 @@ impl<RNG, B> SemiHonest for PsiEvaluator<RNG, B> {}
 
 impl<RNG, B> CircuitPsi for PsiEvaluator<RNG, B>
 where
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     B: BasePsi,
 {
     /// Computes the Circuit PSI on the evaluator's inputs.
@@ -85,7 +86,7 @@ where
             B::base_psi(&mut self.ev, primary_keys, payloads, channel, &mut self.rng)?;
         // (2)
         let primary_keys =
-            bundle_primary_keys::<Evaluator<RNG, OtReceiver, WireMod2>>(&circuit_inputs)?;
+            bundle_primary_keys::<Evaluator<RNG, IKNP<Receiver>, WireMod2>>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) =
             bundle_payloads(&mut self.ev, &circuit_inputs, channel)?;
 

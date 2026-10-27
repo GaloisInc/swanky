@@ -1,4 +1,6 @@
 mod test {
+    use schmivitz::parameters::{Binary128Bit, Binary256Bit, Params};
+
     use fancy_circuits::{
         BinaryBundle,
         binary::BinaryAddition,
@@ -39,10 +41,10 @@ mod test {
     }
 
     // Create a proof for the given circuit and input.
-    fn create_proof(
+    fn create_proof<P: Params>(
         circuit_bytes: &'static str,
         private_input_bytes: &'static str,
-    ) -> (Result<Proof<VoleProver, VoleVerifier>>, Circuit) {
+    ) -> (Result<Proof<VoleProver<P>, VoleVerifier<P>>>, Circuit) {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
         let rng = &mut rng();
@@ -53,8 +55,7 @@ mod test {
         (t1, circuit)
     }
 
-    #[test]
-    fn prove_doesnt_explode() -> Result<()> {
+    fn prove_doesnt_explode<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -70,7 +71,7 @@ mod test {
             < 1 >;
         @end";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes);
         let verif = proof?.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
 
@@ -90,8 +91,7 @@ mod test {
     "
     );
 
-    #[test]
-    fn prove_sieveir_codegen() -> Result<()> {
+    fn prove_sieveir_codegen<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -107,7 +107,7 @@ mod test {
             < 1 >;
         @end";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes);
         let proof = proof.unwrap();
         let verif = proof.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
@@ -118,7 +118,7 @@ mod test {
 
         // Verify the compiled circuit with the dynamic circuit.
         let rng = &mut rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
             &DoesntExplode,
             &mini_circuit.private_inputs,
             None,
@@ -146,8 +146,7 @@ mod test {
     "
     );
 
-    #[test]
-    fn prove_sieveir_assert_zero() -> Result<()> {
+    fn prove_sieveir_assert_zero<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -164,7 +163,7 @@ mod test {
             < 0 >;
         @end";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes);
         let proof = proof.unwrap();
         let verif = proof.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
@@ -174,7 +173,7 @@ mod test {
         assert!(verif.is_ok());
 
         let rng = &mut rng();
-        let proof = Proof::<VoleProver, VoleVerifier>::prove(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
             &AssertZero,
             &mini_circuit.private_inputs,
             None,
@@ -214,14 +213,12 @@ mod test {
         }
     }
 
-    #[test]
-    fn prove_circuit_assert_zero() -> Result<()> {
+    fn prove_circuit_assert_zero<P: Params>() -> Result<()> {
         let private_input = [F2::ZERO; 1];
-        test_circuit(&TestAssertZero, &private_input)
+        test_circuit::<_, P>(&TestAssertZero, &private_input)
     }
 
-    #[test]
-    fn prove_sieveir_assert_zero_interleaved() -> Result<()> {
+    fn prove_sieveir_assert_zero_interleaved<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -241,7 +238,7 @@ mod test {
             < 1 >;
         @end";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes);
         let proof = proof.unwrap();
         let verif = proof.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
@@ -249,8 +246,7 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn prove_sieveir_assert_zero_interleaved_fail() -> Result<()> {
+    fn prove_sieveir_assert_zero_interleaved_fail<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -270,7 +266,7 @@ mod test {
             < 1 >;
         @end";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes);
         let proof = proof.unwrap();
         let verif = proof.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_err());
@@ -278,8 +274,7 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn prove_addc_doesnt_explode() -> Result<()> {
+    fn prove_addc_doesnt_explode<P: Params>() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -300,7 +295,7 @@ mod test {
             < 1 >;
         @end ";
 
-        let (proof, mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        let (proof, mini_circuit) = create_proof::<P>(mini_circuit_bytes, private_input_bytes);
         let verif = proof?.verify_with_circuit(&mini_circuit, &mut transcript());
         assert!(verif.is_ok());
 
@@ -324,8 +319,7 @@ mod test {
       $14 <- @mul(0: $0, $9);
     @end ";
 
-    #[test]
-    fn prove_works_on_slightly_larger_circuit() -> Result<()> {
+    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
@@ -337,7 +331,7 @@ mod test {
             < 0 >;
         @end ";
 
-        let (proof, small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+        let (proof, small_circuit) = create_proof::<P>(SMALL_CIRCUIT, private_input_bytes);
         assert!(
             proof?
                 .verify_with_circuit(&small_circuit, &mut transcript())
@@ -385,28 +379,26 @@ mod test {
         }
     }
 
-    #[test]
-    fn prove_binary_addition_circuit() -> Result<()> {
+    fn prove_binary_addition_circuit<P: Params>() -> Result<()> {
         let mut x = [F2::ZERO; 8];
         let mut y = [F2::ZERO; 8];
         // Test 1 + 1 = 2.
         x[0] = F2::ONE;
         y[0] = F2::ONE;
-        test_circuit(
+        test_circuit::<_, P>(
             &TestBinaryAddition(BinaryAddition::new(), "01000000"),
             &[x, y].concat(),
         )?;
         // Test 3 + 3 = 6.
         x[1] = F2::ONE;
         y[1] = F2::ONE;
-        test_circuit(
+        test_circuit::<_, P>(
             &TestBinaryAddition(BinaryAddition::new(), "01100000"),
             &[x, y].concat(),
         )
     }
 
-    #[test]
-    fn prove_aes256_sieveir() -> Result<()> {
+    fn prove_aes256_sieveir<P: Params>() -> Result<()> {
         if DO_LOGGING {
             init_logger();
         }
@@ -418,7 +410,7 @@ mod test {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
         log::info!("parsing: {:?}", t.elapsed());
 
-        test_sieveir(&circuit)
+        test_sieveir::<P>(&circuit)
     }
 
     struct TestAes(Aes128);
@@ -459,8 +451,7 @@ mod test {
         }
     }
 
-    #[test]
-    fn prove_aes_circuit() -> Result<()> {
+    fn prove_aes_circuit<P: Params>() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -469,11 +460,10 @@ mod test {
         let circuit = TestAes(Aes128::new());
 
         let private_input = (0..256).map(|_| F2::ZERO).collect::<Vec<_>>();
-        test_circuit(&circuit, &private_input)
+        test_circuit::<_, P>(&circuit, &private_input)
     }
 
-    #[test]
-    fn prove_sha256_compression_fn_sieveir() -> Result<()> {
+    fn prove_sha256_compression_fn_sieveir<P: Params>() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -485,7 +475,7 @@ mod test {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
         log::info!("parsing: {:?}", t.elapsed());
 
-        test_sieveir(&circuit)
+        test_sieveir::<P>(&circuit)
     }
 
     struct TestSha256CompressionFunction(Sha256CompressionFunction);
@@ -517,8 +507,7 @@ mod test {
         }
     }
 
-    #[test]
-    fn prove_sha256_compression_fn_circuit() -> Result<()> {
+    fn prove_sha256_compression_fn_circuit<P: Params>() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -529,7 +518,7 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let private_input = (0..768).map(|_| F2::ZERO).collect::<Vec<_>>();
-        test_circuit(&circuit, &private_input)
+        test_circuit::<_, P>(&circuit, &private_input)
     }
 
     struct TestSha256(Sha256);
@@ -552,8 +541,7 @@ mod test {
         }
     }
 
-    #[test]
-    fn prove_sha256_circuit() -> Result<()> {
+    fn prove_sha256_circuit<P: Params>() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -564,7 +552,7 @@ mod test {
         log::info!("parsing: {:?}", t.elapsed());
 
         let private_input = (0..512).map(|_| F2::ZERO).collect::<Vec<_>>();
-        test_circuit(&circuit, &private_input)
+        test_circuit::<_, P>(&circuit, &private_input)
     }
 
     struct TestHmac<'a>(HmacSha256<'a>);
@@ -605,8 +593,7 @@ mod test {
         }
     }
 
-    #[test]
-    fn prove_hmac_circuit() -> Result<()> {
+    fn prove_hmac_circuit<P: Params>() -> Result<()> {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -627,6 +614,77 @@ mod test {
             .collect();
         let private_input = [key, message].concat();
 
-        test_circuit(&circuit, &private_input)
+        test_circuit::<_, P>(&circuit, &private_input)
     }
+
+    macro_rules! make_tests {
+        (mod $name:ident { params = $params:ty $(,)? }) => {
+            mod $name {
+                use super::*;
+                #[test]
+                fn prove_doesnt_explode() -> Result<()> {
+                    super::prove_doesnt_explode::<$params>()
+                }
+                #[test]
+                fn prove_sieveir_codegen() -> Result<()> {
+                    super::prove_sieveir_codegen::<$params>()
+                }
+                #[test]
+                fn prove_sieveir_assert_zero() -> Result<()> {
+                    super::prove_sieveir_assert_zero::<$params>()
+                }
+                #[test]
+                fn prove_circuit_assert_zero() -> Result<()> {
+                    super::prove_circuit_assert_zero::<$params>()
+                }
+                #[test]
+                fn prove_sieveir_assert_zero_interleaved() -> Result<()> {
+                    super::prove_sieveir_assert_zero_interleaved::<$params>()
+                }
+                #[test]
+                fn prove_sieveir_assert_zero_interleaved_fail() -> Result<()> {
+                    super::prove_sieveir_assert_zero_interleaved_fail::<$params>()
+                }
+                #[test]
+                fn prove_addc_doesnt_explode() -> Result<()> {
+                    super::prove_addc_doesnt_explode::<$params>()
+                }
+                #[test]
+                fn prove_works_on_slightly_larger_circuit() -> Result<()> {
+                    super::prove_works_on_slightly_larger_circuit::<$params>()
+                }
+                #[test]
+                fn prove_binary_addition_circuit() -> Result<()> {
+                    super::prove_binary_addition_circuit::<$params>()
+                }
+                #[test]
+                fn prove_aes256_sieveir() -> Result<()> {
+                    super::prove_aes256_sieveir::<$params>()
+                }
+                #[test]
+                fn prove_aes_circuit() -> Result<()> {
+                    super::prove_aes_circuit::<$params>()
+                }
+                #[test]
+                fn prove_sha256_compression_fn_sieveir() -> Result<()> {
+                    super::prove_sha256_compression_fn_sieveir::<$params>()
+                }
+                #[test]
+                fn prove_sha256_compression_fn_circuit() -> Result<()> {
+                    super::prove_sha256_compression_fn_circuit::<$params>()
+                }
+                #[test]
+                fn prove_sha256_circuit() -> Result<()> {
+                    super::prove_sha256_circuit::<$params>()
+                }
+                #[test]
+                fn prove_hmac_circuit() -> Result<()> {
+                    super::prove_hmac_circuit::<$params>()
+                }
+            }
+        };
+    }
+
+    make_tests! { mod binary_128_bit { params = Binary128Bit } }
+    make_tests! { mod binary_256_bit { params = Binary256Bit } }
 }

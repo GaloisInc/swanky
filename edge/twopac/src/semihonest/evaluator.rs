@@ -2,11 +2,12 @@ use fancy_garbling::{Evaluator as Ev, WireLabel, WireMod2};
 use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::CryptoRng;
 use swanky_adversary::SemiHonest;
-use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field_binary::F2;
-use swanky_ot_traits::Receiver as OtReceiver;
+use swanky_ot_traits_new::{ObliviousTransfer, Receiver};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
+use vectoreyes::U8x16;
 
 /// Semi-honest evaluator.
 pub struct Evaluator<RNG, OT, Wire> {
@@ -17,7 +18,7 @@ pub struct Evaluator<RNG, OT, Wire> {
 
 impl<RNG, OT, Wire> Evaluator<RNG, OT, Wire> {}
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>>
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>>
     Evaluator<RNG, OT, Wire>
 {
     /// Make a new `Evaluator`.
@@ -28,14 +29,22 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F
         Ok(Self { evaluator, ot, rng })
     }
 
-    fn run_ot(&mut self, inputs: &[F2], channel: &mut Channel) -> swanky_error::Result<Vec<Block>> {
-        self.ot
-            .receive(channel, inputs, &mut self.rng)
-            .wrap_err(ErrorKind::OtherError, "Failed to run OT.")
+    fn run_ot(&mut self, inputs: &[F2], channel: &mut Channel) -> swanky_error::Result<Vec<U8x16>> {
+        let mut outputs = PartyPrivate::new(Vec::with_capacity(inputs.len()));
+
+        self.ot.ot(
+            PartyEither::new(Witness::EQUAL_TYPES, inputs),
+            PartyPrivate::empty(Witness::EQUAL_TYPES),
+            outputs.as_mut(),
+            channel,
+            &mut self.rng,
+        )?;
+
+        Ok(outputs.into_inner(Witness::EQUAL_TYPES))
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest> FancyBinary
     for Evaluator<RNG, OT, WireMod2>
 {
     fn and(
@@ -56,13 +65,13 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest> FancyBinary
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>> Fancy
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>> Fancy
     for Evaluator<RNG, OT, Wire>
 {
     type Item = Wire;
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>>
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>>
     FancyConstant<F2> for Evaluator<RNG, OT, Wire>
 {
     fn constant(&mut self, x: F2) -> Self::Item {
@@ -70,8 +79,8 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>> FancyEncode<F2>
-    for Evaluator<RNG, OT, Wire>
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>>
+    FancyEncode<F2> for Evaluator<RNG, OT, Wire>
 {
     /// Receive garbler input wires.
     fn receive_many(&mut self, n: usize, channel: &mut Channel) -> swanky_error::Result<Vec<Wire>> {
@@ -94,8 +103,8 @@ impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F
     }
 }
 
-impl<RNG: CryptoRng, OT: OtReceiver<Msg = Block> + SemiHonest, Wire: WireLabel<F2>> FancyOutput<F2>
-    for Evaluator<RNG, OT, Wire>
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>>
+    FancyOutput<F2> for Evaluator<RNG, OT, Wire>
 {
     fn output(&mut self, x: &Wire, channel: &mut Channel) -> swanky_error::Result<Option<F2>> {
         self.evaluator.output(x, channel)

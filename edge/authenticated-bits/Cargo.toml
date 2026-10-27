@@ -11,24 +11,23 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-swanky-ot-traits.workspace = true
-swanky-ot-alsz-kos.workspace = true
-swanky-party.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-f-eq.workspace = true
 swanky-f-rand.workspace = true
-swanky-field-binary.workspace = true
 swanky-field.workspace = true
-swanky-serialization.workspace = true
+swanky-field-binary.workspace = true
+swanky-ot-kos-new.workspace = true
+swanky-ot-traits-new.workspace = true
+swanky-party.workspace = true
 swanky-rng.workspace = true
+swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
 blake3.workspace = true
 bytemuck.workspace = true
 itertools.workspace = true
 rand.workspace = true
-proptest.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

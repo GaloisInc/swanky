@@ -32,13 +32,6 @@ have a lesser stability guarantee.
 - **`humidor`**: A test-bed for Ligero-like protocols
 - **`inferno`**: An implementation of the Limbo zero knowledge proof protocol
 - **`keyed_arena`**: Bump allocator which allows for random access to its allocations
-- **`mac-n-cheese-compiler`**: A tool to compile a zero knowledge circuit to the mac n'cheese IR
-- **`mac-n-cheese-event-log`**: Utilities to define metrics for mac n'cheese
-- **`mac-n-cheese-inspector`**: A tool to inspect mac n'cheese IR files
-- **`mac-n-cheese-ir`**: The definition of the mac n'cheese IR
-- **`mac-n-cheese-runner`**: A tool to proof mac n'cheese IR files in zero-knowledge
-- **`mac-n-cheese-vole`**: An implementation of Vector Oblivious Linear Evaluation
-- **`mac-n-cheese-wire-map`**: An implementation of a sparse array
 - **`popsicle`**: A library for private set intersection
 - **`schmivitz`**: A library for zero-knowledge protocols using VOLE-in-the-head
 - **`simple-arith-circuit`**: Simple arithmetic circuit library
@@ -65,7 +58,12 @@ have a lesser stability guarantee.
 - **`swanky-oprf-traits`**: Base traits impl-ed by all our OPRF implementations
 - **`swanky-ot-alsz-kos`**: Oblivious transfer implementations for the ALSZ and KOS protocols
 - **`swanky-ot-chou-orlandi`**: An implementation of the Chou-Orlandi OT protocol
+- **`swanky-ot-chou-orlandi-new`**: An implementation of the Chou-Orlandi OT protocol
 - **`swanky-ot-dummy`**: Implementation of an insecure OT protocol for testing purposes
+- **`swanky-ot-dummy-new`**: Implementation of an insecure OT protocol for testing purposes
+- **`swanky-ot-iknp`**: An implementation of the Ishai-Kilian-Nissim-Petrank (IKNP) semi-honest OT extension protocol
+- **`swanky-ot-kos-new`**: An implementation of the Keller-Orsini-Scholl OT protocol
+- **`swanky-ot-naor-pinkas-new`**: An implementation of the Naor-Pinkas OT protocol
 - **`swanky-ot-noar-pinkas`**: An implementation of the Noar-Pinkas OT protocol
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-test-new`**: Testing utilities for oblivious transfer protocols

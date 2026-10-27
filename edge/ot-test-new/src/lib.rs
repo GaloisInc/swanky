@@ -30,6 +30,7 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
 ) {
     let m0s = rand_vec::<U8x16>(ninputs);
     let m1s = rand_vec::<U8x16>(ninputs);
+    let ms: Vec<[U8x16; 2]> = m0s.iter().zip(m1s.iter()).map(|(&x, &y)| [x, y]).collect();
 
     let bs = rand_vec::<F2>(ninputs);
 
@@ -38,12 +39,12 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTSender::init(c, &mut rng).unwrap();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot::<Vec<F2>, _, _, Vec<U8x16>>(
-                    PartyPrivate::empty(Witness::EQUAL_TYPES),
-                    PartyPrivate::new(m0s.iter().zip(m1s.iter()).map(|(&x, &y)| [x, y])),
+                .ot::<Vec<U8x16>>(
+                    PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                    PartyPrivate::new(&ms),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     c,
                     &mut rng,
@@ -54,11 +55,11 @@ pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTran
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTReceiver::init(c, &mut rng).unwrap();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
-                .ot::<_, Vec<[U8x16; 2]>, _, _>(
-                    PartyPrivate::new(bs.iter().copied()),
+                .ot(
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     PartyPrivate::new(&mut res),
                     c,
@@ -91,10 +92,10 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTSender::init(c, &mut rng).unwrap();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot_correlated::<Vec<F2>, _>(
+                .ot_correlated(
                     PartyEither::new(Witness::EQUAL_TYPES, ninputs),
                     PartyPrivate::new(delta),
                     &mut out_s,
@@ -107,11 +108,11 @@ pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Rece
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTReceiver::init(c, &mut rng).unwrap();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
                 .ot_correlated(
-                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     PartyPrivate::empty(Witness::EQUAL_TYPES),
                     &mut out_r,
                     c,
@@ -147,10 +148,10 @@ pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(n
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTSender::init(c, &mut rng).unwrap();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
 
             otext
-                .ot_random::<Vec<F2>, _>(
+                .ot_random(
                     PartyEither::new(Witness::EQUAL_TYPES, ninputs),
                     &mut out_s,
                     c,
@@ -162,11 +163,11 @@ pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(n
         },
         |c| {
             let mut rng = SwankyRng::new();
-            let otext = OTReceiver::init(c, &mut rng).unwrap();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
 
             otext
                 .ot_random(
-                    PartyEither::new(Witness::EQUAL_TYPES, bs.iter().copied()),
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
                     &mut out_r,
                     c,
                     &mut rng,

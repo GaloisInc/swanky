@@ -570,11 +570,16 @@ mod tests {
         let mut output_a: Vec<AuthShare<PartyA>> = vec![];
         let mut output_b: Vec<AuthShare<PartyB>> = vec![];
         swanky_channel::local::local_channel_pair(
-            |c| generator_a.generate(nshares, &mut output_a, c, &mut rng_a),
-            |c| generator_b.generate(nshares, &mut output_b, c, &mut rng_b),
+            |c| {
+                generator_a.generate(nshares, &mut output_a, c, &mut rng_a)?;
+                Ok(output_a)
+            },
+            |c| {
+                generator_b.generate(nshares, &mut output_b, c, &mut rng_b)?;
+                Ok(output_b)
+            },
         )
-        .unwrap();
-        (output_a, output_b)
+        .unwrap()
     }
 
     /// Open vectors of `AuthShare`s using their associated generators.

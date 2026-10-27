@@ -2,12 +2,13 @@ use fancy_garbling::{Garbler as Gb, WireLabel, WireMod2};
 use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
-use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits::Sender as OtSender;
+use swanky_ot_traits_new::{ObliviousTransfer, Sender};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
+use vectoreyes::U8x16;
 
 /// Semi-honest garbler.
 pub struct Garbler<RNG, OT, Wire> {
@@ -30,8 +31,8 @@ impl<OT, RNG, Wire> std::ops::DerefMut for Garbler<RNG, OT, Wire> {
 }
 
 impl<
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-    OT: OtSender<Msg = Block> + SemiHonest,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+    OT: ObliviousTransfer<Sender> + SemiHonest,
     Wire: WireLabel<F2>,
 > Garbler<RNG, OT, Wire>
 {
@@ -45,8 +46,8 @@ impl<
     }
 }
 
-impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + SemiHonest> FancyBinary
-    for Garbler<RNG, OT, WireMod2>
+impl<RNG: CryptoRng + SeedableRng<Seed = U8x16>, OT: ObliviousTransfer<Sender> + SemiHonest>
+    FancyBinary for Garbler<RNG, OT, WireMod2>
 {
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         self.garbler.negate(x)
@@ -67,8 +68,8 @@ impl<RNG: CryptoRng + SeedableRng<Seed = Block>, OT: OtSender<Msg = Block> + Sem
 }
 
 impl<
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-    OT: OtSender<Msg = Block> + SemiHonest,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+    OT: ObliviousTransfer<Sender> + SemiHonest,
     Wire: WireLabel<F2>,
 > Fancy for Garbler<RNG, OT, Wire>
 {
@@ -76,8 +77,8 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-    OT: OtSender<Msg = Block> + SemiHonest,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+    OT: ObliviousTransfer<Sender> + SemiHonest,
     Wire: WireLabel<F2>,
 > FancyConstant<F2> for Garbler<RNG, OT, Wire>
 {
@@ -87,8 +88,8 @@ impl<
 }
 
 impl<
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-    OT: OtSender<Msg = Block> + SemiHonest,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+    OT: ObliviousTransfer<Sender> + SemiHonest,
     Wire: WireLabel<F2>,
 > FancyEncode<F2> for Garbler<RNG, OT, Wire>
 {
@@ -108,18 +109,23 @@ impl<
             let delta = self.garbler.delta();
             let (zero, one) = Wire::constant(F2::ONE, &delta, &mut self.rng);
             wires.push(zero);
-            inputs.push((zero.to_repr(), one.to_repr()));
+            inputs.push([zero.to_repr(), one.to_repr()]);
         }
-        self.ot
-            .send(channel, &inputs, &mut self.rng)
-            .wrap_err(ErrorKind::OtherError, "Failed to send obliviously.")?;
+
+        self.ot.ot::<Vec<_>>(
+            PartyEither::new(Witness::EQUAL_TYPES, inputs.len()),
+            PartyPrivate::new(&inputs[..]),
+            PartyPrivate::empty(Witness::EQUAL_TYPES),
+            channel,
+            &mut self.rng,
+        )?;
         Ok(wires)
     }
 }
 
 impl<
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
-    OT: OtSender<Msg = Block> + SemiHonest,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+    OT: ObliviousTransfer<Sender> + SemiHonest,
     Wire: WireLabel<F2>,
 > FancyOutput<F2> for Garbler<RNG, OT, Wire>
 {
