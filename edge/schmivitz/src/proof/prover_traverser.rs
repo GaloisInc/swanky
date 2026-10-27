@@ -1,4 +1,4 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
@@ -216,28 +216,6 @@ impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyConstant<F2> for ProverTrave
     }
 }
 
-impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyEncode<F2> for ProverTraverser<VOLE, P> {
-    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head does not support encode"
-        )
-    }
-
-    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(n);
-        for _ in 0..n {
-            let f = self.next_witness_value()?;
-            let vole = self.next_vole()?;
-
-            // Private input gates don't define a polynomial that would contribute to the aggregated
-            // coefficients being computed
-            output.push(Wire(f, vole));
-        }
-        Ok(output)
-    }
-}
-
 impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyBinary for ProverTraverser<VOLE, P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let res = x.0 + y.0;
@@ -273,6 +251,15 @@ impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyBinary for ProverTraverser<V
 }
 
 impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyZeroKnowledge<F2> for ProverTraverser<VOLE, P> {
+    fn witness(&mut self, _: &mut Channel) -> Result<Self::Item> {
+        let f = self.next_witness_value()?;
+        let vole = self.next_vole()?;
+
+        // Private input gates don't define a polynomial that would contribute to the aggregated
+        // coefficients being computed
+        Ok(Wire(f, vole))
+    }
+
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * value.1;

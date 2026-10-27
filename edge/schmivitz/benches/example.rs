@@ -1,11 +1,11 @@
-use fancy_traits::{Circuit, FancyBinary, FancyEncode};
+use fancy_traits::{Circuit, FancyBinary, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 
 pub struct ExampleCircuit<const N: usize>;
 
-impl<F: FancyBinary + FancyEncode<F2>, const N: usize> Circuit<F> for ExampleCircuit<N> {
+impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for ExampleCircuit<N> {
     type Input = ();
     type Output = ();
 
@@ -15,7 +15,7 @@ impl<F: FancyBinary + FancyEncode<F2>, const N: usize> Circuit<F> for ExampleCir
         _: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let mut v = backend.receive(channel)?;
+        let mut v = backend.witness(channel)?;
 
         // N additions
         for _ in 0..N {
