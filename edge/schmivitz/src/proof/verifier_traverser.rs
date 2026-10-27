@@ -1,6 +1,4 @@
-use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
-};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -116,12 +114,6 @@ impl<P: Params> VerifierTraverser<P> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Wire<P: Params>(FLambda<P>);
 
-impl<P: Params> HasModulus for Wire<P> {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
-
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
 impl<P: Params> FieldBackend<F2> for VerifierTraverser<P> {
@@ -178,7 +170,7 @@ impl<P: Params> Fancy for VerifierTraverser<P> {
     type Item = Wire<P>;
 }
 
-impl<P: Params> FancyBinaryConstant for VerifierTraverser<P> {
+impl<P: Params> FancyConstant<F2> for VerifierTraverser<P> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let value = if constant.into() {
             FLambda::<P>::ONE
@@ -189,17 +181,17 @@ impl<P: Params> FancyBinaryConstant for VerifierTraverser<P> {
     }
 }
 
-impl<P: Params> FancyEncode for VerifierTraverser<P> {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+impl<P: Params> FancyEncode<F2> for VerifierTraverser<P> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head verifier does not support encode"
         )
     }
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(n);
+        for _ in 0..n {
             // Assign a fresh masked witness to the wire
             let res = self.next_masked_witness()?;
 
@@ -234,7 +226,7 @@ impl<P: Params> FancyBinary for VerifierTraverser<P> {
     }
 }
 
-impl<P: Params> FancyZeroKnowledge for VerifierTraverser<P> {
+impl<P: Params> FancyZeroKnowledge<F2> for VerifierTraverser<P> {
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
 

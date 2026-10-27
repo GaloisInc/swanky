@@ -1,6 +1,6 @@
 use crate::{GarblerOutput, ps::PartyGarbler, vec_wrapper::VecWrapper, wire::ValidatorWire};
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary, FancyConstant};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -96,7 +96,7 @@ impl<'a, C> Fancy for GarblerValidator<'a, C> {
     type Item = ValidatorWire;
 }
 
-impl<'a, C> FancyBinaryConstant for GarblerValidator<'a, C> {
+impl<'a, C> FancyConstant<F2> for GarblerValidator<'a, C> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let auth_share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta());
 

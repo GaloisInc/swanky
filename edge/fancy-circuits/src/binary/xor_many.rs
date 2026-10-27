@@ -41,6 +41,8 @@ where
 #[cfg(test)]
 pub mod test {
     use super::XorMany;
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     #[test]
     fn xor_many() {
@@ -50,10 +52,8 @@ pub mod test {
         let mut rng = rand::rng();
         for _ in 0..16 {
             let n = 2 + rng.random_range(..200usize);
-            let inputs = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
-                .collect::<Vec<_>>();
-            let expected = inputs.iter().fold(0, |acc, &x| x.val() ^ acc);
+            let inputs = (0..n).map(|_| DummyVal::rand(&mut rng)).collect::<Vec<_>>();
+            let expected = inputs.iter().fold(F2::ZERO, |acc, &x| x.val() + acc);
             let circuit = XorMany::new();
             let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);

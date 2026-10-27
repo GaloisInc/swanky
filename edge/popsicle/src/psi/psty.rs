@@ -10,14 +10,16 @@ use fancy_circuits::{
     BinaryBundle,
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
-use fancy_garbling::AllWire;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyOutput};
+use fancy_garbling::WireMod2;
+use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_iknp::IKNP;
 use swanky_ot_traits_new::{Receiver as OtReceiver, Sender as OtSender};
@@ -137,23 +139,27 @@ impl SenderState {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<(
-        Garbler<RNG, IKNP<OtSender>, AllWire>,
-        Vec<AllWire>,
-        Vec<AllWire>,
+        Garbler<RNG, IKNP<OtSender>, WireMod2>,
+        Vec<WireMod2>,
+        Vec<WireMod2>,
     )>
     where
         RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     {
-        let mut gb =
-            Garbler::<RNG, IKNP<OtSender>, AllWire>::new(channel, RNG::from_seed(rng.random()))
-                .wrap_err(
-                    ErrorKind::InitializationError,
-                    "Failed to initialize garbler during setup.",
-                )?;
+        let mut gb = Garbler::<RNG, IKNP<OtSender>, _>::new(channel, RNG::from_seed(rng.random()))
+            .wrap_err(
+                ErrorKind::InitializationError,
+                "Failed to initialize garbler during setup.",
+            )?;
         let my_input_bits = encode_inputs(&self.opprf_outputs);
-        let mods = vec![2; my_input_bits.len()]; // all binary moduli
-        let sender_inputs = gb.encode_many(&my_input_bits, &mods, channel)?;
-        let receiver_inputs = gb.receive_many(&mods, channel)?;
+        let sender_inputs = gb.encode_many(
+            &my_input_bits
+                .iter()
+                .map(|bit| F2::from(*bit != 0))
+                .collect::<Vec<_>>(),
+            channel,
+        )?;
+        let receiver_inputs = gb.receive_many(my_input_bits.len(), channel)?;
         Ok((gb, sender_inputs, receiver_inputs))
     }
 
@@ -279,9 +285,9 @@ impl ReceiverState {
         channel: &mut Channel,
         rng: &mut RNG,
     ) -> swanky_error::Result<(
-        Evaluator<RNG, IKNP<OtReceiver>, AllWire>,
-        Vec<AllWire>,
-        Vec<AllWire>,
+        Evaluator<RNG, IKNP<OtReceiver>, WireMod2>,
+        Vec<WireMod2>,
+        Vec<WireMod2>,
     )>
     where
         RNG: CryptoRng + SeedableRng<Seed = U8x16>,
@@ -290,15 +296,20 @@ impl ReceiverState {
         let my_input_bits = encode_inputs(&self.opprf_outputs);
 
         let mut ev =
-            Evaluator::<RNG, IKNP<OtReceiver>, AllWire>::new(channel, RNG::from_seed(rng.random()))
+            Evaluator::<RNG, IKNP<OtReceiver>, _>::new(channel, RNG::from_seed(rng.random()))
                 .wrap_err(
                     ErrorKind::InitializationError,
                     "Failed to initialize receiver during setup.",
                 )?;
 
-        let mods = vec![2; nbins * HASH_SIZE * 8];
-        let sender_inputs = ev.receive_many(&mods, channel)?;
-        let receiver_inputs = ev.encode_many(&my_input_bits, &mods, channel)?;
+        let sender_inputs = ev.receive_many(nbins * HASH_SIZE * 8, channel)?;
+        let receiver_inputs = ev.encode_many(
+            &my_input_bits
+                .iter()
+                .map(|bit| F2::from(*bit != 0))
+                .collect::<Vec<_>>(),
+            channel,
+        )?;
         Ok((ev, sender_inputs, receiver_inputs))
     }
 
@@ -320,7 +331,7 @@ impl ReceiverState {
         let mut intersection = Vec::new();
         for (opt_item, in_intersection) in self.cuckoo.items.iter().zip_eq(mpc_outs) {
             if let Some(item) = opt_item
-                && in_intersection == 1_u16
+                && in_intersection == F2::ONE
             {
                 intersection.push(self.inputs[item.input_index].clone());
             }
@@ -345,7 +356,7 @@ impl ReceiverState {
 
         let mut cardinality = 0;
         for (i, s) in cardinality_outs.into_iter().enumerate() {
-            cardinality += (s as usize) << i;
+            cardinality += (u16::from(s) as usize) << i;
         }
         Ok(cardinality)
     }
@@ -436,7 +447,7 @@ fn fancy_compute_intersection<F: FancyBinary>(
 }
 
 /// Fancy function to compute the cardinality
-fn fancy_compute_cardinality<F: FancyBinary + FancyBinaryConstant>(
+fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
     f: &mut F,
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],

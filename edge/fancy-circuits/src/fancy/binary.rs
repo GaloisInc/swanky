@@ -6,6 +6,7 @@ use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{FancyBinary, FancyEncode, FancyOutput};
 use std::ops::{Deref, DerefMut};
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 
 /// Bundle which is explicitly binary representation.
 #[derive(Clone)]
@@ -19,7 +20,7 @@ impl<W> BinaryBundle<W> {
     }
 }
 
-impl From<(u128, usize)> for BinaryBundle<DummyVal> {
+impl From<(u128, usize)> for BinaryBundle<DummyVal<F2>> {
     /// Generate a new [`BinaryBundle`] of `value.0` containing `value.1` bits.
     fn from(value: (u128, usize)) -> Self {
         let mut dummy = Dummy::new();
@@ -30,8 +31,8 @@ impl From<(u128, usize)> for BinaryBundle<DummyVal> {
     }
 }
 
-impl From<BinaryBundle<DummyVal>> for u128 {
-    fn from(value: BinaryBundle<DummyVal>) -> Self {
+impl From<BinaryBundle<DummyVal<F2>>> for u128 {
+    fn from(value: BinaryBundle<DummyVal<F2>>) -> Self {
         let bin = value.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
         u128_from_bits(&bin)
     }
@@ -51,10 +52,10 @@ impl<W> DerefMut for BinaryBundle<W> {
     }
 }
 
-impl<F: FancyBinary + FancyEncode + FancyOutput> BinaryGadgets for F {}
+impl<F: FancyBinary + FancyEncode<F2> + FancyOutput<F2>> BinaryGadgets for F {}
 
 /// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
-pub trait BinaryGadgets: BundleGadgets + FancyEncode {
+pub trait BinaryGadgets: BundleGadgets + FancyEncode<F2> {
     /// Encode a binary input bundle.
     fn bin_encode(
         &mut self,
@@ -63,8 +64,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
         let xs = util::u128_to_bits(value, nbits);
-        self.encode_many(&xs, &vec![2; nbits], channel)
-            .map(BinaryBundle::new)
+        self.encode_many(&xs, channel).map(BinaryBundle::new)
     }
 
     /// Receive an binary input bundle.
@@ -73,8 +73,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
         nbits: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<BinaryBundle<Self::Item>> {
-        self.receive_many(&vec![2; nbits], channel)
-            .map(BinaryBundle::new)
+        self.receive_many(nbits, channel).map(BinaryBundle::new)
     }
 
     /// Encode many binary input bundles.
@@ -88,7 +87,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
             .iter()
             .flat_map(|x| util::u128_to_bits(*x, nbits))
             .collect::<Vec<_>>();
-        let mut wires = self.encode_many(&xs, &vec![2; values.len() * nbits], channel)?;
+        let mut wires = self.encode_many(&xs, channel)?;
         let buns = (0..values.len())
             .map(|_| {
                 let ws = wires.drain(0..nbits).collect::<Vec<_>>();
@@ -105,7 +104,7 @@ pub trait BinaryGadgets: BundleGadgets + FancyEncode {
         nbits: usize,
         channel: &mut Channel,
     ) -> swanky_error::Result<Vec<BinaryBundle<Self::Item>>> {
-        let mut wires = self.receive_many(&vec![2; ninputs * nbits], channel)?;
+        let mut wires = self.receive_many(ninputs * nbits, channel)?;
         let buns = (0..ninputs)
             .map(|_| {
                 let ws = wires.drain(0..nbits).collect::<Vec<_>>();

@@ -14,7 +14,7 @@ use fancy_garbling::{
     classic::{GarbledChannel, GarbledCircuit},
     util::output_tweak,
 };
-use fancy_traits::{FancyBinary, FancyBinaryConstant, HasModulus};
+use fancy_traits::{FancyBinary, FancyConstant};
 use ndarray::Array3;
 use rand::CryptoRng;
 #[cfg(feature = "serde")]
@@ -27,6 +27,7 @@ use std::{
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, swanky_error};
+use swanky_field_binary::F2;
 use swanky_ot_iknp::IKNP;
 use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
@@ -168,7 +169,7 @@ impl OutputMap {
                     }
                 }
                 if let Some(bit) = decoded {
-                    bits.push(bit);
+                    bits.push(F2::from(bit != 0));
                 } else {
                     swanky_error::bail!(
                         ErrorKind::OtherError,
@@ -814,7 +815,7 @@ impl NeuralNet {
             let inputs = (0..self.ninputs())
                 .map(|_| {
                     let zeros = (0..bitwidths[0])
-                        .map(|_| garbler.encode_zero(2))
+                        .map(|_| garbler.encode_zero())
                         .collect::<Vec<_>>();
                     BinaryBundle::new(zeros)
                 })
@@ -823,7 +824,7 @@ impl NeuralNet {
             let mut nn = BinaryNeuralNet::new(&mut garbler, bitwidths, true);
             let outputs = nn.eval(self, &inputs, secret_weights, channel)?;
 
-            let delta = garbler.delta(2);
+            let delta = garbler.delta();
             Ok((inputs, outputs, delta))
         })?;
         let encoder = InputEncoder::new(inputs, delta);
@@ -866,8 +867,8 @@ impl NeuralNet {
         channel: &mut Channel,
     ) -> Result<()>
     where
-        W: Clone + HasModulus,
-        F: FancyBinary + FancyBinaryConstant + BinaryGadgets,
+        W: Clone,
+        F: FancyBinary + FancyConstant<F2> + BinaryGadgets,
     {
         let mut errors = 0;
 

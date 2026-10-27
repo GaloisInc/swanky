@@ -1,6 +1,6 @@
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{
-    CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode,
+    CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode,
 };
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -61,7 +61,7 @@ impl<'a, C> EvaluatorOnline<'a, C> {
         let num_and_gates = and_auth_shares.len();
         // The constant one wirelabel is set to the value `1`.
         // TODO: Make `const` once `From` is const-compatible.
-        let one = WireMod2::from_repr(U8x16::from(F128b::ONE), 2);
+        let one = WireMod2::from_repr(U8x16::from(F128b::ONE));
         Self {
             circuit,
             delta,
@@ -89,7 +89,7 @@ impl<'a, C> EvaluatorOnline<'a, C> {
         let mut wires: Vec<EvaluatorWire> = Vec::with_capacity(masked_values.len());
         for (masked_value, auth_share) in masked_values.into_iter().zip(auth_shares) {
             // The Evaluator retrieves the wire labels for their own input
-            let wire_label = WireMod2::from_repr(channel.read()?, 2);
+            let wire_label = WireMod2::from_repr(channel.read()?);
             // The Evaluator constructs authenticated values for all their input wires
             wires.push(EvaluatorWire::new(masked_value, wire_label, auth_share));
         }
@@ -140,7 +140,7 @@ impl<'a, C> Fancy for EvaluatorOnline<'a, C> {
     type Item = EvaluatorWire;
 }
 
-impl<'a, C> FancyBinaryConstant for EvaluatorOnline<'a, C> {
+impl<'a, C> FancyConstant<F2> for EvaluatorOnline<'a, C> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta);
 
@@ -244,28 +244,21 @@ impl<'a, C> FancyBinary for EvaluatorOnline<'a, C> {
 
         Ok(EvaluatorWire::new(
             lc_value,
-            WireMod2::from_repr(lc_label, 2),
+            WireMod2::from_repr(lc_label),
             lc_share,
         ))
     }
 }
 
-impl<'a, C> FancyEncode for EvaluatorOnline<'a, C> {
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>> {
-        assert_eq!(values.len(), moduli.len());
-
+impl<'a, C> FancyEncode<F2> for EvaluatorOnline<'a, C> {
+    fn encode_many(&mut self, values: &[F2], channel: &mut Channel) -> Result<Vec<Self::Item>> {
         // Grab authenticated shares for each of the inputs.
-        let my_auth_shares = (0..moduli.len())
+        let my_auth_shares = (0..values.len())
             .map(|_| self.auth_shares.next())
             .collect::<Vec<_>>();
 
         // Open the garbler's shares `[r_w]`.
-        let mut their_bits = Vec::with_capacity(moduli.len());
+        let mut their_bits = Vec::with_capacity(values.len());
         AuthShareGenerator::open_their_shares_with_delta(
             &my_auth_shares,
             self.delta,
@@ -277,9 +270,7 @@ impl<'a, C> FancyEncode for EvaluatorOnline<'a, C> {
         let my_masked_values = their_bits
             .into_iter()
             .zip(my_auth_shares.iter().zip(values.iter()))
-            .map(|(theirs, (mine, value))| {
-                F2::try_from(*value).expect("Invalid value, must be boolean") + mine.bit() + theirs
-            })
+            .map(|(theirs, (mine, value))| value + mine.bit() + theirs)
             .collect::<Vec<_>>();
         for masked_value in my_masked_values.iter() {
             channel.write(masked_value)?;
@@ -288,17 +279,15 @@ impl<'a, C> FancyEncode for EvaluatorOnline<'a, C> {
         self.receive_wirelabels(my_masked_values, my_auth_shares, channel)
     }
 
-    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
+    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>> {
         // Grab authenticated shares for each of the inputs.
-        let my_auth_shares = (0..moduli.len())
-            .map(|_i| self.auth_shares.next())
-            .collect::<Vec<_>>();
+        let my_auth_shares = (0..n).map(|_i| self.auth_shares.next()).collect::<Vec<_>>();
 
         // Open the evaluator's shares `[s_w]`.
         AuthShareGenerator::open_my_shares(&my_auth_shares, channel)?;
 
         // Receive `x_w ⊕ λ_w` from the garbler.
-        let masked_values = (0..moduli.len())
+        let masked_values = (0..n)
             .map(|_| channel.read::<F2>())
             .collect::<Result<Vec<_>>>()?;
 

@@ -1,17 +1,17 @@
 //! A collection of test circuits.
 
 pub mod fancy_binary_constant {
-    //! Circuits that test [`FancyBinaryConstant`].
+    //! Circuits that test [`FancyConstant`].
 
-    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinaryConstant};
+    use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyConstant};
     use swanky_channel::Channel;
     use swanky_error::Result;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
-    /// Circuit for testing [`FancyBinaryConstant::constant`].
+    /// Circuit for testing [`FancyConstant::constant`].
     pub struct TestBinaryConstant;
-    impl<F: FancyBinaryConstant> Circuit<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> Circuit<F> for TestBinaryConstant {
         type Input = ();
         type Output = Vec<F::Item>;
 
@@ -25,7 +25,7 @@ pub mod fancy_binary_constant {
             Ok(outputs)
         }
     }
-    impl<F: FancyBinaryConstant> CircuitInputMapper<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryConstant {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }
@@ -33,12 +33,8 @@ pub mod fancy_binary_constant {
         fn ninputs(&self) -> usize {
             0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
-    impl<F: FancyBinaryConstant> CircuitOutputMapper<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryConstant {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output
         }
@@ -77,10 +73,6 @@ pub mod binary {
         fn ninputs(&self) -> usize {
             1
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestNegateGate {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
@@ -110,10 +102,6 @@ pub mod binary {
         }
 
         fn ninputs(&self) -> usize {
-            2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
             2
         }
     }
@@ -147,10 +135,6 @@ pub mod binary {
         fn ninputs(&self) -> usize {
             self.0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestAndGateFanN {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
@@ -181,10 +165,6 @@ pub mod binary {
 
         fn ninputs(&self) -> usize {
             self.0
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
         }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestOrGateFanN {
@@ -217,310 +197,10 @@ pub mod binary {
         fn ninputs(&self) -> usize {
             self.0
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestXorGateFanN {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             vec![output]
-        }
-    }
-}
-
-pub mod arithmetic {
-    //! Circuits that test [`FancyArithmetic`].
-
-    use crate::arithmetic::AddMany;
-    use fancy_traits::{
-        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyArithmetic, FancyConstant,
-    };
-    use swanky_channel::Channel;
-    use swanky_error::Result;
-
-    /// Circuit for testing [`FancyArithmetic::add`].
-    pub struct TestAddition(pub u16);
-    impl<F: FancyArithmetic> Circuit<F> for TestAddition {
-        type Input = (F::Item, F::Item);
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            _: &mut Channel,
-        ) -> Result<Self::Output> {
-            Ok(backend.add(&inputs.0, &inputs.1))
-        }
-    }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestAddition {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 2);
-            (inputs[0].clone(), inputs[1].clone())
-        }
-
-        fn ninputs(&self) -> usize {
-            2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            self.0
-        }
-    }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestAddition {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-
-    /// Circuit for testing [`AddMany`].
-    pub struct TestAddMany(pub u16, pub usize);
-    impl<F: FancyArithmetic> Circuit<F> for TestAddMany {
-        type Input = Vec<F::Item>;
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            AddMany::new().execute(backend, inputs.as_slice(), channel)
-        }
-    }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestAddMany {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.1);
-            inputs
-        }
-
-        fn ninputs(&self) -> usize {
-            self.1
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            self.0
-        }
-    }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestAddMany {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-
-    /// Circuit for testing [`FancyArithmetic::sub`].
-    pub struct TestSubtraction(pub u16);
-    impl<F: FancyArithmetic> Circuit<F> for TestSubtraction {
-        type Input = (F::Item, F::Item);
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            _: &mut Channel,
-        ) -> Result<Self::Output> {
-            Ok(backend.sub(&inputs.0, &inputs.1))
-        }
-    }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestSubtraction {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 2);
-            (inputs[0].clone(), inputs[1].clone())
-        }
-
-        fn ninputs(&self) -> usize {
-            2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            self.0
-        }
-    }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestSubtraction {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-
-    /// Circuit for testing [`FancyArithmetic::mul`].
-    pub struct TestMulGate(pub u16);
-    impl<F: FancyArithmetic> Circuit<F> for TestMulGate {
-        type Input = (F::Item, F::Item);
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            backend.mul(&inputs.0, &inputs.1, channel)
-        }
-    }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestMulGate {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 2);
-            (inputs[0].clone(), inputs[1].clone())
-        }
-
-        fn ninputs(&self) -> usize {
-            2
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            self.0
-        }
-    }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestMulGate {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-
-    /// Circuit for testing [`FancyArithmetic::mul`] using two different moduli
-    /// for the inputs.
-    pub struct TestMulGateUnequalMods(pub [u16; 2]);
-    impl<F: FancyArithmetic> Circuit<F> for TestMulGateUnequalMods {
-        type Input = (F::Item, F::Item);
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            backend.mul(&inputs.0, &inputs.1, channel)
-        }
-    }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestMulGateUnequalMods {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 2);
-            (inputs[0].clone(), inputs[1].clone())
-        }
-
-        fn ninputs(&self) -> usize {
-            2
-        }
-
-        fn modulus(&self, i: usize) -> u16 {
-            self.0[i]
-        }
-    }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestMulGateUnequalMods {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-
-    /// Circuit for testing [`FancyArithmetic::cmul`].
-    pub struct TestCmul(pub u16, pub u16);
-    impl<F: FancyArithmetic> Circuit<F> for TestCmul {
-        type Input = F::Item;
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            input: Self::Input,
-            _: &mut Channel,
-        ) -> Result<Self::Output> {
-            Ok(backend.cmul(&input, self.1))
-        }
-    }
-    impl<F: FancyArithmetic> CircuitInputMapper<F> for TestCmul {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 1);
-            inputs[0].clone()
-        }
-
-        fn ninputs(&self) -> usize {
-            1
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            self.0
-        }
-    }
-    impl<F: FancyArithmetic> CircuitOutputMapper<F> for TestCmul {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-
-    /// Circuit for testing constant gates.
-    pub struct TestConstants(pub u16, pub u16);
-    impl<F: FancyArithmetic + FancyConstant> Circuit<F> for TestConstants {
-        type Input = F::Item;
-        type Output = F::Item;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            input: Self::Input,
-            channel: &mut Channel,
-        ) -> Result<Self::Output> {
-            let constant = backend.constant(self.1, self.0, channel)?;
-            Ok(backend.add(&input, &constant))
-        }
-    }
-    impl<F: FancyArithmetic + FancyConstant> CircuitInputMapper<F> for TestConstants {
-        fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), 1);
-            inputs[0].clone()
-        }
-
-        fn ninputs(&self) -> usize {
-            1
-        }
-
-        fn modulus(&self, _: usize) -> u16 {
-            self.0
-        }
-    }
-    impl<F: FancyArithmetic + FancyConstant> CircuitOutputMapper<F> for TestConstants {
-        fn flatten(output: Self::Output) -> Vec<F::Item> {
-            vec![output]
-        }
-    }
-}
-
-#[cfg(test)]
-mod fancy_arithmetic {
-    use crate::{
-        test_circuits::arithmetic::{TestConstants, TestMulGate},
-        util::RngExt,
-    };
-    use fancy_plaintext::{Dummy, DummyVal};
-    use rand::{RngExt as _, rng};
-
-    #[test]
-    fn constants() {
-        let mut rng = rng();
-        let q = rng.gen_modulus();
-        let c = rng.random::<u16>() % q;
-        let circ = TestConstants(q, c);
-
-        for _ in 0..64 {
-            let x = DummyVal::rand(q, &mut rng);
-            let output = Dummy::eval(&circ, x).unwrap();
-            assert_eq!(output.val(), (x.val() + c) % q);
-        }
-    }
-
-    #[test]
-    fn arithmetic_half_gate() {
-        let mut rng = rng();
-        let q = rng.gen_prime();
-        let c = TestMulGate(q);
-
-        for _ in 0..16 {
-            let x = DummyVal::rand(q, &mut rng);
-            let y = DummyVal::rand(q, &mut rng);
-            let output = Dummy::eval(&c, (x, y)).unwrap();
-            assert_eq!(output.val(), (x.val() * y.val()) % q);
         }
     }
 }

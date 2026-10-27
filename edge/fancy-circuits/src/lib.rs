@@ -1,7 +1,6 @@
 //! Circuits implementing the [`fancy_traits::Fancy`] API.
 #![deny(missing_docs)]
 
-pub mod arithmetic;
 pub mod binary;
 
 mod linear_oram;

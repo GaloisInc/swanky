@@ -4,8 +4,7 @@
 
 use core::cmp::max;
 use fancy_traits::{
-    CircuitInputMapper, Fancy, FancyArithmetic, FancyBinary, FancyBinaryConstant, FancyConstant,
-    FancyEncode, FancyOutput, HasModulus,
+    CircuitInputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput,
 };
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result};
@@ -17,20 +16,13 @@ pub use wrapper::CircuitAnalyzerWrapper;
 /// An instantiation of [`Fancy::Item`] used by [`CircuitAnalyzer`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AnalyzerItem {
-    modulus: u16,
     depth: usize,
 }
 
 impl AnalyzerItem {
     /// Create a new [`AnalyzerItem`] with the provided modulus.
-    pub fn new(modulus: u16) -> Self {
-        Self { modulus, depth: 0 }
-    }
-}
-
-impl HasModulus for AnalyzerItem {
-    fn modulus(&self) -> u16 {
-        self.modulus
+    pub fn new() -> Self {
+        Self { depth: 0 }
     }
 }
 
@@ -106,7 +98,7 @@ impl CircuitAnalyzer {
     pub fn eval<C: CircuitInputMapper<CircuitAnalyzer>>(&mut self, circuit: &C) -> Result<()> {
         Channel::with(std::io::empty(), |channel| {
             let inputs = (0..circuit.ninputs())
-                .map(|i| self.receive(circuit.modulus(i), channel))
+                .map(|_| self.receive(channel))
                 .collect::<Result<Vec<_>>>()?;
             circuit.execute(self, circuit.map(inputs), channel)?;
             Ok(())
@@ -116,70 +108,22 @@ impl CircuitAnalyzer {
 
 impl FancyBinary for CircuitAnalyzer {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        assert_eq!(x.modulus, 2);
-        assert_eq!(y.modulus, 2);
         self.nxors += 1;
         AnalyzerItem {
-            modulus: x.modulus,
             depth: max(x.depth, y.depth),
         }
     }
 
     fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        assert_eq!(x.modulus, 2);
-        assert_eq!(y.modulus, 2);
         self.nands += 1;
         let depth = max(x.depth, y.depth) + 1;
         self.mul_depth = max(self.mul_depth, depth);
-        Ok(AnalyzerItem {
-            modulus: x.modulus,
-            depth,
-        })
+        Ok(AnalyzerItem { depth })
     }
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
-        assert_eq!(x.modulus, 2);
         self.nnegs += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: x.depth,
-        }
-    }
-}
-
-impl FancyArithmetic for CircuitAnalyzer {
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.nadds += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: max(x.depth, y.depth),
-        }
-    }
-
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
-        self.nsubs += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: max(x.depth, y.depth),
-        }
-    }
-
-    fn cmul(&mut self, x: &Self::Item, _y: u16) -> Self::Item {
-        self.ncmuls += 1;
-        AnalyzerItem {
-            modulus: x.modulus,
-            depth: x.depth,
-        }
-    }
-
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
-        self.nmuls += 1;
-        let depth = max(x.depth, y.depth) + 1;
-        self.mul_depth = max(self.mul_depth, depth);
-        Ok(AnalyzerItem {
-            modulus: x.modulus,
-            depth: max(x.depth, y.depth) + 1,
-        })
+        AnalyzerItem { depth: x.depth }
     }
 }
 
@@ -187,33 +131,20 @@ impl Fancy for CircuitAnalyzer {
     type Item = AnalyzerItem;
 }
 
-impl FancyConstant for CircuitAnalyzer {
-    fn constant(&mut self, _val: u16, q: u16, _: &mut Channel) -> Result<Self::Item> {
-        self.nconstants += 1;
-        Ok(AnalyzerItem {
-            modulus: q,
-            depth: 0,
-        })
-    }
-}
-
-impl FancyBinaryConstant for CircuitAnalyzer {
+impl FancyConstant<F2> for CircuitAnalyzer {
     fn constant(&mut self, _: F2) -> Self::Item {
         self.nconstants += 1;
-        AnalyzerItem {
-            modulus: 2,
-            depth: 0,
-        }
+        AnalyzerItem { depth: 0 }
     }
 }
 
-impl FancyEncode for CircuitAnalyzer {
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        self.ninputs += moduli.len();
-        Ok(moduli.iter().map(|q| AnalyzerItem::new(*q)).collect())
+impl FancyEncode<F2> for CircuitAnalyzer {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        self.ninputs += n;
+        Ok((0..n).map(|_| AnalyzerItem::new()).collect())
     }
 
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         swanky_error::bail!(
             ErrorKind::UnsupportedError,
             "Encoding values is unsupported"
@@ -221,8 +152,8 @@ impl FancyEncode for CircuitAnalyzer {
     }
 }
 
-impl FancyOutput for CircuitAnalyzer {
-    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<u16>> {
+impl FancyOutput<F2> for CircuitAnalyzer {
+    fn output(&mut self, x: &Self::Item, _: &mut Channel) -> Result<Option<F2>> {
         self.mul_depth = max(self.mul_depth, x.depth);
         Ok(None)
     }

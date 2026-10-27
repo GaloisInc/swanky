@@ -5,9 +5,10 @@ use crate::{
     },
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`]s `x` and `y` (for `y != 0`), output `x / y`.
 #[derive(Default)]
@@ -20,7 +21,7 @@ impl<'a> BinaryDivision<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryDivision<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryDivision<'a>
 where
     F::Item: 'a,
 {

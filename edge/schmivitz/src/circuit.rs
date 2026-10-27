@@ -7,7 +7,7 @@
 use crate::parameters::FieldSize;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
 use fancy_traits::{
-    Circuit as FancyCircuit, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge,
+    Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge,
 };
 use hybrid_array::typenum::Unsigned;
 use std::{
@@ -393,8 +393,8 @@ impl<'a> CircuitExecuter<F2> for CircuitInterpreter<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge + FancyEncode> FancyCircuit<F>
-    for CircuitInterpreter<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2> + FancyEncode<F2>>
+    FancyCircuit<F> for CircuitInterpreter<'a>
 {
     type Input = ();
     type Output = Vec<F::Item>; // TODO: This should be `()`.
@@ -454,7 +454,7 @@ impl<'a, F: FancyBinary + FancyBinaryConstant + FancyZeroKnowledge + FancyEncode
                     assert_eq!(*ty, 0);
 
                     for wid in dst.start..=dst.end {
-                        let res = backend.receive(2, channel)?;
+                        let res = backend.receive(channel)?;
 
                         memory.insert(wid, res);
                     }

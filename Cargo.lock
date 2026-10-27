@@ -741,6 +741,7 @@ dependencies = [
  "fancy-traits",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
 ]
 
@@ -776,6 +777,7 @@ dependencies = [
  "swanky-channel",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-rng",
  "vectoreyes",
@@ -789,6 +791,7 @@ dependencies = [
  "rand 0.10.3",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
 ]
 
@@ -798,6 +801,7 @@ version = "0.6.0"
 dependencies = [
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
 ]
 
@@ -1528,6 +1532,8 @@ dependencies = [
  "swanky-cointoss",
  "swanky-cr-hash",
  "swanky-error",
+ "swanky-field",
+ "swanky-field-binary",
  "swanky-oprf-kkrt",
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
@@ -2385,6 +2391,7 @@ dependencies = [
  "serde_json",
  "swanky-channel",
  "swanky-error",
+ "swanky-field-binary",
  "swanky-ot-iknp",
  "swanky-ot-traits-new",
  "swanky-rng",
@@ -2786,6 +2793,7 @@ dependencies = [
  "swanky-adversary",
  "swanky-channel",
  "swanky-error",
+ "swanky-field",
  "swanky-field-binary",
  "swanky-ot-chou-orlandi-new",
  "swanky-ot-iknp",

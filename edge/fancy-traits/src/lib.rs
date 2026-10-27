@@ -1,92 +1,107 @@
-//! Traits for representing circuit computations.
+//! Traits for writing and evaluating circuits.
 //!
-//! The core trait of this module is [`Fancy`], which represents the basic set
-//! of operations possible in a circuit. There are also extension traits that
-//! further extend the core [`Fancy`] trait to provide additional capabilities.
+//! The core trait of this crate is [`Fancy`], which defines the circuit's wire
+//! representation. In addition, there are several extension traits that extend
+//! the capabilities of a [`Fancy`] object, such as to support encoding
+//! constants (through the [`FancyConstant`] trait) or enabling binary operators
+//! (through the [`FancyBinary`] trait).
+//!
+//! Circuits are defined using the [`Circuit`] trait, which is generic over some
+//! [`Fancy`] object. Any [`Fancy`] object can then execute the defined
+//! [`Circuit`] object, and other circuits may call [`Circuit`] implementations
+//! as subcomponents.
+//!
+//! # Example
+//! Below, we define a simple "plaintext" evaluator over `bool`s, and implement
+//! [`Fancy`] and [`FancyBinary`] for this evaluator.
+//! ```
+//! # use fancy_traits::{Fancy, FancyBinary};
+//! # use swanky_channel::Channel;
+//! # use swanky_error::Result;
+//! struct BooleanEvaluator;
+//!
+//! impl Fancy for BooleanEvaluator {
+//!     type Item = bool;
+//! }
+//! impl FancyBinary for BooleanEvaluator {
+//!     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
+//!         x ^ y
+//!     }
+//!     fn and(&mut self, x: &Self::Item, y: &Self::Item, _: &mut Channel) -> Result<Self::Item> {
+//!         Ok(x & y)
+//!     }
+//!     fn negate(&mut self, x: &Self::Item) -> Self::Item {
+//!         !x
+//!     }
+//! }
+//! ```
+//! We can then use this evaluator to a [`Circuit`] by calling
+//! [`Circuit::execute`] with the backend set to `BooleanEvaluator`.
 #![deny(missing_docs)]
 
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteField;
 
 mod circuit;
 pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;
-use swanky_field_binary::F2;
 pub use zk::FancyZeroKnowledge;
-
-/// An object that has a modulus.
-pub trait HasModulus {
-    /// The modulus of the wire.
-    fn modulus(&self) -> u16;
-}
 
 /// The `Fancy` trait is the core trait for writing circuits.
 ///
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
 /// underlying wire representation.
 ///
-/// This trait can be further extended to support binary or arithmetic by using
-/// the [`FancyBinary`] or [`FancyArithmetic`] extension traits, respectively.
-/// The [`FancyEncode`] trait allows for encoding values into wires, and the
-/// [`FancyOutput`] trait allows for converting wires into their underlying
-/// plaintext representation.
+/// This trait can be further extended to support binary by using the
+/// [`FancyBinary`] extension trait. The [`FancyEncode`] trait allows for
+/// encoding values into wires, and the [`FancyOutput`] trait allows for
+/// converting wires into their underlying plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
     type Item: Clone + core::fmt::Debug + Default;
 }
 
 /// Extension trait for [`Fancy`] that provides the ability to encode public constants.
-pub trait FancyConstant: Fancy {
-    /// Encode a constant value `x % q`.
-    fn constant(&mut self, x: u16, q: u16, channel: &mut Channel) -> Result<Self::Item>;
-}
-
-/// Extension trait for [`Fancy`] that provides the ability to encode public
-/// constants, optimized for the binary setting.
-pub trait FancyBinaryConstant: Fancy {
-    /// Encode a binary constant value.
-    fn constant(&mut self, x: F2) -> Self::Item;
+pub trait FancyConstant<FF: FiniteField>: Fancy {
+    /// Encode a constant value `x`.
+    fn constant(&mut self, x: FF) -> Self::Item;
 }
 
 /// Extension trait for [`Fancy`] that provides encoding and receiving operations.
-pub trait FancyEncode: Fancy {
+pub trait FancyEncode<FF: FiniteField>: Fancy {
     /// Encode many wires for known values.
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>>;
+    fn encode_many(&mut self, values: &[FF], channel: &mut Channel) -> Result<Vec<Self::Item>>;
 
     /// Receive many wires for unknown values.
-    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>>;
+    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>>;
 
     /// Encode a wire for a known value.
-    fn encode(&mut self, value: u16, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
-        let xs = self.encode_many(&[value], &[modulus], channel)?;
+    fn encode(&mut self, value: FF, channel: &mut Channel) -> Result<Self::Item> {
+        let xs = self.encode_many(&[value], channel)?;
         Ok(xs[0].clone())
     }
 
     /// Receive a wire for an unknown value.
-    fn receive(&mut self, modulus: u16, channel: &mut Channel) -> Result<Self::Item> {
-        let xs = self.receive_many(&[modulus], channel)?;
+    fn receive(&mut self, channel: &mut Channel) -> Result<Self::Item> {
+        let xs = self.receive_many(1, channel)?;
         Ok(xs[0].clone())
     }
 }
 
 /// Extension trait for [`Fancy`] that provides output operations.
-pub trait FancyOutput: Fancy {
+pub trait FancyOutput<FF: FiniteField>: Fancy {
     /// Output the value associated with wire `x`.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
-    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<u16>>;
+    fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<FF>>;
 
     /// Output the values associated with a slice of wires.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
-    fn outputs(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Option<Vec<u16>>> {
+    fn outputs(&mut self, xs: &[Self::Item], channel: &mut Channel) -> Result<Option<Vec<FF>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             zs.push(self.output(x, channel)?);
@@ -113,33 +128,4 @@ pub trait FancyBinary: Fancy {
         let z = self.and(&notx, &noty, channel)?;
         Ok(self.negate(&z))
     }
-}
-
-/// Extension trait for [`Fancy`] that provides arithmetic operations.
-pub trait FancyArithmetic: Fancy {
-    /// Add `x` and `y`.
-    ///
-    /// # Panics
-    /// This panics if `x` and `y` do not have equal moduli.
-    fn add(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-
-    /// Subtract `x` and `y`.
-    ///
-    /// # Panics
-    /// This panics if `x` and `y` do not have equal moduli.
-    fn sub(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item;
-
-    /// Multiply `x` with the constant `c`.
-    fn cmul(&mut self, x: &Self::Item, c: u16) -> Self::Item;
-
-    /// Multiply `x` and `y`.
-    fn mul(&mut self, x: &Self::Item, y: &Self::Item, channel: &mut Channel) -> Result<Self::Item>;
-}
-
-/// Utility macro for asserting that a wire is binary (i.e., has modulus two).
-#[macro_export]
-macro_rules! is_binary {
-    ($x:ident) => {
-        assert_eq!($x.modulus(), 2);
-    };
 }

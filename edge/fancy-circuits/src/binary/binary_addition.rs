@@ -107,6 +107,8 @@ where
 pub mod test {
     use super::*;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
+    #[cfg(test)]
+    use swanky_field_binary::F2;
 
     /// Circuit for testing [`BinaryAddition`].
     pub struct TestBinaryAddition(pub usize);
@@ -135,10 +137,6 @@ pub mod test {
         fn ninputs(&self) -> usize {
             self.0 * 2
         }
-
-        fn modulus(&self, _: usize) -> u16 {
-            2
-        }
     }
 
     impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinaryAddition {
@@ -164,7 +162,7 @@ pub mod test {
             let y_input = BinaryBundle::from((y, nbits));
             let outputs = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(Into::<u128>::into(outputs.0), (x + y) % q);
-            assert_eq!(outputs.1.val(), (x + y >= q) as u16);
+            assert_eq!(outputs.1.val(), F2::from(x + y >= q));
         }
     }
 

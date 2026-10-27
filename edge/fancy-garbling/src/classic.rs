@@ -8,9 +8,9 @@ use crate::{
 };
 use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyOutput};
 use rand::CryptoRng;
-use std::collections::HashMap;
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
+use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
 /// A garbled circuit.
@@ -43,7 +43,7 @@ impl GarbledCircuit {
     /// 3. An [`OutputMapping`] mapping for mapping output wirelabels to their
     ///    associated underlying values.
     pub fn garble<
-        Wire: WireLabel,
+        Wire: WireLabel<F2>,
         C: CircuitInputMapper<Garbler<RNG, Wire>> + CircuitOutputMapper<Garbler<RNG, Wire>>,
         RNG: CryptoRng,
     >(
@@ -54,10 +54,7 @@ impl GarbledCircuit {
 
         // Produce zero wirelabels for the inputs.
         let inputs = (0..circuit.ninputs())
-            .map(|i| {
-                let q = circuit.modulus(i);
-                garbler.encode_zero(q)
-            })
+            .map(|_| garbler.encode_zero())
             .collect::<Vec<_>>();
 
         let mut channel = GarbledChannel::new_writer(None);
@@ -72,9 +69,8 @@ impl GarbledCircuit {
             // contain that mapping, which is what the below does.
             garbler.outputs(&zeros, channel)?;
 
-            let deltas = garbler.get_deltas();
-            let en = Encoder::new(inputs, deltas.clone());
-            let output_mapping = OutputMapping::new(&zeros, &deltas);
+            let en = Encoder::new(inputs, garbler.delta());
+            let output_mapping = OutputMapping::new(&zeros, garbler.delta());
 
             Ok((en, output_mapping))
         })?;
@@ -84,19 +80,19 @@ impl GarbledCircuit {
 
     /// Evaluate the garbled circuit on the provided inputs, mapping the output
     /// wirelabels to their associated values.
-    pub fn eval<Wire: WireLabel, C: CircuitOutputMapper<Evaluator<Wire>>>(
+    pub fn eval<Wire: WireLabel<F2>, C: CircuitOutputMapper<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: C::Input,
         output_mapping: &OutputMapping,
-    ) -> swanky_error::Result<Vec<u16>> {
+    ) -> swanky_error::Result<Vec<F2>> {
         let wirelabels = self.eval_to_wirelabels(circuit, inputs)?;
         output_mapping.to_outputs(&C::flatten(wirelabels))
     }
 
     /// Evaluate the garbled circuit on the provided inputs, returning the
     /// output wirelabels.
-    pub fn eval_to_wirelabels<Wire: WireLabel, C: Circuit<Evaluator<Wire>>>(
+    pub fn eval_to_wirelabels<Wire: WireLabel<F2>, C: Circuit<Evaluator<Wire>>>(
         &self,
         circuit: &C,
         inputs: C::Input,
@@ -113,14 +109,14 @@ impl GarbledCircuit {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Encoder<Wire> {
     inputs: Vec<Wire>,
-    deltas: HashMap<u16, Wire>,
+    delta: Wire,
 }
 
-impl<Wire: WireLabel> Encoder<Wire> {
-    /// Make a new [`Encoder`] from lists of inputs, alongside a map of
-    /// moduli-to-wire-offsets.
-    pub fn new(inputs: Vec<Wire>, deltas: HashMap<u16, Wire>) -> Self {
-        Encoder { inputs, deltas }
+impl<Wire: WireLabel<F2>> Encoder<Wire> {
+    /// Make a new [`Encoder`] from a vector of zero wirelabels and the `Δ`
+    /// wirelabel.
+    pub fn new(inputs: Vec<Wire>, delta: Wire) -> Self {
+        Encoder { inputs, delta }
     }
 
     /// Encode input values into their associated wirelabels.
@@ -128,38 +124,33 @@ impl<Wire: WireLabel> Encoder<Wire> {
     /// # Panics
     /// This panics if `inputs.len()` does not equal the expected number of
     /// garbler inputs.
-    pub fn encode_inputs(&self, inputs: &[u16]) -> Vec<Wire> {
+    pub fn encode_inputs(&self, inputs: &[F2]) -> Vec<Wire> {
         assert_eq!(inputs.len(), self.inputs.len());
         self.inputs
             .iter()
             .zip(inputs)
-            .map(|(zero, x)| {
-                let q = zero.modulus();
-                zero.clone() + self.deltas[&q].clone() * *x
-            })
+            .map(|(zero, x)| *zero + self.delta * (*x).into())
             .collect()
     }
 }
 
 /// A mapping of output wirelabels to their associated underlying values.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OutputMapping(Vec<Vec<U8x16>>);
+pub struct OutputMapping(Vec<[U8x16; 2]>);
 
 impl OutputMapping {
-    /// Construct a new [`OutputMapping`] from a set of zero wirelabels and
-    /// their associated deltas.
-    pub fn new<Wire: WireLabel>(zeros: &[Wire], deltas: &HashMap<u16, Wire>) -> Self {
-        let mut outputs = Vec::with_capacity(zeros.len());
-        for (i, zero) in zeros.iter().enumerate() {
-            let q = zero.modulus();
-            let mut wirelabels = Vec::with_capacity(q as usize);
-            for k in 0..q {
-                let wirelabel = zero.clone() + deltas[&q].clone() * k;
-                let hashed = wirelabel.hash(output_tweak(i, k));
-                wirelabels.push(hashed);
-            }
-            outputs.push(wirelabels);
-        }
+    /// Construct a new [`OutputMapping`] from a slice of zero wirelabels and
+    /// the `Δ` wirelabel.
+    pub fn new<Wire: WireLabel<F2>>(zeros: &[Wire], delta: Wire) -> Self {
+        let outputs = zeros
+            .iter()
+            .enumerate()
+            .map(|(i, zero)| {
+                core::array::from_fn(|j| {
+                    (*zero + delta * (j as u16)).hash(output_tweak(i, j as u16))
+                })
+            })
+            .collect::<Vec<_>>();
         Self(outputs)
     }
 
@@ -168,28 +159,29 @@ impl OutputMapping {
     /// # Errors
     /// This returns an error if it is unable to find a valid mapping for a
     /// given output wirelabel.
-    pub fn to_outputs<Wire: WireLabel>(
+    pub fn to_outputs<Wire: WireLabel<F2>>(
         &self,
         wirelabels: &[Wire],
-    ) -> swanky_error::Result<Vec<u16>> {
-        let mut outputs = Vec::new();
-        for (i, wirelabel) in wirelabels.iter().enumerate() {
-            let q = wirelabel.modulus();
-            let mut decoded = None;
-            for k in 0..q {
-                let hashed = wirelabel.hash(output_tweak(i, k));
-                if hashed == self.0[i][k as usize] {
-                    decoded = Some(k);
-                    break;
+    ) -> swanky_error::Result<Vec<F2>> {
+        wirelabels
+            .iter()
+            .enumerate()
+            .map(|(i, wirelabel)| {
+                let mut decoded = None;
+                for k in 0..2 {
+                    let hashed = wirelabel.hash(output_tweak(i, k));
+                    if hashed == self.0[i][k as usize] {
+                        decoded = Some(k);
+                        break;
+                    }
                 }
-            }
-            if let Some(output) = decoded {
-                outputs.push(output);
-            } else {
-                swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
-            }
-        }
-        Ok(outputs)
+                if let Some(output) = decoded {
+                    Ok(F2::from(output != 0))
+                } else {
+                    swanky_error::bail!(ErrorKind::OtherError, "Decoding failed");
+                }
+            })
+            .collect()
     }
 }
 

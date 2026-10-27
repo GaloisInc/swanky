@@ -2,11 +2,10 @@ use crate::{
     BinaryBundle,
     binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
-use fancy_traits::{
-    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
-};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// Circuit for running linear ORAM.
 ///
@@ -24,7 +23,7 @@ impl<const N: usize> LinearOram<N> {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant, const N: usize> Circuit<F> for LinearOram<N> {
+impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOram<N> {
     type Input = (Vec<BinaryBundle<F::Item>>, BinaryBundle<F::Item>);
     type Output = BinaryBundle<F::Item>;
 
@@ -55,7 +54,7 @@ impl<F: FancyBinary + FancyBinaryConstant, const N: usize> Circuit<F> for Linear
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
+impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitInputMapper<F> for LinearOram<N> {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), (self.size + 1) * N);
         let (ram_bits, query_bits) = inputs.split_at(self.size * N);
@@ -72,15 +71,9 @@ impl<F: FancyBinary + FancyBinaryConstant, const N: usize> CircuitInputMapper<F>
     fn ninputs(&self) -> usize {
         (self.size + 1) * N
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant, const N: usize> CircuitOutputMapper<F>
-    for LinearOram<N>
-{
+impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitOutputMapper<F> for LinearOram<N> {
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.wires().to_vec()
     }
@@ -89,7 +82,7 @@ impl<F: FancyBinary + FancyBinaryConstant, const N: usize> CircuitOutputMapper<F
 #[cfg(test)]
 pub mod test {
     use crate::{BinaryBundle, LinearOram};
-    use fancy_plaintext::{Dummy, DummyVal};
+    use fancy_plaintext::Dummy;
     use rand::RngExt;
 
     #[test]
@@ -103,7 +96,7 @@ pub mod test {
             let ram: Vec<u128> = (0..ram_size).map(|_| rng.random::<u128>()).collect();
             let index = rng.random_range(..ram_size);
 
-            let ram_input: Vec<BinaryBundle<DummyVal>> = ram
+            let ram_input: Vec<BinaryBundle<_>> = ram
                 .iter()
                 .map(|&val| BinaryBundle::from((val, N)))
                 .collect();

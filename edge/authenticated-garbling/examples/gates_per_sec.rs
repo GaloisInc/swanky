@@ -14,6 +14,8 @@ use swanky_authenticated_garbling::{
 };
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_rng::SwankyRng;
 
 struct And(usize);
@@ -42,10 +44,6 @@ impl<F: FancyBinary> CircuitInputMapper<F> for And {
     }
 
     fn ninputs(&self) -> usize {
-        2
-    }
-
-    fn modulus(&self, _: usize) -> u16 {
         2
     }
 }
@@ -77,11 +75,8 @@ where
     let nands = analyzer.nands();
 
     let inputs = (0..<C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit))
-        .map(|_| 0)
-        .collect::<Vec<u16>>();
-    let moduli = (0..<C as CircuitInputMapper<CircuitAnalyzer>>::ninputs(circuit))
-        .map(|_| 2)
-        .collect::<Vec<u16>>();
+        .map(|_| F2::ZERO)
+        .collect::<Vec<_>>();
 
     println!("*");
     println!("* Circuit: {name} | # ANDs: {nands}");
@@ -117,11 +112,11 @@ where
     let mut ev = SemiHonestEvaluator::<WireMod2>::new();
     let ((mut gb, zeros), (mut ev, wires)) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let zeros = gb.encode_many(&inputs, &moduli, channel)?;
+            let zeros = gb.encode_many(&inputs, channel)?;
             Ok((gb, zeros))
         },
         |channel| {
-            let wires = ev.receive_many(&moduli, channel)?;
+            let wires = ev.receive_many(inputs.len(), channel)?;
             Ok((ev, wires))
         },
     )?;
@@ -183,13 +178,13 @@ where
     let online = Instant::now();
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
-            let inputs = gb.encode_many(&inputs, &moduli, channel)?;
+            let inputs = gb.encode_many(&inputs, channel)?;
             let validator = gb.finalize(channel)?;
             let mut validator = validator.validate(inputs, channel)?;
             validator.outputs(&outputs, channel)
         },
         |channel| {
-            let inputs = ev.receive_many(&moduli, channel)?;
+            let inputs = ev.receive_many(inputs.len(), channel)?;
             let (outputs, ev) = ev.execute(inputs)?;
             let ev = ev.finalize(channel)?;
             let mut ev = ev.validate(channel)?;

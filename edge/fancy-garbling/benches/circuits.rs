@@ -6,6 +6,8 @@ use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunction};
 use fancy_garbling::{Garbler, WireMod2, classic::GarbledCircuit};
 use fancy_traits::CircuitInputMapper;
 use std::hint::black_box;
+use swanky_field::FiniteRing;
+use swanky_field_binary::F2;
 use swanky_rng::SwankyRng;
 
 fn bench_aes_new(c: &mut Criterion) {
@@ -27,7 +29,7 @@ fn bench_garble_aes(c: &mut Criterion) {
 fn bench_eval_aes(c: &mut Criterion) {
     let aes = Aes128::new();
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();
-    let inputs = en.encode_inputs(&vec![0; 256]);
+    let inputs = en.encode_inputs(&vec![F2::ZERO; 256]);
     let key = inputs[..128].try_into().unwrap();
     let block = inputs[128..].try_into().unwrap();
     c.bench_function("eval::aes128", move |bench| {
@@ -54,7 +56,7 @@ fn bench_garble_sha_256(c: &mut Criterion) {
 fn bench_eval_sha_256(c: &mut Criterion) {
     let sha256 = Sha256CompressionFunction::new();
     let (en, gc, _) = GarbledCircuit::garble::<WireMod2, _, _>(&sha256, SwankyRng::new()).unwrap();
-    let inputs = en.encode_inputs(&vec![0; 768]);
+    let inputs = en.encode_inputs(&vec![F2::ZERO; 768]);
     let (block, chain) = <Sha256CompressionFunction as CircuitInputMapper<
         Garbler<SwankyRng, WireMod2>,
     >>::map(&sha256, inputs);
