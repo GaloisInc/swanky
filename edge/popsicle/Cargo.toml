@@ -22,7 +22,6 @@ fancy-traits.workspace = true
 swanky-adversary.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
-swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
 swanky-cr-hash.workspace = true
 swanky-error.workspace = true
