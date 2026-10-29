@@ -145,7 +145,7 @@ fn codegen_impls<T: Read + Seek>(
     quote! {
         impl<F: fancy_traits::FancyBinary + fancy_traits::FancyZeroKnowledge<F2> + #ty_constraints> fancy_traits::Circuit<F> for #struct_name {
             type Input = ();
-            type Output = Vec<F::Item>; // TODO: should be `()`.
+            type Output = ();
 
             fn execute(
                 &self,
@@ -155,7 +155,7 @@ fn codegen_impls<T: Read + Seek>(
             ) -> swanky_error::Result<Self::Output> {
                 use swanky_serialization::CanonicalSerialize;
                 #main
-                Ok(vec![])
+                Ok(())
             }
 
         }
