@@ -39,8 +39,9 @@ pub use crate::preprocesser::wire::WirePreProcessor;
 ///
 /// Authenticated garbling utilizes pre-computed
 /// [`AndTriple`](swanky_authenticated_bits::and_triples::AndTriple)s and
-/// [`AuthShare`]s in its "online" portion. This function returns the (1) wire
-/// shares and (2) triple output shares for the given circuit of interest.
+/// [`AuthShare`]s in its "online" portion. This function returns the
+/// (1) and triple generator, (2) wire shares and (3) triple output
+/// shares for the given circuit of interest.
 pub(crate) fn f_preprocessing<P: GenericParty, C, RNG: CryptoRng>(
     circuit: &C,
     and_generator: &mut AndTripleGenerator<P>,

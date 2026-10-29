@@ -70,10 +70,9 @@ impl<'a, C> GarblerOnline<'a, C> {
                 // Use masked values `x_w + λ_w` and zero wirelabels `L_0` to create
                 // wirelabels `L_{x_w + λ_w}`, and send these to the evaluator.
                 let wirelabel = wire.wirelabel()
-                    + WireMod2::from_repr(
-                        U8x16::from(*masked_value * F128b::from(self.delta.to_repr())),
-                        2,
-                    );
+                    + WireMod2::from_repr(U8x16::from(
+                        *masked_value * F128b::from(self.delta.to_repr()),
+                    ));
                 channel.write(&wirelabel.to_repr())?;
                 Ok(ValidatorWire::new(*masked_value, wire.auth_share()))
             })
@@ -117,16 +116,9 @@ impl<'a, C> Fancy for GarblerOnline<'a, C> {
     type Item = ValidatorWire;
 }
 
-impl<'a, C> FancyEncode for GarblerOnline<'a, C> {
-    fn encode_many(
-        &mut self,
-        values: &[u16],
-        moduli: &[u16],
-        channel: &mut Channel,
-    ) -> Result<Vec<Self::Item>> {
-        assert_eq!(values.len(), moduli.len());
-
-        let offline_wires = (0..moduli.len())
+impl<'a, C> FancyEncode<F2> for GarblerOnline<'a, C> {
+    fn encode_many(&mut self, values: &[F2], channel: &mut Channel) -> Result<Vec<Self::Item>> {
+        let offline_wires = (0..values.len())
             .map(|_| self.inputs.next())
             .collect::<Vec<_>>();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
@@ -145,12 +137,8 @@ impl<'a, C> FancyEncode for GarblerOnline<'a, C> {
         let my_masked_values = their_bits
             .into_iter()
             .zip(my_auth_shares.iter().zip(values.iter()))
-            .map(|(theirs, (mine, value))| {
-                F2::try_from(*value)
-                    .wrap_err(ErrorKind::OtherError, "Invalid value, must be boolean")
-                    .map(|value| theirs + mine.bit() + value)
-            })
-            .collect::<Result<Vec<_>>>()?;
+            .map(|(theirs, (mine, value))| theirs + mine.bit() + value)
+            .collect::<Vec<_>>();
 
         // Send `x_w ⊕ λ_w` to the evaluator.
         for masked_value in my_masked_values.iter() {
@@ -160,10 +148,8 @@ impl<'a, C> FancyEncode for GarblerOnline<'a, C> {
         self.encode_wirelabels(&offline_wires, my_masked_values, channel)
     }
 
-    fn receive_many(&mut self, moduli: &[u16], channel: &mut Channel) -> Result<Vec<Self::Item>> {
-        let offline_wires = (0..moduli.len())
-            .map(|_| self.inputs.next())
-            .collect::<Vec<_>>();
+    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>> {
+        let offline_wires = (0..n).map(|_| self.inputs.next()).collect::<Vec<_>>();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =
             offline_wires.iter().map(|w| w.auth_share()).collect();
 
@@ -171,7 +157,7 @@ impl<'a, C> FancyEncode for GarblerOnline<'a, C> {
         AuthShareGenerator::open_my_shares(&my_auth_shares, channel)?;
 
         // Receive `y_w ⊕ λ_w := y_w ⊕ (s_w ⊕ r_w)` from the evaluator.
-        let their_masked_values = (0..moduli.len())
+        let their_masked_values = (0..n)
             .map(|_| channel.read::<F2>())
             .collect::<Result<Vec<_>>>()?;
 

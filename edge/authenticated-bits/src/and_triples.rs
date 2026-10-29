@@ -161,8 +161,7 @@ impl<P: GenericParty> AndTripleGenerator<P> {
         leaky_ands.shuffle(&mut shuffle_rng);
         // Bucket the leaky AND triples and combine them into (non-leaky) AND triples.
         self.leaky_generator
-            .combine(&leaky_ands, out, bucket_size, channel)?;
-        Ok(())
+            .combine(&leaky_ands, out, bucket_size, channel)
     }
 
     /// Open the AND triples in `triples`.
@@ -487,7 +486,7 @@ mod tests {
         swanky_channel::local::local_channel_pair(
             |c| {
                 let mut shares: Vec<AuthShare<PartyA>> = vec![];
-                generator_a.auth_share_generator_mut().generate(
+                generator_a.leaky_generator.auth_share_generator.generate(
                     nshares,
                     &mut shares,
                     c,
@@ -497,7 +496,7 @@ mod tests {
             },
             |c| {
                 let mut shares: Vec<AuthShare<PartyB>> = vec![];
-                generator_b.auth_share_generator_mut().generate(
+                generator_b.leaky_generator.auth_share_generator.generate(
                     nshares,
                     &mut shares,
                     c,

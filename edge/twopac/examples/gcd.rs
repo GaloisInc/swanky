@@ -3,11 +3,11 @@
 
 use core::cmp::{Ordering, max};
 use fancy_circuits::{BinaryBundle, BinaryGadgets, Gcd};
-use fancy_garbling::AllWire;
 use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
-use swanky_ot_alsz_kos::alsz::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
@@ -24,7 +24,7 @@ const NBITS: usize = 128;
 /// (3) The garbler and the evaluator then run the garbled circuit.
 /// (4) The garbler and the evaluator open the result of the computation.
 fn gb_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
-    let mut gb = Garbler::<SwankyRng, OtSender, AllWire>::new(channel, rng)?;
+    let mut gb = Garbler::<SwankyRng, IKNP<Sender>, _>::new(channel, rng)?;
     let inputs = gb_set_inputs(&mut gb, input, channel)?;
     let gcd = Gcd::new(upper_bound).execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
     gb.bin_output(&gcd, channel)?;
@@ -54,7 +54,7 @@ fn gb_set_inputs<F: BinaryGadgets>(
 /// (5) The evaluator translates the binary output of the circuit into its decimal
 ///     representation.
 fn ev_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
-    let mut ev = Evaluator::<SwankyRng, OtReceiver, AllWire>::new(channel, rng)?;
+    let mut ev = Evaluator::<SwankyRng, IKNP<Receiver>, _>::new(channel, rng)?;
     let inputs = ev_set_inputs(&mut ev, input, channel)?;
     let gcd = Gcd::new(upper_bound).execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
     let output = ev

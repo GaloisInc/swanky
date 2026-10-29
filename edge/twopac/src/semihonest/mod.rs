@@ -10,28 +10,30 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use fancy_analyzer::CircuitAnalyzer;
-    use fancy_circuits::{crypto::aes::Aes128, test_circuits::arithmetic::TestAddition};
-    use fancy_garbling::{AllWire, WireLabel, WireMod2};
+    use fancy_circuits::{crypto::aes::Aes128, test_circuits::binary::TestAndGate};
+    use fancy_garbling::{WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
         Circuit, CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput,
     };
-    use swanky_ot_chou_orlandi::{Receiver as ChouOrlandiReceiver, Sender as ChouOrlandiSender};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+    use swanky_ot_chou_orlandi_new::ChouOrlandi;
+    use swanky_ot_traits_new::{Receiver, Sender};
     use swanky_rng::SwankyRng;
 
     #[test]
-    fn test_addition() {
-        let modulus = 3;
-        let circuit = TestAddition(modulus);
-        for a in 0..2 {
-            for b in 0..2 {
+    fn test_and_gate() {
+        let circuit = TestAndGate;
+        for a in [F2::ZERO, F2::ONE] {
+            for b in [F2::ZERO, F2::ONE] {
                 let (_, output) = swanky_channel::local::local_channel_pair(
                     |channel| {
                         let rng = SwankyRng::new();
                         let mut gb =
-                            Garbler::<SwankyRng, ChouOrlandiSender, AllWire>::new(channel, rng)?;
-                        let x = gb.encode(a, modulus, channel)?;
-                        let y = gb.receive(modulus, channel)?;
+                            Garbler::<SwankyRng, ChouOrlandi<Sender>, _>::new(channel, rng)?;
+                        let x = gb.encode(a, channel)?;
+                        let y = gb.receive(channel)?;
                         let outputs = circuit.execute(&mut gb, (x, y), channel)?;
                         let result = gb.output(&outputs, channel)?;
                         assert!(result.is_none());
@@ -39,26 +41,25 @@ mod tests {
                     },
                     |channel| {
                         let rng = SwankyRng::new();
-                        let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, AllWire>::new(
-                            channel, rng,
-                        )?;
-                        let x = ev.receive(modulus, channel)?;
-                        let y = ev.encode(b, modulus, channel)?;
+                        let mut ev =
+                            Evaluator::<SwankyRng, ChouOrlandi<Receiver>, _>::new(channel, rng)?;
+                        let x = ev.receive(channel)?;
+                        let y = ev.encode(b, channel)?;
                         let output = circuit.execute(&mut ev, (x, y), channel)?;
                         let result = ev.output(&output, channel)?;
                         Ok(result.unwrap())
                     },
                 )
                 .unwrap();
-                assert_eq!((a + b) % modulus, output);
+                assert_eq!((a * b), output);
             }
         }
     }
 
-    type GB<Wire> = Garbler<SwankyRng, ChouOrlandiSender, Wire>;
-    type EV<Wire> = Evaluator<SwankyRng, ChouOrlandiReceiver, Wire>;
+    type GB<Wire> = Garbler<SwankyRng, ChouOrlandi<Sender>, Wire>;
+    type EV<Wire> = Evaluator<SwankyRng, ChouOrlandi<Receiver>, Wire>;
 
-    fn test_aes<C, Wire: WireLabel + Send>(circ: &C)
+    fn test_aes<C, Wire: WireLabel<F2> + Send>(circ: &C)
     where
         C: CircuitInputMapper<Dummy>
             + CircuitOutputMapper<Dummy>
@@ -78,9 +79,9 @@ mod tests {
         let (_, out) = swanky_channel::local::local_channel_pair(
             |channel| {
                 let rng = SwankyRng::new();
-                let mut gb = Garbler::<SwankyRng, ChouOrlandiSender, Wire>::new(channel, rng)?;
-                let mut xs = gb.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
-                let ys = gb.receive_many(&vec![2; 128], channel)?;
+                let mut gb = Garbler::<SwankyRng, ChouOrlandi<Sender>, Wire>::new(channel, rng)?;
+                let mut xs = gb.encode_many(&[F2::ZERO; 128], channel)?;
+                let ys = gb.receive_many(128, channel)?;
                 xs.extend(ys);
                 let outputs = circ.execute(
                     &mut gb,
@@ -95,9 +96,10 @@ mod tests {
             },
             |channel| {
                 let rng = SwankyRng::new();
-                let mut ev = Evaluator::<SwankyRng, ChouOrlandiReceiver, Wire>::new(channel, rng)?;
-                let mut xs = ev.receive_many(&vec![2; 128], channel)?;
-                let ys = ev.encode_many(&vec![0; 128], &vec![2; 128], channel)?;
+                let mut ev =
+                    Evaluator::<SwankyRng, ChouOrlandi<Receiver>, Wire>::new(channel, rng)?;
+                let mut xs = ev.receive_many(128, channel)?;
+                let ys = ev.encode_many(&[F2::ZERO; 128], channel)?;
                 xs.extend(ys);
                 let wirelabels = circ.execute(
                     &mut ev,
@@ -115,7 +117,7 @@ mod tests {
 
         let target = Dummy::eval(
             circ,
-            <C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(0, 2); 256]),
+            <C as CircuitInputMapper<Dummy>>::map(circ, vec![DummyVal::new(F2::ZERO); 256]),
         )
         .unwrap();
         let target = <C as CircuitOutputMapper<Dummy>>::flatten(target)
@@ -123,12 +125,6 @@ mod tests {
             .map(|x| x.val())
             .collect::<Vec<_>>();
         assert_eq!(out, target);
-    }
-
-    #[test]
-    fn test_aes_arithmetic() {
-        let aes = Aes128::new();
-        test_aes::<_, AllWire>(&aes);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use crate::BinaryBundle;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, Fancy, FancyBinaryConstant};
+use fancy_traits::{Circuit, Fancy, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -51,7 +51,7 @@ impl<'a> BinaryLeftShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryLeftShift<'a>
+impl<'a, F: FancyConstant<F2>> Circuit<F> for BinaryLeftShift<'a>
 where
     F::Item: 'a,
 {
@@ -84,7 +84,7 @@ impl<'a> BinaryLeftShiftExtend<'a> {
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryLeftShiftExtend<'a>
+impl<'a, F: FancyConstant<F2>> Circuit<F> for BinaryLeftShiftExtend<'a>
 where
     F::Item: 'a,
 {
@@ -119,7 +119,7 @@ impl<'a> BinaryRightShiftPad<'a> {
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryRightShiftPad<'a>
+impl<'a, F: FancyConstant<F2>> Circuit<F> for BinaryRightShiftPad<'a>
 where
     F::Item: 'a,
 {
@@ -156,7 +156,7 @@ impl<'a> BinaryRightShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryRightShift<'a>
+impl<'a, F: FancyConstant<F2>> Circuit<F> for BinaryRightShift<'a>
 where
     F::Item: 'a,
 {
@@ -186,7 +186,7 @@ impl<'a> BinaryArithmeticRightShift<'a> {
     }
 }
 
-impl<'a, F: FancyBinaryConstant> Circuit<F> for BinaryArithmeticRightShift<'a>
+impl<'a, F: FancyConstant<F2>> Circuit<F> for BinaryArithmeticRightShift<'a>
 where
     F::Item: 'a,
 {

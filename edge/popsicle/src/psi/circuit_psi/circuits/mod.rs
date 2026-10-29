@@ -4,9 +4,10 @@ use fancy_circuits::{
     BinaryBundle,
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
 };
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 
 // How many bytes of the hash to use for the equality tests. This affects
 // correctness, with a lower value increasing the likelihood of a false
@@ -73,7 +74,7 @@ pub fn fancy_cardinality<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: FancyBinary + FancyBinaryConstant,
+    F: FancyBinary + FancyConstant<F2>,
 {
     let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let one = BinaryConstant::new(1, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
@@ -96,7 +97,7 @@ pub fn fancy_payload_sum<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<BinaryBundle<F::Item>>
 where
-    F: FancyBinary + FancyBinaryConstant,
+    F: FancyBinary + FancyConstant<F2>,
 {
     let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
     let mut acc = zero.clone();

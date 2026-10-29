@@ -1,9 +1,7 @@
 //! SHA circuits.
 
 use crate::{binary::BinaryConstant, bristol::BristolFashionCircuit};
-use fancy_traits::{
-    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
-};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -34,7 +32,7 @@ impl Default for Sha256CompressionFunction {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> Circuit<F> for Sha256CompressionFunction {
     type Input = ([F::Item; 512], [F::Item; 256]);
     type Output = [F::Item; 256];
 
@@ -56,7 +54,7 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256CompressionFunct
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> CircuitInputMapper<F> for Sha256CompressionFunction {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 768);
         let (block, chain) = inputs.split_at(512);
@@ -75,13 +73,9 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Sha256Compr
     fn ninputs(&self) -> usize {
         768
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F> for Sha256CompressionFunction {
+impl<F: FancyBinary> CircuitOutputMapper<F> for Sha256CompressionFunction {
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.to_vec()
     }
@@ -121,7 +115,7 @@ impl Default for Sha256 {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
+impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for Sha256 {
     type Input = Vec<F::Item>;
     type Output = [F::Item; 256];
 
@@ -184,13 +178,14 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Sha256 {
 mod test {
     use crate::crypto::sha::{Sha256, Sha256CompressionFunction};
     use fancy_plaintext::{Dummy, DummyVal};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
-    #[cfg(test)]
-    fn string_to_bool_vec(str: &str) -> Vec<DummyVal> {
+    fn string_to_bool_vec(str: &str) -> Vec<DummyVal<F2>> {
         str.chars()
             .map(|c| match c {
-                '0' => DummyVal::new_bool(false),
-                '1' => DummyVal::new_bool(true),
+                '0' => DummyVal::new(F2::ZERO),
+                '1' => DummyVal::new(F2::ONE),
                 _ => panic!("Unexpected character in boolean string"),
             })
             .collect()
@@ -207,12 +202,12 @@ mod test {
             "0110101000001001111001100110011110111011011001111010111010000101001111000110111011110011011100101010010101001111111101010011101001010001000011100101001001111111100110110000010101101000100011000001111110000011110110011010101101011011111000001100110100011001",
         ).try_into().unwrap();
 
-        let block = [DummyVal::new_bool(false); 512];
+        let block = [DummyVal::new(F2::ZERO); 512];
         let output = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1101101001010110100110001011111000010111101110011011010001101001011000100011001101010111100110010111011110011111101111101100101010001100111001011101010010010001110000001101001001100010010000111011101011111110111110011110101000011000001101111010100111011000"
         );
@@ -224,17 +219,17 @@ mod test {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1111110010011001101000101101111110001000111101000010101001111010011110111011100111010001100000000011001111001101110001101010001000000010010101100111010101011111100111010101101110011010010100000100010010101001110011000011000101011010101111101000010010100111"
         );
 
-        let block = [DummyVal::new_bool(true); 512];
+        let block = [DummyVal::new(F2::ONE); 512];
         let output = Dummy::eval(&sha256, (block, iv)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1110111100001100011101001000110111110100110110100101000010101000110101101100010000111100000000010011111011011100001111001110011101101100100111011001111110101001101000010100010110001010110111100101011011101011100001101100000010100110010001001001001011010010"
         );
@@ -246,7 +241,7 @@ mod test {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1100111100001010111001001110101101100111110100111000111111111110101110010100000001101000100110000100101100100010101010111101111001001110100100101011110001010100100011010001010001011000010111100100100011011100101010001000100000101101011110110000100111001110"
         );
@@ -263,7 +258,7 @@ mod test {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1110001110110000110001000100001010011000111111000001110000010100100110101111101111110100110010001001100101101111101110010010010000100111101011100100000111100100011001001001101110010011010011001010010010010101100110010001101101111000010100101011100001010101"
         );
@@ -285,7 +280,7 @@ mod test {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1011101001111000000101101011111110001111000000011100111111101010010000010100000101000000110111100101110110101110001000100010001110110000000000110110000110100011100101100001011101111010100111001011010000010000111111110110000111110010000000000001010110101101"
         );
@@ -297,12 +292,12 @@ mod test {
         // Message: 448 bits of zeros (requires 2 blocks after padding).
 
         let sha256 = Sha256::new();
-        let input = vec![DummyVal::new_bool(false); 448];
+        let input = vec![DummyVal::new(F2::ZERO); 448];
         let output = Dummy::eval(&sha256, input).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1101010010000001011110101010010101001001011101100010100011100111110001110111111001101011011000000110000100000111000001000010101110111011101000110001001100001000100010001100010111110100011110100011011101011110011000010111100110111110011110001001111110111011"
         );
@@ -324,7 +319,7 @@ mod test {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "0100010100110010111011110111001100010001000010011001001010000110000001011001101010111101100001011101010011000000011001110101011111111001011011010010010001001000101100100101100111111001010100011001001000100010101100101010110001101001101101011110101111110011"
         );
@@ -335,12 +330,12 @@ mod test {
         let sha256 = Sha256::new();
 
         let message = "The quick brown fox jumps over the lazy dog";
-        let input: Vec<DummyVal> = message
+        let input: Vec<_> = message
             .bytes()
             .flat_map(|b| {
                 (0..8)
                     .rev()
-                    .map(move |i| DummyVal::new_bool((b >> i) & 1 == 1))
+                    .map(move |i| DummyVal::new(F2::from((b >> i) & 1 == 1)))
             })
             .collect();
 
@@ -348,7 +343,7 @@ mod test {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1101011110101000111110111011001100000111110101111000000010010100011010011100101010011010101111001011000000001000001011100100111110001101010101100101000111100100011011010011110011011011011101100010110100000010110100001011111100110111110010011110010110010010"
         );

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind as SwankyErrorKind, swanky_error};
+use swanky_field_binary::F2;
 use swanky_garbled_nn::NeuralNet;
 
 /// Garbled Neural Net Experiment Launcher
@@ -104,7 +105,7 @@ pub fn main() -> swanky_error::Result<()> {
         Commands::Dummy => {
             Channel::with(std::io::empty(), |channel| {
                 let mut dummy = Dummy::new();
-                nn.boolean_accuracy_test::<DummyVal, Dummy>(
+                nn.boolean_accuracy_test::<DummyVal<F2>, Dummy>(
                     &mut dummy, &tests, &labels, &bitwidth, cli.secret, channel,
                 )?;
                 Ok(())

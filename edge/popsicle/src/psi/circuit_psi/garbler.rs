@@ -3,11 +3,12 @@ use crate::psi::circuit_psi::*;
 use fancy_garbling::WireMod2;
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_block::Block;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
-use swanky_ot_alsz_kos::alsz::Sender as OtSender;
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits_new::Sender;
 use swanky_twopac::semihonest::Garbler;
+use vectoreyes::U8x16;
 
 use self::sender::OpprfSender;
 
@@ -17,18 +18,21 @@ pub type OpprfPsiGarbler<RNG> = PsiGarbler<RNG, OpprfSender>;
 /// A struct defining the Garbling party in Circuit Psi
 pub struct PsiGarbler<RNG, B> {
     /// The actual garbler being called during the garbled circuit
-    pub gb: Garbler<RNG, OtSender, WireMod2>,
+    pub gb: Garbler<RNG, IKNP<Sender>, WireMod2>,
     /// The garbler's dedicated rng
     pub rng: RNG,
     /// A witness for the Base PSI protocol
     _base_psi: PhantomData<B>,
 }
 
-impl<RNG: CryptoRng + SeedableRng, B> PsiGarbler<RNG, B> {
+impl<RNG, B> PsiGarbler<RNG, B>
+where
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+{
     /// Creates a PsiGarbler from a dedicated channel and rng
     pub fn new(channel: &mut Channel, rng: &mut RNG) -> swanky_error::Result<Self> {
         Ok(PsiGarbler {
-            gb: Garbler::<RNG, OtSender, WireMod2>::new(channel, rng.fork())
+            gb: Garbler::<RNG, IKNP<Sender>, WireMod2>::new(channel, rng.fork())
                 .wrap_err(ErrorKind::InitializationError, "Failed to create garbler.")?,
             rng: rng.fork(),
             _base_psi: PhantomData,
@@ -40,7 +44,7 @@ impl<RNG, B> SemiHonest for PsiGarbler<RNG, B> {}
 
 impl<RNG, B> CircuitPsi for PsiGarbler<RNG, B>
 where
-    RNG: CryptoRng + SeedableRng<Seed = Block>,
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     B: BasePsi,
 {
     /// Computes the Circuit PSI on the garbler's inputs.
@@ -77,7 +81,7 @@ where
             B::base_psi(&mut self.gb, primary_keys, payloads, channel, &mut self.rng)?;
         // (2)
         let primary_keys =
-            bundle_primary_keys::<Garbler<RNG, OtSender, WireMod2>>(&circuit_inputs)?;
+            bundle_primary_keys::<Garbler<RNG, IKNP<Sender>, WireMod2>>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) =
             bundle_payloads(&mut self.gb, &circuit_inputs, channel)?;
 

@@ -1,5 +1,6 @@
 use fancy_traits::FancyOutput;
 use swanky_channel::Channel;
+use swanky_field_binary::F2;
 
 /// A collection of wires, useful for the garbled gadgets defined by `BundleGadgets`.
 #[derive(Clone)]
@@ -38,17 +39,17 @@ impl<W> Bundle<W> {
     }
 }
 
-impl<F: FancyOutput> BundleGadgets for F {}
+impl<F: FancyOutput<F2>> BundleGadgets for F {}
 
 /// Extension trait for Fancy which provides Bundle constructions which are not
 /// necessarily CRT nor binary-based.
-pub trait BundleGadgets: FancyOutput {
+pub trait BundleGadgets: FancyOutput<F2> {
     /// Output the wires that make up a bundle.
     fn output_bundle(
         &mut self,
         x: &Bundle<Self::Item>,
         channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<u16>>> {
+    ) -> swanky_error::Result<Option<Vec<F2>>> {
         let ws = x.wires();
         let mut outputs = Vec::with_capacity(ws.len());
         for w in ws.iter() {
@@ -62,7 +63,7 @@ pub trait BundleGadgets: FancyOutput {
         &mut self,
         xs: &[Bundle<Self::Item>],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Option<Vec<Vec<u16>>>> {
+    ) -> swanky_error::Result<Option<Vec<Vec<F2>>>> {
         let mut zs = Vec::with_capacity(xs.len());
         for x in xs.iter() {
             let z = self.output_bundle(x, channel)?;

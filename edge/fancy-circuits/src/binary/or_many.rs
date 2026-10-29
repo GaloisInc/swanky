@@ -40,6 +40,9 @@ where
 
 #[cfg(test)]
 pub mod test {
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+
     use super::OrMany;
 
     #[test]
@@ -51,9 +54,11 @@ pub mod test {
         for _ in 0..16 {
             let n = 2 + rng.random_range(..200usize);
             let inputs = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
+                .map(|_| DummyVal::<F2>::rand(&mut rng))
                 .collect::<Vec<_>>();
-            let expected = inputs.iter().fold(0, |acc, &x| x.val() | acc);
+            let expected = inputs.iter().fold(F2::ZERO, |acc, &x| {
+                F2::from(bool::from(x.val()) | bool::from(acc))
+            });
             let circuit = OrMany::new();
             let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);

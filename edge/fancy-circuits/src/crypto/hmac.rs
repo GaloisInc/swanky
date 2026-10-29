@@ -5,7 +5,7 @@
 
 use crate::{binary::PairwiseXor, crypto::sha::Sha256};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -48,7 +48,7 @@ impl<'a> HmacSha256<'a> {
     const OPAD_BYTE: &'static str = "01011100";
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for HmacSha256<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for HmacSha256<'a>
 where
     F::Item: 'a,
 {
@@ -109,11 +109,11 @@ mod tests {
     use super::*;
     use fancy_plaintext::{Dummy, DummyVal};
 
-    fn string_to_bool_vec(str: &str) -> Vec<DummyVal> {
+    fn string_to_bool_vec(str: &str) -> Vec<DummyVal<F2>> {
         str.chars()
             .map(|c| match c {
-                '0' => DummyVal::new_bool(false),
-                '1' => DummyVal::new_bool(true),
+                '0' => DummyVal::new(F2::ZERO),
+                '1' => DummyVal::new(F2::ONE),
                 _ => panic!("Unexpected character in boolean string"),
             })
             .collect()
@@ -126,7 +126,7 @@ mod tests {
         // Message: empty
 
         let hmac = HmacSha256::new();
-        let key = [DummyVal::new_bool(false); 512];
+        let key = [DummyVal::new(F2::ZERO); 512];
         let message = [];
 
         let output = Dummy::eval(&hmac, (&key, &message)).unwrap();
@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1011011000010011011001111001101000001000000101001101100111101100011101110010111110010101110101110111100011000011010111111100010111111111000101101001011111000100100100110111000101010110010100111100011011000111000100100001010001000010100100101100010110101101"
         );
@@ -149,7 +149,7 @@ mod tests {
         // Message: "test" = 0x74657374
 
         let hmac = HmacSha256::new();
-        let key = [DummyVal::new_bool(false); 512];
+        let key = [DummyVal::new(F2::ZERO); 512];
 
         // "test" in binary
         // 't' = 0x74 = 01110100
@@ -165,7 +165,7 @@ mod tests {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "0100001110110000110011101111100110010010011001011111100111100011010011000001000011101010100111010011010100000001100100100110110100100111101100111001111101010111110001101101011001110100010101100001110110001011101000100011011011100111101010000001100111111011"
         );
@@ -185,16 +185,16 @@ mod tests {
         // 'y' = 0x79 = 01111001
         let mut key = string_to_bool_vec("011010110110010101111001");
         // Pad to 512 bits
-        key.resize(512, DummyVal::new_bool(false));
-        let key: [DummyVal; 512] = key.try_into().expect("Key should contain 512 elements");
+        key.resize(512, DummyVal::new(F2::ZERO));
+        let key: [_; 512] = key.try_into().expect("Key should contain 512 elements");
 
         let message = "The quick brown fox jumps over the lazy dog";
-        let message: Vec<DummyVal> = message
+        let message: Vec<_> = message
             .bytes()
             .flat_map(|b| {
                 (0..8)
                     .rev()
-                    .map(move |i| DummyVal::new_bool((b >> i) & 1 == 1))
+                    .map(move |i| DummyVal::new(F2::from((b >> i) & 1 == 1)))
             })
             .collect();
 
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "1111011110111100100000111111010000110000010100111000010000100100101100010011001010011000111001101010101001101111101100010100001111101111010011010101100110100001010010010100011000010111010110011001011101000111100111011011110000101101000110100011110011011000"
         );

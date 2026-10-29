@@ -52,16 +52,12 @@ pub mod test {
         let mut rng = rand::rng();
         for _ in 0..100 {
             let n = 1 + rng.random_range(..200usize);
-            let x = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
-                .collect::<Vec<_>>();
-            let y = (0..n)
-                .map(|_| DummyVal::rand_bool(&mut rng))
-                .collect::<Vec<_>>();
+            let x = (0..n).map(|_| DummyVal::rand(&mut rng)).collect::<Vec<_>>();
+            let y = (0..n).map(|_| DummyVal::rand(&mut rng)).collect::<Vec<_>>();
             let expected = x
                 .iter()
                 .zip(y.iter())
-                .map(|(x, y)| DummyVal::new(x.val() | y.val(), 2))
+                .map(|(x, y)| DummyVal::new((bool::from(x.val()) | bool::from(y.val())).into()))
                 .collect::<Vec<_>>();
             let output = Dummy::eval(&PairwiseOr::new(), (&x, &y)).unwrap();
             assert_eq!(output, expected);

@@ -3,9 +3,10 @@ use crate::{
     binary::{BinaryMultiplex, BinaryTwosComplement},
 };
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
+use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] `x`, output the absolute value of `x`.
 #[derive(Default)]
@@ -18,7 +19,7 @@ impl<'a> BinaryAbs<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for BinaryAbs<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryAbs<'a>
 where
     F::Item: 'a,
 {

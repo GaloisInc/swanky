@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -48,11 +48,11 @@ impl<'a> MuxConstants<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyBinaryConstant> Circuit<F> for MuxConstants<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for MuxConstants<'a>
 where
     F::Item: 'a,
 {
-    type Input = (&'a F::Item, bool, bool);
+    type Input = (&'a F::Item, F2, F2);
     type Output = F::Item;
 
     fn execute(
@@ -62,7 +62,7 @@ where
         _: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, c1, c2) = inputs;
-        Ok(match (c1, c2) {
+        Ok(match (c1.into(), c2.into()) {
             (false, true) => b.clone(),
             (true, false) => backend.negate(b),
             (false, false) => backend.constant(F2::ZERO),
@@ -76,17 +76,19 @@ mod test {
     use super::Mux;
     use crate::binary::mux::MuxConstants;
     use fancy_plaintext::{Dummy, DummyVal};
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
 
     #[test]
     fn mux() {
-        for b in 0..=1 {
-            for x in 0..=1 {
-                for y in 0..=1 {
-                    let b_val = DummyVal::new(b, 2);
-                    let x_val = DummyVal::new(x, 2);
-                    let y_val = DummyVal::new(y, 2);
+        for b in [F2::ZERO, F2::ONE] {
+            for x in [F2::ZERO, F2::ONE] {
+                for y in [F2::ZERO, F2::ONE] {
+                    let b_val = DummyVal::new(b);
+                    let x_val = DummyVal::new(x);
+                    let y_val = DummyVal::new(y);
                     let output = Dummy::eval(&Mux::new(), (&b_val, &x_val, &y_val)).unwrap();
-                    assert_eq!(output.val(), if b == 0 { x } else { y });
+                    assert_eq!(output.val(), if b == F2::ZERO { x } else { y });
                 }
             }
         }
@@ -94,13 +96,12 @@ mod test {
 
     #[test]
     fn mux_constants() {
-        for b in 0..=1 {
-            for x in 0..=1 {
-                for y in 0..=1 {
-                    let b_val = DummyVal::new(b, 2);
-                    let output =
-                        Dummy::eval(&MuxConstants::new(), (&b_val, x != 0, y != 0)).unwrap();
-                    assert_eq!(output.val(), if b == 0 { x } else { y });
+        for b in [F2::ZERO, F2::ONE] {
+            for x in [F2::ZERO, F2::ONE] {
+                for y in [F2::ZERO, F2::ONE] {
+                    let b_val = DummyVal::new(b);
+                    let output = Dummy::eval(&MuxConstants::new(), (&b_val, x, y)).unwrap();
+                    assert_eq!(output.val(), if b == F2::ZERO { x } else { y });
                 }
             }
         }

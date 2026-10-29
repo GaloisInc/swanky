@@ -1,4 +1,4 @@
-use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary, FancyBinaryConstant};
+use fancy_traits::{Circuit, CircuitInputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -19,7 +19,7 @@ pub(crate) struct BristolFashionCircuit {
     output_refs: Vec<u32>,
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BristolFashionCircuit {
+impl<F: FancyBinary> Circuit<F> for BristolFashionCircuit {
     type Input = Vec<F::Item>;
     type Output = Vec<F::Item>;
 
@@ -56,7 +56,7 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for BristolFashionCircuit 
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BristolFashionCircuit {
+impl<F: FancyBinary> CircuitInputMapper<F> for BristolFashionCircuit {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), self.ninputs);
         inputs
@@ -64,10 +64,6 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for BristolFash
 
     fn ninputs(&self) -> usize {
         self.ninputs
-    }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
     }
 }
 

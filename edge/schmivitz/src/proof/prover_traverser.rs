@@ -1,13 +1,12 @@
-use fancy_traits::{
-    Circuit, Fancy, FancyBinary, FancyBinaryConstant, FancyEncode, FancyZeroKnowledge, HasModulus,
-};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F2, F128b};
+use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
 use swanky_sieve_ir_parser::WireId;
 
+use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
 
@@ -16,14 +15,14 @@ use crate::vole::RandomVoleP;
 ///
 /// The primary steps in circuit traversal include assigning VOLEs to each wire and
 /// computing the two aggregated values used in the proof.
-pub struct ProverTraverser<Vole> {
+pub struct ProverTraverser<Vole, P: Params> {
     /// Current position for a fresh extended witness value.
     wire_values_pos: WireId,
 
     /// Map containing the wire values for the extended witness (private inputs and multiplication gates in the circuit).
     extended_witness: Vec<F2>,
     /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
-    chi_challenge: ChiGenerator,
+    chi_challenge: ChiGenerator<P>,
 
     /// Random VOLE values. There should be one for each extended witness value.
     voles: Vole,
@@ -33,18 +32,18 @@ pub struct ProverTraverser<Vole> {
     /// Partial aggregation of the value $`\tilde a`$ from the protocol.
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,1}`$$.
-    aggregate_degree_0: F128b,
+    aggregate_degree_0: FLambda<P>,
     /// Partial aggregation of the value $`\tilde b`$ from the protocol.
     ///
     /// After traversal, this should have the value $$`\sum_{i \in [t]} \chi_i \cdot A_{i,0}`$$.
-    aggregate_degree_1: F128b,
+    aggregate_degree_1: FLambda<P>,
 
     /// Partial aggregation of the assert zero check.
     /// TODO: Add this to the specification and reference it.
-    aggregate_assert_zero: F128b,
+    aggregate_assert_zero: FLambda<P>,
 }
 
-impl<Vole: RandomVoleP> ProverTraverser<Vole> {
+impl<Vole: RandomVoleP<Params = P>, P: Params> ProverTraverser<Vole, P> {
     /// Create a new circuit traverser.
     ///
     /// Requirements on inputs:
@@ -56,7 +55,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     ///   corresponding to every gate in the extended witness.
     pub(crate) fn new(
         extended_witness: Vec<F2>,
-        chi_challenge: ChiGenerator,
+        chi_challenge: ChiGenerator<P>,
         voles: Vole,
     ) -> Result<Self> {
         // TODO: debug_assert!(extended_witness.len() == voles.extended_witness_length())
@@ -68,14 +67,14 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
             voles,
             vole_assignment_count: 0,
 
-            aggregate_degree_0: F128b::ZERO,
-            aggregate_degree_1: F128b::ZERO,
+            aggregate_degree_0: FLambda::<P>::ZERO,
+            aggregate_degree_1: FLambda::<P>::ZERO,
 
-            aggregate_assert_zero: F128b::ZERO,
+            aggregate_assert_zero: FLambda::<P>::ZERO,
         })
     }
 
-    fn next_vole(&mut self) -> Result<F128b> {
+    fn next_vole(&mut self) -> Result<FLambda<P>> {
         let next_index = self.vole_assignment_count;
         self.vole_assignment_count += 1;
 
@@ -99,7 +98,7 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
     /// The components that were passed to [`Self::new()`] are returned unchanged.
     ///
     /// This will fail if there were unused challenges or VOLEs.
-    pub(crate) fn into_parts(self) -> Result<(F128b, F128b, F128b, Vole)> {
+    pub(crate) fn into_parts(self) -> Result<(FLambda<P>, FLambda<P>, FLambda<P>, Vole)> {
         if self.vole_assignment_count != self.voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
@@ -147,18 +146,12 @@ impl<Vole: RandomVoleP> ProverTraverser<Vole> {
 
 /// An [`F2`] element alongside its associated VOLE tag.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Wire(F2, F128b);
-
-impl HasModulus for Wire {
-    fn modulus(&self) -> u16 {
-        2
-    }
-}
+pub struct Wire<P: Params>(F2, FLambda<P>);
 
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
-impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
-    type Wire = (F2, F128b);
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FieldBackend<F2> for ProverTraverser<VOLE, P> {
+    type Wire = (F2, FLambda<P>);
 
     fn input_public(&mut self) -> Result<Self::Wire> {
         unimplemented!("VOLE-in-the-head does not support `input_public`")
@@ -194,7 +187,7 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
         let degree_0_coeff = left.1 * right.1;
-        let degree_1_coeff = right.0 * left.1 + left.0 * right.1 - vole;
+        let degree_1_coeff = P::f2_scale(right.0, left.1) + P::f2_scale(left.0, right.1) - vole;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
@@ -213,27 +206,27 @@ impl<VOLE: RandomVoleP> FieldBackend<F2> for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> Fancy for ProverTraverser<VOLE> {
-    type Item = Wire;
+impl<VOLE: RandomVoleP<Params = P>, P: Params> Fancy for ProverTraverser<VOLE, P> {
+    type Item = Wire<P>;
 }
 
-impl<VOLE: RandomVoleP> FancyBinaryConstant for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyConstant<F2> for ProverTraverser<VOLE, P> {
     fn constant(&mut self, constant: F2) -> Self::Item {
-        Wire(constant, F128b::ZERO)
+        Wire(constant, FLambda::<P>::ZERO)
     }
 }
 
-impl<VOLE: RandomVoleP> FancyEncode for ProverTraverser<VOLE> {
-    fn encode_many(&mut self, _: &[u16], _: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyEncode<F2> for ProverTraverser<VOLE, P> {
+    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         bail!(
             ErrorKind::OtherError,
             "Invalid input: VOLE-in-the-head does not support encode"
         )
     }
 
-    fn receive_many(&mut self, moduli: &[u16], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(moduli.len());
-        for _ in 0..moduli.len() {
+    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
+        let mut output = Vec::with_capacity(n);
+        for _ in 0..n {
             let f = self.next_witness_value()?;
             let vole = self.next_vole()?;
 
@@ -245,7 +238,7 @@ impl<VOLE: RandomVoleP> FancyEncode for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyBinary for ProverTraverser<VOLE, P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         let res = x.0 + y.0;
 
@@ -266,7 +259,7 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
         let degree_0_coeff = x.1 * y.1;
-        let degree_1_coeff = y.0 * x.1 + x.0 * y.1 - vole;
+        let degree_1_coeff = P::f2_scale(y.0, x.1) + P::f2_scale(x.0, y.1) - vole;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
@@ -279,7 +272,7 @@ impl<VOLE: RandomVoleP> FancyBinary for ProverTraverser<VOLE> {
     }
 }
 
-impl<VOLE: RandomVoleP> FancyZeroKnowledge for ProverTraverser<VOLE> {
+impl<VOLE: RandomVoleP<Params = P>, P: Params> FancyZeroKnowledge<F2> for ProverTraverser<VOLE, P> {
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
         self.aggregate_assert_zero += challenge * value.1;

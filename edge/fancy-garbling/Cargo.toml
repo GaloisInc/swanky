@@ -33,16 +33,13 @@ fancy-traits.workspace = true
 swanky-channel.workspace = true
 swanky-cr-hash.workspace = true
 swanky-error.workspace = true
+swanky-field.workspace = true
 swanky-field-binary.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
 swanky-rng.workspace = true
 criterion.workspace = true
-
-[[bench]]
-name = "wire_operations"
-harness = false
 
 [[bench]]
 name = "garbling"

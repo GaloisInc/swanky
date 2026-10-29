@@ -1,9 +1,7 @@
 //! AES circuits.
 
 use crate::bristol::BristolFashionCircuit;
-use fancy_traits::{
-    Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyBinaryConstant,
-};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -34,7 +32,7 @@ impl Default for Aes128 {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Aes128 {
+impl<F: FancyBinary> Circuit<F> for Aes128 {
     type Input = ([F::Item; 128], [F::Item; 128]);
     type Output = [F::Item; 128];
 
@@ -56,7 +54,7 @@ impl<F: FancyBinary + FancyBinaryConstant> Circuit<F> for Aes128 {
     }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Aes128 {
+impl<F: FancyBinary> CircuitInputMapper<F> for Aes128 {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
         assert_eq!(inputs.len(), 256);
         let (key, block) = inputs.split_at(128);
@@ -69,13 +67,9 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitInputMapper<F> for Aes128 {
     fn ninputs(&self) -> usize {
         256
     }
-
-    fn modulus(&self, _: usize) -> u16 {
-        2
-    }
 }
 
-impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F> for Aes128 {
+impl<F: FancyBinary> CircuitOutputMapper<F> for Aes128 {
     fn flatten(output: Self::Output) -> Vec<F::Item> {
         output.to_vec()
     }
@@ -83,6 +77,9 @@ impl<F: FancyBinary + FancyBinaryConstant> CircuitOutputMapper<F> for Aes128 {
 
 #[cfg(test)]
 mod test {
+    use swanky_field::FiniteRing;
+    use swanky_field_binary::F2;
+
     use super::*;
 
     #[test]
@@ -91,50 +88,50 @@ mod test {
 
         let aes = Aes128::new();
 
-        let key = [DummyVal::new(0, 2); 128];
-        let block = [DummyVal::new(0, 2); 128];
+        let key = [DummyVal::new(F2::ZERO); 128];
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "01100110111010010100101111010100111011111000101000101100001110111000100001001100111110100101100111001010001101000010101100101110"
         );
 
-        let key = [DummyVal::new(1, 2); 128];
-        let block = [DummyVal::new(0, 2); 128];
+        let key = [DummyVal::new(F2::ONE); 128];
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "10100001111101100010010110001100100001110111110101011111110011011000100101100100010010000100010100111000101111111100100100101100"
         );
 
-        let mut key = [DummyVal::new(0, 2); 128];
+        let mut key = [DummyVal::new(F2::ZERO); 128];
         for key_part in key.iter_mut().take(8) {
-            *key_part = DummyVal::new(1, 2);
+            *key_part = DummyVal::new(F2::ONE);
         }
-        let block = [DummyVal::new(0, 2); 128];
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "10110001110101110101100000100101011010110010100011111101100001010000101011010100100101000100001000001000110011110001000101010101"
         );
 
-        let mut key = [DummyVal::new(0, 2); 128];
-        key[7] = DummyVal::new(1, 2);
-        let block = [DummyVal::new(0, 2); 128];
+        let mut key = [DummyVal::new(F2::ZERO); 128];
+        key[7] = DummyVal::new(F2::ONE);
+        let block = [DummyVal::new(F2::ZERO); 128];
         let output = Dummy::eval(&aes, (key, block)).unwrap();
         assert_eq!(
             output
                 .iter()
-                .map(|i| i.val().to_string())
+                .map(|i| u8::from(i.val()).to_string())
                 .collect::<String>(),
             "11011100000011101101100001011101111110010110000100011010101110110111001001001001110011011101000101101000110001010100011001111110"
         );
@@ -149,7 +146,7 @@ mod test {
 
         let (encoder, gc, _) =
             GarbledCircuit::garble::<WireMod2, _, _>(&aes, SwankyRng::new()).unwrap();
-        let inputs = encoder.encode_inputs(&vec![0u16; 256]);
+        let inputs = encoder.encode_inputs(&vec![F2::ZERO; 256]);
         let key = inputs[..128].try_into().unwrap();
         let block = inputs[128..].try_into().unwrap();
         gc.eval_to_wirelabels(&aes, (key, block)).unwrap();

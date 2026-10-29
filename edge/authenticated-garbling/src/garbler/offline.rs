@@ -7,7 +7,7 @@ use crate::wire::OfflineWire;
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::CircuitOutputMapper;
-use fancy_traits::FancyBinaryConstant;
+use fancy_traits::FancyConstant;
 use fancy_traits::{CircuitInputMapper, Fancy, FancyBinary};
 use rand::CryptoRng;
 use swanky_authenticated_bits::and_triples::AndTripleGenerator;
@@ -89,13 +89,13 @@ where
         // channel.write(&one.to_repr())?;
 
         let inputs = (0..ninputs)
-            .map(|_| OfflineWire::new(WireMod2::rand(rng, 2), auth_shares.next()))
+            .map(|_| OfflineWire::new(WireMod2::rand(rng), auth_shares.next()))
             .collect::<Vec<_>>();
 
         Ok(Self {
             circuit,
-            delta: WireMod2::from_repr(delta, 2),
-            zero: WireMod2::from_repr(zero, 2),
+            delta: WireMod2::from_repr(delta),
+            zero: WireMod2::from_repr(zero),
             and_gate_index: 0,
             auth_shares,
             and_auth_shares: VecWrapper::new(and_auth_shares),
@@ -161,7 +161,7 @@ impl<'a, C> Fancy for GarblerOffline<'a, C> {
     type Item = OfflineWire;
 }
 
-impl<'a, C> FancyBinaryConstant for GarblerOffline<'a, C> {
+impl<'a, C> FancyConstant<F2> for GarblerOffline<'a, C> {
     fn constant(&mut self, constant: F2) -> Self::Item {
         let share = AuthShareGenerator::constant_with_delta(F2::ZERO, self.delta.to_repr());
         let wirelabel = if constant == F2::ONE {
@@ -234,7 +234,7 @@ impl<'a, C> FancyBinary for GarblerOffline<'a, C> {
         self.gates.push((gate0, gate1));
         self.gate_bits.push(bit_c);
 
-        Ok(OfflineWire::new(WireMod2::from_repr(lc0, 2), lc_share))
+        Ok(OfflineWire::new(WireMod2::from_repr(lc0), lc_share))
     }
 
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
@@ -246,7 +246,7 @@ impl<'a, C> FancyBinary for GarblerOffline<'a, C> {
 
     fn negate(&mut self, x: &Self::Item) -> Self::Item {
         OfflineWire::new(
-            WireMod2::from_repr(x.wirelabel().to_repr() ^ self.zero.to_repr(), 2),
+            WireMod2::from_repr(x.wirelabel().to_repr() ^ self.zero.to_repr()),
             x.auth_share(),
         )
     }

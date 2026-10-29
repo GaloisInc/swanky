@@ -9,9 +9,9 @@
       },
       "branch": "nixos-26.05",
       "submodules": false,
-      "revision": "78e9c786dc08cd4f3420c2395cd977206a9b1da2",
-      "url": "https://github.com/NixOS/nixpkgs/archive/78e9c786dc08cd4f3420c2395cd977206a9b1da2.tar.gz",
-      "hash": "sha256-VfjaoJ1Uyb7JZTrBgE5Jf2nhjtQPmD9KOd19HJwmZwM="
+      "revision": "718f670e845328e9c2cecdd832835712b2cbd065",
+      "url": "https://github.com/NixOS/nixpkgs/archive/718f670e845328e9c2cecdd832835712b2cbd065.tar.gz",
+      "hash": "sha256-Ee5BWo8sh3pGt70QUdRajnaginqFmWvrtdBc4gJzhks="
     },
     "rust-overlay": {
       "type": "Git",
@@ -22,9 +22,9 @@
       },
       "branch": "master",
       "submodules": false,
-      "revision": "dcee1adabb61484343af863501d2e3d91ef51f72",
-      "url": "https://github.com/oxalica/rust-overlay/archive/dcee1adabb61484343af863501d2e3d91ef51f72.tar.gz",
-      "hash": "sha256-n+rcrZkqos6/HY2iSJsVsJw3Q4mB9XEquYpus97iOi4="
+      "revision": "c7e9d512653a35ef4d5879c3df4d44d7b78d0e6d",
+      "url": "https://github.com/oxalica/rust-overlay/archive/c7e9d512653a35ef4d5879c3df4d44d7b78d0e6d.tar.gz",
+      "hash": "sha256-ObKS44vw4IIVpQ69YJzUGjZ0IwnpWoUlwjJSY7gefdo="
     }
   },
   "version": 7
