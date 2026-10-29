@@ -1,6 +1,6 @@
 use fancy_garbling::{Garbler as Gb, WireLabel, WireMod2};
 use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
-use rand::{CryptoRng, RngExt, SeedableRng};
+use rand::{CryptoRng, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
@@ -30,18 +30,15 @@ impl<OT, RNG, Wire> std::ops::DerefMut for Garbler<RNG, OT, Wire> {
     }
 }
 
-impl<
-    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
-    OT: ObliviousTransfer<Sender> + SemiHonest,
-    Wire: WireLabel<F2>,
-> Garbler<RNG, OT, Wire>
+impl<RNG: CryptoRng + SeedableRng, OT: ObliviousTransfer<Sender> + SemiHonest, Wire: WireLabel<F2>>
+    Garbler<RNG, OT, Wire>
 {
     /// Make a new `Garbler`.
     pub fn new(channel: &mut Channel, mut rng: RNG) -> swanky_error::Result<Self> {
         let ot = OT::init(channel, &mut rng)
             .wrap_err(ErrorKind::InitializationError, "Failed to initialize OT.")?;
 
-        let garbler = Gb::new(RNG::from_seed(rng.random()));
+        let garbler = Gb::new(rng.fork());
         Ok(Garbler { garbler, ot, rng })
     }
 }

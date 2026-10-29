@@ -56,7 +56,8 @@ mod tests {
                 use fancy_traits::FancyOutput;
 
                 let mut gb_psi =
-                    OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::new(channel, &mut SwankyRng::from_seed(seed_sx.into()))
+                        .unwrap();
 
                 let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
                 let res = fancy_cardinality(
@@ -72,7 +73,8 @@ mod tests {
                 use fancy_traits::FancyOutput;
 
                 let mut ev_psi =
-                    OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(seed_rx)).unwrap();
+                    OpprfPsiEvaluator::new(channel, &mut SwankyRng::from_seed(seed_rx.into()))
+                        .unwrap();
                 let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
                 let res = fancy_cardinality(
                     &mut ev_psi.ev,
@@ -105,7 +107,8 @@ mod tests {
                 use fancy_traits::FancyOutput;
 
                 let mut gb_psi =
-                    OpprfPsiGarbler::<SwankyRng>::new(channel, Block::from(seed_sx)).unwrap();
+                    OpprfPsiGarbler::new(channel, &mut SwankyRng::from_seed(seed_sx.into()))
+                        .unwrap();
 
                 let intersection_results = gb_psi
                     .intersect_with_payloads(primary_keys_a, Some(payload_a), channel)
@@ -125,7 +128,8 @@ mod tests {
                 use fancy_traits::FancyOutput;
 
                 let mut ev_psi =
-                    OpprfPsiEvaluator::<SwankyRng>::new(channel, Block::from(seed_rx)).unwrap();
+                    OpprfPsiEvaluator::new(channel, &mut SwankyRng::from_seed(seed_rx.into()))
+                        .unwrap();
                 let intersection_results = ev_psi
                     .intersect_with_payloads(primary_keys_b, Some(payload_b), channel)
                     .unwrap();
