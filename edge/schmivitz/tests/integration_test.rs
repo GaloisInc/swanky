@@ -193,7 +193,7 @@ mod test {
         for TestAssertZero
     {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -201,7 +201,7 @@ mod test {
             _: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            let x = backend.receive(channel)?;
+            let x = backend.witness(channel)?;
             backend.assert_zero(&x, channel)?;
             let y = backend.xor(&x, &x);
             backend.assert_zero(&y, channel)?;
@@ -209,7 +209,7 @@ mod test {
             let y = backend.xor(&x, &one);
             let z = backend.xor(&y, &one);
             backend.assert_zero(&z, channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -345,7 +345,7 @@ mod test {
 
     impl<'a, F: FancyBinary + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestBinaryAddition<'a> {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -355,12 +355,12 @@ mod test {
         ) -> Result<Self::Output> {
             let x = BinaryBundle::new(
                 (0..8)
-                    .map(|_| backend.receive(channel))
+                    .map(|_| backend.witness(channel))
                     .collect::<Result<Vec<_>>>()?,
             );
             let y = BinaryBundle::new(
                 (0..8)
-                    .map(|_| backend.receive(channel))
+                    .map(|_| backend.witness(channel))
                     .collect::<Result<Vec<_>>>()?,
             );
             let (z, carry) = self.0.execute(backend, (&x, &y), channel)?;
@@ -375,7 +375,7 @@ mod test {
                 }
             }
             backend.assert_zero(&carry, channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -417,7 +417,7 @@ mod test {
 
     impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestAes {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -426,12 +426,12 @@ mod test {
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             let key = (0..128)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
             let block = (0..128)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
@@ -447,7 +447,7 @@ mod test {
                     _ => panic!("Unexpected character in boolean string"),
                 }
             }
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -484,7 +484,7 @@ mod test {
         for TestSha256CompressionFunction
     {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -493,17 +493,17 @@ mod test {
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             let block = (0..512)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
             let chain = (0..256)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
             let _ = self.0.execute(backend, (block, chain), channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -525,7 +525,7 @@ mod test {
 
     impl<F: FancyBinary + FancyConstant<F2> + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestSha256 {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -534,10 +534,10 @@ mod test {
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             let input = (0..512)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?;
             let _ = self.0.execute(backend, input, channel)?;
-            Ok(vec![])
+            Ok(())
         }
     }
 
@@ -561,7 +561,7 @@ mod test {
         for TestHmac<'a>
     {
         type Input = ();
-        type Output = Vec<F::Item>; // TODO: should be `()`
+        type Output = ();
 
         fn execute(
             &self,
@@ -570,12 +570,12 @@ mod test {
             channel: &mut Channel,
         ) -> Result<Self::Output> {
             let key = (0..512)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?
                 .try_into()
                 .unwrap();
             let input = (0..32)
-                .map(|_| backend.receive(channel))
+                .map(|_| backend.witness(channel))
                 .collect::<Result<Vec<_>>>()?;
             let outputs = self.0.execute(backend, (&key, &input), channel)?;
             let expected = "0100001110110000110011101111100110010010011001011111100111100011010011000001000011101010100111010011010100000001100100100110110100100111101100111001111101010111110001101101011001110100010101100001110110001011101000100011011011100111101010000001100111111011";
@@ -589,7 +589,7 @@ mod test {
                     _ => panic!("Unexpected character in boolean string"),
                 };
             }
-            Ok(vec![])
+            Ok(())
         }
     }
 

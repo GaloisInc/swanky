@@ -7,7 +7,7 @@ pub struct ExampleCircuit<const N: usize>;
 
 impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for ExampleCircuit<N> {
     type Input = ();
-    type Output = Vec<F::Item>; // TODO: Should be `()`.
+    type Output = ();
 
     fn execute(
         &self,
@@ -15,7 +15,7 @@ impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for Exa
         _: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let mut v = backend.receive(channel)?;
+        let mut v = backend.witness(channel)?;
 
         // N additions
         for _ in 0..N {
@@ -29,6 +29,6 @@ impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for Exa
 
         // backend.assert_zero(&v2)?;
 
-        Ok(vec![])
+        Ok(())
     }
 }

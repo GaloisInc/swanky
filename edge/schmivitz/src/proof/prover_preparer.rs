@@ -1,6 +1,6 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result, bail};
+use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
@@ -132,28 +132,6 @@ impl<'a> FancyConstant<F2> for ProverPreparer<'a> {
     }
 }
 
-impl<'a> FancyEncode<F2> for ProverPreparer<'a> {
-    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head prover does not support encode"
-        )
-    }
-
-    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(n);
-        for _ in 0..n {
-            let f2 = self.private_input[self.priv_input_pos as usize];
-            self.priv_input_pos += 1;
-
-            // TODO: Can we push all of the input witnesses up front?
-            self.witness.push(f2);
-            output.push(Wire(f2));
-        }
-        Ok(output)
-    }
-}
-
 impl<'a> FancyBinary for ProverPreparer<'a> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         Wire(x.0 + y.0)
@@ -176,6 +154,15 @@ impl<'a> FancyBinary for ProverPreparer<'a> {
 }
 
 impl<'a> FancyZeroKnowledge<F2> for ProverPreparer<'a> {
+    fn witness(&mut self, _: &mut Channel) -> Result<Self::Item> {
+        let f2 = self.private_input[self.priv_input_pos as usize];
+        self.priv_input_pos += 1;
+
+        // TODO: Can we push all of the input witnesses up front?
+        self.witness.push(f2);
+        Ok(Wire(f2))
+    }
+
     fn assert_zero(&mut self, _: &Self::Item, _: &mut Channel) -> Result<()> {
         self.challenge_count += 1;
         Ok(())

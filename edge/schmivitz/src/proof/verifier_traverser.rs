@@ -1,4 +1,4 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyZeroKnowledge};
+use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::FiniteRing;
@@ -181,28 +181,6 @@ impl<P: Params> FancyConstant<F2> for VerifierTraverser<P> {
     }
 }
 
-impl<P: Params> FancyEncode<F2> for VerifierTraverser<P> {
-    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        bail!(
-            ErrorKind::OtherError,
-            "Invalid input: VOLE-in-the-head verifier does not support encode"
-        )
-    }
-
-    fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
-        let mut output = Vec::with_capacity(n);
-        for _ in 0..n {
-            // Assign a fresh masked witness to the wire
-            let res = self.next_masked_witness()?;
-
-            // Private input gates don't define a polynomial that would contribute to the aggregate
-            // being computed, so we ignore the challenge
-            output.push(Wire(res));
-        }
-        Ok(output)
-    }
-}
-
 impl<P: Params> FancyBinary for VerifierTraverser<P> {
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         Wire(x.0 + y.0)
@@ -227,6 +205,15 @@ impl<P: Params> FancyBinary for VerifierTraverser<P> {
 }
 
 impl<P: Params> FancyZeroKnowledge<F2> for VerifierTraverser<P> {
+    fn witness(&mut self, _: &mut Channel) -> Result<Self::Item> {
+        // Assign a fresh masked witness to the wire
+        let res = self.next_masked_witness()?;
+
+        // Private input gates don't define a polynomial that would contribute to the aggregate
+        // being computed, so we ignore the challenge
+        Ok(Wire(res))
+    }
+
     fn assert_zero(&mut self, value: &Self::Item, _: &mut Channel) -> Result<()> {
         let challenge = self.chi_challenge.next();
 
