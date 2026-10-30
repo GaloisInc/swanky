@@ -5,7 +5,6 @@ mod tests {
 
     use crate::psi::circuit_psi::{
         circuits::*,
-        evaluator::OpprfPsiEvaluator,
         garbler::OpprfPsiGarbler,
         tests::{utils::*, *},
         utils,
@@ -75,28 +74,25 @@ mod tests {
                 Ok(())
             },
             |channel| {
+                use fancy_garbling::WireMod2;
                 use fancy_traits::FancyOutput;
+                use swanky_ot_iknp::IKNP;
+                use swanky_ot_traits_new::Receiver;
+                use swanky_twopac::semihonest::Evaluator;
 
                 use crate::circuit_psi::base_psi::receiver::OpprfReceiver;
 
-                let mut ev_psi =
-                    OpprfPsiEvaluator::new(channel, &mut SwankyRng::from_seed(seed_rx.into()))
-                        .unwrap();
-                let intersection_results = intersect::<_, OpprfReceiver, _>(
-                    &mut ev_psi.ev,
-                    set_b,
-                    channel,
-                    &mut ev_psi.rng,
-                )
-                .unwrap();
+                let mut rng = SwankyRng::from_seed(seed_rx.into());
+                let mut ev = Evaluator::<_, IKNP<Receiver>, WireMod2>::new(channel, rng.fork())?;
+                let intersection_results =
+                    intersect::<_, OpprfReceiver, _>(&mut ev, set_b, channel, &mut rng)?;
                 let res = fancy_cardinality(
-                    &mut ev_psi.ev,
+                    &mut ev,
                     &intersection_results.intersection.existence_bit_vector,
                     channel,
                 )
                 .unwrap();
-                let res_out = ev_psi
-                    .ev
+                let res_out = ev
                     .outputs(res.wires(), channel)
                     .unwrap()
                     .expect("evaluator should produce outputs");
@@ -145,31 +141,33 @@ mod tests {
                 Ok(())
             },
             |channel| {
+                use fancy_garbling::WireMod2;
                 use fancy_traits::FancyOutput;
+                use swanky_ot_iknp::IKNP;
+                use swanky_ot_traits_new::Receiver;
+                use swanky_twopac::semihonest::Evaluator;
 
                 use crate::circuit_psi::base_psi::receiver::OpprfReceiver;
 
-                let mut ev_psi =
-                    OpprfPsiEvaluator::new(channel, &mut SwankyRng::from_seed(seed_rx.into()))
-                        .unwrap();
+                let mut rng = SwankyRng::from_seed(seed_rx.into());
+                let mut ev = Evaluator::<_, IKNP<Receiver>, WireMod2>::new(channel, rng.fork())?;
                 let intersection_results = intersect_with_payloads::<_, OpprfReceiver, _>(
-                    &mut ev_psi.ev,
+                    &mut ev,
                     primary_keys_b,
                     Some(payload_b),
                     channel,
-                    &mut ev_psi.rng,
+                    &mut rng,
                 )
                 .unwrap();
                 let res = fancy_payload_sum(
-                    &mut ev_psi.ev,
+                    &mut ev,
                     &intersection_results.intersection.existence_bit_vector,
                     &intersection_results.payloads.sender_payloads,
                     &intersection_results.payloads.receiver_payloads,
                     channel,
                 )
                 .unwrap();
-                let res_out = ev_psi
-                    .ev
+                let res_out = ev
                     .outputs(res.wires(), channel)
                     .unwrap()
                     .expect("evaluator should produce outputs");
