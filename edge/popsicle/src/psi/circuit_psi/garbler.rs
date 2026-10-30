@@ -1,15 +1,12 @@
 //! Defining the Garbler's behavior in Circuit Psi according to PSTY19
 use crate::{
-    circuit_psi::{BundlePayloads, circuits::IntersectionBitVector},
+    circuit_psi::intersect_with_payloads,
     psi::circuit_psi::{
-        CircuitPsi, Intersection, Payload, PrimaryKey, PrivateIntersection,
-        PrivateIntersectionPayloads,
+        CircuitPsi, Intersection, PrimaryKey,
         base_psi::{BasePsi, sender},
-        bundle_primary_keys,
     },
 };
 use fancy_garbling::WireMod2;
-use fancy_traits::Circuit;
 use rand::{CryptoRng, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
@@ -57,70 +54,17 @@ where
     RNG: CryptoRng + SeedableRng<Seed = U8x16>,
     B: BasePsi,
 {
-    /// Computes the Circuit PSI on the garbler's inputs.
-    ///
-    /// (0) Check that the set of primary keys has the same size as the set of payloads
-    /// if the latter is not empty.
-    /// (1) Call the Base Psi to create the circuit's input.
-    /// The Base Psi effectively constructs the intersection in a hidden form
-    /// that only the garbled circuit can read and operate on.
-    /// (2) Turns the circuit inputs into bundles that are easier to operate on in swanky's
-    /// fancy garbling.
-    /// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
-    /// vector which indicates the presence or abscence of a primary key.
-    /// (4) Computes the user defined circuit on the parties' inputs.
-    fn intersect_with_payloads(
-        &mut self,
-        primary_keys: &[PrimaryKey],
-        payloads: Option<&[Payload]>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Intersection> {
-        // (0)
-        if let Some(payloads) = payloads
-            && primary_keys.len() != payloads.len()
-        {
-            swanky_error::bail!(
-                ErrorKind::OtherError,
-                "Failed to intersect due to incomplete payload set: (#payloads := {}) != (#primary keys := {})",
-                payloads.len(),
-                primary_keys.len(),
-            );
-        }
-        // (1)
-        let circuit_inputs =
-            B::base_psi(&mut self.gb, primary_keys, payloads, channel, &mut self.rng)?;
-        // (2)
-        let primary_keys =
-            bundle_primary_keys::<Garbler<RNG, IKNP<Sender>, WireMod2>>(&circuit_inputs)?;
-        let (sender_payloads, receiver_payloads) =
-            BundlePayloads::new().execute(&mut self.gb, &circuit_inputs, channel)?;
-
-        // (3)
-        let existence_bit_vector = IntersectionBitVector::new().execute(
-            &mut self.gb,
-            (
-                &circuit_inputs.sender_primary_keys,
-                &circuit_inputs.receiver_primary_keys,
-            ),
-            channel,
-        )?;
-        let intersection_results = Intersection {
-            intersection: PrivateIntersection {
-                existence_bit_vector,
-                primary_keys,
-            },
-            payloads: PrivateIntersectionPayloads {
-                sender_payloads,
-                receiver_payloads,
-            },
-        };
-        Ok(intersection_results)
-    }
     fn intersect(
         &mut self,
         primary_keys: &[PrimaryKey],
         channel: &mut Channel,
-    ) -> swanky_error::Result<Intersection> {
-        self.intersect_with_payloads(primary_keys, None, channel)
+    ) -> swanky_error::Result<Intersection<WireMod2>> {
+        intersect_with_payloads::<_, OpprfSender, _>(
+            &mut self.gb,
+            primary_keys,
+            None,
+            channel,
+            &mut self.rng,
+        )
     }
 }

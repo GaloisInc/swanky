@@ -107,13 +107,20 @@ mod tests {
             |channel| {
                 use fancy_traits::FancyOutput;
 
+                use crate::circuit_psi::base_psi::sender::OpprfSender;
+
                 let mut gb_psi =
                     OpprfPsiGarbler::new(channel, &mut SwankyRng::from_seed(seed_sx.into()))
                         .unwrap();
 
-                let intersection_results = gb_psi
-                    .intersect_with_payloads(primary_keys_a, Some(payload_a), channel)
-                    .unwrap();
+                let intersection_results = intersect_with_payloads::<_, OpprfSender, _>(
+                    &mut gb_psi.gb,
+                    primary_keys_a,
+                    Some(payload_a),
+                    channel,
+                    &mut gb_psi.rng,
+                )
+                .unwrap();
                 let res = fancy_payload_sum(
                     &mut gb_psi.gb,
                     &intersection_results.intersection.existence_bit_vector,
@@ -128,12 +135,19 @@ mod tests {
             |channel| {
                 use fancy_traits::FancyOutput;
 
+                use crate::circuit_psi::base_psi::receiver::OpprfReceiver;
+
                 let mut ev_psi =
                     OpprfPsiEvaluator::new(channel, &mut SwankyRng::from_seed(seed_rx.into()))
                         .unwrap();
-                let intersection_results = ev_psi
-                    .intersect_with_payloads(primary_keys_b, Some(payload_b), channel)
-                    .unwrap();
+                let intersection_results = intersect_with_payloads::<_, OpprfReceiver, _>(
+                    &mut ev_psi.ev,
+                    primary_keys_b,
+                    Some(payload_b),
+                    channel,
+                    &mut ev_psi.rng,
+                )
+                .unwrap();
                 let res = fancy_payload_sum(
                     &mut ev_psi.ev,
                     &intersection_results.intersection.existence_bit_vector,

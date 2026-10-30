@@ -1,9 +1,11 @@
 use fancy_traits::FancyOutput;
 use popsicle::circuit_psi::{
-    CircuitPsi, PAYLOAD_SIZE,
+    PAYLOAD_SIZE,
+    base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
     circuits::fancy_payload_sum,
     evaluator::OpprfPsiEvaluator,
     garbler::OpprfPsiGarbler,
+    intersect_with_payloads,
     utils::{binary_to_u128, int_vec_block512},
 };
 use swanky_block::Block512;
@@ -22,9 +24,14 @@ pub fn psty_payload_sum(
             let mut rng = SwankyRng::new();
             let mut gb_psi = OpprfPsiGarbler::new(channel, &mut rng).unwrap();
 
-            let intersection_results = gb_psi
-                .intersect_with_payloads(set_a, Some(payload_a), channel)
-                .unwrap();
+            let intersection_results = intersect_with_payloads::<_, OpprfSender, _>(
+                &mut gb_psi.gb,
+                set_a,
+                Some(payload_a),
+                channel,
+                &mut rng,
+            )
+            .unwrap();
             let res = fancy_payload_sum(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
@@ -40,9 +47,14 @@ pub fn psty_payload_sum(
             let mut rng = SwankyRng::new();
 
             let mut ev_psi = OpprfPsiEvaluator::<SwankyRng>::new(channel, &mut rng).unwrap();
-            let intersection_results = ev_psi
-                .intersect_with_payloads(set_b, Some(payload_b), channel)
-                .unwrap();
+            let intersection_results = intersect_with_payloads::<_, OpprfReceiver, _>(
+                &mut ev_psi.ev,
+                set_b,
+                Some(payload_b),
+                channel,
+                &mut rng,
+            )
+            .unwrap();
             let res = fancy_payload_sum(
                 &mut ev_psi.ev,
                 &intersection_results.intersection.existence_bit_vector,
