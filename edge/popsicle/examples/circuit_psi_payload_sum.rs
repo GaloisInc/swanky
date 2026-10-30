@@ -3,16 +3,15 @@ use popsicle::circuit_psi::{
     PAYLOAD_SIZE,
     base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
     circuits::fancy_payload_sum,
-    garbler::OpprfPsiGarbler,
     intersect_with_payloads,
     utils::{binary_to_u128, int_vec_block512},
 };
 use rand::SeedableRng;
 use swanky_block::Block512;
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::Receiver;
+use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
-use swanky_twopac::semihonest::Evaluator;
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 const SET_SIZE: usize = 1 << 8;
 
@@ -25,10 +24,10 @@ pub fn psty_payload_sum(
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
             let mut rng = SwankyRng::new();
-            let mut gb_psi = OpprfPsiGarbler::new(channel, &mut rng).unwrap();
+            let mut gb = Garbler::<_, IKNP<Sender>, _>::new(channel, rng.fork())?;
 
             let intersection_results = intersect_with_payloads::<_, OpprfSender, _>(
-                &mut gb_psi.gb,
+                &mut gb,
                 set_a,
                 Some(payload_a),
                 channel,
@@ -36,14 +35,14 @@ pub fn psty_payload_sum(
             )
             .unwrap();
             let res = fancy_payload_sum(
-                &mut gb_psi.gb,
+                &mut gb,
                 &intersection_results.intersection.existence_bit_vector,
                 &intersection_results.payloads.sender_payloads,
                 &intersection_results.payloads.receiver_payloads,
                 channel,
             )
             .unwrap();
-            gb_psi.gb.outputs(res.wires(), channel).unwrap();
+            gb.outputs(res.wires(), channel).unwrap();
             Ok(())
         },
         |channel| {

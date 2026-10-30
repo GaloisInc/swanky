@@ -17,7 +17,6 @@ use swanky_field_binary::F2;
 
 pub mod base_psi;
 pub mod circuits;
-pub mod garbler;
 pub mod tests;
 pub mod utils;
 

@@ -5,7 +5,6 @@ mod tests {
 
     use crate::psi::circuit_psi::{
         circuits::*,
-        garbler::OpprfPsiGarbler,
         tests::{utils::*, *},
         utils,
         utils::*,
@@ -54,23 +53,24 @@ mod tests {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 use fancy_traits::FancyOutput;
+                use swanky_ot_iknp::IKNP;
+                use swanky_ot_traits_new::Sender;
+                use swanky_twopac::semihonest::Garbler;
 
                 use crate::circuit_psi::base_psi::sender::OpprfSender;
 
-                let mut gb_psi =
-                    OpprfPsiGarbler::new(channel, &mut SwankyRng::from_seed(seed_sx.into()))
-                        .unwrap();
+                let mut rng = SwankyRng::from_seed(seed_sx.into());
+                let mut gb = Garbler::<_, IKNP<Sender>, _>::new(channel, rng.fork())?;
 
                 let intersection_results =
-                    intersect::<_, OpprfSender, _>(&mut gb_psi.gb, set_a, channel, &mut gb_psi.rng)
-                        .unwrap();
+                    intersect::<_, OpprfSender, _>(&mut gb, set_a, channel, &mut rng).unwrap();
                 let res = fancy_cardinality(
-                    &mut gb_psi.gb,
+                    &mut gb,
                     &intersection_results.intersection.existence_bit_vector,
                     channel,
                 )
                 .unwrap();
-                gb_psi.gb.outputs(res.wires(), channel).unwrap();
+                gb.outputs(res.wires(), channel).unwrap();
                 Ok(())
             },
             |channel| {
@@ -114,30 +114,32 @@ mod tests {
         let (_, result) = swanky_channel::local::local_channel_pair(
             |channel| {
                 use fancy_traits::FancyOutput;
+                use swanky_ot_iknp::IKNP;
+                use swanky_ot_traits_new::Sender;
+                use swanky_twopac::semihonest::Garbler;
 
                 use crate::circuit_psi::base_psi::sender::OpprfSender;
 
-                let mut gb_psi =
-                    OpprfPsiGarbler::new(channel, &mut SwankyRng::from_seed(seed_sx.into()))
-                        .unwrap();
+                let mut rng = SwankyRng::from_seed(seed_sx.into());
+                let mut gb = Garbler::<_, IKNP<Sender>, _>::new(channel, rng.fork())?;
 
                 let intersection_results = intersect_with_payloads::<_, OpprfSender, _>(
-                    &mut gb_psi.gb,
+                    &mut gb,
                     primary_keys_a,
                     Some(payload_a),
                     channel,
-                    &mut gb_psi.rng,
+                    &mut rng,
                 )
                 .unwrap();
                 let res = fancy_payload_sum(
-                    &mut gb_psi.gb,
+                    &mut gb,
                     &intersection_results.intersection.existence_bit_vector,
                     &intersection_results.payloads.sender_payloads,
                     &intersection_results.payloads.receiver_payloads,
                     channel,
                 )
                 .unwrap();
-                gb_psi.gb.outputs(res.wires(), channel).unwrap();
+                gb.outputs(res.wires(), channel).unwrap();
                 Ok(())
             },
             |channel| {
