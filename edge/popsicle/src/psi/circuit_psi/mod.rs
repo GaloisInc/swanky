@@ -146,14 +146,14 @@ fn bundle_primary_keys<F: FancyBinary>(
 ///
 /// example:
 /// ---------------------------------------
-// primary key (`primary_keys`) | data (`payloads`)
-// ---------------------------------------
-// 0                   | ("GOOG", $22)
-// 1                   | ("AMZN", $47)
-// 2                   | ("META", $92)
-// ...
-/// Computes the Circuit PSI.
+/// primary key (`primary_keys`) | data (`payloads`)
+/// ---------------------------------------
+/// 0                   | ("GOOG", $22)
+/// 1                   | ("AMZN", $47)
+/// 2                   | ("META", $92)
+/// ...
 ///
+/// The protocol works as follows:
 /// (0) Check that the set of primary keys has the same size as the set of payloads
 /// if the latter is not empty.
 /// (1) Call the Base Psi to create the circuit's input.
@@ -228,10 +228,3 @@ pub fn intersect<
 ) -> swanky_error::Result<Intersection<F::Item>> {
     intersect_with_payloads::<F, B, RNG>(backend, keys, None, channel, rng)
 }
-
-/// A trait which describes the parties participating in the circuit
-/// PSI protocol along with their functionality.
-///
-/// This trait is implemented by the two parties participating
-/// in the protocol,i.e the CircuitPsi Garbler and the Evaluator.
-pub trait CircuitPsi {}
