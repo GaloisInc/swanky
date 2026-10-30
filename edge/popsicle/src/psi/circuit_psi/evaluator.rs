@@ -1,12 +1,11 @@
 //! Defining the Evaluator's behavior in Circuit Psi according to PSTY19
 use crate::{
-    circuit_psi::BundlePayloads,
+    circuit_psi::{BundlePayloads, circuits::IntersectionBitVector},
     psi::circuit_psi::{
         CircuitPsi, Intersection, Payload, PrimaryKey, PrivateIntersection,
         PrivateIntersectionPayloads,
         base_psi::{BasePsi, receiver},
         bundle_primary_keys,
-        circuits::fancy_intersection_bit_vector,
     },
 };
 use fancy_garbling::WireMod2;
@@ -102,10 +101,12 @@ where
             BundlePayloads::new().execute(&mut self.ev, &circuit_inputs, channel)?;
 
         // (3)
-        let existence_bit_vector = fancy_intersection_bit_vector(
+        let existence_bit_vector = IntersectionBitVector::new().execute(
             &mut self.ev,
-            &circuit_inputs.sender_primary_keys,
-            &circuit_inputs.receiver_primary_keys,
+            (
+                &circuit_inputs.sender_primary_keys,
+                &circuit_inputs.receiver_primary_keys,
+            ),
             channel,
         )?;
 

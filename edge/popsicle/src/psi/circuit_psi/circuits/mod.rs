@@ -1,8 +1,8 @@
 //! Various fancy circuits
-use crate::circuit_psi::PRIMARY_KEY_SIZE;
+use crate::circuit_psi::{PAYLOAD_SIZE, PRIMARY_KEY_SIZE};
+use core::marker::PhantomData;
 use fancy_circuits::binary::{AddNoCarry, Eq, Mux, PairwiseXor};
 use fancy_traits::{BinaryBundle, Circuit, Fancy, FancyBinary, FancyConstant};
-use itertools::Itertools;
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -12,32 +12,60 @@ use swanky_field_binary::F2;
 // positive.
 const HASH_SIZE: usize = 8;
 
-/// Fancy function to compute the intersection of two sets
-/// and return a bit vector indicating the presence or abscence of
+/// Fancy circuit to compute the intersection of two sets
+/// and return a bit vector indicating the presence or absence of
 /// set elements.
+///
 /// The sender and receiver slices are assumed to be of the same size
 /// and ordered in such a way that if elements are shared between them
 /// then they will be in the same position.
-pub fn fancy_intersection_bit_vector<F: FancyBinary>(
-    f: &mut F,
-    sender_inputs: &[F::Item],
-    receiver_inputs: &[F::Item],
-    channel: &mut Channel,
-) -> swanky_error::Result<Vec<F::Item>> {
-    sender_inputs
-        .chunks(HASH_SIZE * 8)
-        .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
-        .map(|(xs, ys)| {
-            Eq::<{ HASH_SIZE * 8 }>::default().execute(
-                f,
-                (
-                    &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
-                    &BinaryBundle::new(ys.to_vec().try_into().unwrap()),
-                ),
-                channel,
-            )
-        })
-        .collect()
+pub(crate) struct IntersectionBitVector<'a>(PhantomData<&'a ()>);
+
+impl<'a> IntersectionBitVector<'a> {
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for IntersectionBitVector<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (&'a [F::Item], &'a [F::Item]);
+    type Output = Vec<F::Item>;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let (sender_inputs, receiver_inputs) = inputs;
+        assert_eq!(sender_inputs.len(), receiver_inputs.len());
+
+        sender_inputs
+            .chunks(HASH_SIZE * 8)
+            .zip(receiver_inputs.chunks(HASH_SIZE * 8))
+            .map(|(xs, ys)| {
+                Eq::<{ HASH_SIZE * 8 }>::default().execute(
+                    backend,
+                    (
+                        &BinaryBundle::new(
+                            xs.to_vec()
+                                .try_into()
+                                .expect("vector should be of length `HASH_SIZE * 8`"),
+                        ),
+                        &BinaryBundle::new(
+                            ys.to_vec()
+                                .try_into()
+                                .expect("vector should be of length `HASH_SIZE * 8`"),
+                        ),
+                    ),
+                    channel,
+                )
+            })
+            .collect()
+    }
 }
 
 /// Fancy function that turns a slice of binary wires into a vector of BinaryBundle
