@@ -4,6 +4,7 @@ use fancy_circuits::binary::{AddNoCarry, Eq, Mux, PairwiseXor};
 use fancy_traits::{BinaryBundle, Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_field_binary::F2;
 
 // How many bytes of the hash to use for the equality tests. This affects
@@ -54,23 +55,47 @@ pub fn wires_to_bundle<F: Fancy, const N: usize>(x: &[F::Item]) -> Vec<BinaryBun
         .collect()
 }
 
-/// Obliviously unmasks data by subtracting each mask from each element
-pub fn fancy_unmask<F: FancyBinary, const N: usize>(
-    f: &mut F,
-    elements: &[BinaryBundle<F::Item, N>],
-    masks: &[BinaryBundle<F::Item, N>],
-    channel: &mut Channel,
-) -> swanky_error::Result<Vec<BinaryBundle<F::Item, N>>> {
-    let mut res = Vec::new();
+/// Obliviously unmasks data by subtracting each mask from each element.
+pub(crate) struct Unmask<'a>(PhantomData<&'a ()>);
 
-    for i in 0..elements.len() {
-        let xor =
-            PairwiseXor::default().execute(f, (elements[i].wires(), masks[i].wires()), channel)?;
-        res.push(BinaryBundle::new(
-            xor.try_into().expect("vector should be of length `N`"),
-        ));
+impl<'a> Unmask<'a> {
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
     }
-    Ok(res)
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for Unmask<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (
+        &'a [BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>],
+        &'a [BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>],
+    );
+    type Output = Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let (elements, masks) = inputs;
+        elements
+            .iter()
+            .zip(masks.iter())
+            .map(|(element, mask)| {
+                PairwiseXor::default()
+                    .execute(backend, (element.wires(), mask.wires()), channel)
+                    .map(|v| {
+                        BinaryBundle::new(
+                            v.try_into()
+                                .expect("vector should be of length `PAYLOAD_SIZE * 8`"),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>>>()
+    }
 }
 
 /// Fancy function which computes the cardinality of the intersection

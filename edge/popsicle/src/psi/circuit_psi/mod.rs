@@ -102,10 +102,12 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Output> {
-        let sender_payloads = fancy_unmask(
+        let sender_payloads = Unmask::new().execute(
             backend,
-            &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.sender_payloads_masked),
-            &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.masks),
+            (
+                &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.sender_payloads_masked),
+                &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.masks),
+            ),
             channel,
         )?;
         let receiver_payloads =
