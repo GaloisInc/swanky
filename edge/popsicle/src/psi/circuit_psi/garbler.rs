@@ -1,11 +1,5 @@
 //! Defining the Garbler's behavior in Circuit Psi according to PSTY19
-use crate::{
-    circuit_psi::intersect_with_payloads,
-    psi::circuit_psi::{
-        CircuitPsi, Intersection, PrimaryKey,
-        base_psi::{BasePsi, sender},
-    },
-};
+use crate::psi::circuit_psi::base_psi::sender;
 use fancy_garbling::WireMod2;
 use rand::{CryptoRng, SeedableRng};
 use std::marker::PhantomData;
@@ -48,23 +42,3 @@ where
 }
 
 impl<RNG, B> SemiHonest for PsiGarbler<RNG, B> {}
-
-impl<RNG, B> CircuitPsi for PsiGarbler<RNG, B>
-where
-    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
-    B: BasePsi,
-{
-    fn intersect(
-        &mut self,
-        primary_keys: &[PrimaryKey],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Intersection<WireMod2>> {
-        intersect_with_payloads::<_, OpprfSender, _>(
-            &mut self.gb,
-            primary_keys,
-            None,
-            channel,
-            &mut self.rng,
-        )
-    }
-}

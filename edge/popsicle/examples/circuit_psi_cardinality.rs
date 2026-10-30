@@ -1,7 +1,11 @@
 use fancy_traits::FancyOutput;
 use popsicle::circuit_psi::{
-    CircuitPsi, circuits::fancy_cardinality, evaluator::OpprfPsiEvaluator,
-    garbler::OpprfPsiGarbler, utils::binary_to_u128,
+    base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
+    circuits::fancy_cardinality,
+    evaluator::OpprfPsiEvaluator,
+    garbler::OpprfPsiGarbler,
+    intersect,
+    utils::binary_to_u128,
 };
 use swanky_rng::SwankyRng;
 
@@ -13,7 +17,9 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             let mut rng = SwankyRng::new();
             let mut gb_psi = OpprfPsiGarbler::new(channel, &mut rng).unwrap();
 
-            let intersection_results = gb_psi.intersect(set_a, channel).unwrap();
+            let intersection_results =
+                intersect::<_, OpprfSender, _>(&mut gb_psi.gb, set_a, channel, &mut gb_psi.rng)
+                    .unwrap();
             let res = fancy_cardinality(
                 &mut gb_psi.gb,
                 &intersection_results.intersection.existence_bit_vector,
@@ -26,7 +32,9 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
         |channel| {
             let mut rng = SwankyRng::new();
             let mut ev_psi = OpprfPsiEvaluator::new(channel, &mut rng).unwrap();
-            let intersection_results = ev_psi.intersect(set_b, channel).unwrap();
+            let intersection_results =
+                intersect::<_, OpprfReceiver, _>(&mut ev_psi.ev, set_b, channel, &mut ev_psi.rng)
+                    .unwrap();
             let res = fancy_cardinality(
                 &mut ev_psi.ev,
                 &intersection_results.intersection.existence_bit_vector,

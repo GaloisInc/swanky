@@ -8,7 +8,6 @@ use crate::{
     psi::circuit_psi::circuits::wires_to_bundle,
 };
 use core::marker::PhantomData;
-use fancy_garbling::WireMod2;
 use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyEncode, FancyReceive};
 use rand::{CryptoRng, SeedableRng};
 use swanky_block::Block512;
@@ -216,16 +215,23 @@ pub fn intersect_with_payloads<
     Ok(intersection_results)
 }
 
+/// Computes the Circuit PSI on the parties' inputs with no payloads.
+pub fn intersect<
+    F: FancyBinary + FancyEncode<F2> + FancyReceive<F2>,
+    B: BasePsi,
+    RNG: CryptoRng + SeedableRng,
+>(
+    backend: &mut F,
+    keys: &[PrimaryKey],
+    channel: &mut Channel,
+    rng: &mut RNG,
+) -> swanky_error::Result<Intersection<F::Item>> {
+    intersect_with_payloads::<F, B, RNG>(backend, keys, None, channel, rng)
+}
+
 /// A trait which describes the parties participating in the circuit
 /// PSI protocol along with their functionality.
 ///
 /// This trait is implemented by the two parties participating
 /// in the protocol,i.e the CircuitPsi Garbler and the Evaluator.
-pub trait CircuitPsi {
-    /// Computes the Circuit PSI on the parties' inputs with no payloads.
-    fn intersect(
-        &mut self,
-        keys: &[PrimaryKey],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Intersection<WireMod2>>;
-}
+pub trait CircuitPsi {}
