@@ -19,11 +19,6 @@ pub fn binary_to_u128(bin: Vec<F2>) -> u128 {
     acc
 }
 
-/// Hide a value with a mask under crt. Assumes payloads are up to 64bit long
-pub fn mask_payload_binary(x: Block512, y: Block512) -> Block512 {
-    x ^ y
-}
-
 /// Create a vector of Block512, from a vector of u64s
 pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
     values
@@ -67,7 +62,7 @@ pub(crate) fn cuckoo_place_payloads<RNG: CryptoRng + SeedableRng>(
 /// Encoding ID's before passing them to GC.
 /// Note that we are only looking at HASH_SIZE bytes
 /// of the IDs.
-pub fn encode_binary(values: &[Block512], input_size: usize) -> Vec<u16> {
+pub(crate) fn encode_binary(values: &[Block512], input_size: usize) -> Vec<u16> {
     values
         .iter()
         .flat_map(|blk| {
@@ -78,13 +73,8 @@ pub fn encode_binary(values: &[Block512], input_size: usize) -> Vec<u16> {
         .collect()
 }
 
-/// Split a table into megabins of size "megasize". This is useful when parallelizing PSTY
-pub fn split_into_megabins<T: Clone>(table: &[T], megasize: usize) -> Vec<Vec<T>> {
-    table.chunks(megasize).map(|x| x.to_vec()).collect()
-}
-
 /// Flattens bins so that all points in a bin map to the same tag
-pub fn flatten_bin_tags(bins: &[Vec<U8x16>], tags: &[Block512]) -> Vec<(U8x16, Block512)> {
+pub(crate) fn flatten_bin_tags(bins: &[Vec<U8x16>], tags: &[Block512]) -> Vec<(U8x16, Block512)> {
     bins.iter()
         .zip_eq(tags.iter())
         .flat_map(|(bin, &t)| {
@@ -94,7 +84,7 @@ pub fn flatten_bin_tags(bins: &[Vec<U8x16>], tags: &[Block512]) -> Vec<(U8x16, B
         .collect_vec()
 }
 /// Flattens bins so that all points in a bin map have the correct payloads
-pub fn flatten_bins_payloads(
+pub(crate) fn flatten_bins_payloads(
     bins: &[Vec<U8x16>],
     elements: &[Vec<Block512>],
 ) -> Vec<(U8x16, Block512)> {
@@ -110,7 +100,7 @@ pub fn flatten_bins_payloads(
 
 /// A wrapper function that encodes `Block512` as garbled
 /// circuit inputs
-pub fn bin_encode_many_block512<F>(
+pub(crate) fn bin_encode_many_block512<F>(
     gc_party: &mut F,
     values: &[Block512],
     size: usize,
@@ -132,7 +122,7 @@ where
 
 /// A wrapper function that encodes `Block512` as garbled
 /// circuit inputs
-pub fn bin_receive_many_block512<F>(
+pub(crate) fn bin_receive_many_block512<F>(
     gc_party: &mut F,
     size: usize,
     channel: &mut Channel,
