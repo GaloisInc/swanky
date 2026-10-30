@@ -123,14 +123,6 @@ where
     }
 }
 
-fn bundle_primary_keys<F: FancyBinary>(
-    circuit_inputs: &CircuitInputs<F::Item>,
-) -> swanky_error::Result<Vec<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>> {
-    Ok(wires_to_bundle::<F, { PRIMARY_KEY_SIZE * 8 }>(
-        &circuit_inputs.sender_primary_keys,
-    ))
-}
-
 /// Computes the Circuit PSI on the parties' inputs (with payloads).
 ///
 /// self: The parties' internal state.
@@ -187,7 +179,8 @@ pub fn intersect_with_payloads<
     // (1)
     let circuit_inputs = B::base_psi(backend, primary_keys, payloads, channel, rng)?;
     // (2)
-    let primary_keys = bundle_primary_keys::<F>(&circuit_inputs)?;
+    let primary_keys =
+        wires_to_bundle::<F, { PRIMARY_KEY_SIZE * 8 }>(&circuit_inputs.sender_primary_keys);
     let (sender_payloads, receiver_payloads) =
         BundlePayloads::new().execute(backend, &circuit_inputs, channel)?;
 
