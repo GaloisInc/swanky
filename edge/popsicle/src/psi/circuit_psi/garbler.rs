@@ -1,12 +1,16 @@
 //! Defining the Garbler's behavior in Circuit Psi according to PSTY19
-use crate::psi::circuit_psi::{
-    CircuitPsi, Intersection, Payload, PrimaryKey, PrivateIntersection,
-    PrivateIntersectionPayloads,
-    base_psi::{BasePsi, sender},
-    bundle_payloads, bundle_primary_keys,
-    circuits::fancy_intersection_bit_vector,
+use crate::{
+    circuit_psi::BundlePayloads,
+    psi::circuit_psi::{
+        CircuitPsi, Intersection, Payload, PrimaryKey, PrivateIntersection,
+        PrivateIntersectionPayloads,
+        base_psi::{BasePsi, sender},
+        bundle_primary_keys,
+        circuits::fancy_intersection_bit_vector,
+    },
 };
 use fancy_garbling::WireMod2;
+use fancy_traits::Circuit;
 use rand::{CryptoRng, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
@@ -90,7 +94,7 @@ where
         let primary_keys =
             bundle_primary_keys::<Garbler<RNG, IKNP<Sender>, WireMod2>>(&circuit_inputs)?;
         let (sender_payloads, receiver_payloads) =
-            bundle_payloads(&mut self.gb, &circuit_inputs, channel)?;
+            BundlePayloads::new().execute(&mut self.gb, &circuit_inputs, channel)?;
 
         // (3)
         let existence_bit_vector = fancy_intersection_bit_vector(

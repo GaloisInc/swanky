@@ -1,8 +1,9 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
 use crate::psi::circuit_psi::circuits::{fancy_unmask, wires_to_bundle};
+use core::marker::PhantomData;
 use fancy_garbling::WireMod2;
-use fancy_traits::{BinaryBundle, FancyBinary};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary};
 use swanky_block::Block512;
 use swanky_channel::Channel;
 
@@ -69,30 +70,49 @@ pub struct Intersection {
     pub payloads: PrivateIntersectionPayloads<WireMod2>,
 }
 
-/// A function that takes a `CircuitInputs`` (created by a BasePsi) and groups the wires of
-/// its different parts into `BinaryBundle` for ease of use in a fancy garbled circuit.
+/// A circuit that takes a `CircuitInputs`` (created by a BasePsi) and groups
+/// the wires of its different parts into `BinaryBundle` for ease of use in a
+/// fancy garbled circuit.
 ///
-/// For instance, `sender_payloads`'s wires are grouped according to the set primary key size.
-/// This function allows us to reason about circuit inputs not in terms of individual wires, but
-/// rather in terms of the values that they represent.
-fn bundle_payloads<F: FancyBinary>(
-    f: &mut F,
-    circuit_inputs: &CircuitInputs<F::Item>,
-    channel: &mut Channel,
-) -> swanky_error::Result<(
-    Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
-    Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
-)> {
-    let sender_payloads = fancy_unmask(
-        f,
-        &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.sender_payloads_masked),
-        &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.masks),
-        channel,
-    )?;
-    let receiver_payloads =
-        wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.receiver_payloads);
+/// For instance, `sender_payloads`'s wires are grouped according to the set
+/// primary key size. This function allows us to reason about circuit inputs not
+/// in terms of individual wires, but rather in terms of the values that they
+/// represent.
+pub(crate) struct BundlePayloads<'a>(PhantomData<&'a ()>);
 
-    Ok((sender_payloads, receiver_payloads))
+impl<'a> BundlePayloads<'a> {
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<'a, F: FancyBinary> Circuit<F> for BundlePayloads<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a CircuitInputs<F::Item>;
+    type Output = (
+        Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
+        Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
+    );
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> swanky_error::Result<Self::Output> {
+        let sender_payloads = fancy_unmask(
+            backend,
+            &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.sender_payloads_masked),
+            &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.masks),
+            channel,
+        )?;
+        let receiver_payloads =
+            wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.receiver_payloads);
+
+        Ok((sender_payloads, receiver_payloads))
+    }
 }
 
 fn bundle_primary_keys<F: FancyBinary>(
