@@ -126,23 +126,39 @@ where
     }
 }
 
-/// Fancy function which computes the cardinality of the intersection
-pub fn fancy_cardinality<F>(
-    f: &mut F,
-    intersect_bitvec: &[F::Item],
-    channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>
-where
-    F: FancyBinary + FancyConstant<F2>,
-{
-    let zero = BinaryBundle::constant(f, 0);
-    let one = BinaryBundle::constant(f, 1);
-    let mut acc = zero.clone();
-    for bit in intersect_bitvec {
-        let mux = Mux::default().execute(f, (bit.clone(), &zero, &one), channel)?;
-        acc = AddNoCarry::default().execute(f, (&acc, &mux), channel)?;
+/// Circuit to compute the cardinality of the intersection.
+#[derive(Default)]
+pub struct Cardinality<'a>(PhantomData<&'a ()>);
+
+impl<'a> Cardinality<'a> {
+    /// Create a new [`Cardinality`] circuit.
+    pub fn new() -> Self {
+        Self::default()
     }
-    Ok(acc)
+}
+
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for Cardinality<'a>
+where
+    F::Item: 'a,
+{
+    type Input = &'a [F::Item];
+    type Output = BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let zero = BinaryBundle::constant(backend, 0);
+        let one = BinaryBundle::constant(backend, 1);
+        let mut acc = zero.clone();
+        for bit in inputs {
+            let mux = Mux::default().execute(backend, (bit.clone(), &zero, &one), channel)?;
+            acc = AddNoCarry::default().execute(backend, (&acc, &mux), channel)?;
+        }
+        Ok(acc)
+    }
 }
 
 /// Fancy function which computes the payload sum of the intersection

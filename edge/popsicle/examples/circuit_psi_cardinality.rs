@@ -1,7 +1,7 @@
-use fancy_traits::FancyOutput;
+use fancy_traits::{Circuit, FancyOutput};
 use popsicle::circuit_psi::{
     base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
-    circuits::fancy_cardinality,
+    circuits::Cardinality,
     intersect,
     utils::binary_to_u128,
 };
@@ -21,12 +21,11 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
 
             let intersection_results =
                 intersect::<_, OpprfSender, _>(&mut gb, set_a, channel, &mut rng).unwrap();
-            let res = fancy_cardinality(
+            let res = Cardinality::new().execute(
                 &mut gb,
                 &intersection_results.intersection.existence_bit_vector,
                 channel,
-            )
-            .unwrap();
+            )?;
             gb.outputs(res.wires(), channel).unwrap();
             Ok(())
         },
@@ -35,12 +34,13 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             let mut ev = Evaluator::<_, IKNP<Receiver>, _>::new(channel, rng.fork()).unwrap();
             let intersection_results =
                 intersect::<_, OpprfReceiver, _>(&mut ev, set_b, channel, &mut rng).unwrap();
-            let res = fancy_cardinality(
-                &mut ev,
-                &intersection_results.intersection.existence_bit_vector,
-                channel,
-            )
-            .unwrap();
+            let res = Cardinality::new()
+                .execute(
+                    &mut ev,
+                    &intersection_results.intersection.existence_bit_vector,
+                    channel,
+                )
+                .unwrap();
             let res_out = ev
                 .outputs(res.wires(), channel)
                 .unwrap()

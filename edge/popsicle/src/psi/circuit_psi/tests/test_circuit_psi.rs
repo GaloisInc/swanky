@@ -64,12 +64,13 @@ mod tests {
 
                 let intersection_results =
                     intersect::<_, OpprfSender, _>(&mut gb, set_a, channel, &mut rng).unwrap();
-                let res = fancy_cardinality(
-                    &mut gb,
-                    &intersection_results.intersection.existence_bit_vector,
-                    channel,
-                )
-                .unwrap();
+                let res = Cardinality::new()
+                    .execute(
+                        &mut gb,
+                        &intersection_results.intersection.existence_bit_vector,
+                        channel,
+                    )
+                    .unwrap();
                 gb.outputs(res.wires(), channel).unwrap();
                 Ok(())
             },
@@ -86,12 +87,13 @@ mod tests {
                 let mut ev = Evaluator::<_, IKNP<Receiver>, WireMod2>::new(channel, rng.fork())?;
                 let intersection_results =
                     intersect::<_, OpprfReceiver, _>(&mut ev, set_b, channel, &mut rng)?;
-                let res = fancy_cardinality(
-                    &mut ev,
-                    &intersection_results.intersection.existence_bit_vector,
-                    channel,
-                )
-                .unwrap();
+                let res = Cardinality::new()
+                    .execute(
+                        &mut ev,
+                        &intersection_results.intersection.existence_bit_vector,
+                        channel,
+                    )
+                    .unwrap();
                 let res_out = ev
                     .outputs(res.wires(), channel)
                     .unwrap()
