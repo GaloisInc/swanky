@@ -9,6 +9,7 @@ CORE_CRATES=(
     # BEGIN CORE CRATES
     swanky-adversary
     swanky-channel
+    swanky-channel-tracking
     swanky-error
     swanky-party
     swanky-rng
