@@ -31,3 +31,14 @@ pub struct TrackChannel<C: Read + Write> {
     bits_read: usize,
     bits_written: usize,
 }
+
+impl<C: Read + Write> TrackChannel<C> {
+    /// Create a new [`TrackChannel`] around `channel`.
+    pub fn new(channel: C) -> Self {
+        Self {
+            channel,
+            bits_read: 0,
+            bits_written: 0,
+        }
+    }
+}
