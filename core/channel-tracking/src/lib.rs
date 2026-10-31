@@ -50,4 +50,36 @@ impl<C: Read + Write> TrackChannel<C> {
         self.bits_read = 0;
         self.bits_written = 0;
     }
+
+    /// Return the number of kilobits read from the channel.
+    pub fn kilobits_read(&self) -> f64 {
+        self.bits_read as f64 / 1000.0
+    }
+
+    /// Return the number of kilobits written from the channel.
+    pub fn kilobits_written(&self) -> f64 {
+        self.bits_written as f64 / 1000.0
+    }
+
+    /// Return the total amount of communication on the channel (as
+    /// kilobits).
+    pub fn total_kilobits(&self) -> f64 {
+        (self.bits_read + self.bits_written) as f64 / 1000.0
+    }
+
+    /// Return the number of kilobytes read from the channel.
+    pub fn kilobytes_read(&self) -> f64 {
+        self.bits_read as f64 / 8192.0
+    }
+
+    /// Return the number of kilobytes written from the channel.
+    pub fn kilobytes_written(&self) -> f64 {
+        self.bits_written as f64 / 8192.0
+    }
+
+    /// Return the total amount of communication on the channel (as
+    /// kilobytes).
+    pub fn total_kilobytes(&self) -> f64 {
+        self.kilobytes_read() + self.kilobytes_written()
+    }
 }
