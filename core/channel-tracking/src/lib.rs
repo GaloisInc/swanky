@@ -83,3 +83,23 @@ impl<C: Read + Write> TrackChannel<C> {
         self.kilobytes_read() + self.kilobytes_written()
     }
 }
+
+impl<C: Read + Write> Read for TrackChannel<C> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let bytes_read = self.channel.read(buf)?;
+        self.bits_read += bytes_read * 8;
+        Ok(bytes_read)
+    }
+}
+
+impl<C: Read + Write> Write for TrackChannel<C> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let bytes_written = self.channel.write(buf)?;
+        self.bits_written += bytes_written * 8;
+        Ok(bytes_written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.channel.flush()
+    }
+}
