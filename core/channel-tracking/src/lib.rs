@@ -41,4 +41,13 @@ impl<C: Read + Write> TrackChannel<C> {
             bits_written: 0,
         }
     }
+
+    /// Clear the tracking data for this [`TrackChannel`].
+    ///
+    /// This allows the channel to be reused for statistics-gathering
+    /// without having to create a brand new underlying channel.
+    pub fn clear(&mut self) {
+        self.bits_read = 0;
+        self.bits_written = 0;
+    }
 }
