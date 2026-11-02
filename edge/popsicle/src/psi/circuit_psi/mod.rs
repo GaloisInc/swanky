@@ -3,11 +3,10 @@
 use crate::{
     circuit_psi::{
         base_psi::BasePsi,
-        circuits::{IntersectionBitVector, Unmask},
+        circuits::{BundlePayloads, IntersectionBitVector},
     },
     psi::circuit_psi::circuits::wires_to_bundle,
 };
-use core::marker::PhantomData;
 use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyEncode, FancyReceive};
 use rand::{CryptoRng, SeedableRng};
 use swanky_block::Block512;

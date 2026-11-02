@@ -1,5 +1,5 @@
 //! Various fancy circuits
-use crate::circuit_psi::{PAYLOAD_SIZE, PRIMARY_KEY_SIZE};
+use crate::circuit_psi::{CircuitInputs, PAYLOAD_SIZE, PRIMARY_KEY_SIZE};
 use core::marker::PhantomData;
 use fancy_circuits::binary::{AddNoCarry, Eq, Mux, PairwiseXor};
 use fancy_traits::{BinaryBundle, Circuit, Fancy, FancyBinary, FancyConstant};

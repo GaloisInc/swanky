@@ -1,9 +1,11 @@
 //! Util mostly in support of cuckoo hashing.
 
-use rand::{CryptoRng, RngExt};
 use sha2::{Digest, Sha256};
 use swanky_cr_hash::CorrelationRobustHash;
 use vectoreyes::U8x16;
+
+#[cfg(test)]
+use rand::{CryptoRng, RngExt};
 
 /// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 /// as zero. We need to leave 8 bits free in order to add in the hash index when
@@ -28,25 +30,17 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: U8x16) -> Vec<U8x16> {
             let block = aes.hash(U8x16::from(digest));
             block & mask
         })
-        .collect::<Vec<U8x16>>()
+        .collect()
 }
 
-#[allow(dead_code)]
-/// used in tests
-pub fn rand_vec<RNG: CryptoRng>(n: usize, rng: &mut RNG) -> Vec<u8> {
+#[cfg(test)]
+pub(crate) fn rand_vec<RNG: CryptoRng>(n: usize, rng: &mut RNG) -> Vec<u8> {
     (0..n).map(|_| rng.random()).collect()
 }
 
-#[allow(dead_code)]
-/// used in tests
-pub fn rand_vec_vec<RNG: CryptoRng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
+#[cfg(test)]
+pub(crate) fn rand_vec_vec<RNG: CryptoRng>(n: usize, m: usize, rng: &mut RNG) -> Vec<Vec<u8>> {
     (0..n).map(|_| rand_vec(m, rng)).collect()
-}
-
-#[allow(dead_code)]
-/// used in tests
-pub fn rand_u64_vec<RNG: CryptoRng>(n: usize, modulus: u64, rng: &mut RNG) -> Vec<u64> {
-    (0..n).map(|_| rng.random::<u64>() % modulus).collect()
 }
 
 #[cfg(test)]
