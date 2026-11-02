@@ -10,7 +10,7 @@ use rand::{CryptoRng, RngExt};
 /// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 /// as zero. We need to leave 8 bits free in order to add in the hash index when
 /// running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
-pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: U8x16) -> Vec<U8x16> {
+pub(crate) fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: U8x16) -> Vec<U8x16> {
     let aes = CorrelationRobustHash::new(key);
     let mask = U8x16::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
     inputs

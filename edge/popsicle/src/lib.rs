@@ -5,6 +5,6 @@
 
 mod cuckoo;
 mod psi;
-pub mod utils;
+mod utils;
 
 pub use crate::psi::*;
