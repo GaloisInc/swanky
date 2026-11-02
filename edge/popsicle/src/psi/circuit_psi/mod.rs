@@ -76,47 +76,6 @@ pub struct Intersection<T> {
     pub payloads: PrivateIntersectionPayloads<T>,
 }
 
-/// A circuit that takes a [`CircuitInputs`] as input and groups
-/// the wires of its different parts into [`BinaryBundle`]s.
-///
-/// For instance, `sender_payloads`'s wires are grouped according to the set
-/// primary key size. This function allows us to reason about circuit inputs not
-/// in terms of individual wires, but rather in terms of the values that they
-/// represent.
-#[derive(Default)]
-pub(crate) struct BundlePayloads<'a>(PhantomData<&'a ()>);
-
-impl<'a, F: FancyBinary> Circuit<F> for BundlePayloads<'a>
-where
-    F::Item: 'a,
-{
-    type Input = &'a CircuitInputs<F::Item>;
-    type Output = (
-        Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
-        Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
-    );
-
-    fn execute(
-        &self,
-        backend: &mut F,
-        inputs: Self::Input,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Self::Output> {
-        let sender_payloads = Unmask::default().execute(
-            backend,
-            (
-                &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.sender_payloads_masked),
-                &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.masks),
-            ),
-            channel,
-        )?;
-        let receiver_payloads =
-            wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.receiver_payloads);
-
-        Ok((sender_payloads, receiver_payloads))
-    }
-}
-
 /// Computes the Circuit PSI on the parties' inputs (with payloads).
 ///
 /// self: The parties' internal state.
