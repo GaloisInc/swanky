@@ -16,7 +16,8 @@ use swanky_field_binary::F2;
 
 pub mod base_psi;
 pub mod circuits;
-pub mod tests;
+#[cfg(test)]
+mod tests;
 pub mod utils;
 
 /// The type of set primary keys to be used
