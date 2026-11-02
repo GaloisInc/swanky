@@ -12,20 +12,14 @@ use swanky_field_binary::F2;
 // positive.
 const HASH_SIZE: usize = 8;
 
-/// Fancy circuit to compute the intersection of two sets
-/// and return a bit vector indicating the presence or absence of
-/// set elements.
+/// Circuit that computes the intersection of two sets and returns a bit vector
+/// indicating the presence or absence of set elements.
 ///
 /// The sender and receiver slices are assumed to be of the same size
 /// and ordered in such a way that if elements are shared between them
 /// then they will be in the same position.
+#[derive(Default)]
 pub(crate) struct IntersectionBitVector<'a>(PhantomData<&'a ()>);
-
-impl<'a> IntersectionBitVector<'a> {
-    pub(crate) fn new() -> Self {
-        Self(PhantomData)
-    }
-}
 
 impl<'a, F: FancyBinary> Circuit<F> for IntersectionBitVector<'a>
 where
@@ -68,9 +62,11 @@ where
     }
 }
 
-/// Fancy function that turns a slice of binary wires into a vector of BinaryBundle
-/// by grouping wires together according to the size of the element being bundled.
-pub fn wires_to_bundle<F: Fancy, const N: usize>(x: &[F::Item]) -> Vec<BinaryBundle<F::Item, N>> {
+/// Convert a slice of wires into a vector of [`BinaryBundle`]s by grouping
+/// wires together according to the specified size.
+pub(crate) fn wires_to_bundle<F: Fancy, const N: usize>(
+    x: &[F::Item],
+) -> Vec<BinaryBundle<F::Item, N>> {
     x.chunks(N)
         .map(|x_chunk| {
             BinaryBundle::new(
@@ -83,14 +79,12 @@ pub fn wires_to_bundle<F: Fancy, const N: usize>(x: &[F::Item]) -> Vec<BinaryBun
         .collect()
 }
 
-/// Obliviously unmasks data by subtracting each mask from each element.
+/// Circuit to Obliviously unmask data by XORing each mask from each element.
+///
+/// On input $`(X, M)`$, where $`X`$ is a vector of elements and $`M`$ is a
+/// vector of masks, output $`X \oplus M`$.
+#[derive(Default)]
 pub(crate) struct Unmask<'a>(PhantomData<&'a ()>);
-
-impl<'a> Unmask<'a> {
-    pub(crate) fn new() -> Self {
-        Self(PhantomData)
-    }
-}
 
 impl<'a, F: FancyBinary> Circuit<F> for Unmask<'a>
 where
@@ -126,16 +120,12 @@ where
     }
 }
 
-/// Circuit to compute the cardinality of the intersection.
+/// Circuit computing the cardinality of the intersection.
+///
+/// On input $`I`$, where $`I`$ is a bitvector with ones at the indices where
+/// there is an intersection, compute the sum of $`I`$.
 #[derive(Default)]
 pub struct Cardinality<'a>(PhantomData<&'a ()>);
-
-impl<'a> Cardinality<'a> {
-    /// Create a new [`Cardinality`] circuit.
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
 
 impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for Cardinality<'a>
 where

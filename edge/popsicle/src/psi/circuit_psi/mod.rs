@@ -76,21 +76,15 @@ pub struct Intersection<T> {
     pub payloads: PrivateIntersectionPayloads<T>,
 }
 
-/// A circuit that takes a `CircuitInputs`` (created by a BasePsi) and groups
-/// the wires of its different parts into `BinaryBundle` for ease of use in a
-/// fancy garbled circuit.
+/// A circuit that takes a [`CircuitInputs`] as input and groups
+/// the wires of its different parts into [`BinaryBundle`]s.
 ///
 /// For instance, `sender_payloads`'s wires are grouped according to the set
 /// primary key size. This function allows us to reason about circuit inputs not
 /// in terms of individual wires, but rather in terms of the values that they
 /// represent.
+#[derive(Default)]
 pub(crate) struct BundlePayloads<'a>(PhantomData<&'a ()>);
-
-impl<'a> BundlePayloads<'a> {
-    pub(crate) fn new() -> Self {
-        Self(PhantomData)
-    }
-}
 
 impl<'a, F: FancyBinary> Circuit<F> for BundlePayloads<'a>
 where
@@ -108,7 +102,7 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> swanky_error::Result<Self::Output> {
-        let sender_payloads = Unmask::new().execute(
+        let sender_payloads = Unmask::default().execute(
             backend,
             (
                 &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&inputs.sender_payloads_masked),
@@ -182,10 +176,10 @@ pub fn intersect_with_payloads<
     let primary_keys =
         wires_to_bundle::<F, { PRIMARY_KEY_SIZE * 8 }>(&circuit_inputs.sender_primary_keys);
     let (sender_payloads, receiver_payloads) =
-        BundlePayloads::new().execute(backend, &circuit_inputs, channel)?;
+        BundlePayloads::default().execute(backend, &circuit_inputs, channel)?;
 
     // (3)
-    let existence_bit_vector = IntersectionBitVector::new().execute(
+    let existence_bit_vector = IntersectionBitVector::default().execute(
         backend,
         (
             &circuit_inputs.sender_primary_keys,

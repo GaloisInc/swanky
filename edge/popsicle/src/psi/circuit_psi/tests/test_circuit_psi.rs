@@ -64,7 +64,7 @@ mod tests {
 
                 let intersection_results =
                     intersect::<_, OpprfSender, _>(&mut gb, set_a, channel, &mut rng).unwrap();
-                let res = Cardinality::new()
+                let res = Cardinality::default()
                     .execute(
                         &mut gb,
                         &intersection_results.intersection.existence_bit_vector,
@@ -87,7 +87,7 @@ mod tests {
                 let mut ev = Evaluator::<_, IKNP<Receiver>, WireMod2>::new(channel, rng.fork())?;
                 let intersection_results =
                     intersect::<_, OpprfReceiver, _>(&mut ev, set_b, channel, &mut rng)?;
-                let res = Cardinality::new()
+                let res = Cardinality::default()
                     .execute(
                         &mut ev,
                         &intersection_results.intersection.existence_bit_vector,

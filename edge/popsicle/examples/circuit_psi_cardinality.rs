@@ -20,30 +20,27 @@ pub fn psty_cardinality(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> u128 {
             let mut gb = Garbler::<_, IKNP<Sender>, _>::new(channel, rng.fork())?;
 
             let intersection_results =
-                intersect::<_, OpprfSender, _>(&mut gb, set_a, channel, &mut rng).unwrap();
-            let res = Cardinality::new().execute(
+                intersect::<_, OpprfSender, _>(&mut gb, set_a, channel, &mut rng)?;
+            let res = Cardinality::default().execute(
                 &mut gb,
                 &intersection_results.intersection.existence_bit_vector,
                 channel,
             )?;
-            gb.outputs(res.wires(), channel).unwrap();
+            gb.outputs(res.wires(), channel)?;
             Ok(())
         },
         |channel| {
             let mut rng = SwankyRng::new();
-            let mut ev = Evaluator::<_, IKNP<Receiver>, _>::new(channel, rng.fork()).unwrap();
+            let mut ev = Evaluator::<_, IKNP<Receiver>, _>::new(channel, rng.fork())?;
             let intersection_results =
-                intersect::<_, OpprfReceiver, _>(&mut ev, set_b, channel, &mut rng).unwrap();
-            let res = Cardinality::new()
-                .execute(
-                    &mut ev,
-                    &intersection_results.intersection.existence_bit_vector,
-                    channel,
-                )
-                .unwrap();
+                intersect::<_, OpprfReceiver, _>(&mut ev, set_b, channel, &mut rng)?;
+            let res = Cardinality::default().execute(
+                &mut ev,
+                &intersection_results.intersection.existence_bit_vector,
+                channel,
+            )?;
             let res_out = ev
-                .outputs(res.wires(), channel)
-                .unwrap()
+                .outputs(res.wires(), channel)?
                 .expect("evaluator should produce outputs");
             Ok(binary_to_u128(res_out))
         },
