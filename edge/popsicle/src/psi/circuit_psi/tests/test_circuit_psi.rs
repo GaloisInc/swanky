@@ -133,14 +133,17 @@ mod tests {
                     &mut rng,
                 )
                 .unwrap();
-                let res = fancy_payload_sum(
-                    &mut gb,
-                    &intersection_results.intersection.existence_bit_vector,
-                    &intersection_results.payloads.sender_payloads,
-                    &intersection_results.payloads.receiver_payloads,
-                    channel,
-                )
-                .unwrap();
+                let res = PayloadSum::default()
+                    .execute(
+                        &mut gb,
+                        (
+                            &intersection_results.intersection.existence_bit_vector,
+                            &intersection_results.payloads.sender_payloads,
+                            &intersection_results.payloads.receiver_payloads,
+                        ),
+                        channel,
+                    )
+                    .unwrap();
                 gb.outputs(res.wires(), channel).unwrap();
                 Ok(())
             },
@@ -163,14 +166,17 @@ mod tests {
                     &mut rng,
                 )
                 .unwrap();
-                let res = fancy_payload_sum(
-                    &mut ev,
-                    &intersection_results.intersection.existence_bit_vector,
-                    &intersection_results.payloads.sender_payloads,
-                    &intersection_results.payloads.receiver_payloads,
-                    channel,
-                )
-                .unwrap();
+                let res = PayloadSum::default()
+                    .execute(
+                        &mut ev,
+                        (
+                            &intersection_results.intersection.existence_bit_vector,
+                            &intersection_results.payloads.sender_payloads,
+                            &intersection_results.payloads.receiver_payloads,
+                        ),
+                        channel,
+                    )
+                    .unwrap();
                 let res_out = ev
                     .outputs(res.wires(), channel)
                     .unwrap()

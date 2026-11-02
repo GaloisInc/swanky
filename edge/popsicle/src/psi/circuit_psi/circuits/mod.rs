@@ -161,28 +161,43 @@ where
     }
 }
 
-/// Fancy function which computes the payload sum of the intersection
-/// where associated payloads with elements of the intersection are summed
-/// together and returned
-pub fn fancy_payload_sum<F>(
-    f: &mut F,
-    intersect_bitvec: &[F::Item],
-    payload_a: &[BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>],
-    payload_b: &[BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>],
-    channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>
-where
-    F: FancyBinary + FancyConstant<F2>,
-{
-    let zero = BinaryBundle::constant(f, 0);
-    let mut acc = zero.clone();
-    let multiplex = Mux::default();
+/// Circuit computing the payload sum of the intersection.
+///
+/// On input $`(I, A, B)`$, where $`I`$ is a bitvector with ones at the indicies
+/// where there is an intersection, and $`A`$ and $`B`$ are the payload values of
+/// each set, the circuit computes $`\sum_{i \in I} A_i + B_i`$.
+#[derive(Default)]
+pub struct PayloadSum<'a>(PhantomData<&'a ()>);
 
-    for (i, bit) in intersect_bitvec.iter().enumerate() {
-        let mux_a = multiplex.execute(f, (bit.clone(), &zero, &payload_a[i]), channel)?;
-        let mux_b = multiplex.execute(f, (bit.clone(), &zero, &payload_b[i]), channel)?;
-        let mul = AddNoCarry::default().execute(f, (&mux_a, &mux_b), channel)?;
-        acc = AddNoCarry::default().execute(f, (&acc, &mul), channel)?;
+impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for PayloadSum<'a>
+where
+    F::Item: 'a,
+{
+    type Input = (
+        &'a [F::Item],
+        &'a [BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>],
+        &'a [BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>],
+    );
+    type Output = BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        let (intersect_bitvec, payload_a, payload_b) = inputs;
+
+        let zero = BinaryBundle::constant(backend, 0);
+        let mut acc = zero.clone();
+        let multiplex = Mux::default();
+
+        for (i, bit) in intersect_bitvec.iter().enumerate() {
+            let mux_a = multiplex.execute(backend, (bit.clone(), &zero, &payload_a[i]), channel)?;
+            let mux_b = multiplex.execute(backend, (bit.clone(), &zero, &payload_b[i]), channel)?;
+            let mul = AddNoCarry::default().execute(backend, (&mux_a, &mux_b), channel)?;
+            acc = AddNoCarry::default().execute(backend, (&acc, &mul), channel)?;
+        }
+        Ok(acc)
     }
-    Ok(acc)
 }
