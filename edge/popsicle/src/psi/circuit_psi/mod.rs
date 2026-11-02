@@ -78,35 +78,33 @@ pub struct Intersection<T> {
 
 /// Computes the Circuit PSI on the parties' inputs (with payloads).
 ///
-/// self: The parties' internal state.
-/// primary_keys: The parties' set primary keys that we perform the intersection
-///      operation on (see example below).
-/// payloads: The payloads associated with primary keys of the intersection
-///           (e.g. incomes associated with id's that we are intersecting
-///             on).
-///           Payloads are optional, and this function allows computing
-///           on set primary keys alone (see example below).
+/// `primary_keys`: The parties' set primary keys that we perform the
+///               intersection operation on (see example below).
 ///
-/// example:
-/// ---------------------------------------
-/// primary key (`primary_keys`) | data (`payloads`)
-/// ---------------------------------------
-/// 0                   | ("GOOG", $22)
-/// 1                   | ("AMZN", $47)
-/// 2                   | ("META", $92)
+/// `payloads`: The payloads associated with primary keys of the intersection
+///             (e.g. incomes associated with id's that we are intersecting on).
+///             Payloads are optional, and this function allows computing on set
+///             primary keys alone (see example below).
+///
+/// # Example
+/// | primary key (`primary_keys`) | data (`payloads`) |
+/// |------------------------------|-------------------|
+/// | 0                            | ("GOOG", $22)     |
+/// | 1                            | ("AMZN", $47)     |
+/// | 2                            | ("META", $92)     |
 /// ...
 ///
+/// # Protocol Internals
 /// The protocol works as follows:
-/// (0) Check that the set of primary keys has the same size as the set of payloads
-/// if the latter is not empty.
-/// (1) Call the Base Psi to create the circuit's input.
-/// The Base Psi effectively constructs the intersection in a hidden form
-/// that only the garbled circuit can read and operate on.
-/// (2) Turns the circuit inputs into bundles that are easier to operate on in swanky's
-/// fancy garbling.
-/// (3) Takes the output of the Base Psi and turns it into a garbled intersection bit
-/// vector which indicates the presence or abscence of a primary key.
-/// (4) Computes the user defined circuit on the parties' inputs.
+/// 0. Check that the set of primary keys has the same size as the set of
+///    payloads if the latter is not empty.
+/// 1. Call the Base PSI to create the circuit's input. The Base PSI effectively
+///    constructs the intersection in a hidden form that only the garbled
+///    circuit can read and operate on.
+/// 2. Turn the circuit inputs into bundles that are easier to operate on.
+/// 3. Take the output of the Base PSI and turns it into an intersection
+///    bit vector which indicates the presence or abscence of a primary key.
+/// 4. Computes the user defined circuit on the parties' inputs.
 pub fn intersect_with_payloads<
     F: FancyBinary + FancyEncode<F2> + FancyReceive<F2>,
     B: BasePsi,
