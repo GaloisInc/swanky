@@ -6,7 +6,7 @@ use rand::{CryptoRng, RngExt};
 use std::collections::HashSet;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
@@ -104,9 +104,8 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     Sender<OPRF>
 {
     /// Initialize the OPPRF sender.
-    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
+    pub fn init<RNG>(channel: &mut Channel, rng: &mut RNG) -> Result<Self>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         let oprf = OPRF::init(channel, rng)?;
@@ -115,24 +114,21 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
 
     /// Run the OPPRF for `ninputs` inputs with the pairs given in
     /// `points` as the programmed points.
-    pub fn send<C, RNG>(
+    pub fn send<RNG>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         points: &[(Block, Block512)],
         ninputs: usize,
         rng: &mut RNG,
     ) -> Result<()>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         let params = Parameters::new(ninputs)?;
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
-            let h = channel
-                .read_block()
-                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+            let h = channel.read::<Block>()?;
             let aes = Aes128EncryptOnly::new_with_key(h);
             hashkeys.push(aes);
         }
@@ -186,16 +182,15 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         Ok(())
     }
 
-    fn process_oprf_output<C, RNG>(
+    fn process_oprf_output<RNG>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         seed: Block512,
         points: Vec<(Block, Block512)>,
         npoints: usize,
         rng: &mut RNG,
     ) -> Result<()>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         // Check that all input points are unique.
@@ -246,9 +241,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
             if map.len() == points.len() {
                 // Success! Send `m` to the receiver and exit the loop.
-                channel
-                    .write_usize(m)
-                    .wrap_err(ErrorKind::NetworkError, "Unable to write usize")?;
+                channel.write(&m)?;
                 break;
             }
             // Failure :-(. Increment `offset` and try again.
@@ -266,16 +259,12 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             }
         }
         // Send `v` and `table` to the receiver.
-        channel
-            .write_block(&v)
-            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        channel.write(&v)?;
         for entry in table.iter() {
-            channel
-                .write_block512(entry)
-                .wrap_err(ErrorKind::NetworkError, "Unable to write block512")?;
+            channel.write_bytes(entry.as_ref())?;
         }
         channel
-            .flush()
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(())
     }
@@ -308,9 +297,8 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     Receiver<OPRF>
 {
     /// Initialize the OPPRF receiver.
-    pub fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
+    pub fn init<RNG>(channel: &mut Channel, rng: &mut RNG) -> Result<Self>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         let oprf = OPRF::init(channel, rng)?;
@@ -318,14 +306,13 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     }
 
     /// Run the OPPRF on inputs provided by the `inputs` slice.
-    pub fn receive<C, RNG>(
+    pub fn receive<RNG>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         inputs: &[Block],
         rng: &mut RNG,
     ) -> Result<Vec<Block512>>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         let params = Parameters::new(inputs.len())?;
@@ -349,12 +336,10 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 table = table_;
                 // Send `hashkeys` to the sender.
                 for h in hashkeys.into_iter() {
-                    channel
-                        .write_block(&h)
-                        .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+                    channel.write(&h)?;
                 }
                 channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
                 break;
             }
@@ -379,17 +364,14 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 
         let zero = Block512::default();
         for (item, output) in table.items.into_iter().zip(oprf_outputs) {
-            let m = channel
-                .read_usize()
-                .wrap_err(ErrorKind::NetworkError, "Unable to read usize")?;
-            let v = channel
-                .read_block()
-                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+            let m = channel.read::<usize>()?;
+            let v = channel.read::<Block>()?;
             let h = hash_output(v, output, m);
             let mut output = output;
             for i in 0..m {
-                let entry = channel
-                    .read_block512()
+                let mut entry = Block512::default();
+                channel
+                    .read_bytes(entry.as_mut())
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block512")?;
                 output ^= if i == h { entry } else { zero };
             }
@@ -409,11 +391,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
 mod tests {
     use super::*;
     use super::{Receiver as KmprtReceiver, Sender as KmprtSender};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_rng::SwankyRng;
 
     fn _test_opprf_points(ninputs: usize, npoints: usize, npoints_bound: usize) {
@@ -431,26 +409,23 @@ mod tests {
             .iter()
             .map(|(_, y)| *y)
             .collect::<Vec<Block512>>();
-        let (sender, receiver) = UnixStream::pair().unwrap();
         let points_ = points.clone();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut oprf =
-                KmprtSender::<swanky_oprf_kkrt::Sender>::init(&mut channel, &mut rng).unwrap();
-            oprf.send(&mut channel, &points_, ninputs, &mut rng)
-                .unwrap();
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut oprf =
-            KmprtReceiver::<swanky_oprf_kkrt::Receiver>::init(&mut channel, &mut rng).unwrap();
-        let outputs = oprf.receive(&mut channel, &xs, &mut rng).unwrap();
-        handle.join().unwrap();
+        let (_, outputs) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut oprf = KmprtSender::<swanky_oprf_kkrt::Sender>::init(c, &mut rng).unwrap();
+                oprf.send(c, &points_, ninputs, &mut rng).unwrap();
+                Ok(())
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut oprf =
+                    KmprtReceiver::<swanky_oprf_kkrt::Receiver>::init(c, &mut rng).unwrap();
+                Ok(oprf.receive(c, &xs, &mut rng).unwrap())
+            },
+        )
+        .unwrap();
+
         let mut okay = true;
         for j in 0..ninputs {
             if ys[j] != outputs[j] {

@@ -13,7 +13,7 @@ workspace = true
 [dependencies]
 swanky-adversary.workspace = true
 swanky-block.workspace = true
-swanky-channel-legacy.workspace = true
+swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-oprf-kkrt.workspace = true
 swanky-oprf-traits.workspace = true
@@ -22,6 +22,7 @@ vectoreyes.workspace = true
 rand.workspace = true
 
 [dev-dependencies]
+swanky-channel-tracking.workspace = true
 swanky-rng.workspace = true
 
 criterion.workspace = true

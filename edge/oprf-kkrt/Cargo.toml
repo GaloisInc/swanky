@@ -14,7 +14,7 @@ workspace = true
 swanky-adversary.workspace = true
 swanky-bit-matrix-transpose.workspace = true
 swanky-block.workspace = true
-swanky-channel-legacy.workspace = true
+swanky-channel.workspace = true
 swanky-cointoss.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true
@@ -26,3 +26,6 @@ swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
 rand.workspace = true
+
+[dev-dependencies]
+swanky-channel-tracking.workspace = true

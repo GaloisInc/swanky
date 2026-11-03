@@ -1,7 +1,8 @@
 use rand::RngExt;
-use std::time::SystemTime;
+use std::{os::unix::net::UnixStream, time::SystemTime};
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::track_unix_channel_pair;
+use swanky_channel::Channel;
+use swanky_channel_tracking::TrackChannel;
 use swanky_rng::SwankyRng;
 
 fn rand_block_vec(size: usize) -> Vec<Block> {
@@ -15,23 +16,31 @@ fn run(ninputs: usize, npoints: usize) {
     let points = (0..npoints)
         .map(|_| (rng.random(), rng.random()))
         .collect::<Vec<(Block, Block512)>>();
-    let (mut sender, mut receiver) = track_unix_channel_pair();
+    let (sender, receiver) = UnixStream::pair().unwrap();
+
     let total = SystemTime::now();
+
     let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let start = SystemTime::now();
-        let mut oprf: swanky_oprf_kmprt::Sender =
-            swanky_oprf_kmprt::Sender::init(&mut sender, &mut rng).unwrap();
-        println!(
-            "Sender init time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
-        oprf.send(&mut sender, &points, ninputs, &mut rng).unwrap();
-        println!(
-            "Sender send time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
+        let mut sender = TrackChannel::new(sender);
+        Channel::with(&mut sender, |c| {
+            let mut rng = SwankyRng::new();
+            let start = SystemTime::now();
+            let mut oprf: swanky_oprf_kmprt::Sender =
+                swanky_oprf_kmprt::Sender::init(c, &mut rng).unwrap();
+            println!(
+                "Sender init time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            oprf.send(c, &points, ninputs, &mut rng).unwrap();
+            println!(
+                "Sender send time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            Ok(())
+        })
+        .unwrap();
+
         println!(
             "Sender communication (read): {:.2} Mb",
             sender.kilobits_read() / 1000.0
@@ -41,21 +50,29 @@ fn run(ninputs: usize, npoints: usize) {
             sender.kilobits_written() / 1000.0
         );
     });
-    let mut rng = SwankyRng::new();
-    let start = SystemTime::now();
-    let mut oprf: swanky_oprf_kmprt::Receiver =
-        swanky_oprf_kmprt::Receiver::init(&mut receiver, &mut rng).unwrap();
-    println!(
-        "Receiver init time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    let start = SystemTime::now();
-    let _ = oprf.receive(&mut receiver, &inputs, &mut rng).unwrap();
-    println!(
-        "Receiver send time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
+
+    let mut receiver = TrackChannel::new(receiver);
+    Channel::with(&mut receiver, |c| {
+        let mut rng = SwankyRng::new();
+        let start = SystemTime::now();
+        let mut oprf: swanky_oprf_kmprt::Receiver =
+            swanky_oprf_kmprt::Receiver::init(c, &mut rng).unwrap();
+        println!(
+            "Receiver init time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        let start = SystemTime::now();
+        let _ = oprf.receive(c, &inputs, &mut rng).unwrap();
+        println!(
+            "Receiver send time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        Ok(())
+    })
+    .unwrap();
+
     handle.join().unwrap();
+
     println!(
         "Receiver communication (read): {:.2} Mb",
         receiver.kilobits_read() / 1000.0
@@ -64,6 +81,7 @@ fn run(ninputs: usize, npoints: usize) {
         "Receiver communication (write): {:.2} Mb",
         receiver.kilobits_written() / 1000.0
     );
+
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 

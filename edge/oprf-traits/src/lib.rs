@@ -2,7 +2,7 @@
 //! Base traits impl-ed by all our OPRF implementations
 
 use rand::CryptoRng;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::Result;
 
 /// Trait containing the associated types used by an oblivious PRF.
@@ -24,11 +24,11 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self>;
+    fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self>;
     /// Runs `m` OPRF instances as the sender, returning the OPRF seeds.
-    fn send<C: AbstractChannel, RNG: CryptoRng>(
+    fn send<RNG: CryptoRng>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         m: usize,
         rng: &mut RNG,
     ) -> Result<Vec<Self::Seed>>;
@@ -42,11 +42,11 @@ where
     Self: Sized,
 {
     /// Runs any one-time initialization.
-    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self>;
+    fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self>;
     /// Runs the oblivious PRF on inputs `inputs`, returning the OPRF outputs.
-    fn receive<C: AbstractChannel, RNG: CryptoRng>(
+    fn receive<RNG: CryptoRng>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>>;
