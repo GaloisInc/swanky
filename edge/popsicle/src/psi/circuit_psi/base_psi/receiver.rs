@@ -1,4 +1,4 @@
-use rand::{CryptoRng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt};
 
 use crate::{
     circuit_psi::{
@@ -16,7 +16,7 @@ use crate::{
 use fancy_traits::{FancyEncode, FancyReceive};
 use swanky_block::Block512;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, WrapErr};
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_oprf_kmprt::Receiver as KmprtReceiver;
 use vectoreyes::U8x16;
@@ -65,13 +65,9 @@ impl BasePsi for OpprfReceiver {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(
-        channel: &mut Channel,
-        rng: &mut RNG,
-        has_payload: bool,
-    ) -> swanky_error::Result<Self>
+    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self>
     where
-        RNG: CryptoRng + SeedableRng,
+        RNG: CryptoRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
@@ -106,9 +102,9 @@ impl BasePsi for OpprfReceiver {
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
+    ) -> Result<()>
     where
-        RNG: CryptoRng + SeedableRng,
+        RNG: CryptoRng,
     {
         let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
 
@@ -141,13 +137,9 @@ impl BasePsi for OpprfReceiver {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(
-        &mut self,
-        channel: &mut Channel,
-        rng: &mut RNG,
-    ) -> swanky_error::Result<()>
+    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<()>
     where
-        RNG: CryptoRng + SeedableRng,
+        RNG: CryptoRng,
     {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed
@@ -172,14 +164,11 @@ impl BasePsi for OpprfReceiver {
         }
         Ok(())
     }
-    fn encode_circuit_inputs<F>(
+    fn encode_circuit_inputs<F: FancyEncode<F2> + FancyReceive<F2>>(
         &mut self,
-        gc_party: &mut F,
+        backend: &mut F,
         channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitInputs<F::Item>>
-    where
-        F: FancyEncode<F2> + FancyReceive<F2>,
-    {
+    ) -> Result<CircuitInputs<F::Item>> {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in
         // bytes, turning it into bits, and then multiplying it by the
@@ -189,11 +178,11 @@ impl BasePsi for OpprfReceiver {
 
         // First receive encoded inputs from the `OpprfSender`
         let sender_primary_keys: Vec<F::Item> =
-            bin_receive_many_block512(gc_party, primary_keys_binary_len, channel)?;
+            bin_receive_many_block512(backend, primary_keys_binary_len, channel)?;
 
         // Then send encoded inputs
         let receiver_primary_keys: Vec<F::Item> = bin_encode_many_block512(
-            gc_party,
+            backend,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
             channel,
@@ -216,15 +205,15 @@ impl BasePsi for OpprfReceiver {
             let payloads_binary_len = PAYLOAD_SIZE * 8 * self.state.opprf_payloads_in.len();
 
             let sender_payloads: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, payloads_binary_len, channel)?;
+                bin_receive_many_block512(backend, payloads_binary_len, channel)?;
             let receiver_payloads: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
+                backend,
                 &self.state.opprf_payloads_in,
                 PAYLOAD_SIZE,
                 channel,
             )?;
             let masks: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
+                backend,
                 &self.state.opprf_payloads_out,
                 PAYLOAD_SIZE,
                 channel,

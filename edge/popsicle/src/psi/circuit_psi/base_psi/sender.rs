@@ -1,4 +1,4 @@
-use rand::{CryptoRng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt};
 
 use crate::{
     circuit_psi::{
@@ -16,7 +16,7 @@ use crate::{
 use fancy_traits::{FancyEncode, FancyReceive};
 use swanky_block::Block512;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, WrapErr};
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_oprf_kmprt::Sender as KmprtSender;
 use vectoreyes::U8x16;
@@ -66,13 +66,9 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(
-        channel: &mut Channel,
-        rng: &mut RNG,
-        has_payload: bool,
-    ) -> swanky_error::Result<Self>
+    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self>
     where
-        RNG: CryptoRng + SeedableRng,
+        RNG: CryptoRng,
     {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
@@ -105,9 +101,9 @@ impl BasePsi for OpprfSender {
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
+    ) -> Result<()>
     where
-        RNG: CryptoRng + SeedableRng,
+        RNG: CryptoRng,
     {
         // refresh key if cuckoo hash is full
         self.key = channel.read::<U8x16>()?;
@@ -167,13 +163,9 @@ impl BasePsi for OpprfSender {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(
-        &mut self,
-        channel: &mut Channel,
-        rng: &mut RNG,
-    ) -> swanky_error::Result<()>
+    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<()>
     where
-        RNG: CryptoRng + SeedableRng,
+        RNG: CryptoRng,
     {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs
@@ -204,23 +196,20 @@ impl BasePsi for OpprfSender {
         }
         Ok(())
     }
-    fn encode_circuit_inputs<F>(
+    fn encode_circuit_inputs<F: FancyEncode<F2> + FancyReceive<F2>>(
         &mut self,
-        gc_party: &mut F,
+        backend: &mut F,
         channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitInputs<F::Item>>
-    where
-        F: FancyEncode<F2> + FancyReceive<F2>,
-    {
+    ) -> Result<CircuitInputs<F::Item>> {
         let sender_primary_keys = bin_encode_many_block512(
-            gc_party,
+            backend,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
             channel,
         )?;
 
         let receiver_primary_keys =
-            bin_receive_many_block512(gc_party, sender_primary_keys.len(), channel)?;
+            bin_receive_many_block512(backend, sender_primary_keys.len(), channel)?;
 
         let mut result = CircuitInputs {
             sender_primary_keys,
@@ -233,16 +222,16 @@ impl BasePsi for OpprfSender {
         // If payloads exist, then encode them
         if !&self.state.opprf_payloads_out.is_empty() {
             let sender_payloads_masked: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
+                backend,
                 &self.state.opprf_payloads_out,
                 PAYLOAD_SIZE,
                 channel,
             )?;
             let receiver_payloads: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, sender_payloads_masked.len(), channel)?;
+                bin_receive_many_block512(backend, sender_payloads_masked.len(), channel)?;
 
             let masks: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, sender_payloads_masked.len(), channel)?;
+                bin_receive_many_block512(backend, sender_payloads_masked.len(), channel)?;
 
             result.sender_payloads_masked = sender_payloads_masked;
             result.receiver_payloads = receiver_payloads;

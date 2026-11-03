@@ -2,8 +2,9 @@
 //! inputs prior to calling the circuit in the circuit psi
 use crate::circuit_psi::{CircuitInputs, Payload, PrimaryKey};
 use fancy_traits::{FancyEncode, FancyReceive};
-use rand::{CryptoRng, SeedableRng};
+use rand::CryptoRng;
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_field_binary::F2;
 
 // The number of hash functions that will be used to attempt to
@@ -29,26 +30,25 @@ pub mod sender;
 /// performed in the garbled circuit with no a-priori pre-processing computation).
 pub trait BasePsi {
     /// Initializes the BasePsi party
-    fn init<RNG>(
+    fn init<RNG: CryptoRng>(
         channel: &mut Channel,
         rng: &mut RNG,
         has_payload: bool,
-    ) -> swanky_error::Result<Self>
+    ) -> Result<Self>
     where
-        Self: Sized,
-        RNG: CryptoRng + SeedableRng;
+        Self: Sized;
+
     /// Parties locally hash their inputs
     ///
     /// This allows them to agree on an ordering of their inputs.
-    fn hash_data<RNG>(
+    fn hash_data<RNG: CryptoRng>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
-    where
-        RNG: CryptoRng + SeedableRng;
+    ) -> Result<()>;
+
     /// Parties call an OPPRF on their inputs
     ///
     /// This allows them to agree on a hidden representation of
@@ -56,34 +56,30 @@ pub trait BasePsi {
     /// in a garbled circuit. This additionally allows them to mask
     /// their payloads so that only payloads associated with intersection
     /// are kept in the garbled circuit.
-    fn opprf_exchange<RNG>(
+    fn opprf_exchange<RNG: CryptoRng>(
         &mut self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
-    where
-        RNG: CryptoRng + SeedableRng;
+    ) -> Result<()>;
+
     /// Parties turn their inputs into garbled wires
-    fn encode_circuit_inputs<F>(
+    fn encode_circuit_inputs<F: FancyEncode<F2> + FancyReceive<F2>>(
         &mut self,
         gc_party: &mut F,
         channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitInputs<F::Item>>
-    where
-        F: FancyEncode<F2> + FancyReceive<F2>;
+    ) -> Result<CircuitInputs<F::Item>>;
+
     /// A wrapper that calls the different pieces of the BasePsi in order
     /// to the necessary hidden inputs that the CircuitPsi can operate on.
-    fn base_psi<F, RNG>(
+    fn base_psi<F: FancyEncode<F2> + FancyReceive<F2>>(
         gc_party: &mut F,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
-        rng: &mut RNG,
-    ) -> swanky_error::Result<CircuitInputs<F::Item>>
+        rng: &mut impl CryptoRng,
+    ) -> Result<CircuitInputs<F::Item>>
     where
         Self: Sized,
-        F: FancyEncode<F2> + FancyReceive<F2>,
-        RNG: CryptoRng + SeedableRng,
     {
         let has_payloads = payloads.is_some();
 

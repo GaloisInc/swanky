@@ -2,7 +2,7 @@
 use crate::cuckoo::CuckooItem;
 use fancy_traits::{FancyEncode, FancyReceive};
 use itertools::Itertools;
-use rand::{CryptoRng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt};
 use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
@@ -40,9 +40,9 @@ pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
         .collect()
 }
 
-pub(crate) fn cuckoo_place_ids<RNG: CryptoRng + SeedableRng>(
+pub(crate) fn cuckoo_place_ids(
     cuckoo: &[Option<CuckooItem>],
-    rng: &mut RNG,
+    rng: &mut impl CryptoRng,
 ) -> Vec<U8x16> {
     cuckoo
         .iter()
@@ -53,10 +53,10 @@ pub(crate) fn cuckoo_place_ids<RNG: CryptoRng + SeedableRng>(
         .collect::<Vec<U8x16>>()
 }
 
-pub(crate) fn cuckoo_place_payloads<RNG: CryptoRng + SeedableRng>(
+pub(crate) fn cuckoo_place_payloads(
     cuckoo: &[Option<CuckooItem>],
     payloads: &[Block512],
-    rng: &mut RNG,
+    rng: &mut impl CryptoRng,
 ) -> Vec<Block512> {
     cuckoo
         .iter()
