@@ -18,6 +18,58 @@
 //! reference (which automatically implements `std::io::Read` and
 //! `std::io::Write` as well) instead, so that the value is still
 //! accessible when the communication has completed.
+//!
+//! For example:
+//!
+//! ```
+//! use std::os::unix::net::UnixStream;
+//!
+//! use swanky_channel::Channel;
+//! use swanky_channel_tracking::TrackChannel;
+//! use swanky_error::Result;
+//!
+//! fn do_a_work(c: &mut Channel) -> Result<i32> {
+//!     c.write(&17)?;
+//!     c.read()
+//! }
+//!
+//! fn do_b_work(c: &mut Channel) -> Result<i32> {
+//!     let res = c.read()?;
+//!     c.write(&71)?;
+//!     Ok(res)
+//! }
+//!
+//! fn main() {
+//!     let (sender, receiver) = UnixStream::pair().unwrap();
+//!     let handle = std::thread::spawn(move || {
+//!         let mut sender = TrackChannel::new(sender);
+//!         let a_res = Channel::with(&mut sender, |c| {
+//!             do_a_work(c)
+//!         }).unwrap();
+//!         println!(
+//!             "Sender communication (read): {:.2} Kb",
+//!             sender.kilobits_read()
+//!         );
+//!         println!(
+//!             "Sender communication (write): {:.2} Kb",
+//!             sender.kilobits_written()
+//!         );
+//!     });
+//!     let mut receiver = TrackChannel::new(receiver);
+//!     let b_res = Channel::with(&mut receiver, |c| {
+//!         do_b_work(c)
+//!     }).unwrap();
+//!     handle.join().unwrap();
+//!     println!(
+//!         "Receiver communication (read): {:.2} Kb",
+//!         receiver.kilobits_read()
+//!     );
+//!     println!(
+//!         "Receiver communication (write): {:.2} Kb",
+//!         receiver.kilobits_written()
+//!     );
+//! }
+//! ```
 
 use std::io::{Read, Write};
 
