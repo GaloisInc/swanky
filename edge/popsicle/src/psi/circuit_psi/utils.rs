@@ -8,26 +8,34 @@ use swanky_channel::Channel;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
-/// Turn a vector of bits represented as u16 into a decimal
-/// value represented as a u128.
-/// We represent bits as u16 in accordance with fancy's representation
+/// Turn a vector of [`F2`] elements into a [`u128`].
+///
+/// # Panics
+/// Panics if the vector contains more than 128 elements.
 pub fn binary_to_u128(bin: Vec<F2>) -> u128 {
+    assert!(bin.len() <= 128);
+
     let mut acc: u128 = 0;
     for (i, s) in bin.into_iter().enumerate() {
-        acc += (u16::from(s) as u128) << i;
+        acc += (bool::from(s) as u128) << i;
     }
     acc
 }
 
-/// Create a vector of Block512, from a vector of u64s
+/// Create a vector of [`Block512`]s from a vector of [`u128`]s, where `size`
+/// denotes the number of bytes to use from each [`u128`].
+///
+/// # Panics
+/// Panics if `size > 16`.
 pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
+    assert!(size <= 16);
     values
         .into_iter()
         .map(|item| {
-            let value_bytes = item.to_le_bytes();
-            let mut res_block = [0_u8; 64];
-            res_block[0..size].clone_from_slice(&value_bytes[..size]);
-            Block512::from(res_block)
+            let bytes = item.to_le_bytes();
+            let mut block = [0; 64];
+            block[0..size].clone_from_slice(&bytes[..size]);
+            Block512::from(block)
         })
         .collect()
 }
