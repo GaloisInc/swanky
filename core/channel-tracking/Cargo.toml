@@ -1,0 +1,17 @@
+[package]
+name = "swanky-channel-tracking"
+description = "A full-duplex channel wrapper that tracks read/write statistics"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+swanky-channel.workspace = true
+swanky-error.workspace = true

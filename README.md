@@ -16,6 +16,7 @@ have a lesser stability guarantee.
 ## Core
 - **`swanky-adversary`**: Traits describing MPC adversaries.
 - **`swanky-channel`**: A channel abstraction to let users avoid manual flushing
+- **`swanky-channel-tracking`**: A full-duplex channel wrapper that tracks read/write statistics
 - **`swanky-error`**: A common error type for Swanky.
 - **`swanky-party`**: Support for types indexed by a party.
 - **`swanky-rng`**: Pseudorandom number generators for use in Swanky.

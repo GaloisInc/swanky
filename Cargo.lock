@@ -2230,6 +2230,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "swanky-channel-tracking"
+version = "0.6.0"
+dependencies = [
+ "swanky-channel",
+ "swanky-error",
+]
+
+[[package]]
 name = "swanky-cointoss"
 version = "0.6.0"
 dependencies = [
