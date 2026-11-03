@@ -1,6 +1,5 @@
 //! Various utils for PSTY
 use crate::cuckoo::CuckooItem;
-use fancy_circuits::util::{PRIMES, crt, crt_inv, primes_with_width};
 use fancy_traits::FancyEncode;
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
@@ -17,41 +16,6 @@ pub fn binary_to_u128(bin: Vec<F2>) -> u128 {
         acc += (u16::from(s) as u128) << i;
     }
     acc
-}
-
-fn block512_to_crt(b: Block512, size: usize) -> Vec<u16> {
-    let size_b = size / 8;
-    let b_val = b.prefix(size_b);
-
-    let mut b_128 = [0_u8; 16];
-    b_128[..size_b].clone_from_slice(&b_val[..size_b]);
-
-    let q = primes_with_width(size);
-    crt(u128::from_le_bytes(b_128), &q)
-}
-
-/// Hide a value with a mask under crt. Assumes payloads are up to 64bit long
-pub fn mask_payload_crt(x: Block512, y: Block512, size: usize) -> Block512 {
-    let x_crt = block512_to_crt(x, size);
-    let y_crt = block512_to_crt(y, size);
-
-    let q = primes_with_width(size);
-
-    let mut res_crt = Vec::new();
-    for i in 0..q.len() {
-        res_crt.push((x_crt[i] + y_crt[i]) % q[i]);
-    }
-    let res = crt_inv(&res_crt, &q).to_le_bytes();
-    let y_bytes = y.prefix(size);
-    let mut block = [0_u8; 64];
-    for i in 0..size {
-        if i < size / 8 {
-            block[i] = res[i];
-        } else {
-            block[i] = y_bytes[i];
-        }
-    }
-    Block512::from(block)
 }
 
 /// Hide a value with a mask under crt. Assumes payloads are up to 64bit long
@@ -109,22 +73,6 @@ pub fn encode_binary(values: &[Block512], input_size: usize) -> Vec<u16> {
             blk.prefix(input_size)
                 .iter()
                 .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
-        })
-        .collect()
-}
-
-/// Encoding Payloads's before passing them to GC.
-/// Note that we are only looking at PAYLOAD_SIZE bytes
-/// of the payloads.
-pub fn encode_crt(values: &[Block512], output_size: usize, input_size: usize) -> Vec<u16> {
-    let q = &PRIMES[..output_size];
-    values
-        .iter()
-        .flat_map(|blk| {
-            let b = blk.prefix(input_size);
-            let mut b_8 = [0_u8; 16];
-            b_8[..input_size].copy_from_slice(&b[..input_size]);
-            crt(u128::from_le_bytes(b_8), q)
         })
         .collect()
 }
