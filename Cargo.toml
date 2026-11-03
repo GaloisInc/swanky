@@ -33,7 +33,6 @@ members = [
   "edge/field-fft",
   "edge/field-test",
   "edge/flatbuffer-build",
-  "edge/garbled-nn",
   "edge/humidor",
   "edge/inferno",
   "edge/keyed_arena",
@@ -113,7 +112,6 @@ swanky-field-ff-primes = { path = "edge/field-ff-primes" }
 swanky-field-fft = { path = "edge/field-fft" }
 swanky-field-test = { path = "edge/field-test" }
 swanky-flatbuffer-build = { path = "edge/flatbuffer-build" }
-swanky-garbled-nn = { path = "edge/garbled-nn" }
 swanky-malicious-hooks = { path = "edge/malicious-hooks" }
 swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
 swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }

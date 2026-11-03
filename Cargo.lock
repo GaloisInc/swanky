@@ -2392,32 +2392,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-garbled-nn"
-version = "0.6.0"
-dependencies = [
- "clap",
- "criterion",
- "fancy-analyzer",
- "fancy-circuits",
- "fancy-garbling",
- "fancy-plaintext",
- "fancy-traits",
- "itertools 0.15.0",
- "ndarray",
- "rand",
- "serde",
- "serde_json",
- "swanky-channel",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-iknp",
- "swanky-ot-traits-new",
- "swanky-rng",
- "swanky-twopac",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-malicious-hooks"
 version = "0.6.0"
 
