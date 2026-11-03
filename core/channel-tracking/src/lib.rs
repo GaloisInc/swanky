@@ -19,7 +19,7 @@
 //! `std::io::Write` as well) instead, so that the value is still
 //! accessible when the communication has completed.
 //!
-//! For example:
+//! ## Example
 //!
 //! ```
 //! use std::os::unix::net::UnixStream;
