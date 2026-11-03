@@ -177,11 +177,10 @@ impl BasePsi for OpprfReceiver {
         let primary_keys_binary_len = PRIMARY_KEY_SIZE * 8 * self.state.opprf_primary_keys_in.len();
 
         // First receive encoded inputs from the `OpprfSender`
-        let sender_primary_keys: Vec<F::Item> =
-            bin_receive_many_block512(backend, primary_keys_binary_len, channel)?;
+        let sender_primary_keys = backend.receive_many(primary_keys_binary_len, channel)?;
 
         // Then send encoded inputs
-        let receiver_primary_keys: Vec<F::Item> = bin_encode_many_block512(
+        let receiver_primary_keys = bin_encode_many_block512(
             backend,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
@@ -204,15 +203,14 @@ impl BasePsi for OpprfReceiver {
             // Note that PSTY expects parties to have the same set sizes.
             let payloads_binary_len = PAYLOAD_SIZE * 8 * self.state.opprf_payloads_in.len();
 
-            let sender_payloads: Vec<F::Item> =
-                bin_receive_many_block512(backend, payloads_binary_len, channel)?;
-            let receiver_payloads: Vec<F::Item> = bin_encode_many_block512(
+            let sender_payloads = backend.receive_many(payloads_binary_len, channel)?;
+            let receiver_payloads = bin_encode_many_block512(
                 backend,
                 &self.state.opprf_payloads_in,
                 PAYLOAD_SIZE,
                 channel,
             )?;
-            let masks: Vec<F::Item> = bin_encode_many_block512(
+            let masks = bin_encode_many_block512(
                 backend,
                 &self.state.opprf_payloads_out,
                 PAYLOAD_SIZE,

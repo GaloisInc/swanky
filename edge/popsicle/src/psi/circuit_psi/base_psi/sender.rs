@@ -208,8 +208,7 @@ impl BasePsi for OpprfSender {
             channel,
         )?;
 
-        let receiver_primary_keys =
-            bin_receive_many_block512(backend, sender_primary_keys.len(), channel)?;
+        let receiver_primary_keys = backend.receive_many(sender_primary_keys.len(), channel)?;
 
         let mut result = CircuitInputs {
             sender_primary_keys,
@@ -221,17 +220,15 @@ impl BasePsi for OpprfSender {
 
         // If payloads exist, then encode them
         if !&self.state.opprf_payloads_out.is_empty() {
-            let sender_payloads_masked: Vec<F::Item> = bin_encode_many_block512(
+            let sender_payloads_masked = bin_encode_many_block512(
                 backend,
                 &self.state.opprf_payloads_out,
                 PAYLOAD_SIZE,
                 channel,
             )?;
-            let receiver_payloads: Vec<F::Item> =
-                bin_receive_many_block512(backend, sender_payloads_masked.len(), channel)?;
+            let receiver_payloads = backend.receive_many(sender_payloads_masked.len(), channel)?;
 
-            let masks: Vec<F::Item> =
-                bin_receive_many_block512(backend, sender_payloads_masked.len(), channel)?;
+            let masks = backend.receive_many(sender_payloads_masked.len(), channel)?;
 
             result.sender_payloads_masked = sender_payloads_masked;
             result.receiver_payloads = receiver_payloads;

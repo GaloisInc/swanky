@@ -1,10 +1,11 @@
 //! Various utils for PSTY
 use crate::cuckoo::CuckooItem;
-use fancy_traits::{FancyEncode, FancyReceive};
+use fancy_traits::FancyEncode;
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt};
 use swanky_block::Block512;
 use swanky_channel::Channel;
+use swanky_error::Result;
 use swanky_field_binary::F2;
 use vectoreyes::U8x16;
 
@@ -67,16 +68,17 @@ pub(crate) fn cuckoo_place_payloads(
         .collect::<Vec<Block512>>()
 }
 
-/// Encoding ID's before passing them to GC.
-/// Note that we are only looking at HASH_SIZE bytes
-/// of the IDs.
-pub(crate) fn encode_binary(values: &[Block512], input_size: usize) -> Vec<u16> {
+/// Convert a slice of [`Block512`]s into a (flat) vector of [`F2`]s, taking the
+/// first `n` bits of each [`Block512`].
+pub(crate) fn encode_binary(values: &[Block512], n: usize) -> Vec<F2> {
     values
         .iter()
         .flat_map(|blk| {
-            blk.prefix(input_size)
-                .iter()
-                .flat_map(|byte| (0..8).map(|i| u16::from((byte >> i) & 1_u8)).collect_vec())
+            blk.prefix(n).iter().flat_map(|byte| {
+                (0..8)
+                    .map(|i| F2::from(((byte >> i) & 1) != 0))
+                    .collect::<Vec<_>>()
+            })
         })
         .collect()
 }
@@ -106,38 +108,14 @@ pub(crate) fn flatten_bins_payloads(
         .collect_vec()
 }
 
-/// A wrapper function that encodes `Block512` as garbled
-/// circuit inputs
-pub(crate) fn bin_encode_many_block512<F>(
-    gc_party: &mut F,
-    values: &[Block512],
-    size: usize,
+/// Encode a slice of [`Block512`]s to a vector `Fancy` items, using only the
+/// first `n` bits of each [`Block512`].
+pub(crate) fn bin_encode_many_block512<F: FancyEncode<F2>>(
+    backend: &mut F,
+    blocks: &[Block512],
+    n: usize,
     channel: &mut Channel,
-) -> swanky_error::Result<Vec<F::Item>>
-where
-    F: FancyEncode<F2>,
-{
-    let bits = encode_binary(values, size);
-    // Then specify the moduli of the wires
-    gc_party.encode_many(
-        &bits
-            .into_iter()
-            .map(|bit| F2::from(bit != 0))
-            .collect::<Vec<_>>(),
-        channel,
-    )
-}
-
-/// A wrapper function that encodes `Block512` as garbled
-/// circuit inputs
-pub(crate) fn bin_receive_many_block512<F>(
-    gc_party: &mut F,
-    size: usize,
-    channel: &mut Channel,
-) -> swanky_error::Result<Vec<F::Item>>
-where
-    F: FancyReceive<F2>,
-{
-    // Specify the moduli of the wires
-    gc_party.receive_many(size, channel)
+) -> Result<Vec<F::Item>> {
+    let bits = encode_binary(blocks, n);
+    backend.encode_many(&bits, channel)
 }
