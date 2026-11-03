@@ -80,8 +80,8 @@ use std::io::{Read, Write};
 /// `C` should ideally be unbuffered.
 pub struct TrackChannel<C: Read + Write> {
     channel: C,
-    bits_read: usize,
-    bits_written: usize,
+    bytes_read: usize,
+    bytes_written: usize,
 }
 
 impl<C: Read + Write> TrackChannel<C> {
@@ -89,8 +89,8 @@ impl<C: Read + Write> TrackChannel<C> {
     pub fn new(channel: C) -> Self {
         Self {
             channel,
-            bits_read: 0,
-            bits_written: 0,
+            bytes_read: 0,
+            bytes_written: 0,
         }
     }
 
@@ -99,34 +99,34 @@ impl<C: Read + Write> TrackChannel<C> {
     /// This allows the channel to be reused for statistics-gathering
     /// without having to create a brand new underlying channel.
     pub fn clear(&mut self) {
-        self.bits_read = 0;
-        self.bits_written = 0;
+        self.bytes_read = 0;
+        self.bytes_written = 0;
     }
 
     /// Return the number of kilobits read from the channel.
     pub fn kilobits_read(&self) -> f64 {
-        self.bits_read as f64 / 1000.0
+        self.bytes_read as f64 / 125.0
     }
 
     /// Return the number of kilobits written from the channel.
     pub fn kilobits_written(&self) -> f64 {
-        self.bits_written as f64 / 1000.0
+        self.bytes_written as f64 / 125.0
     }
 
     /// Return the total amount of communication on the channel (as
     /// kilobits).
     pub fn total_kilobits(&self) -> f64 {
-        (self.bits_read + self.bits_written) as f64 / 1000.0
+        (self.bytes_read + self.bytes_written) as f64 / 125.0
     }
 
     /// Return the number of kilobytes read from the channel.
     pub fn kilobytes_read(&self) -> f64 {
-        self.bits_read as f64 / 8192.0
+        self.bytes_read as f64 / 1000.0
     }
 
     /// Return the number of kilobytes written from the channel.
     pub fn kilobytes_written(&self) -> f64 {
-        self.bits_written as f64 / 8192.0
+        self.bytes_written as f64 / 1000.0
     }
 
     /// Return the total amount of communication on the channel (as
@@ -139,7 +139,7 @@ impl<C: Read + Write> TrackChannel<C> {
 impl<C: Read + Write> Read for TrackChannel<C> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let bytes_read = self.channel.read(buf)?;
-        self.bits_read += bytes_read * 8;
+        self.bytes_read += bytes_read;
         Ok(bytes_read)
     }
 }
@@ -147,7 +147,7 @@ impl<C: Read + Write> Read for TrackChannel<C> {
 impl<C: Read + Write> Write for TrackChannel<C> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let bytes_written = self.channel.write(buf)?;
-        self.bits_written += bytes_written * 8;
+        self.bytes_written += bytes_written;
         Ok(bytes_written)
     }
 
