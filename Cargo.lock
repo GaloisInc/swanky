@@ -2429,7 +2429,8 @@ dependencies = [
  "swanky-adversary",
  "swanky-bit-matrix-transpose",
  "swanky-block",
- "swanky-channel-legacy",
+ "swanky-channel",
+ "swanky-channel-tracking",
  "swanky-cointoss",
  "swanky-error",
  "swanky-field-binary",
@@ -2449,7 +2450,8 @@ dependencies = [
  "rand",
  "swanky-adversary",
  "swanky-block",
- "swanky-channel-legacy",
+ "swanky-channel",
+ "swanky-channel-tracking",
  "swanky-error",
  "swanky-oprf-kkrt",
  "swanky-oprf-traits",
@@ -2462,7 +2464,7 @@ name = "swanky-oprf-traits"
 version = "0.6.0"
 dependencies = [
  "rand",
- "swanky-channel-legacy",
+ "swanky-channel",
  "swanky-error",
 ]
 

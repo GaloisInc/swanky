@@ -12,7 +12,7 @@ use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
@@ -36,9 +36,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
 }
 
 impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
-    fn init<C, RNG>(channel: &mut C, rng: &mut RNG) -> Result<Self>
+    fn init<RNG>(channel: &mut Channel, rng: &mut RNG) -> Result<Self>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         let mut ot = OT::init(channel, rng)?;
@@ -69,9 +68,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
         })
     }
 
-    fn send<C, RNG>(&mut self, channel: &mut C, m: usize, _: &mut RNG) -> Result<Vec<Self::Seed>>
+    fn send<RNG>(&mut self, channel: &mut Channel, m: usize, _: &mut RNG) -> Result<Vec<Self::Seed>>
     where
-        C: AbstractChannel,
         RNG: CryptoRng,
     {
         // Round up if necessary so that `m mod 16 ≡ 0`.
@@ -88,12 +86,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             let range = j * nrows / 8..(j + 1) * nrows / 8;
             let q = &mut qs[range];
             self.rngs[j].fill_bytes(q);
-            channel
-                .read_bytes(&mut t0)
-                .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
-            channel
-                .read_bytes(&mut t1)
-                .wrap_err(ErrorKind::NetworkError, "Unable to read bytes")?;
+            channel.read_bytes(&mut t0)?;
+            channel.read_bytes(&mut t1)?;
             q.iter_mut()
                 .zip(if b.into() { t1.iter() } else { t0.iter() })
                 .for_each(|(a, &b)| *a ^= b);
@@ -152,7 +146,7 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
 }
 
 impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
-    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
+    fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
         let keys = swanky_cointoss::receive(channel, &seeds)
@@ -178,9 +172,9 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
         })
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng>(
+    fn receive<RNG: CryptoRng>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         inputs: &[Self::Input],
         rng: &mut RNG,
     ) -> Result<Vec<Self::Output>> {
@@ -215,17 +209,13 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
             let t1 = &t1s[range];
             self.rngs[j].0.fill_bytes(&mut t);
             t.iter_mut().zip(t0.iter()).for_each(|(a, &b)| *a ^= b);
-            channel
-                .write_bytes(&t)
-                .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
+            channel.write_bytes(&t)?;
             self.rngs[j].1.fill_bytes(&mut t);
             t.iter_mut().zip(t1.iter()).for_each(|(a, &b)| *a ^= b);
-            channel
-                .write_bytes(&t)
-                .wrap_err(ErrorKind::NetworkError, "Unable to write bytes")?;
+            channel.write_bytes(&t)?;
         }
         channel
-            .flush()
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         Ok(out[0..m].to_vec())
     }
@@ -237,12 +227,8 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-        sync::{Arc, Mutex},
-    };
-    use swanky_channel_legacy::Channel;
+    use std::sync::{Arc, Mutex};
+    use swanky_channel::local::local_channel_pair;
     use swanky_rng::SwankyRng;
 
     #[test]
@@ -263,30 +249,30 @@ mod tests {
         let selections_ = selections.clone();
         let results = Arc::new(Mutex::new(vec![]));
         let results_ = results.clone();
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut oprf =
-                Sender::<swanky_ot_alsz_kos::alsz::Receiver>::init(&mut channel, &mut rng).unwrap();
-            let seeds = oprf.send(&mut channel, n, &mut rng).unwrap();
-            let mut results = results.lock().unwrap();
-            *results = selections_
-                .iter()
-                .zip(seeds)
-                .map(|(inp, seed)| oprf.compute(seed, *inp))
-                .collect::<Vec<Block512>>();
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut oprf =
-            Receiver::<swanky_ot_alsz_kos::alsz::Sender>::init(&mut channel, &mut rng).unwrap();
-        let outputs = oprf.receive(&mut channel, &selections, &mut rng).unwrap();
-        handle.join().unwrap();
+
+        let (_, outputs) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut oprf =
+                    Sender::<swanky_ot_alsz_kos::alsz::Receiver>::init(c, &mut rng).unwrap();
+                let seeds = oprf.send(c, n, &mut rng).unwrap();
+                let mut results = results.lock().unwrap();
+                *results = selections_
+                    .iter()
+                    .zip(seeds)
+                    .map(|(&inp, seed)| oprf.compute(seed, inp))
+                    .collect::<Vec<Block512>>();
+                Ok(())
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut oprf =
+                    Receiver::<swanky_ot_alsz_kos::alsz::Sender>::init(c, &mut rng).unwrap();
+                Ok(oprf.receive(c, &selections, &mut rng).unwrap())
+            },
+        )
+        .unwrap();
+
         let results_ = results_.lock().unwrap();
         for j in 0..n {
             assert_eq!(results_[j], outputs[j]);

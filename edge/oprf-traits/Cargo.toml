@@ -11,7 +11,7 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-swanky-channel-legacy.workspace = true
+swanky-channel.workspace = true
 swanky-error.workspace = true
 
 rand.workspace = true

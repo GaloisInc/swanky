@@ -1,6 +1,7 @@
-use std::time::SystemTime;
+use std::{os::unix::net::UnixStream, time::SystemTime};
 use swanky_block::Block;
-use swanky_channel_legacy::track_unix_channel_pair;
+use swanky_channel::Channel;
+use swanky_channel_tracking::TrackChannel;
 use swanky_oprf_kkrt::{Receiver as KkrtReceiver, Sender as KkrtSender};
 use swanky_oprf_traits::{Receiver as _, Sender as _};
 use swanky_rng::SwankyRng;
@@ -11,23 +12,31 @@ fn rand_block_vec(size: usize) -> Vec<Block> {
 
 fn _test_oprf(n: usize) {
     let selections = rand_block_vec(n);
-    let (mut sender, mut receiver) = track_unix_channel_pair();
+    let (sender, receiver) = UnixStream::pair().unwrap();
+
     let total = SystemTime::now();
+
     let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let start = SystemTime::now();
-        let mut oprf: KkrtSender = KkrtSender::init(&mut sender, &mut rng).unwrap();
-        println!(
-            "Sender init time: {} ms",
-            start.elapsed().unwrap().as_millis()
-        );
-        let start = SystemTime::now();
-        let _ = oprf.send(&mut sender, n, &mut rng).unwrap();
-        println!(
-            "[{}] Send time: {} ms",
-            n,
-            start.elapsed().unwrap().as_millis()
-        );
+        let mut sender = TrackChannel::new(sender);
+        Channel::with(&mut sender, |c| {
+            let mut rng = SwankyRng::new();
+            let start = SystemTime::now();
+            let mut oprf: KkrtSender = KkrtSender::init(c, &mut rng).unwrap();
+            println!(
+                "Sender init time: {} ms",
+                start.elapsed().unwrap().as_millis()
+            );
+            let start = SystemTime::now();
+            let _ = oprf.send(c, n, &mut rng).unwrap();
+            println!(
+                "[{}] Send time: {} ms",
+                n,
+                start.elapsed().unwrap().as_millis()
+            );
+            Ok(())
+        })
+        .unwrap();
+
         println!(
             "Sender communication (read): {:.2} Mb",
             sender.kilobits_read() / 1000.0
@@ -37,21 +46,29 @@ fn _test_oprf(n: usize) {
             sender.kilobits_written() / 1000.0
         );
     });
-    let mut rng = SwankyRng::new();
-    let start = SystemTime::now();
-    let mut oprf: KkrtReceiver = KkrtReceiver::init(&mut receiver, &mut rng).unwrap();
-    println!(
-        "Receiver init time: {} ms",
-        start.elapsed().unwrap().as_millis()
-    );
-    let start = SystemTime::now();
-    let _ = oprf.receive(&mut receiver, &selections, &mut rng).unwrap();
-    println!(
-        "[{}] Receiver time: {} ms",
-        n,
-        start.elapsed().unwrap().as_millis()
-    );
+
+    let mut receiver = TrackChannel::new(receiver);
+    Channel::with(&mut receiver, |c| {
+        let mut rng = SwankyRng::new();
+        let start = SystemTime::now();
+        let mut oprf: KkrtReceiver = KkrtReceiver::init(c, &mut rng).unwrap();
+        println!(
+            "Receiver init time: {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
+        let start = SystemTime::now();
+        let _ = oprf.receive(c, &selections, &mut rng).unwrap();
+        println!(
+            "[{}] Receiver time: {} ms",
+            n,
+            start.elapsed().unwrap().as_millis()
+        );
+        Ok(())
+    })
+    .unwrap();
+
     handle.join().unwrap();
+
     println!(
         "Receiver communication (read): {:.2} Mb",
         receiver.kilobits_read() / 1000.0
@@ -60,6 +77,7 @@ fn _test_oprf(n: usize) {
         "Receiver communication (write): {:.2} Mb",
         receiver.kilobits_written() / 1000.0
     );
+
     println!("Total time: {} ms", total.elapsed().unwrap().as_millis());
 }
 

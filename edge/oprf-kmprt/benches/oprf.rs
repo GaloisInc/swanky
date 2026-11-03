@@ -1,13 +1,9 @@
 //! Oblivious pseudorandom function benchmarks using `criterion`.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-    time::Duration,
-};
+use std::time::Duration;
 use swanky_block::{Block, Block512};
-use swanky_channel_legacy::Channel;
+use swanky_channel::local::local_channel_pair;
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
 use swanky_rng::SwankyRng;
 
@@ -25,40 +21,39 @@ fn rand_point_vec(size: usize) -> Vec<(Block, Block512)> {
 }
 
 fn _bench_oprf_init<S: OprfSender, R: OprfReceiver>() {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let _ = S::init(&mut channel, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let _ = R::init(&mut channel, &mut rng).unwrap();
-    handle.join().unwrap();
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let _ = S::init(c, &mut rng).unwrap();
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let _ = R::init(c, &mut rng).unwrap();
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn _bench_oprf<S: OprfSender<Input = Block>, R: OprfReceiver<Input = Block>>(inputs: Vec<Block>) {
-    let (sender, receiver) = UnixStream::pair().unwrap();
     let m = inputs.len();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut oprf = S::init(&mut channel, &mut rng).unwrap();
-        let _ = oprf.send(&mut channel, m, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut oprf = R::init(&mut channel, &mut rng).unwrap();
-    oprf.receive(&mut channel, &inputs, &mut rng).unwrap();
-    handle.join().unwrap();
+
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut oprf = S::init(c, &mut rng).unwrap();
+            let _ = oprf.send(c, m, &mut rng).unwrap();
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut oprf = R::init(c, &mut rng).unwrap();
+            oprf.receive(c, &inputs, &mut rng).unwrap();
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn bench_oprf(c: &mut Criterion) {
@@ -93,22 +88,20 @@ fn bench_oprf(c: &mut Criterion) {
 
 fn bench_oprf_compute(c: &mut Criterion) {
     c.bench_function("oprf::kkrt (compute)", move |bench| {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(receiver.try_clone().unwrap());
-            let writer = BufWriter::new(receiver);
-            let mut channel = Channel::new(reader, writer);
-            let _: swanky_oprf_kmprt::Receiver =
-                swanky_oprf_kmprt::Receiver::init(&mut channel, &mut rng).unwrap();
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let oprf: swanky_oprf_kkrt::Sender =
-            swanky_oprf_kkrt::Sender::init(&mut channel, &mut rng).unwrap();
-        handle.join().unwrap();
+        let (_, oprf): (_, swanky_oprf_kkrt::Sender) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let _: swanky_oprf_kmprt::Receiver =
+                    swanky_oprf_kmprt::Receiver::init(c, &mut rng).unwrap();
+                Ok(())
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                Ok(swanky_oprf_kkrt::Sender::init(c, &mut rng).unwrap())
+            },
+        )
+        .unwrap();
+
         let seed = rand::random::<Block512>();
         let input = rand::random::<Block>();
         bench.iter(|| {
@@ -119,23 +112,21 @@ fn bench_oprf_compute(c: &mut Criterion) {
 }
 
 fn _bench_opprf(points: Vec<(Block, Block512)>, inputs: Vec<Block>) {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut oprf = OpprfSender::init(&mut channel, &mut rng).unwrap();
-        oprf.send(&mut channel, &points, points.len(), &mut rng)
-            .unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut oprf = OpprfReceiver::init(&mut channel, &mut rng).unwrap();
-    oprf.receive(&mut channel, &inputs, &mut rng).unwrap();
-    handle.join().unwrap();
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut oprf = OpprfSender::init(c, &mut rng).unwrap();
+            oprf.send(c, &points, points.len(), &mut rng).unwrap();
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut oprf = OpprfReceiver::init(c, &mut rng).unwrap();
+            oprf.receive(c, &inputs, &mut rng).unwrap();
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 fn bench_opprf(c: &mut Criterion) {
