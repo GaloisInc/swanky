@@ -11,7 +11,7 @@ use prc::PseudorandomCode;
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
@@ -20,6 +20,7 @@ use swanky_ot_traits_new::{ObliviousTransfer, Receiver as OtReceiver, Sender as 
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use swanky_serialization::SequenceDeserializer;
+use vectoreyes::U8x16;
 
 /// KKRT oblivious PRF sender.
 pub struct Sender<OT: ObliviousTransfer<OtReceiver> + SemiHonest = swanky_ot_iknp::IKNP<OtReceiver>>
@@ -33,7 +34,7 @@ pub struct Sender<OT: ObliviousTransfer<OtReceiver> + SemiHonest = swanky_ot_ikn
 
 impl<OT: ObliviousTransfer<OtReceiver> + SemiHonest> ObliviousPrf for Sender<OT> {
     type Seed = Block512;
-    type Input = Block;
+    type Input = U8x16;
     type Output = Block512;
 }
 
@@ -52,7 +53,7 @@ impl<OT: ObliviousTransfer<OtReceiver> + SemiHonest> OprfSender for Sender<OT> {
             )?
             .read_vec(&mut &s_[..], 8 * 64)
             .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
-        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<U8x16>>();
         let keys = swanky_cointoss::send(channel, &seeds)
             .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
@@ -151,20 +152,20 @@ pub struct Receiver<OT: ObliviousTransfer<OtSender> + SemiHonest = swanky_ot_ikn
 
 impl<OT: ObliviousTransfer<OtSender> + SemiHonest> ObliviousPrf for Receiver<OT> {
     type Seed = Block512;
-    type Input = Block;
+    type Input = U8x16;
     type Output = Block512;
 }
 
 impl<OT: ObliviousTransfer<OtSender> + SemiHonest> OprfReceiver for Receiver<OT> {
     fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
-        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<U8x16>>();
         let keys = swanky_cointoss::receive(channel, &seeds)
             .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
-        let mut k0 = Block::default();
-        let mut k1 = Block::default();
+        let mut k0 = U8x16::default();
+        let mut k1 = U8x16::default();
         for _ in 0..512 {
             rng.fill_bytes(k0.as_mut());
             rng.fill_bytes(k1.as_mut());
@@ -257,8 +258,8 @@ mod tests {
         assert_eq!(seed.as_ref(), input.as_slice());
     }
 
-    fn rand_block_vec(size: usize) -> Vec<Block> {
-        (0..size).map(|_| rand::random::<Block>()).collect()
+    fn rand_block_vec(size: usize) -> Vec<U8x16> {
+        (0..size).map(|_| rand::random::<U8x16>()).collect()
     }
 
     fn _test_oprf(n: usize) {
