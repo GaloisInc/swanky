@@ -29,14 +29,14 @@ mod tests {
             swanky_channel::local::local_channel_pair(
                 |channel| {
                     let mut rng = SwankyRng::seed_from_u64(seed_sx);
-                    let mut sender = OpprfSender::init(channel, &mut rng, true).unwrap();
+                    let mut sender = OpprfSender::init(true, channel, &mut rng).unwrap();
                     let result_hash_sender =
                         sender.hash_data(set, Some(payloads), channel, &mut rng);
                     Ok((sender, result_hash_sender))
                 },
                 |channel| {
                     let mut rng = SwankyRng::seed_from_u64(seed_rx);
-                    let mut receiver = OpprfReceiver::init(channel, &mut rng, true).unwrap();
+                    let mut receiver = OpprfReceiver::init(true, channel, &mut rng).unwrap();
                     let result_hash_receiver =
                         receiver.hash_data(set, Some(payloads), channel, &mut rng);
                     Ok((receiver, result_hash_receiver))

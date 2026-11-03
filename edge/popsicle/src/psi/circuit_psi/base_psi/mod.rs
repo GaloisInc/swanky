@@ -31,9 +31,9 @@ pub mod sender;
 pub trait BasePsi {
     /// Initializes the BasePsi party
     fn init<RNG: CryptoRng>(
+        has_payload: bool,
         channel: &mut Channel,
         rng: &mut RNG,
-        has_payload: bool,
     ) -> Result<Self>
     where
         Self: Sized;
@@ -83,7 +83,7 @@ pub trait BasePsi {
     {
         let has_payloads = payloads.is_some();
 
-        let mut party = Self::init(channel, rng, has_payloads)?;
+        let mut party = Self::init(has_payloads, channel, rng)?;
         party.hash_data(primary_keys, payloads, channel, rng)?;
 
         party.opprf_exchange(channel, rng)?;

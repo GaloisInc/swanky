@@ -30,7 +30,7 @@ mod tests {
             swanky_channel::local::local_channel_pair(
                 |channel| {
                     let mut rng = SwankyRng::seed_from_u64(seed_sx);
-                    let mut sender = OpprfSender::init(channel, &mut rng, true).unwrap();
+                    let mut sender = OpprfSender::init(true, channel, &mut rng).unwrap();
                     let _ = sender.hash_data(set, Some(payloads), channel, &mut rng);
                     let result_opprf_sender = sender.opprf_exchange(channel, &mut rng);
 
@@ -38,7 +38,7 @@ mod tests {
                 },
                 |channel| {
                     let mut rng = SwankyRng::seed_from_u64(seed_rx);
-                    let mut receiver = OpprfReceiver::init(channel, &mut rng, true).unwrap();
+                    let mut receiver = OpprfReceiver::init(true, channel, &mut rng).unwrap();
                     let _ = receiver.hash_data(set, Some(payloads), channel, &mut rng);
                     let result_opprf_receiver = receiver.opprf_exchange(channel, &mut rng);
                     Ok((receiver, result_opprf_receiver))

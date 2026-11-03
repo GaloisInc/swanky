@@ -14,12 +14,12 @@ mod tests {
             let (_, receiver) = swanky_channel::local::local_channel_pair(
                 |channel| {
                     let mut rng = SwankyRng::new();
-                    let _ = OpprfSender::init(channel, &mut rng, true);
+                    let _ = OpprfSender::init(true, channel, &mut rng);
                     Ok(())
                 },
                 |channel| {
                     let mut rng = SwankyRng::new();
-                    let receiver = OpprfReceiver::init(channel, &mut rng, true);
+                    let receiver = OpprfReceiver::init(true, channel, &mut rng);
                     Ok(receiver)
                 },
             )
@@ -37,11 +37,11 @@ mod tests {
             let (sender, _) = swanky_channel::local::local_channel_pair(
                 |channel| {
                     let mut rng = SwankyRng::new();
-                    Ok(OpprfSender::init(channel, &mut rng, true))
+                    Ok(OpprfSender::init(true, channel, &mut rng))
                 },
                 |channel| {
                     let mut rng = SwankyRng::new();
-                    let _ = OpprfReceiver::init(channel, &mut rng, true);
+                    let _ = OpprfReceiver::init(true, channel, &mut rng);
                     Ok(())
                 },
             )

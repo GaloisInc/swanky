@@ -65,10 +65,11 @@ impl BasePsi for OpprfReceiver {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self>
-    where
-        RNG: CryptoRng,
-    {
+    fn init<RNG: CryptoRng>(
+        has_payload: bool,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> Result<Self> {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
@@ -95,17 +96,15 @@ impl BasePsi for OpprfReceiver {
             state: Default::default(),
         })
     }
+
     /// Hash the data using cuckoo hashing
-    fn hash_data<RNG>(
+    fn hash_data<RNG: CryptoRng>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<()>
-    where
-        RNG: CryptoRng,
-    {
+    ) -> Result<()> {
         let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
 
         // refresh the key until the cuckoo hash is not full
@@ -137,10 +136,11 @@ impl BasePsi for OpprfReceiver {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<()>
-    where
-        RNG: CryptoRng,
-    {
+    fn opprf_exchange<RNG: CryptoRng>(
+        &mut self,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> Result<()> {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed
         // output as the sender, otherwise, they receive a random value.

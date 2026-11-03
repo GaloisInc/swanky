@@ -66,10 +66,11 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(channel: &mut Channel, rng: &mut RNG, has_payload: bool) -> Result<Self>
-    where
-        RNG: CryptoRng,
-    {
+    fn init<RNG: CryptoRng>(
+        has_payload: bool,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> Result<Self> {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
@@ -94,17 +95,15 @@ impl BasePsi for OpprfSender {
             state: Default::default(),
         })
     }
+
     /// Hash the data using simple hashing
-    fn hash_data<RNG>(
+    fn hash_data<RNG: CryptoRng>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<()>
-    where
-        RNG: CryptoRng,
-    {
+    ) -> Result<()> {
         // refresh key if cuckoo hash is full
         self.key = channel.read::<U8x16>()?;
 
@@ -163,10 +162,11 @@ impl BasePsi for OpprfSender {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(&mut self, channel: &mut Channel, rng: &mut RNG) -> Result<()>
-    where
-        RNG: CryptoRng,
-    {
+    fn opprf_exchange<RNG: CryptoRng>(
+        &mut self,
+        channel: &mut Channel,
+        rng: &mut RNG,
+    ) -> Result<()> {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs
 
