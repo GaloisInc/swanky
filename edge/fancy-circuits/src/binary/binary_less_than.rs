@@ -45,11 +45,11 @@ where
         // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
         // lhs to remove the y==0 aspect.
         // check if y==0
-        let y_contains_1 = OrMany::new().execute(backend, y.wires().as_slice(), channel)?;
+        let y_contains_1 = OrMany::new().execute(backend, y.wires(), channel)?;
         let y_eq_0 = backend.negate(&y_contains_1);
 
         // if x != 0, then x >= y, ... assuming x is not negative
-        let x_contains_1 = OrMany::new().execute(backend, x.wires().as_slice(), channel)?;
+        let x_contains_1 = OrMany::new().execute(backend, x.wires(), channel)?;
 
         // y == 0 && x >= y
         let rhs = backend.and(&y_eq_0, &x_contains_1, channel)?;
