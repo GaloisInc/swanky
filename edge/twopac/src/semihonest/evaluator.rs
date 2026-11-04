@@ -1,5 +1,5 @@
 use fancy_garbling::{Evaluator as Ev, WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
 use rand::CryptoRng;
 use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
@@ -80,13 +80,17 @@ impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLab
 }
 
 impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>>
-    FancyEncode<F2> for Evaluator<RNG, OT, Wire>
+    FancyReceive<F2> for Evaluator<RNG, OT, Wire>
 {
     /// Receive garbler input wires.
     fn receive_many(&mut self, n: usize, channel: &mut Channel) -> swanky_error::Result<Vec<Wire>> {
         self.evaluator.receive_many(n, channel)
     }
+}
 
+impl<RNG: CryptoRng, OT: ObliviousTransfer<Receiver> + SemiHonest, Wire: WireLabel<F2>>
+    FancyEncode<F2> for Evaluator<RNG, OT, Wire>
+{
     /// Perform OT and obtain wires for the evaluator's inputs.
     fn encode_many(
         &mut self,

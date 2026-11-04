@@ -1,5 +1,5 @@
 use fancy_garbling::{Garbler as Gb, WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
 use rand::{CryptoRng, SeedableRng};
 use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
@@ -97,7 +97,14 @@ impl<
     ) -> swanky_error::Result<Vec<Wire>> {
         self.garbler.encode_many(vals, channel)
     }
+}
 
+impl<
+    RNG: CryptoRng + SeedableRng<Seed = U8x16>,
+    OT: ObliviousTransfer<Sender> + SemiHonest,
+    Wire: WireLabel<F2>,
+> FancyReceive<F2> for Garbler<RNG, OT, Wire>
+{
     fn receive_many(&mut self, n: usize, channel: &mut Channel) -> swanky_error::Result<Vec<Wire>> {
         let mut wires = Vec::with_capacity(n);
         let mut inputs = Vec::with_capacity(n);

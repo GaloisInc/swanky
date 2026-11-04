@@ -1,6 +1,6 @@
 //! Various utils for PSTY
 use crate::cuckoo::CuckooItem;
-use fancy_traits::FancyEncode;
+use fancy_traits::{FancyEncode, FancyReceive};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_block::{Block, Block512};
@@ -137,7 +137,7 @@ pub fn bin_receive_many_block512<F>(
     channel: &mut Channel,
 ) -> swanky_error::Result<Vec<F::Item>>
 where
-    F: FancyEncode<F2>,
+    F: FancyReceive<F2>,
 {
     // Specify the moduli of the wires
     gc_party.receive_many(size, channel)

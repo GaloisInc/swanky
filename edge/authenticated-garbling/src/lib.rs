@@ -14,7 +14,7 @@
 //! the garbler's input is the key, and the evaluator's input is the block.
 //!
 //! ```
-//! # use fancy_traits::{FancyEncode, FancyOutput};
+//! # use fancy_traits::{FancyEncode, FancyOutput, FancyReceive};
 //! # use rand::RngExt;
 //! # use swanky_authenticated_garbling::{GarblerOffline, EvaluatorOffline};
 //! # use swanky_field_binary::F2;

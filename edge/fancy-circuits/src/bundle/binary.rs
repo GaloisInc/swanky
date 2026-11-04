@@ -1,6 +1,6 @@
 use crate::util::{self, u128_from_bits};
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyEncode, FancyOutput};
+use fancy_traits::{FancyEncode, FancyOutput, FancyReceive};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -58,10 +58,12 @@ impl From<BinaryBundle<DummyVal<F2>>> for u128 {
     }
 }
 
-impl<F: FancyEncode<F2> + FancyOutput<F2>> BinaryGadgets for F {}
+impl<F: FancyEncode<F2>> BinaryEncode for F {}
+impl<F: FancyReceive<F2>> BinaryReceive for F {}
+impl<F: FancyOutput<F2>> BinaryOutput for F {}
 
-/// Extension trait for `Fancy` providing gadgets that operate over bundles of mod2 wires.
-pub trait BinaryGadgets: FancyEncode<F2> + FancyOutput<F2> {
+/// Extension trait for `Fancy` providing encode gadgets over bundles of wires.
+pub trait BinaryEncode: FancyEncode<F2> {
     /// Encode a binary input bundle.
     fn bin_encode(
         &mut self,
@@ -71,15 +73,6 @@ pub trait BinaryGadgets: FancyEncode<F2> + FancyOutput<F2> {
     ) -> Result<BinaryBundle<Self::Item>> {
         let xs = util::u128_to_bits(value, nbits);
         self.encode_many(&xs, channel).map(BinaryBundle::new)
-    }
-
-    /// Receive an binary input bundle.
-    fn bin_receive(
-        &mut self,
-        nbits: usize,
-        channel: &mut Channel,
-    ) -> Result<BinaryBundle<Self::Item>> {
-        self.receive_many(nbits, channel).map(BinaryBundle::new)
     }
 
     /// Encode many binary input bundles.
@@ -102,6 +95,18 @@ pub trait BinaryGadgets: FancyEncode<F2> + FancyOutput<F2> {
             .collect::<Vec<_>>();
         Ok(buns)
     }
+}
+
+/// Extension trait for `Fancy` providing receive gadgets over bundles of wires.
+pub trait BinaryReceive: FancyReceive<F2> {
+    /// Receive an binary input bundle.
+    fn bin_receive(
+        &mut self,
+        nbits: usize,
+        channel: &mut Channel,
+    ) -> Result<BinaryBundle<Self::Item>> {
+        self.receive_many(nbits, channel).map(BinaryBundle::new)
+    }
 
     /// Receive many binary input bundles.
     fn bin_receive_many(
@@ -119,7 +124,10 @@ pub trait BinaryGadgets: FancyEncode<F2> + FancyOutput<F2> {
             .collect::<Vec<_>>();
         Ok(buns)
     }
+}
 
+/// Extension trait for `Fancy` providing output gadgets over bundles of wires.
+pub trait BinaryOutput: FancyOutput<F2> {
     /// Output a binary bundle and interpret the result as a `u128`.
     fn bin_output(
         &mut self,

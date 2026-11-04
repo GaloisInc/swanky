@@ -93,7 +93,7 @@ mod streaming {
     use fancy_circuits::test_circuits::binary::TestOrGateFanN;
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
-    use fancy_traits::{FancyEncode, FancyOutput};
+    use fancy_traits::{FancyEncode, FancyOutput, FancyReceive};
     use swanky_field_binary::F2;
     use swanky_rng::SwankyRng;
 

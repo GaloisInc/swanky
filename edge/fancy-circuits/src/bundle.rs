@@ -1,2 +1,2 @@
 mod binary;
-pub use binary::{BinaryBundle, BinaryGadgets};
+pub use binary::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive};

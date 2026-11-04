@@ -6,6 +6,7 @@ use fancy_garbling::{
 };
 use fancy_traits::{
     Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyEncode, FancyOutput,
+    FancyReceive,
 };
 use std::{hint::black_box, time::Instant};
 use swanky_authenticated_garbling::{

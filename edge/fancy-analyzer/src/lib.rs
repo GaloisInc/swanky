@@ -4,10 +4,10 @@
 
 use core::cmp::max;
 use fancy_traits::{
-    CircuitInputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput,
+    CircuitInputMapper, Fancy, FancyBinary, FancyConstant, FancyOutput, FancyReceive,
 };
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result};
+use swanky_error::Result;
 use swanky_field_binary::F2;
 
 mod wrapper;
@@ -138,17 +138,10 @@ impl FancyConstant<F2> for CircuitAnalyzer {
     }
 }
 
-impl FancyEncode<F2> for CircuitAnalyzer {
+impl FancyReceive<F2> for CircuitAnalyzer {
     fn receive_many(&mut self, n: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
         self.ninputs += n;
         Ok((0..n).map(|_| AnalyzerItem::new()).collect())
-    }
-
-    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
-        swanky_error::bail!(
-            ErrorKind::UnsupportedError,
-            "Encoding values is unsupported"
-        )
     }
 }
 

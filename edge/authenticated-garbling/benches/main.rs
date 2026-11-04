@@ -8,7 +8,9 @@ use fancy_circuits::{
         fancy_binary_constant::TestBinaryConstant,
     },
 };
-use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
+use fancy_traits::{
+    CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput, FancyReceive,
+};
 use rand::RngExt;
 use std::time::Duration;
 use swanky_authenticated_garbling::{

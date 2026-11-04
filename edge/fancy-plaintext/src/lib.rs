@@ -4,7 +4,7 @@
 use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
 use rand::CryptoRng;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, Result};
+use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::F2;
 
@@ -78,14 +78,6 @@ impl FancyConstant<F2> for Dummy {
 impl FancyEncode<F2> for Dummy {
     fn encode_many(&mut self, xs: &[F2], _: &mut Channel) -> Result<Vec<Self::Item>> {
         Ok(xs.iter().map(|x| DummyVal::new(*x)).collect())
-    }
-
-    fn receive_many(&mut self, _: usize, _: &mut Channel) -> Result<Vec<Self::Item>> {
-        // Receive is undefined for Dummy which is a single party "protocol"
-        swanky_error::bail!(
-            ErrorKind::UnsupportedError,
-            "`receive_many` is undefined for `Dummy`"
-        );
     }
 }
 

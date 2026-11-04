@@ -1,5 +1,5 @@
 use crate::{BinaryWireLabel, util::output_tweak, wire::WireLabel};
-use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
+use fancy_traits::{Fancy, FancyBinary, FancyConstant, FancyOutput, FancyReceive};
 use swanky_channel::Channel;
 use swanky_error::ErrorKind;
 use swanky_field_binary::F2;
@@ -85,11 +85,7 @@ impl<Wire: WireLabel<F2>> FancyConstant<F2> for Evaluator<Wire> {
     }
 }
 
-impl<Wire: WireLabel<F2>> FancyEncode<F2> for Evaluator<Wire> {
-    fn encode_many(&mut self, _: &[F2], _: &mut Channel) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Evaluator cannot encode values")
-    }
-
+impl<Wire: WireLabel<F2>> FancyReceive<F2> for Evaluator<Wire> {
     fn receive_many(
         &mut self,
         n: usize,

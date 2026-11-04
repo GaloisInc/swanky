@@ -116,10 +116,6 @@ impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyEncode<F2> for Garbler<RNG, Wire>
         }
         Ok(zeros)
     }
-
-    fn receive_many(&mut self, _: usize, _: &mut Channel) -> swanky_error::Result<Vec<Self::Item>> {
-        unimplemented!("Garbler cannot receive values")
-    }
 }
 
 impl<RNG: CryptoRng, Wire: WireLabel<F2>> FancyOutput<F2> for Garbler<RNG, Wire> {
