@@ -4,14 +4,14 @@ use fancy_traits::{Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-/// Convert a [`BinaryBundle`] `x` into its unary vector equivalent.
+/// Convert a [`BinaryBundle`] `x` into its unary equivalent.
 ///
 /// # Panics
 /// Panics if the length of `x` is greater than eight.
 #[derive(Default)]
-pub struct BinaryToUnary<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct ToUnary<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryToUnary<'a, N>
+impl<'a, F: FancyBinary, const N: usize> Circuit<F> for ToUnary<'a, N>
 where
     F::Item: 'a,
 {
@@ -25,12 +25,11 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let wires = inputs.wires();
-        let nbits = wires.len();
-        assert!(nbits <= 8, "wire bitlength is too large");
+        assert!(N <= 8, "wire bitlength is too large");
 
-        let mut outs = Vec::with_capacity(1 << nbits);
+        let mut outs = Vec::with_capacity(1 << N);
 
-        for ix in 0..1 << nbits {
+        for ix in 0..1 << N {
             let mut acc = wires[0].clone();
             if (ix & 1) == 0 {
                 acc = backend.negate(&acc);
@@ -52,19 +51,19 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{BinaryBundle, binary::BinaryToUnary};
+    use crate::{BinaryBundle, binary::ToUnary};
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
 
     #[test]
-    fn binary_to_unary() {
+    fn to_unary_circuit_works() {
         const N: usize = 8;
         const Q: u128 = 1 << N;
 
         let mut rng = rng();
-        let circuit = BinaryToUnary::<N>::default();
+        let circuit = ToUnary::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;

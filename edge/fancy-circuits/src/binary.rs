@@ -63,5 +63,5 @@ pub use binary_shift::BinaryRightShiftPad;
 mod abs;
 pub use abs::AbsoluteValue;
 
-mod binary_to_unary;
-pub use binary_to_unary::BinaryToUnary;
+mod to_unary;
+pub use to_unary::ToUnary;
