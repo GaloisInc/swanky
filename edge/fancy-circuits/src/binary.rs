@@ -49,8 +49,8 @@ mod binary_twos_complement;
 pub use binary_twos_complement::BinaryTwosComplement;
 pub use binary_twos_complement::test::TestBinaryTwosComplement;
 
-mod binary_max;
-pub use binary_max::BinaryMax;
+mod max;
+pub use max::Max;
 
 mod binary_shift;
 pub use binary_shift::BinaryArithmeticRightShift;

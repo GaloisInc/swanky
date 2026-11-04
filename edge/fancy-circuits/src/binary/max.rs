@@ -5,16 +5,14 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 
-/// Binary max.
-///
 /// For a vector of [`BinaryBundle`]s, return the max value.
 ///
 /// # Panics
 /// This panics if the input vector is empty.
 #[derive(Default)]
-pub struct BinaryMax<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct Max<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryMax<'a, N>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for Max<'a, N>
 where
     F::Item: 'a,
 {
@@ -55,24 +53,25 @@ where
 mod test {
     use rand::RngExt;
 
-    use super::BinaryMax;
+    use super::Max;
     use crate::BinaryBundle;
     use fancy_plaintext::Dummy;
 
     #[test]
-    fn binary_max() {
+    fn max_circuit_works() {
         const N: usize = 64;
         const Q: u128 = 1 << N;
         let nitems = 10;
 
         let mut rng = rand::rng();
+        let circuit = Max::default();
 
         for _ in 0..16 {
             let xs: Vec<u128> = (0..nitems).map(|_| rng.random::<u128>() % Q).collect();
             let max = *xs.iter().max().unwrap();
             let xs_input: Vec<BinaryBundle<_, N>> =
                 xs.iter().map(|x| BinaryBundle::from(*x)).collect();
-            let output = Dummy::eval(&BinaryMax::default(), xs_input.as_slice()).unwrap();
+            let output = Dummy::eval(&circuit, xs_input.as_slice()).unwrap();
             assert_eq!(Into::<u128>::into(output), max);
         }
     }
