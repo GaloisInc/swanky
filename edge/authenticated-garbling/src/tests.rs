@@ -5,7 +5,7 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator};
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_circuits::binary::{TestBinaryAddition, TestMul, TestSub, TestTwosComplement};
+use fancy_circuits::binary::{TestAdd, TestMul, TestSub, TestTwosComplement};
 use fancy_circuits::crypto::aes::Aes128;
 use fancy_circuits::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
@@ -182,7 +182,7 @@ fn test_xor_gate_fan_n() {
 #[test]
 fn test_binary_addition() {
     const N: usize = 64;
-    let circuit = TestBinaryAddition::<N>;
+    let circuit = TestAdd::<N>;
 
     test_circuit(N, N, &circuit);
 }

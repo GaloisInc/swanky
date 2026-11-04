@@ -3,7 +3,7 @@ mod test {
 
     use fancy_circuits::{
         BinaryBundle,
-        binary::BinaryAddition,
+        binary::Add,
         crypto::aes::Aes128,
         crypto::hmac::HmacSha256,
         crypto::sha::{Sha256, Sha256CompressionFunction},
@@ -341,7 +341,7 @@ mod test {
         Ok(())
     }
 
-    struct TestBinaryAddition<'a, const N: usize>(BinaryAddition<'a, N>, &'static str);
+    struct TestBinaryAddition<'a, const N: usize>(Add<'a, N>, &'static str);
 
     impl<'a, F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> FancyCircuit<F>
         for TestBinaryAddition<'a, N>
@@ -386,14 +386,14 @@ mod test {
         x[0] = F2::ONE;
         y[0] = F2::ONE;
         test_circuit::<_, P>(
-            &TestBinaryAddition(BinaryAddition::<8>::default(), "01000000"),
+            &TestBinaryAddition(Add::<8>::default(), "01000000"),
             &[x, y].concat(),
         )?;
         // Test 3 + 3 = 6.
         x[1] = F2::ONE;
         y[1] = F2::ONE;
         test_circuit::<_, P>(
-            &TestBinaryAddition(BinaryAddition::<8>::default(), "01100000"),
+            &TestBinaryAddition(Add::<8>::default(), "01100000"),
             &[x, y].concat(),
         )
     }

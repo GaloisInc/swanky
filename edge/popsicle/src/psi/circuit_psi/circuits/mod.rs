@@ -2,7 +2,7 @@
 use crate::circuit_psi::*;
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, Constant, Eq, Mux, PairwiseXor},
+    binary::{AddNoCarry, Constant, Eq, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
@@ -90,7 +90,7 @@ where
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
         let mux = Mux::default().execute(f, (bit.clone(), &zero, &one), channel)?;
-        acc = BinaryAdditionNoCarry::default().execute(f, (&acc, &mux), channel)?;
+        acc = AddNoCarry::default().execute(f, (&acc, &mux), channel)?;
     }
     Ok(acc)
 }
@@ -115,8 +115,8 @@ where
     for (i, bit) in intersect_bitvec.iter().enumerate() {
         let mux_a = multiplex.execute(f, (bit.clone(), &zero, &payload_a[i]), channel)?;
         let mux_b = multiplex.execute(f, (bit.clone(), &zero, &payload_b[i]), channel)?;
-        let mul = BinaryAdditionNoCarry::default().execute(f, (&mux_a, &mux_b), channel)?;
-        acc = BinaryAdditionNoCarry::default().execute(f, (&acc, &mul), channel)?;
+        let mul = AddNoCarry::default().execute(f, (&mux_a, &mux_b), channel)?;
+        acc = AddNoCarry::default().execute(f, (&acc, &mul), channel)?;
     }
     Ok(acc)
 }

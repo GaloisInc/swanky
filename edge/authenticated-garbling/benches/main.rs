@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::{
-    binary::{TestBinaryAddition, TestSub},
+    binary::{TestAdd, TestSub},
     crypto::aes::Aes128,
     test_circuits::{
         binary::{TestAndGateFanN, TestOrGateFanN, TestXorGateFanN},
@@ -175,8 +175,8 @@ fn bench_xor_gate_fan_n(c: &mut Criterion) {
 }
 
 fn bench_binary_addition(c: &mut Criterion) {
-    const N: usize = 400;
-    let circuit = TestBinaryAddition::<N>;
+    const N: usize = 64;
+    let circuit = TestAdd::<N>;
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
@@ -193,7 +193,7 @@ fn bench_binary_addition(c: &mut Criterion) {
 }
 
 fn bench_binary_subtraction(c: &mut Criterion) {
-    const N: usize = 400;
+    const N: usize = 64;
     let circuit = TestSub::<N>;
 
     let mut rng_gb = SwankyRng::new();

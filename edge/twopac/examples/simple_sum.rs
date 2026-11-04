@@ -1,9 +1,8 @@
 //! An example that adds two secret numbers in a binary garbled circuit
 //! using fancy-garbling.
 
-use fancy_circuits::{
-    BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, binary::BinaryAdditionNoCarry,
-};
+use fancy_circuits::binary::AddNoCarry;
+use fancy_circuits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive};
 use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -17,7 +16,7 @@ const N: usize = 128;
 fn gb_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
     let mut gb = Garbler::<SwankyRng, IKNP<Sender>, _>::new(channel, rng)?;
     let inputs = gb_set_inputs(&mut gb, input, channel)?;
-    let sum = BinaryAdditionNoCarry::default().execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
+    let sum = AddNoCarry::default().execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
     gb.bin_output(&sum, channel)?;
     Ok(())
 }
@@ -35,7 +34,7 @@ fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
 fn ev_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
     let mut ev = Evaluator::<SwankyRng, IKNP<Receiver>, _>::new(channel, rng)?;
     let inputs = ev_set_inputs(&mut ev, input, channel)?;
-    let sum = BinaryAdditionNoCarry::default().execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
+    let sum = AddNoCarry::default().execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
     let output = ev
         .bin_output(&sum, channel)
         .unwrap()

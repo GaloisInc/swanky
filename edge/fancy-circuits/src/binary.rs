@@ -6,17 +6,12 @@ pub use binary_ops::{AndMany, OrMany, PairwiseAnd, PairwiseOr, PairwiseXor, XorM
 mod mux;
 pub use mux::{Mux, MuxBit, MuxBitConstants, MuxConstants};
 
-mod binary_adder;
-pub use binary_adder::BinaryAdder;
-
 mod constant;
 pub use constant::Constant;
 pub use constant::test::TestConstant;
 
-mod binary_addition;
-pub use binary_addition::BinaryAddition;
-pub use binary_addition::BinaryAdditionNoCarry;
-pub use binary_addition::test::TestBinaryAddition;
+mod add;
+pub use add::{Add, AddBit, AddNoCarry, TestAdd};
 
 mod sub;
 pub use sub::{Sub, TestSub};

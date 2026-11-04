@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, Constant, Eq},
+    binary::{AddNoCarry, Constant, Eq},
 };
 use fancy_garbling::WireMod2;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
@@ -480,7 +480,7 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
             .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;
         let b_binary = BinaryBundle::new(b_ws.try_into().unwrap());
-        acc = BinaryAdditionNoCarry::default().execute(f, (&acc, &b_binary), channel)?;
+        acc = AddNoCarry::default().execute(f, (&acc, &b_binary), channel)?;
     }
 
     Ok(acc)
