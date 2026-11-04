@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryAddition, BinaryTwosComplement},
+    binary::{BinaryAddition, TwosComplement},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -30,7 +30,7 @@ where
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
 
-        let neg_y = BinaryTwosComplement::default().execute(backend, y, channel)?;
+        let neg_y = TwosComplement::default().execute(backend, y, channel)?;
         BinaryAddition::default().execute(backend, (x, &neg_y), channel)
     }
 }

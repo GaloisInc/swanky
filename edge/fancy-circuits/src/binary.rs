@@ -45,9 +45,9 @@ mod binary_equality;
 pub use binary_equality::BinaryEquality;
 pub use binary_equality::test::TestBinaryEquality;
 
-mod binary_twos_complement;
-pub use binary_twos_complement::BinaryTwosComplement;
-pub use binary_twos_complement::test::TestBinaryTwosComplement;
+mod twos_complement;
+pub use twos_complement::TwosComplement;
+pub use twos_complement::test::TestBinaryTwosComplement;
 
 mod max;
 pub use max::Max;

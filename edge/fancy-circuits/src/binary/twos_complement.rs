@@ -8,12 +8,13 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 
-/// Binary two's complement.
+/// On input [`BinaryBundle`] `x`, output the two's complement of `x`.
+///
+/// This is equivalent to computing `(!x) + 1` in Rust.
 #[derive(Default)]
-pub struct BinaryTwosComplement<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct TwosComplement<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
-    for BinaryTwosComplement<'a, N>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for TwosComplement<'a, N>
 where
     F::Item: 'a,
 {
@@ -41,11 +42,10 @@ where
 }
 
 pub mod test {
+    use super::*;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
 
-    use super::*;
-
-    /// Circuit for testing [`BinaryTwosComplement`].
+    /// Circuit for testing [`TwosComplement`].
     pub struct TestBinaryTwosComplement<const N: usize>;
     impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
         for TestBinaryTwosComplement<N>
@@ -59,7 +59,7 @@ pub mod test {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryTwosComplement::default().execute(backend, &inputs, channel)
+            TwosComplement::default().execute(backend, &inputs, channel)
         }
     }
 
@@ -85,7 +85,7 @@ pub mod test {
     }
 
     #[test]
-    fn binary_twos_complement() {
+    fn twos_complement_circuit_works() {
         use fancy_plaintext::Dummy;
         use rand::RngExt;
 

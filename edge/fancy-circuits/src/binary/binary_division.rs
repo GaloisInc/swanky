@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryAddition, BinaryLeftShiftPad, BinaryTwosComplement, Constant, Mux},
+    binary::{BinaryAddition, BinaryLeftShiftPad, Constant, Mux, TwosComplement},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -27,7 +27,7 @@ where
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
 
-        let ys_neg = BinaryTwosComplement::default().execute(backend, ys, channel)?;
+        let ys_neg = TwosComplement::default().execute(backend, ys, channel)?;
         let mut acc = Constant::<N>::new(0).execute(backend, (), channel)?;
         let mut qs = Constant::<N>::new(0).execute(backend, (), channel)?;
         for (i, x) in xs.wires().iter().rev().enumerate() {
