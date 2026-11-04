@@ -17,7 +17,7 @@ use swanky_ot_traits::{
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<U8x16> {
+fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
     (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 fn rand_f2_vec(size: usize) -> Vec<F2> {
@@ -58,8 +58,8 @@ pub fn bench_block_ot<S: Sender<Msg = U8x16>, R: Receiver<Msg = U8x16>>(
             std::any::type_name::<R>()
         ),
         |bench| {
-            let m0s = rand_block_vec(size);
-            let m1s = rand_block_vec(size);
+            let m0s = rand_u8x16_vec(size);
+            let m1s = rand_u8x16_vec(size);
             let ms = m0s.into_iter().zip(m1s).collect::<Vec<(U8x16, U8x16)>>();
             let bs = rand_f2_vec(size);
             bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()));

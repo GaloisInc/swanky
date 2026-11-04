@@ -17,7 +17,7 @@ use swanky_ot_traits::{
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<U8x16> {
+fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
     (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 
@@ -29,8 +29,8 @@ fn rand_f2_vec(size: usize) -> Vec<F2> {
 pub fn test_otext<OTSender: Sender<Msg = U8x16>, OTReceiver: Receiver<Msg = U8x16> + Display>(
     ninputs: usize,
 ) {
-    let m0s = rand_block_vec(ninputs);
-    let m1s = rand_block_vec(ninputs);
+    let m0s = rand_u8x16_vec(ninputs);
+    let m1s = rand_u8x16_vec(ninputs);
     let bs = rand_f2_vec(ninputs);
     let m0s_ = m0s.clone();
     let m1s_ = m1s.clone();
