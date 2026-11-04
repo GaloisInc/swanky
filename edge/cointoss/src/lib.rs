@@ -6,18 +6,18 @@
 
 use rand_core::{Rng, SeedableRng};
 
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
 /// Coin tossing sender.
 #[inline]
-pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>> {
+pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<Vec<U8x16>> {
     let mut out = Vec::with_capacity(seeds.len());
     for seed in seeds.iter() {
         let mut rng = SwankyRng::from_seed(*seed);
-        let mut com = Block::default();
+        let mut com = U8x16::default();
         rng.fill_bytes(com.as_mut());
         channel
             .write_block(&com)
@@ -45,7 +45,7 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<
 
 /// Coin tossing receiver.
 #[inline]
-pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<Vec<Block>> {
+pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<Vec<U8x16>> {
     let mut coms = Vec::with_capacity(seeds.len());
     let mut out = Vec::with_capacity(seeds.len());
     for _ in 0..seeds.len() {
@@ -67,7 +67,7 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[Block]) -> Result<V
             .read_block()
             .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         let mut rng_ = SwankyRng::from_seed(seed_);
-        let mut check = Block::default();
+        let mut check = U8x16::default();
         rng_.fill_bytes(check.as_mut());
         if check != com {
             bail!(ErrorKind::OtherError, "Commitment check failed");
@@ -89,8 +89,8 @@ mod tests {
     #[test]
     fn test() {
         let (sender, receiver) = UnixStream::pair().unwrap();
-        let seed = rand::random::<Block>();
-        let seed_ = rand::random::<Block>();
+        let seed = rand::random::<U8x16>();
+        let seed_ = rand::random::<U8x16>();
         let handle = std::thread::spawn(move || {
             let reader = BufReader::new(sender.try_clone().unwrap());
             let writer = BufWriter::new(sender);

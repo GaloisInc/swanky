@@ -6,17 +6,18 @@ use crate::{
     utils,
 };
 
-use fancy_traits::{FancyEncode, FancyReceive};
-use swanky_block::{Block, Block512};
+use fancy_traits::FancyEncode;
+use swanky_block::Block512;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::Sender as KmprtSender;
+use vectoreyes::U8x16;
 
 /// A struct defining the sender in the base circuit PSI computation.
 /// A sender here refers to the party which programs the OPPRF in this
 /// computation.
 pub struct OpprfSender {
     /// The hashing key
-    pub key: Block,
+    pub key: U8x16,
     /// The number of hashing bins
     pub nbins: Option<usize>,
     /// The opprf for set primary keys
@@ -42,7 +43,7 @@ pub struct OpprfSender {
 #[derive(Default)]
 pub struct SenderState {
     /// The opprf programmed inputs for the set primary keys
-    pub opprf_primary_keys_in: Vec<Vec<Block>>,
+    pub opprf_primary_keys_in: Vec<Vec<U8x16>>,
     /// The opprf programmed output for the set primary keys
     pub opprf_primary_keys_out: Vec<Block512>,
     /// The opprf programmed inputs for the payloads
@@ -100,7 +101,7 @@ impl BasePsi for OpprfSender {
         RNG: CryptoRng + SeedableRng,
     {
         // refresh key if cuckoo hash is full
-        self.key = channel.read::<Block>()?;
+        self.key = channel.read::<U8x16>()?;
 
         // Receive cuckoo hash info from sender
         // The receiver determines the number of bins
@@ -128,7 +129,7 @@ impl BasePsi for OpprfSender {
                 let bin = CuckooHash::bin(*x, h, nbins);
                 // Then place the item in that bin while keeping track
                 // of the index of the hash function used in the process
-                opprf_primary_keys_in[bin].push(*x ^ Block::from(h as u128));
+                opprf_primary_keys_in[bin].push(*x ^ U8x16::from(h as u128));
                 if let Some(payloads) = payloads {
                     // The payload values are masked before being sent out
                     // and placed in the same bin index as the primary key they

@@ -2,21 +2,21 @@
 
 use rand::{CryptoRng, RngExt};
 use sha2::{Digest, Sha256};
-use swanky_block::Block;
 use swanky_cr_hash::CorrelationRobustHash;
+use vectoreyes::U8x16;
 
 /// Compress an arbitrary vector into a 128-bit chunk, leaving the final 8-bits
 /// as zero. We need to leave 8 bits free in order to add in the hash index when
 /// running the OPRF (cf. <https://eprint.iacr.org/2016/799>, §5.2).
-pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
+pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: U8x16) -> Vec<U8x16> {
     let aes = CorrelationRobustHash::new(key);
-    let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+    let mask = U8x16::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
     inputs
         .iter()
         .map(|input| {
             let mut digest = [0u8; 16];
             if input.len() <= 16 {
-                // Map `input` directly to a `Block`.
+                // Map `input` directly to a `U8x16`.
                 digest[0..input.len()].copy_from_slice(input);
             } else {
                 // Hash `input` first.
@@ -25,10 +25,10 @@ pub fn compress_and_hash_inputs(inputs: &[Vec<u8>], key: Block) -> Vec<Block> {
                 let h = hasher.finalize();
                 digest[0..16].copy_from_slice(&h[0..16]);
             }
-            let block = aes.hash(Block::from(digest));
+            let block = aes.hash(U8x16::from(digest));
             block & mask
         })
-        .collect::<Vec<Block>>()
+        .collect::<Vec<U8x16>>()
 }
 
 #[allow(dead_code)]
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn test_compress_and_hash_inputs() {
         let mut rng = SwankyRng::new();
-        let key = rng.random::<Block>();
+        let key = rng.random::<U8x16>();
         let inputs = rand_vec_vec(13, 16, &mut rng);
         let _ = compress_and_hash_inputs(&inputs, key);
     }

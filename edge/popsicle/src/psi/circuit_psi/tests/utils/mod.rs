@@ -1,9 +1,10 @@
 //! Various utility functionalities for tests
 
 #[cfg(test)]
-use swanky_block::Block;
-#[cfg(test)]
 use swanky_block::Block512;
+
+#[cfg(test)]
+use vectoreyes::U8x16;
 
 #[cfg(test)]
 use std::collections::HashSet;
@@ -51,14 +52,14 @@ pub fn arbitrary_payloads_block125(
 }
 
 #[cfg(test)]
-/// Create a vector of Block, from a vector of vectors of u8
-pub fn u8_vec_block(values: &[Vec<u8>], size: usize) -> Vec<Block> {
+/// Create a vector of U8x16, from a vector of vectors of u8
+pub fn u8_vec_block(values: &[Vec<u8>], size: usize) -> Vec<U8x16> {
     values
         .iter()
         .map(|item| {
             let mut res_block = [0_u8; 16];
             res_block[0..size].copy_from_slice(&item[..size]);
-            Block::from(res_block)
+            U8x16::from(res_block)
         })
         .collect()
 }
@@ -72,10 +73,10 @@ pub fn u8_vec_block512(values: &[Vec<u8>], size: usize) -> Vec<Block512> {
             let mut res_bytes = [0_u8; 16];
             res_bytes[0..size].copy_from_slice(&item[..size]);
             Block512::from([
-                Block::from(res_bytes),
-                Block::from(0),
-                Block::from(0),
-                Block::from(0),
+                U8x16::from(res_bytes),
+                U8x16::from(0),
+                U8x16::from(0),
+                U8x16::from(0),
             ])
         })
         .collect()

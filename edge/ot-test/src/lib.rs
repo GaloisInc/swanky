@@ -8,7 +8,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use swanky_block::Block;
 use swanky_channel_legacy::Channel;
 use swanky_field_binary::F2;
 use swanky_ot_traits::{
@@ -16,9 +15,10 @@ use swanky_ot_traits::{
     Receiver, Sender,
 };
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<Block> {
-    (0..size).map(|_| rand::random::<Block>()).collect()
+fn rand_block_vec(size: usize) -> Vec<U8x16> {
+    (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 
 fn rand_f2_vec(size: usize) -> Vec<F2> {
@@ -26,7 +26,7 @@ fn rand_f2_vec(size: usize) -> Vec<F2> {
 }
 
 /// Test the functionality of an OT protocol by OT-ing `ninputs` blocks.
-pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block> + Display>(
+pub fn test_otext<OTSender: Sender<Msg = U8x16>, OTReceiver: Receiver<Msg = U8x16> + Display>(
     ninputs: usize,
 ) {
     let m0s = rand_block_vec(ninputs);
@@ -41,7 +41,7 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
         let writer = BufWriter::new(sender);
         let mut channel = Channel::new(reader, writer);
         let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
-        let ms = m0s.into_iter().zip(m1s).collect::<Vec<(Block, Block)>>();
+        let ms = m0s.into_iter().zip(m1s).collect::<Vec<(U8x16, U8x16)>>();
         otext.send(&mut channel, &ms, &mut rng).unwrap();
     });
     let mut rng = SwankyRng::new();
@@ -58,12 +58,12 @@ pub fn test_otext<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Bloc
 
 /// Test the functionality of a Correlated OT protocol by OT-ing `ninputs` blocks.
 pub fn test_cotext<
-    OTSender: CorrelatedSender<Msg = Block>,
-    OTReceiver: CorrelatedReceiver<Msg = Block> + Display,
+    OTSender: CorrelatedSender<Msg = U8x16>,
+    OTReceiver: CorrelatedReceiver<Msg = U8x16> + Display,
 >(
     ninputs: usize,
 ) {
-    let delta = rand::random::<Block>();
+    let delta = rand::random::<U8x16>();
     let bs = rand_f2_vec(ninputs);
     let out = Arc::new(Mutex::new(vec![]));
     let out_ = out.clone();
@@ -103,8 +103,8 @@ pub fn test_cotext<
 
 /// Test the functionality of a Random OT protocol by OT-ing `ninputs` blocks.
 pub fn test_rotext<
-    OTSender: RandomSender<Msg = Block>,
-    OTReceiver: RandomReceiver<Msg = Block> + Display,
+    OTSender: RandomSender<Msg = U8x16>,
+    OTReceiver: RandomReceiver<Msg = U8x16> + Display,
 >(
     ninputs: usize,
 ) {
@@ -136,8 +136,8 @@ pub fn test_rotext<
 
 /// Test the functionality of a Random OT protocol (with a fixed key) by OT-ing `ninputs` blocks.
 pub fn test_rotext_fixed_key<
-    OTSender: RandomSender<Msg = Block> + FixedKeyInitializer,
-    OTReceiver: RandomReceiver<Msg = Block> + Display,
+    OTSender: RandomSender<Msg = U8x16> + FixedKeyInitializer,
+    OTReceiver: RandomReceiver<Msg = U8x16> + Display,
 >(
     ninputs: usize,
 ) {

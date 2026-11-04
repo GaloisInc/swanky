@@ -3,9 +3,10 @@ use crate::cuckoo::CuckooItem;
 use fancy_traits::{FancyEncode, FancyReceive};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_field_binary::F2;
+use vectoreyes::U8x16;
 
 /// Turn a vector of bits represented as u16 into a decimal
 /// value represented as a u128.
@@ -39,14 +40,14 @@ pub fn int_vec_block512(values: Vec<u128>, size: usize) -> Vec<Block512> {
 pub(crate) fn cuckoo_place_ids<RNG: CryptoRng + SeedableRng>(
     cuckoo: &[Option<CuckooItem>],
     rng: &mut RNG,
-) -> Vec<Block> {
+) -> Vec<U8x16> {
     cuckoo
         .iter()
         .map(|opt_item| match opt_item {
             Some(item) => item.entry_with_hindex(),
             None => rng.random(),
         })
-        .collect::<Vec<Block>>()
+        .collect::<Vec<U8x16>>()
 }
 
 pub(crate) fn cuckoo_place_payloads<RNG: CryptoRng + SeedableRng>(
@@ -83,7 +84,7 @@ pub fn split_into_megabins<T: Clone>(table: &[T], megasize: usize) -> Vec<Vec<T>
 }
 
 /// Flattens bins so that all points in a bin map to the same tag
-pub fn flatten_bin_tags(bins: &[Vec<Block>], tags: &[Block512]) -> Vec<(Block, Block512)> {
+pub fn flatten_bin_tags(bins: &[Vec<U8x16>], tags: &[Block512]) -> Vec<(U8x16, Block512)> {
     bins.iter()
         .zip_eq(tags.iter())
         .flat_map(|(bin, &t)| {
@@ -94,9 +95,9 @@ pub fn flatten_bin_tags(bins: &[Vec<Block>], tags: &[Block512]) -> Vec<(Block, B
 }
 /// Flattens bins so that all points in a bin map have the correct payloads
 pub fn flatten_bins_payloads(
-    bins: &[Vec<Block>],
+    bins: &[Vec<U8x16>],
     elements: &[Vec<Block512>],
-) -> Vec<(Block, Block512)> {
+) -> Vec<(U8x16, Block512)> {
     bins.iter()
         .zip_eq(elements.iter())
         .flat_map(|(bin, t)| {

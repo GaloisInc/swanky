@@ -17,3 +17,4 @@ sha2.workspace = true
 swanky-block.workspace = true
 swanky-channel.workspace = true
 swanky-serialization.workspace = true
+vectoreyes.workspace = true

@@ -18,7 +18,6 @@ rand.workspace = true
 subtle.workspace = true
 swanky-adversary.workspace = true
 swanky-rng.workspace = true
-swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-cointoss.workspace = true
 swanky-error.workspace = true

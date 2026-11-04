@@ -9,11 +9,11 @@ use rand::{
     distr::{Distribution, Uniform},
 };
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
 // LPN parameters used in the protocol. We use three stages, two sets of LPN
 // parameters for setup, and one set of LPN parameters for the extend phase.
@@ -251,7 +251,7 @@ impl<T: FiniteField> Sender<T> {
             &mut SwankyRng::from_rng(&mut rng),
         )?;
         let spsvole = SpsSender::<T>::init(channel, pows, rng)?;
-        let seed = rng.random::<Block>();
+        let seed = rng.random::<U8x16>();
         let seed = swanky_cointoss::receive(channel, &[seed])
             .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?[0];
         let lpn_rng = SwankyRng::from_seed(seed);
@@ -429,7 +429,7 @@ impl<T: FiniteField> Receiver<T> {
             base_receiver.receive(channel, compute_num_saved::<T>(lpn_setup), rng)?;
         let delta = base_receiver.delta();
         let spsvole = SpsReceiver::<T>::init(channel, pows, delta, rng)?;
-        let seed = rng.random::<Block>();
+        let seed = rng.random::<U8x16>();
         let seed = swanky_cointoss::send(channel, &[seed])
             .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?[0];
         let lpn_rng = SwankyRng::from_seed(seed);

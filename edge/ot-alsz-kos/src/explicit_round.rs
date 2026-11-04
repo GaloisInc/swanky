@@ -6,7 +6,6 @@
 use keyed_arena::{AllocationKey, BorrowedAllocation, KeyedArena};
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::convert::TryInto;
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, ensure};
@@ -49,7 +48,7 @@ impl AlszSender {
     pub(super) fn init<
         C: AbstractChannel,
         RNG: CryptoRng,
-        BaseOtReceiver: swanky_ot_traits::Receiver<Msg = Block>,
+        BaseOtReceiver: swanky_ot_traits::Receiver<Msg = U8x16>,
     >(
         channel: &mut C,
         rng: &mut RNG,
@@ -133,7 +132,7 @@ impl AlszReceiver {
     pub(super) fn init<
         C: AbstractChannel,
         RNG: CryptoRng,
-        BaseOtSender: swanky_ot_traits::Sender<Msg = Block>,
+        BaseOtSender: swanky_ot_traits::Sender<Msg = U8x16>,
     >(
         channel: &mut C,
         rng: &mut RNG,
@@ -141,8 +140,8 @@ impl AlszReceiver {
         let mut ot = BaseOtSender::init(channel, rng)?;
         let mut seeds = Vec::with_capacity(128);
         for _ in 0..128 {
-            let a = rng.random::<Block>();
-            let b = rng.random::<Block>();
+            let a = rng.random::<U8x16>();
+            let b = rng.random::<U8x16>();
             seeds.push((a, b));
         }
         ot.send(channel, &seeds, rng)?;
@@ -255,7 +254,7 @@ impl KosSender {
         &self,
         arena: &KeyedArena,
         selector: u64,
-        inputs: &[(Block, Block)],
+        inputs: &[(U8x16, U8x16)],
         rng: &mut impl CryptoRng,
         mut incoming_bytes: &[u8],
         mut outgoing_bytes: &mut [u8],
@@ -293,9 +292,9 @@ impl KosSender {
         outgoing_bytes = &mut outgoing_bytes[16..];
         debug_assert!(inputs.len() * 16 <= qs.len());
         for (j, (input, &q)) in inputs.iter().zip(qs.as_chunks::<16>().0).enumerate() {
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let y0 = aes_hash.hash(q, j as u128) ^ input.0;
-            let q = q ^ Block::from(self.alsz.s);
+            let q = q ^ U8x16::from(self.alsz.s);
             let y1 = aes_hash.hash(q, j as u128) ^ input.1;
             outgoing_bytes[0..16].copy_from_slice(bytemuck::bytes_of(&y0));
             outgoing_bytes[16..32].copy_from_slice(bytemuck::bytes_of(&y1));
@@ -307,7 +306,7 @@ impl KosSender {
             our_seed,
             qs: qs.key(),
             ncols,
-            ot_s: Block::from(self.alsz.s),
+            ot_s: U8x16::from(self.alsz.s),
         })
     }
 }
@@ -317,7 +316,7 @@ pub struct KosSenderStage2 {
     our_seed: [u8; 16],
     qs: AllocationKey<u8>,
     ncols: usize,
-    ot_s: Block,
+    ot_s: U8x16,
 }
 impl KosSenderStage2 {
     /// How many incoming bytes is this round expecting?
@@ -335,9 +334,9 @@ impl KosSenderStage2 {
         let x: [u8; 16] = incoming[16..32].try_into().unwrap();
         let t0: [u8; 16] = incoming[32..48].try_into().unwrap();
         let t1: [u8; 16] = incoming[48..64].try_into().unwrap();
-        let x = Block::from(x);
-        let t0 = Block::from(t0);
-        let t1 = Block::from(t1);
+        let x = U8x16::from(x);
+        let t0 = U8x16::from(t0);
+        let t1 = U8x16::from(t1);
         // This isn't doing a constant-time comparison, and that's okay.
         // The commitment that the other party gave us isn't private to them
         // (they gave it to us).
@@ -346,13 +345,13 @@ impl KosSenderStage2 {
             ErrorKind::OtherError,
             "KosSenderStage2 reciever lied in cointoss"
         );
-        let mut rng = SwankyRng::from_seed(Block::from(self.our_seed) ^ Block::from(incoming_seed));
-        let mut check = (Block::default(), Block::default());
-        let mut chi = Block::default();
+        let mut rng = SwankyRng::from_seed(U8x16::from(self.our_seed) ^ U8x16::from(incoming_seed));
+        let mut check = (U8x16::default(), U8x16::default());
+        let mut chi = U8x16::default();
         let qs = arena.borrow_mut(self.qs);
         debug_assert_eq!(qs.len(), self.ncols * 16);
         for &q in qs.as_chunks::<16>().0 {
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             rng.fill_bytes(chi.as_mut());
             let [lo, hi] = q.carryless_mul_wide(chi);
             check = (check.0 ^ lo, check.1 ^ hi);
@@ -432,7 +431,7 @@ impl KosReceiver {
             self.alsz
                 .receive_setup(arena, &r, m_, &mut outgoing_bytes[0..alsz_bytes], selector)?;
         outgoing_bytes = &mut outgoing_bytes[alsz_bytes..];
-        let our_seed = rng.random::<Block>();
+        let our_seed = rng.random::<U8x16>();
         outgoing_bytes.copy_from_slice(
             blake3::hash(bytemuck::bytes_of(&our_seed))
                 .as_bytes()
@@ -455,7 +454,7 @@ impl KosReceiver {
 
 /// The state for the second round of the Kos receiver
 pub struct KosReceiverStage2 {
-    our_seed: Block,
+    our_seed: U8x16,
     choices: AllocationKey<bool>,
     ts: AllocationKey<u8>,
     r_: AllocationKey<bool>,
@@ -473,7 +472,7 @@ impl KosReceiverStage2 {
         arena: &'a KeyedArena,
         mut incoming: &[u8],
         outgoing: &mut [u8],
-    ) -> Result<BorrowedAllocation<'a, Block>> {
+    ) -> Result<BorrowedAllocation<'a, U8x16>> {
         let aes_hash = TweakableCircularCorrelationRobustHash::fixed_key();
         let choices = arena.borrow_mut(self.choices);
         let ts = arena.borrow_mut(self.ts);
@@ -492,31 +491,31 @@ impl KosReceiverStage2 {
         );
         let their_seed: [u8; 16] = incoming[0..16].try_into().unwrap();
         incoming = &incoming[16..];
-        let mut rng = SwankyRng::from_seed(Block::from(their_seed) ^ self.our_seed);
+        let mut rng = SwankyRng::from_seed(U8x16::from(their_seed) ^ self.our_seed);
         let out = arena.alloc_slice_fill_with(choices.len(), |j| {
             let b = choices[j];
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y0: [u8; 16] = incoming[0..16].try_into().unwrap();
             let y1: [u8; 16] = incoming[16..32].try_into().unwrap();
-            let y0 = Block::from(y0);
-            let y1 = Block::from(y1);
+            let y0 = U8x16::from(y0);
+            let y1 = U8x16::from(y1);
             incoming = &incoming[32..];
             // TODO: constant-time
             let y = if b { y1 } else { y0 };
 
-            y ^ aes_hash.hash(Block::from(t), j as u128)
+            y ^ aes_hash.hash(U8x16::from(t), j as u128)
         });
         debug_assert!(incoming.is_empty());
-        let mut x = Block::default();
-        let mut t = (Block::default(), Block::default());
-        let mut chi = Block::default();
+        let mut x = U8x16::default();
+        let mut t = (U8x16::default(), U8x16::default());
+        let mut chi = U8x16::default();
         for (j, xj) in r_.iter().copied().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
             let tj: [u8; 16] = tj.try_into().unwrap();
-            let tj = Block::from(tj);
+            let tj = U8x16::from(tj);
             rng.fill_bytes(chi.as_mut());
-            x ^= if xj { chi } else { Block::default() };
+            x ^= if xj { chi } else { U8x16::default() };
             let [lo, hi] = tj.carryless_mul_wide(chi);
             t = (t.0 ^ lo, t.1 ^ hi);
         }
@@ -541,7 +540,7 @@ fn test_kos_ot() {
     use swanky_channel_legacy::Channel;
     let (a, b) = UnixStream::pair().unwrap();
     let sender = std::thread::spawn(move || {
-        let mut rng = SwankyRng::from_seed(Block::from(456));
+        let mut rng = SwankyRng::from_seed(U8x16::from(456));
         let mut channel = Channel::new(
             BufReader::new(a.try_clone().unwrap()),
             BufWriter::new(a.try_clone().unwrap()),
@@ -551,7 +550,7 @@ fn test_kos_ot() {
         out
     });
     let receiver = {
-        let mut rng = SwankyRng::from_seed(Block::from(864));
+        let mut rng = SwankyRng::from_seed(U8x16::from(864));
         let mut channel = Channel::new(
             BufReader::new(b.try_clone().unwrap()),
             BufWriter::new(b.try_clone().unwrap()),
@@ -562,7 +561,7 @@ fn test_kos_ot() {
     };
     let sender = sender.join().unwrap();
     let arena = KeyedArena::with_capacity(0, 0);
-    let run_test = move |inputs: Vec<(Block, Block)>, choices: Vec<bool>, selector: u64| {
+    let run_test = move |inputs: Vec<(U8x16, U8x16)>, choices: Vec<bool>, selector: u64| {
         assert_eq!(inputs.len(), choices.len());
         let mut receiver_initial_outgoing =
             vec![0; KosReceiver::receive_outgoing_bytes(choices.len())];
@@ -571,7 +570,7 @@ fn test_kos_ot() {
                 &arena,
                 selector,
                 arena.alloc_slice_fill_with(choices.len(), |i| choices[i]),
-                &mut SwankyRng::from_seed(Block::from(12)),
+                &mut SwankyRng::from_seed(U8x16::from(12)),
                 &mut receiver_initial_outgoing,
             )
             .unwrap();
@@ -581,7 +580,7 @@ fn test_kos_ot() {
                 &arena,
                 selector,
                 &inputs,
-                &mut SwankyRng::from_seed(Block::from(85412)),
+                &mut SwankyRng::from_seed(U8x16::from(85412)),
                 &receiver_initial_outgoing,
                 &mut sender_outgoing_bytes,
             )
@@ -604,20 +603,20 @@ fn test_kos_ot() {
     };
     run_test(vec![], vec![], 100000000);
     run_test(
-        vec![(Block::from(1), Block::from(2))],
+        vec![(U8x16::from(1), U8x16::from(2))],
         vec![true],
         100000001,
     );
     run_test(
-        vec![(Block::from(1), Block::from(2))],
+        vec![(U8x16::from(1), U8x16::from(2))],
         vec![false],
         100000002,
     );
     for (i, len) in [32, 33, 65, 65, 5873, 8582].iter().copied().enumerate() {
-        let mut rng = SwankyRng::from_seed(Block::from(u128::from((i as u64) + 25903468354)));
+        let mut rng = SwankyRng::from_seed(U8x16::from(u128::from((i as u64) + 25903468354)));
         let choices = (0..len).map(|_| rng.random::<bool>()).collect();
         let inputs = (0..len)
-            .map(|_| (rng.random::<Block>(), rng.random::<Block>()))
+            .map(|_| (rng.random::<U8x16>(), rng.random::<U8x16>()))
             .collect();
         run_test(inputs, choices, i as u64);
     }

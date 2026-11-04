@@ -7,14 +7,13 @@
 //     the current megabin handling is an artifact of older bugs that stalled the system for large sets
 
 use std::fmt::Debug;
-use swanky_block::Block;
 use swanky_error::{ErrorKind, Result, bail};
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 #[derive(Clone, Debug)]
 pub(crate) struct CuckooItem {
     // The actual value.
-    pub(crate) entry: Block,
+    pub(crate) entry: U8x16,
     // The input index associated with the entry.
     pub(crate) input_index: usize,
     // The hash index used. None for stash items.
@@ -23,9 +22,9 @@ pub(crate) struct CuckooItem {
 
 impl CuckooItem {
     /// Replace the first byte of the entry with the hash index. Used in PSTY.
-    pub fn entry_with_hindex(&self) -> Block {
-        let mask = Block::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
-        (self.entry & mask) ^ Block::from(self.hash_index as u128)
+    pub fn entry_with_hindex(&self) -> U8x16 {
+        let mask = U8x16::from(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FF00);
+        (self.entry & mask) ^ U8x16::from(self.hash_index as u128)
     }
 }
 
@@ -85,7 +84,7 @@ impl CuckooHash {
     /// Build a new cuckoo hash table, hashing `inputs` in. We require that the
     /// lower-order-bits of the values in `inputs` are zero-ed out, as those
     /// bits will be used to store the hash index.
-    pub fn new(inputs: &[Block], nhashes: usize) -> Result<CuckooHash> {
+    pub fn new(inputs: &[U8x16], nhashes: usize) -> Result<CuckooHash> {
         let nbins = compute_nbins(inputs.len(), nhashes)?;
 
         let mut tbl = CuckooHash {
@@ -104,7 +103,7 @@ impl CuckooHash {
 
     /// Place `input`, alongside the input index `idx` it corresponds to, in the
     /// hash table.
-    pub fn hash(&mut self, input: Block, idx: usize) -> Result<()> {
+    pub fn hash(&mut self, input: U8x16, idx: usize) -> Result<()> {
         let mut item = CuckooItem {
             entry: input,
             input_index: idx,
@@ -127,9 +126,9 @@ impl CuckooHash {
     }
 
     /// Output the bin number for a given hash output `hash` and hash index `hidx`.
-    pub fn bin(hash: Block, hidx: usize, nbins: usize) -> usize {
+    pub fn bin(hash: U8x16, hidx: usize, nbins: usize) -> usize {
         let aes = Aes128EncryptOnly::new_with_key(hash);
-        let h = aes.encrypt(Block::from(hidx as u128));
+        let h = aes.encrypt(U8x16::from(hidx as u128));
         (u128::from(h) % (nbins as u128)) as usize
     }
 }

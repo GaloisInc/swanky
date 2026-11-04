@@ -565,7 +565,7 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use swanky_block::Block;
+                use vectoreyes::U8x16;
 
                 fn any_fe() -> impl Strategy<Value = $field> {
                     any::<u128>().prop_map(|seed| {
@@ -573,8 +573,8 @@ mod tests {
                     })
                 }
 
-                fn any_seed() -> impl Strategy<Value = Block> {
-                    any::<u128>().prop_map(|seed| Block::from(seed))
+                fn any_seed() -> impl Strategy<Value = U8x16> {
+                    any::<u128>().prop_map(|seed| U8x16::from(seed))
                 }
 
                 proptest! {

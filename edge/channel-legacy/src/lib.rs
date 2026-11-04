@@ -29,8 +29,9 @@ use std::{
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use hybrid_array::Array;
 
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_serialization::CanonicalSerialize;
+use vectoreyes::U8x16;
 
 /// A trait for managing I/O. `AbstractChannel`s are clonable, and provide basic
 /// read/write capabilities for both common and scuttlebutt-specific types.
@@ -143,24 +144,24 @@ pub trait AbstractChannel {
         usize::try_from(x).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 
-    /// Write a `Block` to the channel.
+    /// Write a `U8x16` to the channel.
     #[inline(always)]
-    fn write_block(&mut self, b: &Block) -> Result<()> {
+    fn write_block(&mut self, b: &U8x16) -> Result<()> {
         self.write_bytes(b.as_ref())?;
         Ok(())
     }
 
-    /// Read a `Block` from the channel.
+    /// Read a `U8x16` from the channel.
     #[inline(always)]
-    fn read_block(&mut self) -> Result<Block> {
-        let mut v = Block::default();
+    fn read_block(&mut self) -> Result<U8x16> {
+        let mut v = U8x16::default();
         self.read_bytes(v.as_mut())?;
         Ok(v)
     }
 
-    /// Read `n` `Block`s from the channel.
+    /// Read `n` `U8x16`s from the channel.
     #[inline(always)]
-    fn read_blocks(&mut self, n: usize) -> Result<Vec<Block>> {
+    fn read_blocks(&mut self, n: usize) -> Result<Vec<U8x16>> {
         (0..n).map(|_| self.read_block()).collect()
     }
 

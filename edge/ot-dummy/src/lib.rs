@@ -2,11 +2,11 @@
 //! Implementation of an insecure OT protocol for testing purposes
 
 use rand::CryptoRng;
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use vectoreyes::U8x16;
 
 /// Oblivious transfer sender.
 pub struct Sender {}
@@ -14,7 +14,7 @@ pub struct Sender {}
 pub struct Receiver {}
 
 impl OtSender for Sender {
-    type Msg = Block;
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
@@ -23,7 +23,7 @@ impl OtSender for Sender {
     fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[(Block, Block)],
+        inputs: &[(U8x16, U8x16)],
         _: &mut RNG,
     ) -> Result<()> {
         let mut bs = Vec::with_capacity(inputs.len());
@@ -53,7 +53,7 @@ impl std::fmt::Display for Sender {
 }
 
 impl OtReceiver for Receiver {
-    type Msg = Block;
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
@@ -64,7 +64,7 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         inputs: &[F2],
         _: &mut RNG,
-    ) -> Result<Vec<Block>> {
+    ) -> Result<Vec<U8x16>> {
         for &b in inputs.iter() {
             channel
                 .write_bool(b.into())

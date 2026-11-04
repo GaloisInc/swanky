@@ -1,12 +1,13 @@
 use rand::RngExt;
 use std::{os::unix::net::UnixStream, time::SystemTime};
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_channel_tracking::TrackChannel;
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<Block> {
-    (0..size).map(|_| rand::random::<Block>()).collect()
+fn rand_block_vec(size: usize) -> Vec<U8x16> {
+    (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 
 fn run(ninputs: usize, npoints: usize) {
@@ -15,7 +16,7 @@ fn run(ninputs: usize, npoints: usize) {
     let mut rng = SwankyRng::new();
     let points = (0..npoints)
         .map(|_| (rng.random(), rng.random()))
-        .collect::<Vec<(Block, Block512)>>();
+        .collect::<Vec<(U8x16, Block512)>>();
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let total = SystemTime::now();

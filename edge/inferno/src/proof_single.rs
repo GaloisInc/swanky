@@ -11,11 +11,11 @@ use blake3::Hash;
 use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 use simple_arith_circuit::Circuit;
-use swanky_block::Block;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
 /// The proof for a single execution of the protocol. `N` denotes
 /// the number of participants in the MPC.
@@ -68,7 +68,7 @@ impl<F: FiniteField, const N: usize> ProofSingle<F, N> {
             .collect::<Vec<u128>>()
             .try_into()
             .unwrap(); // This `unwrap` will never fail.
-        let mut rngs = seeds.map(|seed| SwankyRng::from_seed(Block::from(seed)));
+        let mut rngs = seeds.map(|seed| SwankyRng::from_seed(U8x16::from(seed)));
 
         // Secret share the witness.
         let ws: Vec<SecretSharing<F::PrimeField, N>> = witness
@@ -386,7 +386,7 @@ impl<F: FiniteField, const N: usize> OpenedPartiesShares<F, N> {
     pub fn reconstruct_rngs(&self) -> [SwankyRng; N] {
         self.seeds
             .iter()
-            .map(|seed| SwankyRng::from_seed(Block::from(*seed)))
+            .map(|seed| SwankyRng::from_seed(U8x16::from(*seed)))
             .collect::<Vec<SwankyRng>>()
             .try_into()
             .unwrap() // This `unwrap` will never fail
@@ -465,10 +465,10 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use swanky_block::Block;
+                use vectoreyes::U8x16;
 
-                fn any_seed() -> impl Strategy<Value = Block> {
-                    any::<u128>().prop_map(|seed| Block::from(seed))
+                fn any_seed() -> impl Strategy<Value = U8x16> {
+                    any::<u128>().prop_map(|seed| U8x16::from(seed))
                 }
 
                 proptest! {

@@ -7,16 +7,17 @@ use crate::{
 };
 
 use fancy_traits::FancyEncode;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_oprf_kmprt::Receiver as KmprtReceiver;
+use vectoreyes::U8x16;
 
 /// A strut defining the receiver in the base circuit PSI computation.
 /// A receiver here refers to the party which queries the OPPRF in this
 /// computation.
 pub struct OpprfReceiver {
     /// The hashing key
-    pub key: Block,
+    pub key: U8x16,
     /// The opprf for primary keys
     pub opprf_primary_keys: KmprtReceiver,
     /// The opprf for payloads
@@ -41,7 +42,7 @@ pub struct OpprfReceiver {
 #[derive(Default)]
 pub struct ReceiverState {
     /// The opprf query for primary keys
-    pub opprf_primary_keys_in: Vec<Block>,
+    pub opprf_primary_keys_in: Vec<U8x16>,
     /// The opprf output for primary keys
     pub opprf_primary_keys_out: Vec<Block512>,
     /// The opprf query for payloads

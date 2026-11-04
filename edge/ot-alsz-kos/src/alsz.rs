@@ -6,7 +6,6 @@
 use rand::{CryptoRng, Rng, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -17,21 +16,22 @@ use swanky_ot_traits::{
 };
 use swanky_rng::SwankyRng;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
+use vectoreyes::U8x16;
 
 /// Oblivious transfer sender.
-pub struct Sender<OT: OtReceiver<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Receiver> {
+pub struct Sender<OT: OtReceiver<Msg = U8x16> + SemiHonest = swanky_ot_chou_orlandi::Receiver> {
     _ot: PhantomData<OT>,
     s: Vec<F2>,
-    pub(super) s_: Block,
+    pub(super) s_: U8x16,
     rngs: Vec<SwankyRng>,
 }
 /// Oblivious transfer receiver.
-pub struct Receiver<OT: OtSender<Msg = Block> + SemiHonest = swanky_ot_chou_orlandi::Sender> {
+pub struct Receiver<OT: OtSender<Msg = U8x16> + SemiHonest = swanky_ot_chou_orlandi::Sender> {
     _ot: PhantomData<OT>,
     rngs: Vec<(SwankyRng, SwankyRng)>,
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> FixedKeyInitializer for Sender<OT> {
     fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         s_: [u8; 16],
@@ -53,13 +53,13 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> FixedKeyInitializer for Sender<OT
         Ok(Self {
             _ot: PhantomData::<OT>,
             s,
-            s_: Block::from(s_),
+            s_: U8x16::from(s_),
             rngs,
         })
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> Sender<OT> {
     pub(super) fn send_setup<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -89,8 +89,8 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
-    type Msg = Block;
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> OtSender for Sender<OT> {
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let mut s_ = [0u8; 16];
@@ -109,7 +109,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let y0 = CorrelationRobustHash::fixed_key().hash(q) ^ input.0;
             let q = q ^ self.s_;
             let y1 = CorrelationRobustHash::fixed_key().hash(q) ^ input.1;
@@ -127,13 +127,13 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OtSender for Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> std::fmt::Display for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> std::fmt::Display for Sender<OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "ALSZ Sender")
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> CorrelatedSender for Sender<OT> {
     fn send_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -146,7 +146,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let x0 = CorrelationRobustHash::fixed_key().hash(q);
             let x1 = x0 ^ delta;
             let q = q ^ self.s_;
@@ -163,7 +163,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> CorrelatedSender for Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> RandomSender for Sender<OT> {
     fn send_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -175,7 +175,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let x0 = CorrelationRobustHash::fixed_key().hash(q);
             let q = q ^ self.s_;
             let x1 = CorrelationRobustHash::fixed_key().hash(q);
@@ -185,7 +185,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> RandomSender for Sender<OT> {
     }
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + SemiHonest> Receiver<OT> {
     pub(super) fn receive_setup<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -223,14 +223,14 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> Receiver<OT> {
     }
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
-    type Msg = Block;
+impl<OT: OtSender<Msg = U8x16> + SemiHonest> OtReceiver for Receiver<OT> {
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
         let mut ks = Vec::with_capacity(128);
-        let mut k0 = Block::default();
-        let mut k1 = Block::default();
+        let mut k0 = U8x16::default();
+        let mut k1 = U8x16::default();
         for _ in 0..128 {
             rng.fill_bytes(k0.as_mut());
             rng.fill_bytes(k1.as_mut());
@@ -275,14 +275,14 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OtReceiver for Receiver<OT> {
                 .read_block()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if b.into() { y1 } else { y0 };
-            let y = y ^ CorrelationRobustHash::fixed_key().hash(Block::from(t));
+            let y = y ^ CorrelationRobustHash::fixed_key().hash(U8x16::from(t));
             out.push(y);
         }
         Ok(out)
     }
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + SemiHonest> CorrelatedReceiver for Receiver<OT> {
     fn receive_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -307,15 +307,15 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> CorrelatedReceiver for Receiver<OT>
             let y = channel
                 .read_block()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-            let y = if b.into() { y } else { Block::default() };
-            let h = CorrelationRobustHash::fixed_key().hash(Block::from(t));
+            let y = if b.into() { y } else { U8x16::default() };
+            let h = CorrelationRobustHash::fixed_key().hash(U8x16::from(t));
             out.push(y ^ h);
         }
         Ok(out)
     }
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + SemiHonest> RandomReceiver for Receiver<OT> {
     fn receive_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -337,21 +337,21 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> RandomReceiver for Receiver<OT> {
         for j in 0..inputs.len() {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
-            let h = CorrelationRobustHash::fixed_key().hash(Block::from(t));
+            let h = CorrelationRobustHash::fixed_key().hash(U8x16::from(t));
             out.push(h);
         }
         Ok(out)
     }
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> std::fmt::Display for Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + SemiHonest> std::fmt::Display for Receiver<OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "ALSZ Receiver")
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> SemiHonest for Sender<OT> {}
-impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
+impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> SemiHonest for Sender<OT> {}
+impl<OT: OtSender<Msg = U8x16> + SemiHonest> SemiHonest for Receiver<OT> {}
 
 #[test]
 fn test_functionality() {

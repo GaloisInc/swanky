@@ -10,15 +10,15 @@ use curve25519_dalek::{
 };
 use rand::CryptoRng;
 use swanky_adversary::SemiHonest;
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use vectoreyes::U8x16;
 
-pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
+pub(crate) fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
-    Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+    U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
 }
 
 /// Oblivious transfer sender.
@@ -27,7 +27,7 @@ pub struct Sender {}
 pub struct Receiver {}
 
 impl OtSender for Sender {
-    type Msg = Block;
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
@@ -36,7 +36,7 @@ impl OtSender for Sender {
     fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[(Block, Block)],
+        inputs: &[(U8x16, U8x16)],
         mut rng: &mut RNG,
     ) -> Result<()> {
         let m = inputs.len();
@@ -89,7 +89,7 @@ impl std::fmt::Display for Sender {
 }
 
 impl OtReceiver for Receiver {
-    type Msg = Block;
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(_: &mut C, _: &mut RNG) -> Result<Self> {
         Ok(Self {})
@@ -100,7 +100,7 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         inputs: &[F2],
         mut rng: &mut RNG,
-    ) -> Result<Vec<Block>> {
+    ) -> Result<Vec<U8x16>> {
         let m = inputs.len();
         let mut cs = Vec::with_capacity(m);
         let mut ks = Vec::with_capacity(m);
