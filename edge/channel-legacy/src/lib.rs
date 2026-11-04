@@ -161,7 +161,7 @@ pub trait AbstractChannel {
 
     /// Read `n` `U8x16`s from the channel.
     #[inline(always)]
-    fn read_blocks(&mut self, n: usize) -> Result<Vec<U8x16>> {
+    fn read_u8x16s(&mut self, n: usize) -> Result<Vec<U8x16>> {
         (0..n).map(|_| self.read_u8x16()).collect()
     }
 
