@@ -9,10 +9,14 @@ use swanky_error::Result;
 use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] `x`, output the absolute value of `x`.
+///
+/// This is equivalent to `if x >> (N - 1) > 0 { ((!x) + 1) & ((1 << N) - 1) }
+/// else { x }`, where `N` is the length of the [`BinaryBundle`]. It is _not_
+/// equivalent to either `x.abs()` or `x.unsigned_abs()` in Rust.
 #[derive(Default)]
-pub struct BinaryAbs<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct AbsoluteValue<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryAbs<'a, N>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for AbsoluteValue<'a, N>
 where
     F::Item: 'a,
 {
@@ -35,17 +39,17 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{BinaryBundle, binary::BinaryAbs};
+    use crate::{BinaryBundle, binary::AbsoluteValue};
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
     #[test]
-    fn binary_abs() {
+    fn absolute_value_circuit_works() {
         const N: usize = 64;
         const Q: u128 = 1 << N;
 
         let mut rng = rng();
-        let circuit = BinaryAbs::default();
+        let circuit = AbsoluteValue::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;

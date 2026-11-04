@@ -60,8 +60,8 @@ pub use binary_shift::BinaryLeftShiftPad;
 pub use binary_shift::BinaryRightShift;
 pub use binary_shift::BinaryRightShiftPad;
 
-mod binary_abs;
-pub use binary_abs::BinaryAbs;
+mod abs;
+pub use abs::AbsoluteValue;
 
 mod binary_to_unary;
 pub use binary_to_unary::BinaryToUnary;

@@ -6,6 +6,8 @@ use swanky_error::Result;
 use swanky_field_binary::F2;
 
 /// A bundle of binary wires.
+///
+/// Wires are represented in least-significant-bit-first order.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryBundle<W, const N: usize>([W; N]);
