@@ -1,5 +1,5 @@
 use crate::{BinaryBundle, util::u128_to_bits};
-use fancy_traits::{Circuit, Fancy, FancyConstant};
+use fancy_traits::{Circuit, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -27,48 +27,21 @@ impl<F: FancyConstant<F2>, const N: usize> Circuit<F> for Constant<N> {
     }
 }
 
-pub mod test {
+#[cfg(test)]
+mod test {
     use super::*;
-    use fancy_traits::CircuitInputMapper;
-
-    /// Circuit for testing [`Constant`].
-    pub struct TestConstant<const N: usize>(pub u128);
-    impl<F: FancyConstant<F2>, const N: usize> Circuit<F> for TestConstant<N> {
-        type Input = <Constant<N> as Circuit<F>>::Input;
-        type Output = <Constant<N> as Circuit<F>>::Output;
-
-        fn execute(
-            &self,
-            backend: &mut F,
-            inputs: Self::Input,
-            channel: &mut swanky_channel::Channel,
-        ) -> Result<Self::Output> {
-            Constant::new(self.0).execute(backend, inputs, channel)
-        }
-    }
-
-    impl<F: FancyConstant<F2>, const N: usize> CircuitInputMapper<F> for TestConstant<N> {
-        fn map(&self, inputs: Vec<<F as Fancy>::Item>) -> Self::Input {
-            assert!(inputs.is_empty());
-        }
-
-        fn ninputs(&self) -> usize {
-            0
-        }
-    }
+    use fancy_plaintext::Dummy;
+    use rand::RngExt;
 
     #[test]
     fn constant_circuit_works() {
-        use fancy_plaintext::Dummy;
-        use rand::RngExt;
-
         const N: usize = 64;
         const Q: u128 = 1 << N;
 
         let mut rng = rand::rng();
         for _ in 0..16 {
             let value = rng.random::<u128>() % Q;
-            let circuit = TestConstant::<N>(value);
+            let circuit = Constant::<N>::new(value);
             let output = Dummy::eval(&circuit, ()).unwrap();
             assert_eq!(Into::<u128>::into(output), value);
         }
