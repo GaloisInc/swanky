@@ -11,17 +11,20 @@ use prc::PseudorandomCode;
 use rand::{CryptoRng, Rng, RngExt, SeedableRng};
 use std::marker::PhantomData;
 use swanky_adversary::SemiHonest;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
-use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_traits_new::{ObliviousTransfer, Receiver as OtReceiver, Sender as OtSender};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use swanky_serialization::SequenceDeserializer;
+use vectoreyes::U8x16;
 
 /// KKRT oblivious PRF sender.
-pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiver> {
+pub struct Sender<OT: ObliviousTransfer<OtReceiver> + SemiHonest = swanky_ot_iknp::IKNP<OtReceiver>>
+{
     _ot: PhantomData<OT>,
     s: Vec<F2>,
     s_: [u8; 64],
@@ -29,13 +32,13 @@ pub struct Sender<OT: OtReceiver + SemiHonest = swanky_ot_alsz_kos::alsz::Receiv
     rngs: Vec<SwankyRng>,
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> ObliviousPrf for Sender<OT> {
+impl<OT: ObliviousTransfer<OtReceiver> + SemiHonest> ObliviousPrf for Sender<OT> {
     type Seed = Block512;
-    type Input = Block;
+    type Input = U8x16;
     type Output = Block512;
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
+impl<OT: ObliviousTransfer<OtReceiver> + SemiHonest> OprfSender for Sender<OT> {
     fn init<RNG>(channel: &mut Channel, rng: &mut RNG) -> Result<Self>
     where
         RNG: CryptoRng,
@@ -50,11 +53,19 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
             )?
             .read_vec(&mut &s_[..], 8 * 64)
             .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
-        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<U8x16>>();
         let keys = swanky_cointoss::send(channel, &seeds)
             .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
-        let ks = ot.receive(channel, &s, rng)?;
+        let mut outputs = PartyPrivate::new(Vec::with_capacity(s.len()));
+        ot.ot(
+            PartyEither::new(Witness::EQUAL_TYPES, &s[..]),
+            PartyPrivate::empty(Witness::EQUAL_TYPES),
+            outputs.as_mut(),
+            channel,
+            rng,
+        )?;
+        let ks = outputs.into_inner(Witness::EQUAL_TYPES);
         let rngs = ks
             .into_iter()
             .map(SwankyRng::from_seed)
@@ -113,7 +124,7 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> OprfSender for Sender<OT> {
 }
 
 // Separate out `encode` function for optimization purposes.
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
+impl<OT: ObliviousTransfer<OtReceiver> + SemiHonest> Sender<OT> {
     /// Encode `input` into `output`. This is *not* the same as the `compute`
     /// method as it does not integrate the OPRF seed. However, it is useful for
     /// optimization purposes (e.g., when the same seed is used on multiple
@@ -133,37 +144,43 @@ impl<OT: OtReceiver<Msg = Block> + SemiHonest> Sender<OT> {
 }
 
 /// KKRT oblivious PRF receiver.
-pub struct Receiver<OT: OtSender + SemiHonest = swanky_ot_alsz_kos::alsz::Sender> {
+pub struct Receiver<OT: ObliviousTransfer<OtSender> + SemiHonest = swanky_ot_iknp::IKNP<OtSender>> {
     _ot: PhantomData<OT>,
     code: PseudorandomCode,
     rngs: Vec<(SwankyRng, SwankyRng)>,
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> ObliviousPrf for Receiver<OT> {
+impl<OT: ObliviousTransfer<OtSender> + SemiHonest> ObliviousPrf for Receiver<OT> {
     type Seed = Block512;
-    type Input = Block;
+    type Input = U8x16;
     type Output = Block512;
 }
 
-impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
+impl<OT: ObliviousTransfer<OtSender> + SemiHonest> OprfReceiver for Receiver<OT> {
     fn init<RNG: CryptoRng>(channel: &mut Channel, rng: &mut RNG) -> Result<Self> {
         let mut ot = OT::init(channel, rng)?;
-        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<Block>>();
+        let seeds = (0..4).map(|_| rng.random()).collect::<Vec<U8x16>>();
         let keys = swanky_cointoss::receive(channel, &seeds)
             .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let code = PseudorandomCode::new(keys[0], keys[1], keys[2], keys[3]);
         let mut ks = Vec::with_capacity(512);
-        let mut k0 = Block::default();
-        let mut k1 = Block::default();
+        let mut k0 = U8x16::default();
+        let mut k1 = U8x16::default();
         for _ in 0..512 {
             rng.fill_bytes(k0.as_mut());
             rng.fill_bytes(k1.as_mut());
-            ks.push((k0, k1));
+            ks.push([k0, k1]);
         }
-        ot.send(channel, &ks, rng)?;
+        ot.ot::<Vec<_>>(
+            PartyEither::new(Witness::EQUAL_TYPES, ks.len()),
+            PartyPrivate::new(&ks[..]),
+            PartyPrivate::empty(Witness::EQUAL_TYPES),
+            channel,
+            rng,
+        )?;
         let rngs = ks
             .into_iter()
-            .map(|(k0, k1)| (SwankyRng::from_seed(k0), SwankyRng::from_seed(k1)))
+            .map(|[k0, k1]| (SwankyRng::from_seed(k0), SwankyRng::from_seed(k1)))
             .collect::<Vec<(SwankyRng, SwankyRng)>>();
         Ok(Self {
             _ot: PhantomData::<OT>,
@@ -221,14 +238,15 @@ impl<OT: OtSender<Msg = Block> + SemiHonest> OprfReceiver for Receiver<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + SemiHonest> SemiHonest for Sender<OT> {}
-impl<OT: OtSender<Msg = Block> + SemiHonest> SemiHonest for Receiver<OT> {}
+impl<OT: ObliviousTransfer<OtReceiver> + SemiHonest> SemiHonest for Sender<OT> {}
+impl<OT: ObliviousTransfer<OtSender> + SemiHonest> SemiHonest for Receiver<OT> {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
     use swanky_channel::local::local_channel_pair;
+    use swanky_ot_traits_new::{Receiver as OtReceiver, Sender as OtSender};
     use swanky_rng::SwankyRng;
 
     #[test]
@@ -240,12 +258,12 @@ mod tests {
         assert_eq!(seed.as_ref(), input.as_slice());
     }
 
-    fn rand_block_vec(size: usize) -> Vec<Block> {
-        (0..size).map(|_| rand::random::<Block>()).collect()
+    fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
+        (0..size).map(|_| rand::random::<U8x16>()).collect()
     }
 
     fn _test_oprf(n: usize) {
-        let selections = rand_block_vec(n);
+        let selections = rand_u8x16_vec(n);
         let selections_ = selections.clone();
         let results = Arc::new(Mutex::new(vec![]));
         let results_ = results.clone();
@@ -254,7 +272,7 @@ mod tests {
             |c| {
                 let mut rng = SwankyRng::new();
                 let mut oprf =
-                    Sender::<swanky_ot_alsz_kos::alsz::Receiver>::init(c, &mut rng).unwrap();
+                    Sender::<swanky_ot_iknp::IKNP<OtReceiver>>::init(c, &mut rng).unwrap();
                 let seeds = oprf.send(c, n, &mut rng).unwrap();
                 let mut results = results.lock().unwrap();
                 *results = selections_
@@ -267,7 +285,7 @@ mod tests {
             |c| {
                 let mut rng = SwankyRng::new();
                 let mut oprf =
-                    Receiver::<swanky_ot_alsz_kos::alsz::Sender>::init(c, &mut rng).unwrap();
+                    Receiver::<swanky_ot_iknp::IKNP<OtSender>>::init(c, &mut rng).unwrap();
                 Ok(oprf.receive(c, &selections, &mut rng).unwrap())
             },
         )
