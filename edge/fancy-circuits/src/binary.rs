@@ -27,15 +27,8 @@ pub use mul::{Mul, MulLowerHalf, Mulc, TestMul};
 mod div;
 pub use div::Div;
 
-mod binary_less_than;
-pub use binary_less_than::BinaryLessThan;
-pub use binary_less_than::BinaryLessThanSigned;
-pub use binary_less_than::test::TestBinaryLessThan;
-pub use binary_less_than::test::TestBinaryLessThanSigned;
-
-mod binary_greater_than_or_equal;
-pub use binary_greater_than_or_equal::BinaryGreaterThanOrEqual;
-pub use binary_greater_than_or_equal::test::TestBinaryGreaterThanOrEqual;
+mod comparison;
+pub use comparison::{GreaterThanOrEqual, LessThan, LessThanSigned};
 
 mod eq;
 pub use eq::Eq;

@@ -1,4 +1,4 @@
-use crate::{BinaryBundle, binary::BinaryLessThan};
+use crate::{BinaryBundle, binary::LessThan};
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
@@ -28,7 +28,7 @@ where
         let xs = inputs;
         xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
             // Compute `x < y`.
-            let pos = BinaryLessThan::default().execute(backend, (&x, y), channel)?;
+            let pos = LessThan::default().execute(backend, (&x, y), channel)?;
             // Compute `!(x < y)`.
             let neg = backend.negate(&pos);
             // Compute `x * (x >= y) ^ y * (x < y)`.
