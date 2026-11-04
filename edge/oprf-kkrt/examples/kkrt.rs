@@ -6,12 +6,12 @@ use swanky_oprf_traits::{Receiver as _, Sender as _};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<U8x16> {
+fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
     (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 
 fn _test_oprf(n: usize) {
-    let selections = rand_block_vec(n);
+    let selections = rand_u8x16_vec(n);
     let (sender, receiver) = UnixStream::pair().unwrap();
 
     let total = SystemTime::now();
