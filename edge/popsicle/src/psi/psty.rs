@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryEquality, Constant},
+    binary::{BinaryAdditionNoCarry, Constant, Eq},
 };
 use fancy_garbling::WireMod2;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
@@ -434,7 +434,7 @@ fn fancy_compute_intersection<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::<{ HASH_SIZE * 8 }>::default().execute(
+            Eq::<{ HASH_SIZE * 8 }>::default().execute(
                 f,
                 (
                     &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
@@ -459,7 +459,7 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::<{ HASH_SIZE * 8 }>::default().execute(
+            Eq::<{ HASH_SIZE * 8 }>::default().execute(
                 f,
                 (
                     &BinaryBundle::new(xs.to_vec().try_into().unwrap()),

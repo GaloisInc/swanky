@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryEquality, BinarySubtraction, Mux, MuxBit},
+    binary::{Eq, Mux, MuxBit, Sub},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -62,14 +62,12 @@ where
 
             // Compute `a := a - b` and check for an underflow that will help
             // determine if `a > b`.
-            let (r_1, mut underflow_r_1) =
-                BinarySubtraction::default().execute(backend, (&a, &b), channel)?;
+            let (r_1, mut underflow_r_1) = Sub::default().execute(backend, (&a, &b), channel)?;
             // Compute `b := b - a` and check for an underflow that will help
             // determine if `b > a`.
-            let (r_2, mut underflow_r_2) =
-                BinarySubtraction::default().execute(backend, (&b, &a), channel)?;
+            let (r_2, mut underflow_r_2) = Sub::default().execute(backend, (&b, &a), channel)?;
 
-            let is_equal = BinaryEquality::default().execute(backend, (&a, &b), channel)?;
+            let is_equal = Eq::default().execute(backend, (&a, &b), channel)?;
 
             // The `underflow` bits act as dual purpose multiplexing bits:
             // (1) If a > b then underflow_r_1 = 1 and underflow_r_2 = 0

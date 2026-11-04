@@ -5,9 +5,7 @@ use crate::ps::{PartyEvaluator, PartyGarbler};
 use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator};
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_circuits::binary::{
-    TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
-};
+use fancy_circuits::binary::{TestBinaryAddition, TestMul, TestSub, TestTwosComplement};
 use fancy_circuits::crypto::aes::Aes128;
 use fancy_circuits::test_circuits::binary::{
     TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
@@ -192,7 +190,7 @@ fn test_binary_addition() {
 #[test]
 fn test_bin_twos_complement() {
     const N: usize = 64;
-    let circuit = TestBinaryTwosComplement::<N>;
+    let circuit = TestTwosComplement::<N>;
 
     test_circuit(N, 0, &circuit);
 }
@@ -200,7 +198,7 @@ fn test_bin_twos_complement() {
 #[test]
 fn test_binary_subtraction() {
     const N: usize = 64;
-    let circuit = TestBinarySubtraction::<N>;
+    let circuit = TestSub::<N>;
 
     test_circuit(N, N, &circuit);
 }
@@ -208,7 +206,7 @@ fn test_binary_subtraction() {
 #[test]
 fn test_binary_multiplication() {
     const N: usize = 64;
-    let circuit = TestBinaryMultiplication::<N, { 2 * N }>::default();
+    let circuit = TestMul::<N, { 2 * N }>::default();
 
     test_circuit(N, N, &circuit);
 }

@@ -12,12 +12,13 @@ use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 
-/// For [`BinaryBundle`] inputs `x` and `y`, output `x * y`.
+/// For [`BinaryBundle`] inputs `x` and `y` with length `N`, output `x * y` with
+/// length `M = 2 * N`.
 #[derive(Default)]
-pub struct BinaryMultiplication<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
+pub struct Mul<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
-    for BinaryMultiplication<'a, N, M>
+    for Mul<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -64,13 +65,11 @@ where
     }
 }
 
-/// For [`BinaryBundle`]s `x` and `y`, return the the lower-order half of `x *
-/// y`.
+/// For [`BinaryBundle`]s `x` and `y` with length `N`, return `x * y % 2^N`.
 #[derive(Default)]
-pub struct BinaryMultiplicationLowerHalf<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct MulLowerHalf<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
-    for BinaryMultiplicationLowerHalf<'a, N>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for MulLowerHalf<'a, N>
 where
     F::Item: 'a,
 {
@@ -107,12 +106,12 @@ where
     }
 }
 
-/// For [`BinaryBundle`] `x` of length `N`, constant `c`, and bitlength `M`,
-/// output `x * c`, where the output is of bitlength `M`.
+/// For [`BinaryBundle`] `x` of length `N`, and constant `c`,
+/// output `x * c` with length `M = 2 * N`.
 #[derive(Default)]
-pub struct BinaryConstantMultiplication<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
+pub struct Mulc<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize, const M: usize> BinaryConstantMultiplication<'a, N, M> {
+impl<'a, const N: usize, const M: usize> Mulc<'a, N, M> {
     /// Create a new [`BinaryConstantMultiplication`] circuit.
     pub fn new() -> Self {
         Default::default()
@@ -120,7 +119,7 @@ impl<'a, const N: usize, const M: usize> BinaryConstantMultiplication<'a, N, M> 
 }
 
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
-    for BinaryConstantMultiplication<'a, N, M>
+    for Mulc<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -133,6 +132,7 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
+        assert_eq!(M, 2 * N);
         let (x, c) = inputs;
         let zero = Constant::<M>::new(0).execute(backend, (), channel)?;
         u128_to_bits::<M>(c)
@@ -146,12 +146,12 @@ where
     }
 }
 
-/// Circuit for testing [`BinaryMultiplication`].
+/// Circuit for testing [`Mul`].
 #[derive(Default)]
-pub struct TestBinaryMultiplication<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
+pub struct TestMul<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
-    for TestBinaryMultiplication<'a, N, M>
+    for TestMul<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -165,12 +165,12 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        BinaryMultiplication::default().execute(backend, (&x, &y), channel)
+        Mul::default().execute(backend, (&x, &y), channel)
     }
 }
 
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> CircuitInputMapper<F>
-    for TestBinaryMultiplication<'a, N, M>
+    for TestMul<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -196,7 +196,7 @@ where
 }
 
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> CircuitOutputMapper<F>
-    for TestBinaryMultiplication<'a, N, M>
+    for TestMul<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -209,9 +209,7 @@ where
 mod test {
     use crate::{
         BinaryBundle,
-        binary::{
-            BinaryConstantMultiplication, BinaryMultiplication, BinaryMultiplicationLowerHalf,
-        },
+        binary::{Mul, MulLowerHalf, Mulc},
     };
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
@@ -220,9 +218,9 @@ mod test {
     const Q: u128 = 1 << N;
 
     #[test]
-    fn binary_multiplication() {
+    fn mul_circuit_works() {
         let mut rng = rng();
-        let circuit = BinaryMultiplication::<N, { 2 * N }>::default();
+        let circuit = Mul::<N, { 2 * N }>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
@@ -235,9 +233,9 @@ mod test {
     }
 
     #[test]
-    fn binary_multiplication_lower_half() {
+    fn mul_lower_half_circuit_works() {
         let mut rng = rng();
-        let circuit = BinaryMultiplicationLowerHalf::<N>::default();
+        let circuit = MulLowerHalf::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
@@ -250,9 +248,9 @@ mod test {
     }
 
     #[test]
-    fn binary_constant_multiplication() {
+    fn mulc_circuit_works() {
         let mut rng = rng();
-        let circuit = BinaryConstantMultiplication::<N, { 2 * N }>::default();
+        let circuit = Mulc::<N, { 2 * N }>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;

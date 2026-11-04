@@ -8,11 +8,11 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 
-/// For [`BinaryBundle`]s `x` and `y` (for `y != 0`), output `x / y`.
+/// For [`BinaryBundle`]s `x` and `y`, output `x / y`, or zero if `y = 0`.
 #[derive(Default)]
-pub struct BinaryDivision<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct Div<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryDivision<'a, N>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for Div<'a, N>
 where
     F::Item: 'a,
 {
@@ -44,16 +44,17 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{BinaryBundle, binary::BinaryDivision};
+    use crate::{BinaryBundle, binary::Div};
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
     #[test]
-    fn test_binary_division() {
+    fn div_circuit_works() {
         const N: usize = 64;
         const Q: u128 = 1 << N;
 
         let mut rng = rng();
+        let circuit = Div::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
@@ -63,9 +64,17 @@ mod test {
             }
             let x_input = BinaryBundle::from(x);
             let y_input = BinaryBundle::from(y);
-            let output =
-                Dummy::eval(&BinaryDivision::<N>::default(), (&x_input, &y_input)).unwrap();
+            let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(Into::<u128>::into(output), x / y);
+        }
+
+        // Ensure that division by zero equals zero.
+        for _ in 0..16 {
+            let x = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::from(x);
+            let y_input = BinaryBundle::from(0);
+            let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
+            assert_eq!(Into::<u128>::into(output), 0);
         }
     }
 }

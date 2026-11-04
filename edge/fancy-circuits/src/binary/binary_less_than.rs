@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinarySubtraction, MuxBit, OrMany},
+    binary::{MuxBit, OrMany, Sub},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -32,7 +32,7 @@ where
 
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
-        let (_, lhs) = BinarySubtraction::default().execute(backend, (x, y), channel)?;
+        let (_, lhs) = Sub::default().execute(backend, (x, y), channel)?;
 
         // Now we build a clause equal to (y == 0 || x >= y), which we can OR with
         // lhs to remove the y==0 aspect.

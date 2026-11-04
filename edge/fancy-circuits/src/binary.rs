@@ -18,18 +18,14 @@ pub use binary_addition::BinaryAddition;
 pub use binary_addition::BinaryAdditionNoCarry;
 pub use binary_addition::test::TestBinaryAddition;
 
-mod binary_subtraction;
-pub use binary_subtraction::BinarySubtraction;
-pub use binary_subtraction::test::TestBinarySubtraction;
+mod sub;
+pub use sub::{Sub, TestSub};
 
-mod binary_multiplication;
-pub use binary_multiplication::BinaryConstantMultiplication;
-pub use binary_multiplication::BinaryMultiplication;
-pub use binary_multiplication::BinaryMultiplicationLowerHalf;
-pub use binary_multiplication::TestBinaryMultiplication;
+mod mul;
+pub use mul::{Mul, MulLowerHalf, Mulc, TestMul};
 
-mod binary_division;
-pub use binary_division::BinaryDivision;
+mod div;
+pub use div::Div;
 
 mod binary_less_than;
 pub use binary_less_than::BinaryLessThan;
@@ -41,13 +37,11 @@ mod binary_greater_than_or_equal;
 pub use binary_greater_than_or_equal::BinaryGreaterThanOrEqual;
 pub use binary_greater_than_or_equal::test::TestBinaryGreaterThanOrEqual;
 
-mod binary_equality;
-pub use binary_equality::BinaryEquality;
-pub use binary_equality::test::TestBinaryEquality;
+mod eq;
+pub use eq::Eq;
 
 mod twos_complement;
-pub use twos_complement::TwosComplement;
-pub use twos_complement::test::TestBinaryTwosComplement;
+pub use twos_complement::{TestTwosComplement, TwosComplement};
 
 mod max;
 pub use max::Max;

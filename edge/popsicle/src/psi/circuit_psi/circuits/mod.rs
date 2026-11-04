@@ -2,7 +2,7 @@
 use crate::circuit_psi::*;
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryEquality, Constant, Mux, PairwiseXor},
+    binary::{BinaryAdditionNoCarry, Constant, Eq, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
@@ -30,7 +30,7 @@ pub fn fancy_intersection_bit_vector<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::<{ HASH_SIZE * 8 }>::default().execute(
+            Eq::<{ HASH_SIZE * 8 }>::default().execute(
                 f,
                 (
                     &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
