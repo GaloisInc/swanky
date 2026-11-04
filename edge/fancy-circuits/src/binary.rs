@@ -1,28 +1,10 @@
 //! Circuits for operating over binary values.
 
+mod binary_ops;
+pub use binary_ops::{AndMany, OrMany, PairwiseAnd, PairwiseOr, PairwiseXor, XorMany};
+
 mod mux;
-pub use mux::Mux;
-pub use mux::MuxBit;
-pub use mux::MuxBitConstants;
-pub use mux::MuxConstants;
-
-mod pairwise_xor;
-pub use pairwise_xor::PairwiseXor;
-
-mod pairwise_and;
-pub use pairwise_and::PairwiseAnd;
-
-mod pairwise_or;
-pub use pairwise_or::PairwiseOr;
-
-mod and_many;
-pub use and_many::AndMany;
-
-mod or_many;
-pub use or_many::OrMany;
-
-mod xor_many;
-pub use xor_many::XorMany;
+pub use mux::{Mux, MuxBit, MuxBitConstants, MuxConstants};
 
 mod binary_adder;
 pub use binary_adder::BinaryAdder;
