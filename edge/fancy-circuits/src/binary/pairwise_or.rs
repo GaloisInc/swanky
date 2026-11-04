@@ -10,13 +10,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct PairwiseOr<'a>(PhantomData<&'a ()>);
 
-impl<'a> PairwiseOr<'a> {
-    /// Create a new [`PairwiseOr`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary> Circuit<F> for PairwiseOr<'a>
 where
     F::Item: 'a,
@@ -50,6 +43,7 @@ pub mod test {
         use rand::RngExt;
 
         let mut rng = rand::rng();
+        let circuit = PairwiseOr::default();
         for _ in 0..100 {
             let n = 1 + rng.random_range(..200usize);
             let x = (0..n).map(|_| DummyVal::rand(&mut rng)).collect::<Vec<_>>();
@@ -59,7 +53,7 @@ pub mod test {
                 .zip(y.iter())
                 .map(|(x, y)| DummyVal::new((bool::from(x.val()) | bool::from(y.val())).into()))
                 .collect::<Vec<_>>();
-            let output = Dummy::eval(&PairwiseOr::new(), (&x, &y)).unwrap();
+            let output = Dummy::eval(&circuit, (&x, &y)).unwrap();
             assert_eq!(output, expected);
         }
     }

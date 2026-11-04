@@ -14,13 +14,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryMultiplex<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryMultiplex<'a, N> {
-    /// Create a new [`BinaryMultiplex`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryMultiplex<'a, N>
 where
     F::Item: 'a,
@@ -43,7 +36,7 @@ where
             .wires()
             .iter()
             .zip(ys.wires().iter())
-            .map(|(x, y)| Mux::new().execute(backend, (&b.clone(), x, y), channel))
+            .map(|(x, y)| Mux::default().execute(backend, (&b.clone(), x, y), channel))
             .collect::<Result<Vec<_>>>()?
             .try_into()
             .expect("vector should be of length `N`");
@@ -74,7 +67,7 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
         let res = c1_bs
             .into_iter()
             .zip(c2_bs)
-            .map(|(b1, b2)| MuxConstants::new().execute(backend, (&b.clone(), b1, b2), channel))
+            .map(|(b1, b2)| MuxConstants::default().execute(backend, (&b.clone(), b1, b2), channel))
             .collect::<Result<Vec<_>>>()?;
         Ok(BinaryBundle::new(
             res.try_into().expect("vector should be of length `N`"),

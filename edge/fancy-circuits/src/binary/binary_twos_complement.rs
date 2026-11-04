@@ -12,13 +12,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryTwosComplement<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryTwosComplement<'a, N> {
-    /// Create a new [`BinaryTwosComplement`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
     for BinaryTwosComplement<'a, N>
 where
@@ -43,7 +36,7 @@ where
                 .expect("vector should be of length `N`"),
         );
         let one = BinaryConstant::new(1).execute(backend, (), channel)?;
-        BinaryAdditionNoCarry::new().execute(backend, (&not_xs, &one), channel)
+        BinaryAdditionNoCarry::default().execute(backend, (&not_xs, &one), channel)
     }
 }
 
@@ -66,7 +59,7 @@ pub mod test {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryTwosComplement::new().execute(backend, &inputs, channel)
+            BinaryTwosComplement::default().execute(backend, &inputs, channel)
         }
     }
 

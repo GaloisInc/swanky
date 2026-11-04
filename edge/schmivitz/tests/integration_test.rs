@@ -386,14 +386,14 @@ mod test {
         x[0] = F2::ONE;
         y[0] = F2::ONE;
         test_circuit::<_, P>(
-            &TestBinaryAddition(BinaryAddition::<8>::new(), "01000000"),
+            &TestBinaryAddition(BinaryAddition::<8>::default(), "01000000"),
             &[x, y].concat(),
         )?;
         // Test 3 + 3 = 6.
         x[1] = F2::ONE;
         y[1] = F2::ONE;
         test_circuit::<_, P>(
-            &TestBinaryAddition(BinaryAddition::<8>::new(), "01100000"),
+            &TestBinaryAddition(BinaryAddition::<8>::default(), "01100000"),
             &[x, y].concat(),
         )
     }

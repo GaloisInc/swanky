@@ -10,13 +10,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct XorMany<'a>(PhantomData<&'a ()>);
 
-impl<'a> XorMany<'a> {
-    /// Create a new [`XorMany`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary> Circuit<F> for XorMany<'a>
 where
     F::Item: 'a,
@@ -50,11 +43,12 @@ pub mod test {
         use rand::RngExt;
 
         let mut rng = rand::rng();
+        let circuit = XorMany::default();
+
         for _ in 0..16 {
             let n = 2 + rng.random_range(..200usize);
             let inputs = (0..n).map(|_| DummyVal::rand(&mut rng)).collect::<Vec<_>>();
             let expected = inputs.iter().fold(F2::ZERO, |acc, &x| x.val() + acc);
-            let circuit = XorMany::new();
             let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);
         }

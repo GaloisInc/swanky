@@ -11,13 +11,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryGreaterThanOrEqual<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryGreaterThanOrEqual<'a, N> {
-    /// Create a new [`BinaryGreaterThanOrEqual`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
     for BinaryGreaterThanOrEqual<'a, N>
 where
@@ -32,7 +25,7 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let z = BinaryLessThan::new().execute(backend, inputs, channel)?;
+        let z = BinaryLessThan::default().execute(backend, inputs, channel)?;
         Ok(backend.negate(&z))
     }
 }
@@ -55,7 +48,7 @@ pub mod test {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryGreaterThanOrEqual::new().execute(backend, (&inputs.0, &inputs.1), channel)
+            BinaryGreaterThanOrEqual::default().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 

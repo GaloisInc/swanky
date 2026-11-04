@@ -11,13 +11,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct BinaryToUnary<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryToUnary<'a, N> {
-    /// Create a new [`BinaryToUnary`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryToUnary<'a, N>
 where
     F::Item: 'a,
@@ -71,11 +64,12 @@ mod test {
         const Q: u128 = 1 << N;
 
         let mut rng = rng();
+        let circuit = BinaryToUnary::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let x_input = BinaryBundle::from(x);
-            let output = Dummy::eval(&BinaryToUnary::<N>::new(), &x_input).unwrap();
+            let output = Dummy::eval(&circuit, &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(y.val(), F2::ONE);

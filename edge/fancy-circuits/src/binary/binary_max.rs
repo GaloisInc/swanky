@@ -14,13 +14,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryMax<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryMax<'a, N> {
-    /// Create a new [`BinaryMax`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryMax<'a, N>
 where
     F::Item: 'a,
@@ -37,7 +30,7 @@ where
         let xs = inputs;
         xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
             // Compute `x < y`.
-            let pos = BinaryLessThan::new().execute(backend, (&x, y), channel)?;
+            let pos = BinaryLessThan::default().execute(backend, (&x, y), channel)?;
             // Compute `!(x < y)`.
             let neg = backend.negate(&pos);
             // Compute `x * (x >= y) ^ y * (x < y)`.
@@ -79,7 +72,7 @@ mod test {
             let max = *xs.iter().max().unwrap();
             let xs_input: Vec<BinaryBundle<_, N>> =
                 xs.iter().map(|x| BinaryBundle::from(*x)).collect();
-            let output = Dummy::eval(&BinaryMax::new(), xs_input.as_slice()).unwrap();
+            let output = Dummy::eval(&BinaryMax::default(), xs_input.as_slice()).unwrap();
             assert_eq!(Into::<u128>::into(output), max);
         }
     }

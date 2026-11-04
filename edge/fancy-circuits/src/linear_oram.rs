@@ -42,12 +42,13 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOr
         let mut result = zero.clone();
         for (i, item) in ram.iter().enumerate() {
             let index = BinaryConstant::<N>::new(i as u128).execute(backend, (), channel)?;
-            let is_equal = BinaryEquality::new().execute(backend, (&query, &index), channel)?;
-            let mux = BinaryMultiplex::new().execute(backend, (is_equal, &zero, item), channel)?;
+            let is_equal = BinaryEquality::default().execute(backend, (&query, &index), channel)?;
+            let mux =
+                BinaryMultiplex::default().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`
             // instead of `BinaryAddition`.
             let xor =
-                PairwiseXor::new().execute(backend, (result.wires(), mux.wires()), channel)?;
+                PairwiseXor::default().execute(backend, (result.wires(), mux.wires()), channel)?;
             result = BinaryBundle::new(xor.try_into().expect("vector should be of length `N`"));
         }
         Ok(result)

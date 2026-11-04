@@ -14,13 +14,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryDivision<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryDivision<'a, N> {
-    /// Create a new [`BinaryDivision`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryDivision<'a, N>
 where
     F::Item: 'a,
@@ -36,14 +29,15 @@ where
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
 
-        let ys_neg = BinaryTwosComplement::new().execute(backend, ys, channel)?;
+        let ys_neg = BinaryTwosComplement::default().execute(backend, ys, channel)?;
         let mut acc = BinaryConstant::<N>::new(0).execute(backend, (), channel)?;
         let mut qs = BinaryConstant::<N>::new(0).execute(backend, (), channel)?;
         for (i, x) in xs.wires().iter().rev().enumerate() {
-            acc = BinaryLeftShiftPad::new().execute(backend, (&acc, 1, x), channel)?;
+            acc = BinaryLeftShiftPad::default().execute(backend, (&acc, 1, x), channel)?;
             let (res, cout) =
                 BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
-            acc = BinaryMultiplex::new().execute(backend, (cout.clone(), &acc, &res), channel)?;
+            acc =
+                BinaryMultiplex::default().execute(backend, (cout.clone(), &acc, &res), channel)?;
             qs.set(cout, i);
         }
         qs.reverse(); // Switch back to little-endian
@@ -72,7 +66,8 @@ mod test {
             }
             let x_input = BinaryBundle::from(x);
             let y_input = BinaryBundle::from(y);
-            let output = Dummy::eval(&BinaryDivision::<N>::new(), (&x_input, &y_input)).unwrap();
+            let output =
+                Dummy::eval(&BinaryDivision::<N>::default(), (&x_input, &y_input)).unwrap();
             assert_eq!(Into::<u128>::into(output), x / y);
         }
     }

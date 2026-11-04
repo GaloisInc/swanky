@@ -63,29 +63,29 @@ where
             // Compute `a := a - b` and check for an underflow that will help
             // determine if `a > b`.
             let (r_1, mut underflow_r_1) =
-                BinarySubtraction::new().execute(backend, (&a, &b), channel)?;
+                BinarySubtraction::default().execute(backend, (&a, &b), channel)?;
             // Compute `b := b - a` and check for an underflow that will help
             // determine if `b > a`.
             let (r_2, mut underflow_r_2) =
-                BinarySubtraction::new().execute(backend, (&b, &a), channel)?;
+                BinarySubtraction::default().execute(backend, (&b, &a), channel)?;
 
-            let is_equal = BinaryEquality::new().execute(backend, (&a, &b), channel)?;
+            let is_equal = BinaryEquality::default().execute(backend, (&a, &b), channel)?;
 
             // The `underflow` bits act as dual purpose multiplexing bits:
             // (1) If a > b then underflow_r_1 = 1 and underflow_r_2 = 0
             // (2) If b > a then underflow_r_1 = 0 and underflow_r_2 = 1
             // (3) If a == b then underflow_r_1 = underflow_r_2 = 0
             underflow_r_1 =
-                Mux::new().execute(backend, (&is_equal, &underflow_r_1, &zero), channel)?;
+                Mux::default().execute(backend, (&is_equal, &underflow_r_1, &zero), channel)?;
             underflow_r_2 =
-                Mux::new().execute(backend, (&is_equal, &underflow_r_2, &zero), channel)?;
+                Mux::default().execute(backend, (&is_equal, &underflow_r_2, &zero), channel)?;
 
             // Using the `underflow` bits we multiplex in the following way:
             // (1) If a > b, a := a - b and b := b
             // (2) If b > a, a := a  and b := b - a
             // (3) If a == b, a := a and b := b
-            a = BinaryMultiplex::new().execute(backend, (underflow_r_1, &a, &r_1), channel)?;
-            b = BinaryMultiplex::new().execute(backend, (underflow_r_2, &b, &r_2), channel)?;
+            a = BinaryMultiplex::default().execute(backend, (underflow_r_1, &a, &r_1), channel)?;
+            b = BinaryMultiplex::default().execute(backend, (underflow_r_2, &b, &r_2), channel)?;
         }
 
         Ok(a)

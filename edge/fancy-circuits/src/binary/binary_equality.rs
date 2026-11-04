@@ -10,13 +10,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct BinaryEquality<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryEquality<'a, N> {
-    /// Create a new [`BinaryEquality`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryEquality<'a, N>
 where
     F::Item: 'a,
@@ -43,7 +36,7 @@ where
             .collect::<Vec<_>>();
 
         // If any negated XOR is 0, then the values are not equal
-        AndMany::new().execute(backend, zs.as_slice(), channel)
+        AndMany::default().execute(backend, zs.as_slice(), channel)
     }
 }
 
@@ -67,7 +60,7 @@ pub mod test {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinaryEquality::new().execute(backend, (&inputs.0, &inputs.1), channel)
+            BinaryEquality::default().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 

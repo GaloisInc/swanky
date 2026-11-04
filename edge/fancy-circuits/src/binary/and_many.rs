@@ -10,13 +10,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct AndMany<'a>(PhantomData<&'a ()>);
 
-impl<'a> AndMany<'a> {
-    /// Create a new [`AndMany`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary> Circuit<F> for AndMany<'a>
 where
     F::Item: 'a,
@@ -51,12 +44,12 @@ pub mod test {
         use rand::RngExt;
 
         let mut rng = rand::rng();
+        let circuit = AndMany::default();
 
         for _ in 0..100 {
             let n = 2 + (rng.random_range(..200usize));
             let inputs = (0..n).map(|_| DummyVal::rand(&mut rng)).collect::<Vec<_>>();
             let expected = inputs.iter().fold(F2::ONE, |acc, &x| x.val() * acc);
-            let circuit = AndMany::new();
             let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);
         }

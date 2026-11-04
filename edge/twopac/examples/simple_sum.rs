@@ -17,7 +17,7 @@ const N: usize = 128;
 fn gb_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
     let mut gb = Garbler::<SwankyRng, IKNP<Sender>, _>::new(channel, rng)?;
     let inputs = gb_set_inputs(&mut gb, input, channel)?;
-    let sum = BinaryAdditionNoCarry::new().execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
+    let sum = BinaryAdditionNoCarry::default().execute(&mut gb, (&inputs.0, &inputs.1), channel)?;
     gb.bin_output(&sum, channel)?;
     Ok(())
 }
@@ -35,7 +35,7 @@ fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
 fn ev_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
     let mut ev = Evaluator::<SwankyRng, IKNP<Receiver>, _>::new(channel, rng)?;
     let inputs = ev_set_inputs(&mut ev, input, channel)?;
-    let sum = BinaryAdditionNoCarry::new().execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
+    let sum = BinaryAdditionNoCarry::default().execute(&mut ev, (&inputs.0, &inputs.1), channel)?;
     let output = ev
         .bin_output(&sum, channel)
         .unwrap()

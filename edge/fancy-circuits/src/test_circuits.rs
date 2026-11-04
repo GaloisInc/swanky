@@ -123,7 +123,7 @@ pub mod binary {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            AndMany::new().execute(backend, inputs.as_slice(), channel)
+            AndMany::default().execute(backend, inputs.as_slice(), channel)
         }
     }
     impl<F: FancyBinary> CircuitInputMapper<F> for TestAndGateFanN {
@@ -154,7 +154,7 @@ pub mod binary {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            OrMany::new().execute(backend, inputs.as_slice(), channel)
+            OrMany::default().execute(backend, inputs.as_slice(), channel)
         }
     }
     impl<F: FancyBinary> CircuitInputMapper<F> for TestOrGateFanN {
@@ -185,7 +185,7 @@ pub mod binary {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            XorMany::new().execute(backend, inputs.as_slice(), channel)
+            XorMany::default().execute(backend, inputs.as_slice(), channel)
         }
     }
     impl<F: FancyBinary> CircuitInputMapper<F> for TestXorGateFanN {

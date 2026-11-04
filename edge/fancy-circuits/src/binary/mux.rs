@@ -9,13 +9,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct Mux<'a>(PhantomData<&'a ()>);
 
-impl<'a> Mux<'a> {
-    /// Create a new [`Mux`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary> Circuit<F> for Mux<'a>
 where
     F::Item: 'a,
@@ -40,13 +33,6 @@ where
 /// For input `(b, c1, c2)`, return `c1` if `b == 0`, otherwise return `c2`.
 #[derive(Default)]
 pub struct MuxConstants<'a>(PhantomData<&'a ()>);
-
-impl<'a> MuxConstants<'a> {
-    /// Create a new [MuxConstants] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
 
 impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for MuxConstants<'a>
 where
@@ -81,13 +67,15 @@ mod test {
 
     #[test]
     fn mux() {
+        let circuit = Mux::default();
+
         for b in [F2::ZERO, F2::ONE] {
             for x in [F2::ZERO, F2::ONE] {
                 for y in [F2::ZERO, F2::ONE] {
                     let b_val = DummyVal::new(b);
                     let x_val = DummyVal::new(x);
                     let y_val = DummyVal::new(y);
-                    let output = Dummy::eval(&Mux::new(), (&b_val, &x_val, &y_val)).unwrap();
+                    let output = Dummy::eval(&circuit, (&b_val, &x_val, &y_val)).unwrap();
                     assert_eq!(output.val(), if b == F2::ZERO { x } else { y });
                 }
             }
@@ -96,11 +84,13 @@ mod test {
 
     #[test]
     fn mux_constants() {
+        let circuit = MuxConstants::default();
+
         for b in [F2::ZERO, F2::ONE] {
             for x in [F2::ZERO, F2::ONE] {
                 for y in [F2::ZERO, F2::ONE] {
                     let b_val = DummyVal::new(b);
-                    let output = Dummy::eval(&MuxConstants::new(), (&b_val, x, y)).unwrap();
+                    let output = Dummy::eval(&circuit, (&b_val, x, y)).unwrap();
                     assert_eq!(output.val(), if b == F2::ZERO { x } else { y });
                 }
             }

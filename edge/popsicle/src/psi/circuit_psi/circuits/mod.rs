@@ -30,7 +30,7 @@ pub fn fancy_intersection_bit_vector<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::<{ HASH_SIZE * 8 }>::new().execute(
+            BinaryEquality::<{ HASH_SIZE * 8 }>::default().execute(
                 f,
                 (
                     &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
@@ -68,7 +68,7 @@ pub fn fancy_unmask<F: FancyBinary, const N: usize>(
 
     for i in 0..elements.len() {
         let xor =
-            PairwiseXor::new().execute(f, (elements[i].wires(), masks[i].wires()), channel)?;
+            PairwiseXor::default().execute(f, (elements[i].wires(), masks[i].wires()), channel)?;
         res.push(BinaryBundle::new(
             xor.try_into().expect("vector should be of length `N`"),
         ));
@@ -89,8 +89,8 @@ where
     let one = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(1).execute(f, (), channel)?;
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
-        let mux = BinaryMultiplex::new().execute(f, (bit.clone(), &zero, &one), channel)?;
-        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mux), channel)?;
+        let mux = BinaryMultiplex::default().execute(f, (bit.clone(), &zero, &one), channel)?;
+        acc = BinaryAdditionNoCarry::default().execute(f, (&acc, &mux), channel)?;
     }
     Ok(acc)
 }
@@ -110,13 +110,13 @@ where
 {
     let zero = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
     let mut acc = zero.clone();
-    let multiplex = BinaryMultiplex::new();
+    let multiplex = BinaryMultiplex::default();
 
     for (i, bit) in intersect_bitvec.iter().enumerate() {
         let mux_a = multiplex.execute(f, (bit.clone(), &zero, &payload_a[i]), channel)?;
         let mux_b = multiplex.execute(f, (bit.clone(), &zero, &payload_b[i]), channel)?;
-        let mul = BinaryAdditionNoCarry::new().execute(f, (&mux_a, &mux_b), channel)?;
-        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mul), channel)?;
+        let mul = BinaryAdditionNoCarry::default().execute(f, (&mux_a, &mux_b), channel)?;
+        acc = BinaryAdditionNoCarry::default().execute(f, (&acc, &mul), channel)?;
     }
     Ok(acc)
 }

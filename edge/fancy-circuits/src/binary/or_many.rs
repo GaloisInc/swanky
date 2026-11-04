@@ -10,13 +10,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct OrMany<'a>(PhantomData<&'a ()>);
 
-impl<'a> OrMany<'a> {
-    /// Create a new [`OrMany`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary> Circuit<F> for OrMany<'a>
 where
     F::Item: 'a,
@@ -51,6 +44,8 @@ pub mod test {
         use rand::RngExt;
 
         let mut rng = rand::rng();
+        let circuit = OrMany::default();
+
         for _ in 0..16 {
             let n = 2 + rng.random_range(..200usize);
             let inputs = (0..n)
@@ -59,7 +54,6 @@ pub mod test {
             let expected = inputs.iter().fold(F2::ZERO, |acc, &x| {
                 F2::from(bool::from(x.val()) | bool::from(acc))
             });
-            let circuit = OrMany::new();
             let output = Dummy::eval(&circuit, inputs.as_slice()).unwrap();
             assert_eq!(output.val(), expected);
         }

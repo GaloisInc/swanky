@@ -63,7 +63,7 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let xor = PairwiseXor::new();
+        let xor = PairwiseXor::default();
 
         let (key, message) = inputs;
 

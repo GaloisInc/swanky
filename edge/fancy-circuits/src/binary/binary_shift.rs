@@ -11,13 +11,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryLeftShiftPad<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryLeftShiftPad<'a, N> {
-    /// Create a new [`BinaryLeftShiftPad`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: Fancy, const N: usize> Circuit<F> for BinaryLeftShiftPad<'a, N>
 where
     F::Item: 'a,
@@ -68,7 +61,7 @@ where
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let zero = backend.constant(F2::ZERO);
-        BinaryLeftShiftPad::new().execute(backend, (bundle, n, &zero), channel)
+        BinaryLeftShiftPad::default().execute(backend, (bundle, n, &zero), channel)
     }
 }
 

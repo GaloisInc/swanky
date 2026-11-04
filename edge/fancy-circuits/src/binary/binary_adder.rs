@@ -10,13 +10,6 @@ use swanky_error::Result;
 #[derive(Default)]
 pub struct BinaryAdder<'a>(PhantomData<&'a ()>);
 
-impl<'a> BinaryAdder<'a> {
-    /// Create a new [`BinaryAdder`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary> Circuit<F> for BinaryAdder<'a>
 where
     F::Item: 'a,
@@ -56,7 +49,7 @@ pub mod test {
     fn binary_adder() {
         use fancy_plaintext::{Dummy, DummyVal};
 
-        let circuit = BinaryAdder::new();
+        let circuit = BinaryAdder::default();
         let zero = DummyVal::new(F2::ZERO);
         let one = DummyVal::new(F2::ONE);
 

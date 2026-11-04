@@ -12,13 +12,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinaryAbs<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryAbs<'a, N> {
-    /// Create a new [`BinaryAbs`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryAbs<'a, N>
 where
     F::Item: 'a,
@@ -35,8 +28,8 @@ where
         let x = inputs;
 
         let sign = x.wires().last().unwrap();
-        let negated = BinaryTwosComplement::new().execute(backend, x, channel)?;
-        BinaryMultiplex::new().execute(backend, (sign.clone(), x, &negated), channel)
+        let negated = BinaryTwosComplement::default().execute(backend, x, channel)?;
+        BinaryMultiplex::default().execute(backend, (sign.clone(), x, &negated), channel)
     }
 }
 
@@ -52,11 +45,11 @@ mod test {
         const Q: u128 = 1 << N;
 
         let mut rng = rng();
+        let circuit = BinaryAbs::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let x_input = BinaryBundle::<_, N>::from(x);
-            let circuit = BinaryAbs::new();
             let output = Dummy::eval(&circuit, &x_input).unwrap();
             assert_eq!(
                 Into::<u128>::into(output),

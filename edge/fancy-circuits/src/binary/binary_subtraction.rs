@@ -15,13 +15,6 @@ use swanky_field_binary::F2;
 #[derive(Default)]
 pub struct BinarySubtraction<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinarySubtraction<'a, N> {
-    /// Create a new [`BinarySubtraction`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinarySubtraction<'a, N>
 where
     F::Item: 'a,
@@ -37,8 +30,8 @@ where
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
 
-        let neg_y = BinaryTwosComplement::new().execute(backend, y, channel)?;
-        BinaryAddition::new().execute(backend, (x, &neg_y), channel)
+        let neg_y = BinaryTwosComplement::default().execute(backend, y, channel)?;
+        BinaryAddition::default().execute(backend, (x, &neg_y), channel)
     }
 }
 
@@ -59,7 +52,7 @@ pub mod test {
             inputs: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            BinarySubtraction::new().execute(backend, (&inputs.0, &inputs.1), channel)
+            BinarySubtraction::default().execute(backend, (&inputs.0, &inputs.1), channel)
         }
     }
 
