@@ -1,8 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{
-        BinaryAddition, BinaryConstant, BinaryLeftShiftPad, BinaryMultiplex, BinaryTwosComplement,
-    },
+    binary::{BinaryAddition, BinaryConstant, BinaryLeftShiftPad, BinaryTwosComplement, Mux},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -36,8 +34,7 @@ where
             acc = BinaryLeftShiftPad::default().execute(backend, (&acc, 1, x), channel)?;
             let (res, cout) =
                 BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
-            acc =
-                BinaryMultiplex::default().execute(backend, (cout.clone(), &acc, &res), channel)?;
+            acc = Mux::default().execute(backend, (cout.clone(), &acc, &res), channel)?;
             qs.set(cout, i);
         }
         qs.reverse(); // Switch back to little-endian

@@ -2,7 +2,7 @@
 use crate::circuit_psi::*;
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
+    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
@@ -89,7 +89,7 @@ where
     let one = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(1).execute(f, (), channel)?;
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
-        let mux = BinaryMultiplex::default().execute(f, (bit.clone(), &zero, &one), channel)?;
+        let mux = Mux::default().execute(f, (bit.clone(), &zero, &one), channel)?;
         acc = BinaryAdditionNoCarry::default().execute(f, (&acc, &mux), channel)?;
     }
     Ok(acc)
@@ -110,7 +110,7 @@ where
 {
     let zero = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
     let mut acc = zero.clone();
-    let multiplex = BinaryMultiplex::default();
+    let multiplex = Mux::default();
 
     for (i, bit) in intersect_bitvec.iter().enumerate() {
         let mux_a = multiplex.execute(f, (bit.clone(), &zero, &payload_a[i]), channel)?;

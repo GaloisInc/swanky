@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
+    binary::{BinaryConstant, BinaryEquality, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
@@ -43,8 +43,7 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOr
         for (i, item) in ram.iter().enumerate() {
             let index = BinaryConstant::<N>::new(i as u128).execute(backend, (), channel)?;
             let is_equal = BinaryEquality::default().execute(backend, (&query, &index), channel)?;
-            let mux =
-                BinaryMultiplex::default().execute(backend, (is_equal, &zero, item), channel)?;
+            let mux = Mux::default().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`
             // instead of `BinaryAddition`.
             let xor =

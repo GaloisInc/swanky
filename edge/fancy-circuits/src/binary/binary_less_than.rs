@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinarySubtraction, Mux, OrMany},
+    binary::{BinarySubtraction, MuxBit, OrMany},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -97,11 +97,11 @@ where
         // If x is negative and y is positive, then x < y.
         let x_neg_y_pos = backend.and(x_neg, &y_pos, channel)?;
         let r2 =
-            Mux::default().execute(backend, (&x_neg_y_pos, &x_lt_y_unsigned, &one), channel)?;
+            MuxBit::default().execute(backend, (&x_neg_y_pos, &x_lt_y_unsigned, &one), channel)?;
 
         // If x is positive and y is negative, then !(x < y).
         let x_pos_y_neg = backend.and(&x_pos, y_neg, channel)?;
-        Mux::default().execute(backend, (&x_pos_y_neg, &r2, &zero), channel)
+        MuxBit::default().execute(backend, (&x_pos_y_neg, &r2, &zero), channel)
     }
 }
 

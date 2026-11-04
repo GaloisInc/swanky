@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryEquality, BinaryMultiplex, BinarySubtraction, Mux},
+    binary::{BinaryEquality, BinarySubtraction, Mux, MuxBit},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -76,16 +76,16 @@ where
             // (2) If b > a then underflow_r_1 = 0 and underflow_r_2 = 1
             // (3) If a == b then underflow_r_1 = underflow_r_2 = 0
             underflow_r_1 =
-                Mux::default().execute(backend, (&is_equal, &underflow_r_1, &zero), channel)?;
+                MuxBit::default().execute(backend, (&is_equal, &underflow_r_1, &zero), channel)?;
             underflow_r_2 =
-                Mux::default().execute(backend, (&is_equal, &underflow_r_2, &zero), channel)?;
+                MuxBit::default().execute(backend, (&is_equal, &underflow_r_2, &zero), channel)?;
 
             // Using the `underflow` bits we multiplex in the following way:
             // (1) If a > b, a := a - b and b := b
             // (2) If b > a, a := a  and b := b - a
             // (3) If a == b, a := a and b := b
-            a = BinaryMultiplex::default().execute(backend, (underflow_r_1, &a, &r_1), channel)?;
-            b = BinaryMultiplex::default().execute(backend, (underflow_r_2, &b, &r_2), channel)?;
+            a = Mux::default().execute(backend, (underflow_r_1, &a, &r_1), channel)?;
+            b = Mux::default().execute(backend, (underflow_r_2, &b, &r_2), channel)?;
         }
 
         Ok(a)

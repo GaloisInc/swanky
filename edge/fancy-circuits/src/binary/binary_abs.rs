@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryMultiplex, BinaryTwosComplement},
+    binary::{BinaryTwosComplement, Mux},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -29,7 +29,7 @@ where
 
         let sign = x.wires().last().unwrap();
         let negated = BinaryTwosComplement::default().execute(backend, x, channel)?;
-        BinaryMultiplex::default().execute(backend, (sign.clone(), x, &negated), channel)
+        Mux::default().execute(backend, (sign.clone(), x, &negated), channel)
     }
 }
 

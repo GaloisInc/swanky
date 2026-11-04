@@ -2,6 +2,8 @@
 
 mod mux;
 pub use mux::Mux;
+pub use mux::MuxBit;
+pub use mux::MuxBitConstants;
 pub use mux::MuxConstants;
 
 mod pairwise_xor;
@@ -64,10 +66,6 @@ pub use binary_equality::test::TestBinaryEquality;
 mod binary_twos_complement;
 pub use binary_twos_complement::BinaryTwosComplement;
 pub use binary_twos_complement::test::TestBinaryTwosComplement;
-
-mod binary_multiplex;
-pub use binary_multiplex::BinaryMultiplex;
-pub use binary_multiplex::BinaryMultiplexConstantBits;
 
 mod binary_max;
 pub use binary_max::BinaryMax;
