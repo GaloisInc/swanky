@@ -10,21 +10,21 @@ use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] `x`, output the absolute value of `x`.
 #[derive(Default)]
-pub struct BinaryAbs<'a>(PhantomData<&'a ()>);
+pub struct BinaryAbs<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryAbs<'a> {
+impl<'a, const N: usize> BinaryAbs<'a, N> {
     /// Create a new [`BinaryAbs`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryAbs<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryAbs<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = &'a BinaryBundle<F::Item>;
-    type Output = BinaryBundle<F::Item>;
+    type Input = &'a BinaryBundle<F::Item, N>;
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -48,19 +48,20 @@ mod test {
 
     #[test]
     fn binary_abs() {
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
+
         let mut rng = rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
+            let x = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::<_, N>::from(x);
             let circuit = BinaryAbs::new();
             let output = Dummy::eval(&circuit, &x_input).unwrap();
             assert_eq!(
                 Into::<u128>::into(output),
-                if x >> (nbits - 1) > 0 {
-                    ((!x) + 1) & ((1 << nbits) - 1)
+                if x >> (N - 1) > 0 {
+                    ((!x) + 1) & ((1 << N) - 1)
                 } else {
                     x
                 }

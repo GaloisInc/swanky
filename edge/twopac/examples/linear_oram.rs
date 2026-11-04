@@ -14,7 +14,7 @@ use swanky_twopac::semihonest::{Evaluator, Garbler};
 use vectoreyes::U8x16;
 
 /// Bit length of items in RAM.
-const NBITS: usize = 128;
+const N: usize = 128;
 
 /// The expected RAM computation.
 fn ram_in_clear(ram: &[u128], index: usize) -> u128 {
@@ -26,9 +26,9 @@ fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
     gb: &mut F,
     inputs: &[u128],
     channel: &mut Channel,
-) -> Result<(Vec<BinaryBundle<F::Item>>, BinaryBundle<F::Item>)> {
-    let ram = gb.bin_encode_many(inputs, NBITS, channel)?;
-    let query = gb.bin_receive(NBITS, channel)?;
+) -> Result<(Vec<BinaryBundle<F::Item, N>>, BinaryBundle<F::Item, N>)> {
+    let ram = gb.bin_encode_many::<N>(inputs, channel)?;
+    let query = gb.bin_receive::<N>(channel)?;
     Ok((ram, query))
 }
 
@@ -38,9 +38,9 @@ fn ev_set_inputs<F: BinaryEncode + BinaryReceive>(
     input: u128,
     ram_size: usize,
     channel: &mut Channel,
-) -> Result<(Vec<BinaryBundle<F::Item>>, BinaryBundle<F::Item>)> {
-    let ram = ev.bin_receive_many(ram_size, NBITS, channel)?;
-    let query = ev.bin_encode(input, NBITS, channel)?;
+) -> Result<(Vec<BinaryBundle<F::Item, N>>, BinaryBundle<F::Item, N>)> {
+    let ram = ev.bin_receive_many::<N>(ram_size, channel)?;
+    let query = ev.bin_encode::<N>(input, channel)?;
     Ok((ram, query))
 }
 
@@ -54,7 +54,7 @@ fn gb_linear_oram<RNG: CryptoRng + SeedableRng<Seed = U8x16>>(
     // size to the evaluator.
     channel.write(&inputs.len())?;
     // The circuit to garble.
-    let circuit = LinearOram::<NBITS>::new(inputs.len());
+    let circuit = LinearOram::<N>::new(inputs.len());
 
     let inputs = gb_set_inputs(&mut gb, inputs, channel)?;
     let query = circuit.execute(&mut gb, inputs, channel)?;
@@ -68,7 +68,7 @@ fn ev_linear_oram<RNG: CryptoRng>(input: u128, channel: &mut Channel, rng: RNG) 
     // size from the garbler.
     let size = channel.read::<usize>()?;
     // The circuit to evaluate.
-    let circuit = LinearOram::<NBITS>::new(size);
+    let circuit = LinearOram::<N>::new(size);
 
     let inputs = ev_set_inputs(&mut ev, input, size, channel)?;
     let output = circuit.execute(&mut ev, inputs, channel)?;
@@ -99,7 +99,7 @@ fn main() {
     let ram = cli.ram;
 
     let mut analyzer = CircuitAnalyzer::new();
-    analyzer.eval(&LinearOram::<NBITS>::new(ram.len())).unwrap();
+    analyzer.eval(&LinearOram::<N>::new(ram.len())).unwrap();
     println!("{analyzer}");
 
     let (_, result) = swanky_channel::local::local_channel_pair(

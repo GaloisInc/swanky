@@ -15,21 +15,22 @@ use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`] inputs `x` and `y`, output `x * y`.
 #[derive(Default)]
-pub struct BinaryMultiplication<'a>(PhantomData<&'a ()>);
+pub struct BinaryMultiplication<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryMultiplication<'a> {
+impl<'a, const N: usize, const M: usize> BinaryMultiplication<'a, N, M> {
     /// Create a new [`BinaryMultiplication`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
+    for BinaryMultiplication<'a, N, M>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, M>;
 
     fn execute(
         &self,
@@ -37,32 +38,33 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
+        assert_eq!(M, 2 * N);
         let (xs, ys) = inputs;
-        assert_eq!(xs.len(), ys.len());
+        let zero = backend.constant(F2::ZERO);
 
         let xwires = xs.wires();
         let ywires = ys.wires();
 
-        let zero = backend.constant(F2::ZERO);
-
         let mut sum = xwires
             .iter()
             .map(|x| backend.and(x, &ywires[0], channel))
-            .collect::<Result<_>>()
-            .map(BinaryBundle::new)?;
+            .collect::<Result<Vec<_>>>()?;
+        for _ in 0..N {
+            sum.push(zero.clone());
+        }
+        let mut sum =
+            BinaryBundle::new(sum.try_into().expect("vector should be of length `2 * N`"));
 
-        sum.push(zero);
-
-        for (i, ywire) in ywires.iter().enumerate().take(xwires.len()).skip(1) {
+        for (i, ywire) in ywires.iter().enumerate().skip(1) {
             let mul = xwires
                 .iter()
                 .map(|x| backend.and(x, ywire, channel))
-                .collect::<Result<_>>()
-                .map(BinaryBundle::new)?;
-            let shifted = BinaryLeftShiftExtend::new().execute(backend, (&mul, i), channel)?;
-            let res = BinaryAddition::new().execute(backend, (&sum, &shifted), channel)?;
-            sum = res.0;
-            sum.push(res.1);
+                .collect::<Result<Vec<_>>>()?;
+            let mul = BinaryBundle::new(mul.try_into().expect("vector should be of length `N`"));
+            let shifted =
+                BinaryLeftShiftExtend::<N, M>::new().execute(backend, (&mul, i), channel)?;
+            let (result, _) = BinaryAddition::new().execute(backend, (&sum, &shifted), channel)?;
+            sum = result;
         }
 
         Ok(sum)
@@ -72,21 +74,22 @@ where
 /// For [`BinaryBundle`]s `x` and `y`, return the the lower-order half of `x *
 /// y`.
 #[derive(Default)]
-pub struct BinaryMultiplicationLowerHalf<'a>(PhantomData<&'a ()>);
+pub struct BinaryMultiplicationLowerHalf<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryMultiplicationLowerHalf<'a> {
+impl<'a, const N: usize> BinaryMultiplicationLowerHalf<'a, N> {
     /// Create a new [`BinaryMultiplicationLowerHalf`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplicationLowerHalf<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
+    for BinaryMultiplicationLowerHalf<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -95,23 +98,22 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.len(), ys.len());
 
         let xwires = xs.wires();
         let ywires = ys.wires();
 
-        let mut sum = xwires
+        let sum = xwires
             .iter()
             .map(|x| backend.and(x, &ywires[0], channel))
-            .collect::<Result<_>>()
-            .map(BinaryBundle::new)?;
+            .collect::<Result<Vec<_>>>()?;
+        let mut sum = BinaryBundle::new(sum.try_into().expect("vector should be of length `N`"));
 
         for (i, ywire) in ywires.iter().enumerate().take(xwires.len()).skip(1) {
             let mul = xwires
                 .iter()
                 .map(|x| backend.and(x, ywire, channel))
-                .collect::<Result<_>>()
-                .map(BinaryBundle::new)?;
+                .collect::<Result<Vec<_>>>()?;
+            let mul = BinaryBundle::new(mul.try_into().expect("vector should be of length `N`"));
             let shifted = BinaryLeftShift::new().execute(backend, (&mul, i), channel)?;
             sum = BinaryAdditionNoCarry::new().execute(backend, (&sum, &shifted), channel)?;
         }
@@ -119,24 +121,25 @@ where
     }
 }
 
-/// For [`BinaryBundle`] `x`, constant `c`, and bitlength `n`, output `x * c`,
-/// where the output is of bitlength `n`.
+/// For [`BinaryBundle`] `x` of length `N`, constant `c`, and bitlength `M`,
+/// output `x * c`, where the output is of bitlength `M`.
 #[derive(Default)]
-pub struct BinaryConstantMultiplication<'a>(PhantomData<&'a ()>);
+pub struct BinaryConstantMultiplication<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryConstantMultiplication<'a> {
+impl<'a, const N: usize, const M: usize> BinaryConstantMultiplication<'a, N, M> {
     /// Create a new [`BinaryConstantMultiplication`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryConstantMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
+    for BinaryConstantMultiplication<'a, N, M>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, u128, usize);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (&'a BinaryBundle<F::Item, N>, u128);
+    type Output = BinaryBundle<F::Item, M>;
 
     fn execute(
         &self,
@@ -144,35 +147,30 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (x, c, nbits) = inputs;
-        let zero = BinaryConstant::new(0, nbits).execute(backend, (), channel)?;
-        u128_to_bits(c, nbits)
+        let (x, c) = inputs;
+        let zero = BinaryConstant::<M>::new(0).execute(backend, (), channel)?;
+        u128_to_bits::<M>(c)
             .into_iter()
             .enumerate()
             .filter_map(|(i, b)| if b == F2::ONE { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
-                let s = BinaryLeftShift::new().execute(backend, (x, shift_amt), channel)?;
+                let s = BinaryLeftShiftExtend::new().execute(backend, (x, shift_amt), channel)?;
                 BinaryAdditionNoCarry::new().execute(backend, (&z, &s), channel)
             })
     }
 }
 
 /// Circuit for testing [`BinaryMultiplication`].
-pub struct TestBinaryMultiplication<'a>(pub usize, PhantomData<&'a ()>);
+#[derive(Default)]
+pub struct TestBinaryMultiplication<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
-impl<'a> TestBinaryMultiplication<'a> {
-    /// Create a new [TestBinaryMultiplication] circuit.
-    pub fn new(nbits: usize) -> Self {
-        TestBinaryMultiplication(nbits, PhantomData)
-    }
-}
-
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
+    for TestBinaryMultiplication<'a, N, M>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (BinaryBundle<F::Item, N>, BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, M>;
 
     fn execute(
         &self,
@@ -180,31 +178,39 @@ where
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        BinaryMultiplication::new().execute(backend, inputs, channel)
+        let (x, y) = inputs;
+        BinaryMultiplication::new().execute(backend, (&x, &y), channel)
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> CircuitInputMapper<F>
+    for TestBinaryMultiplication<'a, N, M>
 where
     F::Item: 'a,
 {
     fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-        assert_eq!(inputs.len(), self.0 * 2);
-        let (x, y) = inputs.split_at(self.0);
-        let x = BinaryBundle::new(x.to_vec());
-        let y = BinaryBundle::new(y.to_vec());
-        // Leak memory to create static references for the test
-        let x_ref: &'a BinaryBundle<F::Item> = Box::leak(Box::new(x));
-        let y_ref: &'a BinaryBundle<F::Item> = Box::leak(Box::new(y));
-        (x_ref, y_ref)
+        assert_eq!(inputs.len(), 2 * N);
+        let (x, y) = inputs.split_at(N);
+        let x = BinaryBundle::new(
+            x.to_vec()
+                .try_into()
+                .expect("vector should be of length `N`"),
+        );
+        let y = BinaryBundle::new(
+            y.to_vec()
+                .try_into()
+                .expect("vector should be of length `N`"),
+        );
+        (x, y)
     }
 
     fn ninputs(&self) -> usize {
-        self.0 * 2
+        2 * N
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryMultiplication<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> CircuitOutputMapper<F>
+    for TestBinaryMultiplication<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -224,18 +230,23 @@ mod test {
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
+    const N: usize = 64;
+    const Q: u128 = 1 << N;
+
     #[test]
     fn binary_multiplication() {
         let mut rng = rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let y = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
-            let output = Dummy::eval(&BinaryMultiplication::new(), (&x_input, &y_input)).unwrap();
+            let x = rng.random::<u128>() % Q;
+            let y = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::from(x);
+            let y_input = BinaryBundle::from(y);
+            let output = Dummy::eval(
+                &BinaryMultiplication::<N, { 2 * N }>::new(),
+                (&x_input, &y_input),
+            )
+            .unwrap();
             assert_eq!(Into::<u128>::into(output), x * y);
         }
     }
@@ -243,33 +254,35 @@ mod test {
     #[test]
     fn binary_multiplication_lower_half() {
         let mut rng = rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let y = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
-            let output =
-                Dummy::eval(&BinaryMultiplicationLowerHalf::new(), (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), (x * y) % q);
+            let x = rng.random::<u128>() % Q;
+            let y = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::<_, N>::from(x);
+            let y_input = BinaryBundle::<_, N>::from(y);
+            let output = Dummy::eval(
+                &BinaryMultiplicationLowerHalf::<N>::new(),
+                (&x_input, &y_input),
+            )
+            .unwrap();
+            assert_eq!(Into::<u128>::into(output), (x * y) % Q);
         }
     }
 
     #[test]
     fn binary_constant_multiplication() {
         let mut rng = rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let c = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let output =
-                Dummy::eval(&BinaryConstantMultiplication::new(), (&x_input, c, nbits)).unwrap();
-            assert_eq!(Into::<u128>::into(output), (x * c) % q);
+            let x = rng.random::<u128>() % Q;
+            let c = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::<_, N>::from(x);
+            let output = Dummy::eval(
+                &BinaryConstantMultiplication::<N, { 2 * N }>::new(),
+                (&x_input, c),
+            )
+            .unwrap();
+            assert_eq!(Into::<u128>::into(output), x * c);
         }
     }
 }

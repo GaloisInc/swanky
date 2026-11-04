@@ -12,21 +12,21 @@ use swanky_field_binary::F2;
 
 /// For [`BinaryBundle`]s `x` and `y` (for `y != 0`), output `x / y`.
 #[derive(Default)]
-pub struct BinaryDivision<'a>(PhantomData<&'a ()>);
+pub struct BinaryDivision<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryDivision<'a> {
+impl<'a, const N: usize> BinaryDivision<'a, N> {
     /// Create a new [`BinaryDivision`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryDivision<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryDivision<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -35,17 +35,16 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (xs, ys) = inputs;
-        assert_eq!(xs.len(), ys.len());
 
         let ys_neg = BinaryTwosComplement::new().execute(backend, ys, channel)?;
-        let mut acc = BinaryConstant::new(0, xs.len()).execute(backend, (), channel)?;
-        let mut qs = BinaryBundle::new(Vec::new());
-        for x in xs.wires().iter().rev() {
+        let mut acc = BinaryConstant::<N>::new(0).execute(backend, (), channel)?;
+        let mut qs = BinaryConstant::<N>::new(0).execute(backend, (), channel)?;
+        for (i, x) in xs.wires().iter().rev().enumerate() {
             acc = BinaryLeftShiftPad::new().execute(backend, (&acc, 1, x), channel)?;
             let (res, cout) =
                 BinaryAddition::default().execute(backend, (&acc, &ys_neg), channel)?;
             acc = BinaryMultiplex::new().execute(backend, (cout.clone(), &acc, &res), channel)?;
-            qs.push(cout);
+            qs.set(cout, i);
         }
         qs.reverse(); // Switch back to little-endian
         Ok(qs)
@@ -60,19 +59,20 @@ mod test {
 
     #[test]
     fn test_binary_division() {
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
+
         let mut rng = rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let mut y = rng.random::<u128>() % q;
+            let x = rng.random::<u128>() % Q;
+            let mut y = rng.random::<u128>() % Q;
             while y == 0 {
-                y = rng.random::<u128>() % q;
+                y = rng.random::<u128>() % Q;
             }
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
-            let output = Dummy::eval(&BinaryDivision::new(), (&x_input, &y_input)).unwrap();
+            let x_input = BinaryBundle::from(x);
+            let y_input = BinaryBundle::from(y);
+            let output = Dummy::eval(&BinaryDivision::<N>::new(), (&x_input, &y_input)).unwrap();
             assert_eq!(Into::<u128>::into(output), x / y);
         }
     }

@@ -12,25 +12,25 @@ use swanky_field_binary::F2;
 /// For bit `b` and [`BinaryBundle`]s `x` and `y`, output `x` if `b == 0`, and
 /// `y` otherwise.
 #[derive(Default)]
-pub struct BinaryMultiplex<'a>(PhantomData<&'a ()>);
+pub struct BinaryMultiplex<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryMultiplex<'a> {
+impl<'a, const N: usize> BinaryMultiplex<'a, N> {
     /// Create a new [`BinaryMultiplex`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryMultiplex<'a>
+impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryMultiplex<'a, N>
 where
     F::Item: 'a,
 {
     type Input = (
         F::Item,
-        &'a BinaryBundle<F::Item>,
-        &'a BinaryBundle<F::Item>,
+        &'a BinaryBundle<F::Item, N>,
+        &'a BinaryBundle<F::Item, N>,
     );
-    type Output = BinaryBundle<F::Item>;
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -39,22 +39,27 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (b, xs, ys) = inputs;
-        xs.wires()
+        let res: [_; N] = xs
+            .wires()
             .iter()
             .zip(ys.wires().iter())
             .map(|(x, y)| Mux::new().execute(backend, (&b.clone(), x, y), channel))
-            .collect::<Result<Vec<_>>>()
-            .map(BinaryBundle::new)
+            .collect::<Result<Vec<_>>>()?
+            .try_into()
+            .expect("vector should be of length `N`");
+        Ok(BinaryBundle::new(res))
     }
 }
 
 /// For bit `b` and constants `c1` and `c2` of bitlength `n`, output `c1` if `b
 /// == 0` and `c2` otherwise.
-pub struct BinaryMultiplexConstantBits;
+pub struct BinaryMultiplexConstantBits<const N: usize>;
 
-impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplexConstantBits {
-    type Input = (F::Item, u128, u128, usize);
-    type Output = BinaryBundle<F::Item>;
+impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
+    for BinaryMultiplexConstantBits<N>
+{
+    type Input = (F::Item, u128, u128);
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -62,16 +67,18 @@ impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMultiplexConstantB
         inputs: Self::Input,
         channel: &mut Channel,
     ) -> Result<Self::Output> {
-        let (b, c1, c2, nbits) = inputs;
+        let (b, c1, c2) = inputs;
 
-        let c1_bs = u128_to_bits(c1, nbits);
-        let c2_bs = u128_to_bits(c2, nbits);
-        c1_bs
+        let c1_bs = u128_to_bits::<N>(c1);
+        let c2_bs = u128_to_bits::<N>(c2);
+        let res = c1_bs
             .into_iter()
             .zip(c2_bs)
             .map(|(b1, b2)| MuxConstants::new().execute(backend, (&b.clone(), b1, b2), channel))
-            .collect::<Result<_>>()
-            .map(BinaryBundle::new)
+            .collect::<Result<Vec<_>>>()?;
+        Ok(BinaryBundle::new(
+            res.try_into().expect("vector should be of length `N`"),
+        ))
     }
 }
 
@@ -86,16 +93,17 @@ mod test {
 
     #[test]
     fn binary_multiplex() {
+        const N: usize = 64;
+
         let mut rng = rand::rng();
-        let nbits = 1 + (rng.random_range(..200usize));
-        let x = rng.random::<u128>() % (nbits as u128);
-        let y = rng.random::<u128>() % (nbits as u128);
-        let x_inputs = BinaryBundle::from((x, nbits));
-        let y_inputs = BinaryBundle::from((y, nbits));
+        let x = rng.random::<u128>() % (N as u128);
+        let y = rng.random::<u128>() % (N as u128);
+        let x_inputs = BinaryBundle::from(x);
+        let y_inputs = BinaryBundle::from(y);
 
         for b in [F2::ZERO, F2::ONE] {
             let output = Dummy::eval(
-                &BinaryMultiplex::new(),
+                &BinaryMultiplex::<N>::default(),
                 (DummyVal::new(b), &x_inputs, &y_inputs),
             )
             .unwrap();
@@ -108,17 +116,15 @@ mod test {
 
     #[test]
     fn binary_multiplex_constant_bits() {
+        const N: usize = 64;
+
         let mut rng = rand::rng();
-        let nbits = 1 + (rng.random_range(..200usize));
-        let x = rng.random::<u128>() % (nbits as u128);
-        let y = rng.random::<u128>() % (nbits as u128);
+        let x = rng.random::<u128>() % (N as u128);
+        let y = rng.random::<u128>() % (N as u128);
 
         for b in [F2::ZERO, F2::ONE] {
-            let output = Dummy::eval(
-                &BinaryMultiplexConstantBits,
-                (DummyVal::new(b), x, y, nbits),
-            )
-            .unwrap();
+            let output =
+                Dummy::eval(&BinaryMultiplexConstantBits::<N>, (DummyVal::new(b), x, y)).unwrap();
             assert_eq!(
                 Into::<u128>::into(output),
                 if b == F2::ZERO { x } else { y }

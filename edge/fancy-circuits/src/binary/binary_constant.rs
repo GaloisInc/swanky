@@ -8,29 +8,22 @@ use swanky_field_binary::F2;
 ///
 /// For `(value, nbits)`, return a [`BinaryBundle`] containing `value` in its
 /// bit representation.
-pub struct BinaryConstant {
-    value: u128,
-    nbits: usize,
-}
+pub struct BinaryConstant<const N: usize>(u128);
 
-impl BinaryConstant {
-    /// Create a new [`BinaryConstant`] circuit for `value % 2^nbits`.
-    pub fn new(value: u128, nbits: usize) -> Self {
-        Self { value, nbits }
+impl<const N: usize> BinaryConstant<N> {
+    /// Create a new [`BinaryConstant`] circuit for `value % 2^N`.
+    pub fn new(value: u128) -> Self {
+        Self(value)
     }
 }
 
-impl<F: FancyConstant<F2>> Circuit<F> for BinaryConstant {
+impl<F: FancyConstant<F2>, const N: usize> Circuit<F> for BinaryConstant<N> {
     type Input = ();
-    type Output = BinaryBundle<F::Item>;
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(&self, backend: &mut F, _: Self::Input, _: &mut Channel) -> Result<Self::Output> {
-        let xs = u128_to_bits(self.value, self.nbits);
-        Ok(BinaryBundle::new(
-            xs.into_iter()
-                .map(|x| backend.constant(x))
-                .collect::<Vec<_>>(),
-        ))
+        let xs = u128_to_bits::<N>(self.0);
+        Ok(BinaryBundle::new(xs.map(|x| backend.constant(x))))
     }
 }
 
@@ -39,10 +32,10 @@ pub mod test {
     use fancy_traits::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryConstant`].
-    pub struct TestBinaryConstant(pub u128, pub usize);
-    impl<F: FancyConstant<F2>> Circuit<F> for TestBinaryConstant {
-        type Input = <BinaryConstant as Circuit<F>>::Input;
-        type Output = <BinaryConstant as Circuit<F>>::Output;
+    pub struct TestBinaryConstant<const N: usize>(pub u128);
+    impl<F: FancyConstant<F2>, const N: usize> Circuit<F> for TestBinaryConstant<N> {
+        type Input = <BinaryConstant<N> as Circuit<F>>::Input;
+        type Output = <BinaryConstant<N> as Circuit<F>>::Output;
 
         fn execute(
             &self,
@@ -50,11 +43,11 @@ pub mod test {
             inputs: Self::Input,
             channel: &mut swanky_channel::Channel,
         ) -> Result<Self::Output> {
-            BinaryConstant::new(self.0, self.1).execute(backend, inputs, channel)
+            BinaryConstant::new(self.0).execute(backend, inputs, channel)
         }
     }
 
-    impl<F: FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryConstant {
+    impl<F: FancyConstant<F2>, const N: usize> CircuitInputMapper<F> for TestBinaryConstant<N> {
         fn map(&self, inputs: Vec<<F as Fancy>::Item>) -> Self::Input {
             assert!(inputs.is_empty());
         }
@@ -70,10 +63,10 @@ pub mod test {
         use rand::RngExt;
 
         let mut rng = rand::rng();
+        const N: usize = 127;
         for _ in 0..16 {
-            let nbits = 1 + rng.random_range(..127usize);
-            let value = rng.random::<u128>() % (nbits as u128);
-            let c = TestBinaryConstant(value, nbits);
+            let value = rng.random::<u128>() % (N as u128);
+            let c = TestBinaryConstant::<N>(value);
             let output = Dummy::eval(&c, ()).unwrap();
             assert_eq!(Into::<u128>::into(output), value);
         }

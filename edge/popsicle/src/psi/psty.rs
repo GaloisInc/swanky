@@ -434,11 +434,11 @@ fn fancy_compute_intersection<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::new().execute(
+            BinaryEquality::<{ HASH_SIZE * 8 }>::new().execute(
                 f,
                 (
-                    &BinaryBundle::new(xs.to_vec()),
-                    &BinaryBundle::new(ys.to_vec()),
+                    &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
+                    &BinaryBundle::new(ys.to_vec().try_into().unwrap()),
                 ),
                 channel,
             )
@@ -452,26 +452,26 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
     sender_inputs: &[F::Item],
     receiver_inputs: &[F::Item],
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item>> {
+) -> swanky_error::Result<BinaryBundle<F::Item, { HASH_SIZE * 8 }>> {
     assert_eq!(sender_inputs.len(), receiver_inputs.len());
 
     let eqs = sender_inputs
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::new().execute(
+            BinaryEquality::<{ HASH_SIZE * 8 }>::new().execute(
                 f,
                 (
-                    &BinaryBundle::new(xs.to_vec()),
-                    &BinaryBundle::new(ys.to_vec()),
+                    &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
+                    &BinaryBundle::new(ys.to_vec().try_into().unwrap()),
                 ),
                 channel,
             )
         })
         .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
-    let mut acc = BinaryConstant::new(0, HASH_SIZE * 8).execute(f, (), channel)?;
-    let one = BinaryConstant::new(1, HASH_SIZE * 8).execute(f, (), channel)?;
+    let mut acc = BinaryConstant::<{ HASH_SIZE * 8 }>::new(0).execute(f, (), channel)?;
+    let one = BinaryConstant::<{ HASH_SIZE * 8 }>::new(1).execute(f, (), channel)?;
 
     for b in eqs.into_iter() {
         let b_ws = one
@@ -479,7 +479,7 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
             .iter()
             .map(|w| f.and(w, &b, channel))
             .collect::<Result<Vec<_>, _>>()?;
-        let b_binary = BinaryBundle::new(b_ws);
+        let b_binary = BinaryBundle::new(b_ws.try_into().unwrap());
         acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &b_binary), channel)?;
     }
 

@@ -183,34 +183,34 @@ fn test_xor_gate_fan_n() {
 
 #[test]
 fn test_binary_addition() {
-    let ninputs = 400;
-    let circuit = TestBinaryAddition(ninputs);
+    const N: usize = 64;
+    let circuit = TestBinaryAddition::<N>;
 
-    test_circuit(ninputs, ninputs, &circuit);
+    test_circuit(N, N, &circuit);
 }
 
 #[test]
 fn test_bin_twos_complement() {
-    let ninputs = 64;
-    let circuit = TestBinaryTwosComplement(ninputs);
+    const N: usize = 64;
+    let circuit = TestBinaryTwosComplement::<N>;
 
-    test_circuit(ninputs, 0, &circuit);
+    test_circuit(N, 0, &circuit);
 }
 
 #[test]
 fn test_binary_subtraction() {
-    let ninputs = 64;
-    let circuit = TestBinarySubtraction(ninputs);
+    const N: usize = 64;
+    let circuit = TestBinarySubtraction::<N>;
 
-    test_circuit(ninputs, ninputs, &circuit);
+    test_circuit(N, N, &circuit);
 }
 
 #[test]
 fn test_binary_multiplication() {
-    let ninputs = 64;
-    let circuit = TestBinaryMultiplication::new(ninputs);
+    const N: usize = 64;
+    let circuit = TestBinaryMultiplication::<N, { 2 * N }>::default();
 
-    test_circuit(ninputs, ninputs, &circuit);
+    test_circuit(N, N, &circuit);
 }
 
 #[test]

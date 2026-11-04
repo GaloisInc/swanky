@@ -10,21 +10,22 @@ use swanky_field_binary::F2;
 
 /// Binary two's complement.
 #[derive(Default)]
-pub struct BinaryTwosComplement<'a>(PhantomData<&'a ()>);
+pub struct BinaryTwosComplement<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryTwosComplement<'a> {
+impl<'a, const N: usize> BinaryTwosComplement<'a, N> {
     /// Create a new [`BinaryTwosComplement`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryTwosComplement<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
+    for BinaryTwosComplement<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = &'a BinaryBundle<F::Item>;
-    type Output = BinaryBundle<F::Item>;
+    type Input = &'a BinaryBundle<F::Item, N>;
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -37,9 +38,11 @@ where
                 .wires()
                 .iter()
                 .map(|x| backend.negate(x))
-                .collect::<Vec<_>>(),
+                .collect::<Vec<_>>()
+                .try_into()
+                .expect("vector should be of length `N`"),
         );
-        let one = BinaryConstant::new(1, input.len()).execute(backend, (), channel)?;
+        let one = BinaryConstant::new(1).execute(backend, (), channel)?;
         BinaryAdditionNoCarry::new().execute(backend, (&not_xs, &one), channel)
     }
 }
@@ -50,10 +53,12 @@ pub mod test {
     use super::*;
 
     /// Circuit for testing [`BinaryTwosComplement`].
-    pub struct TestBinaryTwosComplement(pub usize);
-    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryTwosComplement {
-        type Input = BinaryBundle<F::Item>;
-        type Output = BinaryBundle<F::Item>;
+    pub struct TestBinaryTwosComplement<const N: usize>;
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
+        for TestBinaryTwosComplement<N>
+    {
+        type Input = BinaryBundle<F::Item, N>;
+        type Output = BinaryBundle<F::Item, N>;
 
         fn execute(
             &self,
@@ -65,18 +70,22 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitInputMapper<F>
+        for TestBinaryTwosComplement<N>
+    {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0);
-            BinaryBundle::new(inputs)
+            assert_eq!(inputs.len(), N);
+            BinaryBundle::new(inputs.try_into().expect("vector should be of length `N`"))
         }
 
         fn ninputs(&self) -> usize {
-            self.0
+            N
         }
     }
 
-    impl<F: FancyBinary + FancyConstant<F2>> CircuitOutputMapper<F> for TestBinaryTwosComplement {
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitOutputMapper<F>
+        for TestBinaryTwosComplement<N>
+    {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             output.wires().to_vec()
         }
@@ -87,16 +96,17 @@ pub mod test {
         use fancy_plaintext::Dummy;
         use rand::RngExt;
 
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
+
         let mut rng = rand::rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = TestBinaryTwosComplement(nbits);
+        let circuit = TestBinaryTwosComplement::<N>;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let output = Dummy::eval(&c, x_input).unwrap();
-            assert_eq!(Into::<u128>::into(output), (((!x) % q) + 1) % q);
+            let x = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::from(x);
+            let output = Dummy::eval(&circuit, x_input).unwrap();
+            assert_eq!(Into::<u128>::into(output), (((!x) % Q) + 1) % Q);
         }
     }
 }

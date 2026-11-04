@@ -13,20 +13,20 @@ use swanky_field_binary::F2;
 ///
 /// For [`BinaryBundle`]s `x` and `y`, return `x < y`.
 #[derive(Default)]
-pub struct BinaryLessThan<'a>(PhantomData<&'a ()>);
+pub struct BinaryLessThan<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryLessThan<'a> {
+impl<'a, const N: usize> BinaryLessThan<'a, N> {
     /// Create a new [`BinaryLessThan`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryLessThan<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryLessThan<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
     type Output = F::Item;
 
     fn execute(
@@ -36,7 +36,6 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.len(), y.len());
 
         // underflow indicates y != 0 && x >= y
         // requiring special care to remove the y != 0, which is what follows.
@@ -71,20 +70,21 @@ where
 /// For [`BinaryBundle`]s `x` and `y` representing signed integers in two's complement,
 /// return `x < y`.
 #[derive(Default)]
-pub struct BinaryLessThanSigned<'a>(PhantomData<&'a ()>);
+pub struct BinaryLessThanSigned<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryLessThanSigned<'a> {
+impl<'a, const N: usize> BinaryLessThanSigned<'a, N> {
     /// Create a new [`BinaryLessThanSigned`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryLessThanSigned<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
+    for BinaryLessThanSigned<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
     type Output = F::Item;
 
     fn execute(
@@ -94,7 +94,6 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.len(), y.len());
 
         let zero = backend.constant(F2::ZERO);
         let one = backend.constant(F2::ONE);
@@ -124,9 +123,9 @@ pub mod test {
     use fancy_traits::CircuitInputMapper;
 
     /// Circuit for testing [`BinaryLessThan`].
-    pub struct TestBinaryLessThan(pub usize);
-    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryLessThan {
-        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+    pub struct TestBinaryLessThan<const N: usize>;
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for TestBinaryLessThan<N> {
+        type Input = (BinaryBundle<F::Item, N>, BinaryBundle<F::Item, N>);
         type Output = F::Item;
 
         fn execute(
@@ -139,22 +138,37 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryLessThan {
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitInputMapper<F>
+        for TestBinaryLessThan<N>
+    {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0 * 2);
-            let (x, y) = inputs.split_at(self.0);
-            (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))
+            assert_eq!(inputs.len(), 2 * N);
+            let (x, y) = inputs.split_at(N);
+            (
+                BinaryBundle::new(
+                    x.to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                ),
+                BinaryBundle::new(
+                    y.to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                ),
+            )
         }
 
         fn ninputs(&self) -> usize {
-            self.0 * 2
+            2 * N
         }
     }
 
     /// Circuit for testing [`BinaryLessThanSigned`].
-    pub struct TestBinaryLessThanSigned(pub usize);
-    impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for TestBinaryLessThanSigned {
-        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
+    pub struct TestBinaryLessThanSigned<const N: usize>;
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F>
+        for TestBinaryLessThanSigned<N>
+    {
+        type Input = (BinaryBundle<F::Item, N>, BinaryBundle<F::Item, N>);
         type Output = F::Item;
 
         fn execute(
@@ -167,15 +181,28 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary + FancyConstant<F2>> CircuitInputMapper<F> for TestBinaryLessThanSigned {
+    impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitInputMapper<F>
+        for TestBinaryLessThanSigned<N>
+    {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0 * 2);
-            let (x, y) = inputs.split_at(self.0);
-            (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))
+            assert_eq!(inputs.len(), 2 * N);
+            let (x, y) = inputs.split_at(N);
+            (
+                BinaryBundle::new(
+                    x.to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                ),
+                BinaryBundle::new(
+                    y.to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                ),
+            )
         }
 
         fn ninputs(&self) -> usize {
-            self.0 * 2
+            2 * N
         }
     }
 
@@ -184,17 +211,18 @@ pub mod test {
         use fancy_plaintext::Dummy;
         use rand::RngExt;
 
+        const N: usize = 64;
+        const Q: u128 = 1 << 64;
+
         let mut rng = rand::rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let c = TestBinaryLessThan(nbits);
+        let circuit = TestBinaryLessThan::<N>;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let y = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
-            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
+            let x = rng.random::<u128>() % Q;
+            let y = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::from(x);
+            let y_input = BinaryBundle::from(y);
+            let output = Dummy::eval(&circuit, (x_input, y_input)).unwrap();
             assert_eq!(output.val(), F2::from(x < y));
         }
     }
@@ -204,17 +232,18 @@ pub mod test {
         use fancy_plaintext::Dummy;
         use rand::RngExt;
 
+        const N: usize = 64;
+        const Q: u128 = 1 << 64;
+
         let mut rng = rand::rng();
-        let nbits = 64;
-        let q = 1u128 << nbits;
-        let c = TestBinaryLessThanSigned(nbits);
+        let circuit = TestBinaryLessThanSigned::<N>;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let y = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
-            let output = Dummy::eval(&c, (x_input, y_input)).unwrap();
+            let x = rng.random::<u128>() % Q;
+            let y = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::from(x);
+            let y_input = BinaryBundle::from(y);
+            let output = Dummy::eval(&circuit, (x_input, y_input)).unwrap();
             assert_eq!(output.val(), F2::from((x as i64) < (y as i64)));
         }
     }

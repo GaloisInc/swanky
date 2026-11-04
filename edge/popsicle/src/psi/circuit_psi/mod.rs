@@ -43,38 +43,22 @@ pub struct CircuitInputs<F> {
 }
 
 /// Encoded Garbled Circuit PsiInputs
+#[derive(Default)]
 pub struct PrivateIntersectionPayloads<F> {
     /// The sender's unmasked payloads wires
-    pub sender_payloads: Vec<BinaryBundle<F>>,
+    pub sender_payloads: Vec<BinaryBundle<F, { PAYLOAD_SIZE * 8 }>>,
     /// The receiver payloads wires
-    pub receiver_payloads: Vec<BinaryBundle<F>>,
-}
-
-impl<F> Default for PrivateIntersectionPayloads<F> {
-    fn default() -> Self {
-        PrivateIntersectionPayloads {
-            sender_payloads: vec![],
-            receiver_payloads: vec![],
-        }
-    }
+    pub receiver_payloads: Vec<BinaryBundle<F, { PAYLOAD_SIZE * 8 }>>,
 }
 
 /// Encoded Garbled Circuit PsiInputs
+#[derive(Default)]
 pub struct PrivateIntersection<F> {
     /// The bit vector that indicates whether
     /// a set primary key is in the intersection or not
     pub existence_bit_vector: Vec<F>,
     /// The sender set primary keys wires
-    pub primary_keys: Vec<BinaryBundle<F>>,
-}
-
-impl<F> Default for PrivateIntersection<F> {
-    fn default() -> Self {
-        PrivateIntersection {
-            existence_bit_vector: vec![],
-            primary_keys: vec![],
-        }
-    }
+    pub primary_keys: Vec<BinaryBundle<F, { PRIMARY_KEY_SIZE * 8 }>>,
 }
 
 /// A struct defining the intersection results, i.e. the bit vector
@@ -97,25 +81,27 @@ fn bundle_payloads<F: FancyBinary>(
     f: &mut F,
     circuit_inputs: &CircuitInputs<F::Item>,
     channel: &mut Channel,
-) -> swanky_error::Result<(Vec<BinaryBundle<F::Item>>, Vec<BinaryBundle<F::Item>>)> {
+) -> swanky_error::Result<(
+    Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
+    Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
+)> {
     let sender_payloads = fancy_unmask(
         f,
-        &wires_to_bundle::<F>(&circuit_inputs.sender_payloads_masked, PAYLOAD_SIZE * 8),
-        &wires_to_bundle::<F>(&circuit_inputs.masks, PAYLOAD_SIZE * 8),
+        &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.sender_payloads_masked),
+        &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.masks),
         channel,
     )?;
     let receiver_payloads =
-        wires_to_bundle::<F>(&circuit_inputs.receiver_payloads, PAYLOAD_SIZE * 8);
+        wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.receiver_payloads);
 
     Ok((sender_payloads, receiver_payloads))
 }
 
 fn bundle_primary_keys<F: FancyBinary>(
     circuit_inputs: &CircuitInputs<F::Item>,
-) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>> {
-    Ok(wires_to_bundle::<F>(
+) -> swanky_error::Result<Vec<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>> {
+    Ok(wires_to_bundle::<F, { PRIMARY_KEY_SIZE * 8 }>(
         &circuit_inputs.sender_primary_keys,
-        PRIMARY_KEY_SIZE * 8,
     ))
 }
 /// A trait which describes the parties participating in the circuit

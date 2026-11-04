@@ -12,21 +12,21 @@ use swanky_field_binary::F2;
 /// # Panics
 /// This panics if the input vector is empty.
 #[derive(Default)]
-pub struct BinaryMax<'a>(PhantomData<&'a ()>);
+pub struct BinaryMax<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryMax<'a> {
+impl<'a, const N: usize> BinaryMax<'a, N> {
     /// Create a new [`BinaryMax`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for BinaryMax<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for BinaryMax<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = &'a [BinaryBundle<F::Item>];
-    type Output = BinaryBundle<F::Item>;
+    type Input = &'a [BinaryBundle<F::Item, N>];
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -35,23 +35,24 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let xs = inputs;
-        assert!(!xs.is_empty(), "`xs` cannot be empty");
         xs.iter().skip(1).try_fold(xs[0].clone(), |x, y| {
             // Compute `x < y`.
             let pos = BinaryLessThan::new().execute(backend, (&x, y), channel)?;
             // Compute `!(x < y)`.
             let neg = backend.negate(&pos);
             // Compute `x * (x >= y) ^ y * (x < y)`.
+            let res = x
+                .wires()
+                .iter()
+                .zip(y.wires().iter())
+                .map(|(x, y)| {
+                    let xp = backend.and(x, &neg, channel)?;
+                    let yp = backend.and(y, &pos, channel)?;
+                    Ok(backend.xor(&xp, &yp))
+                })
+                .collect::<Result<Vec<F::Item>>>()?;
             Ok(BinaryBundle::new(
-                x.wires()
-                    .iter()
-                    .zip(y.wires().iter())
-                    .map(|(x, y)| {
-                        let xp = backend.and(x, &neg, channel)?;
-                        let yp = backend.and(y, &pos, channel)?;
-                        Ok(backend.xor(&xp, &yp))
-                    })
-                    .collect::<Result<Vec<F::Item>>>()?,
+                res.try_into().expect("vector should be of length `N`"),
             ))
         })
     }
@@ -67,16 +68,17 @@ mod test {
 
     #[test]
     fn binary_max() {
-        let mut rng = rand::rng();
-        let nbits = 64;
-        let q = 1 << nbits;
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
         let nitems = 10;
 
+        let mut rng = rand::rng();
+
         for _ in 0..16 {
-            let xs: Vec<u128> = (0..nitems).map(|_| rng.random::<u128>() % q).collect();
+            let xs: Vec<u128> = (0..nitems).map(|_| rng.random::<u128>() % Q).collect();
             let max = *xs.iter().max().unwrap();
-            let xs_input: Vec<BinaryBundle<_>> =
-                xs.iter().map(|x| BinaryBundle::from((*x, nbits))).collect();
+            let xs_input: Vec<BinaryBundle<_, N>> =
+                xs.iter().map(|x| BinaryBundle::from(*x)).collect();
             let output = Dummy::eval(&BinaryMax::new(), xs_input.as_slice()).unwrap();
             assert_eq!(Into::<u128>::into(output), max);
         }

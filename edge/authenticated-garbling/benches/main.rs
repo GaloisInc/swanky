@@ -175,15 +175,15 @@ fn bench_xor_gate_fan_n(c: &mut Criterion) {
 }
 
 fn bench_binary_addition(c: &mut Criterion) {
-    let ninputs = 400;
-    let circuit = TestBinaryAddition(ninputs);
+    const N: usize = 400;
+    let circuit = TestBinaryAddition::<N>;
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<_> = (0..ninputs).map(|_| rng_gb.random()).collect();
-    let inputs_ev: Vec<_> = (0..ninputs).map(|_| rng_ev.random()).collect();
+    let inputs_gb: Vec<_> = (0..N).map(|_| rng_gb.random()).collect();
+    let inputs_ev: Vec<_> = (0..N).map(|_| rng_ev.random()).collect();
     c.bench_function(
-        &format!("binary-addition::input-sizes::({ninputs},{ninputs})"),
+        &format!("binary-addition::input-sizes::({N},{N})"),
         move |b| {
             b.iter(|| {
                 test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);
@@ -193,15 +193,15 @@ fn bench_binary_addition(c: &mut Criterion) {
 }
 
 fn bench_binary_subtraction(c: &mut Criterion) {
-    let ninputs = 400;
-    let circuit = TestBinarySubtraction(ninputs);
+    const N: usize = 400;
+    let circuit = TestBinarySubtraction::<N>;
 
     let mut rng_gb = SwankyRng::new();
     let mut rng_ev = SwankyRng::new();
-    let inputs_gb: Vec<_> = (0..ninputs).map(|_| rng_gb.random()).collect();
-    let inputs_ev: Vec<_> = (0..ninputs).map(|_| rng_ev.random()).collect();
+    let inputs_gb: Vec<_> = (0..N).map(|_| rng_gb.random()).collect();
+    let inputs_ev: Vec<_> = (0..N).map(|_| rng_ev.random()).collect();
     c.bench_function(
-        &format!("binary-subtraction::input-sizes::({ninputs},{ninputs})"),
+        &format!("binary-subtraction::input-sizes::({N},{N})"),
         move |b| {
             b.iter(|| {
                 test_circuit(&inputs_gb, &inputs_ev, &mut rng_gb, &mut rng_ev, &circuit);

@@ -12,7 +12,7 @@ use swanky_ot_traits_new::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
-const NBITS: usize = 128;
+const N: usize = 128;
 
 fn gb_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
     let mut gb = Garbler::<SwankyRng, IKNP<Sender>, _>::new(channel, rng)?;
@@ -26,9 +26,9 @@ fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
     gb: &mut F,
     input: u128,
     channel: &mut Channel,
-) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
-    let x = gb.bin_encode(input, NBITS, channel)?;
-    let y = gb.bin_receive(NBITS, channel)?;
+) -> Result<(BinaryBundle<F::Item, N>, BinaryBundle<F::Item, N>)> {
+    let x = gb.bin_encode::<N>(input, channel)?;
+    let y = gb.bin_receive::<N>(channel)?;
     Ok((x, y))
 }
 
@@ -47,9 +47,9 @@ fn ev_set_inputs<F: BinaryEncode + BinaryReceive>(
     ev: &mut F,
     input: u128,
     channel: &mut Channel,
-) -> Result<(BinaryBundle<F::Item>, BinaryBundle<F::Item>)> {
-    let x = ev.bin_receive(NBITS, channel)?;
-    let y = ev.bin_encode(input, NBITS, channel)?;
+) -> Result<(BinaryBundle<F::Item, N>, BinaryBundle<F::Item, N>)> {
+    let x = ev.bin_receive::<N>(channel)?;
+    let y = ev.bin_encode::<N>(input, channel)?;
     Ok((x, y))
 }
 

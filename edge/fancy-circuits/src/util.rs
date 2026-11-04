@@ -5,12 +5,12 @@
 use swanky_field_binary::F2;
 
 /// Convert a `u128` into a vector of bits.
-pub(crate) fn u128_to_bits(x: u128, nbits: usize) -> Vec<F2> {
-    let mut bits = Vec::with_capacity(nbits);
+pub(crate) fn u128_to_bits<const N: usize>(x: u128) -> [F2; N] {
+    let mut bits = [F2::default(); N];
     let mut y = x;
-    for _ in 0..nbits {
+    for bit in bits.iter_mut() {
         let b = y & 1;
-        bits.push((b != 0).into());
+        *bit = (b != 0).into();
         y -= b;
         y /= 2;
     }
@@ -38,7 +38,7 @@ mod tests {
         let mut rng = rng();
         for _ in 0..128 {
             let x = rng.random::<u128>();
-            assert_eq!(u128_from_bits(&u128_to_bits(x, 128)), x);
+            assert_eq!(u128_from_bits(&u128_to_bits::<128>(x)), x);
         }
     }
 }

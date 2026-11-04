@@ -12,21 +12,21 @@ use swanky_error::Result;
 /// For [`BinaryBundle`]s `x` and `y`, return `(x + y, c)`, where `c` is the
 /// carry bit.
 #[derive(Default)]
-pub struct BinaryAddition<'a>(PhantomData<&'a ()>);
+pub struct BinaryAddition<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryAddition<'a> {
+impl<'a, const N: usize> BinaryAddition<'a, N> {
     /// Create a new [`BinaryAddition`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryAddition<'a>
+impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryAddition<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = (BinaryBundle<F::Item>, F::Item);
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
+    type Output = (BinaryBundle<F::Item, N>, F::Item);
 
     fn execute(
         &self,
@@ -35,20 +35,22 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.len(), y.len());
         let xwires = x.wires();
         let ywires = y.wires();
         let (mut z, mut c) =
             BinaryAdder::new().execute(backend, (&xwires[0], &ywires[0], None), channel)?;
         let mut bs = vec![z];
-        for i in 1..xwires.len() {
+        for i in 1..N {
             let res =
                 BinaryAdder::new().execute(backend, (&xwires[i], &ywires[i], Some(&c)), channel)?;
             z = res.0;
             c = res.1;
             bs.push(z);
         }
-        Ok((BinaryBundle::new(bs), c))
+        Ok((
+            BinaryBundle::new(bs.try_into().expect("vector should be of length `N`")),
+            c,
+        ))
     }
 }
 
@@ -56,21 +58,21 @@ where
 ///
 /// For [`BinaryBundle`]s `x` and `y`, return `(x + y)`.
 #[derive(Default)]
-pub struct BinaryAdditionNoCarry<'a>(PhantomData<&'a ()>);
+pub struct BinaryAdditionNoCarry<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryAdditionNoCarry<'a> {
+impl<'a, const N: usize> BinaryAdditionNoCarry<'a, N> {
     /// Create a new [`BinaryAdditionNoCarry`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryAdditionNoCarry<'a>
+impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryAdditionNoCarry<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -79,13 +81,12 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, y) = inputs;
-        assert_eq!(x.len(), y.len());
         let xwires = x.wires();
         let ywires = y.wires();
         let (mut z, mut c) =
             BinaryAdder::new().execute(backend, (&xwires[0], &ywires[0], None), channel)?;
         let mut bs = vec![z];
-        for i in 1..xwires.len() - 1 {
+        for i in 1..N - 1 {
             let res =
                 BinaryAdder::new().execute(backend, (&xwires[i], &ywires[i], Some(&c)), channel)?;
             z = res.0;
@@ -100,7 +101,9 @@ where
         ];
         z = XorMany::new().execute(backend, &xor_inputs[..], channel)?;
         bs.push(z);
-        Ok(BinaryBundle::new(bs))
+        Ok(BinaryBundle::new(
+            bs.try_into().expect("vector should be of length `N`"),
+        ))
     }
 }
 
@@ -111,11 +114,11 @@ pub mod test {
     use swanky_field_binary::F2;
 
     /// Circuit for testing [`BinaryAddition`].
-    pub struct TestBinaryAddition(pub usize);
+    pub struct TestBinaryAddition<const N: usize>;
 
-    impl<F: FancyBinary> Circuit<F> for TestBinaryAddition {
-        type Input = (BinaryBundle<F::Item>, BinaryBundle<F::Item>);
-        type Output = (BinaryBundle<F::Item>, F::Item);
+    impl<F: FancyBinary, const N: usize> Circuit<F> for TestBinaryAddition<N> {
+        type Input = (BinaryBundle<F::Item, N>, BinaryBundle<F::Item, N>);
+        type Output = (BinaryBundle<F::Item, N>, F::Item);
 
         fn execute(
             &self,
@@ -127,19 +130,30 @@ pub mod test {
         }
     }
 
-    impl<F: FancyBinary> CircuitInputMapper<F> for TestBinaryAddition {
+    impl<F: FancyBinary, const N: usize> CircuitInputMapper<F> for TestBinaryAddition<N> {
         fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
-            assert_eq!(inputs.len(), self.0 * 2);
-            let (x, y) = inputs.split_at(self.0);
-            (BinaryBundle::new(x.to_vec()), BinaryBundle::new(y.to_vec()))
+            assert_eq!(inputs.len(), 2 * N);
+            let (x, y) = inputs.split_at(N);
+            (
+                BinaryBundle::new(
+                    x.to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                ),
+                BinaryBundle::new(
+                    y.to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                ),
+            )
         }
 
         fn ninputs(&self) -> usize {
-            self.0 * 2
+            2 * N
         }
     }
 
-    impl<F: FancyBinary> CircuitOutputMapper<F> for TestBinaryAddition {
+    impl<F: FancyBinary, const N: usize> CircuitOutputMapper<F> for TestBinaryAddition<N> {
         fn flatten(output: Self::Output) -> Vec<F::Item> {
             [output.0.wires().to_vec(), vec![output.1]].concat()
         }
@@ -150,19 +164,19 @@ pub mod test {
         use fancy_plaintext::Dummy;
         use rand::RngExt;
 
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
+
         let mut rng = rand::rng();
-        let nbits = 64;
-        let q = 1 << nbits;
-        let circuit = BinaryAddition::new();
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let y = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
-            let outputs = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(outputs.0), (x + y) % q);
-            assert_eq!(outputs.1.val(), F2::from(x + y >= q));
+            let x = rng.random::<u128>() % Q;
+            let y = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::<_, N>::from(x);
+            let y_input = BinaryBundle::<_, N>::from(y);
+            let outputs = Dummy::eval(&BinaryAddition::default(), (&x_input, &y_input)).unwrap();
+            assert_eq!(Into::<u128>::into(outputs.0), (x + y) % Q);
+            assert_eq!(outputs.1.val(), F2::from(x + y >= Q));
         }
     }
 
@@ -171,17 +185,18 @@ pub mod test {
         use fancy_plaintext::Dummy;
         use rand::RngExt;
 
+        const N: usize = 64;
+        const Q: u128 = 1 << N;
+
         let mut rng = rand::rng();
-        let nbits = 64;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let y = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let y_input = BinaryBundle::from((y, nbits));
+            let x = rng.random::<u128>() % Q;
+            let y = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::<_, N>::from(x);
+            let y_input = BinaryBundle::<_, N>::from(y);
             let output = Dummy::eval(&BinaryAdditionNoCarry::new(), (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), (x + y) % q);
+            assert_eq!(Into::<u128>::into(output), (x + y) % Q);
         }
     }
 }

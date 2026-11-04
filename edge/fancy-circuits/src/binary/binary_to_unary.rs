@@ -9,20 +9,20 @@ use swanky_error::Result;
 /// # Panics
 /// Panics if the length of `x` is greater than eight.
 #[derive(Default)]
-pub struct BinaryToUnary<'a>(PhantomData<&'a ()>);
+pub struct BinaryToUnary<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a> BinaryToUnary<'a> {
+impl<'a, const N: usize> BinaryToUnary<'a, N> {
     /// Create a new [`BinaryToUnary`] circuit.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<'a, F: FancyBinary> Circuit<F> for BinaryToUnary<'a>
+impl<'a, F: FancyBinary, const N: usize> Circuit<F> for BinaryToUnary<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = &'a BinaryBundle<F::Item>;
+    type Input = &'a BinaryBundle<F::Item, N>;
     type Output = Vec<F::Item>;
 
     fn execute(
@@ -67,14 +67,15 @@ mod test {
 
     #[test]
     fn binary_to_unary() {
+        const N: usize = 8;
+        const Q: u128 = 1 << N;
+
         let mut rng = rng();
-        let nbits = 8;
-        let q = 1 << nbits;
 
         for _ in 0..16 {
-            let x = rng.random::<u128>() % q;
-            let x_input = BinaryBundle::from((x, nbits));
-            let output = Dummy::eval(&BinaryToUnary::new(), &x_input).unwrap();
+            let x = rng.random::<u128>() % Q;
+            let x_input = BinaryBundle::from(x);
+            let output = Dummy::eval(&BinaryToUnary::<N>::new(), &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {
                     assert_eq!(y.val(), F2::ONE);

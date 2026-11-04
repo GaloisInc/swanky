@@ -11,12 +11,12 @@ use swanky_field_binary::F2;
 
 /// Given [`BinaryBundle`]s `a` and `b`, output `GCD(a, b)`.
 #[derive(Default)]
-pub struct Gcd<'a> {
+pub struct Gcd<'a, const N: usize> {
     upper_bound: usize,
     _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a> Gcd<'a> {
+impl<'a, const N: usize> Gcd<'a, N> {
     /// Create a new [`Gcd`] circuit using a fixed upper bound.
     ///
     /// Since the circuit needs to be oblivious, we cannot terminate the GCD
@@ -33,12 +33,12 @@ impl<'a> Gcd<'a> {
     }
 }
 
-impl<'a, F: FancyBinary + FancyConstant<F2>> Circuit<F> for Gcd<'a>
+impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for Gcd<'a, N>
 where
     F::Item: 'a,
 {
-    type Input = (&'a BinaryBundle<F::Item>, &'a BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (&'a BinaryBundle<F::Item, N>, &'a BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
