@@ -146,7 +146,7 @@ pub trait AbstractChannel {
 
     /// Write a `U8x16` to the channel.
     #[inline(always)]
-    fn write_block(&mut self, b: &U8x16) -> Result<()> {
+    fn write_u8x16(&mut self, b: &U8x16) -> Result<()> {
         self.write_bytes(b.as_ref())?;
         Ok(())
     }

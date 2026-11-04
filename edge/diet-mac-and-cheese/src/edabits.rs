@@ -714,7 +714,7 @@ impl<
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()
@@ -1020,7 +1020,7 @@ impl<
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()

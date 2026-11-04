@@ -69,10 +69,10 @@ impl OtSender for Sender {
                 .write_pt(&ei0)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
             channel
-                .write_block(&e01)
+                .write_u8x16(&e01)
                 .wrap_err(ErrorKind::NetworkError, "Unnable to write block")?;
             channel
-                .write_block(&e11)
+                .write_u8x16(&e11)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel

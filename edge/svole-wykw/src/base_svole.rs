@@ -124,7 +124,7 @@ impl<FE: FF> Receiver<FE> {
             y += self.pows.get()[i] * b
         }
         channel
-            .write_block(&seed)
+            .write_u8x16(&seed)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
             .flush()

@@ -118,10 +118,10 @@ impl<OT: OtReceiver<Msg = U8x16> + Malicious> OtSender for Sender<OT> {
             let y1 =
                 TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ input.1;
             channel
-                .write_block(&y0)
+                .write_u8x16(&y0)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             channel
-                .write_block(&y1)
+                .write_u8x16(&y1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel
@@ -150,7 +150,7 @@ impl<OT: OtReceiver<Msg = U8x16> + Malicious> CorrelatedSender for Sender<OT> {
             let q = q ^ self.ot.s_;
             let y = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ x1;
             channel
-                .write_block(&y)
+                .write_u8x16(&y)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             out.push(x0);
         }
@@ -251,13 +251,13 @@ impl<OT: OtSender<Msg = U8x16> + Malicious> Receiver<OT> {
             t = (t.0 ^ lo, t.1 ^ hi);
         }
         channel
-            .write_block(&x)
+            .write_u8x16(&x)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
-            .write_block(&t.0)
+            .write_u8x16(&t.0)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
-            .write_block(&t.1)
+            .write_u8x16(&t.1)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
             .flush()

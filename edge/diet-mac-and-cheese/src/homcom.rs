@@ -221,7 +221,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()
@@ -524,7 +524,7 @@ where
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()

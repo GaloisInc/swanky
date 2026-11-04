@@ -244,7 +244,7 @@ impl<OT: OtReceiver<Msg = U8x16> + Malicious, FE: FF> Sender<OT, FE> {
             va -= *pows * z;
         }
         channel
-            .write_block(&seed)
+            .write_u8x16(&seed)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
             .flush()

@@ -36,7 +36,7 @@ impl OtSender for Sender {
         for (b, m) in bs.into_iter().zip(inputs.iter()) {
             let m = if b { m.1 } else { m.0 };
             channel
-                .write_block(&m)
+                .write_u8x16(&m)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel

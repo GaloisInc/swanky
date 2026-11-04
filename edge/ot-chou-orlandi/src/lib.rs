@@ -78,10 +78,10 @@ impl OtSender for Sender {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
             channel
-                .write_block(&c0)
+                .write_u8x16(&c0)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             channel
-                .write_block(&c1)
+                .write_u8x16(&c1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel

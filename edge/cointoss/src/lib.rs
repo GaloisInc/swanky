@@ -20,7 +20,7 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<Vec<
         let mut com = U8x16::default();
         rng.fill_bytes(com.as_mut());
         channel
-            .write_block(&com)
+            .write_u8x16(&com)
             .wrap_err(ErrorKind::NetworkError, "Failed to write block")?;
     }
     channel
@@ -34,7 +34,7 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<Vec<
     }
     for seed in seeds.iter() {
         channel
-            .write_block(seed)
+            .write_u8x16(seed)
             .wrap_err(ErrorKind::NetworkError, "Failed to write block")?;
     }
     channel
@@ -56,7 +56,7 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<V
     }
     for seed in seeds.iter() {
         channel
-            .write_block(seed)
+            .write_u8x16(seed)
             .wrap_err(ErrorKind::NetworkError, "Failed to write block")?;
     }
     channel

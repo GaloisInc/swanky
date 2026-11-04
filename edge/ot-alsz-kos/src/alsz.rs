@@ -114,10 +114,10 @@ impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> OtSender for Sender<OT> {
             let q = q ^ self.s_;
             let y1 = CorrelationRobustHash::fixed_key().hash(q) ^ input.1;
             channel
-                .write_block(&y0)
+                .write_u8x16(&y0)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             channel
-                .write_block(&y1)
+                .write_u8x16(&y1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel
@@ -152,7 +152,7 @@ impl<OT: OtReceiver<Msg = U8x16> + SemiHonest> CorrelatedSender for Sender<OT> {
             let q = q ^ self.s_;
             let y = CorrelationRobustHash::fixed_key().hash(q) ^ x1;
             channel
-                .write_block(&y)
+                .write_u8x16(&y)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             out.push(x0);
         }
