@@ -52,11 +52,6 @@ pub use zk::FancyZeroKnowledge;
 ///
 /// The trait contains an associated type, [`Fancy::Item`], which defines the
 /// underlying wire representation.
-///
-/// This trait can be further extended to support binary by using the
-/// [`FancyBinary`] extension trait. The [`FancyEncode`] trait allows for
-/// encoding values into wires, and the [`FancyOutput`] trait allows for
-/// converting wires into their underlying plaintext representation.
 pub trait Fancy {
     /// The underlying wire representation of this [`Fancy`] object.
     type Item: Clone + core::fmt::Debug + Default;
@@ -68,7 +63,8 @@ pub trait FancyConstant<FF: FiniteField>: Fancy {
     fn constant(&mut self, x: FF) -> Self::Item;
 }
 
-/// Extension trait for [`Fancy`] that provides encoding and receiving operations.
+/// Extension trait for [`Fancy`] that provides encoding operations. This allows
+/// a party to turn a private value into its [`Fancy::Item`] representation.
 pub trait FancyEncode<FF: FiniteField>: Fancy {
     /// Encode many wires for known values.
     fn encode_many(&mut self, values: &[FF], channel: &mut Channel) -> Result<Vec<Self::Item>>;
@@ -80,7 +76,9 @@ pub trait FancyEncode<FF: FiniteField>: Fancy {
     }
 }
 
-/// Extension trait for [`Fancy`] that provides receiving operations.
+/// Extension trait for [`Fancy`] that provides receiving operations. This
+/// allows a party to receive a private value as its [`Fancy::Item`]
+/// representation.
 pub trait FancyReceive<FF: FiniteField>: Fancy {
     /// Receive many wires for unknown values.
     fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>>;
@@ -92,15 +90,16 @@ pub trait FancyReceive<FF: FiniteField>: Fancy {
     }
 }
 
-/// Extension trait for [`Fancy`] that provides output operations.
+/// Extension trait for [`Fancy`] that provides output operations. This allows a
+/// party to output a [`Fancy::Item`] as its underlying (plaintext) value.
 pub trait FancyOutput<FF: FiniteField>: Fancy {
-    /// Output the value associated with wire `x`.
+    /// Output the value associated with a [`Fancy::Item`].
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
     fn output(&mut self, x: &Self::Item, channel: &mut Channel) -> Result<Option<FF>>;
 
-    /// Output the values associated with a slice of wires.
+    /// Output the values associated with a slice of [`Fancy::Item`]s.
     ///
     /// Some [`Fancy`] implementers don't actually *return* output, but they
     /// need to be involved in the process, so they can return `None`.
