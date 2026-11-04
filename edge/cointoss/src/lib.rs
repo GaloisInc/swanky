@@ -28,7 +28,7 @@ pub fn send<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<Vec<
         .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
     for seed in seeds.iter() {
         let seed_ = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         out.push(*seed ^ seed_);
     }
@@ -50,7 +50,7 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<V
     let mut out = Vec::with_capacity(seeds.len());
     for _ in 0..seeds.len() {
         let com = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         coms.push(com);
     }
@@ -64,7 +64,7 @@ pub fn receive<C: AbstractChannel>(channel: &mut C, seeds: &[U8x16]) -> Result<V
         .wrap_err(ErrorKind::NetworkError, "Failed to flush channel")?;
     for (seed, com) in seeds.iter().zip(coms) {
         let seed_ = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Failed to read block")?;
         let mut rng_ = SwankyRng::from_seed(seed_);
         let mut check = U8x16::default();

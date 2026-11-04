@@ -708,7 +708,7 @@ impl<
                     .flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?
             }
             WhichParty::Verifier(_) => {
@@ -1015,7 +1015,7 @@ impl<
         // step 3): get seed for permutation
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();

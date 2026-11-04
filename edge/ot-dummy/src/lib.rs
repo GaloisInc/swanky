@@ -76,7 +76,7 @@ impl OtReceiver for Receiver {
         let mut out = Vec::with_capacity(inputs.len());
         for _ in 0..inputs.len() {
             let m = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             out.push(m);
         }

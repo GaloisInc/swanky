@@ -214,7 +214,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
         let mut rng = match P::WHICH {
             WhichParty::Prover(_) => {
                 let seed = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?;
                 SwankyRng::from_seed(seed)
             }
@@ -519,7 +519,7 @@ where
         debug!("check_zero");
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();

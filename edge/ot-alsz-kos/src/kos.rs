@@ -61,13 +61,13 @@ impl<OT: OtReceiver<Msg = U8x16> + Malicious> Sender<OT> {
             check = (check.0 ^ lo, check.1 ^ hi)
         }
         let x = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let t0 = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let t1 = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let [lo, hi] = x.carryless_mul_wide(self.ot.s_);
         let check = (check.0 ^ lo, check.1 ^ hi);
@@ -287,10 +287,10 @@ impl<OT: OtSender<Msg = U8x16> + Malicious> OtReceiver for Receiver<OT> {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y0 = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y1 = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if b.into() { y1 } else { y0 };
             let y = y ^ TweakableCircularCorrelationRobustHash::fixed_key()
@@ -314,7 +314,7 @@ impl<OT: OtSender<Msg = U8x16> + Malicious> CorrelatedReceiver for Receiver<OT> 
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if b.into() { y } else { U8x16::default() };
             let h =

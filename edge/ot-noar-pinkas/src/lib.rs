@@ -136,10 +136,10 @@ impl OtReceiver for Receiver {
                     .read_pt()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
                 let e01 = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let e11 = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let e1 = match b.into() {
                     false => e01,

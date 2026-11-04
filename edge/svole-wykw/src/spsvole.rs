@@ -368,7 +368,7 @@ impl<OT: OtSender<Msg = U8x16> + Malicious, FE: FF> Receiver<OT, FE> {
             .map(|(pow, (x, y))| (*y - x * self.delta) * *pow)
             .sum();
         let seed = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let mut rng_chi = SwankyRng::from_seed(seed);
         let mut vb = FE::ZERO;

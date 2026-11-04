@@ -60,7 +60,7 @@ impl<FE: FF> Sender<FE> {
             .flush()
             .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
         let seed = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let mut rng_chi = SwankyRng::from_seed(seed);
         for (u, w) in uws.iter().copied() {

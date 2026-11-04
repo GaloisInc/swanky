@@ -144,10 +144,10 @@ impl OtReceiver for Receiver {
             .zip(ks)
             .map(|(&b, k)| {
                 let c0 = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let c1 = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let c = k ^ if b.into() { c1 } else { c0 };
                 Ok(c)

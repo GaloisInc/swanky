@@ -153,7 +153,7 @@ pub trait AbstractChannel {
 
     /// Read a `U8x16` from the channel.
     #[inline(always)]
-    fn read_block(&mut self) -> Result<U8x16> {
+    fn read_u8x16(&mut self) -> Result<U8x16> {
         let mut v = U8x16::default();
         self.read_bytes(v.as_mut())?;
         Ok(v)
@@ -162,7 +162,7 @@ pub trait AbstractChannel {
     /// Read `n` `U8x16`s from the channel.
     #[inline(always)]
     fn read_blocks(&mut self, n: usize) -> Result<Vec<U8x16>> {
-        (0..n).map(|_| self.read_block()).collect()
+        (0..n).map(|_| self.read_u8x16()).collect()
     }
 
     /// Write a `Block512` to the channel.

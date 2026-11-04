@@ -269,10 +269,10 @@ impl<OT: OtSender<Msg = U8x16> + SemiHonest> OtReceiver for Receiver<OT> {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y0 = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y1 = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if b.into() { y1 } else { y0 };
             let y = y ^ CorrelationRobustHash::fixed_key().hash(U8x16::from(t));
@@ -305,7 +305,7 @@ impl<OT: OtSender<Msg = U8x16> + SemiHonest> CorrelatedReceiver for Receiver<OT>
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if b.into() { y } else { U8x16::default() };
             let h = CorrelationRobustHash::fixed_key().hash(U8x16::from(t));
