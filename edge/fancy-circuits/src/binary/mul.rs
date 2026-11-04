@@ -1,8 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{
-        BinaryAddition, BinaryAdditionNoCarry, BinaryLeftShift, BinaryLeftShiftExtend, Constant,
-    },
+    binary::{BinaryAddition, BinaryAdditionNoCarry, Constant, LeftShift, LeftShiftExtend},
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
@@ -55,7 +53,7 @@ where
                 .collect::<Result<Vec<_>>>()?;
             let mul = BinaryBundle::new(mul.try_into().expect("vector should be of length `N`"));
             let shifted =
-                BinaryLeftShiftExtend::<N, M>::new().execute(backend, (&mul, i), channel)?;
+                LeftShiftExtend::<N, M>::default().execute(backend, (&mul, i), channel)?;
             let (result, _) =
                 BinaryAddition::default().execute(backend, (&sum, &shifted), channel)?;
             sum = result;
@@ -99,7 +97,7 @@ where
                 .map(|x| backend.and(x, ywire, channel))
                 .collect::<Result<Vec<_>>>()?;
             let mul = BinaryBundle::new(mul.try_into().expect("vector should be of length `N`"));
-            let shifted = BinaryLeftShift::new().execute(backend, (&mul, i), channel)?;
+            let shifted = LeftShift::default().execute(backend, (&mul, i), channel)?;
             sum = BinaryAdditionNoCarry::default().execute(backend, (&sum, &shifted), channel)?;
         }
         Ok(sum)
@@ -140,7 +138,7 @@ where
             .enumerate()
             .filter_map(|(i, b)| if b == F2::ONE { Some(i) } else { None })
             .try_fold(zero, |z, shift_amt| {
-                let s = BinaryLeftShiftExtend::new().execute(backend, (x, shift_amt), channel)?;
+                let s = LeftShiftExtend::default().execute(backend, (x, shift_amt), channel)?;
                 BinaryAdditionNoCarry::default().execute(backend, (&z, &s), channel)
             })
     }

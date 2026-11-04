@@ -9,9 +9,9 @@ use swanky_field_binary::F2;
 /// For [`BinaryBundle`] `x`, integer `n`, and pad `c`, compute `x << n`,
 /// retaining the size of `x` and padding on the right with `c`.
 #[derive(Default)]
-pub struct BinaryLeftShiftPad<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct LeftShiftPad<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, F: Fancy, const N: usize> Circuit<F> for BinaryLeftShiftPad<'a, N>
+impl<'a, F: Fancy, const N: usize> Circuit<F> for LeftShiftPad<'a, N>
 where
     F::Item: 'a,
 {
@@ -37,16 +37,9 @@ where
 ///
 /// This is equivalent to `x.wrapping_shl(n)` in Rust.
 #[derive(Default)]
-pub struct BinaryLeftShift<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct LeftShift<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryLeftShift<'a, N> {
-    /// Create a new [`BinaryLeftShift`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for BinaryLeftShift<'a, N>
+impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for LeftShift<'a, N>
 where
     F::Item: 'a,
 {
@@ -61,7 +54,7 @@ where
     ) -> Result<Self::Output> {
         let (bundle, n) = inputs;
         let zero = backend.constant(F2::ZERO);
-        BinaryLeftShiftPad::default().execute(backend, (bundle, n, &zero), channel)
+        LeftShiftPad::default().execute(backend, (bundle, n, &zero), channel)
     }
 }
 
@@ -73,17 +66,10 @@ where
 /// # Panics
 /// Panics if `M < N + n`.
 #[derive(Default)]
-pub struct BinaryLeftShiftExtend<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
-
-impl<'a, const N: usize, const M: usize> BinaryLeftShiftExtend<'a, N, M> {
-    /// Create a new [`BinaryLeftShiftExtend`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
+pub struct LeftShiftExtend<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
 impl<'a, F: FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
-    for BinaryLeftShiftExtend<'a, N, M>
+    for LeftShiftExtend<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -115,16 +101,9 @@ where
 /// For [`BinaryBundle`] `x`, integer `n`, and pad `c`, compute `x >> n`,
 /// retaining the size of `x` and filling space on the left by `c`.
 #[derive(Default)]
-pub struct BinaryRightShiftPad<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct RightShiftPad<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryRightShiftPad<'a, N> {
-    /// Create a new [`BinaryRightShiftPad`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for BinaryRightShiftPad<'a, N>
+impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for RightShiftPad<'a, N>
 where
     F::Item: 'a,
 {
@@ -152,16 +131,9 @@ where
 ///
 /// This is equivalent to `x >> n` in Rust.
 #[derive(Default)]
-pub struct BinaryRightShift<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct RightShift<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryRightShift<'a, N> {
-    /// Create a new [`BinaryRightShift`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for BinaryRightShift<'a, N>
+impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for RightShift<'a, N>
 where
     F::Item: 'a,
 {
@@ -176,22 +148,19 @@ where
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
         let zero = backend.constant(F2::ZERO);
-        BinaryRightShiftPad::new().execute(backend, (x, n, zero), channel)
+        RightShiftPad::default().execute(backend, (x, n, zero), channel)
     }
 }
 
-/// Arithmetic right shift.
+/// For [`BinaryBundle`] `x` and integer `n`, compute an arithmetic right shift
+/// of `x` by `n`.
+///
+/// This is equivalent to `(x as iN) >> n`, where `iN` is the signed
+/// representation containing `N` bits.
 #[derive(Default)]
-pub struct BinaryArithmeticRightShift<'a, const N: usize>(PhantomData<&'a ()>);
+pub struct ArithmeticRightShift<'a, const N: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize> BinaryArithmeticRightShift<'a, N> {
-    /// Create a new [`BinaryArithmeticRightShift`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for BinaryArithmeticRightShift<'a, N>
+impl<'a, F: FancyConstant<F2>, const N: usize> Circuit<F> for ArithmeticRightShift<'a, N>
 where
     F::Item: 'a,
 {
@@ -206,7 +175,7 @@ where
     ) -> Result<Self::Output> {
         let (x, n) = inputs;
         let pad = x.wires().last().unwrap();
-        BinaryRightShiftPad::new().execute(backend, (x, n, pad.clone()), channel)
+        RightShiftPad::default().execute(backend, (x, n, pad.clone()), channel)
     }
 }
 
@@ -214,70 +183,73 @@ where
 mod test {
     use crate::{
         BinaryBundle,
-        binary::{
-            BinaryArithmeticRightShift, BinaryLeftShift, BinaryLeftShiftExtend,
-            binary_shift::BinaryRightShift,
-        },
+        binary::{ArithmeticRightShift, LeftShift, LeftShiftExtend, shift::RightShift},
     };
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
     #[test]
-    fn left_shift() {
+    fn left_shift_circuit_works() {
         const N: usize = 64;
+
         let mut rng = rng();
+        let circuit = LeftShift::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u64>();
             let n = rng.random_range(..N);
             let input = BinaryBundle::from(x as u128);
-            let output = Dummy::eval(&BinaryLeftShift::<N>::new(), (&input, n)).unwrap();
+            let output = Dummy::eval(&circuit, (&input, n)).unwrap();
             assert_eq!(Into::<u128>::into(output) as u64, x.wrapping_shl(n as u32));
         }
     }
 
     #[test]
-    fn left_shift_extend() {
+    fn left_shift_extend_circuit_works() {
         const N: usize = 64;
         const Q: u128 = 1 << N;
+
         let mut rng = rng();
+        let circuit = LeftShiftExtend::<N, { 2 * N }>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let n = rng.random_range(..N);
             let input = BinaryBundle::from(x);
-            let output =
-                Dummy::eval(&BinaryLeftShiftExtend::<N, { 2 * N }>::new(), (&input, n)).unwrap();
+            let output = Dummy::eval(&circuit, (&input, n)).unwrap();
             assert_eq!(Into::<u128>::into(output), x << n);
         }
     }
 
     #[test]
-    fn right_shift() {
+    fn right_shift_circuit_works() {
         const N: usize = 64;
+
         let mut rng = rng();
+        let circuit = RightShift::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u64>();
             let n = rng.random_range(..N);
             let input = BinaryBundle::from(x as u128);
-            let output = Dummy::eval(&BinaryRightShift::<N>::new(), (&input, n)).unwrap();
+            let output = Dummy::eval(&circuit, (&input, n)).unwrap();
             assert_eq!(Into::<u128>::into(output) as u64, x >> n);
         }
     }
 
     #[test]
-    fn arithmetic_right_shift() {
+    fn arithmetic_right_shift_circuit_works() {
         const N: usize = 64;
         const Q: u128 = 1 << N;
+
         let mut rng = rng();
+        let circuit = ArithmeticRightShift::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let n = rng.random_range(..N);
             let x_input = BinaryBundle::from(x);
-            let output =
-                Dummy::eval(&BinaryArithmeticRightShift::<N>::new(), (&x_input, n)).unwrap();
+            let output = Dummy::eval(&circuit, (&x_input, n)).unwrap();
             assert_eq!(Into::<u128>::into(output) as i64, (x as i64) >> n);
         }
     }

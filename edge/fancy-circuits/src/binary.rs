@@ -46,13 +46,10 @@ pub use twos_complement::{TestTwosComplement, TwosComplement};
 mod max;
 pub use max::Max;
 
-mod binary_shift;
-pub use binary_shift::BinaryArithmeticRightShift;
-pub use binary_shift::BinaryLeftShift;
-pub use binary_shift::BinaryLeftShiftExtend;
-pub use binary_shift::BinaryLeftShiftPad;
-pub use binary_shift::BinaryRightShift;
-pub use binary_shift::BinaryRightShiftPad;
+mod shift;
+pub use shift::{
+    ArithmeticRightShift, LeftShift, LeftShiftExtend, LeftShiftPad, RightShift, RightShiftPad,
+};
 
 mod abs;
 pub use abs::AbsoluteValue;
