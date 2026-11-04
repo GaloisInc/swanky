@@ -14,7 +14,7 @@ mod tests {
     use fancy_garbling::{WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{
-        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput,
+        Circuit, CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput, FancyReceive,
     };
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;

@@ -5,7 +5,7 @@ use crate::{
     wire::{OfflineWire, ValidatorWire},
 };
 use fancy_garbling::{WireLabel, WireMod2};
-use fancy_traits::{Fancy, FancyEncode};
+use fancy_traits::{Fancy, FancyEncode, FancyReceive};
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
@@ -147,7 +147,9 @@ impl<'a, C> FancyEncode<F2> for GarblerOnline<'a, C> {
 
         self.encode_wirelabels(&offline_wires, my_masked_values, channel)
     }
+}
 
+impl<'a, C> FancyReceive<F2> for GarblerOnline<'a, C> {
     fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>> {
         let offline_wires = (0..n).map(|_| self.inputs.next()).collect::<Vec<_>>();
         let my_auth_shares: Vec<AuthShare<PartyGarbler>> =

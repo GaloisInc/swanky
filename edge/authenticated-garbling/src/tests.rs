@@ -14,7 +14,9 @@ use fancy_circuits::test_circuits::binary::{
 };
 use fancy_circuits::test_circuits::fancy_binary_constant::TestBinaryConstant;
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput};
+use fancy_traits::{
+    CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput, FancyReceive,
+};
 use rand::RngExt;
 use swanky_field_binary::F2;
 use swanky_rng::SwankyRng;

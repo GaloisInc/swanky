@@ -1,6 +1,6 @@
 use fancy_circuits::crypto::{aes::Aes128, sha::Sha256CompressionFunction};
 use fancy_garbling::WireMod2;
-use fancy_traits::{CircuitInputMapper, FancyEncode};
+use fancy_traits::{CircuitInputMapper, FancyEncode, FancyReceive};
 use std::time::SystemTime;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;

@@ -2,7 +2,7 @@
 //! using `fancy-garbling`.
 
 use core::cmp::{Ordering, max};
-use fancy_circuits::{BinaryBundle, BinaryGadgets, Gcd};
+use fancy_circuits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, Gcd};
 use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -31,7 +31,7 @@ fn gb_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng
     Ok(())
 }
 
-fn gb_set_inputs<F: BinaryGadgets>(
+fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
     gb: &mut F,
     input: u128,
     channel: &mut Channel,
@@ -63,7 +63,7 @@ fn ev_gcd(input: u128, upper_bound: usize, channel: &mut Channel, rng: SwankyRng
     Ok(output)
 }
 
-fn ev_set_inputs<F: BinaryGadgets>(
+fn ev_set_inputs<F: BinaryEncode + BinaryReceive>(
     ev: &mut F,
     input: u128,
     channel: &mut Channel,

@@ -73,14 +73,17 @@ pub trait FancyEncode<FF: FiniteField>: Fancy {
     /// Encode many wires for known values.
     fn encode_many(&mut self, values: &[FF], channel: &mut Channel) -> Result<Vec<Self::Item>>;
 
-    /// Receive many wires for unknown values.
-    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>>;
-
     /// Encode a wire for a known value.
     fn encode(&mut self, value: FF, channel: &mut Channel) -> Result<Self::Item> {
         let xs = self.encode_many(&[value], channel)?;
         Ok(xs[0].clone())
     }
+}
+
+/// Extension trait for [`Fancy`] that provides receiving operations.
+pub trait FancyReceive<FF: FiniteField>: Fancy {
+    /// Receive many wires for unknown values.
+    fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>>;
 
     /// Receive a wire for an unknown value.
     fn receive(&mut self, channel: &mut Channel) -> Result<Self::Item> {

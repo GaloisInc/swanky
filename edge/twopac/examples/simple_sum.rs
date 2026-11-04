@@ -1,7 +1,9 @@
 //! An example that adds two secret numbers in a binary garbled circuit
 //! using fancy-garbling.
 
-use fancy_circuits::{BinaryBundle, BinaryGadgets, binary::BinaryAdditionNoCarry};
+use fancy_circuits::{
+    BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, binary::BinaryAdditionNoCarry,
+};
 use fancy_traits::Circuit;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -20,7 +22,7 @@ fn gb_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<()> {
     Ok(())
 }
 
-fn gb_set_inputs<F: BinaryGadgets>(
+fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
     gb: &mut F,
     input: u128,
     channel: &mut Channel,
@@ -41,7 +43,7 @@ fn ev_sum(input: u128, channel: &mut Channel, rng: SwankyRng) -> Result<u128> {
     Ok(output)
 }
 
-fn ev_set_inputs<F: BinaryGadgets>(
+fn ev_set_inputs<F: BinaryEncode + BinaryReceive>(
     ev: &mut F,
     input: u128,
     channel: &mut Channel,

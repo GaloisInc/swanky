@@ -11,7 +11,7 @@ use fancy_circuits::{
     binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
 };
 use fancy_garbling::WireMod2;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
+use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;

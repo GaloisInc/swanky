@@ -2,7 +2,7 @@
 //! using fancy-garbling.
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_circuits::{BinaryBundle, BinaryGadgets, LinearOram};
+use fancy_circuits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, LinearOram};
 use fancy_traits::{Circuit, FancyOutput};
 use rand::{CryptoRng, SeedableRng};
 use swanky_channel::Channel;
@@ -22,7 +22,7 @@ fn ram_in_clear(ram: &[u128], index: usize) -> u128 {
 }
 
 /// Set the inputs from the garbler's perspective.
-fn gb_set_inputs<F: BinaryGadgets>(
+fn gb_set_inputs<F: BinaryEncode + BinaryReceive>(
     gb: &mut F,
     inputs: &[u128],
     channel: &mut Channel,
@@ -33,7 +33,7 @@ fn gb_set_inputs<F: BinaryGadgets>(
 }
 
 /// Set the inputs from the evaluator's perspective.
-fn ev_set_inputs<F: BinaryGadgets>(
+fn ev_set_inputs<F: BinaryEncode + BinaryReceive>(
     ev: &mut F,
     input: u128,
     ram_size: usize,

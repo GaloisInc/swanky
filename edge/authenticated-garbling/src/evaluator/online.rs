@@ -1,6 +1,7 @@
 use fancy_garbling::{WireLabel, WireMod2};
 use fancy_traits::{
     CircuitInputMapper, CircuitOutputMapper, Fancy, FancyBinary, FancyConstant, FancyEncode,
+    FancyReceive,
 };
 use swanky_authenticated_bits::authshares::{AuthShare, AuthShareGenerator};
 use swanky_channel::Channel;
@@ -278,7 +279,9 @@ impl<'a, C> FancyEncode<F2> for EvaluatorOnline<'a, C> {
 
         self.receive_wirelabels(my_masked_values, my_auth_shares, channel)
     }
+}
 
+impl<'a, C> FancyReceive<F2> for EvaluatorOnline<'a, C> {
     fn receive_many(&mut self, n: usize, channel: &mut Channel) -> Result<Vec<Self::Item>> {
         // Grab authenticated shares for each of the inputs.
         let my_auth_shares = (0..n).map(|_i| self.auth_shares.next()).collect::<Vec<_>>();
