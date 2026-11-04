@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryConstant},
+    binary::{BinaryAdditionNoCarry, Constant},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -35,7 +35,7 @@ where
                 .try_into()
                 .expect("vector should be of length `N`"),
         );
-        let one = BinaryConstant::new(1).execute(backend, (), channel)?;
+        let one = Constant::new(1).execute(backend, (), channel)?;
         BinaryAdditionNoCarry::default().execute(backend, (&not_xs, &one), channel)
     }
 }

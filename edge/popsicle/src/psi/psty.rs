@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality},
+    binary::{BinaryAdditionNoCarry, BinaryEquality, Constant},
 };
 use fancy_garbling::WireMod2;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
@@ -470,8 +470,8 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
         })
         .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
-    let mut acc = BinaryConstant::<{ HASH_SIZE * 8 }>::new(0).execute(f, (), channel)?;
-    let one = BinaryConstant::<{ HASH_SIZE * 8 }>::new(1).execute(f, (), channel)?;
+    let mut acc = Constant::<{ HASH_SIZE * 8 }>::new(0).execute(f, (), channel)?;
+    let one = Constant::<{ HASH_SIZE * 8 }>::new(1).execute(f, (), channel)?;
 
     for b in eqs.into_iter() {
         let b_ws = one

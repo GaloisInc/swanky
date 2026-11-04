@@ -2,7 +2,7 @@
 use crate::circuit_psi::*;
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, Mux, PairwiseXor},
+    binary::{BinaryAdditionNoCarry, BinaryEquality, Constant, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
@@ -85,8 +85,8 @@ pub fn fancy_cardinality<F>(
 where
     F: FancyBinary + FancyConstant<F2>,
 {
-    let zero = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
-    let one = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(1).execute(f, (), channel)?;
+    let zero = Constant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
+    let one = Constant::<{ PRIMARY_KEY_SIZE * 8 }>::new(1).execute(f, (), channel)?;
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
         let mux = Mux::default().execute(f, (bit.clone(), &zero, &one), channel)?;
@@ -108,7 +108,7 @@ pub fn fancy_payload_sum<F>(
 where
     F: FancyBinary + FancyConstant<F2>,
 {
-    let zero = BinaryConstant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
+    let zero = Constant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
     let mut acc = zero.clone();
     let multiplex = Mux::default();
 

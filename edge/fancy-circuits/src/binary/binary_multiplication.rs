@@ -1,8 +1,7 @@
 use crate::{
     BinaryBundle,
     binary::{
-        BinaryAddition, BinaryAdditionNoCarry, BinaryConstant, BinaryLeftShift,
-        BinaryLeftShiftExtend,
+        BinaryAddition, BinaryAdditionNoCarry, BinaryLeftShift, BinaryLeftShiftExtend, Constant,
     },
     util::u128_to_bits,
 };
@@ -135,7 +134,7 @@ where
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let (x, c) = inputs;
-        let zero = BinaryConstant::<M>::new(0).execute(backend, (), channel)?;
+        let zero = Constant::<M>::new(0).execute(backend, (), channel)?;
         u128_to_bits::<M>(c)
             .into_iter()
             .enumerate()

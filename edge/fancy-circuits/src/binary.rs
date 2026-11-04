@@ -9,9 +9,9 @@ pub use mux::{Mux, MuxBit, MuxBitConstants, MuxConstants};
 mod binary_adder;
 pub use binary_adder::BinaryAdder;
 
-mod binary_constant;
-pub use binary_constant::BinaryConstant;
-pub use binary_constant::test::TestBinaryConstant;
+mod constant;
+pub use constant::Constant;
+pub use constant::test::TestConstant;
 
 mod binary_addition;
 pub use binary_addition::BinaryAddition;
