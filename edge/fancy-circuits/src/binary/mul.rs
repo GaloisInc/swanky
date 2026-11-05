@@ -106,10 +106,10 @@ where
 /// For [`BinaryBundle`] `x` of length `N`, and constant `c`,
 /// output `x * c` with length `M = 2 * N`.
 #[derive(Default)]
-pub struct Mulc<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
+pub struct MulConstant<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
-    for Mulc<'a, N, M>
+    for MulConstant<'a, N, M>
 where
     F::Item: 'a,
 {
@@ -199,7 +199,7 @@ where
 mod test {
     use crate::{
         BinaryBundle,
-        binary::{Mul, MulLowerHalf, Mulc},
+        binary::{Mul, MulConstant, MulLowerHalf},
     };
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
@@ -240,7 +240,7 @@ mod test {
     #[test]
     fn mulc_circuit_works() {
         let mut rng = rng();
-        let circuit = Mulc::<N, { 2 * N }>::default();
+        let circuit = MulConstant::<N, { 2 * N }>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;

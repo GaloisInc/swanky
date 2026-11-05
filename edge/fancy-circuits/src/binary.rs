@@ -20,7 +20,7 @@ pub use eq::Eq;
 mod max;
 pub use max::Max;
 mod mul;
-pub use mul::{Mul, MulLowerHalf, Mulc, TestMul};
+pub use mul::{Mul, MulConstant, MulLowerHalf, TestMul};
 mod mux;
 pub use mux::{Mux, MuxBit, MuxBitConstants, MuxConstants};
 mod shift;
