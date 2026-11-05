@@ -1,7 +1,9 @@
 //! SHA circuits.
 
-use crate::{BinaryBundle, bristol::BristolFashionCircuit};
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
+use crate::bristol::BristolFashionCircuit;
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
+};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;

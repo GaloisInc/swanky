@@ -2,13 +2,14 @@ mod test {
     use schmivitz::parameters::{Binary128Bit, Binary256Bit, Params};
 
     use fancy_circuits::{
-        BinaryBundle,
         binary::Add,
         crypto::aes::Aes128,
         crypto::hmac::HmacSha256,
         crypto::sha::{Sha256, Sha256CompressionFunction},
     };
-    use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyZeroKnowledge};
+    use fancy_traits::{
+        BinaryBundle, Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyZeroKnowledge,
+    };
     use merlin::Transcript;
     use rand::rng;
     use schmivitz::{

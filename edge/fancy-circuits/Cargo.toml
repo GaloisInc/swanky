@@ -14,7 +14,6 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-fancy-plaintext.workspace = true
 fancy-traits.workspace = true
 swanky-channel.workspace = true
 swanky-error.workspace = true

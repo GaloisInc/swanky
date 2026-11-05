@@ -43,6 +43,9 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteField;
 
+mod bundle;
+pub use bundle::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive};
+pub use bundle::{u128_from_bits, u128_to_bits};
 mod circuit;
 pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;

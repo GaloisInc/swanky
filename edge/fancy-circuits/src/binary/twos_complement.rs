@@ -1,6 +1,8 @@
-use crate::{BinaryBundle, binary::AddNoCarry};
+use crate::binary::AddNoCarry;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -91,9 +93,9 @@ mod test {
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
+            let x_input = Dummy::constant(x);
             let output = Dummy::eval(&circuit, &x_input).unwrap();
-            assert_eq!(Into::<u128>::into(output), (((!x) % Q) + 1) % Q);
+            assert_eq!(Dummy::from(output), (((!x) % Q) + 1) % Q);
         }
     }
 }

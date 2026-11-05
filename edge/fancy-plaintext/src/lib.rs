@@ -1,7 +1,10 @@
 //! Plaintext implementation of [`Fancy`].
 #![deny(missing_docs)]
 
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode, FancyOutput};
+use fancy_traits::{
+    BinaryBundle, BinaryEncode, Circuit, Fancy, FancyBinary, FancyConstant, FancyEncode,
+    FancyOutput, u128_from_bits,
+};
 use rand::CryptoRng;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -33,6 +36,17 @@ impl<FF: FiniteField> DummyVal<FF> {
 }
 
 impl Dummy {
+    /// Create a constant [`BinaryBundle`] value.
+    pub fn constant<const N: usize>(value: u128) -> BinaryBundle<<Self as Fancy>::Item, N> {
+        Channel::with(std::io::empty(), |channel| Dummy.bin_encode(value, channel)).unwrap()
+    }
+
+    /// Convert a [`BinaryBundle`] value into a `u128`.
+    pub fn from<const N: usize>(value: BinaryBundle<DummyVal<F2>, N>) -> u128 {
+        let bin = value.wires().iter().map(|w| w.val()).collect::<Vec<_>>();
+        u128_from_bits(&bin)
+    }
+
     /// Evaluate a circuit on the provided inputs in plaintext.
     pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: C::Input) -> Result<C::Output> {
         Channel::with(std::io::empty(), |c| circuit.execute(&mut Dummy, inputs, c))

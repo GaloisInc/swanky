@@ -1,6 +1,4 @@
-use crate::util::{self, u128_from_bits, u128_to_bits};
-use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyConstant, FancyEncode, FancyOutput, FancyReceive};
+use crate::{FancyConstant, FancyEncode, FancyOutput, FancyReceive};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -29,7 +27,7 @@ impl<W, const N: usize> BinaryBundle<W, N> {
     }
 
     /// In place reversal of the wires in the [`BinaryBundle`].
-    pub(crate) fn reverse(&mut self) {
+    pub fn reverse(&mut self) {
         self.0.reverse();
     }
 
@@ -37,24 +35,32 @@ impl<W, const N: usize> BinaryBundle<W, N> {
     ///
     /// # Panics
     /// Panics if `i >= N`.
-    pub(crate) fn set(&mut self, value: W, i: usize) {
+    pub fn set(&mut self, value: W, i: usize) {
         assert!(i < N);
         self.0[i] = value;
     }
 }
 
-impl<const N: usize> From<u128> for BinaryBundle<DummyVal<F2>, N> {
-    /// Generate a new [`BinaryBundle`] of `value % 2^N`.
-    fn from(value: u128) -> Self {
-        Channel::with(std::io::empty(), |channel| Dummy.bin_encode(value, channel)).unwrap()
-    }
+/// Convert a `u128` into a vector of `N` bits.
+///
+/// # Panics
+/// Panics if `N > 128`.
+pub fn u128_to_bits<const N: usize>(x: u128) -> [F2; N] {
+    assert!(N <= 128);
+    core::array::from_fn(|i| F2::from(((x >> i) & 1) != 0))
 }
 
-impl<const N: usize> From<BinaryBundle<DummyVal<F2>, N>> for u128 {
-    fn from(value: BinaryBundle<DummyVal<F2>, N>) -> Self {
-        let bin = value.0.iter().map(|w| w.val()).collect::<Vec<_>>();
-        u128_from_bits(&bin)
+/// Convert a slice of bits into a `u128`.
+///
+/// # Panics
+/// Panics if the slice length is greater than 128.
+pub fn u128_from_bits(bits: &[F2]) -> u128 {
+    assert!(bits.len() <= 128);
+    let mut x = 0;
+    for (i, bit) in bits.iter().enumerate() {
+        x += (u16::from(*bit) as u128) << i;
     }
+    x
 }
 
 impl<F: FancyEncode<F2>> BinaryEncode for F {}
@@ -69,7 +75,7 @@ pub trait BinaryEncode: FancyEncode<F2> {
         value: u128,
         channel: &mut Channel,
     ) -> Result<BinaryBundle<Self::Item, N>> {
-        let xs = util::u128_to_bits::<N>(value);
+        let xs = u128_to_bits::<N>(value);
         let encoded = self.encode_many(&xs, channel)?;
         Ok(BinaryBundle::new(
             encoded.try_into().expect("vector should be of length `N`"),
@@ -84,7 +90,7 @@ pub trait BinaryEncode: FancyEncode<F2> {
     ) -> Result<Vec<BinaryBundle<Self::Item, N>>> {
         let xs = values
             .iter()
-            .flat_map(|x| util::u128_to_bits::<N>(*x))
+            .flat_map(|x| u128_to_bits::<N>(*x))
             .collect::<Vec<_>>();
         let mut wires = self.encode_many(&xs, channel)?;
         let buns = (0..values.len())
@@ -139,7 +145,7 @@ pub trait BinaryOutput: FancyOutput<F2> {
             x.0.iter()
                 .map(|wire| self.output(wire, channel))
                 .collect::<Result<Option<Vec<_>>>>()?;
-        Ok(bits.map(|bits| util::u128_from_bits(&bits)))
+        Ok(bits.map(|bits| u128_from_bits(&bits)))
     }
 
     /// Output a slice of binary bundles and interpret the results as a `u128`.
@@ -154,5 +160,20 @@ pub trait BinaryOutput: FancyOutput<F2> {
             zs.push(z);
         }
         Ok(zs.into_iter().collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{RngExt, rng};
+
+    #[test]
+    fn u128_to_bits_conversion_works() {
+        let mut rng = rng();
+        for _ in 0..128 {
+            let x = rng.random::<u128>();
+            assert_eq!(u128_from_bits(&u128_to_bits::<128>(x)), x);
+        }
     }
 }

@@ -1,6 +1,5 @@
-use crate::BinaryBundle;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -51,7 +50,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{BinaryBundle, binary::ToUnary};
+    use crate::binary::ToUnary;
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
     use swanky_field::FiniteRing;
@@ -67,7 +66,7 @@ mod test {
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
+            let x_input = Dummy::constant(x);
             let output = Dummy::eval(&circuit, &x_input).unwrap();
             for (i, y) in output.into_iter().enumerate() {
                 if i as u128 == x {

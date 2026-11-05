@@ -1,9 +1,6 @@
-use crate::{
-    BinaryBundle,
-    binary::{Add, LeftShiftPad, Mux, TwosComplement},
-};
+use crate::binary::{Add, LeftShiftPad, Mux, TwosComplement};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -43,7 +40,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{BinaryBundle, binary::Div};
+    use crate::binary::Div;
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
@@ -61,19 +58,19 @@ mod test {
             while y == 0 {
                 y = rng.random::<u128>() % Q;
             }
-            let x_input = BinaryBundle::from(x);
-            let y_input = BinaryBundle::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), x / y);
+            assert_eq!(Dummy::from(output), x / y);
         }
 
         // Ensure that division by zero equals zero.
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
-            let y_input = BinaryBundle::from(0);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(0);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), 0);
+            assert_eq!(Dummy::from(output), 0);
         }
     }
 }

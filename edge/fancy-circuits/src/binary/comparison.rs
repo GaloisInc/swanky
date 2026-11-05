@@ -1,9 +1,6 @@
-use crate::{
-    BinaryBundle,
-    binary::{MuxBit, OrMany, Sub},
-};
+use crate::binary::{MuxBit, OrMany, Sub};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -140,8 +137,8 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
-            let y_input = BinaryBundle::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), F2::from(x < y));
         }
@@ -158,8 +155,8 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
-            let y_input = BinaryBundle::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), F2::from((x as i64) < (y as i64)));
         }
@@ -179,8 +176,8 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
-            let y_input = BinaryBundle::<_, N>::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), F2::from(x >= y));
         }

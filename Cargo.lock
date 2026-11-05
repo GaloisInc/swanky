@@ -838,6 +838,7 @@ dependencies = [
 name = "fancy-traits"
 version = "0.6.0"
 dependencies = [
+ "rand",
  "swanky-channel",
  "swanky-error",
  "swanky-field",

@@ -6,12 +6,11 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
 };
-use fancy_circuits::{
-    BinaryBundle,
-    binary::{AddNoCarry, Eq},
-};
+use fancy_circuits::binary::{AddNoCarry, Eq};
 use fancy_garbling::WireMod2;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
+use fancy_traits::{
+    BinaryBundle, Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive,
+};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;

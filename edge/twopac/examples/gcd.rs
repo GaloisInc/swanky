@@ -2,8 +2,8 @@
 //! using `fancy-garbling`.
 
 use core::cmp::{Ordering, max};
-use fancy_circuits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, Gcd};
-use fancy_traits::Circuit;
+use fancy_circuits::Gcd;
+use fancy_traits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, Circuit};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_ot_iknp::IKNP;

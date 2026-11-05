@@ -2,8 +2,8 @@
 //! using fancy-garbling.
 
 use fancy_analyzer::CircuitAnalyzer;
-use fancy_circuits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, LinearOram};
-use fancy_traits::{Circuit, FancyOutput};
+use fancy_circuits::LinearOram;
+use fancy_traits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, Circuit, FancyOutput};
 use rand::{CryptoRng, SeedableRng};
 use swanky_channel::Channel;
 use swanky_error::Result;

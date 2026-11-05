@@ -1,11 +1,9 @@
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyConstant, u128_to_bits};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-
-use crate::{BinaryBundle, util::u128_to_bits};
 
 /// For input `(b, x, y)` return `x` if `b == 0`, otherwise return `y`.
 #[derive(Default)]
@@ -133,10 +131,7 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for MuxConst
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        BinaryBundle,
-        binary::mux::{Mux, MuxBitConstants},
-    };
+    use crate::binary::mux::{Mux, MuxBitConstants};
     use fancy_plaintext::{Dummy, DummyVal};
     use rand::RngExt;
     use swanky_field::FiniteRing;
@@ -182,15 +177,12 @@ mod test {
         let mut rng = rand::rng();
         let x = rng.random::<u128>() % (N as u128);
         let y = rng.random::<u128>() % (N as u128);
-        let x_inputs = BinaryBundle::from(x);
-        let y_inputs = BinaryBundle::from(y);
+        let x_inputs = Dummy::constant(x);
+        let y_inputs = Dummy::constant(y);
 
         for b in [F2::ZERO, F2::ONE] {
             let output = Dummy::eval(&circuit, (DummyVal::new(b), &x_inputs, &y_inputs)).unwrap();
-            assert_eq!(
-                Into::<u128>::into(output),
-                if b == F2::ZERO { x } else { y }
-            );
+            assert_eq!(Dummy::from(output), if b == F2::ZERO { x } else { y });
         }
     }
 
@@ -205,10 +197,7 @@ mod test {
 
         for b in [F2::ZERO, F2::ONE] {
             let output = Dummy::eval(&circuit, (DummyVal::new(b), x, y)).unwrap();
-            assert_eq!(
-                Into::<u128>::into(output),
-                if b == F2::ZERO { x } else { y }
-            );
+            assert_eq!(Dummy::from(output), if b == F2::ZERO { x } else { y });
         }
     }
 }

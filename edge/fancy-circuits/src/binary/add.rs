@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
+use fancy_traits::{BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
-use crate::{BinaryBundle, binary::XorMany};
+use crate::binary::XorMany;
 
 /// For input bits `x` and `y` and optional carry bit `c`, return `(x + y + c,
 /// c')`, where `c'` is the new carry bit.
@@ -203,16 +203,16 @@ mod test {
         const Q: u128 = 1 << N;
 
         let mut rng = rand::rng();
-        let circuit = Add::default();
+        let circuit = Add::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
-            let y_input = BinaryBundle::<_, N>::from(y);
-            let outputs = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(outputs.0), (x + y) % Q);
-            assert_eq!(outputs.1.val(), F2::from(x + y >= Q));
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
+            let (sum, carry) = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
+            assert_eq!(Dummy::from(sum), (x + y) % Q);
+            assert_eq!(carry.val(), F2::from(x + y >= Q));
         }
     }
 
@@ -222,15 +222,15 @@ mod test {
         const Q: u128 = 1 << N;
 
         let mut rng = rand::rng();
-        let circuit = AddNoCarry::default();
+        let circuit = AddNoCarry::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
-            let y_input = BinaryBundle::<_, N>::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), (x + y) % Q);
+            assert_eq!(Dummy::from(output), (x + y) % Q);
         }
     }
 }

@@ -1,8 +1,7 @@
-use crate::{
-    BinaryBundle,
-    binary::{Eq, Mux, PairwiseXor},
+use crate::binary::{Eq, Mux, PairwiseXor};
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
 };
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -93,7 +92,7 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitOutputMapper<F> 
 
 #[cfg(test)]
 pub mod test {
-    use crate::{BinaryBundle, LinearOram};
+    use crate::LinearOram;
     use fancy_plaintext::Dummy;
     use rand::RngExt;
 
@@ -108,12 +107,13 @@ pub mod test {
             let ram: Vec<u128> = (0..ram_size).map(|_| rng.random::<u128>()).collect();
             let index = rng.random_range(..ram_size);
 
-            let ram_input: Vec<BinaryBundle<_, _>> =
-                ram.iter().map(|&val| BinaryBundle::from(val)).collect();
-            let query_input = BinaryBundle::from(index as u128);
+            let ram_input = ram
+                .iter()
+                .map(|&val| Dummy::constant(val))
+                .collect::<Vec<_>>();
+            let query_input = Dummy::constant(index as u128);
             let output = Dummy::eval(&c, (ram_input, query_input)).unwrap();
-            let result: u128 = output.into();
-            assert_eq!(result, ram[index]);
+            assert_eq!(Dummy::from(output), ram[index]);
         }
     }
 }
