@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{Add, AddNoCarry, Constant, LeftShift, LeftShiftExtend},
+    binary::{Add, AddNoCarry, LeftShift, LeftShiftExtend},
     util::u128_to_bits,
 };
 use core::marker::PhantomData;
@@ -124,7 +124,7 @@ where
     ) -> Result<Self::Output> {
         assert_eq!(M, 2 * N);
         let (x, c) = inputs;
-        let zero = Constant::<M>::new(0).execute(backend, (), channel)?;
+        let zero = BinaryBundle::constant(backend, 0);
         u128_to_bits::<M>(c)
             .into_iter()
             .enumerate()

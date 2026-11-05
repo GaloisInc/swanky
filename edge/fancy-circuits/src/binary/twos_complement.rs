@@ -1,7 +1,4 @@
-use crate::{
-    BinaryBundle,
-    binary::{AddNoCarry, Constant},
-};
+use crate::{BinaryBundle, binary::AddNoCarry};
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
@@ -36,7 +33,7 @@ where
                 .try_into()
                 .expect("vector should be of length `N`"),
         );
-        let one = Constant::new(1).execute(backend, (), channel)?;
+        let one = BinaryBundle::constant(backend, 1);
         AddNoCarry::default().execute(backend, (&not_xs, &one), channel)
     }
 }

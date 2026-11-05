@@ -1,6 +1,6 @@
-use crate::util::{self, u128_from_bits};
+use crate::util::{self, u128_from_bits, u128_to_bits};
 use fancy_plaintext::{Dummy, DummyVal};
-use fancy_traits::{FancyEncode, FancyOutput, FancyReceive};
+use fancy_traits::{FancyConstant, FancyEncode, FancyOutput, FancyReceive};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -12,9 +12,15 @@ use swanky_field_binary::F2;
 pub struct BinaryBundle<W, const N: usize>([W; N]);
 
 impl<W, const N: usize> BinaryBundle<W, N> {
-    /// Create a new binary bundle from an array of wires.
+    /// Create a new [`BinaryBundle`] from an array of wires.
     pub fn new(ws: [W; N]) -> Self {
         Self(ws)
+    }
+
+    /// Create a new [`BinaryBundle`] for a constant value.
+    pub fn constant<F: FancyConstant<F2, Item = W>>(backend: &mut F, value: u128) -> Self {
+        let xs = u128_to_bits::<N>(value);
+        BinaryBundle::new(xs.map(|x| backend.constant(x)))
     }
 
     /// The internal array of wires contained in the [`BinaryBundle`].

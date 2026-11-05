@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{Constant, Eq, Mux, PairwiseXor},
+    binary::{Eq, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
@@ -35,13 +35,13 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOr
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
 
-        let zero = Constant::<N>::new(0).execute(backend, (), channel)?;
+        let zero = BinaryBundle::constant(backend, 0);
 
         // Traverse the RAM one element at a time, and multiplex the result
         // based on whether the query matches the current index.
         let mut result = zero.clone();
         for (i, item) in ram.iter().enumerate() {
-            let index = Constant::<N>::new(i as u128).execute(backend, (), channel)?;
+            let index = BinaryBundle::constant(backend, i as u128);
             let is_equal = Eq::default().execute(backend, (&query, &index), channel)?;
             let mux = Mux::default().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`

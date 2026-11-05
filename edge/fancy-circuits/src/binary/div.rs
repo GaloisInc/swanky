@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{Add, Constant, LeftShiftPad, Mux, TwosComplement},
+    binary::{Add, LeftShiftPad, Mux, TwosComplement},
 };
 use core::marker::PhantomData;
 use fancy_traits::{Circuit, FancyBinary, FancyConstant};
@@ -28,8 +28,8 @@ where
         let (xs, ys) = inputs;
 
         let ys_neg = TwosComplement::default().execute(backend, ys, channel)?;
-        let mut acc = Constant::<N>::new(0).execute(backend, (), channel)?;
-        let mut qs = Constant::<N>::new(0).execute(backend, (), channel)?;
+        let mut acc = BinaryBundle::constant(backend, 0);
+        let mut qs = BinaryBundle::constant(backend, 0);
         for (i, x) in xs.wires().iter().rev().enumerate() {
             acc = LeftShiftPad::default().execute(backend, (&acc, 1, x), channel)?;
             let (res, cout) = Add::default().execute(backend, (&acc, &ys_neg), channel)?;

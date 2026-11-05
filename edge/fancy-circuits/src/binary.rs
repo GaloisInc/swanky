@@ -11,8 +11,6 @@ pub use binary_ops::{
 };
 mod comparison;
 pub use comparison::{GreaterThanOrEqual, LessThan, LessThanSigned};
-mod constant;
-pub use constant::Constant;
 mod div;
 pub use div::Div;
 mod eq;
