@@ -47,7 +47,7 @@ impl<W, const N: usize> BinaryBundle<W, N> {
 /// # Panics
 /// Panics if `N > 128`.
 pub fn u128_to_bits<const N: usize>(x: u128) -> [F2; N] {
-    assert!(N <= 128);
+    assert!(N <= 128, "bitwidth too large: {N} > 128");
     core::array::from_fn(|i| F2::from(((x >> i) & 1) != 0))
 }
 
@@ -56,7 +56,11 @@ pub fn u128_to_bits<const N: usize>(x: u128) -> [F2; N] {
 /// # Panics
 /// Panics if the slice length is greater than 128.
 pub fn u128_from_bits(bits: &[F2]) -> u128 {
-    assert!(bits.len() <= 128);
+    assert!(
+        bits.len() <= 128,
+        "bitwidth too large: {} > 128",
+        bits.len()
+    );
     let mut x = 0;
     for (i, bit) in bits.iter().enumerate() {
         x += (u16::from(*bit) as u128) << i;
