@@ -11,7 +11,7 @@ use swanky_field_binary::F2;
 pub struct Constant<const N: usize>(u128);
 
 impl<const N: usize> Constant<N> {
-    /// Create a new [`BinaryConstant`] circuit for `x % 2^N`.
+    /// Create a new [`Constant`] circuit for `x % 2^N`.
     pub fn new(x: u128) -> Self {
         Self(x)
     }

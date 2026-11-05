@@ -108,13 +108,6 @@ where
 #[derive(Default)]
 pub struct Mulc<'a, const N: usize, const M: usize>(PhantomData<&'a ()>);
 
-impl<'a, const N: usize, const M: usize> Mulc<'a, N, M> {
-    /// Create a new [`BinaryConstantMultiplication`] circuit.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 impl<'a, F: FancyBinary + FancyConstant<F2>, const N: usize, const M: usize> Circuit<F>
     for Mulc<'a, N, M>
 where
