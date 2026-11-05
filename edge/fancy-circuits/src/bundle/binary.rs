@@ -9,7 +9,6 @@ use swanky_field_binary::F2;
 ///
 /// Wires are represented in least-significant-bit-first order.
 #[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryBundle<W, const N: usize>([W; N]);
 
 impl<W, const N: usize> BinaryBundle<W, N> {

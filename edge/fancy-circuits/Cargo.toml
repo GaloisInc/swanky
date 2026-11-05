@@ -13,9 +13,6 @@ version.workspace = true
 [lints]
 workspace = true
 
-[features]
-serde = ["dep:serde"]
-
 [dependencies]
 fancy-plaintext.workspace = true
 fancy-traits.workspace = true
@@ -24,10 +21,9 @@ swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 
-rand.workspace = true
-serde = { workspace = true, features = ["derive"], optional = true }
-
 [dev-dependencies]
 fancy-plaintext.workspace = true
 fancy-garbling.workspace = true
 swanky-rng.workspace = true
+
+rand.workspace = true
