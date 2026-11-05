@@ -1,5 +1,5 @@
 mod test {
-    use schmivitz::parameters::{Binary128Bit, Binary256Bit, Params};
+    use schmivitz::parameters::{Binary128Bit, Binary256Bit, FLambda, Params};
 
     use fancy_circuits::{
         binary::Add,
@@ -21,7 +21,7 @@ mod test {
     use std::{sync::Once, time::Instant};
     use swanky_channel::Channel;
     use swanky_error::Result;
-    use swanky_field::FiniteRing;
+    use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::F2;
     use swanky_sieve_ir_codegen::compile_sieve_ir_str;
 
@@ -45,7 +45,10 @@ mod test {
     fn create_proof<P: Params>(
         circuit_bytes: &'static str,
         private_input_bytes: &'static str,
-    ) -> (Result<Proof<VoleProver<P>, VoleVerifier<P>>>, Circuit) {
+    ) -> (Result<Proof<VoleProver<P>, VoleVerifier<P>>>, Circuit)
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let circuit = load_circuit_from_strings_prover(circuit_bytes, private_input_bytes).unwrap();
 
         let rng = &mut rng();
@@ -56,7 +59,10 @@ mod test {
         (t1, circuit)
     }
 
-    fn prove_doesnt_explode<P: Params>() -> Result<()> {
+    fn prove_doesnt_explode<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -92,7 +98,10 @@ mod test {
     "
     );
 
-    fn prove_sieveir_codegen<P: Params>() -> Result<()> {
+    fn prove_sieveir_codegen<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -147,7 +156,10 @@ mod test {
     "
     );
 
-    fn prove_sieveir_assert_zero<P: Params>() -> Result<()> {
+    fn prove_sieveir_assert_zero<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -214,12 +226,18 @@ mod test {
         }
     }
 
-    fn prove_circuit_assert_zero<P: Params>() -> Result<()> {
+    fn prove_circuit_assert_zero<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let private_input = [F2::ZERO; 1];
         test_circuit::<_, P>(&TestAssertZero, &private_input)
     }
 
-    fn prove_sieveir_assert_zero_interleaved<P: Params>() -> Result<()> {
+    fn prove_sieveir_assert_zero_interleaved<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -247,7 +265,10 @@ mod test {
         Ok(())
     }
 
-    fn prove_sieveir_assert_zero_interleaved_fail<P: Params>() -> Result<()> {
+    fn prove_sieveir_assert_zero_interleaved_fail<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -275,7 +296,10 @@ mod test {
         Ok(())
     }
 
-    fn prove_addc_doesnt_explode<P: Params>() -> Result<()> {
+    fn prove_addc_doesnt_explode<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -320,7 +344,10 @@ mod test {
       $14 <- @mul(0: $0, $9);
     @end ";
 
-    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()> {
+    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
@@ -380,7 +407,10 @@ mod test {
         }
     }
 
-    fn prove_binary_addition_circuit<P: Params>() -> Result<()> {
+    fn prove_binary_addition_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mut x = [F2::ZERO; 8];
         let mut y = [F2::ZERO; 8];
         // Test 1 + 1 = 2.
@@ -399,7 +429,10 @@ mod test {
         )
     }
 
-    fn prove_aes256_sieveir<P: Params>() -> Result<()> {
+    fn prove_aes256_sieveir<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         if DO_LOGGING {
             init_logger();
         }
@@ -452,7 +485,10 @@ mod test {
         }
     }
 
-    fn prove_aes_circuit<P: Params>() -> Result<()> {
+    fn prove_aes_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -464,7 +500,10 @@ mod test {
         test_circuit::<_, P>(&circuit, &private_input)
     }
 
-    fn prove_sha256_compression_fn_sieveir<P: Params>() -> Result<()> {
+    fn prove_sha256_compression_fn_sieveir<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -508,7 +547,10 @@ mod test {
         }
     }
 
-    fn prove_sha256_compression_fn_circuit<P: Params>() -> Result<()> {
+    fn prove_sha256_compression_fn_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -542,7 +584,10 @@ mod test {
         }
     }
 
-    fn prove_sha256_circuit<P: Params>() -> Result<()> {
+    fn prove_sha256_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
@@ -594,7 +639,10 @@ mod test {
         }
     }
 
-    fn prove_hmac_circuit<P: Params>() -> Result<()> {
+    fn prove_hmac_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         // if log-level `RUST_LOG` not already set, then set to info
         if DO_LOGGING {
             init_logger();
