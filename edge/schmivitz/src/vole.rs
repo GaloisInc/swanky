@@ -8,13 +8,74 @@
 pub(crate) mod insecure;
 
 use crypto_primitives::Chall3;
-use hybrid_array::Array;
+use hybrid_array::{Array, ArraySize};
 use merlin::Transcript;
 use rand::CryptoRng;
+use std::marker::PhantomData;
+use std::ops::Mul;
 use swanky_error::Result;
+use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b};
 
 use crate::parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes};
+
+/// Combine field elements using a fixed `F`-basis of `FE`.
+/// Both methods use the same basis weights; `combine_extension` must be `FE`-linear.
+pub trait ExtensionFieldLifter<F, FE>
+where
+    F: FiniteField + IsSubFieldOf<FE>,
+    FE: FiniteField,
+{
+    /// Basis size, equal to the dimension of `FE` over `F`.
+    type BasisSize: ArraySize;
+
+    /// Combine [`Self::BasisSize`] base-field coordinates into one extension-field value.
+    fn combine_base(values: &Array<F, Self::BasisSize>) -> FE;
+
+    /// Combine [`Self::BasisSize`] extension-field elements using the same basis weights.
+    fn combine_extension(values: &Array<FE, Self::BasisSize>) -> FE;
+}
+
+/// Combine field elements using successive powers of the extension field's generator.
+///
+/// Specifically, computes
+/// $\operatorname{combine}(z_0,\ldots,z_{r-1})=\sum_{k=0}^{r-1}z_kX^k$, where $X$ is
+/// the extension field's multiplicative generator.
+pub(crate) fn combine<V, FE>(values: &[V]) -> FE
+where
+    V: Copy + Mul<FE, Output = FE>,
+    FE: FiniteField,
+{
+    // Start with `X^0 = 1`
+    let mut power = FE::ONE;
+    let mut acc = FE::ZERO;
+
+    for vi in values {
+        acc += *vi * power;
+        power *= FE::GENERATOR;
+    }
+    acc
+}
+
+/// Power-basis lifting from `F2` to `P::FLambda`.
+pub(crate) struct ExtensionFieldLifterF2FLambda<P> {
+    _phatom: PhantomData<P>,
+}
+
+impl<P: Params> ExtensionFieldLifter<F2, P::FLambda> for ExtensionFieldLifterF2FLambda<P>
+where
+    F2: IsSubFieldOf<P::FLambda>,
+{
+    type BasisSize = MaskLength<P>;
+
+    fn combine_base(values: &Array<F2, Self::BasisSize>) -> P::FLambda {
+        combine::<F2, P::FLambda>(values)
+    }
+
+    fn combine_extension(values: &Array<P::FLambda, Self::BasisSize>) -> P::FLambda {
+        combine::<P::FLambda, P::FLambda>(values)
+    }
+}
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;

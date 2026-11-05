@@ -18,6 +18,7 @@
 
 pub mod circuit;
 pub mod circuit_validator;
+pub mod higher_degree_commitment;
 pub mod parameters;
 pub mod proof;
 pub mod vole;
