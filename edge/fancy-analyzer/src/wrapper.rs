@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn aes_128_bristol_format_is_correct() {
         let circuit = Aes128::new();
-        let mut analyzer = CircuitAnalyzerWrapper::new(Dummy::new());
+        let mut analyzer = CircuitAnalyzerWrapper::new(Dummy);
         let key = [Wire::new(DummyVal::new(F2::ZERO)); 128];
         let block = [Wire::new(DummyVal::new(F2::ZERO)); 128];
 

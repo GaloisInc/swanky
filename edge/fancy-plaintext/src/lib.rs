@@ -33,21 +33,9 @@ impl<FF: FiniteField> DummyVal<FF> {
 }
 
 impl Dummy {
-    /// Create a new [`Dummy`] instance.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Evaluate a circuit on the provided inputs in plaintext.
     pub fn eval<C: Circuit<Dummy>>(circuit: &C, inputs: C::Input) -> Result<C::Output> {
-        let mut dummy = Dummy::new();
-        Channel::with(std::io::empty(), |c| circuit.execute(&mut dummy, inputs, c))
-    }
-}
-
-impl Default for Dummy {
-    fn default() -> Self {
-        Self::new()
+        Channel::with(std::io::empty(), |c| circuit.execute(&mut Dummy, inputs, c))
     }
 }
 

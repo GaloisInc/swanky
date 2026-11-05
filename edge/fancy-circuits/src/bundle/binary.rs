@@ -46,8 +46,7 @@ impl<W, const N: usize> BinaryBundle<W, N> {
 impl<const N: usize> From<u128> for BinaryBundle<DummyVal<F2>, N> {
     /// Generate a new [`BinaryBundle`] of `value % 2^N`.
     fn from(value: u128) -> Self {
-        let mut dummy = Dummy::new();
-        Channel::with(std::io::empty(), |channel| dummy.bin_encode(value, channel)).unwrap()
+        Channel::with(std::io::empty(), |channel| Dummy.bin_encode(value, channel)).unwrap()
     }
 }
 
