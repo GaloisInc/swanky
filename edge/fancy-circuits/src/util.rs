@@ -4,27 +4,25 @@
 
 use swanky_field_binary::F2;
 
-/// Convert a `u128` into a vector of bits.
+/// Convert a `u128` into a vector of `N` bits.
+///
+/// # Panics
+/// Panics if `N > 128`.
 pub(crate) fn u128_to_bits<const N: usize>(x: u128) -> [F2; N] {
-    let mut bits = [F2::default(); N];
-    let mut y = x;
-    for bit in bits.iter_mut() {
-        let b = y & 1;
-        *bit = (b != 0).into();
-        y -= b;
-        y /= 2;
-    }
-    bits
+    assert!(N <= 128);
+    core::array::from_fn(|i| F2::from(((x >> i) & 1) != 0))
 }
 
-/// Convert a vector of bits into a `u128`.
-pub fn u128_from_bits(bs: &[F2]) -> u128 {
+/// Convert a slice of bits into a `u128`.
+///
+/// # Panics
+/// Panics if the slice length is greater than 128.
+pub fn u128_from_bits(bits: &[F2]) -> u128 {
+    assert!(bits.len() <= 128);
     let mut x = 0;
-    for &b in bs.iter().skip(1).rev() {
-        x += (u16::from(b)) as u128;
-        x *= 2;
+    for (i, bit) in bits.iter().enumerate() {
+        x += (u16::from(*bit) as u128) << i;
     }
-    x += u16::from(bs[0]) as u128;
     x
 }
 
