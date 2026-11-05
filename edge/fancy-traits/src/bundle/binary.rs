@@ -3,10 +3,11 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
 
-/// A bundle of binary wires.
+/// A fixed-length bundle of binary wires.
 ///
 /// Wires are represented in least-significant-bit-first order.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct BinaryBundle<W, const N: usize>([W; N]);
 
 impl<W, const N: usize> BinaryBundle<W, N> {
@@ -67,9 +68,10 @@ impl<F: FancyEncode<F2>> BinaryEncode for F {}
 impl<F: FancyReceive<F2>> BinaryReceive for F {}
 impl<F: FancyOutput<F2>> BinaryOutput for F {}
 
-/// Extension trait for `Fancy` providing encode gadgets over bundles of wires.
+/// Extension trait for [`crate::Fancy`] providing [`FancyEncode`] operations
+/// over [`BinaryBundle`]s.
 pub trait BinaryEncode: FancyEncode<F2> {
-    /// Encode a binary input bundle.
+    /// Encode a `u128` as a [`BinaryBundle`].
     fn bin_encode<const N: usize>(
         &mut self,
         value: u128,
@@ -82,7 +84,7 @@ pub trait BinaryEncode: FancyEncode<F2> {
         ))
     }
 
-    /// Encode many binary input bundles.
+    /// Encode a slice of `u128`s as a vector of [`BinaryBundle`]s.
     fn bin_encode_many<const N: usize>(
         &mut self,
         values: &[u128],
@@ -92,20 +94,27 @@ pub trait BinaryEncode: FancyEncode<F2> {
             .iter()
             .flat_map(|x| u128_to_bits::<N>(*x))
             .collect::<Vec<_>>();
-        let mut wires = self.encode_many(&xs, channel)?;
-        let buns = (0..values.len())
-            .map(|_| {
-                let ws = wires.drain(0..N).collect::<Vec<_>>();
-                BinaryBundle::new(ws.try_into().expect("vector should be of length `N`"))
+        let wires = self.encode_many(&xs, channel)?;
+        Ok(wires
+            .as_chunks::<N>()
+            .0
+            .iter()
+            .map(|chunk| {
+                BinaryBundle::new(
+                    chunk
+                        .to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                )
             })
-            .collect::<Vec<_>>();
-        Ok(buns)
+            .collect())
     }
 }
 
-/// Extension trait for `Fancy` providing receive gadgets over bundles of wires.
+/// Extension trait for [`crate::Fancy`] providing [`FancyReceive`] operations
+/// over [`BinaryBundle`]s.
 pub trait BinaryReceive: FancyReceive<F2> {
-    /// Receive an binary input bundle.
+    /// Receive a [`BinaryBundle`].
     fn bin_receive<const N: usize>(
         &mut self,
         channel: &mut Channel,
@@ -116,26 +125,33 @@ pub trait BinaryReceive: FancyReceive<F2> {
         ))
     }
 
-    /// Receive many binary input bundles.
+    /// Receive many [`BinaryBundle`]s.
     fn bin_receive_many<const N: usize>(
         &mut self,
         ninputs: usize,
         channel: &mut Channel,
     ) -> Result<Vec<BinaryBundle<Self::Item, N>>> {
-        let mut wires = self.receive_many(ninputs * N, channel)?;
-        let buns = (0..ninputs)
-            .map(|_| {
-                let ws = wires.drain(0..N).collect::<Vec<_>>();
-                BinaryBundle::new(ws.try_into().expect("vector should be of length `N`"))
+        let wires = self.receive_many(ninputs * N, channel)?;
+        Ok(wires
+            .as_chunks::<N>()
+            .0
+            .iter()
+            .map(|chunk| {
+                BinaryBundle::new(
+                    chunk
+                        .to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                )
             })
-            .collect::<Vec<_>>();
-        Ok(buns)
+            .collect())
     }
 }
 
-/// Extension trait for `Fancy` providing output gadgets over bundles of wires.
+/// Extension trait for [`crate::Fancy`] providing [`FancyOutput`] operations
+/// over [`BinaryBundle`]s.
 pub trait BinaryOutput: FancyOutput<F2> {
-    /// Output a binary bundle and interpret the result as a `u128`.
+    /// Output a [`BinaryBundle`] as a `u128`.
     fn bin_output<const N: usize>(
         &mut self,
         x: &BinaryBundle<Self::Item, N>,
@@ -148,18 +164,15 @@ pub trait BinaryOutput: FancyOutput<F2> {
         Ok(bits.map(|bits| u128_from_bits(&bits)))
     }
 
-    /// Output a slice of binary bundles and interpret the results as a `u128`.
+    /// Output a slice of [`BinaryBundle`]s as a vector of `u128`s.
     fn bin_outputs<const N: usize>(
         &mut self,
         xs: &[BinaryBundle<Self::Item, N>],
         channel: &mut Channel,
     ) -> Result<Option<Vec<u128>>> {
-        let mut zs = Vec::with_capacity(xs.len());
-        for x in xs.iter() {
-            let z = self.bin_output(x, channel)?;
-            zs.push(z);
-        }
-        Ok(zs.into_iter().collect())
+        xs.iter()
+            .map(|x| self.bin_output(x, channel))
+            .collect::<Result<Option<Vec<_>>>>()
     }
 }
 
