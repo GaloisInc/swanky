@@ -66,6 +66,29 @@
 //! }
 //! ```
 //!
+//! ```
+//! use swanky_field_binary::{F2, F128b};
+//! use swanky_sieve_ir_api::*;
+//!
+//! fn example3<B>(backend: &mut B) -> CircuitResult<()>
+//! where
+//!     B: HigherDegreeBackend<F2, F128b>,
+//! {
+//!     let v0 = backend.input_private()?;
+//!     let v1 = backend.mul(&v0, &v0)?;
+//!     let v2 = backend.add(&v1, &v1)?;
+//!
+//!     backend.assert_zero(&v2)?;
+//!
+//!     let inps = backend.inputs_private::<4>()?;
+//!     backend.assert_zero_higher_degree(&inps, |b, x| {
+//!         let x01 = b.h_mul(&x[0], &x[1])?;
+//!         let x23 = b.h_mul(&x[2], &x[3])?;
+//!         b.h_mul(&x01, &x23)
+//!     })?;
+//!     Ok(())
+//! }
+//! ```
 
 #![deny(missing_docs)]
 
@@ -127,4 +150,70 @@ pub trait FieldBackend<F> {
 pub trait CircuitExecuter<F> {
     /// The body of the circuit to execute, given a backend.
     fn execute<B: FieldBackend<F>>(&self, backend: &mut B) -> CircuitResult<()>;
+}
+
+/// A trait abstracting over backends that support higher degree constraints.
+pub trait HigherDegreeBackend<F, FE>: FieldBackend<F> {
+    /// Backend's repesentation for higher degree wire values.
+    type HigherDegreeWire;
+
+    /// Field addition.
+    fn h_add(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> CircuitResult<Self::HigherDegreeWire>;
+
+    /// Field addition with a constant.
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F)
+    -> CircuitResult<Self::HigherDegreeWire>;
+
+    /// Field multiplication.
+    fn h_mul(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> CircuitResult<Self::HigherDegreeWire>;
+
+    /// Field multiplication with a constant.
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F)
+    -> CircuitResult<Self::HigherDegreeWire>;
+
+    /// Assert that a higher degree constraint equals 0.
+    ///
+    /// The callback uses the higher degree gate operations and must describe the same
+    /// constraint for each backend; errors are propagated to the caller.
+    fn assert_zero_higher_degree<const INPUT_LEN: usize>(
+        &mut self,
+        inputs: &[Self::Wire; INPUT_LEN],
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
+    ) -> CircuitResult<()>;
+}
+
+/// `HigherDegreeCircuitExecuter` abstracts over backends to execute a circuit that may contain
+/// higher degree constraints over a single field type.
+///
+/// This is the [`CircuitExecuter`] equivalent for [`HigherDegreeBackend`]s.
+pub trait HigherDegreeCircuitExecuter<F, FE> {
+    /// The body of the circuit to execute, given a backend.
+    fn execute<B: HigherDegreeBackend<F, FE>>(&self, backend: &mut B) -> CircuitResult<()>;
+}
+
+/// Implements [`HigherDegreeCircuitExecuter`] for a circuit that already implements
+/// [`CircuitExecuter`] by only exercising the [`FieldBackend`] gates.
+///
+/// (A blanket implementation would prevent circuits from implementing
+/// [`HigherDegreeCircuitExecuter`] directly, due to trait coherence.)
+#[macro_export]
+macro_rules! delegate_higher_degree_executer {
+    ($f:ty, $fe:ty, $circuit:ty) => {
+        impl $crate::HigherDegreeCircuitExecuter<$f, $fe> for $circuit {
+            fn execute<B: $crate::HigherDegreeBackend<$f, $fe>>(
+                &self,
+                backend: &mut B,
+            ) -> $crate::CircuitResult<()> {
+                <Self as $crate::CircuitExecuter<$f>>::execute(self, backend)
+            }
+        }
+    };
 }
