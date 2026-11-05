@@ -62,7 +62,8 @@ where
         let ywires = y.wires();
         let (mut z, mut c) =
             AddBit::default().execute(backend, (&xwires[0], &ywires[0], None), channel)?;
-        let mut bs = vec![z];
+        let mut bs = Vec::with_capacity(N);
+        bs.push(z);
         for i in 1..N {
             let res =
                 AddBit::default().execute(backend, (&xwires[i], &ywires[i], Some(&c)), channel)?;
@@ -145,7 +146,8 @@ where
         let ywires = y.wires();
         let (mut z, mut c) =
             AddBit::default().execute(backend, (&xwires[0], &ywires[0], None), channel)?;
-        let mut bs = vec![z];
+        let mut bs = Vec::with_capacity(N);
+        bs.push(z);
         for i in 1..N - 1 {
             let res =
                 AddBit::default().execute(backend, (&xwires[i], &ywires[i], Some(&c)), channel)?;
