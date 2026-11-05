@@ -10,7 +10,7 @@ pub use garbler::Garbler;
 mod tests {
     use super::*;
     use fancy_analyzer::CircuitAnalyzer;
-    use fancy_circuits::{crypto::aes::Aes128, test_circuits::binary::TestAndGate};
+    use fancy_circuits::{crypto::aes::Aes128, test_circuits::TestAndGate};
     use fancy_garbling::{WireLabel, WireMod2};
     use fancy_plaintext::{Dummy, DummyVal};
     use fancy_traits::{

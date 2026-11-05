@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -31,6 +31,37 @@ where
     }
 }
 
+/// Circuit for testing [`AndMany`].
+pub struct TestAndMany(pub usize);
+impl<F: FancyBinary> Circuit<F> for TestAndMany {
+    type Input = Vec<F::Item>;
+    type Output = F::Item;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        AndMany::default().execute(backend, inputs.as_slice(), channel)
+    }
+}
+impl<F: FancyBinary> CircuitInputMapper<F> for TestAndMany {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), self.0);
+        inputs
+    }
+
+    fn ninputs(&self) -> usize {
+        self.0
+    }
+}
+impl<F: FancyBinary> CircuitOutputMapper<F> for TestAndMany {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        vec![output]
+    }
+}
+
 /// Returns `true` if any input is `true`.
 ///
 /// # Panics
@@ -59,6 +90,37 @@ where
     }
 }
 
+/// Circuit for testing [`OrMany`].
+pub struct TestOrMany(pub usize);
+impl<F: FancyBinary> Circuit<F> for TestOrMany {
+    type Input = Vec<F::Item>;
+    type Output = F::Item;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        OrMany::default().execute(backend, inputs.as_slice(), channel)
+    }
+}
+impl<F: FancyBinary> CircuitInputMapper<F> for TestOrMany {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), self.0);
+        inputs
+    }
+
+    fn ninputs(&self) -> usize {
+        self.0
+    }
+}
+impl<F: FancyBinary> CircuitOutputMapper<F> for TestOrMany {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        vec![output]
+    }
+}
+
 /// Returns the XOR of a vector of items.
 ///
 /// # Panics
@@ -84,6 +146,37 @@ where
             .iter()
             .skip(1)
             .fold(inputs[0].clone(), |acc, x| backend.xor(&acc, x)))
+    }
+}
+
+/// Circuit for testing [`XorMany`].
+pub struct TestXorMany(pub usize);
+impl<F: FancyBinary> Circuit<F> for TestXorMany {
+    type Input = Vec<F::Item>;
+    type Output = F::Item;
+
+    fn execute(
+        &self,
+        backend: &mut F,
+        inputs: Self::Input,
+        channel: &mut Channel,
+    ) -> Result<Self::Output> {
+        XorMany::default().execute(backend, inputs.as_slice(), channel)
+    }
+}
+impl<F: FancyBinary> CircuitInputMapper<F> for TestXorMany {
+    fn map(&self, inputs: Vec<F::Item>) -> Self::Input {
+        assert_eq!(inputs.len(), self.0);
+        inputs
+    }
+
+    fn ninputs(&self) -> usize {
+        self.0
+    }
+}
+impl<F: FancyBinary> CircuitOutputMapper<F> for TestXorMany {
+    fn flatten(output: Self::Output) -> Vec<F::Item> {
+        vec![output]
     }
 }
 

@@ -5,7 +5,10 @@ pub use abs::AbsoluteValue;
 mod add;
 pub use add::{Add, AddBit, AddNoCarry, TestAdd};
 mod binary_ops;
-pub use binary_ops::{AndMany, OrMany, PairwiseAnd, PairwiseOr, PairwiseXor, XorMany};
+pub use binary_ops::{
+    AndMany, OrMany, PairwiseAnd, PairwiseOr, PairwiseXor, TestAndMany, TestOrMany, TestXorMany,
+    XorMany,
+};
 mod comparison;
 pub use comparison::{GreaterThanOrEqual, LessThan, LessThanSigned};
 mod constant;
