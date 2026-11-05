@@ -1,6 +1,6 @@
 use crate::{
     BinaryBundle,
-    binary::{BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
+    binary::{Constant, Eq, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
@@ -24,8 +24,8 @@ impl<const N: usize> LinearOram<N> {
 }
 
 impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOram<N> {
-    type Input = (Vec<BinaryBundle<F::Item>>, BinaryBundle<F::Item>);
-    type Output = BinaryBundle<F::Item>;
+    type Input = (Vec<BinaryBundle<F::Item, N>>, BinaryBundle<F::Item, N>);
+    type Output = BinaryBundle<F::Item, N>;
 
     fn execute(
         &self,
@@ -35,20 +35,20 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOr
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
 
-        let zero = BinaryConstant::new(0, N).execute(backend, (), channel)?;
+        let zero = Constant::<N>::new(0).execute(backend, (), channel)?;
 
         // Traverse the RAM one element at a time, and multiplex the result
         // based on whether the query matches the current index.
         let mut result = zero.clone();
         for (i, item) in ram.iter().enumerate() {
-            let index = BinaryConstant::new(i as u128, N).execute(backend, (), channel)?;
-            let is_equal = BinaryEquality::new().execute(backend, (&query, &index), channel)?;
-            let mux = BinaryMultiplex::new().execute(backend, (is_equal, &zero, item), channel)?;
+            let index = Constant::<N>::new(i as u128).execute(backend, (), channel)?;
+            let is_equal = Eq::default().execute(backend, (&query, &index), channel)?;
+            let mux = Mux::default().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`
             // instead of `BinaryAddition`.
             let xor =
-                PairwiseXor::new().execute(backend, (result.wires(), mux.wires()), channel)?;
-            result = BinaryBundle::new(xor);
+                PairwiseXor::default().execute(backend, (result.wires(), mux.wires()), channel)?;
+            result = BinaryBundle::new(xor.try_into().expect("vector should be of length `N`"));
         }
         Ok(result)
     }
@@ -59,11 +59,23 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitInputMapper<F> f
         assert_eq!(inputs.len(), (self.size + 1) * N);
         let (ram_bits, query_bits) = inputs.split_at(self.size * N);
 
-        let ram: Vec<BinaryBundle<F::Item>> = ram_bits
+        let ram: Vec<BinaryBundle<F::Item, N>> = ram_bits
             .chunks(N)
-            .map(|chunk| BinaryBundle::new(chunk.to_vec()))
+            .map(|chunk| {
+                BinaryBundle::new(
+                    chunk
+                        .to_vec()
+                        .try_into()
+                        .expect("vector should be of length `N`"),
+                )
+            })
             .collect();
-        let query = BinaryBundle::new(query_bits.to_vec());
+        let query = BinaryBundle::new(
+            query_bits
+                .to_vec()
+                .try_into()
+                .expect("vector should be of length `N`"),
+        );
 
         (ram, query)
     }
@@ -96,11 +108,9 @@ pub mod test {
             let ram: Vec<u128> = (0..ram_size).map(|_| rng.random::<u128>()).collect();
             let index = rng.random_range(..ram_size);
 
-            let ram_input: Vec<BinaryBundle<_>> = ram
-                .iter()
-                .map(|&val| BinaryBundle::from((val, N)))
-                .collect();
-            let query_input = BinaryBundle::from((index as u128, N));
+            let ram_input: Vec<BinaryBundle<_, _>> =
+                ram.iter().map(|&val| BinaryBundle::from(val)).collect();
+            let query_input = BinaryBundle::from(index as u128);
             let output = Dummy::eval(&c, (ram_input, query_input)).unwrap();
             let result: u128 = output.into();
             assert_eq!(result, ram[index]);

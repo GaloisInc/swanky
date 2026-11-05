@@ -3,7 +3,7 @@ mod test {
 
     use fancy_circuits::{
         BinaryBundle,
-        binary::BinaryAddition,
+        binary::Add,
         crypto::aes::Aes128,
         crypto::hmac::HmacSha256,
         crypto::sha::{Sha256, Sha256CompressionFunction},
@@ -341,9 +341,11 @@ mod test {
         Ok(())
     }
 
-    struct TestBinaryAddition<'a>(BinaryAddition<'a>, &'static str);
+    struct TestBinaryAddition<'a, const N: usize>(Add<'a, N>, &'static str);
 
-    impl<'a, F: FancyBinary + FancyZeroKnowledge<F2>> FancyCircuit<F> for TestBinaryAddition<'a> {
+    impl<'a, F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> FancyCircuit<F>
+        for TestBinaryAddition<'a, N>
+    {
         type Input = ();
         type Output = ();
 
@@ -353,16 +355,14 @@ mod test {
             _: Self::Input,
             channel: &mut Channel,
         ) -> Result<Self::Output> {
-            let x = BinaryBundle::new(
-                (0..8)
-                    .map(|_| backend.witness(channel))
-                    .collect::<Result<Vec<_>>>()?,
-            );
-            let y = BinaryBundle::new(
-                (0..8)
-                    .map(|_| backend.witness(channel))
-                    .collect::<Result<Vec<_>>>()?,
-            );
+            let x = (0..N)
+                .map(|_| backend.witness(channel))
+                .collect::<Result<Vec<_>>>()?;
+            let x = BinaryBundle::new(x.try_into().expect("vector should be of length `N`"));
+            let y = (0..N)
+                .map(|_| backend.witness(channel))
+                .collect::<Result<Vec<_>>>()?;
+            let y = BinaryBundle::new(y.try_into().expect("vector should be of length `N`"));
             let (z, carry) = self.0.execute(backend, (&x, &y), channel)?;
             for (wire, c) in z.wires().iter().zip(self.1.chars()) {
                 match c {
@@ -386,14 +386,14 @@ mod test {
         x[0] = F2::ONE;
         y[0] = F2::ONE;
         test_circuit::<_, P>(
-            &TestBinaryAddition(BinaryAddition::new(), "01000000"),
+            &TestBinaryAddition(Add::<8>::default(), "01000000"),
             &[x, y].concat(),
         )?;
         // Test 3 + 3 = 6.
         x[1] = F2::ONE;
         y[1] = F2::ONE;
         test_circuit::<_, P>(
-            &TestBinaryAddition(BinaryAddition::new(), "01100000"),
+            &TestBinaryAddition(Add::<8>::default(), "01100000"),
             &[x, y].concat(),
         )
     }

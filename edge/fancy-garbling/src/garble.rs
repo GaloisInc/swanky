@@ -40,7 +40,7 @@ mod helpers {
 #[cfg(test)]
 mod nonstreaming {
     use crate::{Evaluator, Garbler, WireLabel, WireMod2, classic::GarbledCircuit};
-    use fancy_circuits::test_circuits::binary::TestOrGateFanN;
+    use fancy_circuits::binary::TestOrMany;
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
     use swanky_field_binary::F2;
@@ -83,14 +83,14 @@ mod nonstreaming {
 
     #[test]
     fn or_many() {
-        garble_test_helper::<WireMod2, _>(&TestOrGateFanN(16));
+        garble_test_helper::<WireMod2, _>(&TestOrMany(16));
     }
 }
 
 #[cfg(test)]
 mod streaming {
     use crate::{Evaluator, Garbler, WireLabel, WireMod2};
-    use fancy_circuits::test_circuits::binary::TestOrGateFanN;
+    use fancy_circuits::binary::TestOrMany;
     use fancy_plaintext::Dummy;
     use fancy_traits::{CircuitInputMapper, CircuitOutputMapper};
     use fancy_traits::{FancyEncode, FancyOutput, FancyReceive};
@@ -154,6 +154,6 @@ mod streaming {
 
     #[test]
     fn or_many() {
-        streaming_test_helper::<WireMod2, _>(&TestOrGateFanN(16));
+        streaming_test_helper::<WireMod2, _>(&TestOrMany(16));
     }
 }

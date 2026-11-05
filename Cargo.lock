@@ -793,7 +793,6 @@ dependencies = [
  "fancy-plaintext",
  "fancy-traits",
  "rand",
- "serde",
  "swanky-channel",
  "swanky-error",
  "swanky-field",

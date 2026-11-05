@@ -2,7 +2,7 @@
 use crate::circuit_psi::*;
 use fancy_circuits::{
     BinaryBundle,
-    binary::{BinaryAdditionNoCarry, BinaryConstant, BinaryEquality, BinaryMultiplex, PairwiseXor},
+    binary::{AddNoCarry, Constant, Eq, Mux, PairwiseXor},
 };
 use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
@@ -30,11 +30,11 @@ pub fn fancy_intersection_bit_vector<F: FancyBinary>(
         .chunks(HASH_SIZE * 8)
         .zip_eq(receiver_inputs.chunks(HASH_SIZE * 8))
         .map(|(xs, ys)| {
-            BinaryEquality::new().execute(
+            Eq::<{ HASH_SIZE * 8 }>::default().execute(
                 f,
                 (
-                    &BinaryBundle::new(xs.to_vec()),
-                    &BinaryBundle::new(ys.to_vec()),
+                    &BinaryBundle::new(xs.to_vec().try_into().unwrap()),
+                    &BinaryBundle::new(ys.to_vec().try_into().unwrap()),
                 ),
                 channel,
             )
@@ -44,25 +44,34 @@ pub fn fancy_intersection_bit_vector<F: FancyBinary>(
 
 /// Fancy function that turns a slice of binary wires into a vector of BinaryBundle
 /// by grouping wires together according to the size of the element being bundled.
-pub fn wires_to_bundle<F: Fancy>(x: &[F::Item], size: usize) -> Vec<BinaryBundle<F::Item>> {
-    x.chunks(size)
-        .map(|x_chunk| BinaryBundle::new(x_chunk.to_vec()))
+pub fn wires_to_bundle<F: Fancy, const N: usize>(x: &[F::Item]) -> Vec<BinaryBundle<F::Item, N>> {
+    x.chunks(N)
+        .map(|x_chunk| {
+            BinaryBundle::new(
+                x_chunk
+                    .to_vec()
+                    .try_into()
+                    .expect("vector should be of length `N`"),
+            )
+        })
         .collect()
 }
 
 /// Obliviously unmasks data by subtracting each mask from each element
-pub fn fancy_unmask<F: FancyBinary>(
+pub fn fancy_unmask<F: FancyBinary, const N: usize>(
     f: &mut F,
-    elements: &[BinaryBundle<F::Item>],
-    masks: &[BinaryBundle<F::Item>],
+    elements: &[BinaryBundle<F::Item, N>],
+    masks: &[BinaryBundle<F::Item, N>],
     channel: &mut Channel,
-) -> swanky_error::Result<Vec<BinaryBundle<F::Item>>> {
+) -> swanky_error::Result<Vec<BinaryBundle<F::Item, N>>> {
     let mut res = Vec::new();
 
     for i in 0..elements.len() {
         let xor =
-            PairwiseXor::new().execute(f, (elements[i].wires(), masks[i].wires()), channel)?;
-        res.push(BinaryBundle::new(xor));
+            PairwiseXor::default().execute(f, (elements[i].wires(), masks[i].wires()), channel)?;
+        res.push(BinaryBundle::new(
+            xor.try_into().expect("vector should be of length `N`"),
+        ));
     }
     Ok(res)
 }
@@ -72,16 +81,16 @@ pub fn fancy_cardinality<F>(
     f: &mut F,
     intersect_bitvec: &[F::Item],
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item>>
+) -> swanky_error::Result<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>
 where
     F: FancyBinary + FancyConstant<F2>,
 {
-    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
-    let one = BinaryConstant::new(1, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
+    let zero = Constant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
+    let one = Constant::<{ PRIMARY_KEY_SIZE * 8 }>::new(1).execute(f, (), channel)?;
     let mut acc = zero.clone();
     for bit in intersect_bitvec {
-        let mux = BinaryMultiplex::new().execute(f, (bit.clone(), &zero, &one), channel)?;
-        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mux), channel)?;
+        let mux = Mux::default().execute(f, (bit.clone(), &zero, &one), channel)?;
+        acc = AddNoCarry::default().execute(f, (&acc, &mux), channel)?;
     }
     Ok(acc)
 }
@@ -92,22 +101,22 @@ where
 pub fn fancy_payload_sum<F>(
     f: &mut F,
     intersect_bitvec: &[F::Item],
-    payload_a: &[BinaryBundle<F::Item>],
-    payload_b: &[BinaryBundle<F::Item>],
+    payload_a: &[BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>],
+    payload_b: &[BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>],
     channel: &mut Channel,
-) -> swanky_error::Result<BinaryBundle<F::Item>>
+) -> swanky_error::Result<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>
 where
     F: FancyBinary + FancyConstant<F2>,
 {
-    let zero = BinaryConstant::new(0, PRIMARY_KEY_SIZE * 8).execute(f, (), channel)?;
+    let zero = Constant::<{ PRIMARY_KEY_SIZE * 8 }>::new(0).execute(f, (), channel)?;
     let mut acc = zero.clone();
-    let multiplex = BinaryMultiplex::new();
+    let multiplex = Mux::default();
 
     for (i, bit) in intersect_bitvec.iter().enumerate() {
         let mux_a = multiplex.execute(f, (bit.clone(), &zero, &payload_a[i]), channel)?;
         let mux_b = multiplex.execute(f, (bit.clone(), &zero, &payload_b[i]), channel)?;
-        let mul = BinaryAdditionNoCarry::new().execute(f, (&mux_a, &mux_b), channel)?;
-        acc = BinaryAdditionNoCarry::new().execute(f, (&acc, &mul), channel)?;
+        let mul = AddNoCarry::default().execute(f, (&mux_a, &mux_b), channel)?;
+        acc = AddNoCarry::default().execute(f, (&acc, &mul), channel)?;
     }
     Ok(acc)
 }

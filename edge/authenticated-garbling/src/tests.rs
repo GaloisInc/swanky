@@ -6,13 +6,10 @@ use crate::{EvaluatorOffline, EvaluatorOnline, GarblerOffline, GarblerValidator}
 
 use fancy_analyzer::CircuitAnalyzer;
 use fancy_circuits::binary::{
-    TestBinaryAddition, TestBinaryMultiplication, TestBinarySubtraction, TestBinaryTwosComplement,
+    TestAdd, TestAndMany, TestMul, TestOrMany, TestSub, TestTwosComplement, TestXorMany,
 };
 use fancy_circuits::crypto::aes::Aes128;
-use fancy_circuits::test_circuits::binary::{
-    TestAndGate, TestAndGateFanN, TestNegateGate, TestOrGateFanN, TestXorGateFanN,
-};
-use fancy_circuits::test_circuits::fancy_binary_constant::TestBinaryConstant;
+use fancy_circuits::test_circuits::{TestAndGate, TestBinaryConstant, TestNegateGate};
 use fancy_plaintext::{Dummy, DummyVal};
 use fancy_traits::{
     CircuitInputMapper, CircuitOutputMapper, FancyEncode, FancyOutput, FancyReceive,
@@ -24,7 +21,7 @@ use swanky_rng::SwankyRng;
 #[test]
 fn test_party_construction_passes() {
     let input_size = 400;
-    let circuit = TestAndGateFanN(input_size);
+    let circuit = TestAndMany(input_size);
     swanky_channel::local::local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
@@ -158,7 +155,7 @@ fn test_constant_gates() {
 fn test_and_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = TestAndGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestAndMany(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -167,7 +164,7 @@ fn test_and_gate_fan_n() {
 fn test_or_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = TestOrGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestOrMany(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
@@ -176,41 +173,41 @@ fn test_or_gate_fan_n() {
 fn test_xor_gate_fan_n() {
     let ninputs_gb = 400;
     let ninputs_ev = 400;
-    let circuit = TestXorGateFanN(ninputs_gb + ninputs_ev);
+    let circuit = TestXorMany(ninputs_gb + ninputs_ev);
 
     test_circuit(ninputs_gb, ninputs_ev, &circuit);
 }
 
 #[test]
 fn test_binary_addition() {
-    let ninputs = 400;
-    let circuit = TestBinaryAddition(ninputs);
+    const N: usize = 64;
+    let circuit = TestAdd::<N>;
 
-    test_circuit(ninputs, ninputs, &circuit);
+    test_circuit(N, N, &circuit);
 }
 
 #[test]
 fn test_bin_twos_complement() {
-    let ninputs = 64;
-    let circuit = TestBinaryTwosComplement(ninputs);
+    const N: usize = 64;
+    let circuit = TestTwosComplement::<N>;
 
-    test_circuit(ninputs, 0, &circuit);
+    test_circuit(N, 0, &circuit);
 }
 
 #[test]
 fn test_binary_subtraction() {
-    let ninputs = 64;
-    let circuit = TestBinarySubtraction(ninputs);
+    const N: usize = 64;
+    let circuit = TestSub::<N>;
 
-    test_circuit(ninputs, ninputs, &circuit);
+    test_circuit(N, N, &circuit);
 }
 
 #[test]
 fn test_binary_multiplication() {
-    let ninputs = 64;
-    let circuit = TestBinaryMultiplication::new(ninputs);
+    const N: usize = 64;
+    let circuit = TestMul::<N, { 2 * N }>::default();
 
-    test_circuit(ninputs, ninputs, &circuit);
+    test_circuit(N, N, &circuit);
 }
 
 #[test]
