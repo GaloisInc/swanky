@@ -6,7 +6,7 @@
 
 use crate::ligero::FieldForLigero;
 use crate::threshold_secret_sharing::PackedSecretSharingGenerator;
-use crate::util::*;
+use crate::util::padd;
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, Zip, concatenate};
 use rand::CryptoRng;
 use swanky_field_fft as fft;
@@ -480,6 +480,7 @@ impl<Field: FieldForLigero> Params<Field> {
 
 #[cfg(test)]
 use {
+    crate::util::{TestField, arb_test_field, psub},
     proptest::{collection::vec as pvec, prelude::*, *},
     rand::prelude::{SeedableRng, StdRng},
     swanky_field::FiniteRing,

@@ -1,9 +1,8 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
-use crate::psi::circuit_psi::{base_psi::*, circuits::*};
+use crate::psi::circuit_psi::circuits::{fancy_unmask, wires_to_bundle};
 use fancy_garbling::WireMod2;
 use fancy_traits::{BinaryBundle, FancyBinary};
-use rand::{CryptoRng, SeedableRng};
 use swanky_block::Block512;
 use swanky_channel::Channel;
 

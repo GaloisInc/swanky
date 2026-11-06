@@ -76,6 +76,7 @@ version = "0.6.0"
 assertions_on_constants = "allow"
 derived_hash_with_manual_eq = "allow"
 type_complexity = "allow"
+wildcard_imports = "deny"
 
 [workspace.dependencies]
 # Don't remove, or modify, the below "# BEGIN OUR CRATES" line. It's used by ./swanky new-crate

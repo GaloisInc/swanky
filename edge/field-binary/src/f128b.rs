@@ -255,7 +255,7 @@ mod move_to_vectoreyes {
 // This is `pub(crate)` because `F256b` reuses `clmul`: a carry-less multiply is independent of the
 // polynomial modulus, so the 256-bit version is the same schoolbook product one level up.
 pub(crate) mod multiplication {
-    use super::move_to_vectoreyes::*;
+    use super::move_to_vectoreyes::carryless_mul_64bit;
     use vectoreyes::U64x2;
 
     // Algorithm 1 from page 12 of https://is.gd/tOd246
@@ -405,7 +405,7 @@ pub(crate) mod multiplication {
 impl<'a> MulAssign<&'a F128b> for F128b {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a F128b) {
-        use multiplication::*;
+        use multiplication::{clmul, reduce};
         let (hi, lo) = clmul(self.0, rhs.0);
         self.0 = reduce(hi, lo);
     }

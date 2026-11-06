@@ -237,7 +237,8 @@ pub mod generics {
     //!
     //! This isn't an exhaustive list, as users can `impl` their own [`Generic`] instances (see the
     //! docs on [`Generic`] for more info).
-    use super::*;
+    use super::{Generic, GenericOut};
+    use std::marker::PhantomData;
     /// `GenericOut<Identity, T> = T`
     pub enum Identity {}
     impl<T> Generic<T> for Identity {
