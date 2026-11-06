@@ -7,10 +7,10 @@
 //! [`PartyPrivate`] types allow for functionality to be shared between the parties.
 
 use crate::{
-    GenericParty, GenericWhichParty, OppositeParty, Party0, Party1,
+    GenericParty, OppositeParty,
     either::{
         PartyEither, PartyEitherCopy,
-        raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
+        raw::{RawEither, bounds},
     },
     ty_eq::{EqualityProposition as EqProp, Witness, generics},
 };
@@ -25,7 +25,11 @@ pub mod raw {
     //! [`PartyPrivateRaw`] internals of a [`PartyPrivate`].
     //!
     //! [`PartyPrivate`] is a [`TransparentWrapper`] over [`PartyPrivateRaw`].
-    use super::*;
+    use crate::{
+        GenericParty, GenericWhichParty, OppositeParty, Party0, Party1,
+        either::raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
+        ty_eq::{EqualityProposition as EqProp, Witness},
+    };
     /// A zero-sized typed used to represent a value private to not the current party
     #[derive(
         bytemuck::Pod,
@@ -199,7 +203,9 @@ pub mod raw {
         }
     }
 }
-use raw::*;
+use raw::{
+    PartyPrivateRaw, PrivateToOtherParty, PrivateWhich, private_empty, private_full, private_which,
+};
 
 macro_rules! private {
     ($(
