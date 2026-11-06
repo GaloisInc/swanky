@@ -33,7 +33,7 @@ pub trait FieldForFFT<const N: usize>: FiniteField + TryFrom<u128> {
 mod cooley_tukey {
     //! FFT by in-place Cooley-Tukey algorithms.
 
-    use super::*;
+    use super::FieldForFFT;
 
     /// 2-radix FFT.
     ///
