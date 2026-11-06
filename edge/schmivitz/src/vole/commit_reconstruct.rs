@@ -10,7 +10,7 @@ use crate::vole::crypto_primitives::{Chall3, Com, H1, IV, Prg, Seed};
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
 use rand::RngExt;
-use rayon::iter::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::mpsc::channel, thread};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F8b};

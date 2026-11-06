@@ -10,7 +10,7 @@
 use fancy_traits::Circuit as FancyCircuit;
 use merlin::Transcript;
 use rand::{CryptoRng, rng};
-use rayon::iter::*;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
