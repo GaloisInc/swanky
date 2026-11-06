@@ -12,3 +12,6 @@ ${ROOT}/swanky lint # Note that `swanky lint` runs `swanky fmt --check`
 
 # Invariant 2: We want to not have any Clippy errors prior to a commit
 cargo clippy --all-targets -- -Dwarnings # Warnings are considered errors
+
+# Invariant 3: All crate documentation builds without warnings/errors
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
