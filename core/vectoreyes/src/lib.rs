@@ -1,5 +1,7 @@
 #![deny(missing_docs)]
 #![allow(unsafe_op_in_unsafe_fn)]
+// Because we generate a large volume of code that uses wildcard
+// imports, we allow their use in vectoreyes.
 #![allow(clippy::wildcard_imports)]
 //! VectorEyes is a (almost entirely) safe and cross-platform wrapper library around vectorized
 //! operations.
