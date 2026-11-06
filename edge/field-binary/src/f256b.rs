@@ -224,7 +224,7 @@ mod multiplication {
 impl<'a> MulAssign<&'a F256b> for F256b {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a F256b) {
-        use multiplication::*;
+        use multiplication::{clmul, reduce};
         let (hi, lo) = clmul(self.0, rhs.0);
         self.0 = reduce(hi, lo);
     }

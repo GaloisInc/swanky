@@ -232,7 +232,7 @@ impl IsSubFieldOf<F128b> for F8b {
 }
 
 mod conversion_matrices;
-use conversion_matrices::*;
+use conversion_matrices::{F8_16_TO_F128, F128_TO_F8_16};
 
 #[cfg(test)]
 mod tests {
