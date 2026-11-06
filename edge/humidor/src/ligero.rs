@@ -65,14 +65,16 @@
 use digest::Digest as CryptoDigest;
 use hybrid_array::typenum::Unsigned;
 use ndarray::{Array1, Array2, ArrayView1, Axis, concatenate};
-use rand::{CryptoRng, SeedableRng};
+use rand::CryptoRng;
+#[cfg(test)]
+use rand::SeedableRng;
 use sprs::{CsMat, TriMat};
 use std::ops::Range;
 use swanky_field::FiniteField;
 use swanky_field_fft::FieldForFFT;
+#[cfg(test)]
 use swanky_rng::SwankyRng;
 #[cfg(test)]
-use swanky_serialization::CanonicalSerialize;
 use vectoreyes::U8x16;
 
 type HashOutput<T> = digest::Output<T>;
@@ -81,7 +83,9 @@ type HashOutput<T> = digest::Output<T>;
 use proptest::{collection::vec as pvec, prelude::*, *};
 
 use crate::params::Params;
-use crate::util::*;
+#[cfg(test)]
+use crate::util::{TestField, TestHash, arb_test_field};
+use crate::util::{padd, psub};
 use crate::{merkle, security_warning::warn_vulnerabilities};
 use simple_arith_circuit::{Circuit, Op};
 
@@ -967,7 +971,32 @@ fn make_qshared<Field: FieldForLigero>(
 
 /// Interactive Ligero implementation.
 pub mod interactive {
-    use super::*;
+    use std::ops::Range;
+
+    use digest::Digest as CryptoDigest;
+    use ndarray::{Array1, Array2, Axis, concatenate};
+    #[cfg(test)]
+    use proptest::{collection::vec as pvec, prelude::*, *};
+    use rand::CryptoRng;
+    #[cfg(test)]
+    use rand::SeedableRng;
+
+    use simple_arith_circuit::Circuit;
+    #[cfg(test)]
+    use swanky_field::FiniteRing;
+    #[cfg(test)]
+    use swanky_rng::SwankyRng;
+    #[cfg(test)]
+    use vectoreyes::U8x16;
+
+    #[cfg(test)]
+    use crate::util::{TestField, TestHash, arb_test_field};
+    use crate::{merkle, security_warning::warn_vulnerabilities};
+
+    use super::{
+        FieldForLigero, HashOutput, Params, Public, Round0, Round1, Round2, Round3, Round4, Secret,
+        expected_proof_size, make_p0, make_pa, make_qa, make_qadd, make_qshared, verify,
+    };
 
     /// Interactive Ligero prover.
     pub struct Prover<Field, H: CryptoDigest> {
@@ -1369,7 +1398,30 @@ pub mod interactive {
 //      * Fiat-Shamir comes with additional soundness error. Check that this
 //        leads to acceptable security. If not, we may need to add repetitions.
 pub mod noninteractive {
-    use super::*;
+    use std::ops::Range;
+
+    use digest::Digest as CryptoDigest;
+    use ndarray::{Array1, Array2};
+    #[cfg(test)]
+    use proptest::{collection::vec as pvec, prelude::*, *};
+    use rand::{CryptoRng, SeedableRng};
+
+    use simple_arith_circuit::Circuit;
+    #[cfg(test)]
+    use swanky_field::FiniteRing;
+    use swanky_rng::SwankyRng;
+    #[cfg(test)]
+    use swanky_serialization::CanonicalSerialize;
+    use vectoreyes::U8x16;
+
+    use crate::security_warning::warn_vulnerabilities;
+    #[cfg(test)]
+    use crate::util::{TestField, TestHash, arb_test_field};
+
+    use super::{
+        FieldForLigero, HashOutput, Params, Public, Round0, Round1, Round2, Round3, Round4,
+        expected_proof_size, interactive, verify,
+    };
 
     /// Complete proof message sent from prover to verifier.
     pub struct Proof<Field, H: CryptoDigest> {
