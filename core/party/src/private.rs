@@ -18,13 +18,14 @@ use bytemuck::TransparentWrapper;
 use std::fmt::Debug;
 
 pub mod raw {
-    //! Internals of [`PartyPrivate`]s
+    //! Internals of [`PartyPrivate`](super::PartyPrivate)s
     //!
     //! For advanced uses, just like you might need to use [`RawEither`] instead of
-    //! [`PartyEither`], you might need to access the
-    //! [`PartyPrivateRaw`] internals of a [`PartyPrivate`].
+    //! [`PartyEither`](crate::either::PartyEither), you might need to access the
+    //! [`PartyPrivateRaw`] internals of a [`PartyPrivate`](super::PartyPrivate).
     //!
-    //! [`PartyPrivate`] is a [`TransparentWrapper`] over [`PartyPrivateRaw`].
+    //! [`PartyPrivate`](super::PartyPrivate) is a
+    //! [`TransparentWrapper`](bytemuck::TransparentWrapper) over [`PartyPrivateRaw`].
     use crate::{
         GenericParty, GenericWhichParty, OppositeParty, Party0, Party1,
         either::raw::{EitherBound, RawEither, bounds, is_t0, is_t1},
@@ -87,22 +88,22 @@ pub mod raw {
         );
     }
 
-    /// Evidence that a [`PartyPrivate`] is either full or empty.
+    /// Evidence that a [`PartyPrivate`](super::PartyPrivate) is either full or empty.
     ///
     /// Constructed via [`private_which`]
     #[derive(Clone, Copy, Debug)]
     pub enum PrivateWhich<Full, Empty> {
-        /// Evidence that the [`PartyPrivate`] is full
+        /// Evidence that the [`PartyPrivate`](super::PartyPrivate) is full
         ///
         /// i.e. evidence that `PrivateTo == P`
         Full(Full),
-        /// Evidence that the [`PartyPrivate`] is empty
+        /// Evidence that the [`PartyPrivate`](super::PartyPrivate) is empty
         ///
         /// i.e. evidence that `OppositeParty<PrivateTo> == P`
         Empty(Empty),
     }
     /// Construct a [`PrivateWhich`] to prove whether a
-    /// [`PartyPrivate<PrivateTo, P, _>`](PartyPrivate) would be full or empty.
+    /// [`PartyPrivate<PrivateTo, P, _>`](super::PartyPrivate) would be full or empty.
     #[inline(always)]
     pub const fn private_which<
         PrivateTo: GenericParty<PartySystem = P::PartySystem>,
@@ -135,7 +136,7 @@ pub mod raw {
         }
     }
 
-    /// The [`RawEither`] which [`PartyPrivate`] is a [`TransparentWrapper`] to
+    /// The [`RawEither`] which [`PartyPrivate`](super::PartyPrivate) is a [`TransparentWrapper`](bytemuck::TransparentWrapper) to
     pub type PartyPrivateRaw<Bound, PrivateTo, P, T> = RawEither<
         Bound,
         PrivateTo,
