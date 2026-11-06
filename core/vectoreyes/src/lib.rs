@@ -1,5 +1,6 @@
 #![deny(missing_docs)]
 #![allow(unsafe_op_in_unsafe_fn)]
+#![allow(clippy::wildcard_imports)]
 //! VectorEyes is a (almost entirely) safe and cross-platform wrapper library around vectorized
 //! operations.
 //!
