@@ -1,7 +1,10 @@
 use fancy_traits::FancyOutput;
 use popsicle::circuit_psi::{
-    CircuitPsi, PAYLOAD_SIZE, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler,
-    utils::*,
+    CircuitPsi, PAYLOAD_SIZE,
+    circuits::fancy_payload_sum,
+    evaluator::OpprfPsiEvaluator,
+    garbler::OpprfPsiGarbler,
+    utils::{binary_to_u128, int_vec_block512},
 };
 use swanky_block::Block512;
 use swanky_rng::SwankyRng;

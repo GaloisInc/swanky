@@ -1,7 +1,7 @@
 //! Testing the hashing phase in Base Psi
 #[cfg(test)]
 mod tests {
-    use rand::RngExt;
+    use rand::{RngExt, SeedableRng};
 
     use crate::psi::circuit_psi::{
         base_psi::{BasePsi, receiver::OpprfReceiver, sender::OpprfSender},

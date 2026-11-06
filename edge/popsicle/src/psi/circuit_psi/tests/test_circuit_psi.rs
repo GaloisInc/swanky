@@ -1,9 +1,10 @@
 //! Testing Circuit Psi on various circuits
 #[cfg(test)]
 mod tests {
-    use rand::RngExt;
+    use rand::{RngExt, SeedableRng};
 
     use crate::psi::circuit_psi::{
+        circuits::*,
         evaluator::OpprfPsiEvaluator,
         garbler::OpprfPsiGarbler,
         tests::{utils::*, *},

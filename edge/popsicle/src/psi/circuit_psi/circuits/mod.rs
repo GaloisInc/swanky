@@ -1,7 +1,7 @@
 //! Various fancy circuits
-use crate::circuit_psi::*;
+use crate::circuit_psi::PRIMARY_KEY_SIZE;
 use fancy_circuits::binary::{AddNoCarry, Eq, Mux, PairwiseXor};
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, Fancy, FancyBinary, FancyConstant};
 use itertools::Itertools;
 use swanky_channel::Channel;
 use swanky_field_binary::F2;

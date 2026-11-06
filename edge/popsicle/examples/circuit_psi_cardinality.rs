@@ -1,6 +1,7 @@
 use fancy_traits::FancyOutput;
 use popsicle::circuit_psi::{
-    CircuitPsi, circuits::*, evaluator::OpprfPsiEvaluator, garbler::OpprfPsiGarbler, utils::*,
+    CircuitPsi, circuits::fancy_cardinality, evaluator::OpprfPsiEvaluator,
+    garbler::OpprfPsiGarbler, utils::binary_to_u128,
 };
 use swanky_rng::SwankyRng;
 
