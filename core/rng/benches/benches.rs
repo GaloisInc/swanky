@@ -16,7 +16,7 @@ mod measurement {
     }
 }
 
-use measurement::*;
+use measurement::{Measurement, new_measurement};
 
 fn bench_aes_rand_random(c: &mut Criterion<Measurement>) {
     c.bench_function("Aes128Rng::random::<[u8; 16]>", |b| {
