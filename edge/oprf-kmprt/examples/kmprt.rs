@@ -6,13 +6,13 @@ use swanky_channel_tracking::TrackChannel;
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<U8x16> {
+fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
     (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 
 fn run(ninputs: usize, npoints: usize) {
     println!("npoints = {}, ninputs = {}", npoints, ninputs);
-    let inputs = rand_block_vec(ninputs);
+    let inputs = rand_u8x16_vec(ninputs);
     let mut rng = SwankyRng::new();
     let points = (0..npoints)
         .map(|_| (rng.random(), rng.random()))
