@@ -242,13 +242,13 @@ pub fn arbitrary_zero_circuit<F: PrimeFiniteField>(
 mod tests {
     use super::*;
     use rand::SeedableRng;
-    use swanky_block::Block;
     use swanky_rng::SwankyRng;
+    use vectoreyes::U8x16;
 
     type TestField = swanky_field_ff_primes::F2e19x3e26;
 
-    fn any_seed() -> impl Strategy<Value = Block> {
-        any::<u128>().prop_map(Block::from)
+    fn any_seed() -> impl Strategy<Value = U8x16> {
+        any::<u128>().prop_map(U8x16::from)
     }
 
     proptest! {

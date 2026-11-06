@@ -21,7 +21,6 @@ serde = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
 log.workspace = true
 swanky-rng.workspace = true
-swanky-block.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
@@ -31,6 +30,7 @@ swanky-field-ff-primes.workspace = true
 proptest.workspace = true
 bincode.workspace = true
 tempfile.workspace = true
+vectoreyes.workspace = true
 
 [[bench]]
 name = "reader_scalability"

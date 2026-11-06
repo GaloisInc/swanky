@@ -7,14 +7,13 @@ use rand::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConditionallySelectable};
 use swanky_adversary::Malicious;
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_field_binary::F2;
 use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
 use swanky_ot_traits::{RandomReceiver as ROTReceiver, RandomSender as ROTSender};
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
@@ -40,12 +39,12 @@ pub(super) type CopeeSender<FE> = Sender<KosSender, FE>;
 pub(super) type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
 
 // Uses `Aes128EncryptOnly` as a pseudo-random function.
-fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: Block) -> FE::PrimeField {
+fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: U8x16) -> FE::PrimeField {
     let seed = aes.encrypt(pt);
     FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(seed))
 }
 
-impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
+impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
     pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -86,7 +85,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
         channel: &mut C,
         input: &FE::PrimeField,
     ) -> Result<FE> {
-        let pt = Block::from(self.counter as u128);
+        let pt = U8x16::from(self.counter as u128);
         let mut w = FE::ZERO;
         for (i, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;
@@ -106,7 +105,7 @@ impl<ROT: ROTSender<Msg = Block> + Malicious, FE: FF> Sender<ROT, FE> {
     }
 }
 
-impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
+impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
     pub(super) fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -153,7 +152,7 @@ impl<ROT: ROTReceiver<Msg = Block> + Malicious, FE: FF> Receiver<ROT, FE> {
     }
 
     pub(super) fn receive<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<FE> {
-        let pt = Block::from(self.counter as u128);
+        let pt = U8x16::from(self.counter as u128);
         let mut res = FE::ZERO;
         for (j, pow) in self.pows.get().iter().enumerate() {
             let mut sum = FE::ZERO;

@@ -10,7 +10,6 @@ use rand::{
     distr::{Distribution, Uniform},
 };
 use swanky_adversary::Malicious;
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
@@ -105,15 +104,15 @@ fn eq_receive<C: AbstractChannel, RNG: CryptoRng, FE: FF>(
     Ok(x == y)
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
+impl<OT: OtReceiver<Msg = U8x16> + Malicious, FE: FF> Sender<OT, FE> {
     pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self> {
         let ot = OT::init(channel, rng)?;
-        let seed0 = rng.random::<Block>();
-        let seed1 = rng.random::<Block>();
+        let seed0 = rng.random::<U8x16>();
+        let seed1 = rng.random::<U8x16>();
         let seeds = swanky_cointoss::send(channel, &[seed0, seed1])
             .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
@@ -215,7 +214,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     ) -> Result<()> {
         let r = Degree::<FE>::USIZE;
         // Generate `chi`s from seed and send seed to receiver at the end.
-        let seed = rng.random::<Block>();
+        let seed = rng.random::<U8x16>();
         let mut rng_chi = SwankyRng::from_seed(seed);
         let mut va = FE::ZERO;
         let mut x_stars = vec![FE::PrimeField::ZERO; r];
@@ -245,7 +244,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
             va -= *pows * z;
         }
         channel
-            .write_block(&seed)
+            .write_u8x16(&seed)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
             .flush()
@@ -271,7 +270,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious, FE: FF> Sender<OT, FE> {
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
+impl<OT: OtSender<Msg = U8x16> + Malicious, FE: FF> Receiver<OT, FE> {
     pub(super) fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         pows: Powers<FE>,
@@ -279,8 +278,8 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         mut rng: &mut RNG,
     ) -> Result<Self> {
         let ot = OT::init(channel, &mut rng)?;
-        let seed0 = rng.random::<Block>();
-        let seed1 = rng.random::<Block>();
+        let seed0 = rng.random::<U8x16>();
+        let seed1 = rng.random::<U8x16>();
         let seeds = swanky_cointoss::receive(channel, &[seed0, seed1])
             .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let aes0 = Aes128EncryptOnly::new_with_key(seeds[0]);
@@ -318,7 +317,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
         }
         let mut keys = Vec::with_capacity(t * nbits);
         for i in 0..t {
-            let seed = rng.random::<Block>();
+            let seed = rng.random::<U8x16>();
             self.ggm_temporary_storage
                 .resize(ggm_temporary_storage_size(nbits), U8x16::default());
             ggm(
@@ -369,7 +368,7 @@ impl<OT: OtSender<Msg = Block> + Malicious, FE: FF> Receiver<OT, FE> {
             .map(|(pow, (x, y))| (*y - x * self.delta) * *pow)
             .sum();
         let seed = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let mut rng_chi = SwankyRng::from_seed(seed);
         let mut vb = FE::ZERO;

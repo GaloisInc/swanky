@@ -24,7 +24,6 @@ ndarray.workspace = true
 num-traits.workspace = true
 rand.workspace = true
 swanky-rng.workspace = true
-swanky-block.workspace = true
 swanky-field.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-field-fft.workspace = true
@@ -33,6 +32,7 @@ hybrid-array.workspace = true
 digest.workspace = true
 simple-arith-circuit = { workspace = true, features = ["serde"] }
 bincode.workspace = true
+vectoreyes.workspace = true
 
 [dev-dependencies]
 simple-arith-circuit = { workspace = true, features = ["proptest"] }

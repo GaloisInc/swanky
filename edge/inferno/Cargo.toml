@@ -21,13 +21,13 @@ parking_lot.workspace = true
 rand.workspace = true
 rayon.workspace = true
 swanky-rng.workspace = true
-swanky-block.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-polynomial.workspace = true
 swanky-serialization.workspace = true
 serde = { workspace = true, features = ["derive"] }
 simple-arith-circuit = { workspace = true, features = ["serde"] }
+vectoreyes.workspace = true
 
 [dev-dependencies]
 clap = { workspace = true, features = ["derive"] }

@@ -42,11 +42,11 @@ flatbuffers.workspace = true
 serde = { workspace = true, features = ["derive"] }
 toml = { workspace = true, features = ["display", "parse"] }
 swanky-rng.workspace = true
-swanky-block.workspace = true
 swanky-channel-legacy.workspace = true
 swanky-party.workspace = true
 swanky-serialization.workspace = true
 rustc-hash.workspace = true
+vectoreyes.workspace = true
 
 [build-dependencies]
 swanky-flatbuffer-build.workspace = true

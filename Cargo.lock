@@ -686,7 +686,6 @@ dependencies = [
  "rustc-hash",
  "serde",
  "subtle",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field",
@@ -701,6 +700,7 @@ dependencies = [
  "swanky-sieve-ir-parser",
  "swanky-svole-wykw",
  "toml",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -1069,13 +1069,13 @@ dependencies = [
  "sha2",
  "simple-arith-circuit",
  "sprs",
- "swanky-block",
  "swanky-field",
  "swanky-field-ff-primes",
  "swanky-field-fft",
  "swanky-polynomial",
  "swanky-rng",
  "swanky-serialization",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -1117,7 +1117,6 @@ dependencies = [
  "serde",
  "serde_json",
  "simple-arith-circuit",
- "swanky-block",
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
@@ -1125,6 +1124,7 @@ dependencies = [
  "swanky-polynomial",
  "swanky-rng",
  "swanky-serialization",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2072,13 +2072,13 @@ dependencies = [
  "proptest",
  "rand",
  "serde",
- "swanky-block",
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-field-ff-primes",
  "swanky-rng",
  "tempfile",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2227,6 +2227,7 @@ dependencies = [
  "swanky-block",
  "swanky-channel",
  "swanky-serialization",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2243,10 +2244,10 @@ version = "0.6.0"
 dependencies = [
  "rand",
  "rand_core 0.10.1",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-rng",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2454,7 +2455,6 @@ dependencies = [
  "rand",
  "swanky-adversary",
  "swanky-bit-matrix-transpose",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-cr-hash",
@@ -2477,12 +2477,12 @@ dependencies = [
  "curve25519-dalek",
  "rand",
  "swanky-adversary",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2511,12 +2511,12 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "rand",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2611,12 +2611,12 @@ dependencies = [
  "curve25519-dalek",
  "rand",
  "swanky-adversary",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-error",
  "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2625,11 +2625,11 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "rand",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-field-binary",
  "swanky-ot-traits",
  "swanky-rng",
+ "vectoreyes",
 ]
 
 [[package]]
@@ -2759,7 +2759,6 @@ dependencies = [
  "rand",
  "subtle",
  "swanky-adversary",
- "swanky-block",
  "swanky-channel-legacy",
  "swanky-cointoss",
  "swanky-error",

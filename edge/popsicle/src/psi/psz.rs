@@ -12,11 +12,12 @@ use itertools::Itertools;
 use rand::{CryptoRng, RngExt, seq::SliceRandom};
 use std::collections::{HashMap, HashSet};
 use swanky_adversary::SemiHonest;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_cointoss;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
+use vectoreyes::U8x16;
 
 const NHASHES: usize = 3;
 
@@ -81,7 +82,7 @@ impl Sender {
         inputs: &[Vec<u8>],
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> Result<Vec<Block>> {
+    ) -> Result<Vec<U8x16>> {
         let key = swanky_cointoss::send(channel, &[rng.random()])
             .wrap_err(ErrorKind::OtherError, "Cointoss protocol failed")?[0];
         let masksize = compute_masksize(inputs.len())?;
@@ -89,7 +90,7 @@ impl Sender {
         let nbins = channel.read()?;
         let seeds = self.oprf.send(channel, nbins, rng)?;
         let payloads = (0..inputs.len())
-            .map(|_| rng.random::<Block>())
+            .map(|_| rng.random::<U8x16>())
             .collect_vec();
 
         // For each hash function `hᵢ`, construct set `Hᵢ = {F(k_{hᵢ(x)}, x ||
@@ -185,7 +186,7 @@ impl Receiver {
     ) -> Result<
         HashMap<
             Vec<u8>, // Intersection item
-            Block,   // Payload
+            U8x16,   // Payload
         >,
     > {
         let (tbl, outputs) = self.perform_oprfs(inputs, channel, rng)?;
@@ -202,7 +203,7 @@ impl Receiver {
                 channel
                     .read_bytes(&mut tag)
                     .wrap_err(ErrorKind::NetworkError, "Failed to read bytes")?;
-                let ct = channel.read::<Block>()?;
+                let ct = channel.read::<U8x16>()?;
                 h.insert(tag, ct);
             }
         }
@@ -218,7 +219,7 @@ impl Receiver {
                 // if the tag is present, decrypt the payload using F(x).
                 if let Some(&ct) = hs[item.hash_index].get(tag) {
                     let val = inputs[item.input_index].clone();
-                    let key = Block::from(
+                    let key = U8x16::from(
                         <[u8; 16]>::try_from(&output.as_ref()[masksize..masksize + 16])
                             .expect("it is exactly 16 bytes long"),
                     );
@@ -261,10 +262,10 @@ impl Receiver {
                     item.entry
                 } else {
                     // No item found, so use the "default" item.
-                    Block::default()
+                    U8x16::default()
                 }
             })
-            .collect::<Vec<Block>>();
+            .collect::<Vec<U8x16>>();
 
         let oprf_outputs = self.oprf.receive(channel, &oprf_inputs, rng)?;
 

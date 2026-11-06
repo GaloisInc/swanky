@@ -9,24 +9,24 @@ use std::{
 };
 
 use criterion::Criterion;
-use swanky_block::Block;
 use swanky_channel_legacy::Channel;
 use swanky_field_binary::F2;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
-fn rand_block_vec(size: usize) -> Vec<Block> {
-    (0..size).map(|_| rand::random::<Block>()).collect()
+fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
+    (0..size).map(|_| rand::random::<U8x16>()).collect()
 }
 fn rand_f2_vec(size: usize) -> Vec<F2> {
     (0..size).map(|_| rand::random::<F2>()).collect()
 }
 
-fn bench_block_ot_inner<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg = Block>>(
+fn bench_block_ot_inner<OTSender: Sender<Msg = U8x16>, OTReceiver: Receiver<Msg = U8x16>>(
     bs: &[F2],
-    ms: Vec<(Block, Block)>,
+    ms: Vec<(U8x16, U8x16)>,
 ) {
     let (sender, receiver) = UnixStream::pair().unwrap();
     let handle = std::thread::spawn(move || {
@@ -47,7 +47,7 @@ fn bench_block_ot_inner<OTSender: Sender<Msg = Block>, OTReceiver: Receiver<Msg 
 }
 
 /// Benchmark a 1-out-of-2 OT protocol using `size` inputs.
-pub fn bench_block_ot<S: Sender<Msg = Block>, R: Receiver<Msg = Block>>(
+pub fn bench_block_ot<S: Sender<Msg = U8x16>, R: Receiver<Msg = U8x16>>(
     c: &mut Criterion,
     size: usize,
 ) {
@@ -58,9 +58,9 @@ pub fn bench_block_ot<S: Sender<Msg = Block>, R: Receiver<Msg = Block>>(
             std::any::type_name::<R>()
         ),
         |bench| {
-            let m0s = rand_block_vec(size);
-            let m1s = rand_block_vec(size);
-            let ms = m0s.into_iter().zip(m1s).collect::<Vec<(Block, Block)>>();
+            let m0s = rand_u8x16_vec(size);
+            let m1s = rand_u8x16_vec(size);
+            let ms = m0s.into_iter().zip(m1s).collect::<Vec<(U8x16, U8x16)>>();
             let bs = rand_f2_vec(size);
             bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()));
         },
@@ -68,11 +68,11 @@ pub fn bench_block_ot<S: Sender<Msg = Block>, R: Receiver<Msg = Block>>(
 }
 
 fn bench_block_cot_inner<
-    OTSender: CorrelatedSender<Msg = Block>,
-    OTReceiver: CorrelatedReceiver<Msg = Block>,
+    OTSender: CorrelatedSender<Msg = U8x16>,
+    OTReceiver: CorrelatedReceiver<Msg = U8x16>,
 >(
     bs: &[F2],
-    delta: Block,
+    delta: U8x16,
 ) {
     let m = bs.len();
     let (sender, receiver) = UnixStream::pair().unwrap();
@@ -95,7 +95,7 @@ fn bench_block_cot_inner<
 }
 
 /// Benchmark a correlated OT protocol with `size` inputs.
-pub fn bench_correlated_ot<S: CorrelatedSender<Msg = Block>, R: CorrelatedReceiver<Msg = Block>>(
+pub fn bench_correlated_ot<S: CorrelatedSender<Msg = U8x16>, R: CorrelatedReceiver<Msg = U8x16>>(
     c: &mut Criterion,
     size: usize,
 ) {
@@ -106,7 +106,7 @@ pub fn bench_correlated_ot<S: CorrelatedSender<Msg = Block>, R: CorrelatedReceiv
             std::any::type_name::<R>()
         ),
         move |bench| {
-            let delta = rand::random::<Block>();
+            let delta = rand::random::<U8x16>();
             let bs = rand_f2_vec(size);
             bench.iter(|| bench_block_cot_inner::<S, R>(&bs, delta))
         },
@@ -114,8 +114,8 @@ pub fn bench_correlated_ot<S: CorrelatedSender<Msg = Block>, R: CorrelatedReceiv
 }
 
 fn bench_block_rot_inner<
-    OTSender: RandomSender<Msg = Block>,
-    OTReceiver: RandomReceiver<Msg = Block>,
+    OTSender: RandomSender<Msg = U8x16>,
+    OTReceiver: RandomReceiver<Msg = U8x16>,
 >(
     bs: &[F2],
 ) {
@@ -139,7 +139,7 @@ fn bench_block_rot_inner<
 }
 
 /// Benchmark a random OT protocol with `size` inputs.
-pub fn bench_random_ot<S: RandomSender<Msg = Block>, R: RandomReceiver<Msg = Block>>(
+pub fn bench_random_ot<S: RandomSender<Msg = U8x16>, R: RandomReceiver<Msg = U8x16>>(
     c: &mut Criterion,
     size: usize,
 ) {

@@ -12,7 +12,6 @@ use crate::{
 use hybrid_array::Array;
 use log::{debug, warn};
 use rand::{RngExt, SeedableRng};
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
@@ -23,6 +22,7 @@ use swanky_party::{
 };
 use swanky_rng::SwankyRng;
 use swanky_svole_wykw::LpnParams;
+use vectoreyes::U8x16;
 
 // Size of batches for multiplication / assert-zero
 pub const BATCH_SIZE: usize = 3_000_000;
@@ -214,14 +214,14 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
         let mut rng = match P::WHICH {
             WhichParty::Prover(_) => {
                 let seed = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?;
                 SwankyRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.random::<Block>();
+                let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()
@@ -519,12 +519,12 @@ where
         debug!("check_zero");
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
-                let seed = rng.random::<Block>();
+                let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()
@@ -601,7 +601,7 @@ where
             }
         }
 
-        let seed = Block::from(<[u8; 16]>::try_from(&hasher.finalize().as_bytes()[0..16]).unwrap());
+        let seed = U8x16::from(<[u8; 16]>::try_from(&hasher.finalize().as_bytes()[0..16]).unwrap());
         let mut rng = SwankyRng::from_seed(seed);
 
         match P::WHICH {

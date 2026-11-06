@@ -4,7 +4,6 @@
 use crate::alsz::{Receiver as AlszReceiver, Sender as AlszSender};
 use rand::{CryptoRng, Rng, SeedableRng};
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_cointoss;
 use swanky_cr_hash::TweakableCircularCorrelationRobustHash;
@@ -16,21 +15,22 @@ use swanky_ot_traits::{
 };
 use swanky_rng::SwankyRng;
 use swanky_serialization::{SequenceDeserializer, SequenceSerializer};
+use vectoreyes::U8x16;
 
 // The statistical security parameter.
 const SSP: usize = 40;
 
 /// Oblivious transfer extension sender.
-pub struct Sender<OT: OtReceiver<Msg = Block> + Malicious = swanky_ot_chou_orlandi::Receiver> {
+pub struct Sender<OT: OtReceiver<Msg = U8x16> + Malicious = swanky_ot_chou_orlandi::Receiver> {
     pub(super) ot: AlszSender<OT>,
 }
 
 /// Oblivious transfer extension receiver.
-pub struct Receiver<OT: OtSender<Msg = Block> + Malicious = swanky_ot_chou_orlandi::Sender> {
+pub struct Receiver<OT: OtSender<Msg = U8x16> + Malicious = swanky_ot_chou_orlandi::Sender> {
     ot: AlszReceiver<OT>,
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> Sender<OT> {
     pub(super) fn send_setup<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -45,29 +45,29 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
         let ncols = m + 128 + SSP;
         let qs = self.ot.send_setup(channel, ncols)?;
         // Check correlation
-        let mut seed = Block::default();
+        let mut seed = U8x16::default();
         rng.fill_bytes(seed.as_mut());
         let seed = swanky_cointoss::send(channel, &[seed])
             .wrap_err(ErrorKind::NetworkError, "Unable to send cointoss")?;
         let mut rng = SwankyRng::from_seed(seed[0]);
-        let mut check = (Block::default(), Block::default());
-        let mut chi = Block::default();
+        let mut check = (U8x16::default(), U8x16::default());
+        let mut chi = U8x16::default();
         for j in 0..ncols {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             rng.fill_bytes(chi.as_mut());
             let [lo, hi] = q.carryless_mul_wide(chi);
             check = (check.0 ^ lo, check.1 ^ hi)
         }
         let x = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let t0 = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let t1 = channel
-            .read_block()
+            .read_u8x16()
             .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
         let [lo, hi] = x.carryless_mul_wide(self.ot.s_);
         let check = (check.0 ^ lo, check.1 ^ hi);
@@ -80,7 +80,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> FixedKeyInitializer for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> FixedKeyInitializer for Sender<OT> {
     fn init_fixed_key<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
         s_: [u8; 16],
@@ -91,8 +91,8 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> FixedKeyInitializer for Sender<OT>
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
-    type Msg = Block;
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> OtSender for Sender<OT> {
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let ot = AlszSender::<OT>::init(channel, rng)?;
@@ -102,7 +102,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[(Block, Block)],
+        inputs: &[(U8x16, U8x16)],
         rng: &mut RNG,
     ) -> Result<()> {
         let m = inputs.len();
@@ -111,17 +111,17 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
         for (j, input) in inputs.iter().enumerate() {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let y0 =
                 TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ input.0;
             let q = q ^ self.ot.s_;
             let y1 =
                 TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ input.1;
             channel
-                .write_block(&y0)
+                .write_u8x16(&y0)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             channel
-                .write_block(&y1)
+                .write_u8x16(&y1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel
@@ -131,7 +131,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> OtSender for Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> CorrelatedSender for Sender<OT> {
     fn send_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -144,13 +144,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let x0 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
             let x1 = x0 ^ delta;
             let q = q ^ self.ot.s_;
             let y = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128) ^ x1;
             channel
-                .write_block(&y)
+                .write_u8x16(&y)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             out.push(x0);
         }
@@ -161,7 +161,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> CorrelatedSender for Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> RandomSender for Sender<OT> {
     fn send_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -173,7 +173,7 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
         for j in 0..m {
             let q = &qs[j * 16..(j + 1) * 16];
             let q: [u8; 16] = q.try_into().unwrap();
-            let q = Block::from(q);
+            let q = U8x16::from(q);
             let x0 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
             let q = q ^ self.ot.s_;
             let x1 = TweakableCircularCorrelationRobustHash::fixed_key().hash(q, j as u128);
@@ -183,13 +183,13 @@ impl<OT: OtReceiver<Msg = Block> + Malicious> RandomSender for Sender<OT> {
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> std::fmt::Display for Sender<OT> {
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> std::fmt::Display for Sender<OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "KOS Sender")
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + Malicious> Receiver<OT> {
     pub(super) fn receive_setup<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -226,13 +226,13 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             .wrap_err(ErrorKind::SerializationError, "Failed to write bits")?;
         let ts = self.ot.receive_setup(channel, &r, m_)?;
         // Check correlation
-        let mut seed = Block::default();
+        let mut seed = U8x16::default();
         rng.fill_bytes(seed.as_mut());
         let seed = swanky_cointoss::receive(channel, &[seed])
             .wrap_err(ErrorKind::NetworkError, "Unable to receive cointoss")?;
         let mut rng = SwankyRng::from_seed(seed[0]);
-        let mut x = Block::default();
-        let mut t = (Block::default(), Block::default());
+        let mut x = U8x16::default();
+        let mut t = (U8x16::default(), U8x16::default());
         let r_ = F2BitDeserializer::new(&mut std::io::empty())
             .wrap_err(
                 ErrorKind::SerializationError,
@@ -240,24 +240,24 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
             )?
             .read_vec(&mut &r[..], m_)
             .wrap_err(ErrorKind::SerializationError, "Failed to read bits")?;
-        let mut chi = Block::default();
+        let mut chi = U8x16::default();
         for (j, xj) in r_.into_iter().enumerate() {
             let tj = &ts[j * 16..(j + 1) * 16];
             let tj: [u8; 16] = tj.try_into().unwrap();
-            let tj = Block::from(tj);
+            let tj = U8x16::from(tj);
             rng.fill_bytes(chi.as_mut());
-            x ^= if xj.into() { chi } else { Block::default() };
+            x ^= if xj.into() { chi } else { U8x16::default() };
             let [lo, hi] = tj.carryless_mul_wide(chi);
             t = (t.0 ^ lo, t.1 ^ hi);
         }
         channel
-            .write_block(&x)
+            .write_u8x16(&x)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
-            .write_block(&t.0)
+            .write_u8x16(&t.0)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
-            .write_block(&t.1)
+            .write_u8x16(&t.1)
             .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         channel
             .flush()
@@ -266,8 +266,8 @@ impl<OT: OtSender<Msg = Block> + Malicious> Receiver<OT> {
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
-    type Msg = Block;
+impl<OT: OtSender<Msg = U8x16> + Malicious> OtReceiver for Receiver<OT> {
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, rng: &mut RNG) -> Result<Self> {
         let ot = AlszReceiver::<OT>::init(channel, rng)?;
@@ -279,7 +279,7 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
         channel: &mut C,
         inputs: &[F2],
         rng: &mut RNG,
-    ) -> Result<Vec<Block>> {
+    ) -> Result<Vec<U8x16>> {
         let ts = self.receive_setup(channel, inputs, rng)?;
         // Output result
         let mut out = Vec::with_capacity(inputs.len());
@@ -287,21 +287,21 @@ impl<OT: OtSender<Msg = Block> + Malicious> OtReceiver for Receiver<OT> {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y0 = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y1 = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
             let y = if b.into() { y1 } else { y0 };
             let y = y ^ TweakableCircularCorrelationRobustHash::fixed_key()
-                .hash(Block::from(t), j as u128);
+                .hash(U8x16::from(t), j as u128);
             out.push(y);
         }
         Ok(out)
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + Malicious> CorrelatedReceiver for Receiver<OT> {
     fn receive_correlated<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -314,18 +314,18 @@ impl<OT: OtSender<Msg = Block> + Malicious> CorrelatedReceiver for Receiver<OT> 
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let y = channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-            let y = if b.into() { y } else { Block::default() };
+            let y = if b.into() { y } else { U8x16::default() };
             let h =
-                TweakableCircularCorrelationRobustHash::fixed_key().hash(Block::from(t), j as u128);
+                TweakableCircularCorrelationRobustHash::fixed_key().hash(U8x16::from(t), j as u128);
             out.push(y ^ h);
         }
         Ok(out)
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + Malicious> RandomReceiver for Receiver<OT> {
     fn receive_random<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
@@ -338,23 +338,23 @@ impl<OT: OtSender<Msg = Block> + Malicious> RandomReceiver for Receiver<OT> {
             let t = &ts[j * 16..(j + 1) * 16];
             let t: [u8; 16] = t.try_into().unwrap();
             let h =
-                TweakableCircularCorrelationRobustHash::fixed_key().hash(Block::from(t), j as u128);
+                TweakableCircularCorrelationRobustHash::fixed_key().hash(U8x16::from(t), j as u128);
             out.push(h);
         }
         Ok(out)
     }
 }
 
-impl<OT: OtSender<Msg = Block> + Malicious> std::fmt::Display for Receiver<OT> {
+impl<OT: OtSender<Msg = U8x16> + Malicious> std::fmt::Display for Receiver<OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "KOS Receiver")
     }
 }
 
-impl<OT: OtReceiver<Msg = Block> + Malicious> SemiHonest for Sender<OT> {}
-impl<OT: OtSender<Msg = Block> + Malicious> SemiHonest for Receiver<OT> {}
-impl<OT: OtReceiver<Msg = Block> + Malicious> Malicious for Sender<OT> {}
-impl<OT: OtSender<Msg = Block> + Malicious> Malicious for Receiver<OT> {}
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> SemiHonest for Sender<OT> {}
+impl<OT: OtSender<Msg = U8x16> + Malicious> SemiHonest for Receiver<OT> {}
+impl<OT: OtReceiver<Msg = U8x16> + Malicious> Malicious for Sender<OT> {}
+impl<OT: OtSender<Msg = U8x16> + Malicious> Malicious for Receiver<OT> {}
 
 #[test]
 fn test_functionality() {

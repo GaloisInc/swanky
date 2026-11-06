@@ -5,11 +5,11 @@
 use rand::{CryptoRng, RngExt};
 use std::collections::HashSet;
 use swanky_adversary::SemiHonest;
-use swanky_block::{Block, Block512};
+use swanky_block::Block512;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_oprf_traits::{Receiver as OprfReceiver, Sender as OprfSender};
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 mod cuckoo;
 
@@ -20,13 +20,13 @@ const N_TABLE_LOOPS: usize = 128;
 // the Davies-Meyer-esque single-block-length compression function
 // under-the-hood, and we pre-key `k`.
 #[inline(always)]
-fn hash_input_keyed(k: &Aes128EncryptOnly, x: Block, range: usize) -> usize {
+fn hash_input_keyed(k: &Aes128EncryptOnly, x: U8x16, range: usize) -> usize {
     let h = k.encrypt(x) ^ x;
     (u128::from(h) % (range as u128)) as usize
 }
 
 // Hash `y` with key `k`, producing a result in the range `[0..range-1]`.
-fn hash_output(k: Block, y: Block512, range: usize) -> usize {
+fn hash_output(k: U8x16, y: Block512, range: usize) -> usize {
     let aes = Aes128EncryptOnly::new_with_key(k);
     hash_output_keyed(&aes, y, range)
 }
@@ -35,7 +35,7 @@ fn hash_output(k: Block, y: Block512, range: usize) -> usize {
 //
 // XXX: can we remove this re-keying? It'll speed things up a bunch.
 fn hash_output_keyed(k: &Aes128EncryptOnly, y: Block512, range: usize) -> usize {
-    let ys: [Block; 4] = y.into();
+    let ys: [U8x16; 4] = y.into();
     let h = k.encrypt(ys[0]) ^ ys[0];
     let k = Aes128EncryptOnly::new_with_key(h);
     let h = k.encrypt(ys[1]) ^ ys[1];
@@ -100,7 +100,7 @@ pub struct Sender<OPRF = swanky_oprf_kkrt::Sender> {
     oprf: OPRF,
 }
 
-impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
+impl<OPRF: OprfSender<Seed = Block512, Input = U8x16, Output = Block512> + SemiHonest>
     Sender<OPRF>
 {
     /// Initialize the OPPRF sender.
@@ -117,7 +117,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
     pub fn send<RNG>(
         &mut self,
         channel: &mut Channel,
-        points: &[(Block, Block512)],
+        points: &[(U8x16, Block512)],
         ninputs: usize,
         rng: &mut RNG,
     ) -> Result<()>
@@ -128,7 +128,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         // Receive `hashkeys` from the receiver. These are used to fill `bins` below.
         let mut hashkeys = Vec::with_capacity(params.h1 + params.h2);
         for _ in 0..params.h1 + params.h2 {
-            let h = channel.read::<Block>()?;
+            let h = channel.read::<U8x16>()?;
             let aes = Aes128EncryptOnly::new_with_key(h);
             hashkeys.push(aes);
         }
@@ -186,7 +186,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
         &mut self,
         channel: &mut Channel,
         seed: Block512,
-        points: Vec<(Block, Block512)>,
+        points: Vec<(U8x16, Block512)>,
         npoints: usize,
         rng: &mut RNG,
     ) -> Result<()>
@@ -198,14 +198,14 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
             points
                 .iter()
                 .map(|(x, _)| *x)
-                .collect::<std::collections::HashSet<Block>>()
+                .collect::<std::collections::HashSet<U8x16>>()
                 .len(),
             points.len()
         );
 
         assert!(points.len() <= npoints);
 
-        let mut v = rng.random::<Block>();
+        let mut v = rng.random::<U8x16>();
         let mut aes = Aes128EncryptOnly::new_with_key(v);
         let mut map = HashSet::with_capacity(points.len());
         // Store compute `y`s and `h`s for later use.
@@ -235,7 +235,7 @@ impl<OPRF: OprfSender<Seed = Block512, Input = Block, Output = Block512> + SemiH
                     break;
                 }
                 // Try again.
-                v = rng.random::<Block>();
+                v = rng.random::<U8x16>();
                 aes = Aes128EncryptOnly::new_with_key(v);
                 map.clear();
             }
@@ -293,7 +293,7 @@ pub struct Receiver<OPRF: OprfReceiver + SemiHonest = swanky_oprf_kkrt::Receiver
     oprf: OPRF,
 }
 
-impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + SemiHonest>
+impl<OPRF: OprfReceiver<Seed = Block512, Input = U8x16, Output = Block512> + SemiHonest>
     Receiver<OPRF>
 {
     /// Initialize the OPPRF receiver.
@@ -309,7 +309,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
     pub fn receive<RNG>(
         &mut self,
         channel: &mut Channel,
-        inputs: &[Block],
+        inputs: &[U8x16],
         rng: &mut RNG,
     ) -> Result<Vec<Block512>>
     where
@@ -325,7 +325,7 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
         loop {
             let hashkeys = (0..params.h1 + params.h2)
                 .map(|_| rng.random())
-                .collect::<Vec<Block>>();
+                .collect::<Vec<U8x16>>();
             // Build a cuckoo hash table using `hashkeys`.
             if let Ok(table_) = cuckoo::CuckooHash::build(
                 inputs,
@@ -356,16 +356,16 @@ impl<OPRF: OprfReceiver<Seed = Block512, Input = Block, Output = Block512> + Sem
                 if let Some(item) = item {
                     item.entry
                 } else {
-                    rng.random::<Block>()
+                    rng.random::<U8x16>()
                 }
             })
-            .collect::<Vec<Block>>();
+            .collect::<Vec<U8x16>>();
         let oprf_outputs = self.oprf.receive(channel, &items, rng)?;
 
         let zero = Block512::default();
         for (item, output) in table.items.into_iter().zip(oprf_outputs) {
             let m = channel.read::<usize>()?;
-            let v = channel.read::<Block>()?;
+            let v = channel.read::<U8x16>()?;
             let h = hash_output(v, output, m);
             let mut output = output;
             for i in 0..m {
@@ -399,12 +399,12 @@ mod tests {
         assert!(npoints <= npoints_bound);
         let mut rng = SwankyRng::new();
         let points = (0..npoints)
-            .map(|_| (rng.random::<Block>(), rng.random()))
-            .collect::<Vec<(Block, Block512)>>();
+            .map(|_| (rng.random::<U8x16>(), rng.random()))
+            .collect::<Vec<(U8x16, Block512)>>();
         let xs = points[0..ninputs]
             .iter()
             .map(|(x, _)| *x)
-            .collect::<Vec<Block>>();
+            .collect::<Vec<U8x16>>();
         let ys = points[0..ninputs]
             .iter()
             .map(|(_, y)| *y)

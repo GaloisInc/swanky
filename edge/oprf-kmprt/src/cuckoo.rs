@@ -1,11 +1,10 @@
 #![allow(clippy::too_many_arguments)]
 
-use swanky_block::Block;
-use vectoreyes::{Aes128EncryptOnly, AesBlockCipher};
+use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
 #[derive(Clone, Debug)]
 pub struct Item {
-    pub entry: Block,
+    pub entry: U8x16,
     pub index: usize,
     hindex: usize,
 }
@@ -32,8 +31,8 @@ const N_ATTEMPTS: usize = 100;
 
 impl CuckooHash {
     pub fn build(
-        inputs: &[Block],
-        hashkeys: &[Block],
+        inputs: &[U8x16],
+        hashkeys: &[U8x16],
         ms: (usize, usize),
         hs: (usize, usize),
     ) -> Result<Self, Error> {
@@ -59,13 +58,13 @@ impl CuckooHash {
     fn _hash(
         &mut self,
         hashkeys: &[Aes128EncryptOnly],
-        entry: Block,
+        entry: U8x16,
         index: usize,
         h: usize,
         hoffset: usize,
         m: usize,
         moffset: usize,
-    ) -> Option<(Block, usize)> {
+    ) -> Option<(U8x16, usize)> {
         let mut entry = entry;
         let mut index = index;
         let mut hindex = 0;
@@ -93,7 +92,7 @@ impl CuckooHash {
     fn hash(
         &mut self,
         hashkeys: &[Aes128EncryptOnly],
-        entry: Block,
+        entry: U8x16,
         index: usize,
     ) -> Result<(), Error> {
         // Try to place in the first `m₁` bins.

@@ -35,11 +35,11 @@ mod tests {
     use crate::{Circuit, circuitgen::random_circuit};
     use proptest::prelude::*;
     use rand::{SeedableRng, distr::Uniform, prelude::Distribution};
-    use swanky_block::Block;
     use swanky_rng::SwankyRng;
+    use vectoreyes::U8x16;
 
-    fn any_seed() -> impl Strategy<Value = Block> {
-        any::<u128>().prop_map(Block::from)
+    fn any_seed() -> impl Strategy<Value = U8x16> {
+        any::<u128>().prop_map(U8x16::from)
     }
 
     macro_rules! test_serialization {

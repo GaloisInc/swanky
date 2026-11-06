@@ -12,13 +12,13 @@ mod tests {
         *,
     };
     use std::collections::HashSet;
-    use swanky_block::Block;
     use swanky_rng::SwankyRng;
+    use vectoreyes::U8x16;
 
     // Computes the cardinality of the intersection in the clear
     pub fn cardinality_in_clear(set_a: &[Vec<u8>], set_b: &[Vec<u8>]) -> usize {
-        let set_a: HashSet<Block> = HashSet::from_iter(u8_vec_block(set_a, PRIMARY_KEY_SIZE));
-        let set_b: HashSet<Block> = HashSet::from_iter(u8_vec_block(set_b, PRIMARY_KEY_SIZE));
+        let set_a: HashSet<U8x16> = HashSet::from_iter(u8_vec_block(set_a, PRIMARY_KEY_SIZE));
+        let set_b: HashSet<U8x16> = HashSet::from_iter(u8_vec_block(set_b, PRIMARY_KEY_SIZE));
 
         set_a.intersection(&set_b).count()
     }
@@ -32,8 +32,8 @@ mod tests {
         payload_a: &[u128],
         payload_b: &[u128],
     ) -> u128 {
-        let primary_keys_a: Vec<Block> = u8_vec_block(primary_keys_a, PRIMARY_KEY_SIZE);
-        let primary_keys_b: Vec<Block> = u8_vec_block(primary_keys_b, PRIMARY_KEY_SIZE);
+        let primary_keys_a: Vec<U8x16> = u8_vec_block(primary_keys_a, PRIMARY_KEY_SIZE);
+        let primary_keys_b: Vec<U8x16> = u8_vec_block(primary_keys_b, PRIMARY_KEY_SIZE);
 
         let mut acc = 0;
         for i in 0..primary_keys_a.len() {

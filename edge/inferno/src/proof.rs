@@ -128,8 +128,8 @@ mod tests {
 
     use super::*;
     use rand::{RngExt, SeedableRng};
-    use swanky_block::Block;
     use swanky_field_binary::F64b;
+    use vectoreyes::U8x16;
 
     const N: usize = 16;
     const K: usize = 8;
@@ -141,10 +141,10 @@ mod tests {
                 use super::*;
                 #[allow(unused_imports)]
                 use proptest::prelude::*;
-                use swanky_block::Block;
+                use vectoreyes::U8x16;
 
-                fn any_seed() -> impl Strategy<Value = Block> {
-                    any::<u128>().prop_map(|seed| Block::from(seed))
+                fn any_seed() -> impl Strategy<Value = U8x16> {
+                    any::<u128>().prop_map(|seed| U8x16::from(seed))
                 }
 
                 proptest! {
@@ -217,7 +217,7 @@ mod tests {
         let mut commitments = Vec::with_capacity(nrounds + 2);
 
         let seeds: [u128; N] = std::array::from_fn(|_| rng.random::<u128>());
-        let mut rngs = seeds.map(|s| SwankyRng::from_seed(Block::from(s)));
+        let mut rngs = seeds.map(|s| SwankyRng::from_seed(U8x16::from(s)));
 
         let ws: Vec<SecretSharing<F2, N>> = witness
             .iter()

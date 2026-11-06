@@ -2,11 +2,11 @@ use crate::Proof;
 use proptest::prelude::*;
 use simple_arith_circuit::Circuit;
 use std::path::PathBuf;
-use swanky_block::Block;
 use swanky_field::FiniteField;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F64b};
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
 // The number of parties in the MPC
 const N: usize = 16;
@@ -25,8 +25,8 @@ fn test<F: FiniteField>(
     assert!(res.is_ok());
 }
 
-fn any_seed() -> impl Strategy<Value = Block> {
-    any::<u128>().prop_map(Block::from)
+fn any_seed() -> impl Strategy<Value = U8x16> {
+    any::<u128>().prop_map(U8x16::from)
 }
 
 macro_rules! test_circuits {

@@ -10,7 +10,6 @@ use rand::{RngExt, SeedableRng};
 use std::io::{BufReader, BufWriter};
 use std::net::TcpStream;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
-use swanky_block::Block;
 use swanky_channel_legacy::{AbstractChannel, SyncChannel};
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
 use swanky_field::{FiniteField, FiniteRing};
@@ -21,6 +20,7 @@ use swanky_party::{
     ty_eq::{EqualityProposition, Witness},
 };
 use swanky_rng::SwankyRng;
+use vectoreyes::U8x16;
 
 /// Edabits struct
 #[derive(Clone)]
@@ -708,13 +708,13 @@ impl<
                     .flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?
             }
             WhichParty::Verifier(_) => {
-                let seed = rng.random::<Block>();
+                let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()
@@ -1015,12 +1015,12 @@ impl<
         // step 3): get seed for permutation
         let seed = match P::WHICH {
             WhichParty::Prover(_) => channel
-                .read_block()
+                .read_u8x16()
                 .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
             WhichParty::Verifier(_) => {
-                let seed = rng.random::<Block>();
+                let seed = rng.random::<U8x16>();
                 channel
-                    .write_block(&seed)
+                    .write_u8x16(&seed)
                     .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
                 channel
                     .flush()

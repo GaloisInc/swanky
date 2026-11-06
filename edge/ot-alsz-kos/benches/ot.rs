@@ -1,11 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use swanky_block::Block;
 use swanky_ot_traits::{
     CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
 };
+use vectoreyes::U8x16;
 fn do_bench<
-    S: Sender<Msg = Block> + CorrelatedSender + RandomSender,
-    R: Receiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
+    S: Sender<Msg = U8x16> + CorrelatedSender + RandomSender,
+    R: Receiver<Msg = U8x16> + CorrelatedReceiver + RandomReceiver,
 >(
     c: &mut Criterion,
 ) {

@@ -19,15 +19,15 @@ use curve25519_dalek::{
 };
 use rand::CryptoRng;
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_block::Block;
 use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use vectoreyes::U8x16;
 
-fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> Block {
+fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
-    Block::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+    U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
 }
 
 /// Oblivious transfer sender.
@@ -38,7 +38,7 @@ pub struct Sender {
 }
 
 impl OtSender for Sender {
-    type Msg = Block;
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(
         channel: &mut C,
@@ -58,7 +58,7 @@ impl OtSender for Sender {
     fn send<C: AbstractChannel, RNG: CryptoRng>(
         &mut self,
         channel: &mut C,
-        inputs: &[(Block, Block)],
+        inputs: &[(U8x16, U8x16)],
         _: &mut RNG,
     ) -> Result<()> {
         let ys = self.y * self.s;
@@ -72,16 +72,16 @@ impl OtSender for Sender {
                 let k1 = hash_pt(self.counter + i as u128, &(yr - ys));
                 Ok((k0, k1))
             })
-            .collect::<Result<Vec<(Block, Block)>>>()?;
+            .collect::<Result<Vec<(U8x16, U8x16)>>>()?;
         self.counter += inputs.len() as u128;
         for (input, k) in inputs.iter().zip(ks) {
             let c0 = k.0 ^ input.0;
             let c1 = k.1 ^ input.1;
             channel
-                .write_block(&c0)
+                .write_u8x16(&c0)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
             channel
-                .write_block(&c1)
+                .write_u8x16(&c1)
                 .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
         }
         channel
@@ -104,7 +104,7 @@ pub struct Receiver {
 }
 
 impl OtReceiver for Receiver {
-    type Msg = Block;
+    type Msg = U8x16;
 
     fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, _: &mut RNG) -> Result<Self> {
         let s = channel
@@ -119,7 +119,7 @@ impl OtReceiver for Receiver {
         channel: &mut C,
         inputs: &[F2],
         mut rng: &mut RNG,
-    ) -> Result<Vec<Block>> {
+    ) -> Result<Vec<U8x16>> {
         let zero = &Scalar::ZERO * &self.s;
         let one = &Scalar::ONE * &self.s;
         let ks = inputs
@@ -134,7 +134,7 @@ impl OtReceiver for Receiver {
                     .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
                 Ok(hash_pt(self.counter + i as u128, &(&x * &self.s)))
             })
-            .collect::<Result<Vec<Block>>>()?;
+            .collect::<Result<Vec<U8x16>>>()?;
         channel
             .flush()
             .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
@@ -144,10 +144,10 @@ impl OtReceiver for Receiver {
             .zip(ks)
             .map(|(&b, k)| {
                 let c0 = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let c1 = channel
-                    .read_block()
+                    .read_u8x16()
                     .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
                 let c = k ^ if b.into() { c1 } else { c0 };
                 Ok(c)
