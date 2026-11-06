@@ -1,6 +1,6 @@
-use crate::{BinaryBundle, binary::AndMany};
+use crate::binary::AndMany;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary};
 use swanky_channel::Channel;
 use swanky_error::Result;
 
@@ -58,8 +58,8 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
-            let y_input = BinaryBundle::<_, N>::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
             assert_eq!(output.val(), F2::from(x == y));
         }
@@ -67,7 +67,7 @@ mod test {
         // Test specifically for equal values.
         for _ in 0..8 {
             let x = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
+            let x_input = Dummy::constant(x);
             let output = Dummy::eval(&circuit, (&x_input, &x_input)).unwrap();
             assert_eq!(output.val(), F2::ONE);
         }

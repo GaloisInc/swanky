@@ -102,7 +102,7 @@ fn mixed_op(c: &mut Criterion) {
 }
 
 fn linear_oram(c: &mut Criterion) {
-    let circuit = LinearOram::<1024>::new(1024);
+    let circuit = LinearOram::<128>::new(1024);
     bench_garble_binary(c, "linear_oram", &circuit);
     bench_eval_binary(c, "linear_oram", &circuit);
 }

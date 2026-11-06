@@ -1,6 +1,6 @@
-use crate::{BinaryBundle, binary::LessThan};
+use crate::binary::LessThan;
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -51,11 +51,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::RngExt;
-
     use super::Max;
-    use crate::BinaryBundle;
     use fancy_plaintext::Dummy;
+    use rand::RngExt;
 
     #[test]
     fn max_circuit_works() {
@@ -64,15 +62,14 @@ mod test {
         let nitems = 10;
 
         let mut rng = rand::rng();
-        let circuit = Max::default();
+        let circuit = Max::<N>::default();
 
         for _ in 0..16 {
             let xs: Vec<u128> = (0..nitems).map(|_| rng.random::<u128>() % Q).collect();
             let max = *xs.iter().max().unwrap();
-            let xs_input: Vec<BinaryBundle<_, N>> =
-                xs.iter().map(|x| BinaryBundle::from(*x)).collect();
+            let xs_input = xs.iter().map(|x| Dummy::constant(*x)).collect::<Vec<_>>();
             let output = Dummy::eval(&circuit, xs_input.as_slice()).unwrap();
-            assert_eq!(Into::<u128>::into(output), max);
+            assert_eq!(Dummy::from(output), max);
         }
     }
 }

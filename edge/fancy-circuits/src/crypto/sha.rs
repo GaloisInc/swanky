@@ -1,7 +1,9 @@
 //! SHA circuits.
 
-use crate::{binary::Constant, bristol::BristolFashionCircuit};
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
+use crate::bristol::BristolFashionCircuit;
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
+};
 use std::io::Cursor;
 use swanky_channel::Channel;
 use swanky_error::Result;
@@ -155,7 +157,7 @@ impl<F: FancyBinary + FancyConstant<F2>> Circuit<F> for Sha256 {
         }
 
         // Append the original message length as a 64-bit big-endian integer.
-        let mut length = Constant::<64>::new(message_len as u128).execute(backend, (), channel)?;
+        let mut length = BinaryBundle::<_, 64>::constant(backend, message_len as u128);
         // Constants are represented in little-endian, but here we need message
         // length to be in big-endian. So we reverse the bundle before using it.
         length.reverse();

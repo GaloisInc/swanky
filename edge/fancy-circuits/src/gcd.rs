@@ -1,9 +1,6 @@
-use crate::{
-    BinaryBundle,
-    binary::{Eq, Mux, MuxBit, Sub},
-};
+use crate::binary::{Eq, Mux, MuxBit, Sub};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;

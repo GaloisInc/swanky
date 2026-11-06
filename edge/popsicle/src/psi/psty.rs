@@ -6,12 +6,11 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
 };
-use fancy_circuits::{
-    BinaryBundle,
-    binary::{AddNoCarry, Constant, Eq},
-};
+use fancy_circuits::binary::{AddNoCarry, Eq};
 use fancy_garbling::WireMod2;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive};
+use fancy_traits::{
+    BinaryBundle, Circuit, FancyBinary, FancyConstant, FancyEncode, FancyOutput, FancyReceive,
+};
 use itertools::Itertools;
 use rand::{CryptoRng, RngExt, SeedableRng};
 use swanky_adversary::SemiHonest;
@@ -470,8 +469,8 @@ fn fancy_compute_cardinality<F: FancyBinary + FancyConstant<F2>>(
         })
         .collect::<swanky_error::Result<Vec<F::Item>>>()?;
 
-    let mut acc = Constant::<{ HASH_SIZE * 8 }>::new(0).execute(f, (), channel)?;
-    let one = Constant::<{ HASH_SIZE * 8 }>::new(1).execute(f, (), channel)?;
+    let mut acc = BinaryBundle::constant(f, 0);
+    let one = BinaryBundle::<_, { HASH_SIZE * 8 }>::constant(f, 1);
 
     for b in eqs.into_iter() {
         let b_ws = one

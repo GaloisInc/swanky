@@ -1,10 +1,9 @@
-use crate::{
-    BinaryBundle,
-    binary::{Add, AddNoCarry, Constant, LeftShift, LeftShiftExtend},
-    util::u128_to_bits,
-};
+use crate::binary::{Add, AddNoCarry, LeftShift, LeftShiftExtend};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
+    u128_to_bits,
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
@@ -124,7 +123,7 @@ where
     ) -> Result<Self::Output> {
         assert_eq!(M, 2 * N);
         let (x, c) = inputs;
-        let zero = Constant::<M>::new(0).execute(backend, (), channel)?;
+        let zero = BinaryBundle::constant(backend, 0);
         u128_to_bits::<M>(c)
             .into_iter()
             .enumerate()
@@ -197,10 +196,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        BinaryBundle,
-        binary::{Mul, MulConstant, MulLowerHalf},
-    };
+    use crate::binary::{Mul, MulConstant, MulLowerHalf};
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
@@ -215,10 +211,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
-            let y_input = BinaryBundle::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), x * y);
+            assert_eq!(Dummy::from(output), x * y);
         }
     }
 
@@ -230,10 +226,10 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
-            let y_input = BinaryBundle::<_, N>::from(y);
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
             let output = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(output), (x * y) % Q);
+            assert_eq!(Dummy::from(output), (x * y) % Q);
         }
     }
 
@@ -245,9 +241,9 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let c = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
+            let x_input = Dummy::constant(x);
             let output = Dummy::eval(&circuit, (&x_input, c)).unwrap();
-            assert_eq!(Into::<u128>::into(output), x * c);
+            assert_eq!(Dummy::from(output), x * c);
         }
     }
 }

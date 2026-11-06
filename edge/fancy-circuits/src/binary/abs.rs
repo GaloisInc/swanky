@@ -1,9 +1,6 @@
-use crate::{
-    BinaryBundle,
-    binary::{Mux, TwosComplement},
-};
+use crate::binary::{Mux, TwosComplement};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, FancyBinary, FancyConstant};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -39,7 +36,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{BinaryBundle, binary::AbsoluteValue};
+    use crate::binary::AbsoluteValue;
     use fancy_plaintext::Dummy;
     use rand::{RngExt, rng};
 
@@ -49,14 +46,14 @@ mod test {
         const Q: u128 = 1 << N;
 
         let mut rng = rng();
-        let circuit = AbsoluteValue::default();
+        let circuit = AbsoluteValue::<N>::default();
 
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::<_, N>::from(x);
+            let x_input = Dummy::constant(x);
             let output = Dummy::eval(&circuit, &x_input).unwrap();
             assert_eq!(
-                Into::<u128>::into(output),
+                Dummy::from(output),
                 if x >> (N - 1) > 0 {
                     ((!x) + 1) & ((1 << N) - 1)
                 } else {

@@ -1,8 +1,7 @@
-use crate::{
-    BinaryBundle,
-    binary::{Constant, Eq, Mux, PairwiseXor},
+use crate::binary::{Eq, Mux, PairwiseXor};
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
 };
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -35,13 +34,13 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> Circuit<F> for LinearOr
     ) -> Result<Self::Output> {
         let (ram, query) = inputs;
 
-        let zero = Constant::<N>::new(0).execute(backend, (), channel)?;
+        let zero = BinaryBundle::constant(backend, 0);
 
         // Traverse the RAM one element at a time, and multiplex the result
         // based on whether the query matches the current index.
         let mut result = zero.clone();
         for (i, item) in ram.iter().enumerate() {
-            let index = Constant::<N>::new(i as u128).execute(backend, (), channel)?;
+            let index = BinaryBundle::constant(backend, i as u128);
             let is_equal = Eq::default().execute(backend, (&query, &index), channel)?;
             let mux = Mux::default().execute(backend, (is_equal, &zero, item), channel)?;
             // Every `mux` but one will be zero, so we can use `PairwiseXor`
@@ -93,7 +92,7 @@ impl<F: FancyBinary + FancyConstant<F2>, const N: usize> CircuitOutputMapper<F> 
 
 #[cfg(test)]
 pub mod test {
-    use crate::{BinaryBundle, LinearOram};
+    use crate::LinearOram;
     use fancy_plaintext::Dummy;
     use rand::RngExt;
 
@@ -108,12 +107,13 @@ pub mod test {
             let ram: Vec<u128> = (0..ram_size).map(|_| rng.random::<u128>()).collect();
             let index = rng.random_range(..ram_size);
 
-            let ram_input: Vec<BinaryBundle<_, _>> =
-                ram.iter().map(|&val| BinaryBundle::from(val)).collect();
-            let query_input = BinaryBundle::from(index as u128);
+            let ram_input = ram
+                .iter()
+                .map(|&val| Dummy::constant(val))
+                .collect::<Vec<_>>();
+            let query_input = Dummy::constant(index as u128);
             let output = Dummy::eval(&c, (ram_input, query_input)).unwrap();
-            let result: u128 = output.into();
-            assert_eq!(result, ram[index]);
+            assert_eq!(Dummy::from(output), ram[index]);
         }
     }
 }

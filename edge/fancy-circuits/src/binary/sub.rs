@@ -1,9 +1,8 @@
-use crate::{
-    BinaryBundle,
-    binary::{Add, TwosComplement},
-};
+use crate::binary::{Add, TwosComplement};
 use core::marker::PhantomData;
-use fancy_traits::{Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant};
+use fancy_traits::{
+    BinaryBundle, Circuit, CircuitInputMapper, CircuitOutputMapper, FancyBinary, FancyConstant,
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
@@ -97,11 +96,11 @@ mod test {
         for _ in 0..16 {
             let x = rng.random::<u128>() % Q;
             let y = rng.random::<u128>() % Q;
-            let x_input = BinaryBundle::from(x);
-            let y_input = BinaryBundle::from(y);
-            let outputs = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
-            assert_eq!(Into::<u128>::into(outputs.0), x.overflowing_sub(y).0 % Q);
-            assert_eq!(outputs.1.val(), F2::from(y != 0 && x >= y));
+            let x_input = Dummy::constant(x);
+            let y_input = Dummy::constant(y);
+            let (result, underflow) = Dummy::eval(&circuit, (&x_input, &y_input)).unwrap();
+            assert_eq!(Dummy::from(result), x.overflowing_sub(y).0 % Q);
+            assert_eq!(underflow.val(), F2::from(y != 0 && x >= y));
         }
     }
 }

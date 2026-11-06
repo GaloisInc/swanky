@@ -18,3 +18,6 @@ swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
