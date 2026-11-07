@@ -11,9 +11,12 @@ version.workspace = true
 workspace = true
 
 [dependencies]
+criterion.workspace = true
 swanky-field.workspace = true
 swanky-polynomial.workspace = true
+swanky-rng.workspace = true
 swanky-serialization.workspace = true
 proptest.workspace = true
+rand.workspace = true
 hybrid-array.workspace = true
 

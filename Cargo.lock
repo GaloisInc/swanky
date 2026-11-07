@@ -2377,10 +2377,13 @@ dependencies = [
 name = "swanky-field-test"
 version = "0.6.0"
 dependencies = [
+ "criterion",
  "hybrid-array",
  "proptest",
+ "rand",
  "swanky-field",
  "swanky-polynomial",
+ "swanky-rng",
  "swanky-serialization",
 ]
 
