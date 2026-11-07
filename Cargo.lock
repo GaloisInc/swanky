@@ -2346,6 +2346,7 @@ name = "swanky-field-ff-primes"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "crypto-bigint",
  "ff",
  "ff_codegen",
