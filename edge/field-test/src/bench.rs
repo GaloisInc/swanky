@@ -16,5 +16,97 @@
 /// the appropriate changes to `Cargo.toml` to run it as a benchmark.
 #[macro_export]
 macro_rules! bench_field {
-    () => {};
+    ($bench_name:ident, $fe:ty) => {
+        mod $bench_name {
+            use super::*;
+            type FE = $fe;
+
+            // Make benches a separate module, so `use super::*;`
+            // doesn't pollute the benchmarking module namespace.
+            // We need it above, because `$fe` might be an unqualified
+            // name.
+            mod benches {
+                use super::FE;
+                use $crate::__internal_macro_exports::{criterion, swanky_field, swanky_rng};
+
+                use std::hint::black_box;
+
+                use criterion::{Criterion, criterion_group};
+
+                use swanky_field::{FiniteField, FiniteRing};
+                use swanky_rng::SwankyRng;
+
+                pub fn add(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::add", std::any::type_name::<FE>()), |b| {
+                        let x = <FE>::random(&mut rand::rng());
+                        let y = <FE>::random(&mut rand::rng());
+                        b.iter(|| black_box(black_box(x) + black_box(y)));
+                    });
+                }
+
+                pub fn mul(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::mul", std::any::type_name::<FE>()), |b| {
+                        let x = <FE>::random(&mut rand::rng());
+                        let y = <FE>::random(&mut rand::rng());
+                        b.iter(|| black_box(black_box(x) * black_box(y)));
+                    });
+                }
+
+                pub fn div(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::div", std::any::type_name::<FE>()), |b| {
+                        let x = <FE>::random(&mut rand::rng());
+                        let y = <FE>::random_nonzero(&mut rand::rng());
+                        b.iter(|| black_box(black_box(x) / black_box(y)));
+                    });
+                }
+
+                pub fn pow(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::pow32", std::any::type_name::<FE>()), |b| {
+                        let x = <FE>::random(&mut rand::rng());
+                        b.iter(|| black_box(black_box(x).pow(black_box(32u128))));
+                    });
+                }
+
+                pub fn inverse(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::inverse", std::any::type_name::<FE>()), |b| {
+                        let x = <FE>::random_nonzero(&mut rand::rng());
+                        b.iter(|| black_box(black_box(x).inverse()));
+                    });
+                }
+
+                pub fn random(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::random", std::any::type_name::<FE>()), |b| {
+                        let mut rng = SwankyRng::new();
+                        b.iter(|| black_box(<FE>::random(&mut rng)));
+                    });
+                }
+
+                pub fn sum(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::sum100", std::any::type_name::<FE>()), |b| {
+                        let x: Vec<_> = (0..100).map(|_| <FE>::random(&mut rand::rng())).collect();
+                        b.iter(|| black_box(black_box(x.iter().copied()).sum::<FE>()));
+                    });
+                }
+
+                pub fn product(c: &mut Criterion) {
+                    c.bench_function(&format!("{}::prod100", std::any::type_name::<FE>()), |b| {
+                        let x: Vec<_> = (0..100).map(|_| <FE>::random(&mut rand::rng())).collect();
+                        b.iter(|| black_box(black_box(x.iter().copied()).product::<FE>()));
+                    });
+                }
+            }
+
+            $crate::__internal_macro_exports::criterion::criterion_group!(
+                $bench_name,
+                benches::add,
+                benches::mul,
+                benches::div,
+                benches::pow,
+                benches::inverse,
+                benches::random,
+                benches::sum,
+                benches::product
+            );
+        }
+    };
 }
