@@ -28,9 +28,5 @@ proptest.workspace = true
 criterion.workspace = true
 
 [[bench]]
-name = "f128b"
-harness = false
-
-[[bench]]
-name = "f256b"
+name = "field-binary"
 harness = false
