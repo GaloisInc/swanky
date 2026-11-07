@@ -31,7 +31,7 @@ macro_rules! test_field {
             // be an unqualified name in the super namespace.
             mod tests {
                 use super::FE;
-                use $crate::__internal_macro_exports::*;
+                use $crate::__internal_macro_exports::{proptest, hybrid_array, swanky_field, swanky_polynomial, swanky_serialization};
                 use proptest::prelude::*;
                 use hybrid_array::{Array, ArraySize, typenum::Unsigned};
                 use swanky_field::{Degree, FiniteField, FiniteRing, PrimeFiniteField};
