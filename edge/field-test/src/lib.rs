@@ -16,6 +16,7 @@ pub mod __internal_macro_exports {
     pub use swanky_serialization;
 }
 
+mod bench;
 mod field;
 mod ring;
 pub use field::*;
