@@ -512,6 +512,7 @@ mod tests {
     use proptest::prelude::*;
     use vectoreyes::U8x16;
     swanky_field_test::test_field!(test_field, F128b, crate::f128b::polynomial_modulus_f128b);
+    swanky_field_test::test_newton_polynomial!(test_newton_polynomial, F128b);
     proptest! {
         #[test]
         fn lsb_works(input in any::<u128>()) {

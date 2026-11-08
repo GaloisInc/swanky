@@ -192,4 +192,5 @@ impl IsSubFieldOf<F64b> for F2 {
 mod tests {
     use super::F64b;
     swanky_field_test::test_field!(test_field, F64b, crate::f64b::polynomial_modulus_f64b);
+    swanky_field_test::test_newton_polynomial!(test_newton_polynomial, F64b);
 }

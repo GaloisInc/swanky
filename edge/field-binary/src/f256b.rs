@@ -364,13 +364,14 @@ mod tests {
 
     use super::F256b;
     use proptest::prelude::*;
-    use swanky_field_test::{arbitrary_ring, test_field};
+    use swanky_field_test::{arbitrary_ring, test_field, test_newton_polynomial};
 
     test_field! {
         test_field,
         F256b,
         crate::f256b::polynomial_modulus_f256b
     }
+    test_newton_polynomial!(test_newton_polynomial, F256b);
 
     proptest! {
         #[test]
