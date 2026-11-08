@@ -294,6 +294,8 @@ macro_rules! prime_field_using_ff {
 
             #[cfg(test)]
             swanky_field_test::test_field!(test_field, $name, Polynomial::x);
+            #[cfg(test)]
+            swanky_field_test::test_newton_polynomial!(test_newton_polynomial, $name);
 
             #[cfg(test)]
             mod tests {
