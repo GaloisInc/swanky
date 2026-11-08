@@ -203,6 +203,7 @@ mod tests {
     use proptest::prelude::*;
 
     swanky_field_test::test_field!(test_field, F61p, Polynomial::x);
+    swanky_field_test::test_newton_polynomial!(test_newton_polynomial, F61p);
 
     #[cfg(test)]
     proptest! {
