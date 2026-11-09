@@ -31,67 +31,127 @@ macro_rules! bench_field {
 
                 use std::hint::black_box;
 
-                use criterion::{Criterion, criterion_group};
+                use criterion::{BatchSize, Criterion, criterion_group};
 
                 use swanky_field::{FiniteField, FiniteRing};
                 use swanky_rng::SwankyRng;
 
                 pub fn add(c: &mut Criterion) {
                     c.bench_function(&format!("{}::add", std::any::type_name::<FE>()), |b| {
-                        let x = <FE>::random(&mut rand::rng());
-                        let y = <FE>::random(&mut rand::rng());
-                        b.iter(|| black_box(black_box(x) + black_box(y)));
+                        b.iter_batched(
+                            || {
+                                (
+                                    <FE>::random(&mut rand::rng()),
+                                    <FE>::random(&mut rand::rng()),
+                                )
+                            },
+                            |(x, y)| {
+                                black_box(black_box(x) + black_box(y));
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn mul(c: &mut Criterion) {
                     c.bench_function(&format!("{}::mul", std::any::type_name::<FE>()), |b| {
-                        let x = <FE>::random(&mut rand::rng());
-                        let y = <FE>::random(&mut rand::rng());
-                        b.iter(|| black_box(black_box(x) * black_box(y)));
+                        b.iter_batched(
+                            || {
+                                (
+                                    <FE>::random(&mut rand::rng()),
+                                    <FE>::random(&mut rand::rng()),
+                                )
+                            },
+                            |(x, y)| {
+                                black_box(black_box(x) * black_box(y));
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn div(c: &mut Criterion) {
                     c.bench_function(&format!("{}::div", std::any::type_name::<FE>()), |b| {
-                        let x = <FE>::random(&mut rand::rng());
-                        let y = <FE>::random_nonzero(&mut rand::rng());
-                        b.iter(|| black_box(black_box(x) / black_box(y)));
+                        b.iter_batched(
+                            || {
+                                (
+                                    <FE>::random(&mut rand::rng()),
+                                    <FE>::random(&mut rand::rng()),
+                                )
+                            },
+                            |(x, y)| {
+                                black_box(black_box(x) / black_box(y));
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn pow(c: &mut Criterion) {
                     c.bench_function(&format!("{}::pow32", std::any::type_name::<FE>()), |b| {
-                        let x = <FE>::random(&mut rand::rng());
-                        b.iter(|| black_box(black_box(x).pow(black_box(32u128))));
+                        b.iter_batched(
+                            || <FE>::random(&mut rand::rng()),
+                            |x| {
+                                black_box(black_box(x).pow(black_box(32u128)));
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn inverse(c: &mut Criterion) {
                     c.bench_function(&format!("{}::inverse", std::any::type_name::<FE>()), |b| {
-                        let x = <FE>::random_nonzero(&mut rand::rng());
-                        b.iter(|| black_box(black_box(x).inverse()));
+                        b.iter_batched(
+                            || <FE>::random(&mut rand::rng()),
+                            |x| {
+                                black_box(black_box(x).inverse());
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn random(c: &mut Criterion) {
                     c.bench_function(&format!("{}::random", std::any::type_name::<FE>()), |b| {
-                        let mut rng = SwankyRng::new();
-                        b.iter(|| black_box(<FE>::random(&mut rng)));
+                        b.iter_batched(
+                            || SwankyRng::new(),
+                            |mut rng| {
+                                black_box(<FE>::random(&mut rng));
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn sum(c: &mut Criterion) {
                     c.bench_function(&format!("{}::sum100", std::any::type_name::<FE>()), |b| {
-                        let x: Vec<_> = (0..100).map(|_| <FE>::random(&mut rand::rng())).collect();
-                        b.iter(|| black_box(black_box(x.iter().copied()).sum::<FE>()));
+                        b.iter_batched(
+                            || {
+                                (0..100)
+                                    .map(|_| <FE>::random(&mut rand::rng()))
+                                    .collect::<Vec<_>>()
+                            },
+                            |x| {
+                                black_box(black_box(x.iter().copied()).sum::<FE>());
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
 
                 pub fn product(c: &mut Criterion) {
                     c.bench_function(&format!("{}::prod100", std::any::type_name::<FE>()), |b| {
-                        let x: Vec<_> = (0..100).map(|_| <FE>::random(&mut rand::rng())).collect();
-                        b.iter(|| black_box(black_box(x.iter().copied()).product::<FE>()));
+                        b.iter_batched(
+                            || {
+                                (0..100)
+                                    .map(|_| <FE>::random(&mut rand::rng()))
+                                    .collect::<Vec<_>>()
+                            },
+                            |x| {
+                                black_box(black_box(x.iter().copied()).product::<FE>());
+                            },
+                            BatchSize::SmallInput,
+                        );
                     });
                 }
             }
