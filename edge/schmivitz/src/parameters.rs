@@ -36,13 +36,7 @@ pub trait Params: Clone + Copy + core::fmt::Debug + Default + 'static {
     /// The XOF used throughout the protocol.
     type Xof: ExtendableOutput + Default;
 
-    /// The field size ($`p`$ in the paper) in which the input circuit / polynomials
-    /// and the witness are defined.
-    ///
-    /// Note that the ZK protocol for degree-2 polynomials from small-sized sVOLE defined in
-    /// Section 6.2 actually allows the input polynomials to be defined over an extension field
-    /// $`\mathbb F_{p^k}`$, for some $`k`$. For ease of implementation, we restrict the input
-    /// polynomials to be over $`\mathbb F_p`$.
+    /// Computational security parameter ($`\lambda`$ in the paper).
     type SecurityParam: ArraySize;
 
     /// The size of an [`FLambda`] element in bytes.
