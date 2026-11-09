@@ -9,13 +9,17 @@
 /// our macros need.
 #[doc(hidden)]
 pub mod __internal_macro_exports {
+    pub use criterion;
     pub use hybrid_array;
     pub use proptest;
+    pub use rand;
     pub use swanky_field;
     pub use swanky_polynomial;
+    pub use swanky_rng;
     pub use swanky_serialization;
 }
 
+mod bench;
 mod field;
 mod ring;
 pub use field::*;

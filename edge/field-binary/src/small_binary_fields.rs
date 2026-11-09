@@ -268,6 +268,7 @@ macro_rules! small_binary_field {
                 }
             }
             swanky_field_test::test_field!(test_field, $name, $modulus_fn);
+            swanky_field_test::test_newton_polynomial!(test_newton_polynomial, $name);
         }
     };
 }

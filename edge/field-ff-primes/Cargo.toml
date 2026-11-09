@@ -26,6 +26,7 @@ crypto-bigint.workspace = true
 bytemuck.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 swanky-field-test.workspace = true
 proptest.workspace = true
 num-bigint.workspace = true
@@ -36,4 +37,8 @@ tempfile.workspace = true
 sha2.workspace = true
 num-bigint.workspace = true
 num_cpus.workspace = true
+
+[[bench]]
+name = "field-ff-primes"
+harness = false
 

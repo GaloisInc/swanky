@@ -2330,6 +2330,7 @@ name = "swanky-field-f61p"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "crypto-bigint",
  "hybrid-array",
  "proptest",
@@ -2345,6 +2346,7 @@ name = "swanky-field-ff-primes"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
+ "criterion",
  "crypto-bigint",
  "ff",
  "ff_codegen",
@@ -2377,10 +2379,13 @@ dependencies = [
 name = "swanky-field-test"
 version = "0.6.0"
 dependencies = [
+ "criterion",
  "hybrid-array",
  "proptest",
+ "rand",
  "swanky-field",
  "swanky-polynomial",
+ "swanky-rng",
  "swanky-serialization",
 ]
 

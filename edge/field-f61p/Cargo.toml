@@ -20,6 +20,12 @@ crypto-bigint.workspace = true
 bytemuck.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 swanky-field-test.workspace = true
 proptest.workspace = true
+
+[[bench]]
+name = "f61p"
+harness = false
+
 

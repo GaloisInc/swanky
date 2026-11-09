@@ -31,7 +31,7 @@ macro_rules! test_field {
             // be an unqualified name in the super namespace.
             mod tests {
                 use super::FE;
-                use $crate::__internal_macro_exports::*;
+                use $crate::__internal_macro_exports::{proptest, hybrid_array, swanky_field, swanky_polynomial, swanky_serialization};
                 use proptest::prelude::*;
                 use hybrid_array::{Array, ArraySize, typenum::Unsigned};
                 use swanky_field::{Degree, FiniteField, FiniteRing, PrimeFiniteField};
@@ -321,8 +321,57 @@ macro_rules! test_field {
                             }
                         }
                     }
-                    // TODO: test newton polynomials
                 }
+            }
+        }
+    };
+}
+
+/// Test that an implementation supports Newton polynomial
+/// interpolation.
+///
+/// Run it like
+/// `swanky_field_test::test_newton_polynomial!(newton_tests,
+/// MyFunField)`, where `newton_tests` is an arbitrary module name
+/// used to namespace the tests, and `MyFunField` is the field to
+/// test.
+#[macro_export]
+macro_rules! test_newton_polynomial {
+    ($tests_name:ident, $fe:ty) => {
+        mod $tests_name {
+            use super::*;
+            type FE = $fe;
+            // We make tests a separate module, so that we can avoid
+            // the `use super::*;` from polluting the tests namespace.
+            // We need the `use super::*;` above, because `$fe` might
+            // be an unqualified name in the super namespace.
+            mod tests {
+                use super::FE;
+                use $crate::__internal_macro_exports::{proptest, swanky_polynomial};
+
+                use proptest::prelude::*;
+                use swanky_polynomial::{NewtonPolynomial, Polynomial};
+
+                proptest! {
+                        #[test]
+                        fn test_newton_polynomial(
+                            (p, xs) in $crate::arbitrary_polynomial::<FE>().prop_flat_map(|p| {
+                                (
+                                    Just(p.clone()),
+                                    proptest::collection::vec($crate::arbitrary_ring::<FE>(), p.degree())
+                                )
+                            })
+                        ) {
+                            let ys: Vec<FE> = xs.iter().map(|&x| p.eval(x)).collect();
+
+                            let npoly = NewtonPolynomial::new(xs.clone());
+                            let mut coeffs = ys.clone();
+                            npoly.interpolate_in_place(&mut coeffs);
+                            let ys_: Vec<FE> = xs.iter().map(|&x| npoly.eval(&coeffs, x)).collect();
+
+                            prop_assert_eq!(ys, ys_);
+                        }
+                    }
             }
         }
     };
