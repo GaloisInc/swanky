@@ -13,12 +13,12 @@ use diet_mac_and_cheese::svole_trait::Svole;
 use log::info;
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::BufReader;
 use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Instant;
-use swanky_channel_legacy::{Channel, SyncChannel};
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field_binary::{F2, F40b};
 use swanky_rng::SwankyRng;
@@ -103,13 +103,13 @@ fn start_connection_prover(addresses: &[String]) -> Result<Vec<TcpStream>> {
 /// The type is generic over parameters `P`, `C`.
 /// The parameter `P` is for both a prover or a verifier to use this type via the `Party` trait.
 /// The parameter `C` is to allow different types of channels.
-struct ChannelIterator<P, C> {
+struct ChannelIterator<P> {
     addresses: Vec<String>,
     idx: usize,
-    phantom: PhantomData<(P, C)>,
+    phantom: PhantomData<P>,
 }
 
-impl<P, C> ChannelIterator<P, C> {
+impl<P> ChannelIterator<P> {
     /// Create a new [`ChannelIterator`] given a list of addresses.
     fn new(addresses: &[String]) -> Self {
         Self {
@@ -131,10 +131,8 @@ impl<P, C> ChannelIterator<P, C> {
     }
 }
 
-impl<P: Party> Iterator
-    for ChannelIterator<P, SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>
-{
-    type Item = SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>;
+impl<P: Party> Iterator for ChannelIterator<P> {
+    type Item = TcpStream;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(addr) = self.next_address() {
@@ -143,9 +141,7 @@ impl<P: Party> Iterator
                     Ok(listener) => match listener.accept() {
                         Ok((stream, _addr)) => {
                             info!("accept connection on {addr}");
-                            let reader = BufReader::new(stream.try_clone().unwrap());
-                            let writer = BufWriter::new(stream);
-                            Some(SyncChannel::new(reader, writer))
+                            Some(stream)
                         }
                         _ => {
                             info!("Error accepting addr {addr}");
@@ -161,9 +157,7 @@ impl<P: Party> Iterator
                     let c = TcpStream::connect(&addr);
                     if let Ok(stream) = c {
                         info!("connection accepted by {addr}");
-                        let reader = BufReader::new(stream.try_clone().unwrap());
-                        let writer = BufWriter::new(stream);
-                        return Some(SyncChannel::new(reader, writer));
+                        return Some(stream);
                     }
                 },
             }
@@ -251,77 +245,68 @@ fn run_singlethreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> 
             let mut conns = start_connection_verifier(std::slice::from_ref(&args.connection_addr))?;
             let stream = conns.pop().unwrap();
 
-            let reader = BufReader::new(stream.try_clone().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to clone TCP stream for reader.",
-            )?);
-            let writer = BufWriter::new(stream);
-            let mut channel = Channel::new(reader, writer);
+            Channel::with(stream, |channel| {
+                let start = Instant::now();
+                let rng = SwankyRng::new();
 
-            let start = Instant::now();
-            let rng = SwankyRng::new();
+                let mut evaluator =
+                    EvaluatorCirc::<Verifier, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                        channel,
+                        rng,
+                        inputs,
+                        type_store,
+                        config.lpn(),
+                        config.no_batching(),
+                    )?;
+                evaluator.load_backends(channel, config.lpn())?;
+                info!("init time: {:?}", start.elapsed());
 
-            let mut evaluator =
-                EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
-                    &mut channel,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.lpn(),
-                    config.no_batching(),
-                )?;
-            evaluator.load_backends(&mut channel, config.lpn())?;
-            info!("init time: {:?}", start.elapsed());
-
-            let start = Instant::now();
-            if is_text {
-                let relation_file = File::open(relation_path)
-                    .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
-                let relation_reader = BufReader::new(relation_file);
-                evaluator.evaluate_relation_text(relation_reader)?;
-            } else {
-                evaluator.evaluate_relation(&relation_path)?;
-            }
-            info!("time circ exec: {:?}", start.elapsed());
-            info!("VERIFIER DONE!");
+                let start = Instant::now();
+                if is_text {
+                    let relation_file = File::open(relation_path)
+                        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
+                    let relation_reader = BufReader::new(relation_file);
+                    evaluator.evaluate_relation_text(relation_reader, channel)?;
+                } else {
+                    evaluator.evaluate_relation(&relation_path, channel)?;
+                }
+                info!("time circ exec: {:?}", start.elapsed());
+                info!("VERIFIER DONE!");
+                Ok(())
+            })?;
         }
         Some(_) => {
             // Prover mode
             let mut conns = start_connection_prover(std::slice::from_ref(&args.connection_addr))?;
             let stream = conns.pop().unwrap();
 
-            let reader = BufReader::new(stream.try_clone().wrap_err(
-                ErrorKind::NetworkError,
-                "Failed to clone TCP stream for reader.",
-            )?);
-            let writer = BufWriter::new(stream);
-            let mut channel = Channel::new(reader, writer);
-
-            let start = Instant::now();
-            let rng = SwankyRng::new();
-
-            let mut evaluator =
-                EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
-                    &mut channel,
-                    rng,
-                    inputs,
-                    type_store,
-                    config.lpn(),
-                    config.no_batching(),
-                )?;
-            evaluator.load_backends(&mut channel, config.lpn())?;
-            info!("init time: {:?}", start.elapsed());
-            let start = Instant::now();
-            if is_text {
-                let relation_file = File::open(relation_path)
-                    .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
-                let relation_reader = BufReader::new(relation_file);
-                evaluator.evaluate_relation_text(relation_reader)?;
-            } else {
-                evaluator.evaluate_relation(&relation_path)?;
-            }
-            info!("time circ exec: {:?}", start.elapsed());
-            info!("PROVER DONE!");
+            Channel::with(stream, |channel| {
+                let start = Instant::now();
+                let rng = SwankyRng::new();
+                let mut evaluator =
+                    EvaluatorCirc::<Prover, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                        channel,
+                        rng,
+                        inputs,
+                        type_store,
+                        config.lpn(),
+                        config.no_batching(),
+                    )?;
+                evaluator.load_backends(channel, config.lpn())?;
+                info!("init time: {:?}", start.elapsed());
+                let start = Instant::now();
+                if is_text {
+                    let relation_file = File::open(relation_path)
+                        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
+                    let relation_reader = BufReader::new(relation_file);
+                    evaluator.evaluate_relation_text(relation_reader, channel)?;
+                } else {
+                    evaluator.evaluate_relation(&relation_path, channel)?;
+                }
+                info!("time circ exec: {:?}", start.elapsed());
+                info!("PROVER DONE!");
+                Ok(())
+            })?;
         }
     }
     Ok(())
@@ -343,13 +328,10 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
     match args.witness {
         None => {
             // Verifier mode
-            let mut channels = ChannelIterator::<
-                Verifier,
-                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
-            >::new(&addresses);
+            let mut channels = ChannelIterator::<Verifier>::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = match channels.next() {
+            let main_channel = match channels.next() {
                 Some(c) => c,
                 _ => {
                     bail!(ErrorKind::OtherError, "cannot open first channel");
@@ -364,7 +346,6 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             let mut handles = vec![];
             let (mut evaluator, handles_f2) = EvaluatorCirc::<
                 Verifier,
-                _,
                 SvoleAtomic<_, F2, F40b>,
                 SvoleAtomic<_, F40b, F40b>,
             >::new_multithreaded(
@@ -379,7 +360,6 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
-                &mut channel,
                 &mut channels,
                 config.lpn(),
                 config.threads_per_field(),
@@ -388,14 +368,16 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             info!("init time: {:?}", init_time.elapsed());
 
             let start = Instant::now();
-            if is_text {
-                let relation_file = File::open(relation_path)
-                    .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
-                let relation_reader = BufReader::new(relation_file);
-                evaluator.evaluate_relation_text(relation_reader)?;
-            } else {
-                evaluator.evaluate_relation(&relation_path)?;
-            }
+            Channel::with(main_channel, |channel| {
+                if is_text {
+                    let relation_file = File::open(relation_path)
+                        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
+                    let relation_reader = BufReader::new(relation_file);
+                    evaluator.evaluate_relation_text(relation_reader, channel)
+                } else {
+                    evaluator.evaluate_relation(&relation_path, channel)
+                }
+            })?;
             evaluator.terminate()?;
             for handle in handles {
                 handle.join().expect("thread failed to join")?;
@@ -407,13 +389,10 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
         }
         Some(_) => {
             // Prover mode
-            let mut channels = ChannelIterator::<
-                Prover,
-                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>,
-            >::new(&addresses);
+            let mut channels = ChannelIterator::<Prover>::new(&addresses);
 
             // This is the channel for the main thread
-            let mut channel = match channels.next() {
+            let main_channel = match channels.next() {
                 Some(c) => c,
                 _ => {
                     bail!(ErrorKind::OtherError, "cannot open first channel");
@@ -428,7 +407,6 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             let mut handles = vec![];
             let (mut evaluator, handles_f2) = EvaluatorCirc::<
                 Prover,
-                _,
                 SvoleAtomic<_, F2, F40b>,
                 SvoleAtomic<_, F40b, F40b>,
             >::new_multithreaded(
@@ -443,7 +421,6 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             handles.extend(handles_f2);
 
             let handles_fields = evaluator.load_backends_multithreaded(
-                &mut channel,
                 &mut channels,
                 config.lpn(),
                 config.threads_per_field(),
@@ -452,14 +429,16 @@ fn run_multithreaded(args: &Cli, config: &Config, is_text: bool) -> Result<()> {
             info!("init time: {:?}", init_time.elapsed());
 
             let start = Instant::now();
-            if is_text {
-                let relation_file = File::open(relation_path)
-                    .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
-                let relation_reader = BufReader::new(relation_file);
-                evaluator.evaluate_relation_text(relation_reader)?;
-            } else {
-                evaluator.evaluate_relation(&relation_path)?;
-            }
+            Channel::with(main_channel, |channel| {
+                if is_text {
+                    let relation_file = File::open(relation_path)
+                        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
+                    let relation_reader = BufReader::new(relation_file);
+                    evaluator.evaluate_relation_text(relation_reader, channel)
+                } else {
+                    evaluator.evaluate_relation(&relation_path, channel)
+                }
+            })?;
             evaluator.terminate()?;
             for handle in handles {
                 handle.join().expect("thread failed to join")?;
@@ -494,24 +473,24 @@ fn run_plaintext(args: &Cli) -> Result<()> {
             // Prover mode
             let start = Instant::now();
 
-            let mut evaluator = EvaluatorCirc::<
-                Prover,
-                SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
-                Svole<_, F2, F40b>,
-                Svole<_, F40b, F40b>,
-            >::new_plaintext(inputs, type_store)?;
+            let mut evaluator =
+                EvaluatorCirc::<Prover, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new_plaintext(
+                    inputs, type_store,
+                )?;
             evaluator.load_backends_plaintext()?;
             info!("init time: {:?}", start.elapsed());
             let start = Instant::now();
 
-            if args.text {
-                let relation_file = File::open(relation_path)
-                    .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
-                let relation_reader = BufReader::new(relation_file);
-                evaluator.evaluate_relation_text(relation_reader)?;
-            } else {
-                evaluator.evaluate_relation(&relation_path)?;
-            }
+            Channel::with(std::io::empty(), |channel| {
+                if args.text {
+                    let relation_file = File::open(relation_path)
+                        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
+                    let relation_reader = BufReader::new(relation_file);
+                    evaluator.evaluate_relation_text(relation_reader, channel)
+                } else {
+                    evaluator.evaluate_relation(&relation_path, channel)
+                }
+            })?;
             evaluator.terminate()?;
             info!("time circ exec: {:?}", start.elapsed());
         }

@@ -34,7 +34,7 @@ serde = { workspace = true, features = ["derive"] }
 subtle.workspace = true
 toml = { workspace = true, features = ["display", "parse"] }
 
-swanky-channel-legacy.workspace = true
+swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true

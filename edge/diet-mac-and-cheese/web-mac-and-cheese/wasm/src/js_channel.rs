@@ -1,4 +1,5 @@
-use swanky_channel_legacy::AbstractChannel;
+use std::io::{Read, Write};
+
 use wasm_bindgen::prelude::*;
 
 // TODO: We should experiment with an API that exchange vector of data instead individual bytes to minimize
@@ -74,20 +75,33 @@ impl ShimChannel {
     }
 }
 
-impl AbstractChannel for ShimChannel {
-    fn read_bytes(&mut self, bytes: &mut [u8]) -> std::io::Result<()> {
-        for byte in bytes.iter_mut() {
-            *byte = self.read_one_byte();
+impl Read for ShimChannel {
+    /// Read up to `bytes.len()` bytes from the channel.
+    ///
+    /// In practice, only reads one byte at a time, since the
+    /// underlying call to `js_read_byte` blocks until a byte is
+    /// available, with no indication about the availability of future
+    /// bytes.
+    /// This avoids a deadlock when the peer sends less data than
+    /// requested.
+    fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        match bytes.first_mut() {
+            Some(byte) => {
+                *byte = self.read_one_byte();
+                Ok(1)
+            }
+            None => Ok(0),
         }
-        Ok(())
     }
+}
 
+impl Write for ShimChannel {
     /// Write a slice of `u8`s to the channel.
-    fn write_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
         for b in bytes {
             self.write_one_byte(*b);
         }
-        Ok(())
+        Ok(bytes.len())
     }
     /// Flush the channel.
     fn flush(&mut self) -> std::io::Result<()> {

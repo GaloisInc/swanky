@@ -19,7 +19,7 @@ use crate::{
 };
 use hybrid_array::Array;
 use rand::SeedableRng;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F2, F40b};
@@ -29,42 +29,31 @@ use swanky_rng::SwankyRng;
 pub(crate) struct DietMacAndCheeseExtField<
     P: Party,
     T: FiniteField<PrimeField = F2>,
-    C: AbstractChannel + Clone,
     SVOLE1: SvoleT<P, F2, T>,
     SVOLE2: SvoleT<P, T, T>,
 > where
     F2: IsSubFieldOf<T>,
 {
-    dmc: DietMacAndCheese<P, F2, T, C, SVOLE1>,
-    lifted_dmc: DietMacAndCheese<P, T, T, C, SVOLE2>,
-    dora_states: HashMap<usize, DoraState<P, T, T, C, SVOLE2>>,
-    ram_states: Vec<BooleanRam<P, T, C, SVOLE1>>,
+    dmc: DietMacAndCheese<P, F2, T, SVOLE1>,
+    lifted_dmc: DietMacAndCheese<P, T, T, SVOLE2>,
+    dora_states: HashMap<usize, DoraState<P, T, T, SVOLE2>>,
+    ram_states: Vec<BooleanRam<P, T, SVOLE1>>,
 }
 
-impl<
-    P: Party,
-    T: FiniteField<PrimeField = F2>,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, T>,
-    SVOLE2: SvoleT<P, T, T>,
-> DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
+impl<P: Party, T: FiniteField<PrimeField = F2>, SVOLE1: SvoleT<P, F2, T>, SVOLE2: SvoleT<P, T, T>>
+    DietMacAndCheeseExtField<P, T, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
     pub(crate) fn init_with_fcom(
-        channel: &mut C,
         mut rng: SwankyRng,
         fcom: &FCom<P, F2, T, SVOLE1>,
         fcom_ext: &FCom<P, T, T, SVOLE2>,
         no_batching: bool,
     ) -> Result<Self> {
-        let dmc = DietMacAndCheese::init_with_fcom(
-            channel,
-            SwankyRng::from_rng(&mut rng),
-            fcom,
-            no_batching,
-        )?;
-        let lifted_dmc = DietMacAndCheese::init_with_fcom(channel, rng, fcom_ext, no_batching)?;
+        let dmc =
+            DietMacAndCheese::init_with_fcom(SwankyRng::from_rng(&mut rng), fcom, no_batching)?;
+        let lifted_dmc = DietMacAndCheese::init_with_fcom(rng, fcom_ext, no_batching)?;
         Ok(Self {
             dmc,
             lifted_dmc,
@@ -74,24 +63,19 @@ where
     }
 }
 
-impl<
-    P: Party,
-    T: FiniteField<PrimeField = F2>,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, T>,
-    SVOLE2: SvoleT<P, T, T>,
-> BackendT for DietMacAndCheeseExtField<P, T, C, SVOLE1, SVOLE2>
+impl<P: Party, T: FiniteField<PrimeField = F2>, SVOLE1: SvoleT<P, F2, T>, SVOLE2: SvoleT<P, T, T>>
+    BackendT for DietMacAndCheeseExtField<P, T, SVOLE1, SVOLE2>
 where
     F2: IsSubFieldOf<T>,
 {
-    type Wire = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheese<P, F2, T, C, SVOLE1> as BackendT>::FieldElement;
+    type Wire = <DietMacAndCheese<P, F2, T, SVOLE1> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheese<P, F2, T, SVOLE1> as BackendT>::FieldElement;
 
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         self.dmc.wire_value(wire)
     }
-    fn random(&mut self) -> Result<Self::FieldElement> {
-        self.dmc.random()
+    fn random(&mut self, channel: &mut Channel) -> Result<Self::FieldElement> {
+        self.dmc.random(channel)
     }
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.copy(wire)
@@ -99,8 +83,8 @@ where
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.constant(val)
     }
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
-        self.dmc.assert_zero(wire)
+    fn assert_zero(&mut self, wire: &Self::Wire, channel: &mut Channel) -> Result<()> {
+        self.dmc.assert_zero(wire, channel)
     }
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.add(a, b)
@@ -108,8 +92,8 @@ where
     fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.sub(a, b)
     }
-    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
-        self.dmc.mul(a, b)
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire, channel: &mut Channel) -> Result<Self::Wire> {
+        self.dmc.mul(a, b, channel)
     }
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.add_constant(a, b)
@@ -121,42 +105,46 @@ where
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.input_public(val)
     }
-    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        self.dmc.input_private(val)
+    fn input_private(
+        &mut self,
+        val: Option<Self::FieldElement>,
+        channel: &mut Channel,
+    ) -> Result<Self::Wire> {
+        self.dmc.input_private(val, channel)
     }
-    fn finalize(&mut self) -> Result<()> {
-        self.dmc.finalize()?;
-        self.lifted_dmc.finalize()?;
+    fn finalize(&mut self, channel: &mut Channel) -> Result<()> {
+        self.dmc.finalize(channel)?;
+        self.lifted_dmc.finalize(channel)?;
         Ok(())
     }
 }
 
-impl<
-    P: Party,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, F40b>,
-    SVOLE2: SvoleT<P, F40b, F40b>,
-> BackendConvT<P> for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>> BackendConvT<P>
+    for DietMacAndCheeseExtField<P, F40b, SVOLE1, SVOLE2>
 {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
-        self.dmc.assert_conv_to_bits(w)
+    fn assert_conv_to_bits(
+        &mut self,
+        w: &Self::Wire,
+        channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
+        self.dmc.assert_conv_to_bits(w, channel)
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
-        self.dmc.assert_conv_from_bits(x)
+    fn assert_conv_from_bits(
+        &mut self,
+        x: &[Mac<P, F2, F40b>],
+        channel: &mut Channel,
+    ) -> Result<Self::Wire> {
+        self.dmc.assert_conv_from_bits(x, channel)
     }
 
-    fn finalize_conv(&mut self) -> Result<()> {
-        self.dmc.finalize_conv()
+    fn finalize_conv(&mut self, channel: &mut Channel) -> Result<()> {
+        self.dmc.finalize_conv(channel)
     }
 }
 
-impl<
-    P: Party,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, F40b>,
-    SVOLE2: SvoleT<P, F40b, F40b>,
-> BackendDisjunctionT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>> BackendDisjunctionT
+    for DietMacAndCheeseExtField<P, F40b, SVOLE1, SVOLE2>
 {
     fn disjunction(
         &mut self,
@@ -164,11 +152,12 @@ impl<
         fun_store: &FunStore,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
+        channel: &mut Channel,
     ) -> Result<Vec<Self::Wire>> {
         // Assumes `inputs` is in the expected input format (input wires in
         // their proper order, then big-endian condition wires).
-        fn lift_guard<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>>(
-            dmc: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE>,
+        fn lift_guard<P: Party, SVOLE: SvoleT<P, F2, F40b>>(
+            dmc: &mut DietMacAndCheese<P, F2, F40b, SVOLE>,
             inputs: &[Mac<P, F2, F40b>],
             num_cond: usize,
         ) -> Mac<P, F40b, F40b> {
@@ -201,17 +190,17 @@ impl<
         fn execute_branch<
             I: Iterator<Item = F2>,
             P: Party,
-            C: AbstractChannel + Clone,
             SVOLE1: SvoleT<P, F2, F40b>,
             SVOLE2: SvoleT<P, F40b, F40b>,
         >(
-            dmcf2: &mut DietMacAndCheese<P, F2, F40b, C, SVOLE1>,
-            dmc: &mut DietMacAndCheese<P, F40b, F40b, C, SVOLE2>,
+            dmcf2: &mut DietMacAndCheese<P, F2, F40b, SVOLE1>,
+            dmc: &mut DietMacAndCheese<P, F40b, F40b, SVOLE2>,
             wit_tape: I,
-            inputs: &[<DietMacAndCheese<P, F2, F40b, C, SVOLE1> as BackendT>::Wire],
+            inputs: &[<DietMacAndCheese<P, F2, F40b, SVOLE1> as BackendT>::Wire],
             cond: usize,
-            st: &mut DoraState<P, F40b, F40b, C, SVOLE2>,
-        ) -> Result<Vec<<DietMacAndCheese<P, F2, F40b, C, SVOLE1> as BackendT>::Wire>> {
+            st: &mut DoraState<P, F40b, F40b, SVOLE2>,
+            channel: &mut Channel,
+        ) -> Result<Vec<<DietMacAndCheese<P, F2, F40b, SVOLE1> as BackendT>::Wire>> {
             // Must have at least one condition wire
             debug_assert!(cond > 0);
 
@@ -237,7 +226,13 @@ impl<
             let adjusted_inputs = adjust_inputs(inputs, cond, guard_val);
 
             st.dora
-                .mux(dmc, wit_tape.map(|x| x.into()), &adjusted_inputs, opt)?
+                .mux(
+                    dmc,
+                    wit_tape.map(|x| x.into()),
+                    &adjusted_inputs,
+                    opt,
+                    channel,
+                )?
                 .iter()
                 .copied()
                 .map(<Mac<P, F2, F40b>>::try_from)
@@ -245,13 +240,14 @@ impl<
         }
 
         match self.dora_states.entry(disj.id()) {
-            Entry::Occupied(mut entry) => execute_branch::<_, _, _, SVOLE1, _>(
+            Entry::Occupied(mut entry) => execute_branch::<_, _, SVOLE1, _>(
                 &mut self.dmc,
                 &mut self.lifted_dmc,
                 inswit.wit_iter::<F2>(),
                 inputs,
                 disj.cond() as usize,
                 entry.get_mut(),
+                channel,
             ),
             Entry::Vacant(entry) => {
                 // Compile disjunction to F40b
@@ -274,46 +270,39 @@ impl<
                 });
 
                 // Compute opt
-                execute_branch::<_, _, _, SVOLE1, _>(
+                execute_branch::<_, _, SVOLE1, _>(
                     &mut self.dmc,
                     &mut self.lifted_dmc,
                     inswit.wit_iter::<F2>(),
                     inputs,
                     disj.cond() as usize,
                     dora,
+                    channel,
                 )
             }
         }
     }
 
-    fn finalize_disj(&mut self) -> Result<()> {
+    fn finalize_disj(&mut self, channel: &mut Channel) -> Result<()> {
         for (_, disj) in std::mem::take(&mut self.dora_states) {
-            disj.dora.finalize(&mut self.lifted_dmc)?;
+            disj.dora.finalize(&mut self.lifted_dmc, channel)?;
         }
         Ok(())
     }
 }
 
-impl<
-    P: Party,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, F40b>,
-    SVOLE2: SvoleT<P, F40b, F40b>,
-> BackendLiftT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>> BackendLiftT
+    for DietMacAndCheeseExtField<P, F40b, SVOLE1, SVOLE2>
 {
-    type LiftedBackend = DietMacAndCheese<P, F40b, F40b, C, SVOLE2>;
+    type LiftedBackend = DietMacAndCheese<P, F40b, F40b, SVOLE2>;
 
     fn lift(&mut self) -> &mut Self::LiftedBackend {
         &mut self.lifted_dmc
     }
 }
 
-impl<
-    P: Party,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, F40b>,
-    SVOLE2: SvoleT<P, F40b, F40b>,
-> BackendRamT for DietMacAndCheeseExtField<P, F40b, C, SVOLE1, SVOLE2>
+impl<P: Party, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, F40b, F40b>> BackendRamT
+    for DietMacAndCheeseExtField<P, F40b, SVOLE1, SVOLE2>
 {
     fn init_ram(
         &mut self,
@@ -337,22 +326,33 @@ impl<
         Ok(ram_id)
     }
 
-    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+    fn ram_read(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        channel: &mut Channel,
+    ) -> Result<Vec<Self::Wire>> {
         debug_assert!(ram < self.ram_states.len());
 
-        self.ram_states[ram].read(&mut self.dmc, addr)
+        self.ram_states[ram].read(&mut self.dmc, addr, channel)
     }
 
-    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()> {
+    fn ram_write(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        new: &[Self::Wire],
+        channel: &mut Channel,
+    ) -> Result<()> {
         debug_assert!(ram < self.ram_states.len());
 
-        self.ram_states[ram].write(&mut self.dmc, addr, new)
+        self.ram_states[ram].write(&mut self.dmc, addr, new, channel)
     }
 
-    fn finalize_rams(&mut self) -> Result<()> {
+    fn finalize_rams(&mut self, channel: &mut Channel) -> Result<()> {
         self.ram_states
             .iter_mut()
-            .try_for_each(|ram| ram.finalize(&mut self.dmc))
+            .try_for_each(|ram| ram.finalize(&mut self.dmc, channel))
     }
 }
 
@@ -364,83 +364,64 @@ mod test {
     use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
     use rand::SeedableRng;
-    use std::thread::JoinHandle;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
-    use swanky_error::{ErrorKind, WrapErr};
+    use swanky_channel::local::local_channel_pair;
     use swanky_field_binary::{F2, F40b};
     use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
 
     #[test]
     fn test_backend_ext_field() -> swanky_error::Result<()> {
-        let (sender, receiver) = UnixStream::pair().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to create Unix socket pair.",
-        )?;
-        let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+        local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let fcom = FCom::<Verifier, F2, F40b, Svole<Verifier, F2, F40b>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
 
-            let fcom = FCom::<Prover, F2, F40b, Svole<Prover, F2, F40b>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )?;
+                let fcom_ext = FCom::<Verifier, F40b, F40b, Svole<Verifier, F40b, F40b>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
 
-            let fcom_ext = FCom::<Prover, F40b, F40b, Svole<Prover, F40b, F40b>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )?;
+                let mut eval = DietMacAndCheeseExtField::<
+                    Verifier,
+                    F40b,
+                    Svole<Verifier, F2, F40b>,
+                    Svole<Verifier, F40b, F40b>,
+                >::init_with_fcom(rng, &fcom, &fcom_ext, false)?;
+                eval.finalize(channel)
+            },
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let fcom = FCom::<Prover, F2, F40b, Svole<Prover, F2, F40b>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
 
-            let mut eval =
-                DietMacAndCheeseExtField::<
+                let fcom_ext = FCom::<Prover, F40b, F40b, Svole<Prover, F40b, F40b>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+
+                let mut eval = DietMacAndCheeseExtField::<
                     Prover,
                     F40b,
-                    _,
                     Svole<Prover, F2, F40b>,
                     Svole<Prover, F40b, F40b>,
-                >::init_with_fcom(&mut channel, rng, &fcom, &fcom_ext, false)?;
-            eval.finalize().unwrap();
-            swanky_error::Result::Ok(())
-        });
-
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let fcom = FCom::<Verifier, F2, F40b, Svole<Verifier, F2, F40b>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+                >::init_with_fcom(rng, &fcom, &fcom_ext, false)?;
+                eval.finalize(channel)
+            },
         )?;
 
-        let fcom_ext = FCom::<Verifier, F40b, F40b, Svole<Verifier, F40b, F40b>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-        )?;
-
-        let mut eval = DietMacAndCheeseExtField::<
-            Verifier,
-            F40b,
-            _,
-            Svole<Verifier, F2, F40b>,
-            Svole<Verifier, F40b, F40b>,
-        >::init_with_fcom(&mut channel, rng, &fcom, &fcom_ext, false)?;
-        eval.finalize().unwrap();
-
-        handle.join().unwrap()
+        Ok(())
     }
 }

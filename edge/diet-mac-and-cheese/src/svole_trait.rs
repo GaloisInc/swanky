@@ -10,7 +10,7 @@ use std::{
     cell::{RefCell, RefMut},
     rc::Rc,
 };
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
@@ -28,8 +28,8 @@ use swanky_svole_wykw::{LpnParams, Receiver, Sender};
 pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
     /// Initialize function.
     /// Initialize with delta when provided.
-    fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
+    fn init(
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -39,9 +39,9 @@ pub trait SvoleT<P: Party, V, T>: SvoleStopSignal {
         Self: Sized;
 
     /// Extend function producing more correlations in the `out` vector.
-    fn extend<C: AbstractChannel + Clone>(
+    fn extend(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()>;
@@ -93,8 +93,8 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> SvoleT<P, V, T> for Svole<P, 
 where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
-    fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
+    fn init(
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -126,9 +126,9 @@ where
         })
     }
 
-    fn extend<C: AbstractChannel + Clone>(
+    fn extend(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {

@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use swanky_channel_legacy::AbstractChannel;
 use swanky_field::FiniteField;
-
-// handling of (FS) transcripts
-mod tx;
 
 // handling of R1CS accumulators
 mod acc;
@@ -126,17 +122,12 @@ impl<F: FiniteField + SieveIrDeserialize> Clause<F> {
     }
 }
 
-pub struct DoraState<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> where
+pub struct DoraState<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>>
+where
     F::PrimeField: IsSubFieldOf<V>,
 {
     // map used to lookup the guard -> active clause index
     pub clause_resolver: PartyPrivate<Prover, P, HashMap<F, usize>>,
     // dora for this particular switch/mux
-    pub dora: Dora<P, V, F, C, SvoleF>,
+    pub dora: Dora<P, V, F, SvoleF>,
 }

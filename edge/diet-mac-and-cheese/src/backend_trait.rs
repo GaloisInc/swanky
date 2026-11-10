@@ -1,6 +1,7 @@
 //! Core backend trait used for Diet Mac'n'Cheese.
 
 use crate::mac::MacT;
+use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteField;
 
@@ -16,21 +17,25 @@ pub trait BackendT {
     /// Return a copy of `wire`.
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire>;
     /// Return a random [`Self::FieldElement`].
-    fn random(&mut self) -> Result<Self::FieldElement>;
+    fn random(&mut self, channel: &mut Channel) -> Result<Self::FieldElement>;
     /// Return `val` as a [`Self::Wire`].
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire>;
     /// Assert that `wire` is zero.
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()>;
+    fn assert_zero(&mut self, wire: &Self::Wire, channel: &mut Channel) -> Result<()>;
 
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;
     fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;
-    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire>;
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire, channel: &mut Channel) -> Result<Self::Wire>;
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire>;
     fn mul_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire>;
 
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire>;
-    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire>;
+    fn input_private(
+        &mut self,
+        val: Option<Self::FieldElement>,
+        channel: &mut Channel,
+    ) -> Result<Self::Wire>;
 
     /// Finalize the internal checks.
-    fn finalize(&mut self) -> Result<()>;
+    fn finalize(&mut self, channel: &mut Channel) -> Result<()>;
 }

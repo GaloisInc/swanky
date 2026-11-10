@@ -4,6 +4,7 @@ use crate::circuit_ir::{FunStore, TypeId, TypeSpecification, TypeStore, WireCoun
 use crate::memory::Memory;
 use crate::party::{Party, WhichParty};
 use subtle::{ConditionallySelectable, ConstantTimeEq};
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
@@ -51,10 +52,11 @@ impl MuxVersion {
         &self,
         backend: &mut B,
         memory: &mut Memory<B::Wire>,
+        channel: &mut Channel,
     ) -> Result<()> {
         match self {
-            MuxVersion::MuxVerV0(p) => p.execute::<P, _>(backend, memory),
-            MuxVersion::MuxVerV1(p) => p.0.execute::<P, _>(backend, memory),
+            MuxVersion::MuxVerV0(p) => p.execute::<P, _>(backend, memory, channel),
+            MuxVersion::MuxVerV1(p) => p.0.execute::<P, _>(backend, memory, channel),
         }
     }
 }
@@ -90,6 +92,7 @@ impl MuxV0 {
         &self,
         cond_vec: &[B::Wire],
         backend: &mut B,
+        channel: &mut Channel,
     ) -> Result<Vec<B::Wire>> {
         // The main idea is to initialize the output vector to 10000...
         // and use the cond expressed in binary to control shift by power of twos
@@ -125,9 +128,9 @@ impl MuxV0 {
             for i in 0..shift_by {
                 if i + shift_by < self.selector_range {
                     // only write when the index in within the bounds of the selector_range
-                    ys[i + shift_by] = backend.mul(&ys[i], cond)?;
+                    ys[i + shift_by] = backend.mul(&ys[i], cond, channel)?;
                 }
-                ys[i] = backend.mul(&ys[i], &neg_cond)?;
+                ys[i] = backend.mul(&ys[i], &neg_cond, channel)?;
                 // break the loop when the index touched is ready to get over the selector_range
                 if i == self.selector_range - 1 {
                     break;
@@ -143,7 +146,7 @@ impl MuxV0 {
                 acc = backend.add(&acc, y)?;
             }
             acc = backend.add_constant(&acc, B::FieldElement::ONE)?;
-            backend.assert_zero(&acc)?;
+            backend.assert_zero(&acc, channel)?;
         }
         // permissive
         // no check
@@ -155,6 +158,7 @@ impl MuxV0 {
         &self,
         cond: B::Wire,
         backend: &mut B,
+        channel: &mut Channel,
     ) -> Result<Vec<B::Wire>> {
         // decode `cond` into a vector ys of 0s or 1s such that ys[i] == 1 <=> cond == i
         // The steps are basically:
@@ -196,7 +200,7 @@ impl MuxV0 {
         }
 
         for inp in inputs.iter() {
-            let t = backend.input_private(*inp)?;
+            let t = backend.input_private(*inp, channel)?;
             ys.push(t);
         }
 
@@ -204,16 +208,16 @@ impl MuxV0 {
         let one = backend.constant(B::FieldElement::ONE)?;
         for y_i in ys.iter() {
             let tmp1 = backend.sub(&one, y_i)?;
-            let tmp2 = backend.mul(y_i, &tmp1)?;
-            backend.assert_zero(&tmp2)?;
+            let tmp2 = backend.mul(y_i, &tmp1, channel)?;
+            backend.assert_zero(&tmp2, channel)?;
         }
 
         // 3) Check that If y_i == 1 then cond == i   (done with CheckZero(y_i * (cond-i)))
         let mut minus_i = B::FieldElement::ZERO;
         for y_i in ys.iter() {
             let tmp1 = backend.add_constant(&cond, minus_i)?;
-            let tmp2 = backend.mul(y_i, &tmp1)?;
-            backend.assert_zero(&tmp2)?;
+            let tmp2 = backend.mul(y_i, &tmp1, channel)?;
+            backend.assert_zero(&tmp2, channel)?;
             minus_i -= B::FieldElement::ONE;
         }
 
@@ -225,7 +229,7 @@ impl MuxV0 {
                 sum_ys = backend.add(&sum_ys, y_i)?;
             }
             let sum_ys_minus_one = backend.sub(&one, &sum_ys)?;
-            backend.assert_zero(&sum_ys_minus_one)?;
+            backend.assert_zero(&sum_ys_minus_one, channel)?;
         } // 4) b) otherwise permissive
         // no check
         Ok(ys)
@@ -236,6 +240,7 @@ impl MuxV0 {
         &self,
         backend: &mut B,
         memory: &mut Memory<B::Wire>,
+        channel: &mut Channel,
     ) -> Result<()> {
         // The general idea for how the mux plugin works is the following.
         // Let's consider the following example:
@@ -260,13 +265,13 @@ impl MuxV0 {
         // 1) decode cond to get ys
         let ys = if self.cond_num_wire == 1 && self.field_type_id != std::any::TypeId::of::<F2>() {
             let cond = memory.get(start_cond_wire);
-            self.decode::<P, _>(*cond, backend)?
+            self.decode::<P, _>(*cond, backend, channel)?
         } else {
             let mut cond_vec = Vec::with_capacity(self.cond_num_wire);
             for i in 0..self.cond_num_wire {
                 cond_vec.push(*memory.get(start_cond_wire + (i as u64)));
             }
-            self.decode_boolean(cond_vec.as_slice(), backend)?
+            self.decode_boolean(cond_vec.as_slice(), backend, channel)?
         };
         // The shape of `r` will match the self.branch_shape
         let mut r = Vec::with_capacity(self.branch_shape.len());
@@ -279,7 +284,7 @@ impl MuxV0 {
 
             for i in 0..*wirerange_size {
                 let x = memory.get(wire + i);
-                r1.push(backend.mul(&ys[0], x)?);
+                r1.push(backend.mul(&ys[0], x, channel)?);
             }
             r.push(r1);
 
@@ -294,7 +299,7 @@ impl MuxV0 {
                 for i in 0..*wirerange_size {
                     let x_i = memory.get(wire + i);
 
-                    let t = backend.mul(y_i, x_i)?;
+                    let t = backend.mul(y_i, x_i, channel)?;
                     r[branch][i as usize] = backend.add(&r[branch][i as usize], &t)?;
                 }
                 // moving by `wirerange_size` on the inputs

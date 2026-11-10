@@ -12,6 +12,7 @@ use crate::{
 
 use hybrid_array::Array;
 use std::marker::PhantomData;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F2, F40b};
@@ -97,7 +98,7 @@ where
         Ok(*wire)
     }
 
-    fn random(&mut self) -> Result<Self::FieldElement> {
+    fn random(&mut self, _channel: &mut Channel) -> Result<Self::FieldElement> {
         Ok(Self::FieldElement::random(&mut self.rng))
     }
 
@@ -105,7 +106,7 @@ where
         self.input_public(val)
     }
 
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+    fn assert_zero(&mut self, wire: &Self::Wire, _channel: &mut Channel) -> Result<()> {
         self.monitor.incr_monitor_check_zero();
         if wire.0 == Self::FieldElement::ZERO {
             Ok(())
@@ -124,7 +125,12 @@ where
         Ok(WirePlaintext::new(a.0 - b.0))
     }
 
-    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+    fn mul(
+        &mut self,
+        a: &Self::Wire,
+        b: &Self::Wire,
+        _channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mul();
         Ok(WirePlaintext::new(a.0 * b.0))
     }
@@ -144,12 +150,16 @@ where
         Ok(WirePlaintext::new(val))
     }
 
-    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
+    fn input_private(
+        &mut self,
+        val: Option<Self::FieldElement>,
+        _channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         self.monitor.incr_monitor_witness();
         Ok(WirePlaintext::new(val.unwrap()))
     }
 
-    fn finalize(&mut self) -> Result<()> {
+    fn finalize(&mut self, _channel: &mut Channel) -> Result<()> {
         self.monitor.log_final_monitor();
         Ok(())
     }
@@ -182,11 +192,12 @@ impl BackendDisjunctionT for DietMacAndCheesePlaintext<F2, F40b> {
         _fun_store: &FunStore,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
+        _channel: &mut Channel,
     ) -> Result<Vec<Self::Wire>> {
         unimplemented!("The plaintext backend does not support the disjunction plugin")
     }
 
-    fn finalize_disj(&mut self) -> Result<()> {
+    fn finalize_disj(&mut self, _channel: &mut Channel) -> Result<()> {
         Ok(())
     }
 }
@@ -198,17 +209,22 @@ impl<F: PrimeFiniteField> BackendDisjunctionT for DietMacAndCheesePlaintext<F, F
         _fun_store: &FunStore,
         _inputs: &[Self::Wire],
         _disj: &DisjunctionBody,
+        _channel: &mut Channel,
     ) -> Result<Vec<Self::Wire>> {
         unimplemented!("The plaintext backend does not support the disjunction plugin")
     }
 
-    fn finalize_disj(&mut self) -> Result<()> {
+    fn finalize_disj(&mut self, _channel: &mut Channel) -> Result<()> {
         Ok(())
     }
 }
 
 impl<P: Party> BackendConvT<P> for DietMacAndCheesePlaintext<F2, F40b> {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
+    fn assert_conv_to_bits(
+        &mut self,
+        w: &Self::Wire,
+        _channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
         match P::WHICH {
             WhichParty::Prover(_) => {
                 let bmac = Mac::new(PartyPrivateCopy::new(w.0), F40b::ZERO);
@@ -222,7 +238,11 @@ impl<P: Party> BackendConvT<P> for DietMacAndCheesePlaintext<F2, F40b> {
         }
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(
+        &mut self,
+        x: &[Mac<P, F2, F40b>],
+        _channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         match P::WHICH {
             WhichParty::Prover(ev) => Ok(WirePlaintext::new(x[0].value().into_inner(ev))),
             WhichParty::Verifier(_) => {
@@ -233,13 +253,17 @@ impl<P: Party> BackendConvT<P> for DietMacAndCheesePlaintext<F2, F40b> {
         }
     }
 
-    fn finalize_conv(&mut self) -> Result<()> {
+    fn finalize_conv(&mut self, _channel: &mut Channel) -> Result<()> {
         Ok(())
     }
 }
 
 impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintext<F, F> {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
+    fn assert_conv_to_bits(
+        &mut self,
+        w: &Self::Wire,
+        _channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
         let mut v;
         let bits = w.0.bit_decomposition();
         match P::WHICH {
@@ -261,7 +285,11 @@ impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintex
         Ok(v)
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(
+        &mut self,
+        x: &[Mac<P, F2, F40b>],
+        channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         let mut power_twos = F::ONE;
         let mut recomposed_value = F::ZERO;
 
@@ -280,12 +308,12 @@ impl<P: Party, F: PrimeFiniteField> BackendConvT<P> for DietMacAndCheesePlaintex
             );
         }
 
-        let mac = self.input_private(Some(recomposed_value))?; // `Some` because the plaintext is the prover.
+        let mac = self.input_private(Some(recomposed_value), channel)?; // `Some` because the plaintext is the prover.
 
         Ok(mac)
     }
 
-    fn finalize_conv(&mut self) -> Result<()> {
+    fn finalize_conv(&mut self, _channel: &mut Channel) -> Result<()> {
         Ok(())
     }
 }
@@ -304,15 +332,26 @@ where
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn ram_read(&mut self, _ram: RamId, _addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+    fn ram_read(
+        &mut self,
+        _ram: RamId,
+        _addr: &[Self::Wire],
+        _channel: &mut Channel,
+    ) -> Result<Vec<Self::Wire>> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn ram_write(&mut self, _ram: RamId, _addr: &[Self::Wire], _new: &[Self::Wire]) -> Result<()> {
+    fn ram_write(
+        &mut self,
+        _ram: RamId,
+        _addr: &[Self::Wire],
+        _new: &[Self::Wire],
+        _channel: &mut Channel,
+    ) -> Result<()> {
         unimplemented!("The plaintext backend does not support the RAM plugin")
     }
 
-    fn finalize_rams(&mut self) -> Result<()> {
+    fn finalize_rams(&mut self, _channel: &mut Channel) -> Result<()> {
         Ok(())
     }
 }

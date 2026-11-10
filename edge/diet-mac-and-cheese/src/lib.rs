@@ -43,6 +43,7 @@ mod plaintext;
 mod plugins;
 mod ram;
 mod sieveir_phase2;
+mod transcript;
 
 use serde::Deserialize;
 use std::fmt::Display;
