@@ -24,7 +24,7 @@ pub const fn ggm_temporary_storage_size(depth: usize) -> usize {
 /// `tmp_storage` allows `ggm` to preserve allocations across invocations. It should be a slice
 /// of size `ggm_temporary_storage_size(depth)`. Its contents should be ignored.
 /// `depth` doesn't count the "root" node.
-pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
+pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<[T; 2]>>(
     depth: usize,
     initial_seed: U8x16,
     aes: &(Aes128EncryptOnly, Aes128EncryptOnly),
@@ -117,7 +117,7 @@ pub fn ggm<FE: FiniteField, T: From<U8x16>, Dst: Extend<(T, T)>>(
             k0 ^= s0;
             k1 ^= s1;
         }
-        (k0.into(), k1.into())
+        [k0.into(), k1.into()]
     }));
     // TODO: fuse this loop with the previous loop.
     let exp = 1 << depth;
@@ -369,7 +369,7 @@ mod tests {
         let alpha_keys: Vec<U8x16> = alpha_bits
             .iter()
             .zip(keys.iter())
-            .map(|(&b, k)| if !bool::from(b) { k.1 } else { k.0 })
+            .map(|(&b, k)| if !bool::from(b) { k[1] } else { k[0] })
             .collect();
         let mut vs_ = vec![(VF::ZERO, FE::ZERO); exp];
         let sum = ggm_prime::<VF, FE, (VF, FE)>(
