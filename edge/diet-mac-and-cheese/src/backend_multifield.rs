@@ -2789,8 +2789,7 @@ pub(crate) mod tests {
                     type_store,
                     LpnSize::Small,
                     false,
-                )
-                .unwrap();
+                )?;
                 eval.load_backends(channel, LpnSize::Small)?;
                 eval.evaluate_gates(&gates, &func_store, channel)
             },

@@ -171,8 +171,7 @@ mod tests {
                     LPN_SETUP_SMALL,
                     LPN_EXTEND_SMALL,
                     false,
-                )
-                .unwrap();
+                )?;
                 let zero = party.input_private(Some(F2::ZERO), channel)?;
                 let one = party.input_private(Some(F2::ONE), channel)?;
 

@@ -1304,14 +1304,11 @@ mod tests {
                 )?[0]
                     .clone();
 
-                fconv
-                    .fcom_f2
-                    .open(
-                        channel,
-                        &res,
-                        &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
-                    )
-                    .unwrap();
+                fconv.fcom_f2.open(
+                    channel,
+                    &res,
+                    &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
+                )?;
 
                 fconv.fcom_f2.open(
                     channel,
@@ -1340,7 +1337,7 @@ mod tests {
                         &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
                     )?;
 
-                let dabits_mac = fconv.random_dabits(channel, &mut rng, count).unwrap();
+                let dabits_mac = fconv.random_dabits(channel, &mut rng, count)?;
                 fconv.fdabit(channel, &mut rng, &dabits_mac)
             },
             |channel| {
@@ -1351,7 +1348,7 @@ mod tests {
                         &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
                     )?;
 
-                let dabits = fconv.random_dabits(channel, &mut rng, count).unwrap();
+                let dabits = fconv.random_dabits(channel, &mut rng, count)?;
                 fconv.fdabit(channel, &mut rng, &dabits)
             },
         )

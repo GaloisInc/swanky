@@ -868,12 +868,11 @@ mod tests {
                     &mut rng,
                     LPN_SETUP_SMALL,
                     LPN_EXTEND_SMALL,
-                )
-                .unwrap();
+                )?;
 
                 let mut v = Vec::new();
                 for _ in 0..count {
-                    let x = fcom.random(channel, &mut rng).unwrap();
+                    let x = fcom.random(channel, &mut rng)?;
                     let cst = V::random(&mut rng);
                     channel.write(&cst)?;
                     channel.force_flush().unwrap();
@@ -1009,9 +1008,8 @@ mod tests {
                     let mut v = Vec::new();
                     for _ in 0..n {
                         let x = V::random_nonzero(&mut rng);
-                        let xmac = fcom
-                            .input1_prover(Witness::EQUAL_TYPES, channel, &mut rng, x)
-                            .unwrap();
+                        let xmac =
+                            fcom.input1_prover(Witness::EQUAL_TYPES, channel, &mut rng, x)?;
                         v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
                     }
                     channel.force_flush().unwrap();
@@ -1054,16 +1052,13 @@ mod tests {
                 let mut rng = SwankyRng::from_seed(Default::default());
 
                 let mut fcom =
-                    FCom::<Verifier, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic)
-                        .unwrap();
+                    FCom::<Verifier, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic)?;
 
                 let mut v = Vec::new();
                 for _ in 0..count {
-                    let xmac = fcom.random(channel, &mut rng).unwrap();
-                    let ymac = fcom.random(channel, &mut rng).unwrap();
-                    let zmac = fcom
-                        .input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, 1)
-                        .unwrap()[0];
+                    let xmac = fcom.random(channel, &mut rng)?;
+                    let ymac = fcom.random(channel, &mut rng)?;
+                    let zmac = fcom.input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, 1)?[0];
                     v.push((xmac, ymac, zmac));
                 }
                 fcom.quicksilver_check_multiply(channel, &mut rng, &v)
@@ -1090,18 +1085,16 @@ mod tests {
 
                 let mut rng = SwankyRng::from_seed(Default::default());
                 let mut fcom =
-                    FCom::<Prover, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic)
-                        .unwrap();
+                    FCom::<Prover, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic)?;
 
                 let mut v = Vec::new();
                 for _ in 0..count {
-                    let x = fcom.random(channel, &mut rng).unwrap();
-                    let y = fcom.random(channel, &mut rng).unwrap();
+                    let x = fcom.random(channel, &mut rng)?;
+                    let y = fcom.random(channel, &mut rng)?;
                     let z = x.value().into_inner(Witness::EQUAL_TYPES)
                         * y.value().into_inner(Witness::EQUAL_TYPES);
-                    let z_mac = fcom
-                        .input_prover(Witness::EQUAL_TYPES, channel, &mut rng, &[z])
-                        .unwrap()[0];
+                    let z_mac =
+                        fcom.input_prover(Witness::EQUAL_TYPES, channel, &mut rng, &[z])?[0];
                     v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
                 }
                 channel.force_flush().unwrap();

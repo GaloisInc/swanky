@@ -41,8 +41,7 @@ fn test_range_example() {
         |channel| {
             let rng = SwankyRng::from_seed(Default::default());
             let mut dmc: DietMacAndCheese<Verifier, F61p, F61p, Svole<_, F61p, F61p>> =
-                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                    .unwrap();
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
             dmc.input_private(None, channel)?;
 
@@ -67,7 +66,7 @@ fn test_range_example() {
 
             let mut disj = Dora::<Prover, F61p, F61p, Svole<_, _, F61p>>::new(range_check);
 
-            prover.input_private(Some(F61p::ONE), channel).unwrap();
+            prover.input_private(Some(F61p::ONE), channel)?;
 
             // do a number of range checks
             for _ in 0..NUM_RANGE_PROOFS {
@@ -80,8 +79,7 @@ fn test_range_example() {
                     &[v],
                     PartyPrivateCopy::new(wi),
                     channel,
-                )
-                .unwrap(); // because it is assigned 1
+                )?; // because it is assigned 1
             }
             disj.finalize(&mut prover, channel)?;
 
@@ -148,7 +146,7 @@ fn test_witness_example() {
             let mut input = Vec::new();
 
             for _ in 0..INPUTS {
-                input.push(verifier.input_private(None, channel).unwrap());
+                input.push(verifier.input_private(None, channel)?);
             }
 
             let mut disj = Dora::new(range_check_clone);
@@ -186,7 +184,7 @@ fn test_witness_example() {
                     0.try_into().unwrap() // pad with zeros
                 };
                 wit_tape.push(vin);
-                input.push(prover.input_private(Some(v), channel).unwrap());
+                input.push(prover.input_private(Some(v), channel)?);
             }
 
             // do a number of range checks
@@ -197,8 +195,7 @@ fn test_witness_example() {
                 &input,
                 PartyPrivateCopy::new(wi),
                 channel,
-            )
-            .unwrap();
+            )?;
             disj.finalize(&mut prover, channel)?;
             prover.finalize(channel)
         },

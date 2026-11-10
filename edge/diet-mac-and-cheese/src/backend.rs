@@ -481,34 +481,30 @@ mod tests {
             |channel| {
                 let rng = SwankyRng::from_seed(Default::default());
                 let mut dmc: DietMacAndCheese<Verifier, V, T, Svole<_, _, _>> =
-                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                        .unwrap();
+                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
                 let one = V::ONE;
                 let two = one + one;
                 let three = two + one;
-                let one1 = dmc.input_public(one).unwrap();
-                let one2 = dmc.input_public(one).unwrap();
-                let two_pub = dmc.add(&one1, &one2).unwrap();
-                let three_pub = dmc.add_constant(&two_pub, one).unwrap();
-                let two_priv = dmc.input_private(None, channel).unwrap();
-                let six = dmc.mul(&two_priv, &three_pub, channel).unwrap();
-                let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-                let n24_priv = dmc.mul(&twelve_priv, &two_priv, channel).unwrap();
-                let r_zero_priv = dmc
-                    .add_constant(&n24_priv, -(three * two * two * two))
-                    .unwrap();
-                dmc.assert_zero(&r_zero_priv, channel).unwrap();
-                dmc.finalize(channel).unwrap();
-                dmc.assert_zero(&n24_priv, channel).unwrap();
+                let one1 = dmc.input_public(one)?;
+                let one2 = dmc.input_public(one)?;
+                let two_pub = dmc.add(&one1, &one2)?;
+                let three_pub = dmc.add_constant(&two_pub, one)?;
+                let two_priv = dmc.input_private(None, channel)?;
+                let six = dmc.mul(&two_priv, &three_pub, channel)?;
+                let twelve_priv = dmc.mul_constant(&six, two)?;
+                let n24_priv = dmc.mul(&twelve_priv, &two_priv, channel)?;
+                let r_zero_priv = dmc.add_constant(&n24_priv, -(three * two * two * two))?;
+                dmc.assert_zero(&r_zero_priv, channel)?;
+                dmc.finalize(channel)?;
+                dmc.assert_zero(&n24_priv, channel)?;
                 assert!(dmc.finalize(channel).is_err());
                 Ok(())
             },
             |channel| {
                 let rng = SwankyRng::from_seed(Default::default());
                 let mut dmc: DietMacAndCheese<Prover, V, T, Svole<_, _, _>> =
-                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                        .unwrap();
+                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
                 // one1        = public(1)
                 // one2        = public(1)
@@ -524,26 +520,24 @@ mod tests {
                 let one = V::ONE;
                 let two = one + one;
                 let three = two + one;
-                let one1 = dmc.input_public(one).unwrap();
-                let one2 = dmc.input_public(one).unwrap();
-                let two_pub = dmc.add(&one1, &one2).unwrap();
-                assert_eq!(two_pub, dmc.input_public(two).unwrap());
-                let three_pub = dmc.add_constant(&two_pub, one).unwrap();
-                assert_eq!(three_pub, dmc.input_public(three).unwrap());
-                let two_priv = dmc.input_private(Some(two), channel).unwrap();
-                let six = dmc.mul(&two_priv, &three_pub, channel).unwrap();
-                let twelve_priv = dmc.mul_constant(&six, two).unwrap();
+                let one1 = dmc.input_public(one)?;
+                let one2 = dmc.input_public(one)?;
+                let two_pub = dmc.add(&one1, &one2)?;
+                assert_eq!(two_pub, dmc.input_public(two)?);
+                let three_pub = dmc.add_constant(&two_pub, one)?;
+                assert_eq!(three_pub, dmc.input_public(three)?);
+                let two_priv = dmc.input_private(Some(two), channel)?;
+                let six = dmc.mul(&two_priv, &three_pub, channel)?;
+                let twelve_priv = dmc.mul_constant(&six, two)?;
                 assert_eq!(
                     twelve_priv.value().into_inner(Witness::EQUAL_TYPES),
                     three * two * two
                 );
-                let n24_priv = dmc.mul(&twelve_priv, &two_priv, channel).unwrap();
-                let r_zero_priv = dmc
-                    .add_constant(&n24_priv, -(three * two * two * two))
-                    .unwrap();
-                dmc.assert_zero(&r_zero_priv, channel).unwrap();
-                dmc.finalize(channel).unwrap();
-                dmc.assert_zero(&n24_priv, channel).unwrap();
+                let n24_priv = dmc.mul(&twelve_priv, &two_priv, channel)?;
+                let r_zero_priv = dmc.add_constant(&n24_priv, -(three * two * two * two))?;
+                dmc.assert_zero(&r_zero_priv, channel)?;
+                dmc.finalize(channel)?;
+                dmc.assert_zero(&n24_priv, channel)?;
                 assert!(dmc.finalize(channel).is_err());
                 Ok(())
             },
