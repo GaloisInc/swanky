@@ -1404,7 +1404,7 @@ impl<P: Party, SvoleF2: SvoleT<P, F2, F40b> + 'static, SvoleF2Ext: SvoleT<P, F40
 {
     /// Initialize a new (single-threaded) `EvaluatorCirc`.
     ///
-    /// This requires an [`AbstractChannel`] and a [`SwankyRng`] to initialize the
+    /// This requires an [`Channel`] and a [`SwankyRng`] to initialize the
     /// homomorphic commitment scheme for [`F2`] and its extension field
     /// [`F40b`]. This is suboptimal; ideally, these protocols would only start
     /// in circuits where they are strictly required (i.e., Boolean circuits or
