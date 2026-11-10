@@ -1,10 +1,6 @@
-use std::{
-    io::{BufReader, BufWriter},
-    iter,
-    os::unix::net::UnixStream,
-};
+use std::iter;
 
-use swanky_channel_legacy::Channel;
+use swanky_channel::local::local_channel_pair;
 use swanky_field::FiniteRing;
 use swanky_field_f61p::F61p;
 use swanky_party::{private::PartyPrivateCopy, ty_eq::Witness};
@@ -39,64 +35,58 @@ fn test_range_example() {
         .collect::<Vec<_>>();
 
     let range_check = Disjunction::new(clauses.iter().cloned(), 1, 0);
-
-    let (sender, receiver) = UnixStream::pair().unwrap();
-
     let range_check_clone = range_check.clone();
 
-    let handle = std::thread::spawn(move || {
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
+    local_channel_pair(
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut dmc: DietMacAndCheese<Verifier, F61p, F61p, Svole<_, F61p, F61p>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-        let mut prover: DietMacAndCheese<Prover, F61p, F61p, _, Svole<_, _, F61p>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
+            dmc.input_private(None, channel)?;
 
-        let mut disj = Dora::<Prover, F61p, F61p, _, Svole<_, _, F61p>>::new(range_check);
+            let mut disj = Dora::new(range_check_clone);
+            for _ in 0..NUM_RANGE_PROOFS {
+                let v = dmc.input_private(None, channel)?;
+                disj.mux(
+                    &mut dmc,
+                    iter::empty(),
+                    &[v],
+                    PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                    channel,
+                )?;
+            }
+            disj.finalize(&mut dmc, channel)?;
+            dmc.finalize(channel)
+        },
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut prover: DietMacAndCheese<Prover, F61p, F61p, Svole<_, _, F61p>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-        prover.input_private(Some(F61p::ONE)).unwrap();
+            let mut disj = Dora::<Prover, F61p, F61p, Svole<_, _, F61p>>::new(range_check);
 
-        // do a number of range checks
-        for _ in 0..NUM_RANGE_PROOFS {
-            let wi: usize = prover.rng.random_range(..RANGE_SIZE);
-            let wf = F61p::try_from(wi as u128).unwrap();
-            let v = prover.input_private(Some(wf)).unwrap();
-            disj.mux(&mut prover, iter::empty(), &[v], PartyPrivateCopy::new(wi))
-                .unwrap(); // because it is assigned 1
-        }
-        disj.finalize(&mut prover).unwrap();
+            prover.input_private(Some(F61p::ONE), channel)?;
 
-        prover.finalize().unwrap();
-    });
+            // do a number of range checks
+            for _ in 0..NUM_RANGE_PROOFS {
+                let wi: usize = prover.rng.random_range(..RANGE_SIZE);
+                let wf = F61p::try_from(wi as u128).unwrap();
+                let v = prover.input_private(Some(wf), channel).unwrap();
+                disj.mux(
+                    &mut prover,
+                    iter::empty(),
+                    &[v],
+                    PartyPrivateCopy::new(wi),
+                    channel,
+                )?; // because it is assigned 1
+            }
+            disj.finalize(&mut prover, channel)?;
 
-    let rng = SwankyRng::from_seed(Default::default());
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-
-    let mut dmc: DietMacAndCheese<Verifier, F61p, F61p, _, Svole<_, F61p, F61p>> =
-        DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-            .unwrap();
-
-    dmc.input_private(None).unwrap();
-
-    let mut disj = Dora::new(range_check_clone);
-    for _ in 0..NUM_RANGE_PROOFS {
-        let v = dmc.input_private(None).unwrap();
-        disj.mux(
-            &mut dmc,
-            iter::empty(),
-            &[v],
-            PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
-        )
-        .unwrap();
-    }
-    disj.finalize(&mut dmc).unwrap();
-    dmc.finalize().unwrap();
-
-    handle.join().unwrap();
+            prover.finalize(channel)
+        },
+    )
+    .unwrap();
 }
 
 // a simple example of using a witness gate
@@ -145,80 +135,70 @@ fn test_witness_example() {
         OUTPUTS as WireCount,
     );
 
-    let (sender, receiver) = UnixStream::pair().unwrap();
-
     let range_check_clone = disj.clone();
 
-    let handle = std::thread::spawn(move || {
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
+    local_channel_pair(
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut verifier: DietMacAndCheese<Verifier, F61p, F61p, Svole<_, F61p, F61p>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-        let mut prover: DietMacAndCheese<Prover, F61p, F61p, _, Svole<_, _, F61p>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
+            let mut input = Vec::new();
 
-        let mut disj = Dora::<Prover, F61p, F61p, _, Svole<_, _, F61p>>::new(disj);
+            for _ in 0..INPUTS {
+                input.push(verifier.input_private(None, channel)?);
+            }
 
-        // select clause
-        let wi = prover.rng.random_range(..256);
+            let mut disj = Dora::new(range_check_clone);
 
-        // generate input and witness
-        let mut wit_tape: Vec<F61p> = Vec::new();
-        let mut input = Vec::new();
+            disj.mux(
+                &mut verifier,
+                iter::empty(),
+                &input,
+                PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+                channel,
+            )?;
 
-        for n in 0..INPUTS {
-            let v = prover.rng.random::<F61p>();
-            let vin = if n < wi {
-                v.inverse()
-            } else {
-                0.try_into().unwrap() // pad with zeros
-            };
-            wit_tape.push(vin);
-            input.push(prover.input_private(Some(v)).unwrap());
-        }
+            disj.finalize(&mut verifier, channel)?;
+            verifier.finalize(channel)
+        },
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut prover: DietMacAndCheese<Prover, F61p, F61p, Svole<_, _, F61p>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-        // do a number of range checks
+            let mut disj = Dora::<Prover, F61p, F61p, Svole<_, _, F61p>>::new(disj);
 
-        disj.mux(
-            &mut prover,
-            wit_tape.into_iter(),
-            &input,
-            PartyPrivateCopy::new(wi),
-        )
-        .unwrap();
-        disj.finalize(&mut prover).unwrap();
-        prover.finalize().unwrap();
-    });
+            // select clause
+            let wi = prover.rng.random_range(..256);
 
-    let rng = SwankyRng::from_seed(Default::default());
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
+            // generate input and witness
+            let mut wit_tape: Vec<F61p> = Vec::new();
+            let mut input = Vec::new();
 
-    let mut verifier: DietMacAndCheese<Verifier, F61p, F61p, _, Svole<_, F61p, F61p>> =
-        DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-            .unwrap();
+            for n in 0..INPUTS {
+                let v = prover.rng.random::<F61p>();
+                let vin = if n < wi {
+                    v.inverse()
+                } else {
+                    0.try_into().unwrap() // pad with zeros
+                };
+                wit_tape.push(vin);
+                input.push(prover.input_private(Some(v), channel)?);
+            }
 
-    let mut input = Vec::new();
+            // do a number of range checks
 
-    for _ in 0..INPUTS {
-        input.push(verifier.input_private(None).unwrap());
-    }
-
-    let mut disj = Dora::new(range_check_clone);
-
-    disj.mux(
-        &mut verifier,
-        iter::empty(),
-        &input,
-        PartyPrivateCopy::empty(Witness::EQUAL_TYPES),
+            disj.mux(
+                &mut prover,
+                wit_tape.into_iter(),
+                &input,
+                PartyPrivateCopy::new(wi),
+                channel,
+            )?;
+            disj.finalize(&mut prover, channel)?;
+            prover.finalize(channel)
+        },
     )
     .unwrap();
-
-    disj.finalize(&mut verifier).unwrap();
-    verifier.finalize().unwrap();
-
-    handle.join().unwrap();
 }

@@ -5,10 +5,11 @@ use crate::svole_trait::{SvoleStopSignal, SvoleT, field_name};
 use log::{debug, info};
 use std::cell::RefCell;
 use std::fmt::Debug;
+use std::io::{Read, Write};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure, swanky_error};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::{
@@ -71,8 +72,8 @@ impl<P: Party, V, T: Copy> SvoleStopSignal for SvoleAtomic<P, V, T> {
 }
 
 impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, V, T> {
-    fn init<C: AbstractChannel + Clone>(
-        _channel: &mut C,
+    fn init(
+        _channel: &mut Channel,
         _rng: &mut SwankyRng,
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
@@ -90,9 +91,9 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
         }
     }
 
-    fn extend<C: AbstractChannel + Clone>(
+    fn extend(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         _rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
@@ -119,7 +120,7 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomic<P, 
                 // the verifier does not receive the values because it's not flushed,
                 // hence it is a deadlock.
                 channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 debug!("SLEEP! VoleInterface {:?}", T::default());
                 // exponential backoff sleep
@@ -152,8 +153,8 @@ pub struct ThreadSvole<P: Party, V, T: FiniteField> {
 
 impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     /// Initialize the functionality.
-    pub fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
+    pub fn init(
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -193,11 +194,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
     }
 
     /// Run the functionality.
-    pub fn run<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut SwankyRng,
-    ) -> Result<()>
+    pub fn run(&mut self, channel: &mut Channel, rng: &mut SwankyRng) -> Result<()>
     where
         // This constraint is necessary in order to use `wykw::sole::Sender::send`
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
@@ -245,7 +242,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ThreadSvole<P, V, T> {
                         self.vole_comm
                             .as_mut()
                             .into_inner(ev)
-                            .receive::<_, V>(
+                            .receive(
                                 channel,
                                 rng,
                                 self.svole_atomic
@@ -316,9 +313,9 @@ impl<P: Party, V, T: Copy> SvoleAtomicRoundRobin<P, V, T> {
     }
 }
 
-fn get_channel<C2: AbstractChannel + Clone + 'static + Send, I>(channels: &mut I) -> Result<C2>
+fn get_channel<S, I>(channels: &mut I) -> Result<S>
 where
-    I: Iterator<Item = C2>,
+    I: Iterator<Item = S>,
 {
     channels
         .next()
@@ -332,7 +329,7 @@ where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
     // Create a `SvoleAtomicRounRobin`
-    pub(crate) fn create_and_spawn_svole_threads<C: AbstractChannel + Clone + 'static + Send, I>(
+    pub(crate) fn create_and_spawn_svole_threads<S: Read + Write + Send + 'static, I>(
         channels_vole: &mut I,
         threads_per_field: usize,
         lpn_setup: LpnParams,
@@ -344,14 +341,14 @@ where
         Vec<std::thread::JoinHandle<Result<()>>>,
     )>
     where
-        I: Iterator<Item = C>,
+        I: Iterator<Item = S>,
     {
         let mut threads = vec![];
         let mut svoles_atomics: Vec<SvoleAtomic<P, V, T>> = vec![];
         let mut svoles_atomics_to_stop: Vec<SvoleAtomic<P, V, T>> = vec![];
 
         for _ in 0..threads_per_field {
-            let mut channel = get_channel(channels_vole)?;
+            let channel = get_channel(channels_vole)?;
             let svole_atomic = SvoleAtomic::<P, V, T>::create();
             let svole_atomic2 = svole_atomic.duplicate();
             let svole_atomic3 = svole_atomic.duplicate();
@@ -363,16 +360,17 @@ where
                     field_name::<T>()
                 );
                 let mut rng2 = SwankyRng::new();
-                let mut svole = ThreadSvole::<P, V, T>::init(
-                    &mut channel,
-                    &mut rng2,
-                    lpn_setup,
-                    lpn_extend,
-                    svole_atomic,
-                    delta,
-                )?;
-                svole.run(&mut channel, &mut rng2)?;
-                Ok(())
+                Channel::with(channel, |channel| {
+                    let mut svole = ThreadSvole::<P, V, T>::init(
+                        channel,
+                        &mut rng2,
+                        lpn_setup,
+                        lpn_extend,
+                        svole_atomic,
+                        delta,
+                    )?;
+                    svole.run(channel, &mut rng2)
+                })
             });
             threads.push(svole_thread);
             svoles_atomics.push(svole_atomic2);
@@ -386,8 +384,8 @@ where
 }
 
 impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoundRobin<P, V, T> {
-    fn init<C: AbstractChannel + Clone>(
-        _channel: &mut C,
+    fn init(
+        _channel: &mut Channel,
         _rng: &mut SwankyRng,
         _lpn_setup: LpnParams,
         _lpn_extend: LpnParams,
@@ -407,9 +405,9 @@ impl<P: Party, V, T: Copy + Default + Debug> SvoleT<P, V, T> for SvoleAtomicRoun
         }
     }
 
-    fn extend<C: AbstractChannel + Clone>(
+    fn extend(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         out: &mut PartyEither<P, &mut Vec<(V, T)>, &mut Vec<T>>,
     ) -> Result<()> {
@@ -433,11 +431,7 @@ mod test {
     use crate::party::Verifier;
     use crate::svole_trait::SvoleT;
     use rand::RngExt;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::{Channel, local::LocalSocket};
     use swanky_party::{either::PartyEither, ty_eq::Witness};
     use swanky_rng::SwankyRng;
 
@@ -492,32 +486,32 @@ mod test {
         let mut round_robin = SvoleAtomicRoundRobin::new(vec![t1_copy, t2_copy]).unwrap();
 
         let mut rng = SwankyRng::new();
-        let (sender, _receiver) = UnixStream::pair().unwrap();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut v: Vec<u32> = vec![];
-        let mut out = PartyEither::new(Witness::EQUAL_TYPES, &mut v);
-        let mut i = 0;
-        let mut other_rng = rand::rng();
-        for _ in 0..2 * how_many {
-            let random_millis = other_rng.random_range(0..=SLEEP_TIME);
-            round_robin
-                .extend::<_>(&mut channel, &mut rng, &mut out)
-                .unwrap();
-            assert_eq!(
-                out.as_ref().into_inner(Witness::EQUAL_TYPES)[0],
-                i + CONST_42
-            );
-            assert_eq!(
-                out.as_ref().into_inner(Witness::EQUAL_TYPES)[1],
-                i + CONST_42 + 1
-            );
-            i = (i + SHIFT) % (2 * SHIFT);
-            out.as_mut().into_inner(Witness::EQUAL_TYPES).clear();
+        let (sender, _receiver) = LocalSocket::pair().unwrap();
+        Channel::with(sender, |channel| {
+            let mut v: Vec<u32> = vec![];
+            let mut out = PartyEither::new(Witness::EQUAL_TYPES, &mut v);
+            let mut i = 0;
+            let mut other_rng = rand::rng();
+            for _ in 0..2 * how_many {
+                let random_millis = other_rng.random_range(0..=SLEEP_TIME);
+                round_robin.extend(channel, &mut rng, &mut out).unwrap();
+                assert_eq!(
+                    out.as_ref().into_inner(Witness::EQUAL_TYPES)[0],
+                    i + CONST_42
+                );
+                assert_eq!(
+                    out.as_ref().into_inner(Witness::EQUAL_TYPES)[1],
+                    i + CONST_42 + 1
+                );
+                i = (i + SHIFT) % (2 * SHIFT);
+                out.as_mut().into_inner(Witness::EQUAL_TYPES).clear();
 
-            std::thread::sleep(std::time::Duration::from_millis(random_millis));
-        }
+                std::thread::sleep(std::time::Duration::from_millis(random_millis));
+            }
+            Ok(())
+        })
+        .unwrap();
+
         handle1.join().unwrap();
         handle2.join().unwrap();
     }

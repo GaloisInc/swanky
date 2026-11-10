@@ -7,10 +7,8 @@ use crate::svole_trait::{SvoleT, field_name};
 use hybrid_array::typenum::Unsigned;
 use log::info;
 use rand::{RngExt, SeedableRng};
-use std::io::{BufReader, BufWriter};
-use std::net::TcpStream;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
-use swanky_channel_legacy::{AbstractChannel, SyncChannel};
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure, swanky_error};
 use swanky_field::{FiniteField, FiniteRing};
 use swanky_field_binary::{F2, F40b};
@@ -153,9 +151,9 @@ impl<
         })
     }
 
-    fn convert_bit_2_field<C: AbstractChannel + Clone>(
+    fn convert_bit_2_field(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         r_batch: &[Dabit<P, FE>],
         x_batch: &[Mac<P, F2, F40b>],
         r_mac_plus_x_mac: &mut PartyPrivate<Verifier, P, &mut Vec<Mac<P, F2, F40b>>>,
@@ -230,9 +228,9 @@ impl<
     // contrary to the one in the paper that applies it on a pair of
     // bits. This allows to the keep the rounds of communication equal
     // to m for any vector of additions.
-    fn bit_add_carry<C: AbstractChannel + Clone>(
+    fn bit_add_carry(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         x_batch: &[Edabits<P, FE>],
         y_batch: &[Edabits<P, FE>],
@@ -395,7 +393,7 @@ impl<
         // check all the multiplication in one batch
         if let WhichParty::Prover(_) = P::WHICH {
             channel
-                .flush()
+                .force_flush()
                 .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
         }
         self.fcom_f2
@@ -421,9 +419,9 @@ impl<
     }
 
     /// generate random edabits
-    pub fn random_edabits<C: AbstractChannel + Clone>(
+    pub fn random_edabits(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         nb_bits: usize,
         num: usize, // in the paper: NB + C
@@ -476,9 +474,9 @@ impl<
         Ok(edabits_vec)
     }
 
-    fn random_dabits<C: AbstractChannel + Clone>(
+    fn random_dabits(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         num: usize,
     ) -> Result<Vec<Dabit<P, FE>>> {
@@ -519,9 +517,9 @@ impl<
         Ok(dabit_vec)
     }
 
-    fn fdabit<C: AbstractChannel + Clone>(
+    fn fdabit(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         dabits: &[Dabit<P, FE>],
     ) -> Result<()> {
@@ -705,19 +703,15 @@ impl<
         let seed = match P::WHICH {
             WhichParty::Prover(_) => {
                 channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-                channel
-                    .read_u8x16()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?
+                channel.read::<U8x16>()?
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
+                channel.write(&seed)?;
                 channel
-                    .write_u8x16(&seed)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 seed
             }
@@ -888,9 +882,9 @@ impl<
 
     // The conversion loop requires all of these parameters to function
     #[allow(clippy::too_many_arguments)]
-    fn conv_loop<C: AbstractChannel + Clone>(
+    fn conv_loop(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         edabits_vector: &[Edabits<P, FE>],
         r: &[Edabits<P, FE>],
@@ -974,14 +968,13 @@ impl<
     }
 
     /// conversion checking
-    pub fn conv<C: AbstractChannel + Clone>(
+    pub fn conv(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         num_bucket: usize,
         num_cut: usize,
         edabits_vector: &[Edabits<P, FE>],
-        bucket_channels: Option<Vec<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>>,
     ) -> Result<()> {
         let n = edabits_vector.len();
         if n == 0 {
@@ -1014,16 +1007,12 @@ impl<
 
         // step 3): get seed for permutation
         let seed = match P::WHICH {
-            WhichParty::Prover(_) => channel
-                .read_u8x16()
-                .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
+            WhichParty::Prover(_) => channel.read::<U8x16>()?,
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
+                channel.write(&seed)?;
                 channel
-                    .write_u8x16(&seed)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 seed
             }
@@ -1055,30 +1044,28 @@ impl<
         // unnecessary step with quicksilver mult check
 
         // step 6)
-        if bucket_channels.is_none() {
-            let mut convert_bit_2_field_aux1 = PartyPrivate::new(Vec::with_capacity(n));
-            let mut convert_bit_2_field_aux2 = match P::WHICH {
-                WhichParty::Prover(ev) => PartyEither::new(ev, Vec::with_capacity(n)),
-                WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(n)),
-            };
-            let mut e_m_batch = Vec::with_capacity(n);
-            let mut ei_batch = PartyPrivate::new(Vec::with_capacity(n));
-            for j in 0..num_bucket {
-                // base index for the window of `idx_base..idx_base + n` values
-                let idx_base = j * n;
+        let mut convert_bit_2_field_aux1 = PartyPrivate::new(Vec::with_capacity(n));
+        let mut convert_bit_2_field_aux2 = match P::WHICH {
+            WhichParty::Prover(ev) => PartyEither::new(ev, Vec::with_capacity(n)),
+            WhichParty::Verifier(ev) => PartyEither::new(ev, Vec::with_capacity(n)),
+        };
+        let mut e_m_batch = Vec::with_capacity(n);
+        let mut ei_batch = PartyPrivate::new(Vec::with_capacity(n));
+        for j in 0..num_bucket {
+            // base index for the window of `idx_base..idx_base + n` values
+            let idx_base = j * n;
 
-                self.conv_loop(
-                    channel,
-                    rng,
-                    edabits_vector,
-                    &r[idx_base..idx_base + n],
-                    &dabits[idx_base..idx_base + n],
-                    &mut convert_bit_2_field_aux1.as_mut(),
-                    &mut convert_bit_2_field_aux2.as_mut(),
-                    &mut e_m_batch,
-                    &mut ei_batch.as_mut(),
-                )?;
-            }
+            self.conv_loop(
+                channel,
+                rng,
+                edabits_vector,
+                &r[idx_base..idx_base + n],
+                &dabits[idx_base..idx_base + n],
+                &mut convert_bit_2_field_aux1.as_mut(),
+                &mut convert_bit_2_field_aux2.as_mut(),
+                &mut e_m_batch,
+                &mut ei_batch.as_mut(),
+            )?;
         }
 
         Ok(())
@@ -1092,11 +1079,7 @@ mod tests {
     use crate::homcom::FCom;
     use crate::party::{Prover, Verifier};
     use crate::svole_trait::Svole;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::FiniteField;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
@@ -1115,42 +1098,81 @@ mod tests {
 
     fn test_convert_bit_2_field<FE: FiniteField<PrimeField = FE>>() {
         let count = 100;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            )
-            .unwrap();
+        let (res, resprover) = local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
 
-            let mut res = Vec::new();
-            for _ in 0..count {
-                let (rb, rb_mac) = fconv
-                    .fcom_f2
-                    .random(&mut channel, &mut rng)
-                    .unwrap()
-                    .decompose(Witness::EQUAL_TYPES);
-                let rm = f2_to_fe(rb);
-                let rm_mac = fconv
-                    .fcom_fe
-                    .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &[rm])
-                    .unwrap()[0];
-                let (x_f2, x_f2_mac) = fconv
-                    .fcom_f2
-                    .random(&mut channel, &mut rng)
-                    .unwrap()
-                    .decompose(Witness::EQUAL_TYPES);
+                let mut res = Vec::new();
+                for _ in 0..count {
+                    let rb_mac = fconv.fcom_f2.random(channel, &mut rng)?;
+                    let r_m_mac =
+                        fconv
+                            .fcom_fe
+                            .input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, 1)?[0];
+                    let x_f2_mac = fconv.fcom_f2.random(channel, &mut rng)?;
 
-                let mut convert_bit_2_field_aux =
-                    PartyEither::new(Witness::EQUAL_TYPES, Vec::new());
-                let mut x_m_batch = Vec::new();
-                fconv
-                    .convert_bit_2_field(
-                        &mut channel,
+                    let mut convert_bit_2_field_aux1 = PartyPrivate::new(Vec::new());
+                    let mut convert_bit_2_field_aux2 =
+                        PartyEither::new(Witness::EQUAL_TYPES, Vec::new());
+                    let mut x_m_batch = Vec::new();
+                    fconv.convert_bit_2_field(
+                        channel,
+                        &[Dabit {
+                            bit: rb_mac,
+                            value: r_m_mac,
+                        }],
+                        &[x_f2_mac],
+                        &mut convert_bit_2_field_aux1.as_mut(),
+                        &mut convert_bit_2_field_aux2.as_mut(),
+                        &mut x_m_batch,
+                    )?;
+
+                    let mut x_m = Vec::new();
+                    fconv.fcom_fe.open(
+                        channel,
+                        &[x_m_batch[0]],
+                        &mut PartyPrivate::new(&mut x_m),
+                    )?;
+                    res.push(x_m[0]);
+                }
+                Ok(res)
+            },
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
+
+                let mut res = Vec::new();
+                for _ in 0..count {
+                    let (rb, rb_mac) = fconv
+                        .fcom_f2
+                        .random(channel, &mut rng)?
+                        .decompose(Witness::EQUAL_TYPES);
+                    let rm = f2_to_fe(rb);
+                    let rm_mac = fconv.fcom_fe.input_prover(
+                        Witness::EQUAL_TYPES,
+                        channel,
+                        &mut rng,
+                        &[rm],
+                    )?[0];
+                    let (x_f2, x_f2_mac) = fconv
+                        .fcom_f2
+                        .random(channel, &mut rng)?
+                        .decompose(Witness::EQUAL_TYPES);
+
+                    let mut convert_bit_2_field_aux =
+                        PartyEither::new(Witness::EQUAL_TYPES, Vec::new());
+                    let mut x_m_batch = Vec::new();
+                    fconv.convert_bit_2_field(
+                        channel,
                         &[Dabit {
                             bit: Mac::new(PartyPrivateCopy::new(rb), rb_mac),
                             value: Mac::new(PartyPrivateCopy::new(rm), rm_mac),
@@ -1159,75 +1181,24 @@ mod tests {
                         &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
                         &mut convert_bit_2_field_aux.as_mut(),
                         &mut x_m_batch,
-                    )
-                    .unwrap();
+                    )?;
 
-                fconv
-                    .fcom_fe
-                    .open(
-                        &mut channel,
+                    fconv.fcom_fe.open(
+                        channel,
                         &x_m_batch,
                         &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
-                    )
-                    .unwrap();
+                    )?;
 
-                assert_eq!(
-                    f2_to_fe::<FE::PrimeField>(x_f2),
-                    x_m_batch[0].value().into_inner(Witness::EQUAL_TYPES)
-                );
-                res.push((x_f2, x_m_batch[0].value().into_inner(Witness::EQUAL_TYPES)));
-            }
-            res
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                    assert_eq!(
+                        f2_to_fe::<FE::PrimeField>(x_f2),
+                        x_m_batch[0].value().into_inner(Witness::EQUAL_TYPES)
+                    );
+                    res.push((x_f2, x_m_batch[0].value().into_inner(Witness::EQUAL_TYPES)));
+                }
+                Ok(res)
+            },
         )
         .unwrap();
-
-        let mut res = Vec::new();
-        for _ in 0..count {
-            let rb_mac = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
-            let r_m_mac = fconv
-                .fcom_fe
-                .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, 1)
-                .unwrap()[0];
-            let x_f2_mac = fconv.fcom_f2.random(&mut channel, &mut rng).unwrap();
-
-            let mut convert_bit_2_field_aux1 = PartyPrivate::new(Vec::new());
-            let mut convert_bit_2_field_aux2 = PartyEither::new(Witness::EQUAL_TYPES, Vec::new());
-            let mut x_m_batch = Vec::new();
-            fconv
-                .convert_bit_2_field(
-                    &mut channel,
-                    &[Dabit {
-                        bit: rb_mac,
-                        value: r_m_mac,
-                    }],
-                    &[x_f2_mac],
-                    &mut convert_bit_2_field_aux1.as_mut(),
-                    &mut convert_bit_2_field_aux2.as_mut(),
-                    &mut x_m_batch,
-                )
-                .unwrap();
-
-            let mut x_m = Vec::new();
-            fconv
-                .fcom_fe
-                .open(
-                    &mut channel,
-                    &[x_m_batch[0]],
-                    &mut PartyPrivate::new(&mut x_m),
-                )
-                .unwrap();
-            res.push(x_m[0]);
-        }
-
-        let resprover = handle.join().unwrap();
 
         for i in 0..count {
             assert_eq!(resprover[i].1, res[i]);
@@ -1236,7 +1207,6 @@ mod tests {
 
     fn test_bit_add_carry<FE: FiniteField<PrimeField = FE>>() {
         let power = 6;
-        let (sender, receiver) = UnixStream::pair().unwrap();
 
         // adding
         //   110101
@@ -1248,39 +1218,80 @@ mod tests {
         let expected = [F2::ONE, F2::ONE, F2::ZERO, F2::ZERO, F2::ZERO, F2::ONE];
         let carry = F2::ONE;
 
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            )
-            .unwrap();
+        let ((res, c), _) = local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
 
-            let x_mac = fconv
-                .fcom_f2
-                .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &x)
-                .unwrap();
-            let y_mac = fconv
-                .fcom_f2
-                .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &y)
-                .unwrap();
+                let x_mac =
+                    fconv
+                        .fcom_f2
+                        .input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, power)?;
+                let y_mac =
+                    fconv
+                        .fcom_f2
+                        .input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, power)?;
 
-            let mut vx = Vec::new();
-            for i in 0..power {
-                vx.push(Mac::new(PartyPrivateCopy::new(x[i]), x_mac[i]));
-            }
+                let default_fe = Mac::new(PartyPrivateCopy::empty(Witness::EQUAL_TYPES), FE::ZERO);
+                let (res_mac, c_mac) = fconv.bit_add_carry(
+                    channel,
+                    &mut rng,
+                    &[Edabits {
+                        bits: x_mac,
+                        value: default_fe,
+                    }],
+                    &[Edabits {
+                        bits: y_mac,
+                        value: default_fe,
+                    }],
+                )?[0]
+                    .clone();
 
-            let mut vy = Vec::new();
-            for i in 0..power {
-                vy.push(Mac::new(PartyPrivateCopy::new(y[i]), y_mac[i]));
-            }
-            let default_fe = Mac::new(PartyPrivateCopy::new(FE::PrimeField::ZERO), FE::ZERO);
-            let (res, c) = fconv
-                .bit_add_carry(
-                    &mut channel,
+                let mut res = Vec::new();
+                fconv
+                    .fcom_f2
+                    .open(channel, &res_mac, &mut PartyPrivate::new(&mut res))?;
+
+                let mut c = Vec::new();
+                fconv
+                    .fcom_f2
+                    .open(channel, &[c_mac], &mut PartyPrivate::new(&mut c))?;
+
+                Ok((res, c))
+            },
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
+
+                let x_mac =
+                    fconv
+                        .fcom_f2
+                        .input_prover(Witness::EQUAL_TYPES, channel, &mut rng, &x)?;
+                let y_mac =
+                    fconv
+                        .fcom_f2
+                        .input_prover(Witness::EQUAL_TYPES, channel, &mut rng, &y)?;
+
+                let mut vx = Vec::new();
+                for i in 0..power {
+                    vx.push(Mac::new(PartyPrivateCopy::new(x[i]), x_mac[i]));
+                }
+
+                let mut vy = Vec::new();
+                for i in 0..power {
+                    vy.push(Mac::new(PartyPrivateCopy::new(y[i]), y_mac[i]));
+                }
+                let default_fe = Mac::new(PartyPrivateCopy::new(FE::PrimeField::ZERO), FE::ZERO);
+                let (res, c) = fconv.bit_add_carry(
+                    channel,
                     &mut rng,
                     &[Edabits {
                         bits: vx,
@@ -1290,78 +1301,24 @@ mod tests {
                         bits: vy,
                         value: default_fe,
                     }],
-                )
-                .unwrap()[0]
-                .clone();
+                )?[0]
+                    .clone();
 
-            fconv
-                .fcom_f2
-                .open(
-                    &mut channel,
+                fconv.fcom_f2.open(
+                    channel,
                     &res,
                     &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
-                )
-                .unwrap();
+                )?;
 
-            fconv
-                .fcom_f2
-                .open(
-                    &mut channel,
+                fconv.fcom_f2.open(
+                    channel,
                     &[c],
                     &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
-                )
-                .unwrap();
-            (res, c)
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                )?;
+                Ok((res, c))
+            },
         )
         .unwrap();
-
-        let x_mac = fconv
-            .fcom_f2
-            .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, power)
-            .unwrap();
-        let y_mac = fconv
-            .fcom_f2
-            .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, power)
-            .unwrap();
-
-        let default_fe = Mac::new(PartyPrivateCopy::empty(Witness::EQUAL_TYPES), FE::ZERO);
-        let (res_mac, c_mac) = fconv
-            .bit_add_carry(
-                &mut channel,
-                &mut rng,
-                &[Edabits {
-                    bits: x_mac,
-                    value: default_fe,
-                }],
-                &[Edabits {
-                    bits: y_mac,
-                    value: default_fe,
-                }],
-            )
-            .unwrap()[0]
-            .clone();
-
-        let mut res = Vec::new();
-        fconv
-            .fcom_f2
-            .open(&mut channel, &res_mac, &mut PartyPrivate::new(&mut res))
-            .unwrap();
-
-        let mut c = Vec::new();
-        fconv
-            .fcom_f2
-            .open(&mut channel, &[c_mac], &mut PartyPrivate::new(&mut c))
-            .unwrap();
-
-        let _resprover = handle.join().unwrap();
 
         for i in 0..power {
             assert_eq!(expected[i], res[i]);
@@ -1371,97 +1328,81 @@ mod tests {
 
     fn test_fdabit<FE: FiniteField<PrimeField = FE>>() {
         let count = 5;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            )
-            .unwrap();
+        local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
 
-            let dabits = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
-            fconv.fdabit(&mut channel, &mut rng, &dabits).unwrap();
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                let dabits_mac = fconv.random_dabits(channel, &mut rng, count)?;
+                fconv.fdabit(channel, &mut rng, &dabits_mac)
+            },
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
+
+                let dabits = fconv.random_dabits(channel, &mut rng, count)?;
+                fconv.fdabit(channel, &mut rng, &dabits)
+            },
         )
         .unwrap();
-
-        let dabits_mac = fconv.random_dabits(&mut channel, &mut rng, count).unwrap();
-        fconv.fdabit(&mut channel, &mut rng, &dabits_mac).unwrap();
-
-        handle.join().unwrap();
     }
 
     fn test_conv<FE: FiniteField<PrimeField = FE>>() {
         let nb_edabits = 50;
-        let (sender, receiver) = UnixStream::pair().unwrap();
 
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fconv = Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-                &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            )
-            .unwrap();
+        local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
 
-            for n in 1..nb_edabits {
-                let edabits = fconv
-                    .random_edabits(&mut channel, &mut rng, NB_BITS, n)
-                    .unwrap();
+                for n in 1..nb_edabits {
+                    let edabits = fconv.random_edabits(channel, &mut rng, NB_BITS, n)?;
 
-                fconv
-                    .conv(
-                        &mut channel,
+                    fconv.conv(
+                        channel,
                         &mut rng,
                         DEFAULT_NUM_BUCKET,
                         DEFAULT_NUM_CUT,
                         &edabits,
-                        None,
-                    )
-                    .unwrap();
-            }
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fconv = Conv::<Verifier, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
-            &FCom::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap(),
+                    )?;
+                }
+                Ok(())
+            },
+            |channel| {
+                let mut rng = SwankyRng::new();
+                let mut fconv =
+                    Conv::<Prover, FE, Svole<_, _, _>, Svole<_, _, _>>::init_with_fcoms(
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                        &FCom::init(channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL)?,
+                    )?;
+
+                for n in 1..nb_edabits {
+                    let edabits = fconv.random_edabits(channel, &mut rng, NB_BITS, n)?;
+
+                    fconv.conv(
+                        channel,
+                        &mut rng,
+                        DEFAULT_NUM_BUCKET,
+                        DEFAULT_NUM_CUT,
+                        &edabits,
+                    )?;
+                }
+                Ok(())
+            },
         )
         .unwrap();
-
-        for n in 1..nb_edabits {
-            let edabits = fconv
-                .random_edabits(&mut channel, &mut rng, NB_BITS, n)
-                .unwrap();
-
-            fconv
-                .conv(
-                    &mut channel,
-                    &mut rng,
-                    DEFAULT_NUM_BUCKET,
-                    DEFAULT_NUM_CUT,
-                    &edabits,
-                    None,
-                )
-                .unwrap();
-        }
-
-        handle.join().unwrap();
     }
 
     #[test]

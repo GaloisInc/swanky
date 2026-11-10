@@ -1,12 +1,7 @@
 #[test]
 fn test_arithmetic_ram() {
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
     use rand::SeedableRng;
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field_f61p::F61p;
     use swanky_rng::SwankyRng;
     use swanky_svole_wykw::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL};
@@ -23,77 +18,58 @@ fn test_arithmetic_ram() {
     const RAM_SIZE: usize = 100;
     const RAM_STEPS: usize = 100;
 
-    let (sender, receiver) = UnixStream::pair().unwrap();
+    local_channel_pair(
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut verifier: DietMacAndCheese<Verifier, F61p, F61p, Svole<_, _, _>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-    let handle = std::thread::spawn(move || {
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
+            let mut ram = DoraRam::<Verifier, F61p, F61p, _, _>::new(
+                vec![Default::default()],
+                2,
+                Arithmetic::new(RAM_SIZE),
+            );
+            for _ in 0..RAM_STEPS {
+                let addr = verifier.input_private(None, channel)?;
+                let value = ram.remove(&mut verifier, &[addr], channel)?;
+                ram.insert(&mut verifier, &[addr], &value)?;
+            }
 
-        let mut prover: DietMacAndCheese<Prover, F61p, F61p, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
+            ram.finalize(&mut verifier, channel)?;
+            verifier.finalize(channel)
+        },
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut prover: DietMacAndCheese<Prover, F61p, F61p, Svole<_, _, _>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-        let mut ram = DoraRam::<Prover, F61p, F61p, _, _, _>::new(
-            &mut prover,
-            vec![Default::default()],
-            2,
-            Arithmetic::new(RAM_SIZE),
-        );
+            let mut ram = DoraRam::<Prover, F61p, F61p, _, _>::new(
+                vec![Default::default()],
+                2,
+                Arithmetic::new(RAM_SIZE),
+            );
 
-        for _ in 0..RAM_STEPS {
-            let addr = rand::random::<u32>() % (RAM_SIZE as u32);
-            let addr = F61p::try_from(addr as u128).unwrap();
-            let addr = prover.input_private(Some(addr)).unwrap();
+            for _ in 0..RAM_STEPS {
+                let addr = rand::random::<u32>() % (RAM_SIZE as u32);
+                let addr = F61p::try_from(addr as u128).unwrap();
+                let addr = prover.input_private(Some(addr), channel)?;
 
-            let value = ram.remove(&mut prover, &[addr]).unwrap();
+                let value = ram.remove(&mut prover, &[addr], channel)?;
 
-            ram.insert(&mut prover, &[addr], &value).unwrap();
-        }
+                ram.insert(&mut prover, &[addr], &value)?;
+            }
 
-        ram.finalize(&mut prover).unwrap();
-        prover.finalize().unwrap();
-    });
-
-    {
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut verifier: DietMacAndCheese<Verifier, F61p, F61p, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
-
-        let mut ram = DoraRam::<Verifier, F61p, F61p, _, _, _>::new(
-            &mut verifier,
-            vec![Default::default()],
-            2,
-            Arithmetic::new(RAM_SIZE),
-        );
-        for _ in 0..RAM_STEPS {
-            let addr = verifier.input_private(None).unwrap();
-            let value = ram.remove(&mut verifier, &[addr]).unwrap();
-            ram.insert(&mut verifier, &[addr], &value).unwrap();
-        }
-
-        ram.finalize(&mut verifier).unwrap();
-        verifier.finalize().unwrap();
-    }
-
-    handle.join().unwrap();
+            ram.finalize(&mut prover, channel)?;
+            prover.finalize(channel)
+        },
+    )
+    .unwrap();
 }
 
 #[test]
 fn test_boolean_ram() {
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
     use rand::SeedableRng;
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
     use swanky_rng::SwankyRng;
@@ -111,76 +87,62 @@ fn test_boolean_ram() {
     const RAM_SIZE: usize = 100;
     const RAM_STEPS: usize = 100;
 
-    let (sender, receiver) = UnixStream::pair().unwrap();
+    local_channel_pair(
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut verifier: DietMacAndCheese<Verifier, F2, F40b, Svole<_, _, _>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-    let handle = std::thread::spawn(move || {
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
+            let mut ram = DoraRam::<Verifier, F2, F40b, _, _>::new(
+                vec![Default::default(); 7],
+                2,
+                Boolean::new(7, 7, RAM_SIZE),
+            );
+            for _ in 0..RAM_STEPS {
+                let addr: Vec<_> = (0..7)
+                    .map(|_| verifier.input_private(None, channel).unwrap())
+                    .collect();
+                let value = ram.remove(&mut verifier, &addr, channel)?;
+                ram.insert(&mut verifier, &addr, &value)?;
+            }
 
-        let mut prover: DietMacAndCheese<Prover, F2, F40b, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
+            ram.finalize(&mut verifier, channel)?;
+            verifier.finalize(channel)
+        },
+        |channel| {
+            let rng = SwankyRng::from_seed(Default::default());
+            let mut prover: DietMacAndCheese<Prover, F2, F40b, Svole<_, _, _>> =
+                DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-        let mut ram = DoraRam::<Prover, F2, F40b, _, _, _>::new(
-            &mut prover,
-            vec![Default::default(); 7],
-            2,
-            Boolean::new(7, 7, RAM_SIZE),
-        );
+            let mut ram = DoraRam::<Prover, F2, F40b, _, _>::new(
+                vec![Default::default(); 7],
+                2,
+                Boolean::new(7, 7, RAM_SIZE),
+            );
 
-        for _ in 0..RAM_STEPS {
-            let addr = vec![
-                F2::ZERO,
-                rand::random::<F2>(),
-                rand::random::<F2>(),
-                rand::random::<F2>(),
-                rand::random::<F2>(),
-                rand::random::<F2>(),
-                rand::random::<F2>(),
-            ];
-            let addr: Vec<_> = addr
-                .into_iter()
-                .map(|b| prover.input_private(Some(b)).unwrap())
-                .collect();
+            for _ in 0..RAM_STEPS {
+                let addr = vec![
+                    F2::ZERO,
+                    rand::random::<F2>(),
+                    rand::random::<F2>(),
+                    rand::random::<F2>(),
+                    rand::random::<F2>(),
+                    rand::random::<F2>(),
+                    rand::random::<F2>(),
+                ];
+                let addr: Vec<_> = addr
+                    .into_iter()
+                    .map(|b| prover.input_private(Some(b), channel).unwrap())
+                    .collect();
 
-            let value = ram.remove(&mut prover, &addr).unwrap();
+                let value = ram.remove(&mut prover, &addr, channel)?;
 
-            ram.insert(&mut prover, &addr, &value).unwrap();
-        }
+                ram.insert(&mut prover, &addr, &value)?;
+            }
 
-        ram.finalize(&mut prover).unwrap();
-        prover.finalize().unwrap();
-    });
-
-    {
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut verifier: DietMacAndCheese<Verifier, F2, F40b, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
-
-        let mut ram = DoraRam::<Verifier, F2, F40b, _, _, _>::new(
-            &mut verifier,
-            vec![Default::default(); 7],
-            2,
-            Boolean::new(7, 7, RAM_SIZE),
-        );
-        for _ in 0..RAM_STEPS {
-            let addr: Vec<_> = (0..7)
-                .map(|_| verifier.input_private(None).unwrap())
-                .collect();
-            let value = ram.remove(&mut verifier, &addr).unwrap();
-            ram.insert(&mut verifier, &addr, &value).unwrap();
-        }
-
-        ram.finalize(&mut verifier).unwrap();
-        verifier.finalize().unwrap();
-    }
-
-    handle.join().unwrap();
+            ram.finalize(&mut prover, channel)?;
+            prover.finalize(channel)
+        },
+    )
+    .unwrap();
 }

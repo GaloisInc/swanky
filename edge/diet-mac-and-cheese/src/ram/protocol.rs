@@ -2,7 +2,7 @@ use std::{collections::hash_map::Entry, iter, marker::PhantomData};
 
 use rustc_hash::FxHashMap;
 
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
@@ -15,9 +15,10 @@ use crate::{
     party::{Party, Prover, WhichParty},
     ram::collapse_vec,
     svole_trait::SvoleT,
+    transcript::Transcript,
 };
 
-use super::{MemorySpace, tx::TxChannel};
+use super::MemorySpace;
 
 /// The Dora RAM protocol state.
 ///
@@ -46,7 +47,6 @@ pub struct DoraRam<
     P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
-    C: AbstractChannel + Clone,
     M: MemorySpace<V>,
     SVOLE: SvoleT<P, V, F>,
 > where
@@ -55,7 +55,7 @@ pub struct DoraRam<
     init_value: Vec<Mac<P, V, F>>,
     challenge_size: usize,
     space: M,
-    ch: TxChannel<C>,
+    transcript: Transcript,
     memory: PartyPrivate<Prover, P, FxHashMap<Vec<V>, Vec<V>>>,
     rds: Vec<Vec<Mac<P, V, F>>>,
     wrs: Vec<Vec<Mac<P, V, F>>>,
@@ -73,25 +73,14 @@ where
         .collect()
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    M: MemorySpace<V>,
-    SVOLE: SvoleT<P, V, F>,
-> DoraRam<P, V, F, C, M, SVOLE>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, M: MemorySpace<V>, SVOLE: SvoleT<P, V, F>>
+    DoraRam<P, V, F, M, SVOLE>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     /// Create a new `DoraRam` using the Diet Mac'n'Cheese protocol, the initial
     /// memory value, the size of challenges, and the address space.
-    pub fn new(
-        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
-        mut init_value: Vec<Mac<P, V, F>>,
-        challenge_size: usize,
-        space: M,
-    ) -> Self {
+    pub fn new(mut init_value: Vec<Mac<P, V, F>>, challenge_size: usize, space: M) -> Self {
         // Extend the initial value with  challenge values
         // We pay a small price here for a very efficient copy when finalizing
         init_value.append(&mut commit_pub(&vec![V::default(); challenge_size]));
@@ -101,7 +90,7 @@ where
             init_value,
             challenge_size,
             space,
-            ch: TxChannel::new(dmc.channel.clone(), Default::default()),
+            transcript: Transcript::new(),
             memory: Default::default(),
             rds: vec![],
             wrs: vec![],
@@ -115,8 +104,9 @@ where
     /// This must always be called before [`insert`] for a given `addr`.
     pub fn remove(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        dmc: &mut DietMacAndCheese<P, V, F, SVOLE>,
         addr: &[Mac<P, V, F>],
+        channel: &mut Channel,
     ) -> Result<Vec<Mac<P, V, F>>> {
         ensure!(
             addr.len() == self.space.addr_size(),
@@ -146,30 +136,30 @@ where
                             .collect()
                     });
 
-                for elem in iter::empty()
-                    .chain(addr.iter().copied())
-                    .chain(old.into_iter().map(|x| {
-                        let m = dmc
-                            .fcom
-                            .input1_prover(ev, &mut self.ch, &mut dmc.rng, x)
-                            .unwrap();
-                        Mac::new(PartyPrivateCopy::new(x), m)
-                    }))
-                {
+                let macs = dmc.fcom.input_prover_with_transcript(
+                    ev,
+                    channel,
+                    &mut dmc.rng,
+                    &old,
+                    &mut self.transcript,
+                )?;
+                for elem in iter::empty().chain(addr.iter().copied()).chain(
+                    old.into_iter()
+                        .zip(macs)
+                        .map(|(x, m)| Mac::new(PartyPrivateCopy::new(x), m)),
+                ) {
                     flat.push(elem);
                 }
             }
             WhichParty::Verifier(ev) => {
-                for elem in
-                    iter::empty()
-                        .chain(addr.iter().copied())
-                        .chain(dmc.fcom.input_verifier(
-                            ev,
-                            &mut self.ch,
-                            &mut dmc.rng,
-                            stored_size,
-                        )?)
-                {
+                let macs = dmc.fcom.input_verifier_with_transcript(
+                    ev,
+                    channel,
+                    &mut dmc.rng,
+                    stored_size,
+                    &mut self.transcript,
+                )?;
+                for elem in iter::empty().chain(addr.iter().copied()).chain(macs) {
                     flat.push(elem);
                 }
             }
@@ -186,7 +176,7 @@ where
     /// calling [`remove`].
     pub fn insert(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        dmc: &mut DietMacAndCheese<P, V, F, SVOLE>,
         addr: &[Mac<P, V, F>],
         value: &[Mac<P, V, F>],
     ) -> Result<()> {
@@ -220,7 +210,7 @@ where
                         for elem in iter::empty()
                             .chain(addr.iter().copied())
                             .chain(value.iter().copied())
-                            .chain(commit_pub(&self.ch.challenge(self.challenge_size)))
+                            .chain(commit_pub(&self.transcript.challenges(self.challenge_size)))
                         {
                             flat.push(elem);
                         }
@@ -239,8 +229,8 @@ where
                     .chain(addr.iter().copied())
                     .chain(value.iter().copied())
                     .chain(
-                        self.ch
-                            .challenge(self.challenge_size)
+                        self.transcript
+                            .challenges(self.challenge_size)
                             .iter()
                             .map(|&x| dmc.input_public(x).unwrap()),
                     )
@@ -255,7 +245,11 @@ where
     }
 
     /// Finalize the RAM protocol (check that `rds` is a permutation of `wrs`).
-    pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> Result<()> {
+    pub fn finalize(
+        mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, SVOLE>,
+        channel: &mut Channel,
+    ) -> Result<()> {
         log::info!("finalizing ram: {} operations", self.wrs.len(),);
 
         let flattened_size = self.space.addr_size() + self.space.value_size() + self.challenge_size;
@@ -288,41 +282,26 @@ where
             };
             pre[..self.space.addr_size()].copy_from_slice(&addr);
             self.wrs.push(pre.clone());
-            self.remove(dmc, &addr)?;
+            self.remove(dmc, &addr, channel)?;
         }
 
         debug_assert_eq!(self.rds.len(), self.wrs.len());
 
         let (chal_cmbn, chal_perm1) = match P::WHICH {
             WhichParty::Prover(_) => {
-                dmc.channel
-                    .flush()
+                channel
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-                (
-                    dmc.channel.read_serializable::<V>().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to read combined challenge.",
-                    )?,
-                    dmc.channel.read_serializable::<V>().wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to read permutation challenge.",
-                    )?,
-                )
+                (channel.read::<V>()?, channel.read::<V>()?)
             }
             WhichParty::Verifier(_) => {
                 let chals @ (chal_cmbn, chal_perm1) =
                     (V::random(&mut dmc.rng), V::random(&mut dmc.rng));
 
-                dmc.channel.write_serializable(&chal_cmbn).wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write combined challenge.",
-                )?;
-                dmc.channel.write_serializable(&chal_perm1).wrap_err(
-                    ErrorKind::NetworkError,
-                    "Failed to write permutation challenge.",
-                )?;
-                dmc.channel
-                    .flush()
+                channel.write(&chal_cmbn)?;
+                channel.write(&chal_perm1)?;
+                channel
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 chals
@@ -342,6 +321,6 @@ where
         self.rds.shrink_to_fit();
 
         log::debug!("permutation check");
-        permutation(dmc, chal_perm1, &wrs, &rds)
+        permutation(dmc, chal_perm1, &wrs, &rds, channel)
     }
 }

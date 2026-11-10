@@ -9,7 +9,7 @@ use rand::{
     distr::{Distribution, Uniform},
 };
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::{Degree, DegreeModulo, FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_rng::SwankyRng;
@@ -147,9 +147,9 @@ pub struct Sender<T: FiniteField> {
 }
 
 impl<T: FiniteField> Sender<T> {
-    fn send_internal<C: AbstractChannel, V: IsSubFieldOf<T>>(
+    fn send_internal<V: IsSubFieldOf<T>>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         params: LpnParams,
         num_saved: usize,
         rng: &mut SwankyRng,
@@ -237,8 +237,8 @@ impl<T: FiniteField> Sender<T> {
     }
 
     /// Initialize the VOLE sender.
-    pub fn init<C: AbstractChannel>(
-        channel: &mut C,
+    pub fn init(
+        channel: &mut Channel,
         mut rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -274,9 +274,9 @@ impl<T: FiniteField> Sender<T> {
 
     /// Generate VOLEs. `V` denotes the [`FiniteField`] type to use for the VOLE
     /// value.
-    pub fn send<C: AbstractChannel, V: IsSubFieldOf<T>>(
+    pub fn send<V: IsSubFieldOf<T>>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         output: &mut Vec<(V, T)>,
     ) -> Result<()>
@@ -293,11 +293,7 @@ impl<T: FiniteField> Sender<T> {
     }
 
     /// Duplicate the sender's state.
-    pub fn duplicate<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut SwankyRng,
-    ) -> Result<Self> {
+    pub fn duplicate(&mut self, channel: &mut Channel, rng: &mut SwankyRng) -> Result<Self> {
         let mut base_voles: Vec<(T::PrimeField, T)> = Vec::new();
         self.send_internal(
             channel,
@@ -334,9 +330,9 @@ pub struct Receiver<T: FiniteField> {
 }
 
 impl<T: FiniteField> Receiver<T> {
-    fn receive_internal<C: AbstractChannel, V: IsSubFieldOf<T>>(
+    fn receive_internal<V: IsSubFieldOf<T>>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         params: LpnParams,
         num_saved: usize,
         rng: &mut SwankyRng,
@@ -412,8 +408,8 @@ impl<T: FiniteField> Receiver<T> {
     /// Initialize the VOLE receiver.
     ///
     /// When provided as argument it uses a particular `delta`.
-    pub fn init<C: AbstractChannel>(
-        channel: &mut C,
+    pub fn init(
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -442,7 +438,7 @@ impl<T: FiniteField> Receiver<T> {
             lpn_rng,
         };
         let mut base_voles_setup = Vec::new();
-        receiver.receive_internal::<_, T::PrimeField>(
+        receiver.receive_internal::<T::PrimeField>(
             channel,
             lpn_setup,
             0,
@@ -460,16 +456,16 @@ impl<T: FiniteField> Receiver<T> {
 
     /// Generate VOLEs. `V` denotes the [`FiniteField`] type to use for the VOLE
     /// value.
-    pub fn receive<C: AbstractChannel, V: IsSubFieldOf<T>>(
+    pub fn receive<V: IsSubFieldOf<T>>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         output: &mut Vec<T>,
     ) -> Result<()>
     where
         T::PrimeField: IsSubFieldOf<V>,
     {
-        self.receive_internal::<_, V>(
+        self.receive_internal::<V>(
             channel,
             self.lpn_extend,
             compute_num_saved::<T>(self.lpn_extend),
@@ -479,16 +475,16 @@ impl<T: FiniteField> Receiver<T> {
     }
 
     /// Duplicate the receiver's state.
-    pub fn duplicate<C: AbstractChannel, SFE: IsSubFieldOf<T>>(
+    pub fn duplicate<SFE: IsSubFieldOf<T>>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
     ) -> Result<Self>
     where
         T::PrimeField: IsSubFieldOf<SFE>,
     {
         let mut base_voles = Vec::new();
-        self.receive_internal::<_, T::PrimeField>(
+        self.receive_internal::<T::PrimeField>(
             channel,
             self.lpn_setup,
             compute_num_saved::<T>(self.lpn_setup),
@@ -520,11 +516,7 @@ impl<FF: FiniteField> Malicious for Receiver<FF> {}
 #[cfg(test)]
 mod tests {
     use super::{LPN_EXTEND_SMALL, LPN_SETUP_SMALL, Receiver, Sender};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b, F128b};
     use swanky_field_f61p::F61p;
@@ -534,33 +526,27 @@ mod tests {
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut vole =
-                Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-            let mut out: Vec<(V, T)> = Vec::new();
-            vole.send(&mut channel, &mut rng, &mut out).unwrap();
-            out
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut vole = Receiver::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            None,
+        let (uws, (vole, vs)) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut vole =
+                    Sender::init(c, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
+                let mut out: Vec<(V, T)> = Vec::new();
+                vole.send(c, &mut rng, &mut out).unwrap();
+                Ok(out)
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut vole =
+                    Receiver::init(c, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, None).unwrap();
+
+                let mut out: Vec<T> = Vec::new();
+                vole.receive(c, &mut rng, &mut out).unwrap();
+                Ok((vole, out))
+            },
         )
         .unwrap();
-        let mut vs: Vec<T> = Vec::new();
-        vole.receive(&mut channel, &mut rng, &mut vs).unwrap();
-        let uws = handle.join().unwrap();
+
         for i in 0..uws.len() {
             assert_eq!(uws[i].1, uws[i].0 * vole.delta() + vs[i]);
             assert_ne!(uws[i].1, T::ZERO);
@@ -571,54 +557,42 @@ mod tests {
     where
         <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
     {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut vole =
-                Sender::init(&mut channel, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
-            let mut uws: Vec<(V, T)> = Vec::new();
-            vole.send(&mut channel, &mut rng, &mut uws).unwrap();
-            let mut vole2 = vole.duplicate(&mut channel, &mut rng).unwrap();
-            let mut uws2 = Vec::new();
-            vole2.send(&mut channel, &mut rng, &mut uws2).unwrap();
-            let mut uws3 = Vec::new();
-            vole.send(&mut channel, &mut rng, &mut uws3).unwrap();
-            assert_ne!(uws2, uws3);
-            uws.extend(uws2);
-            uws.extend(uws3);
-            uws
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut vole = Receiver::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            None,
+        let (uws, (vole, vs)) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut vole =
+                    Sender::init(c, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL).unwrap();
+                let mut uws: Vec<(V, T)> = Vec::new();
+                vole.send(c, &mut rng, &mut uws).unwrap();
+                let mut vole2 = vole.duplicate(c, &mut rng).unwrap();
+                let mut uws2 = Vec::new();
+                vole2.send(c, &mut rng, &mut uws2).unwrap();
+                let mut uws3 = Vec::new();
+                vole.send(c, &mut rng, &mut uws3).unwrap();
+                assert_ne!(uws2, uws3);
+                uws.extend(uws2);
+                uws.extend(uws3);
+                Ok(uws)
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                let mut vole =
+                    Receiver::init(c, &mut rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, None).unwrap();
+                let mut vs: Vec<T> = Vec::new();
+                vole.receive(c, &mut rng, &mut vs).unwrap();
+                let mut vole2 = vole.duplicate(c, &mut rng).unwrap();
+                let mut vs2 = Vec::new();
+                vole2.receive(c, &mut rng, &mut vs2).unwrap();
+                let mut vs3 = Vec::new();
+                vole.receive(c, &mut rng, &mut vs3).unwrap();
+                assert_ne!(vs2, vs3);
+                vs.extend(vs2);
+                vs.extend(vs3);
+                Ok((vole, vs))
+            },
         )
         .unwrap();
-        let mut vs: Vec<T> = Vec::new();
-        vole.receive::<_, V>(&mut channel, &mut rng, &mut vs)
-            .unwrap();
-        let mut vole2 = vole.duplicate::<_, V>(&mut channel, &mut rng).unwrap();
-        let mut vs2 = Vec::new();
-        vole2
-            .receive::<_, V>(&mut channel, &mut rng, &mut vs2)
-            .unwrap();
-        let mut vs3 = Vec::new();
-        vole.receive::<_, V>(&mut channel, &mut rng, &mut vs3)
-            .unwrap();
-        assert_ne!(vs2, vs3);
-        vs.extend(vs2);
-        vs.extend(vs3);
 
-        let uws = handle.join().unwrap();
         for i in 0..uws.len() {
             assert_eq!(uws[i].1, uws[i].0 * vole.delta() + vs[i]);
         }

@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
-use swanky_channel_legacy::TrackChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F40b};
 use swanky_rng::SwankyRng;
@@ -66,33 +66,33 @@ fn do_it<Stream: Read + Write + Debug + 'static>(
         }
     }
 
-    let mut channel = TrackChannel::new(WsChannel::new(websocket));
+    Channel::with(WsChannel::new(websocket), |c| {
+        // MAC AND CHEESE STARTS
+        let rng = SwankyRng::new();
 
-    // MAC AND CHEESE STARTS
-    let rng = SwankyRng::new();
+        let no_batching = false;
+        let mut evaluator =
+            EvaluatorCirc::<Verifier, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+                c,
+                rng,
+                inputs,
+                TypeStore::try_from(rel.header().types.clone())?,
+                LpnSize::Medium,
+                no_batching,
+            )?;
+        evaluator.load_backends(c, LpnSize::Medium)?;
+        info!("init time: {:?}", start.elapsed());
 
-    let no_batching = false;
-    let mut evaluator =
-        EvaluatorCirc::<Verifier, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
-            &mut channel,
-            rng,
-            inputs,
-            TypeStore::try_from(rel.header().types.clone())?,
-            LpnSize::Medium,
-            no_batching,
-        )?;
-    evaluator.load_backends(&mut channel, LpnSize::Medium)?;
-    info!("init time: {:?}", start.elapsed());
+        let start = Instant::now();
+        let relation_file = File::open(relation.as_path())
+            .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
+        let relation_reader = BufReader::new(relation_file);
+        evaluator.evaluate_relation_text(relation_reader, c)?;
+        info!("time circ exec: {:?}", start.elapsed());
+        info!("VERIFIER DONE!");
 
-    let start = Instant::now();
-    let relation_file = File::open(relation.as_path())
-        .wrap_err(ErrorKind::FilesystemError, "Failed to open relation.")?;
-    let relation_reader = BufReader::new(relation_file);
-    evaluator.evaluate_relation_text(relation_reader)?;
-    info!("time circ exec: {:?}", start.elapsed());
-    info!("VERIFIER DONE!");
-
-    Ok(())
+        Ok(())
+    })
 }
 
 fn main() {

@@ -20,32 +20,32 @@ workspace = true
 jemalloc = ["jemallocator"]
 
 [dependencies]
-swanky-svole-wykw.workspace = true
 blake3.workspace = true
-crypto-bigint.workspace = true
-rand.workspace = true
 clap.workspace = true
+crypto-bigint.workspace = true
+flatbuffers.workspace = true
 hybrid-array.workspace = true
 jemallocator = { workspace = true, optional = true }
 log.workspace = true
 pretty_env_logger.workspace = true
+rand.workspace = true
+rustc-hash.workspace = true
+serde = { workspace = true, features = ["derive"] }
+subtle.workspace = true
+toml = { workspace = true, features = ["display", "parse"] }
+
+swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
-swanky-polynomial.workspace = true
-swanky-sieve-ir-parser.workspace = true
-subtle.workspace = true
-
-flatbuffers.workspace = true
-serde = { workspace = true, features = ["derive"] }
-toml = { workspace = true, features = ["display", "parse"] }
-swanky-rng.workspace = true
-swanky-channel-legacy.workspace = true
 swanky-party.workspace = true
+swanky-polynomial.workspace = true
+swanky-rng.workspace = true
 swanky-serialization.workspace = true
-rustc-hash.workspace = true
+swanky-sieve-ir-parser.workspace = true
+swanky-svole-wykw.workspace = true
 vectoreyes.workspace = true
 
 [build-dependencies]
@@ -53,7 +53,6 @@ swanky-flatbuffer-build.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
-swanky-field-f61p.workspace = true
 
 [[example]]
 name = "dietmc_lib"

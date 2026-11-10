@@ -1,5 +1,5 @@
 use std::iter;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_party::{
@@ -15,6 +15,7 @@ use crate::{
     mac::Mac,
     party::{Party, Prover, WhichParty},
     svole_trait::SvoleT,
+    transcript::Transcript,
 };
 
 use super::{
@@ -30,23 +31,20 @@ pub(super) struct CommittedWitness<'a, B: BackendT> {
 }
 
 // Low-level commit to vector
-// (allows control of the channel for Fiat-Shamir)
-//
-// Ideally there would be a nicer way to do this.
 fn commit_vec<
     P: Party,
     V: IsSubFieldOf<F>,
     F: FiniteField,
-    C: AbstractChannel + Clone,
     I: IntoIterator<Item = V>,
     SvoleF: SvoleT<P, V, F>,
 >(
     backend: &mut FCom<P, V, F, SvoleF>,
-    channel: &mut C,
+    channel: &mut Channel,
     rng: &mut SwankyRng,
+    transcript: &mut Transcript,
     sec: PartyPrivate<Prover, P, I>, // secret values
     len: usize,                      // padded length
-) -> Result<impl Iterator<Item = Mac<P, V, F>> + use<P, V, F, C, I, SvoleF>>
+) -> Result<impl Iterator<Item = Mac<P, V, F>> + use<P, V, F, I, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -62,7 +60,7 @@ where
             );
 
             // mac vector
-            let tag = backend.input_prover(ev, channel, rng, &pad)?;
+            let tag = backend.input_prover_with_transcript(ev, channel, rng, &pad, transcript)?;
 
             // combine
             Ok(tag
@@ -73,29 +71,21 @@ where
                 .into_iter())
         }
         WhichParty::Verifier(ev) => {
-            let inp = backend.input_verifier(ev, channel, rng, len)?;
+            let inp = backend.input_verifier_with_transcript(ev, channel, rng, len, transcript)?;
             Ok(inp.into_iter())
         }
     }
 }
 
-impl<
-    'a,
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> CommittedWitness<'a, DietMacAndCheese<P, V, F, C, SvoleF>>
+impl<'a, P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>>
+    CommittedWitness<'a, DietMacAndCheese<P, V, F, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
-    pub fn commit<
-        'b,
-        I: Iterator<Item = <DietMacAndCheese<P, V, F, C, SvoleF> as BackendT>::Wire>,
-    >(
-        channel: &mut (impl AbstractChannel + Clone),
-        backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
+    pub fn commit<'b, I: Iterator<Item = <DietMacAndCheese<P, V, F, SvoleF> as BackendT>::Wire>>(
+        channel: &mut Channel,
+        transcript: &mut Transcript,
+        backend: &mut DietMacAndCheese<P, V, F, SvoleF>,
         disj: &'a Disjunction<V>,
         input: I,
         witness: PartyPrivate<Prover, P, &'b ExtendedWitness<V>>,
@@ -104,6 +94,7 @@ where
             &mut backend.fcom,
             channel,
             &mut backend.rng,
+            transcript,
             witness.map(|witness| {
                 witness
                     .outputs()
@@ -171,19 +162,15 @@ pub(super) struct CommittedCrossTerms<B: BackendT> {
     pub terms: Vec<B::Wire>,
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> CommittedCrossTerms<DietMacAndCheese<P, V, F, C, SvoleF>>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>>
+    CommittedCrossTerms<DietMacAndCheese<P, V, F, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit(
-        channel: &mut (impl AbstractChannel + Clone),
-        backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
+        channel: &mut Channel,
+        transcript: &mut Transcript,
+        backend: &mut DietMacAndCheese<P, V, F, SvoleF>,
         disj: &Disjunction<V>,
         cxt: PartyPrivate<Prover, P, &CrossTerms<V>>,
     ) -> Result<Self> {
@@ -192,6 +179,7 @@ where
             &mut backend.fcom,
             channel,
             &mut backend.rng,
+            transcript,
             cxt.map(|cxt| cxt.terms.iter().copied()),
             disj.dim_err(),
         )?);
@@ -199,19 +187,15 @@ where
     }
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>>
+    ComittedAcc<DietMacAndCheese<P, V, F, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
     pub fn commit(
-        channel: &mut (impl AbstractChannel + Clone),
-        backend: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
+        channel: &mut Channel,
+        transcript: &mut Transcript,
+        backend: &mut DietMacAndCheese<P, V, F, SvoleF>,
         disj: &Disjunction<V>,
         acc: &PartyPrivate<Prover, P, &Accumulator<V>>,
     ) -> Result<Self> {
@@ -219,6 +203,7 @@ where
             &mut backend.fcom,
             channel,
             &mut backend.rng,
+            transcript,
             acc.as_ref().map(|acc| acc.wit.iter().copied()),
             disj.dim_ext(),
         )?
@@ -228,6 +213,7 @@ where
             &mut backend.fcom,
             channel,
             &mut backend.rng,
+            transcript,
             acc.as_ref().map(|acc| acc.err.iter().copied()),
             disj.dim_err(),
         )?

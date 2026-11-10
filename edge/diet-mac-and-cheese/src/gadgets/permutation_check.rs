@@ -5,6 +5,7 @@ use crate::{
     gadgets::dotproduct_with_public_powers, mac::MacT,
 };
 use hybrid_array::{Array, typenum::Unsigned};
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{DegreeModulo, FiniteField, FiniteRing};
 
@@ -22,6 +23,7 @@ pub(crate) fn permutation_check<B: BackendT>(
     mut ys: impl Iterator<Item = B::Wire>,
     ntuples: usize,
     tuple_size: usize,
+    channel: &mut Channel,
 ) -> Result<()> {
     ensure!(
         <B::FieldElement as FiniteField>::NumberOfBitsInBitDecomposition::USIZE >= 40,
@@ -30,23 +32,23 @@ pub(crate) fn permutation_check<B: BackendT>(
     );
 
     let minus_one = -B::FieldElement::ONE;
-    let random = backend.random()?;
-    let challenge = backend.random()?;
+    let random = backend.random(channel)?;
+    let challenge = backend.random(channel)?;
 
     let mut x = backend.constant(B::FieldElement::ONE)?;
     for _ in 0..ntuples {
         let result = dotproduct_with_public_powers(backend, &mut xs, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
-        x = backend.mul(&x, &tmp)?;
+        x = backend.mul(&x, &tmp, channel)?;
     }
     let mut y = backend.constant(B::FieldElement::ONE)?;
     for _ in 0..ntuples {
         let result = dotproduct_with_public_powers(backend, &mut ys, random, tuple_size)?;
         let tmp = backend.add_constant(&result, challenge * minus_one)?;
-        y = backend.mul(&y, &tmp)?;
+        y = backend.mul(&y, &tmp, channel)?;
     }
     let z = backend.sub(&x, &y)?;
-    backend.assert_zero(&z)
+    backend.assert_zero(&z, channel)
 }
 
 /// This type implements an iterator for packing elements together based on a
@@ -119,23 +121,26 @@ pub(crate) fn permutation_check_binary<M: MacT, B: BackendLiftT<Wire = M>>(
     ys: impl Iterator<Item = B::Wire>,
     ntuples: usize,
     tuple_size: usize,
+    channel: &mut Channel,
 ) -> Result<()> {
     let nbits = <M::Tag as FiniteField>::NumberOfBitsInBitDecomposition::USIZE;
     let new_tuple_size = tuple_size.div_ceil(nbits);
     let packed_xs = Packer::<M, B, _>::new(xs, tuple_size);
     let packed_ys = Packer::<M, B, _>::new(ys, tuple_size);
-    permutation_check::<B::LiftedBackend>(backend, packed_xs, packed_ys, ntuples, new_tuple_size)
+    permutation_check::<B::LiftedBackend>(
+        backend,
+        packed_xs,
+        packed_ys,
+        ntuples,
+        new_tuple_size,
+        channel,
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
     use rand::{RngExt, seq::SliceRandom};
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::{FiniteField, FiniteRing};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
@@ -169,83 +174,78 @@ mod tests {
         let xs_ = xs.clone();
         let ys_ = ys.clone();
 
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+        local_channel_pair(
+            |channel| {
+                let rng = SwankyRng::new();
 
-            let mut party = DietMacAndCheese::<Prover, F, F, _, Svole<Prover, F, F>>::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
-            let xs: Vec<Mac<Prover, F, F>> = xs_
-                .into_iter()
-                .map(|x| party.input_private(Some(x)).unwrap())
-                .collect();
-            let ys: Vec<Mac<Prover, F, F>> = ys_
-                .into_iter()
-                .map(|y| party.input_private(Some(y)).unwrap())
-                .collect();
+                let mut party = DietMacAndCheese::<Verifier, F, F, Svole<Verifier, F, F>>::init(
+                    channel,
+                    rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    false,
+                )?;
+                let xs: Vec<Mac<Verifier, F, F>> = xs
+                    .clone()
+                    .iter()
+                    .map(|_| party.input_private(None, channel).unwrap())
+                    .collect();
+                let ys: Vec<Mac<Verifier, F, F>> = ys
+                    .iter()
+                    .map(|_| party.input_private(None, channel).unwrap())
+                    .collect();
 
-            permutation_check(
-                &mut party,
-                xs.into_iter(),
-                ys.into_iter(),
-                ntuples,
-                tuple_size,
-            )
-            .unwrap();
-            if is_good {
-                party.finalize().unwrap();
-            } else {
-                let _ = party.finalize().unwrap_err();
-            }
-        });
+                permutation_check(
+                    &mut party,
+                    xs.into_iter(),
+                    ys.into_iter(),
+                    ntuples,
+                    tuple_size,
+                    channel,
+                )?;
+                if is_good {
+                    party.finalize(channel)?;
+                } else {
+                    let _ = party.finalize(channel).unwrap_err();
+                }
+                Ok(())
+            },
+            |channel| {
+                let rng = SwankyRng::new();
 
-        let rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
+                let mut party = DietMacAndCheese::<Prover, F, F, Svole<Prover, F, F>>::init(
+                    channel,
+                    rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    false,
+                )?;
+                let xs: Vec<Mac<Prover, F, F>> = xs_
+                    .into_iter()
+                    .map(|x| party.input_private(Some(x), channel).unwrap())
+                    .collect();
+                let ys: Vec<Mac<Prover, F, F>> = ys_
+                    .into_iter()
+                    .map(|y| party.input_private(Some(y), channel).unwrap())
+                    .collect();
 
-        let mut party = DietMacAndCheese::<Verifier, F, F, _, Svole<Verifier, F, F>>::init(
-            &mut channel,
-            rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
+                permutation_check(
+                    &mut party,
+                    xs.into_iter(),
+                    ys.into_iter(),
+                    ntuples,
+                    tuple_size,
+                    channel,
+                )?;
+                if is_good {
+                    party.finalize(channel)?;
+                } else {
+                    let _ = party.finalize(channel).unwrap_err();
+                }
+                Ok(())
+            },
         )
         .unwrap();
-        let xs: Vec<Mac<Verifier, F, F>> = xs
-            .clone()
-            .iter()
-            .map(|_| party.input_private(None).unwrap())
-            .collect();
-        let ys: Vec<Mac<Verifier, F, F>> = ys
-            .iter()
-            .map(|_| party.input_private(None).unwrap())
-            .collect();
-
-        permutation_check(
-            &mut party,
-            xs.into_iter(),
-            ys.into_iter(),
-            ntuples,
-            tuple_size,
-        )
-        .unwrap();
-        if is_good {
-            party.finalize().unwrap();
-        } else {
-            let _ = party.finalize().unwrap_err();
-        }
-
-        handle.join().unwrap();
     }
 
     fn test_permutation_binary(ntuples: usize, tuple_size: usize, is_good: bool) {
@@ -263,111 +263,110 @@ mod tests {
         let xs_ = xs.clone();
         let ys_ = ys.clone();
 
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+        local_channel_pair(
+            |channel| {
+                let rng = SwankyRng::new();
 
-            let mut party = DietMacAndCheese::<Prover, F2, F40b, _, Svole<Prover, F2, F40b>>::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
-            let mut party2 = party
-                .lift::<Svole<Prover, F40b, F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-                .unwrap();
-            let xs: Vec<Mac<Prover, F2, F40b>> = xs_
-                .into_iter()
-                .map(|x| party.input_private(Some(x)).unwrap())
-                .collect();
-            let ys: Vec<Mac<Prover, F2, F40b>> = ys_
-                .into_iter()
-                .map(|y| party.input_private(Some(y)).unwrap())
-                .collect();
+                let mut party =
+                    DietMacAndCheese::<Verifier, F2, F40b, Svole<Verifier, F2, F40b>>::init(
+                        channel,
+                        rng,
+                        LPN_SETUP_SMALL,
+                        LPN_EXTEND_SMALL,
+                        false,
+                    )?;
+                let mut party2 = party.lift::<Svole<Verifier, F40b, F40b>>(
+                    channel,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+                let xs: Vec<Mac<Verifier, F2, F40b>> = xs
+                    .clone()
+                    .iter()
+                    .map(|_| party.input_private(None, channel).unwrap())
+                    .collect();
+                let ys: Vec<Mac<Verifier, F2, F40b>> = ys
+                    .iter()
+                    .map(|_| party.input_private(None, channel).unwrap())
+                    .collect();
 
-            permutation_check_binary::<
-                Mac<Prover, F2, F40b>,
-                DietMacAndCheeseExtField<
-                    Prover,
-                    F40b,
-                    Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                    Svole<Prover, F2, F40b>,
-                    Svole<Prover, F40b, F40b>,
-                >,
-            >(
-                &mut party2,
-                xs.into_iter(),
-                ys.into_iter(),
-                ntuples,
-                tuple_size,
-            )
-            .unwrap();
-            if is_good {
-                party.finalize().unwrap();
-                party2.finalize().unwrap();
-            } else {
-                party.finalize().unwrap();
-                let _ = party2.finalize().unwrap_err();
-            }
-        });
+                permutation_check_binary::<
+                    Mac<Verifier, F2, F40b>,
+                    DietMacAndCheeseExtField<
+                        Verifier,
+                        F40b,
+                        Svole<Verifier, F2, F40b>,
+                        Svole<Verifier, F40b, F40b>,
+                    >,
+                >(
+                    &mut party2,
+                    xs.into_iter(),
+                    ys.into_iter(),
+                    ntuples,
+                    tuple_size,
+                    channel,
+                )?;
+                if is_good {
+                    party.finalize(channel)?;
+                    party2.finalize(channel)?;
+                } else {
+                    party.finalize(channel)?;
+                    let _ = party2.finalize(channel).unwrap_err();
+                }
+                Ok(())
+            },
+            |channel| {
+                let rng = SwankyRng::new();
 
-        let rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
+                let mut party =
+                    DietMacAndCheese::<Prover, F2, F40b, Svole<Prover, F2, F40b>>::init(
+                        channel,
+                        rng,
+                        LPN_SETUP_SMALL,
+                        LPN_EXTEND_SMALL,
+                        false,
+                    )?;
+                let mut party2 = party.lift::<Svole<Prover, F40b, F40b>>(
+                    channel,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+                let xs: Vec<Mac<Prover, F2, F40b>> = xs_
+                    .into_iter()
+                    .map(|x| party.input_private(Some(x), channel).unwrap())
+                    .collect();
+                let ys: Vec<Mac<Prover, F2, F40b>> = ys_
+                    .into_iter()
+                    .map(|y| party.input_private(Some(y), channel).unwrap())
+                    .collect();
 
-        let mut party = DietMacAndCheese::<Verifier, F2, F40b, _, Svole<Verifier, F2, F40b>>::init(
-            &mut channel,
-            rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
+                permutation_check_binary::<
+                    Mac<Prover, F2, F40b>,
+                    DietMacAndCheeseExtField<
+                        Prover,
+                        F40b,
+                        Svole<Prover, F2, F40b>,
+                        Svole<Prover, F40b, F40b>,
+                    >,
+                >(
+                    &mut party2,
+                    xs.into_iter(),
+                    ys.into_iter(),
+                    ntuples,
+                    tuple_size,
+                    channel,
+                )?;
+                if is_good {
+                    party.finalize(channel)?;
+                    party2.finalize(channel)?;
+                } else {
+                    party.finalize(channel)?;
+                    let _ = party2.finalize(channel).unwrap_err();
+                }
+                Ok(())
+            },
         )
         .unwrap();
-        let mut party2 = party
-            .lift::<Svole<Verifier, F40b, F40b>>(LPN_SETUP_SMALL, LPN_EXTEND_SMALL)
-            .unwrap();
-        let xs: Vec<Mac<Verifier, F2, F40b>> = xs
-            .clone()
-            .iter()
-            .map(|_| party.input_private(None).unwrap())
-            .collect();
-        let ys: Vec<Mac<Verifier, F2, F40b>> = ys
-            .iter()
-            .map(|_| party.input_private(None).unwrap())
-            .collect();
-
-        permutation_check_binary::<
-            Mac<Verifier, F2, F40b>,
-            DietMacAndCheeseExtField<
-                Verifier,
-                F40b,
-                Channel<BufReader<UnixStream>, BufWriter<UnixStream>>,
-                Svole<Verifier, F2, F40b>,
-                Svole<Verifier, F40b, F40b>,
-            >,
-        >(
-            &mut party2,
-            xs.into_iter(),
-            ys.into_iter(),
-            ntuples,
-            tuple_size,
-        )
-        .unwrap();
-        if is_good {
-            party.finalize().unwrap();
-            party2.finalize().unwrap();
-        } else {
-            party.finalize().unwrap();
-            let _ = party2.finalize().unwrap_err();
-        }
-
-        handle.join().unwrap();
     }
 
     fn test_permutation_(ntuples: usize, tuple_size: usize, is_good: bool) {

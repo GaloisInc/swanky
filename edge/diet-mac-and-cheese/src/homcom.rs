@@ -8,11 +8,12 @@ use crate::{
     mac::Mac,
     party::{Party, Prover, Verifier, WhichParty},
     svole_trait::SvoleT,
+    transcript::Transcript,
 };
 use hybrid_array::Array;
 use log::{debug, warn};
 use rand::{RngExt, SeedableRng};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail, ensure};
 use swanky_field::{DegreeModulo, FiniteField, IsSubFieldOf};
 use swanky_party::{
@@ -80,21 +81,19 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
         self.count += 1;
     }
 
-    pub(crate) fn finalize<C: AbstractChannel + Clone>(
+    pub(crate) fn finalize(
         &mut self,
         mask: Mac<P, T, T>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         delta: PartyPrivateCopy<Verifier, P, T>,
     ) -> Result<usize> {
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-                let chi = channel
-                    .read_serializable()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.")?;
+                let chi = channel.read::<T>()?;
                 let mut chi_power = chi;
 
                 let mut sum_a0 = T::ZERO;
@@ -114,14 +113,10 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 let u = sum_a0 + mask.mac();
                 let v = sum_a1 + mask.value().into_inner(ev);
 
+                channel.write(&u)?;
+                channel.write(&v)?;
                 channel
-                    .write_serializable(&u)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.")?;
-                channel
-                    .write_serializable(&v)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 let c = self.count;
@@ -129,19 +124,13 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> MultCheckState<P, V, T> {
                 Ok(c)
             }
             WhichParty::Verifier(ev) => {
+                channel.write(&self.chi.into_inner(ev))?;
                 channel
-                    .write_serializable::<T>(&self.chi.into_inner(ev))
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
-                let u = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.")?;
-                let v = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.")?;
+                let u = channel.read::<T>()?;
+                let v = channel.read::<T>()?;
 
                 let b_plus = self.sum_b.into_inner(ev) + mask.mac();
                 if b_plus == (u + (-delta.into_inner(ev)) * v) {
@@ -206,25 +195,17 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
         Ok(())
     }
 
-    pub(crate) fn finalize<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut SwankyRng,
-    ) -> Result<usize> {
+    pub(crate) fn finalize(&mut self, channel: &mut Channel, rng: &mut SwankyRng) -> Result<usize> {
         let mut rng = match P::WHICH {
             WhichParty::Prover(_) => {
-                let seed = channel
-                    .read_u8x16()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?;
+                let seed = channel.read::<U8x16>()?;
                 SwankyRng::from_seed(seed)
             }
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
+                channel.write(&seed)?;
                 channel
-                    .write_u8x16(&seed)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 SwankyRng::from_seed(seed)
             }
@@ -239,11 +220,9 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                     let chi = T::random(&mut rng);
                     m += chi * mac.mac();
                 }
+                channel.write(&m)?;
                 channel
-                    .write_serializable::<T>(&m)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 b
@@ -254,9 +233,7 @@ impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField> ZeroCheckState<P, V, T> {
                     let chi = T::random(&mut rng);
                     key_chi += chi * mac.mac();
                 }
-                let m = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.")?;
+                let m = channel.read::<T>()?;
 
                 key_chi == m
             }
@@ -286,8 +263,8 @@ where
     <T as FiniteField>::PrimeField: IsSubFieldOf<V>,
 {
     /// Initialize the commitment scheme.
-    pub fn init<C: AbstractChannel + Clone>(
-        channel: &mut C,
+    pub fn init(
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -322,8 +299,8 @@ where
         })
     }
 
-    pub fn init_with_delta<C: AbstractChannel + Clone>(
-        channel: &mut C,
+    pub fn init_with_delta(
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -359,11 +336,7 @@ where
     }
 
     /// Return a random [`Mac`].
-    pub fn random<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut SwankyRng,
-    ) -> Result<Mac<P, V, T>> {
+    pub fn random(&mut self, channel: &mut Channel, rng: &mut SwankyRng) -> Result<Mac<P, V, T>> {
         match P::WHICH {
             WhichParty::Prover(ev) => match self.voles.as_mut().into_inner(ev).pop() {
                 Some(e) => return Ok(Mac::new(PartyPrivateCopy::new(e.0), e.1)),
@@ -394,10 +367,10 @@ where
     }
 
     /// Input a slice and return the associated MACs.
-    pub fn input_prover<C: AbstractChannel + Clone>(
+    pub fn input_prover(
         &mut self,
         ev: Witness<impl EqualityProposition<Prover, P>>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         source: &[V],
     ) -> Result<Vec<T>> {
@@ -409,10 +382,10 @@ where
     }
 
     /// Input a number of commitment values and return the associated MACs.
-    pub fn input_verifier<C: AbstractChannel + Clone>(
+    pub fn input_verifier(
         &mut self,
         ev: Witness<impl EqualityProposition<Verifier, P>>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         source: usize,
     ) -> Result<Vec<Mac<P, V, T>>> {
@@ -422,10 +395,46 @@ where
         Ok(out)
     }
 
-    pub fn input_prover_low_level<C: AbstractChannel + Clone>(
+    /// Like [`Self::input_prover`], but additionally absorb the
+    /// committed values into the Fiat-Shamir `transcript`.
+    pub fn input_prover_with_transcript(
         &mut self,
         ev: Witness<impl EqualityProposition<Prover, P>>,
-        channel: &mut C,
+        channel: &mut Channel,
+        rng: &mut SwankyRng,
+        source: &[V],
+        transcript: &mut Transcript,
+    ) -> Result<Vec<T>> {
+        debug!("input (with transcript)");
+        let mut out = Vec::with_capacity(source.len());
+        for &x_i in source {
+            out.push(self.input1(ev, channel, rng, x_i, Some(transcript))?);
+        }
+        Ok(out)
+    }
+
+    /// Like [`Self::input_verifier`], but additionally absorb the
+    /// committed values into the Fiat-Shamir `transcript`.
+    pub fn input_verifier_with_transcript(
+        &mut self,
+        ev: Witness<impl EqualityProposition<Verifier, P>>,
+        channel: &mut Channel,
+        rng: &mut SwankyRng,
+        source: usize,
+        transcript: &mut Transcript,
+    ) -> Result<Vec<Mac<P, V, T>>> {
+        debug!("input (with transcript)");
+        let mut out = Vec::with_capacity(source);
+        for _ in 0..source {
+            out.push(self.input1_mac(ev, channel, rng, Some(transcript))?);
+        }
+        Ok(out)
+    }
+
+    pub fn input_prover_low_level(
+        &mut self,
+        ev: Witness<impl EqualityProposition<Prover, P>>,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         source: &[V],
         out: &mut Vec<T>,
@@ -438,10 +447,10 @@ where
         Ok(())
     }
 
-    pub fn input_verifier_low_level<C: AbstractChannel + Clone>(
+    pub fn input_verifier_low_level(
         &mut self,
         ev: Witness<impl EqualityProposition<Verifier, P>>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         source: usize,
         out: &mut Vec<Mac<P, V, T>>,
@@ -449,9 +458,7 @@ where
         debug!("input_low_level");
         for _ in 0..source {
             let r = self.random(channel, rng)?;
-            let y = channel
-                .read_serializable::<V>()
-                .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.")?;
+            let y = channel.read::<V>()?;
             out.push(Mac::new(
                 PartyPrivateCopy::empty(ev),
                 r.mac() - y * self.delta.into_inner(ev),
@@ -460,38 +467,60 @@ where
         Ok(())
     }
 
-    pub fn input1_prover<C: AbstractChannel + Clone>(
+    fn input1(
         &mut self,
         ev: Witness<impl EqualityProposition<Prover, P>>,
-        channel: &mut C,
+        channel: &mut Channel,
+        rng: &mut SwankyRng,
+        x: V,
+        transcript: Option<&mut Transcript>,
+    ) -> Result<T> {
+        let r = self.random(channel, rng)?;
+        let y = x - r.value().into_inner(ev);
+        if let Some(transcript) = transcript {
+            transcript.absorb(y);
+        }
+        channel.write(&y)?;
+        Ok(r.mac())
+    }
+
+    fn input1_mac(
+        &mut self,
+        ev: Witness<impl EqualityProposition<Verifier, P>>,
+        channel: &mut Channel,
+        rng: &mut SwankyRng,
+        transcript: Option<&mut Transcript>,
+    ) -> Result<Mac<P, V, T>> {
+        let r = self.random(channel, rng)?;
+        let y = channel.read::<V>()?;
+        if let Some(transcript) = transcript {
+            transcript.absorb(y);
+        }
+        Ok(Mac::new(
+            PartyPrivateCopy::empty(ev),
+            r.mac() - y * self.delta.into_inner(ev),
+        ))
+    }
+
+    pub fn input1_prover(
+        &mut self,
+        ev: Witness<impl EqualityProposition<Prover, P>>,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         x: V,
     ) -> Result<T> {
         debug!("input1");
-        let r = self.random(channel, rng)?;
-        let y = x - r.value().into_inner(ev);
-        channel
-            .write_serializable(&y)
-            .wrap_err(ErrorKind::NetworkError, "Failed to write 'y'.")?;
-        Ok(r.mac())
+        self.input1(ev, channel, rng, x, None)
     }
 
-    pub fn input1_verifier<C: AbstractChannel + Clone>(
+    pub fn input1_verifier(
         &mut self,
         ev: Witness<impl EqualityProposition<Verifier, P>>,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
     ) -> Result<Mac<P, V, T>> {
         debug!("input1");
-        let r = self.random(channel, rng)?;
-        let y = channel
-            .read_serializable::<V>()
-            .wrap_err(ErrorKind::NetworkError, "Failed to read 'y'.")?;
-        let out = Mac::new(
-            PartyPrivateCopy::empty(ev),
-            r.mac() - y * self.delta.into_inner(ev),
-        );
-        Ok(out)
+        self.input1_mac(ev, channel, rng, None)
     }
 
     /// Add a constant.
@@ -510,24 +539,20 @@ where
     }
 
     /// Check that a batch of [`Mac`]s are zero.
-    pub fn check_zero<C: AbstractChannel + Clone>(
+    pub fn check_zero(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         mac_batch: &[Mac<P, V, T>],
     ) -> Result<()> {
         debug!("check_zero");
         let seed = match P::WHICH {
-            WhichParty::Prover(_) => channel
-                .read_u8x16()
-                .wrap_err(ErrorKind::NetworkError, "Failed to read seed block.")?,
+            WhichParty::Prover(_) => channel.read::<U8x16>()?,
             WhichParty::Verifier(_) => {
                 let seed = rng.random::<U8x16>();
+                channel.write(&seed)?;
                 channel
-                    .write_u8x16(&seed)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write seed.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 seed
             }
@@ -543,11 +568,9 @@ where
                     m += chi * mac.mac();
                     b &= mac.value().into_inner(ev) == V::ZERO;
                 }
+                channel.write(&m)?;
                 channel
-                    .write_serializable::<T>(&m)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 b
@@ -558,9 +581,7 @@ where
                     let chi = T::random(&mut rng);
                     key_chi += chi * key.mac();
                 }
-                let m = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.")?;
+                let m = channel.read::<T>()?;
 
                 key_chi == m
             }
@@ -571,9 +592,9 @@ where
     }
 
     /// Open a batch of [`Mac`]s. Only verifiers write to `out`.
-    pub fn open<C: AbstractChannel + Clone>(
+    pub fn open(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         batch: &[Mac<P, V, T>],
         out: &mut PartyPrivate<Verifier, P, &mut Vec<V>>,
     ) -> Result<()> {
@@ -583,18 +604,14 @@ where
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 for mac in batch.iter() {
-                    channel
-                        .write_serializable::<V>(&mac.value().into_inner(ev))
-                        .wrap_err(ErrorKind::NetworkError, "Failed to write MAC.")?;
+                    channel.write(&mac.value().into_inner(ev))?;
                     hasher.update(&mac.value().into_inner(ev).to_bytes());
                 }
             }
             WhichParty::Verifier(ev) => {
                 out.as_mut().into_inner(ev).clear();
                 for _ in 0..batch.len() {
-                    let x = channel
-                        .read_serializable::<V>()
-                        .wrap_err(ErrorKind::NetworkError, "Failed to read 'x'.")?;
+                    let x = channel.read::<V>()?;
                     out.as_mut().into_inner(ev).push(x);
                     hasher.update(&x.to_bytes());
                 }
@@ -611,11 +628,9 @@ where
                     let chi = T::random(&mut rng);
                     m += chi * mac.mac();
                 }
+                channel.write(&m)?;
                 channel
-                    .write_serializable::<T>(&m)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'm'.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 Ok(())
@@ -629,9 +644,7 @@ where
                     key_chi += chi * mac.mac();
                     x_chi += out.as_ref().into_inner(ev)[i] * chi;
                 }
-                let m = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'm'.")?;
+                let m = channel.read::<T>()?;
 
                 assert_eq!(out.as_ref().into_inner(ev).len(), batch.len());
                 if key_chi + self.delta.into_inner(ev) * x_chi == m {
@@ -645,9 +658,9 @@ where
     }
 
     /// Quicksilver multiplication check.
-    pub fn quicksilver_check_multiply<C: AbstractChannel + Clone>(
+    pub fn quicksilver_check_multiply(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         triples: &[(Mac<P, V, T>, Mac<P, V, T>, Mac<P, V, T>)],
     ) -> Result<()> {
@@ -656,9 +669,7 @@ where
                 let mut sum_a0 = T::ZERO;
                 let mut sum_a1 = T::ZERO;
 
-                let chi = channel
-                    .read_serializable()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read chi.")?;
+                let chi = channel.read::<T>()?;
                 let mut chi_power = chi;
 
                 for ((x, x_mac), (y, y_mac), (_, z_mac)) in triples
@@ -683,25 +694,19 @@ where
                 let u = sum_a0 + mask.mac();
                 let v = sum_a1 + mask.value().into_inner(ev);
 
+                channel.write(&u)?;
+                channel.write(&v)?;
                 channel
-                    .write_serializable(&u)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'u'.")?;
-                channel
-                    .write_serializable(&v)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write 'v'.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 Ok(())
             }
             WhichParty::Verifier(ev) => {
                 let chi = T::random(rng);
+                channel.write(&chi)?;
                 channel
-                    .write_serializable::<T>(&chi)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write chi.")?;
-                channel
-                    .flush()
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
 
                 let mut sum_b = T::ZERO;
@@ -720,12 +725,8 @@ where
                 }
                 let mask = Mac::lift(&vs);
 
-                let u = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'u'.")?;
-                let v = channel
-                    .read_serializable::<T>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read 'v'.")?;
+                let u = channel.read::<T>()?;
+                let v = channel.read::<T>()?;
 
                 let b_plus = sum_b + mask.mac();
                 if b_plus == (u + (-self.delta.into_inner(ev)) * v) {
@@ -743,9 +744,9 @@ where
     /// Finalize the multiplication check for a state.
     ///
     /// Return the number of triples checked.
-    pub fn quicksilver_finalize<C: AbstractChannel + Clone>(
+    pub fn quicksilver_finalize(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: &mut SwankyRng,
         state: &mut MultCheckState<P, V, T>,
     ) -> Result<usize> {
@@ -755,11 +756,7 @@ where
     }
 
     /// Generate a random mask MAC over the tag field.
-    pub fn gen_mask<C: AbstractChannel + Clone>(
-        &mut self,
-        channel: &mut C,
-        rng: &mut SwankyRng,
-    ) -> Result<Mac<P, T, T>> {
+    pub fn gen_mask(&mut self, channel: &mut Channel, rng: &mut SwankyRng) -> Result<Mac<P, T, T>> {
         let mut macs = Array::<_, DegreeModulo<V, T>>::default();
         for mac in macs.iter_mut() {
             *mac = self.random(channel, rng)?;
@@ -775,11 +772,8 @@ mod tests {
     use crate::svole_thread::{SvoleAtomic, ThreadSvole};
     use crate::svole_trait::{Svole, SvoleT};
     use rand::SeedableRng;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::{AbstractChannel, Channel, SyncChannel};
+    use swanky_channel::Channel;
+    use swanky_channel::local::{LocalSocket, local_channel_pair};
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
@@ -795,59 +789,47 @@ mod tests {
         T::PrimeField: IsSubFieldOf<V>,
     {
         let count = 100;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )
-            .unwrap();
+        let (verifier_values, prover_values) = local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+                let mut v = Vec::with_capacity(count);
+                for _ in 0..count {
+                    v.push(fcom.random(channel, &mut rng)?);
+                }
 
-            let mut v = Vec::with_capacity(count);
-            for _ in 0..count {
-                v.push(fcom.random(&mut channel, &mut rng).unwrap());
-            }
-            fcom.open(
-                &mut channel,
-                &v,
-                &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
-            )
-            .unwrap();
-            v
-        });
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+                let mut r = PartyPrivate::new(Vec::new());
+                fcom.open(channel, &v, &mut r.as_mut())?;
+
+                Ok(r.into_inner(Witness::EQUAL_TYPES))
+            },
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+
+                let mut v = Vec::with_capacity(count);
+                for _ in 0..count {
+                    v.push(fcom.random(channel, &mut rng)?);
+                }
+                fcom.open(channel, &v, &mut PartyPrivate::empty(Witness::EQUAL_TYPES))?;
+                Ok(v.iter()
+                    .map(|mac| mac.value().into_inner(Witness::EQUAL_TYPES))
+                    .collect::<Vec<_>>())
+            },
         )
         .unwrap();
-        let mut v = Vec::with_capacity(count);
-        for _ in 0..count {
-            v.push(fcom.random(&mut channel, &mut rng).unwrap());
-        }
 
-        let mut r = PartyPrivate::new(Vec::new());
-        fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
-
-        let resprover = handle.join().unwrap();
-
-        for (i, res) in resprover.iter().enumerate() {
-            assert_eq!(
-                r.as_ref().into_inner(Witness::EQUAL_TYPES)[i],
-                res.value().into_inner(Witness::EQUAL_TYPES)
-            );
-        }
+        assert_eq!(verifier_values, prover_values)
     }
 
     fn test_fcom_affine<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -855,72 +837,59 @@ mod tests {
         T::PrimeField: IsSubFieldOf<V>,
     {
         let count = 200;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )
-            .unwrap();
+        let (verifier_values, prover_values) = local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
 
-            let mut v = Vec::new();
-            for _ in 0..count {
-                let x = fcom.random(&mut channel, &mut rng).unwrap();
-                let cst = V::random(&mut rng);
-                channel.write_serializable::<V>(&cst).unwrap();
-                channel.flush().unwrap();
-                let m = x * cst;
-                v.push(m);
-                let a = fcom.affine_add_cst(cst, x);
-                v.push(a);
-            }
-            fcom.open(
-                &mut channel,
-                &v,
-                &mut PartyPrivate::empty(Witness::EQUAL_TYPES),
-            )
-            .unwrap();
-            v
-        });
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+                let mut v = Vec::new();
+                for _ in 0..count {
+                    let x_mac = fcom.random(channel, &mut rng)?;
+                    let cst = channel.read::<V>()?;
+                    let m_mac = x_mac * cst;
+                    v.push(m_mac);
+                    let a_mac = fcom.affine_add_cst(cst, x_mac);
+                    v.push(a_mac);
+                }
+
+                let mut r = PartyPrivate::new(Vec::new());
+                fcom.open(channel, &v, &mut r.as_mut())?;
+                Ok(r.into_inner(Witness::EQUAL_TYPES))
+            },
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+
+                let mut v = Vec::new();
+                for _ in 0..count {
+                    let x = fcom.random(channel, &mut rng)?;
+                    let cst = V::random(&mut rng);
+                    channel.write(&cst)?;
+                    channel.force_flush().unwrap();
+                    let m = x * cst;
+                    v.push(m);
+                    let a = fcom.affine_add_cst(cst, x);
+                    v.push(a);
+                }
+                fcom.open(channel, &v, &mut PartyPrivate::empty(Witness::EQUAL_TYPES))?;
+                Ok(v.iter()
+                    .map(|mac| mac.value().into_inner(Witness::EQUAL_TYPES))
+                    .collect::<Vec<_>>())
+            },
         )
         .unwrap();
 
-        let mut v = Vec::new();
-        for _ in 0..count {
-            let x_mac = fcom.random(&mut channel, &mut rng).unwrap();
-            let cst = channel.read_serializable::<V>().unwrap();
-            let m_mac = x_mac * cst;
-            v.push(m_mac);
-            let a_mac = fcom.affine_add_cst(cst, x_mac);
-            v.push(a_mac);
-        }
-
-        let mut r = PartyPrivate::new(Vec::new());
-        fcom.open(&mut channel, &v, &mut r.as_mut()).unwrap();
-
-        let batch_prover = handle.join().unwrap();
-
-        for (i, res) in batch_prover.iter().enumerate() {
-            assert_eq!(
-                r.as_ref().into_inner(Witness::EQUAL_TYPES)[i],
-                res.value().into_inner(Witness::EQUAL_TYPES)
-            );
-        }
+        assert_eq!(verifier_values, prover_values);
     }
 
     fn test_fcom_multiplication<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -928,61 +897,49 @@ mod tests {
         T::PrimeField: IsSubFieldOf<V>,
     {
         let count = 50;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )
-            .unwrap();
+        local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<_, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
 
-            let mut v = Vec::new();
-            for _ in 0..count {
-                let x = fcom.random(&mut channel, &mut rng).unwrap();
-                let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value().into_inner(Witness::EQUAL_TYPES)
-                    * y.value().into_inner(Witness::EQUAL_TYPES);
-                let z_mac = fcom
-                    .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &[z])
-                    .unwrap()[0];
-                v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
-            }
-            channel.flush().unwrap();
-            fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
-                .unwrap();
-            v
-        });
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<_, V, T, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+                let mut v = Vec::new();
+                for _ in 0..count {
+                    let xmac = fcom.random(channel, &mut rng)?;
+                    let ymac = fcom.random(channel, &mut rng)?;
+                    let zmac = fcom.input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, 1)?[0];
+                    v.push((xmac, ymac, zmac));
+                }
+                fcom.quicksilver_check_multiply(channel, &mut rng, &v)
+            },
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+
+                let mut v = Vec::new();
+                for _ in 0..count {
+                    let x = fcom.random(channel, &mut rng)?;
+                    let y = fcom.random(channel, &mut rng)?;
+                    let z = x.value().into_inner(Witness::EQUAL_TYPES)
+                        * y.value().into_inner(Witness::EQUAL_TYPES);
+                    let z_mac =
+                        fcom.input_prover(Witness::EQUAL_TYPES, channel, &mut rng, &[z])?[0];
+                    v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
+                }
+                channel.force_flush().unwrap();
+                fcom.quicksilver_check_multiply(channel, &mut rng, &v)
+            },
         )
         .unwrap();
-
-        let mut v = Vec::new();
-        for _ in 0..count {
-            let xmac = fcom.random(&mut channel, &mut rng).unwrap();
-            let ymac = fcom.random(&mut channel, &mut rng).unwrap();
-            let zmac = fcom
-                .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, 1)
-                .unwrap()[0];
-            v.push((xmac, ymac, zmac));
-        }
-        fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
-            .unwrap();
-
-        handle.join().unwrap();
     }
 
     fn test_fcom_check_zero<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -990,89 +947,79 @@ mod tests {
         T::PrimeField: IsSubFieldOf<V>,
     {
         let count = 50;
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
-                &mut channel,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-            )
-            .unwrap();
+        local_channel_pair(
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
 
-            for n in 0..count {
-                // ZEROs
-                let mut v = Vec::new();
-                for _ in 0..n {
-                    let x = V::ZERO;
-                    let xmac = fcom
-                        .input1_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, x)
-                        .unwrap();
-                    v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
+                for n in 0..count {
+                    // ZEROs
+                    let mut v = Vec::new();
+                    for _ in 0..n {
+                        let xmac = fcom.input1_verifier(Witness::EQUAL_TYPES, channel, &mut rng)?;
+                        v.push(xmac);
+                    }
+                    let r = fcom.check_zero(channel, &mut rng, &v);
+                    assert!(r.is_ok());
                 }
-                channel.flush().unwrap();
-                let r = fcom.check_zero(&mut channel, &mut rng, v.as_slice());
-                assert!(r.is_ok());
-            }
 
-            for n in 1..count {
-                // NON_ZERO
-                let mut v = Vec::new();
-                for _ in 0..n {
-                    let x = V::random_nonzero(&mut rng);
-                    let xmac = fcom
-                        .input1_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, x)
-                        .unwrap();
-                    v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
+                for n in 1..count {
+                    // non ZERO
+                    let mut v = Vec::new();
+                    for _ in 0..n {
+                        let xmac = fcom.input1_verifier(Witness::EQUAL_TYPES, channel, &mut rng)?;
+                        v.push(xmac);
+                    }
+                    let r = fcom.check_zero(channel, &mut rng, &v);
+                    assert!(r.is_err());
                 }
-                channel.flush().unwrap();
-                let r = fcom.check_zero(&mut channel, &mut rng, v.as_slice());
-                assert!(r.is_err());
-            }
-        });
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let mut fcom = FCom::<Verifier, V, T, Svole<_, _, _>>::init(
-            &mut channel,
-            &mut rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
+                Ok(())
+            },
+            |channel| {
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom = FCom::<Prover, V, T, Svole<_, _, _>>::init(
+                    channel,
+                    &mut rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                )?;
+
+                for n in 0..count {
+                    // ZEROs
+                    let mut v = Vec::new();
+                    for _ in 0..n {
+                        let x = V::ZERO;
+                        let xmac =
+                            fcom.input1_prover(Witness::EQUAL_TYPES, channel, &mut rng, x)?;
+                        v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
+                    }
+                    channel.force_flush().unwrap();
+                    let r = fcom.check_zero(channel, &mut rng, v.as_slice());
+                    assert!(r.is_ok());
+                }
+
+                for n in 1..count {
+                    // NON_ZERO
+                    let mut v = Vec::new();
+                    for _ in 0..n {
+                        let x = V::random_nonzero(&mut rng);
+                        let xmac =
+                            fcom.input1_prover(Witness::EQUAL_TYPES, channel, &mut rng, x)?;
+                        v.push(Mac::new(PartyPrivateCopy::new(x), xmac));
+                    }
+                    channel.force_flush().unwrap();
+                    let r = fcom.check_zero(channel, &mut rng, v.as_slice());
+                    assert!(r.is_err());
+                }
+                Ok(())
+            },
         )
         .unwrap();
-
-        for n in 0..count {
-            // ZEROs
-            let mut v = Vec::new();
-            for _ in 0..n {
-                let xmac = fcom
-                    .input1_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng)
-                    .unwrap();
-                v.push(xmac);
-            }
-            let r = fcom.check_zero(&mut channel, &mut rng, &v);
-            assert!(r.is_ok());
-        }
-
-        for n in 1..count {
-            // non ZERO
-            let mut v = Vec::new();
-            for _ in 0..n {
-                let xmac = fcom
-                    .input1_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng)
-                    .unwrap();
-                v.push(xmac);
-            }
-            let r = fcom.check_zero(&mut channel, &mut rng, &v);
-            assert!(r.is_err());
-        }
-
-        handle.join().unwrap();
     }
 
     fn test_fcom_multiplication_multithreaded<V: IsSubFieldOf<T>, T: FiniteField>()
@@ -1080,97 +1027,81 @@ mod tests {
         T::PrimeField: IsSubFieldOf<V>,
     {
         let count = 50;
-        let (sender_vole, receiver_vole) = UnixStream::pair().unwrap();
-        let (sender, receiver) = UnixStream::pair().unwrap();
+        let (sender_vole, receiver_vole) = LocalSocket::pair().unwrap();
 
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender_vole.try_clone().unwrap());
-            let writer = BufWriter::new(sender_vole);
-            let mut channel_vole = SyncChannel::new(reader, writer);
+        local_channel_pair(
+            |channel| {
+                let svole_atomic = SvoleAtomic::create();
+                let svole_atomic2 = svole_atomic.duplicate();
 
-            let svole_atomic = SvoleAtomic::<Prover, V, T>::create();
-            let svole_atomic2 = svole_atomic.duplicate();
+                let _svole_thread = std::thread::spawn(move || {
+                    let mut rng = SwankyRng::from_seed(Default::default());
+                    Channel::with(receiver_vole, |channel_vole| {
+                        let mut svole_receiver = ThreadSvole::init(
+                            channel_vole,
+                            &mut rng,
+                            LPN_SETUP_SMALL,
+                            LPN_EXTEND_SMALL,
+                            svole_atomic2,
+                            None,
+                        )?;
+                        svole_receiver.run(channel_vole, &mut rng)
+                    })
+                    .unwrap();
+                });
+                let mut rng = SwankyRng::from_seed(Default::default());
 
-            let _svole_thread = std::thread::spawn(move || {
-                let mut svole_prover = ThreadSvole::init(
-                    &mut channel_vole,
-                    &mut rng,
-                    LPN_SETUP_SMALL,
-                    LPN_EXTEND_SMALL,
-                    svole_atomic2,
-                    None,
-                )
-                .unwrap();
-                svole_prover.run(&mut channel_vole, &mut rng).unwrap();
-            });
+                let mut fcom =
+                    FCom::<Verifier, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic)?;
 
-            let mut rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+                let mut v = Vec::new();
+                for _ in 0..count {
+                    let xmac = fcom.random(channel, &mut rng)?;
+                    let ymac = fcom.random(channel, &mut rng)?;
+                    let zmac = fcom.input_verifier(Witness::EQUAL_TYPES, channel, &mut rng, 1)?[0];
+                    v.push((xmac, ymac, zmac));
+                }
+                fcom.quicksilver_check_multiply(channel, &mut rng, &v)
+            },
+            |channel| {
+                let svole_atomic = SvoleAtomic::<Prover, V, T>::create();
+                let svole_atomic2 = svole_atomic.duplicate();
 
-            let mut fcom =
-                FCom::<Prover, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic).unwrap();
+                let _svole_thread = std::thread::spawn(move || {
+                    let mut rng = SwankyRng::from_seed(Default::default());
+                    Channel::with(sender_vole, |channel_vole| {
+                        let mut svole_prover = ThreadSvole::init(
+                            channel_vole,
+                            &mut rng,
+                            LPN_SETUP_SMALL,
+                            LPN_EXTEND_SMALL,
+                            svole_atomic2,
+                            None,
+                        )?;
+                        svole_prover.run(channel_vole, &mut rng)
+                    })
+                    .unwrap();
+                });
 
-            let mut v = Vec::new();
-            for _ in 0..count {
-                let x = fcom.random(&mut channel, &mut rng).unwrap();
-                let y = fcom.random(&mut channel, &mut rng).unwrap();
-                let z = x.value().into_inner(Witness::EQUAL_TYPES)
-                    * y.value().into_inner(Witness::EQUAL_TYPES);
-                let z_mac = fcom
-                    .input_prover(Witness::EQUAL_TYPES, &mut channel, &mut rng, &[z])
-                    .unwrap()[0];
-                v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
-            }
-            channel.flush().unwrap();
-            fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
-                .unwrap();
-            v
-        });
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver_vole.try_clone().unwrap());
-        let writer = BufWriter::new(receiver_vole);
-        let mut channel_vole = SyncChannel::new(reader, writer);
+                let mut rng = SwankyRng::from_seed(Default::default());
+                let mut fcom =
+                    FCom::<Prover, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic)?;
 
-        let svole_atomic = SvoleAtomic::create();
-        let svole_atomic2 = svole_atomic.duplicate();
-
-        let _svole_thread = std::thread::spawn(move || {
-            let mut svole_receiver = ThreadSvole::init(
-                &mut channel_vole,
-                &mut rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                svole_atomic2,
-                None,
-            )
-            .unwrap();
-            svole_receiver.run(&mut channel_vole, &mut rng).unwrap();
-        });
-
-        let mut rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut fcom =
-            FCom::<Verifier, V, T, SvoleAtomic<_, _, _>>::init_with_vole(svole_atomic).unwrap();
-
-        let mut v = Vec::new();
-        for _ in 0..count {
-            let xmac = fcom.random(&mut channel, &mut rng).unwrap();
-            let ymac = fcom.random(&mut channel, &mut rng).unwrap();
-            let zmac = fcom
-                .input_verifier(Witness::EQUAL_TYPES, &mut channel, &mut rng, 1)
-                .unwrap()[0];
-            v.push((xmac, ymac, zmac));
-        }
-        fcom.quicksilver_check_multiply(&mut channel, &mut rng, &v)
-            .unwrap();
-
-        handle.join().unwrap();
+                let mut v = Vec::new();
+                for _ in 0..count {
+                    let x = fcom.random(channel, &mut rng)?;
+                    let y = fcom.random(channel, &mut rng)?;
+                    let z = x.value().into_inner(Witness::EQUAL_TYPES)
+                        * y.value().into_inner(Witness::EQUAL_TYPES);
+                    let z_mac =
+                        fcom.input_prover(Witness::EQUAL_TYPES, channel, &mut rng, &[z])?[0];
+                    v.push((x, y, Mac::new(PartyPrivateCopy::new(z), z_mac)));
+                }
+                channel.force_flush().unwrap();
+                fcom.quicksilver_check_multiply(channel, &mut rng, &v)
+            },
+        )
+        .unwrap();
     }
 
     #[test]

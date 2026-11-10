@@ -17,22 +17,22 @@ hybrid-array.workspace = true
 rand.workspace = true
 subtle.workspace = true
 swanky-adversary.workspace = true
-swanky-rng.workspace = true
-swanky-channel-legacy.workspace = true
+swanky-channel.workspace = true
 swanky-cointoss.workspace = true
 swanky-error.workspace = true
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
-swanky-ot-traits.workspace = true
 swanky-ot-alsz-kos.workspace = true
+swanky-ot-traits.workspace = true
+swanky-rng.workspace = true
 swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-swanky-field-f61p.workspace = true
 proptest.workspace = true
 swanky-field-binary.workspace = true
+swanky-field-f61p.workspace = true
 
 [[bench]]
 name = "svole"

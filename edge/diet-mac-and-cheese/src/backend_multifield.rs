@@ -34,11 +34,10 @@ use rand::SeedableRng;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
 use std::iter;
-use std::marker::PhantomData;
 use std::path::PathBuf;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, OptionExt, Result, WrapErr, bail, ensure};
 use swanky_field::{FiniteField, FiniteRing, PrimeFiniteField, StatisticallySecureField};
 use swanky_field_binary::{F2, F40b};
@@ -104,12 +103,20 @@ const CONVERSION_BATCH_SIZE_SAFE: usize = 1_024;
 /// functions to go to bits.
 pub trait BackendConvT<P: Party>: BackendT {
     // Convert a wire to bits in lower-endian
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>>;
+    fn assert_conv_to_bits(
+        &mut self,
+        w: &Self::Wire,
+        channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>>;
     // convert bits in lower-endian to a wire
-    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire>;
+    fn assert_conv_from_bits(
+        &mut self,
+        x: &[Mac<P, F2, F40b>],
+        channel: &mut Channel,
+    ) -> Result<Self::Wire>;
 
     // Finalize the field switching conversions, by running edabits conversion checks
-    fn finalize_conv(&mut self) -> Result<()>;
+    fn finalize_conv(&mut self, channel: &mut Channel) -> Result<()>;
 }
 
 pub trait BackendLiftT: BackendT {
@@ -117,13 +124,8 @@ pub trait BackendLiftT: BackendT {
     fn lift(&mut self) -> &mut Self::LiftedBackend;
 }
 
-impl<
-    P: Party,
-    T: PrimeFiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE1: SvoleT<P, F2, F40b>,
-    SVOLE2: SvoleT<P, T, T>,
-> BackendLiftT for DietMacAndCheeseConv<P, T, C, SVOLE1, SVOLE2>
+impl<P: Party, T: PrimeFiniteField, SVOLE1: SvoleT<P, F2, F40b>, SVOLE2: SvoleT<P, T, T>>
+    BackendLiftT for DietMacAndCheeseConv<P, T, SVOLE1, SVOLE2>
 {
     type LiftedBackend = Self;
 
@@ -134,7 +136,7 @@ impl<
 
 pub trait BackendDisjunctionT: BackendT {
     // finalize the disjunctions, by running the final Dora checks
-    fn finalize_disj(&mut self) -> Result<()>;
+    fn finalize_disj(&mut self, channel: &mut Channel) -> Result<()>;
 
     // execute a disjunction on the given inputs
     fn disjunction(
@@ -143,6 +145,7 @@ pub trait BackendDisjunctionT: BackendT {
         fun_store: &FunStore,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
+        channel: &mut Channel,
     ) -> Result<Vec<Self::Wire>>;
 }
 
@@ -170,28 +173,47 @@ pub trait BackendRamT: BackendT {
     ) -> Result<RamId>;
 
     /// Read and return the value at `addr` in `ram`.
-    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>>;
+    fn ram_read(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        channel: &mut Channel,
+    ) -> Result<Vec<Self::Wire>>;
 
     /// Write `new` to `addr` in `ram`.
-    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()>;
+    fn ram_write(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        new: &[Self::Wire],
+        channel: &mut Channel,
+    ) -> Result<()>;
 
     /// Finalize all operations on all RAMs.
-    fn finalize_rams(&mut self) -> Result<()>;
+    fn finalize_rams(&mut self, channel: &mut Channel) -> Result<()>;
 }
 
-impl<P: Party, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
-    for DietMacAndCheese<P, F2, F40b, C, SVOLE>
+impl<P: Party, SVOLE: SvoleT<P, F2, F40b>> BackendConvT<P>
+    for DietMacAndCheese<P, F2, F40b, SVOLE>
 {
-    fn assert_conv_to_bits(&mut self, w: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
+    fn assert_conv_to_bits(
+        &mut self,
+        w: &Self::Wire,
+        _channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
         debug!("CONV_TO_BITS {w:?}");
         Ok(vec![*w])
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(
+        &mut self,
+        x: &[Mac<P, F2, F40b>],
+        _channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         Ok(x[0])
     }
 
-    fn finalize_conv(&mut self) -> Result<()> {
+    fn finalize_conv(&mut self, _channel: &mut Channel) -> Result<()> {
         // We dont need to finalize the conversion
         // for the binary functionality because they are for free.
         Ok(())
@@ -227,29 +249,23 @@ impl<E> EdabitsMap<E> {
 pub(crate) struct DietMacAndCheeseConv<
     P: Party,
     FE: FiniteField,
-    C: AbstractChannel + Clone,
     SvoleF2: SvoleT<P, F2, F40b>,
     SvoleFE: SvoleT<P, FE, FE>,
 > {
-    dmc: DietMacAndCheese<P, FE, FE, C, SvoleFE>,
+    dmc: DietMacAndCheese<P, FE, FE, SvoleFE>,
     conv: Conv<P, FE, SvoleF2, SvoleFE>,
-    dora_states: HashMap<usize, DoraState<P, FE, FE, C, SvoleFE>>,
-    ram_states: Vec<ArithmeticRam<P, FE, FE, C, SvoleFE>>,
+    dora_states: HashMap<usize, DoraState<P, FE, FE, SvoleFE>>,
+    ram_states: Vec<ArithmeticRam<P, FE, FE, SvoleFE>>,
     edabits_map: EdabitsMap<Edabits<P, FE>>,
-    dmc_f2: DietMacAndCheese<P, F2, F40b, C, SvoleF2>,
+    dmc_f2: DietMacAndCheese<P, F2, F40b, SvoleF2>,
     no_batching: bool,
 }
 
-impl<
-    P: Party,
-    FE: PrimeFiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF2: SvoleT<P, F2, F40b>,
-    SvoleFE: SvoleT<P, FE, FE>,
-> DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+impl<P: Party, FE: PrimeFiniteField, SvoleF2: SvoleT<P, F2, F40b>, SvoleFE: SvoleT<P, FE, FE>>
+    DietMacAndCheeseConv<P, FE, SvoleF2, SvoleFE>
 {
     pub fn init(
-        channel: &mut C,
+        channel: &mut Channel,
         mut rng: SwankyRng,
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
         lpn_setup: LpnParams,
@@ -257,7 +273,7 @@ impl<
         no_batching: bool,
     ) -> Result<Self> {
         let rng2 = SwankyRng::from_rng(&mut rng);
-        let dmc = DietMacAndCheese::<P, FE, FE, C, SvoleFE>::init(
+        let dmc = DietMacAndCheese::<P, FE, FE, SvoleFE>::init(
             channel,
             rng,
             lpn_setup,
@@ -271,18 +287,12 @@ impl<
             dora_states: Default::default(),
             ram_states: Default::default(),
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheese::<P, F2, F40b, C, SvoleF2>::init_with_fcom(
-                channel,
-                rng2,
-                fcom_f2,
-                no_batching,
-            )?,
+            dmc_f2: DietMacAndCheese::<P, F2, F40b, _>::init_with_fcom(rng2, fcom_f2, no_batching)?,
             no_batching,
         })
     }
 
     pub fn init_with_svole(
-        channel: &mut C,
         mut rng: SwankyRng,
         fcom_f2: &FCom<P, F2, F40b, SvoleF2>,
         svole2: SvoleFE,
@@ -291,12 +301,7 @@ impl<
         let rng2 = SwankyRng::from_rng(&mut rng);
 
         let fcom = FCom::init_with_vole(svole2)?;
-        let dmc = DietMacAndCheese::<P, FE, FE, C, SvoleFE>::init_with_fcom(
-            channel,
-            rng,
-            &fcom,
-            no_batching,
-        )?;
+        let dmc = DietMacAndCheese::<P, FE, FE, SvoleFE>::init_with_fcom(rng, &fcom, no_batching)?;
         let conv = Conv::init_with_fcoms(fcom_f2, &dmc.fcom)?;
         Ok(DietMacAndCheeseConv {
             dmc,
@@ -304,8 +309,7 @@ impl<
             dora_states: Default::default(),
             ram_states: Default::default(),
             edabits_map: EdabitsMap::new(),
-            dmc_f2: DietMacAndCheese::<P, F2, F40b, C, SvoleF2>::init_with_fcom(
-                channel,
+            dmc_f2: DietMacAndCheese::<P, F2, F40b, SvoleF2>::init_with_fcom(
                 rng2,
                 fcom_f2,
                 no_batching,
@@ -314,17 +318,16 @@ impl<
         })
     }
 
-    fn maybe_do_conversion_check(&mut self, bit_width: usize) -> Result<()> {
+    fn maybe_do_conversion_check(&mut self, bit_width: usize, channel: &mut Channel) -> Result<()> {
         let edabits = self.edabits_map.get_edabits(bit_width).unwrap();
         let num = edabits.len();
         if self.no_batching {
             self.conv.conv(
-                &mut self.dmc.channel,
+                channel,
                 &mut self.dmc.rng,
                 CONVERSION_PARAM_B_SAFE,
                 CONVERSION_PARAM_B_SAFE,
                 edabits,
-                None,
             )?;
             self.edabits_map.set_edabits(bit_width, vec![]);
         } else if num >= 2 * CONVERSION_BATCH_SIZE {
@@ -333,12 +336,11 @@ impl<
             let index_to_split = edabits.len() - CONVERSION_BATCH_SIZE;
             let (_, edabits_to_process) = edabits.split_at(index_to_split);
             self.conv.conv(
-                &mut self.dmc.channel,
+                channel,
                 &mut self.dmc.rng,
                 CONVERSION_PARAM_B,
                 CONVERSION_PARAM_B,
                 edabits_to_process,
-                None,
             )?;
             edabits.truncate(index_to_split);
             assert_eq!(
@@ -351,22 +353,17 @@ impl<
     }
 }
 
-impl<
-    P: Party,
-    FE: PrimeFiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF2: SvoleT<P, F2, F40b>,
-    SvoleFE: SvoleT<P, FE, FE>,
-> BackendT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+impl<P: Party, FE: PrimeFiniteField, SvoleF2: SvoleT<P, F2, F40b>, SvoleFE: SvoleT<P, FE, FE>>
+    BackendT for DietMacAndCheeseConv<P, FE, SvoleF2, SvoleFE>
 {
-    type Wire = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT>::Wire;
-    type FieldElement = <DietMacAndCheese<P, FE, FE, C, SvoleFE> as BackendT>::FieldElement;
+    type Wire = <DietMacAndCheese<P, FE, FE, SvoleFE> as BackendT>::Wire;
+    type FieldElement = <DietMacAndCheese<P, FE, FE, SvoleFE> as BackendT>::FieldElement;
 
     fn wire_value(&self, wire: &Self::Wire) -> Option<Self::FieldElement> {
         self.dmc.wire_value(wire)
     }
-    fn random(&mut self) -> Result<Self::FieldElement> {
-        self.dmc.random()
+    fn random(&mut self, channel: &mut Channel) -> Result<Self::FieldElement> {
+        self.dmc.random(channel)
     }
     fn copy(&mut self, wire: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.copy(wire)
@@ -374,8 +371,8 @@ impl<
     fn constant(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.constant(val)
     }
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
-        self.dmc.assert_zero(wire)
+    fn assert_zero(&mut self, wire: &Self::Wire, channel: &mut Channel) -> Result<()> {
+        self.dmc.assert_zero(wire, channel)
     }
     fn add(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.add(a, b)
@@ -383,8 +380,8 @@ impl<
     fn sub(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
         self.dmc.sub(a, b)
     }
-    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
-        self.dmc.mul(a, b)
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire, channel: &mut Channel) -> Result<Self::Wire> {
+        self.dmc.mul(a, b, channel)
     }
     fn add_constant(&mut self, a: &Self::Wire, b: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.add_constant(a, b)
@@ -396,12 +393,16 @@ impl<
     fn input_public(&mut self, val: Self::FieldElement) -> Result<Self::Wire> {
         self.dmc.input_public(val)
     }
-    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
-        self.dmc.input_private(val)
+    fn input_private(
+        &mut self,
+        val: Option<Self::FieldElement>,
+        channel: &mut Channel,
+    ) -> Result<Self::Wire> {
+        self.dmc.input_private(val, channel)
     }
-    fn finalize(&mut self) -> Result<()> {
-        self.dmc.finalize()?;
-        self.dmc_f2.finalize()?;
+    fn finalize(&mut self, channel: &mut Channel) -> Result<()> {
+        self.dmc.finalize(channel)?;
+        self.dmc_f2.finalize(channel)?;
         Ok(())
     }
 }
@@ -411,14 +412,13 @@ impl<
 impl<
     P: Party,
     FP: PrimeFiniteField + SieveIrDeserialize,
-    C: AbstractChannel + Clone,
     SvoleF2: SvoleT<P, F2, F40b>,
     SvoleFP: SvoleT<P, FP, FP>,
-> BackendDisjunctionT for DietMacAndCheeseConv<P, FP, C, SvoleF2, SvoleFP>
+> BackendDisjunctionT for DietMacAndCheeseConv<P, FP, SvoleF2, SvoleFP>
 {
-    fn finalize_disj(&mut self) -> Result<()> {
+    fn finalize_disj(&mut self, channel: &mut Channel) -> Result<()> {
         for (_, disj) in std::mem::take(&mut self.dora_states) {
-            disj.dora.finalize(&mut self.dmc)?;
+            disj.dora.finalize(&mut self.dmc, channel)?;
         }
         Ok(())
     }
@@ -429,21 +429,22 @@ impl<
         fun_store: &FunStore,
         inputs: &[Self::Wire],
         disj: &DisjunctionBody,
+        channel: &mut Channel,
     ) -> Result<Vec<Self::Wire>> {
         fn execute_branch<
             I: Iterator<Item = F>,
             P: Party,
             F: FiniteField,
-            C: AbstractChannel + Clone,
             SvoleF: SvoleT<P, F, F>,
         >(
             ev: Witness<impl EqualityProposition<P, Prover>>,
-            dmc: &mut DietMacAndCheese<P, F, F, C, SvoleF>,
+            dmc: &mut DietMacAndCheese<P, F, F, SvoleF>,
             wit_tape: I,
-            inputs: &[<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire],
+            inputs: &[<DietMacAndCheese<P, F, F, SvoleF> as BackendT>::Wire],
             cond: usize,
-            st: &mut DoraState<P, F, F, C, SvoleF>,
-        ) -> Result<Vec<<DietMacAndCheese<P, F, F, C, SvoleF> as BackendT>::Wire>> {
+            st: &mut DoraState<P, F, F, SvoleF>,
+            channel: &mut Channel,
+        ) -> Result<Vec<<DietMacAndCheese<P, F, F, SvoleF> as BackendT>::Wire>> {
             // currently only support 1 field element switch
             debug_assert_eq!(cond, 1);
 
@@ -459,7 +460,7 @@ impl<
                 .expect("no clause guard is satisfied");
 
             st.dora
-                .mux(dmc, wit_tape, inputs, PartyPrivateCopy::new(opt))
+                .mux(dmc, wit_tape, inputs, PartyPrivateCopy::new(opt), channel)
         }
 
         match self.dora_states.entry(disj.id()) {
@@ -471,12 +472,14 @@ impl<
                     inputs,
                     disj.cond() as usize,
                     entry.get_mut(),
+                    channel,
                 ),
                 WhichParty::Verifier(ev) => entry.get_mut().dora.mux(
                     &mut self.dmc,
                     iter::empty(),
                     inputs,
                     PartyPrivateCopy::empty(ev),
+                    channel,
                 ),
             },
             Entry::Vacant(entry) => {
@@ -507,12 +510,14 @@ impl<
                         inputs,
                         disj.cond() as usize,
                         dora,
+                        channel,
                     ),
                     WhichParty::Verifier(ev) => dora.dora.mux(
                         &mut self.dmc,
                         iter::empty(),
                         inputs,
                         PartyPrivateCopy::empty(ev),
+                        channel,
                     ),
                 }
             }
@@ -520,15 +525,14 @@ impl<
     }
 }
 
-impl<
-    P: Party,
-    FE: PrimeFiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF2: SvoleT<P, F2, F40b>,
-    SvoleFE: SvoleT<P, FE, FE>,
-> BackendConvT<P> for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+impl<P: Party, FE: PrimeFiniteField, SvoleF2: SvoleT<P, F2, F40b>, SvoleFE: SvoleT<P, FE, FE>>
+    BackendConvT<P> for DietMacAndCheeseConv<P, FE, SvoleF2, SvoleFE>
 {
-    fn assert_conv_to_bits(&mut self, a: &Self::Wire) -> Result<Vec<Mac<P, F2, F40b>>> {
+    fn assert_conv_to_bits(
+        &mut self,
+        a: &Self::Wire,
+        channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
         debug!("CONV_TO_BITS {a:?}");
         let mut v;
 
@@ -539,23 +543,20 @@ impl<
                 v = Vec::with_capacity(bits.len());
                 for b in bits {
                     let b2 = F2::from(b);
-                    let mac = self.conv.fcom_f2.input1_prover(
-                        ev,
-                        &mut self.dmc.channel,
-                        &mut self.dmc.rng,
-                        b2,
-                    )?;
+                    let mac =
+                        self.conv
+                            .fcom_f2
+                            .input1_prover(ev, channel, &mut self.dmc.rng, b2)?;
                     v.push(Mac::new(PartyPrivateCopy::new(b2), mac));
                 }
             }
             WhichParty::Verifier(ev) => {
                 v = Vec::with_capacity(FE::NumberOfBitsInBitDecomposition::to_usize());
                 for _ in 0..FE::NumberOfBitsInBitDecomposition::to_usize() {
-                    let mac = self.conv.fcom_f2.input1_verifier(
-                        ev,
-                        &mut self.dmc.channel,
-                        &mut self.dmc.rng,
-                    )?;
+                    let mac = self
+                        .conv
+                        .fcom_f2
+                        .input1_verifier(ev, channel, &mut self.dmc.rng)?;
                     v.push(mac);
                 }
             }
@@ -570,6 +571,7 @@ impl<
                 .map(F2::from)
                 .collect::<Vec<_>>()
                 .as_slice(),
+            channel,
         )?;
 
         let r = v.clone();
@@ -577,12 +579,16 @@ impl<
         let bit_width = v.len();
         self.edabits_map
             .push_elem(bit_width, Edabits::<P, FE> { bits: v, value: *a });
-        self.maybe_do_conversion_check(bit_width)?;
+        self.maybe_do_conversion_check(bit_width, channel)?;
 
         Ok(r)
     }
 
-    fn assert_conv_from_bits(&mut self, x: &[Mac<P, F2, F40b>]) -> Result<Self::Wire> {
+    fn assert_conv_from_bits(
+        &mut self,
+        x: &[Mac<P, F2, F40b>],
+        channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         let mut power_twos: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ONE);
         let mut recomposed_value: PartyPrivateCopy<Prover, _, _> = PartyPrivateCopy::new(FE::ZERO);
 
@@ -608,23 +614,24 @@ impl<
             debug!("CONV_FROM_BITS {:?}", recomposed_value.into_inner(ev));
         }
 
-        let mac = <DietMacAndCheese<P, FE, FE, C, SvoleFE>>::input_private(
+        let mac = <DietMacAndCheese<P, FE, FE, SvoleFE>>::input_private(
             &mut self.dmc,
             match P::WHICH {
                 WhichParty::Prover(ev) => Some(recomposed_value.into_inner(ev)),
                 WhichParty::Verifier(_) => None,
             },
+            channel,
         )?;
 
         let bit_width = bits.len();
         self.edabits_map
             .push_elem(bit_width, Edabits::<P, FE> { bits, value: mac });
-        self.maybe_do_conversion_check(bit_width)?;
+        self.maybe_do_conversion_check(bit_width, channel)?;
 
         Ok(mac)
     }
 
-    fn finalize_conv(&mut self) -> Result<()> {
+    fn finalize_conv(&mut self, channel: &mut Channel) -> Result<()> {
         // The keys must be sorted deterministically so that the prover and verifier are in sync.
         // This is the reason why the EdabitsMap is using a BTreeMap instead of a HashMap.
         for edabits in self.edabits_map.0.values() {
@@ -637,59 +644,54 @@ impl<
                     CONVERSION_BATCH_SIZE_SAFE,
                 );
                 self.conv.conv(
-                    &mut self.dmc.channel,
+                    channel,
                     &mut self.dmc.rng,
                     CONVERSION_PARAM_B_SAFE,
                     CONVERSION_PARAM_B_SAFE,
                     edabits,
-                    None,
                 )?;
             } else if edabits.len() >= CONVERSION_BATCH_SIZE_SAFE
                 && edabits.len() < CONVERSION_BATCH_SIZE
             {
                 self.conv.conv(
-                    &mut self.dmc.channel,
+                    channel,
                     &mut self.dmc.rng,
                     CONVERSION_PARAM_B_SAFE,
                     CONVERSION_PARAM_B_SAFE,
                     edabits,
-                    None,
                 )?;
             } else if edabits.len() >= CONVERSION_BATCH_SIZE
                 && edabits.len() < (CONVERSION_BATCH_SIZE + CONVERSION_BATCH_SIZE_SAFE)
             {
                 self.conv.conv(
-                    &mut self.dmc.channel,
+                    channel,
                     &mut self.dmc.rng,
                     CONVERSION_PARAM_B,
                     CONVERSION_PARAM_B,
                     edabits,
-                    None,
                 )?;
             } else {
                 let index_to_split = CONVERSION_BATCH_SIZE;
                 let (edabits1, edabits2) = edabits.split_at(index_to_split);
                 self.conv.conv(
-                    &mut self.dmc.channel,
+                    channel,
                     &mut self.dmc.rng,
                     CONVERSION_PARAM_B,
                     CONVERSION_PARAM_B,
                     edabits1,
-                    None,
                 )?;
 
                 // TODO: maybe split this in small chunks
                 self.conv.conv(
-                    &mut self.dmc.channel,
+                    channel,
                     &mut self.dmc.rng,
                     CONVERSION_PARAM_B_SAFE,
                     CONVERSION_PARAM_B_SAFE,
                     edabits2,
-                    None,
                 )?;
             }
         }
-        self.dmc.channel.flush().wrap_err(
+        channel.force_flush().wrap_err(
             ErrorKind::OtherError,
             "Error during channel flush (using legacy channel).",
         )?;
@@ -697,13 +699,8 @@ impl<
     }
 }
 
-impl<
-    P: Party,
-    FE: PrimeFiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF2: SvoleT<P, F2, F40b>,
-    SvoleFE: SvoleT<P, FE, FE>,
-> BackendRamT for DietMacAndCheeseConv<P, FE, C, SvoleF2, SvoleFE>
+impl<P: Party, FE: PrimeFiniteField, SvoleF2: SvoleT<P, F2, F40b>, SvoleFE: SvoleT<P, FE, FE>>
+    BackendRamT for DietMacAndCheeseConv<P, FE, SvoleF2, SvoleFE>
 {
     fn init_ram(
         &mut self,
@@ -723,25 +720,40 @@ impl<
         Ok(ram_id)
     }
 
-    fn ram_read(&mut self, ram: RamId, addr: &[Self::Wire]) -> Result<Vec<Self::Wire>> {
+    fn ram_read(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        channel: &mut Channel,
+    ) -> Result<Vec<Self::Wire>> {
         debug_assert!(ram < self.ram_states.len());
         debug_assert_eq!(addr.len(), 1);
 
-        Ok(vec![self.ram_states[ram].read(&mut self.dmc, &addr[0])?])
+        Ok(vec![self.ram_states[ram].read(
+            &mut self.dmc,
+            &addr[0],
+            channel,
+        )?])
     }
 
-    fn ram_write(&mut self, ram: RamId, addr: &[Self::Wire], new: &[Self::Wire]) -> Result<()> {
+    fn ram_write(
+        &mut self,
+        ram: RamId,
+        addr: &[Self::Wire],
+        new: &[Self::Wire],
+        channel: &mut Channel,
+    ) -> Result<()> {
         debug_assert!(ram < self.ram_states.len());
         debug_assert_eq!(addr.len(), 1);
         debug_assert_eq!(new.len(), 1);
 
-        self.ram_states[ram].write(&mut self.dmc, &addr[0], &new[0])
+        self.ram_states[ram].write(&mut self.dmc, &addr[0], &new[0], channel)
     }
 
-    fn finalize_rams(&mut self) -> Result<()> {
+    fn finalize_rams(&mut self, channel: &mut Channel) -> Result<()> {
         self.ram_states
             .iter_mut()
-            .try_for_each(|ram| ram.finalize(&mut self.dmc))
+            .try_for_each(|ram| ram.finalize(&mut self.dmc, channel))
     }
 }
 
@@ -761,12 +773,22 @@ trait EvaluatorT<P: Party> {
         gate: &GateM,
         instances: Option<Vec<Number>>,
         witnesses: Option<Vec<Number>>,
+        channel: &mut Channel,
     ) -> Result<()>;
 
     /// Start the conversion for a [`ConvGate`].
-    fn conv_gate_get(&mut self, gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>>;
+    fn conv_gate_get(
+        &mut self,
+        gate: &ConvGate,
+        channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>>;
     /// Finish the conversion for a [`ConvGate`].
-    fn conv_gate_set(&mut self, gate: &ConvGate, bits: &[Mac<P, F2, F40b>]) -> Result<()>;
+    fn conv_gate_set(
+        &mut self,
+        gate: &ConvGate,
+        bits: &[Mac<P, F2, F40b>],
+        channel: &mut Channel,
+    ) -> Result<()>;
 
     /// Get the [`RamId`] at `wire_id`.
     fn get_ram_id(&mut self, wire_id: WireId) -> Result<RamId>;
@@ -786,6 +808,7 @@ trait EvaluatorT<P: Party> {
     /// Option-like, and starting with a variant for RamIds. Since we don't
     /// anticipate additional new plugins being proposed, we go with the design
     /// as documented above.
+    #[allow(clippy::too_many_arguments)]
     fn plugin_call_gate(
         &mut self,
         inswit: &mut FieldInputs,
@@ -794,6 +817,7 @@ trait EvaluatorT<P: Party> {
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
+        channel: &mut Channel,
     ) -> Result<Option<RamId>>;
 
     fn push_frame(&mut self, compiled_info: &CompiledInfo);
@@ -808,7 +832,7 @@ trait EvaluatorT<P: Party> {
         allow_allocation: bool,
     );
 
-    fn finalize(&mut self) -> Result<()>;
+    fn finalize(&mut self, channel: &mut Channel) -> Result<()>;
 }
 
 /// An [`EvaluatorT`] for RAM types.
@@ -829,6 +853,7 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
         gate: &GateM,
         _instances: Option<Vec<Number>>,
         _witnesses: Option<Vec<Number>>,
+        _channel: &mut Channel,
     ) -> Result<()> {
         use GateM::*;
 
@@ -845,11 +870,20 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
         Ok(())
     }
 
-    fn conv_gate_get(&mut self, _gate: &ConvGate) -> Result<Vec<Mac<P, F2, F40b>>> {
+    fn conv_gate_get(
+        &mut self,
+        _gate: &ConvGate,
+        _channel: &mut Channel,
+    ) -> Result<Vec<Mac<P, F2, F40b>>> {
         unimplemented!("EvaluatorRam cannot convert between field types.")
     }
 
-    fn conv_gate_set(&mut self, _gate: &ConvGate, _bits: &[Mac<P, F2, F40b>]) -> Result<()> {
+    fn conv_gate_set(
+        &mut self,
+        _gate: &ConvGate,
+        _bits: &[Mac<P, F2, F40b>],
+        _channel: &mut Channel,
+    ) -> Result<()> {
         unimplemented!("EvaluatorRam cannot convert between field types.")
     }
 
@@ -870,6 +904,7 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
         _outputs: &[WireRange],
         _inputs: &[WireRange],
         _plugin: &PluginExecution,
+        _channel: &mut Channel,
     ) -> Result<Option<RamId>> {
         unimplemented!("RAM operations are handled by the underlying address/value field.")
     }
@@ -896,7 +931,7 @@ impl<P: Party> EvaluatorT<P> for EvaluatorRam {
             .allocate_slice(src_first, src_last, start, count, allow_allocation);
     }
 
-    fn finalize(&mut self) -> Result<()> {
+    fn finalize(&mut self, _channel: &mut Channel) -> Result<()> {
         // RAM finalization is handled by the underlying address/value field.
         Ok(())
     }
@@ -937,6 +972,7 @@ where
         gate: &GateM,
         instances: Option<Vec<Number>>,
         witnesses: Option<Vec<Number>>,
+        channel: &mut Channel,
     ) -> Result<()> {
         use GateM::*;
 
@@ -951,7 +987,7 @@ where
             AssertZero(_, inp) => {
                 let wire = self.memory.get(*inp);
                 debug!("AssertZero wire: {wire:?}");
-                if self.backend.assert_zero(wire).is_err() {
+                if self.backend.assert_zero(wire, channel).is_err() {
                     bail!(ErrorKind::OtherError, "Assert zero fails on wire {}", *inp);
                 }
             }
@@ -985,7 +1021,7 @@ where
             Mul(_, out, left, right) => {
                 let l = self.memory.get(*left);
                 let r = self.memory.get(*right);
-                let v = self.backend.mul(l, r)?;
+                let v = self.backend.mul(l, r, channel)?;
                 self.memory.set(*out, &v);
             }
 
@@ -1023,7 +1059,7 @@ where
                     let w = witnesses
                         .as_ref()
                         .and_then(|wv| B::FieldElement::from_number(&wv[i]).ok());
-                    let v = self.backend.input_private(w)?;
+                    let v = self.backend.input_private(w, channel)?;
                     self.memory.set(curr_out, &v);
                 }
             }
@@ -1040,7 +1076,7 @@ where
                 panic!("Conv should be intercepted earlier")
             }
             Challenge(_, out) => {
-                let v = self.backend.random()?;
+                let v = self.backend.random(channel)?;
                 let v = self.backend.input_public(v)?;
                 self.memory.set(*out, &v);
             }
@@ -1059,6 +1095,7 @@ where
         outputs: &[WireRange],
         inputs: &[WireRange],
         plugin: &PluginExecution,
+        channel: &mut Channel,
     ) -> Result<Option<RamId>> {
         fn copy_mem<W>(mem: &Memory<W>, range: WireRange) -> impl Iterator<Item = &W>
         where
@@ -1074,7 +1111,7 @@ where
                 assert_eq!(inputs.len(), 2);
                 let xs = copy_mem(&self.memory, inputs[0]).copied();
                 let ys = copy_mem(&self.memory, inputs[1]).copied();
-                plugin.execute::<_>(xs, ys, &mut self.backend)?
+                plugin.execute::<_>(xs, ys, &mut self.backend, channel)?
             }
             PluginExecution::Disjunction(disj) => {
                 assert!(!inputs.is_empty(), "must provide condition");
@@ -1094,9 +1131,9 @@ where
                 debug_assert_eq!(wires.len() as WireCount, disj.inputs() + disj.cond());
 
                 // invoke disjunction implement on the backend
-                let wires = self
-                    .backend
-                    .disjunction(inswit, fun_store, &wires[..], disj)?;
+                let wires =
+                    self.backend
+                        .disjunction(inswit, fun_store, &wires[..], disj, channel)?;
                 debug_assert_eq!(wires.len() as u64, disj.outputs());
 
                 // write back output wires
@@ -1109,7 +1146,7 @@ where
                 debug_assert!(wires.next().is_none());
             }
             PluginExecution::Mux(plugin) => {
-                plugin.execute::<P, B>(&mut self.backend, &mut self.memory)?
+                plugin.execute::<P, B>(&mut self.backend, &mut self.memory, channel)?
             }
             PluginExecution::Ram(plugin) => match plugin {
                 RamVersion::RamBoolV0(RamBoolV0(Ram {
@@ -1164,7 +1201,7 @@ where
                         )?;
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
 
-                        let values = self.backend.ram_read(ram_id, &addr)?;
+                        let values = self.backend.ram_read(ram_id, &addr, channel)?;
                         debug_assert_eq!(values.len(), *value_count);
 
                         for (w, value) in (outputs[0].0..=outputs[0].1).zip(values) {
@@ -1185,7 +1222,7 @@ where
                         let addr: Vec<_> = copy_mem(&self.memory, inputs[1]).copied().collect();
                         let new: Vec<_> = copy_mem(&self.memory, inputs[2]).copied().collect();
 
-                        self.backend.ram_write(ram_id, &addr, &new)?
+                        self.backend.ram_write(ram_id, &addr, &new, channel)?
                     }
                 },
             },
@@ -1209,6 +1246,7 @@ where
     fn conv_gate_get(
         &mut self,
         (_, _, _, (start, end)): &ConvGate,
+        channel: &mut Channel,
     ) -> Result<Vec<Mac<P, F2, F40b>>> {
         if *start != *end {
             if self.is_boolean {
@@ -1222,7 +1260,7 @@ where
                 for inp in *start..(*end + 1) {
                     let in_wire = self.memory.get(inp);
                     debug!("CONV GET {in_wire:?}");
-                    let bits = self.backend.assert_conv_to_bits(in_wire)?;
+                    let bits = self.backend.assert_conv_to_bits(in_wire, channel)?;
                     assert_eq!(bits.len(), 1);
                     v.push(bits[0]);
                 }
@@ -1238,7 +1276,7 @@ where
         } else {
             let in_wire = self.memory.get(*start);
             debug!("CONV GET {in_wire:?}");
-            let bits = self.backend.assert_conv_to_bits(in_wire)?;
+            let bits = self.backend.assert_conv_to_bits(in_wire, channel)?;
             debug!("CONV GET bits {bits:?}");
             Ok(bits)
         }
@@ -1248,13 +1286,14 @@ where
         &mut self,
         (_, (start, end), _, _): &ConvGate,
         bits: &[Mac<P, F2, F40b>],
+        channel: &mut Channel,
     ) -> Result<()> {
         if *start != *end {
             if self.is_boolean {
                 assert!((*end - *start + 1) as usize <= bits.len());
 
                 for (i, _) in (*start..(*end + 1)).enumerate() {
-                    let v = self.backend.assert_conv_from_bits(&[bits[i]])?;
+                    let v = self.backend.assert_conv_from_bits(&[bits[i]], channel)?;
                     debug!("CONV SET {v:?}");
                     let out_wire = end - (i as WireId);
                     // NOTE: Without reverse in case conversation gates are little-endian instead of big-endian
@@ -1269,7 +1308,7 @@ where
                 );
             }
         } else {
-            let v = self.backend.assert_conv_from_bits(bits)?;
+            let v = self.backend.assert_conv_from_bits(bits, channel)?;
             debug!("CONV SET {v:?}");
             self.memory.set(*start, &v);
             Ok(())
@@ -1304,12 +1343,12 @@ where
             .allocate_slice(src_first, src_last, start, count, allow_allocation);
     }
 
-    fn finalize(&mut self) -> Result<()> {
+    fn finalize(&mut self, channel: &mut Channel) -> Result<()> {
         debug!("Finalize in EvaluatorSingle");
-        self.backend.finalize_conv()?;
-        self.backend.finalize_disj()?;
-        self.backend.finalize_rams()?;
-        self.backend.finalize()?;
+        self.backend.finalize_conv(channel)?;
+        self.backend.finalize_disj(channel)?;
+        self.backend.finalize_rams(channel)?;
+        self.backend.finalize(channel)?;
         Ok(())
     }
 }
@@ -1339,13 +1378,8 @@ where
 ///      specification. It is an unchecked runtime error to invoke
 ///      `EvaluatorCirc` methods on invalid SIEVE IR resources
 /// 4. Call [`Self::terminate`] to stop and reset  any sVOLE functionality
-pub struct EvaluatorCirc<
-    P: Party,
-    // See use of phantom for details on `C`
-    C: AbstractChannel + Clone + 'static,
-    SvoleF2: SvoleT<P, F2, F40b>,
-    SvoleF2Ext: SvoleT<P, F40b, F40b>,
-> {
+pub struct EvaluatorCirc<P: Party, SvoleF2: SvoleT<P, F2, F40b>, SvoleF2Ext: SvoleT<P, F40b, F40b>>
+{
     inputs: CircInputs,
     // Fcom <F2,F40b> functionality shared between the F2 backend and for field switching.
     // This is an optional to allow using none in the plaintext mode.
@@ -1363,21 +1397,14 @@ pub struct EvaluatorCirc<
     // This is an optimization.
     helper_callframe_arr: [WireId; 256],
     no_batching: bool,
-    phantom: PhantomData<C>, // Storing the channel type here, is almost a convenience to prevent adding the type paramter to
-                             // a handful of functions in the `impl`, maybe a TODO to eliminate the phatom and bring the type down to the
-                             // functions. One benefit would be to not have to pass a dummy channel for the plaintext mode
 }
 
-impl<
-    P: Party,
-    C: AbstractChannel + Clone + 'static,
-    SvoleF2: SvoleT<P, F2, F40b> + 'static,
-    SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static,
-> EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
+impl<P: Party, SvoleF2: SvoleT<P, F2, F40b> + 'static, SvoleF2Ext: SvoleT<P, F40b, F40b> + 'static>
+    EvaluatorCirc<P, SvoleF2, SvoleF2Ext>
 {
     /// Initialize a new (single-threaded) `EvaluatorCirc`.
     ///
-    /// This requires an [`AbstractChannel`] and a [`SwankyRng`] to initialize the
+    /// This requires an [`Channel`] and a [`SwankyRng`] to initialize the
     /// homomorphic commitment scheme for [`F2`] and its extension field
     /// [`F40b`]. This is suboptimal; ideally, these protocols would only start
     /// in circuits where they are strictly required (i.e., Boolean circuits or
@@ -1391,7 +1418,7 @@ impl<
     /// For plaintext evaluation, see [`Self::new_plaintext`]. For multithreaded
     /// evaluation, see [`Self::new_multithreaded`].
     pub fn new(
-        channel: &mut C,
+        channel: &mut Channel,
         mut rng: SwankyRng,
         inputs: CircInputs,
         type_store: TypeStore,
@@ -1425,7 +1452,6 @@ impl<
             multithreaded_voles: vec![],
             helper_callframe_arr: [0; 256],
             no_batching,
-            phantom: PhantomData,
         })
     }
 
@@ -1449,7 +1475,6 @@ impl<
             multithreaded_voles: vec![],
             helper_callframe_arr: [0; 256],
             no_batching: false, // unused
-            phantom: PhantomData,
         })
     }
 
@@ -1462,7 +1487,7 @@ impl<
     ///
     /// The returned `JoinHandle`s should, after [`Self::terminate`] is
     /// called, be `join`ed.
-    pub fn new_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
+    pub fn new_multithreaded<S: Read + Write + Send + 'static, I>(
         channels_vole: &mut I,
         threads_per_field: usize,
         mut rng: SwankyRng,
@@ -1471,16 +1496,11 @@ impl<
         no_batching: bool,
         lpn_size: LpnSize,
     ) -> Result<(
-        EvaluatorCirc<
-            P,
-            C,
-            SvoleAtomicRoundRobin<P, F2, F40b>,
-            SvoleAtomicRoundRobin<P, F40b, F40b>,
-        >,
+        EvaluatorCirc<P, SvoleAtomicRoundRobin<P, F2, F40b>, SvoleAtomicRoundRobin<P, F40b, F40b>>,
         Vec<std::thread::JoinHandle<Result<()>>>,
     )>
     where
-        I: Iterator<Item = C2>,
+        I: Iterator<Item = S>,
     {
         let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
 
@@ -1496,7 +1516,7 @@ impl<
 
         // Setting up all the threads for F2 voles
         let (svole_round_robin, svoles_atomics, threads_f2) =
-            SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads::<C2, I>(
+            SvoleAtomicRoundRobin::<P, F2, F40b>::create_and_spawn_svole_threads::<S, I>(
                 channels_vole,
                 threads_per_field,
                 lpn_setup,
@@ -1511,7 +1531,7 @@ impl<
 
         // Setting up all the threads for full field F40b voles
         let (svole_round_robin, svoles_atomics, threads_f2_ext) =
-            SvoleAtomicRoundRobin::<P, F40b, F40b>::create_and_spawn_svole_threads::<C2, I>(
+            SvoleAtomicRoundRobin::<P, F40b, F40b>::create_and_spawn_svole_threads::<S, I>(
                 channels_vole,
                 threads_per_field,
                 lpn_setup,
@@ -1541,7 +1561,6 @@ impl<
                 multithreaded_voles,
                 helper_callframe_arr: [0; 256],
                 no_batching,
-                phantom: PhantomData,
             },
             threads,
         ))
@@ -1558,7 +1577,7 @@ impl<
     ///
     /// For plaintext evaluation, use [`Self::load_backends_plaintext`]. For
     /// multithreaded evaluation, use [`Self::load_backends_multithreaded`].
-    pub fn load_backends(&mut self, channel: &mut C, lpn_size: LpnSize) -> Result<()> {
+    pub fn load_backends(&mut self, channel: &mut Channel, lpn_size: LpnSize) -> Result<()> {
         let type_store = self.type_store.clone();
         for (idx, spec) in type_store.iter() {
             let rng = SwankyRng::from_rng(&mut self.rng);
@@ -1798,7 +1817,7 @@ impl<
     #[allow(clippy::too_many_arguments)]
     fn load_backend_fe<FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: SwankyRng,
         idx: usize,
         lpn_setup: LpnParams,
@@ -1806,7 +1825,7 @@ impl<
     ) -> Result<()> {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
-        let dmc = DietMacAndCheeseConv::<P, FE, _, _, Svole<_, FE, FE>>::init(
+        let dmc = DietMacAndCheeseConv::<P, FE, _, Svole<_, FE, FE>>::init(
             channel,
             rng,
             self.fcom_f2.as_ref().unwrap(),
@@ -1834,7 +1853,7 @@ impl<
     /// when multithreading - use [`Self::load_backends_multithreaded`] instead.
     pub fn load_backend(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         rng: SwankyRng,
         field: std::any::TypeId,
         idx: usize,
@@ -1847,8 +1866,7 @@ impl<
             assert_eq!(idx, self.eval.len());
 
             // Note for F2 we do not use the backend with Conv but the one that can lift values to its extension field
-            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, SvoleF2Ext>::init_with_fcom(
-                channel,
+            let dmc = DietMacAndCheeseExtField::<P, F40b, SvoleF2, SvoleF2Ext>::init_with_fcom(
                 rng,
                 self.fcom_f2.as_ref().unwrap(),
                 self.fcom_f2_ext.as_ref().unwrap(),
@@ -1998,17 +2016,11 @@ impl<
         }
     }
 
-    fn load_backend_multithreaded_f2(
-        &mut self,
-        channel: &mut C,
-        rng: SwankyRng,
-        _idx: usize,
-    ) -> Result<()> {
+    fn load_backend_multithreaded_f2(&mut self, rng: SwankyRng, _idx: usize) -> Result<()> {
         info!("loading field F2");
 
         let back: Box<dyn EvaluatorT<P>> = {
-            let dmc = DietMacAndCheeseExtField::<P, F40b, _, SvoleF2, SvoleF2Ext>::init_with_fcom(
-                channel,
+            let dmc = DietMacAndCheeseExtField::<P, F40b, SvoleF2, SvoleF2Ext>::init_with_fcom(
                 rng,
                 self.fcom_f2.as_ref().unwrap(),
                 self.fcom_f2_ext.as_ref().unwrap(),
@@ -2024,11 +2036,10 @@ impl<
     #[allow(clippy::too_many_arguments)]
     fn load_backend_multithreaded_fe<
         FE: PrimeFiniteField + StatisticallySecureField + SieveIrDeserialize,
-        C2: AbstractChannel + Clone + 'static + Send,
+        S: Read + Write + Send + 'static,
         I,
     >(
         &mut self,
-        channel: &mut C,
         channels_vole: &mut I,
         threads_per_field: usize,
         mut rng: SwankyRng,
@@ -2037,7 +2048,7 @@ impl<
         lpn_extend: LpnParams,
     ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>>
     where
-        I: Iterator<Item = C2>,
+        I: Iterator<Item = S>,
     {
         assert!(idx == self.eval.len());
         let back: Box<dyn EvaluatorT<P>>;
@@ -2065,8 +2076,7 @@ impl<
 
         debug!("Starting DietMacAndCheese...");
         let dmc =
-            DietMacAndCheeseConv::<P, FE, _, SvoleF2, SvoleAtomicRoundRobin<P, FE, FE>>::init_with_svole(
-                channel,
+            DietMacAndCheeseConv::<P, FE, SvoleF2, SvoleAtomicRoundRobin<P, FE, FE>>::init_with_svole(
                 rng,
                 self.fcom_f2.as_ref().unwrap(),
                 svole_round_robin,
@@ -2078,9 +2088,8 @@ impl<
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn load_backend_multi_any<C2: AbstractChannel + Clone + 'static + Send, I>(
+    fn load_backend_multi_any<S: Read + Write + Send + 'static, I>(
         &mut self,
-        channel: &mut C,
         channels_vole: &mut I,
         threads_per_field: usize,
         rng: SwankyRng,
@@ -2089,13 +2098,12 @@ impl<
         lpn_size: LpnSize,
     ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>>
     where
-        I: Iterator<Item = C2>,
+        I: Iterator<Item = S>,
     {
         if field == std::any::TypeId::of::<F61p>() {
             info!("loading field F161p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-            self.load_backend_multithreaded_fe::<F61p, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<F61p, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2106,8 +2114,7 @@ impl<
         } else if field == std::any::TypeId::of::<F127p>() {
             info!("loading field F127p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-            self.load_backend_multithreaded_fe::<F127p, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<F127p, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2118,8 +2125,7 @@ impl<
         } else if field == std::any::TypeId::of::<F128p>() {
             info!("loading field F128p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size(lpn_size);
-            self.load_backend_multithreaded_fe::<F128p, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<F128p, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2130,8 +2136,7 @@ impl<
         } else if field == std::any::TypeId::of::<Secp256k1>() {
             info!("loading field Secp256k1");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<Secp256k1, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<Secp256k1, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2142,8 +2147,7 @@ impl<
         } else if field == std::any::TypeId::of::<Secp256k1order>() {
             info!("loading field Secp256k1order");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<Secp256k1order, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<Secp256k1order, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2154,8 +2158,7 @@ impl<
         } else if field == std::any::TypeId::of::<F384p>() {
             info!("loading field F384p");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<F384p, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<F384p, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2166,8 +2169,7 @@ impl<
         } else if field == std::any::TypeId::of::<F384q>() {
             info!("loading field F384q");
             let (lpn_setup, lpn_extend) = mapping_lpn_size_large_field(lpn_size);
-            self.load_backend_multithreaded_fe::<F384q, C2, I>(
-                channel,
+            self.load_backend_multithreaded_fe::<F384q, S, I>(
                 channels_vole,
                 threads_per_field,
                 rng,
@@ -2192,15 +2194,14 @@ impl<
     /// For single-threaded zero-knowledge loading, use [`Self::load_backends`].
     /// For single-threaded plaintext loading, use
     ///[`Self::load_backends_plaintext`].
-    pub fn load_backends_multithreaded<C2: AbstractChannel + Clone + 'static + Send, I>(
+    pub fn load_backends_multithreaded<S: Read + Write + Send + 'static, I>(
         &mut self,
-        channel: &mut C,
         channels_vole: &mut I,
         lpn_size: LpnSize,
         threads_per_field: usize,
     ) -> Result<Vec<std::thread::JoinHandle<Result<()>>>>
     where
-        I: Iterator<Item = C2>,
+        I: Iterator<Item = S>,
     {
         let type_store = self.type_store.clone();
         let mut handles = vec![];
@@ -2209,10 +2210,9 @@ impl<
             match spec {
                 TypeSpecification::Field(field) => {
                     if *field == std::any::TypeId::of::<F2>() {
-                        self.load_backend_multithreaded_f2(channel, rng, *idx as usize)?;
+                        self.load_backend_multithreaded_f2(rng, *idx as usize)?;
                     } else {
                         let more_handles = self.load_backend_multi_any(
-                            channel,
                             channels_vole,
                             threads_per_field,
                             rng,
@@ -2241,9 +2241,9 @@ impl<
     ///
     /// **CAUTION!** `finish` is different than [`Self::terminate`], which must
     /// be called to cleanly reset the `EvaluatorCirc`'s sVOLE functionalities!
-    pub fn finish(&mut self) -> Result<()> {
+    pub fn finish(&mut self, channel: &mut Channel) -> Result<()> {
         for i in 0..self.eval.len() {
-            self.eval[i].finalize()?;
+            self.eval[i].finalize(channel)?;
         }
         Ok(())
     }
@@ -2254,14 +2254,24 @@ impl<
     /// a `TypeStore`, `FunStore`, and `CircInputs`  consistent with the gates.
     ///
     /// Calls [`Self::finish`] after evaluation is complete.
-    pub fn evaluate_gates(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
-        self.evaluate_gates_passed(gates, fun_store)?;
-        self.finish()
+    pub fn evaluate_gates(
+        &mut self,
+        gates: &[GateM],
+        fun_store: &FunStore,
+        channel: &mut Channel,
+    ) -> Result<()> {
+        self.evaluate_gates_passed(gates, fun_store, channel)?;
+        self.finish(channel)
     }
 
-    fn evaluate_gates_passed(&mut self, gates: &[GateM], fun_store: &FunStore) -> Result<()> {
+    fn evaluate_gates_passed(
+        &mut self,
+        gates: &[GateM],
+        fun_store: &FunStore,
+        channel: &mut Channel,
+    ) -> Result<()> {
         for gate in gates.iter() {
-            self.eval_gate(gate, fun_store)?;
+            self.eval_gate(gate, fun_store, channel)?;
         }
         Ok(())
     }
@@ -2279,9 +2289,10 @@ impl<
         gates: &[GateM],
         fun_store: &FunStore,
         inputs: &mut CircInputs,
+        channel: &mut Channel,
     ) -> Result<()> {
         for gate in gates.iter() {
-            self.eval_gate_with_inputs(gate, fun_store, inputs)?;
+            self.eval_gate_with_inputs(gate, fun_store, inputs, channel)?;
         }
         Ok(())
     }
@@ -2289,7 +2300,7 @@ impl<
     /// Evaluate a relation,  given as a path to a SIEVE IR flatbuffer file.
     ///
     /// Calls [`Self::finish`] after evaluation is complete.
-    pub fn evaluate_relation(&mut self, path: &PathBuf) -> Result<()> {
+    pub fn evaluate_relation(&mut self, path: &PathBuf, channel: &mut Channel) -> Result<()> {
         let mut buf_rel = BufRelation::new(path, &self.type_store)?;
 
         loop {
@@ -2299,25 +2310,29 @@ impl<
                     break;
                 }
                 Some(()) => {
-                    self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
+                    self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store, channel)?;
                 }
             }
         }
-        self.finish()
+        self.finish(channel)
     }
 
     /// Evaluate a relation, provided as a text relation via `T: Read + Seek`.
     ///
     /// Calls [`Self::finish`] after evaluation is complete.
-    pub fn evaluate_relation_text<T: Read + Seek>(&mut self, rel: T) -> Result<()> {
+    pub fn evaluate_relation_text<T: Read + Seek>(
+        &mut self,
+        rel: T,
+        channel: &mut Channel,
+    ) -> Result<()> {
         let rel = RelationReader::new(rel)?;
 
         let mut buf_rel = TextRelation::new(self.type_store.clone(), FunStore::default());
 
         rel.read(&mut buf_rel)?;
-        self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store)?;
+        self.evaluate_gates_passed(&buf_rel.gates, &buf_rel.fun_store, channel)?;
 
-        self.finish()
+        self.finish(channel)
     }
 
     fn callframe_start(
@@ -2398,18 +2413,19 @@ impl<
         out_ranges: &[WireRange],
         in_ranges: &[WireRange],
         fun_store: &FunStore,
+        channel: &mut Channel,
     ) -> Result<()> {
         let func = fun_store.get_func(fun_id)?;
         match &func.body() {
             FunctionBody::Gates(body) => {
                 self.callframe_start(func, out_ranges, in_ranges)?;
-                self.evaluate_gates_passed(body.gates(), fun_store)?;
+                self.evaluate_gates_passed(body.gates(), fun_store, channel)?;
                 self.callframe_end(func);
             }
             FunctionBody::Plugin(body) => match body {
                 PluginExecution::Gates(body) => {
                     self.callframe_start(func, out_ranges, in_ranges)?;
-                    self.evaluate_gates_passed(body.gates(), fun_store)?;
+                    self.evaluate_gates_passed(body.gates(), fun_store, channel)?;
                     self.callframe_end(func);
                 }
                 PluginExecution::PermutationCheck(plugin) => {
@@ -2422,6 +2438,7 @@ impl<
                         out_ranges,
                         in_ranges,
                         body,
+                        channel,
                     )?;
                 }
                 PluginExecution::Disjunction(plugin) => {
@@ -2435,6 +2452,7 @@ impl<
                         out_ranges,
                         in_ranges,
                         body,
+                        channel,
                     )?;
                 }
                 PluginExecution::Mux(plugin) => {
@@ -2447,6 +2465,7 @@ impl<
                         out_ranges,
                         in_ranges,
                         body,
+                        channel,
                     )?;
                     self.callframe_end(func);
                 }
@@ -2487,6 +2506,7 @@ impl<
                                         out_ranges,
                                         in_ranges,
                                         body,
+                                        channel,
                                     )?
                                     .ok_or_swanky_error(
                                         ErrorKind::OtherError,
@@ -2514,6 +2534,7 @@ impl<
                                     out_ranges,
                                     in_ranges,
                                     body,
+                                    channel,
                                 )?;
                             }
                         },
@@ -2525,16 +2546,21 @@ impl<
         Ok(())
     }
 
-    fn eval_gate(&mut self, gate: &GateM, fun_store: &FunStore) -> Result<()> {
+    fn eval_gate(
+        &mut self,
+        gate: &GateM,
+        fun_store: &FunStore,
+        channel: &mut Channel,
+    ) -> Result<()> {
         debug!("GATE: {gate:?}");
         match gate {
             GateM::Conv(gate) => {
                 debug!("CONV IN");
                 let (ty1, _, ty2, _) = gate.as_ref();
                 // First we get the bits from the input and then we convert to the output.
-                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref())?;
+                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref(), channel)?;
                 // then we convert the bits to the out field.
-                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
+                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits, channel)?;
                 debug!("CONV OUT");
             }
             GateM::Instance(ty, out) => {
@@ -2543,6 +2569,7 @@ impl<
                     gate,
                     self.inputs.pop_instances(i, out.1 - out.0 + 1),
                     None,
+                    channel,
                 )?;
             }
             GateM::Witness(ty, out) => {
@@ -2551,18 +2578,19 @@ impl<
                     gate,
                     None,
                     self.inputs.pop_witnesses(i, out.1 - out.0 + 1),
+                    channel,
                 )?;
             }
             GateM::Call(arg) => {
                 let (fun_id, out_ranges, in_ranges) = arg.as_ref();
-                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
+                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store, channel)?;
             }
             GateM::Comment(str) => {
                 debug!("Comment: {str:?}");
             }
             _ => {
                 let ty = gate.type_id();
-                self.eval[ty as usize].evaluate_gate(gate, None, None)?;
+                self.eval[ty as usize].evaluate_gate(gate, None, None, channel)?;
             }
         }
         Ok(())
@@ -2575,6 +2603,7 @@ impl<
         gate: &GateM,
         fun_store: &FunStore,
         inputs: &mut CircInputs,
+        channel: &mut Channel,
     ) -> Result<()> {
         debug!("GATE: {gate:?}");
         match gate {
@@ -2582,9 +2611,9 @@ impl<
                 debug!("CONV IN");
                 let (ty1, _, ty2, _) = gate.as_ref();
                 // First we get the bits from the input and then we convert to the output.
-                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref())?;
+                let bits = self.eval[*ty2 as usize].conv_gate_get(gate.as_ref(), channel)?;
                 // then we convert the bits to the out field.
-                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits)?;
+                self.eval[*ty1 as usize].conv_gate_set(gate.as_ref(), &bits, channel)?;
                 debug!("CONV OUT");
             }
             GateM::Instance(ty, out) => {
@@ -2593,6 +2622,7 @@ impl<
                     gate,
                     inputs.pop_instances(i, out.1 - out.0 + 1),
                     None,
+                    channel,
                 )?;
             }
             GateM::Witness(ty, out) => {
@@ -2601,18 +2631,19 @@ impl<
                     gate,
                     None,
                     inputs.pop_witnesses(i, out.1 - out.0 + 1),
+                    channel,
                 )?;
             }
             GateM::Call(arg) => {
                 let (fun_id, out_ranges, in_ranges) = arg.as_ref();
-                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store)?;
+                self.evaluate_call_gate(*fun_id, out_ranges, in_ranges, fun_store, channel)?;
             }
             GateM::Comment(str) => {
                 debug!("Comment: {str:?}");
             }
             _ => {
                 let ty = gate.type_id();
-                self.eval[ty as usize].evaluate_gate(gate, None, None)?;
+                self.eval[ty as usize].evaluate_gate(gate, None, None, channel)?;
             }
         }
         Ok(())
@@ -2631,12 +2662,8 @@ impl<
     }
 }
 
-impl<
-    P: Party,
-    C: AbstractChannel + Clone,
-    SvoleF2: SvoleT<P, F2, F40b>,
-    SvoleF2Ext: SvoleT<P, F40b, F40b>,
-> Drop for EvaluatorCirc<P, C, SvoleF2, SvoleF2Ext>
+impl<P: Party, SvoleF2: SvoleT<P, F2, F40b>, SvoleF2Ext: SvoleT<P, F40b, F40b>> Drop
+    for EvaluatorCirc<P, SvoleF2, SvoleF2Ext>
 {
     fn drop(&mut self) {
         if !self.multithreaded_voles.is_empty() {
@@ -2664,15 +2691,9 @@ pub(crate) mod tests {
         fields::{F384P_MODULUS, F384Q_MODULUS},
     };
     use rand::SeedableRng;
+    use std::collections::VecDeque;
     use std::env;
-    use std::net::TcpStream;
-    use std::{collections::VecDeque, thread::JoinHandle};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::{Channel, SyncChannel};
-    use swanky_error::{ErrorKind, WrapErr};
+    use swanky_channel::{Channel, local::local_channel_pair};
     use swanky_field::FiniteRing;
     use swanky_field::PrimeFiniteField;
     use swanky_field_binary::F2;
@@ -2749,65 +2770,55 @@ pub(crate) mod tests {
         let gates_prover = gates.clone();
         let ins_prover = instances.clone();
         let wit_prover = witnesses;
-        let type_store = TypeStore::try_from(fields.clone())?;
+        let type_store = TypeStore::try_from(fields)?;
         let type_store_prover = type_store.clone();
-        let (sender, receiver) = UnixStream::pair().wrap_err(
-            ErrorKind::NetworkError,
-            "Failed to create Unix socket pair.",
+
+        local_channel_pair(
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut inputs = CircInputs::default();
+
+                for (id, inst) in instances.into_iter().enumerate() {
+                    inputs.ingest_instances(id, VecDeque::from(inst));
+                }
+
+                let mut eval = EvaluatorCirc::<Verifier, Svole<_, _, _>, Svole<_, _, _>>::new(
+                    channel,
+                    rng,
+                    inputs,
+                    type_store,
+                    LpnSize::Small,
+                    false,
+                )?;
+                eval.load_backends(channel, LpnSize::Small)?;
+                eval.evaluate_gates(&gates, &func_store, channel)
+            },
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut inputs = CircInputs::default();
+
+                for (id, instances) in ins_prover.into_iter().enumerate() {
+                    inputs.ingest_instances(id, VecDeque::from(instances));
+                }
+
+                for (id, witnesses) in wit_prover.into_iter().enumerate() {
+                    inputs.ingest_witnesses(id, VecDeque::from(witnesses));
+                }
+
+                let mut eval = EvaluatorCirc::<Prover, Svole<_, _, _>, Svole<_, _, _>>::new(
+                    channel,
+                    rng,
+                    inputs,
+                    type_store_prover,
+                    LpnSize::Small,
+                    false,
+                )?;
+                eval.load_backends(channel, LpnSize::Small)?;
+                eval.evaluate_gates(&gates_prover, &func_store_prover, channel)
+            },
         )?;
-        let handle: JoinHandle<swanky_error::Result<()>> = std::thread::spawn(move || {
-            let rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
 
-            let mut inputs = CircInputs::default();
-
-            for (id, instances) in ins_prover.into_iter().enumerate() {
-                inputs.ingest_instances(id, VecDeque::from(instances));
-            }
-
-            for (id, witnesses) in wit_prover.into_iter().enumerate() {
-                inputs.ingest_witnesses(id, VecDeque::from(witnesses));
-            }
-
-            let mut eval = EvaluatorCirc::<Prover, _, Svole<_, _, _>, Svole<_, _, _>>::new(
-                &mut channel,
-                rng,
-                inputs,
-                type_store_prover,
-                LpnSize::Small,
-                false,
-            )?;
-            eval.load_backends(&mut channel, LpnSize::Small)?;
-            eval.evaluate_gates(&gates_prover, &func_store_prover)?;
-            swanky_error::Result::Ok(())
-        });
-
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut inputs = CircInputs::default();
-
-        for (id, inst) in instances.into_iter().enumerate() {
-            inputs.ingest_instances(id, VecDeque::from(inst));
-        }
-
-        let mut eval = EvaluatorCirc::<Verifier, _, Svole<_, _, _>, Svole<_, _, _>>::new(
-            &mut channel,
-            rng,
-            inputs,
-            type_store,
-            LpnSize::Small,
-            false,
-        )
-        .unwrap();
-        eval.load_backends(&mut channel, LpnSize::Small)?;
-        eval.evaluate_gates(&gates, &func_store)?;
-
-        handle.join().unwrap()
+        Ok(())
     }
 
     pub(crate) fn test_circuit_plaintext(
@@ -2817,7 +2828,7 @@ pub(crate) mod tests {
         instances: Vec<Vec<Number>>,
         witnesses: Vec<Vec<Number>>,
     ) -> swanky_error::Result<()> {
-        let type_store = TypeStore::try_from(fields.clone())?;
+        let type_store = TypeStore::try_from(fields)?;
 
         let mut inputs = CircInputs::default();
 
@@ -2829,15 +2840,13 @@ pub(crate) mod tests {
             inputs.ingest_witnesses(id, VecDeque::from(witnesses));
         }
 
-        let mut eval = EvaluatorCirc::<
-            Prover,
-            SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>, // unnecessary type
-            Svole<_, _, _>,
-            Svole<_, _, _>,
-        >::new_plaintext(inputs, type_store)?;
+        let mut eval = EvaluatorCirc::<Prover, Svole<_, _, _>, Svole<_, _, _>>::new_plaintext(
+            inputs, type_store,
+        )?;
         eval.load_backends_plaintext()?;
-        eval.evaluate_gates(&gates, &func_store)?;
-        swanky_error::Result::Ok(())
+        Channel::with(std::io::empty(), |channel| {
+            eval.evaluate_gates(&gates, &func_store, channel)
+        })
     }
 
     fn test_conv_00() {

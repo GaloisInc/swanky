@@ -1,6 +1,5 @@
 use std::io::Result;
 use std::io::{Read, Write};
-use swanky_channel_legacy::AbstractChannel;
 use tungstenite::Message;
 use tungstenite::WebSocket;
 
@@ -25,11 +24,10 @@ impl<Stream: Read + Write> WsChannel<Stream> {
         }
     }
 
-    fn read_one_byte(&mut self) -> u8 {
-        self.curr += 1;
-        if self.curr >= self.read_buffer.len() {
-            let msg = self.websocket.read().unwrap();
-            match msg {
+    /// Blocks until the next non-empty binary message is buffered.
+    fn fill_read_buffer(&mut self) -> Result<()> {
+        while self.curr >= self.read_buffer.len() {
+            match self.websocket.read().map_err(std::io::Error::other)? {
                 Message::Binary(m) => {
                     self.read_buffer = m.to_vec();
                     self.curr = 0;
@@ -40,7 +38,7 @@ impl<Stream: Read + Write> WsChannel<Stream> {
             }
         }
 
-        self.read_buffer[self.curr]
+        Ok(())
     }
 
     fn write_one_byte(&mut self, b: u8) -> Result<()> {
@@ -62,21 +60,36 @@ impl<Stream: Read + Write> WsChannel<Stream> {
     }
 }
 
-impl<Stream: Read + Write> AbstractChannel for WsChannel<Stream> {
-    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<()> {
-        for byte in bytes.iter_mut() {
-            *byte = self.read_one_byte();
+impl<Stream: Read + Write> Read for WsChannel<Stream> {
+    /// Read up to `bytes.len()` bytes from the channel.
+    ///
+    /// Only blocks for a single websocket message, returning a short
+    /// read if `bytes` is not filled.
+    /// This avoids a deadlock when the peer sends less data than
+    /// requested.
+    fn read(&mut self, bytes: &mut [u8]) -> Result<usize> {
+        if bytes.is_empty() {
+            return Ok(0);
         }
-        Ok(())
-    }
 
+        self.fill_read_buffer()?;
+        let n = (self.read_buffer.len() - self.curr).min(bytes.len());
+        bytes[..n].copy_from_slice(&self.read_buffer[self.curr..self.curr + n]);
+        self.curr += n;
+
+        Ok(n)
+    }
+}
+
+impl<Stream: Read + Write> Write for WsChannel<Stream> {
     /// Write a slice of `u8`s to the channel.
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+    fn write(&mut self, bytes: &[u8]) -> Result<usize> {
         for b in bytes {
             self.write_one_byte(*b)?;
         }
-        Ok(())
+        Ok(bytes.len())
     }
+
     /// Flush the channel.
     fn flush(&mut self) -> Result<()> {
         self.internal_flush();

@@ -28,6 +28,7 @@ use crate::{
     mac::MacT,
     number_to_u64,
 };
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, ensure};
 use swanky_field_binary::F2;
 use swanky_sieve_ir_parser::PluginTypeArg;
@@ -72,9 +73,17 @@ impl PermutationCheckV1 {
         xs: impl Iterator<Item = B::Wire>,
         ys: impl Iterator<Item = B::Wire>,
         backend: &mut B,
+        channel: &mut Channel,
     ) -> Result<()> {
         assert_eq!(self.field_type_id, std::any::TypeId::of::<F2>());
-        permutation_check_binary::<M, B>(backend.lift(), xs, ys, self.ntuples, self.tuple_size)
+        permutation_check_binary::<M, B>(
+            backend.lift(),
+            xs,
+            ys,
+            self.ntuples,
+            self.tuple_size,
+            channel,
+        )
     }
 
     /// Run the permutation check on two lists provided by `xs` and `ys`,
@@ -84,12 +93,13 @@ impl PermutationCheckV1 {
         xs: impl Iterator<Item = B::Wire>,
         ys: impl Iterator<Item = B::Wire>,
         backend: &mut B,
+        channel: &mut Channel,
     ) -> Result<()> {
         if std::any::TypeId::of::<B::FieldElement>() == std::any::TypeId::of::<F2>() {
-            self.execute_binary::<B::Wire, B>(xs, ys, backend)
+            self.execute_binary::<B::Wire, B>(xs, ys, backend, channel)
         } else {
             assert_ne!(self.field_type_id, std::any::TypeId::of::<F2>());
-            permutation_check(backend, xs, ys, self.ntuples, self.tuple_size)
+            permutation_check(backend, xs, ys, self.ntuples, self.tuple_size, channel)
         }
     }
 }

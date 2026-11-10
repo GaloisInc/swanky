@@ -1,4 +1,5 @@
 use crate::backend_trait::BackendT;
+use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
@@ -11,6 +12,7 @@ pub(crate) fn less_than_eq_with_public<B: BackendT<FieldElement = F2>>(
     backend: &mut B,
     a: &[B::Wire],
     b: &[B::FieldElement],
+    channel: &mut Channel,
 ) -> Result<()> {
     // act = 1;
     // r   = 0;
@@ -33,7 +35,7 @@ pub(crate) fn less_than_eq_with_public<B: BackendT<FieldElement = F2>>(
         let one_plus_a_plus_b = backend.add_constant(&a_plus_b, F2::ONE)?;
 
         // act' = act(1+a+b)
-        let act_prime = backend.mul(&act, &one_plus_a_plus_b)?;
+        let act_prime = backend.mul(&act, &one_plus_a_plus_b, channel)?;
 
         // r + 1
         let r_plus_one = backend.add_constant(&r, F2::ONE)?;
@@ -43,10 +45,10 @@ pub(crate) fn less_than_eq_with_public<B: BackendT<FieldElement = F2>>(
         let p1 = backend.mul_constant(&a_i, b_1)?;
 
         // act * (a * (b+1))
-        let act_times_p1 = backend.mul(&act, &p1)?;
+        let act_times_p1 = backend.mul(&act, &p1, channel)?;
 
         // (r+1) * (act * (a * (b+1)))
-        let p2 = backend.mul(&r_plus_one, &act_times_p1)?;
+        let p2 = backend.mul(&r_plus_one, &act_times_p1, channel)?;
 
         // r' = r + ((r+1) * act * a * (b+1))
         let r_prime = backend.add(&r, &p2)?;
@@ -55,18 +57,13 @@ pub(crate) fn less_than_eq_with_public<B: BackendT<FieldElement = F2>>(
         r = r_prime;
     }
 
-    backend.assert_zero(&r)
+    backend.assert_zero(&r, channel)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-
     use rand::SeedableRng;
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::{Channel, local::local_channel_pair};
     use swanky_field::FiniteRing;
     use swanky_field_binary::{F2, F40b};
     use swanky_rng::SwankyRng;
@@ -83,85 +80,105 @@ mod tests {
 
     #[test]
     fn less_than_eq_with_public_works() {
-        fn run<B: BackendT<FieldElement = F2>>(party: &mut B, zero: B::Wire, one: B::Wire) {
-            less_than_eq_with_public(party, &[zero], &[F2::ZERO]).unwrap();
-            party.finalize().unwrap();
-            less_than_eq_with_public(party, &[zero], &[F2::ONE]).unwrap();
-            party.finalize().unwrap();
-            less_than_eq_with_public(party, &[one], &[F2::ONE]).unwrap();
-            party.finalize().unwrap();
-            less_than_eq_with_public(party, &[one], &[F2::ZERO]).unwrap();
-            let _ = party.finalize().unwrap_err();
+        fn run<B: BackendT<FieldElement = F2>>(
+            party: &mut B,
+            zero: B::Wire,
+            one: B::Wire,
+            channel: &mut Channel,
+        ) {
+            less_than_eq_with_public(party, &[zero], &[F2::ZERO], channel).unwrap();
+            party.finalize(channel).unwrap();
+            less_than_eq_with_public(party, &[zero], &[F2::ONE], channel).unwrap();
+            party.finalize(channel).unwrap();
+            less_than_eq_with_public(party, &[one], &[F2::ONE], channel).unwrap();
+            party.finalize(channel).unwrap();
+            less_than_eq_with_public(party, &[one], &[F2::ZERO], channel).unwrap();
+            let _ = party.finalize(channel).unwrap_err();
 
-            less_than_eq_with_public(party, &[zero], &[F2::ZERO]).unwrap();
-            party.finalize().unwrap();
+            less_than_eq_with_public(party, &[zero], &[F2::ZERO], channel).unwrap();
+            party.finalize(channel).unwrap();
 
-            less_than_eq_with_public(party, &[one, one, zero], &[F2::ONE, F2::ONE, F2::ZERO])
-                .unwrap();
-            party.finalize().unwrap();
+            less_than_eq_with_public(
+                party,
+                &[one, one, zero],
+                &[F2::ONE, F2::ONE, F2::ZERO],
+                channel,
+            )
+            .unwrap();
+            party.finalize(channel).unwrap();
 
-            less_than_eq_with_public(party, &[one, one, one], &[F2::ONE, F2::ONE, F2::ZERO])
-                .unwrap();
-            let _ = party.finalize().unwrap_err();
+            less_than_eq_with_public(
+                party,
+                &[one, one, one],
+                &[F2::ONE, F2::ONE, F2::ZERO],
+                channel,
+            )
+            .unwrap();
+            let _ = party.finalize(channel).unwrap_err();
 
-            less_than_eq_with_public(party, &[one, zero, zero], &[F2::ONE, F2::ZERO, F2::ONE])
-                .unwrap();
-            party.finalize().unwrap();
+            less_than_eq_with_public(
+                party,
+                &[one, zero, zero],
+                &[F2::ONE, F2::ZERO, F2::ONE],
+                channel,
+            )
+            .unwrap();
+            party.finalize(channel).unwrap();
 
-            less_than_eq_with_public(party, &[one, one, one], &[F2::ONE, F2::ONE, F2::ONE])
-                .unwrap();
-            party.finalize().unwrap();
+            less_than_eq_with_public(
+                party,
+                &[one, one, one],
+                &[F2::ONE, F2::ONE, F2::ONE],
+                channel,
+            )
+            .unwrap();
+            party.finalize(channel).unwrap();
 
             less_than_eq_with_public(
                 party,
                 &[one, zero, one, one],
                 &[F2::ONE, F2::ZERO, F2::ZERO, F2::ONE],
+                channel,
             )
             .unwrap();
-            let _ = party.finalize().unwrap_err();
+            let _ = party.finalize(channel).unwrap_err();
 
             // that's testing the little-endianness of the function
-            less_than_eq_with_public(party, &[one, one], &[F2::ZERO, F2::ONE]).unwrap();
-            let _ = party.finalize().unwrap_err();
+            less_than_eq_with_public(party, &[one, one], &[F2::ZERO, F2::ONE], channel).unwrap();
+            let _ = party.finalize(channel).unwrap_err();
         }
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+        local_channel_pair(
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut party = DietMacAndCheese::<Verifier, F2, F40b, Svole<_, _, _>>::init(
+                    channel,
+                    rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    false,
+                )?;
+                let zero = party.input_private(None, channel)?;
+                let one = party.input_private(None, channel)?;
 
-            let mut party = DietMacAndCheese::<Prover, F2, F40b, _, Svole<_, _, _>>::init(
-                &mut channel,
-                rng,
-                LPN_SETUP_SMALL,
-                LPN_EXTEND_SMALL,
-                false,
-            )
-            .unwrap();
-            let zero = party.input_private(Some(F2::ZERO)).unwrap();
-            let one = party.input_private(Some(F2::ONE)).unwrap();
+                run(&mut party, zero, one, channel);
+                Ok(())
+            },
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut party = DietMacAndCheese::<Prover, F2, F40b, Svole<_, _, _>>::init(
+                    channel,
+                    rng,
+                    LPN_SETUP_SMALL,
+                    LPN_EXTEND_SMALL,
+                    false,
+                )?;
+                let zero = party.input_private(Some(F2::ZERO), channel)?;
+                let one = party.input_private(Some(F2::ONE), channel)?;
 
-            run(&mut party, zero, one);
-        });
-
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut party = DietMacAndCheese::<Verifier, F2, F40b, _, Svole<_, _, _>>::init(
-            &mut channel,
-            rng,
-            LPN_SETUP_SMALL,
-            LPN_EXTEND_SMALL,
-            false,
+                run(&mut party, zero, one, channel);
+                Ok(())
+            },
         )
         .unwrap();
-        let zero = party.input_private(None).unwrap();
-        let one = party.input_private(None).unwrap();
-
-        run(&mut party, zero, one);
-        handle.join().unwrap();
     }
 }

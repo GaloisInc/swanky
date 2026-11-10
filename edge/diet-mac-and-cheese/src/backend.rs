@@ -7,7 +7,7 @@ use crate::party::{Party, Prover, WhichParty};
 use crate::svole_trait::SvoleT;
 use crate::svole_trait::field_name;
 use log::{debug, info, warn};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, bail};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::PartyPrivateCopy;
@@ -128,17 +128,11 @@ impl<V: FiniteField, T: FiniteField> Monitor<V, T> {
 }
 
 /// Single-Field Diet Mac'n'Cheese.
-pub struct DietMacAndCheese<
-    P: Party,
-    V: IsSubFieldOf<T>,
-    T: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, T>,
-> where
+pub struct DietMacAndCheese<P: Party, V: IsSubFieldOf<T>, T: FiniteField, SVOLE: SvoleT<P, V, T>>
+where
     T::PrimeField: IsSubFieldOf<V>,
 {
     pub(crate) fcom: FCom<P, V, T, SVOLE>,
-    pub(crate) channel: C,
     pub(crate) rng: SwankyRng,
     mult_check_state: MultCheckState<P, V, T>,
     zero_check_state: ZeroCheckState<P, V, T>,
@@ -146,19 +140,14 @@ pub struct DietMacAndCheese<
     monitor: Monitor<V, T>,
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<T>,
-    T: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, T>,
-> DietMacAndCheese<P, V, T, C, SVOLE>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, SVOLE: SvoleT<P, V, T>>
+    DietMacAndCheese<P, V, T, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
     /// Initialize by providing a channel, a random generator, and a pair of LPN parameters as defined by SVOLE.
     pub fn init(
-        channel: &mut C,
+        channel: &mut Channel,
         mut rng: SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -168,7 +157,6 @@ where
         let zero_check_state = ZeroCheckState::init()?;
         Ok(Self {
             fcom: FCom::init(channel, &mut rng, lpn_setup, lpn_extend)?,
-            channel: channel.clone(),
             rng,
             monitor: Monitor::default(),
             mult_check_state,
@@ -179,7 +167,6 @@ where
 
     /// Initialize by providing a reference to an FCom.
     pub(crate) fn init_with_fcom(
-        channel: &mut C,
         mut rng: SwankyRng,
         fcom: &FCom<P, V, T, SVOLE>,
         no_batching: bool,
@@ -188,7 +175,6 @@ where
         let zero_check_state = ZeroCheckState::init()?;
         Ok(Self {
             fcom: fcom.duplicate()?,
-            channel: channel.clone(),
             rng,
             monitor: Monitor::default(),
             mult_check_state,
@@ -199,7 +185,7 @@ where
 
     #[cfg(test)]
     fn init_with_delta(
-        channel: &mut C,
+        channel: &mut Channel,
         mut rng: SwankyRng,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
@@ -210,7 +196,6 @@ where
         let zero_check_state = ZeroCheckState::init()?;
         Ok(Self {
             fcom: FCom::init_with_delta(channel, &mut rng, lpn_setup, lpn_extend, delta)?,
-            channel: channel.clone(),
             rng,
             monitor: Monitor::default(),
             mult_check_state,
@@ -225,24 +210,25 @@ where
     #[cfg(test)]
     pub fn lift<VOLE2: SvoleT<P, T, T>>(
         &mut self,
+        channel: &mut Channel,
         lpn_setup: LpnParams,
         lpn_extend: LpnParams,
-    ) -> Result<DietMacAndCheese<P, T, T, C, VOLE2>> {
+    ) -> Result<DietMacAndCheese<P, T, T, VOLE2>> {
         use rand::SeedableRng;
 
-        self.channel
-            .flush()
+        channel
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
         match P::WHICH {
-            WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, C, VOLE2>::init(
-                &mut self.channel,
+            WhichParty::Prover(_) => DietMacAndCheese::<P, T, T, VOLE2>::init(
+                channel,
                 SwankyRng::from_rng(&mut self.rng),
                 lpn_setup,
                 lpn_extend,
                 self.no_batching,
             ),
-            WhichParty::Verifier(ev) => DietMacAndCheese::<P, T, T, C, VOLE2>::init_with_delta(
-                &mut self.channel,
+            WhichParty::Verifier(ev) => DietMacAndCheese::<P, T, T, VOLE2>::init_with_delta(
+                channel,
                 SwankyRng::from_rng(&mut self.rng),
                 lpn_setup,
                 lpn_extend,
@@ -252,57 +238,53 @@ where
         }
     }
 
-    fn input(&mut self, v: PartyPrivateCopy<Prover, P, V>) -> Result<Mac<P, V, T>> {
+    fn input(
+        &mut self,
+        v: PartyPrivateCopy<Prover, P, V>,
+        channel: &mut Channel,
+    ) -> Result<Mac<P, V, T>> {
         Ok(match P::WHICH {
             WhichParty::Prover(ev) => {
-                let tag =
-                    self.fcom
-                        .input1_prover(ev, &mut self.channel, &mut self.rng, v.into_inner(ev));
+                let tag = self
+                    .fcom
+                    .input1_prover(ev, channel, &mut self.rng, v.into_inner(ev));
                 Mac::new(v, tag?)
             }
-            WhichParty::Verifier(ev) => {
-                self.fcom
-                    .input1_verifier(ev, &mut self.channel, &mut self.rng)?
-            }
+            WhichParty::Verifier(ev) => self.fcom.input1_verifier(ev, channel, &mut self.rng)?,
         })
     }
 
-    fn do_mult_check(&mut self) -> Result<usize> {
+    fn do_mult_check(&mut self, channel: &mut Channel) -> Result<usize> {
         debug!("do mult_check");
-        self.channel
-            .flush()
+        channel
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-        let count = self.fcom.quicksilver_finalize(
-            &mut self.channel,
-            &mut self.rng,
-            &mut self.mult_check_state,
-        )?;
+        let count =
+            self.fcom
+                .quicksilver_finalize(channel, &mut self.rng, &mut self.mult_check_state)?;
         self.monitor.incr_zk_mult_check(count);
         Ok(count)
     }
 
-    fn do_check_zero(&mut self) -> Result<usize> {
-        self.channel
-            .flush()
+    fn do_check_zero(&mut self, channel: &mut Channel) -> Result<usize> {
+        channel
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-        let count = self
-            .zero_check_state
-            .finalize(&mut self.channel, &mut self.rng)?;
+        let count = self.zero_check_state.finalize(channel, &mut self.rng)?;
         self.monitor.incr_zk_check_zero(count);
         Ok(count)
     }
 
-    fn push_check_zero(&mut self, e: &Mac<P, V, T>) -> Result<()> {
+    fn push_check_zero(&mut self, e: &Mac<P, V, T>, channel: &mut Channel) -> Result<()> {
         if self.no_batching {
-            self.fcom
-                .check_zero(&mut self.channel, &mut self.rng, &[*e])?;
+            self.fcom.check_zero(channel, &mut self.rng, &[*e])?;
             return Ok(());
         }
 
         self.zero_check_state.accumulate(e)?;
 
         if self.zero_check_state.count() == QUEUE_CAPACITY {
-            self.do_check_zero()?;
+            self.do_check_zero(channel)?;
         }
 
         Ok(())
@@ -313,13 +295,8 @@ where
     }
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<T>,
-    T: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, T>,
-> Drop for DietMacAndCheese<P, V, T, C, SVOLE>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, SVOLE: SvoleT<P, V, T>> Drop
+    for DietMacAndCheese<P, V, T, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -332,13 +309,8 @@ where
     }
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<T>,
-    T: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, T>,
-> BackendT for DietMacAndCheese<P, V, T, C, SVOLE>
+impl<P: Party, V: IsSubFieldOf<T>, T: FiniteField, SVOLE: SvoleT<P, V, T>> BackendT
+    for DietMacAndCheese<P, V, T, SVOLE>
 where
     T::PrimeField: IsSubFieldOf<V>,
 {
@@ -356,25 +328,20 @@ where
         Ok(*wire)
     }
 
-    fn random(&mut self) -> Result<Self::FieldElement> {
+    fn random(&mut self, channel: &mut Channel) -> Result<Self::FieldElement> {
         match P::WHICH {
             WhichParty::Prover(_) => {
-                self.channel
-                    .flush()
+                channel
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-                let challenge = self
-                    .channel
-                    .read_serializable::<Self::FieldElement>()
-                    .wrap_err(ErrorKind::NetworkError, "Failed to read challenge data.")?;
+                let challenge = channel.read::<Self::FieldElement>()?;
                 Ok(challenge)
             }
             WhichParty::Verifier(_) => {
                 let challenge = Self::FieldElement::random(&mut self.rng);
-                self.channel
-                    .write_serializable(&challenge)
-                    .wrap_err(ErrorKind::NetworkError, "Failed to write challenge data.")?;
-                self.channel
-                    .flush()
+                channel.write(&challenge)?;
+                channel
+                    .force_flush()
                     .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                 Ok(challenge)
             }
@@ -385,9 +352,9 @@ where
         self.input_public(val)
     }
 
-    fn assert_zero(&mut self, wire: &Self::Wire) -> Result<()> {
+    fn assert_zero(&mut self, wire: &Self::Wire, channel: &mut Channel) -> Result<()> {
         self.monitor.incr_monitor_check_zero();
-        self.push_check_zero(wire)?;
+        self.push_check_zero(wire, channel)?;
         Ok(())
     }
 
@@ -401,7 +368,7 @@ where
         Ok(*a - *b)
     }
 
-    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire) -> Result<Self::Wire> {
+    fn mul(&mut self, a: &Self::Wire, b: &Self::Wire, channel: &mut Channel) -> Result<Self::Wire> {
         self.monitor.incr_monitor_mul();
 
         let out = match P::WHICH {
@@ -410,9 +377,9 @@ where
                 let b_clr = b.value().into_inner(ev);
                 let product = a_clr * b_clr;
 
-                self.input(PartyPrivateCopy::new(product))?
+                self.input(PartyPrivateCopy::new(product), channel)?
             }
-            WhichParty::Verifier(ev) => self.input(PartyPrivateCopy::empty(ev))?,
+            WhichParty::Verifier(ev) => self.input(PartyPrivateCopy::empty(ev), channel)?,
         };
 
         self.mult_check_state
@@ -420,8 +387,8 @@ where
 
         if self.mult_check_state.count() >= BATCH_SIZE {
             self.mult_check_state.finalize(
-                self.fcom.gen_mask(&mut self.channel, &mut self.rng)?,
-                &mut self.channel,
+                self.fcom.gen_mask(channel, &mut self.rng)?,
+                channel,
                 &mut self.rng,
                 self.fcom.get_delta(),
             )?;
@@ -451,12 +418,16 @@ where
         })
     }
 
-    fn input_private(&mut self, val: Option<Self::FieldElement>) -> Result<Self::Wire> {
+    fn input_private(
+        &mut self,
+        val: Option<Self::FieldElement>,
+        channel: &mut Channel,
+    ) -> Result<Self::Wire> {
         match P::WHICH {
             WhichParty::Prover(_) => {
                 if let Some(val) = val {
                     self.monitor.incr_monitor_witness();
-                    self.input(PartyPrivateCopy::new(val))
+                    self.input(PartyPrivateCopy::new(val), channel)
                 } else {
                     bail!(
                         ErrorKind::OtherError,
@@ -469,19 +440,19 @@ where
                     bail!(ErrorKind::OtherError, "Private input given to the verifier")
                 } else {
                     self.monitor.incr_monitor_witness();
-                    self.input(PartyPrivateCopy::empty(ev))
+                    self.input(PartyPrivateCopy::empty(ev), channel)
                 }
             }
         }
     }
 
-    fn finalize(&mut self) -> Result<()> {
+    fn finalize(&mut self, channel: &mut Channel) -> Result<()> {
         debug!("finalize");
-        self.channel
-            .flush()
+        channel
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-        let zero_check_count = self.do_check_zero()?;
-        let mult_check_count = self.do_mult_check()?;
+        let zero_check_count = self.do_check_zero(channel)?;
+        let mult_check_count = self.do_mult_check(channel)?;
         debug!("finalize: mult_check: {mult_check_count:?}, check_zero: {zero_check_count:?}");
         self.log_final_monitor();
         Ok(())
@@ -494,11 +465,7 @@ mod tests {
     use crate::svole_trait::Svole;
     use crate::{backend::DietMacAndCheese, backend_trait::BackendT, mac::validate};
     use rand::SeedableRng;
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F40b};
     use swanky_field_f61p::F61p;
@@ -510,127 +477,108 @@ mod tests {
     where
         T::PrimeField: IsSubFieldOf<V>,
     {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+        local_channel_pair(
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut dmc: DietMacAndCheese<Verifier, V, T, Svole<_, _, _>> =
+                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-            let mut dmc: DietMacAndCheese<Prover, V, T, _, Svole<_, _, _>> =
-                DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                    .unwrap();
+                let one = V::ONE;
+                let two = one + one;
+                let three = two + one;
+                let one1 = dmc.input_public(one)?;
+                let one2 = dmc.input_public(one)?;
+                let two_pub = dmc.add(&one1, &one2)?;
+                let three_pub = dmc.add_constant(&two_pub, one)?;
+                let two_priv = dmc.input_private(None, channel)?;
+                let six = dmc.mul(&two_priv, &three_pub, channel)?;
+                let twelve_priv = dmc.mul_constant(&six, two)?;
+                let n24_priv = dmc.mul(&twelve_priv, &two_priv, channel)?;
+                let r_zero_priv = dmc.add_constant(&n24_priv, -(three * two * two * two))?;
+                dmc.assert_zero(&r_zero_priv, channel)?;
+                dmc.finalize(channel)?;
+                dmc.assert_zero(&n24_priv, channel)?;
+                assert!(dmc.finalize(channel).is_err());
+                Ok(())
+            },
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut dmc: DietMacAndCheese<Prover, V, T, Svole<_, _, _>> =
+                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-            // one1        = public(1)
-            // one2        = public(1)
-            // two_pub     = add(one1, one2)
-            // three_pub   = addc(two_pub, 1)
-            // two_priv    = priv(2)
-            // six         = mul(two_priv, three_pub)
-            // twelve_priv = mulc(six, 2)
-            // n24_priv    = mul(twelve_priv, two_priv)
-            // r_zero_priv = addc(n24_priv, -24)
-            // assert_zero(r_zero_priv)
-            // assert_zero(n24_priv) !!!!FAIL!!!!!
-            let one = V::ONE;
-            let two = one + one;
-            let three = two + one;
-            let one1 = dmc.input_public(one).unwrap();
-            let one2 = dmc.input_public(one).unwrap();
-            let two_pub = dmc.add(&one1, &one2).unwrap();
-            assert_eq!(two_pub, dmc.input_public(two).unwrap());
-            let three_pub = dmc.add_constant(&two_pub, one).unwrap();
-            assert_eq!(three_pub, dmc.input_public(three).unwrap());
-            let two_priv = dmc.input_private(Some(two)).unwrap();
-            let six = dmc.mul(&two_priv, &three_pub).unwrap();
-            let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-            assert_eq!(
-                twelve_priv.value().into_inner(Witness::EQUAL_TYPES),
-                three * two * two
-            );
-            let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
-            let r_zero_priv = dmc
-                .add_constant(&n24_priv, -(three * two * two * two))
-                .unwrap();
-            dmc.assert_zero(&r_zero_priv).unwrap();
-            dmc.finalize().unwrap();
-            dmc.assert_zero(&n24_priv).unwrap();
-            assert!(dmc.finalize().is_err());
-        });
-
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut dmc: DietMacAndCheese<Verifier, V, T, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
-
-        let one = V::ONE;
-        let two = one + one;
-        let three = two + one;
-        let one1 = dmc.input_public(one).unwrap();
-        let one2 = dmc.input_public(one).unwrap();
-        let two_pub = dmc.add(&one1, &one2).unwrap();
-        let three_pub = dmc.add_constant(&two_pub, one).unwrap();
-        let two_priv = dmc.input_private(None).unwrap();
-        let six = dmc.mul(&two_priv, &three_pub).unwrap();
-        let twelve_priv = dmc.mul_constant(&six, two).unwrap();
-        let n24_priv = dmc.mul(&twelve_priv, &two_priv).unwrap();
-        let r_zero_priv = dmc
-            .add_constant(&n24_priv, -(three * two * two * two))
-            .unwrap();
-        dmc.assert_zero(&r_zero_priv).unwrap();
-        dmc.finalize().unwrap();
-        dmc.assert_zero(&n24_priv).unwrap();
-        assert!(dmc.finalize().is_err());
-
-        handle.join().unwrap();
+                // one1        = public(1)
+                // one2        = public(1)
+                // two_pub     = add(one1, one2)
+                // three_pub   = addc(two_pub, 1)
+                // two_priv    = priv(2)
+                // six         = mul(two_priv, three_pub)
+                // twelve_priv = mulc(six, 2)
+                // n24_priv    = mul(twelve_priv, two_priv)
+                // r_zero_priv = addc(n24_priv, -24)
+                // assert_zero(r_zero_priv)
+                // assert_zero(n24_priv) !!!!FAIL!!!!!
+                let one = V::ONE;
+                let two = one + one;
+                let three = two + one;
+                let one1 = dmc.input_public(one)?;
+                let one2 = dmc.input_public(one)?;
+                let two_pub = dmc.add(&one1, &one2)?;
+                assert_eq!(two_pub, dmc.input_public(two)?);
+                let three_pub = dmc.add_constant(&two_pub, one)?;
+                assert_eq!(three_pub, dmc.input_public(three)?);
+                let two_priv = dmc.input_private(Some(two), channel)?;
+                let six = dmc.mul(&two_priv, &three_pub, channel)?;
+                let twelve_priv = dmc.mul_constant(&six, two)?;
+                assert_eq!(
+                    twelve_priv.value().into_inner(Witness::EQUAL_TYPES),
+                    three * two * two
+                );
+                let n24_priv = dmc.mul(&twelve_priv, &two_priv, channel)?;
+                let r_zero_priv = dmc.add_constant(&n24_priv, -(three * two * two * two))?;
+                dmc.assert_zero(&r_zero_priv, channel)?;
+                dmc.finalize(channel)?;
+                dmc.assert_zero(&n24_priv, channel)?;
+                assert!(dmc.finalize(channel).is_err());
+                Ok(())
+            },
+        )
+        .unwrap();
     }
 
     fn test_challenge<V: IsSubFieldOf<T>, T: FiniteField>()
     where
         T::PrimeField: IsSubFieldOf<V>,
     {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let rng = SwankyRng::from_seed(Default::default());
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
+        let ((verifier, delta), prover) = local_channel_pair(
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut dmc: DietMacAndCheese<Verifier, V, T, Svole<_, _, _>> =
+                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-            let mut dmc: DietMacAndCheese<Prover, V, T, _, Svole<_, _, _>> =
-                DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                    .unwrap();
+                let challenge = dmc.random(channel)?;
+                let verifier = dmc.input_public(challenge)?;
+                dmc.finalize(channel)?;
 
-            let challenge = dmc.random().unwrap();
-            let challenge = dmc.input_public(challenge).unwrap();
+                Ok((
+                    verifier,
+                    dmc.fcom.get_delta().into_inner(Witness::EQUAL_TYPES),
+                ))
+            },
+            |channel| {
+                let rng = SwankyRng::from_seed(Default::default());
+                let mut dmc: DietMacAndCheese<Prover, V, T, Svole<_, _, _>> =
+                    DietMacAndCheese::init(channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)?;
 
-            dmc.finalize().unwrap();
+                let challenge = dmc.random(channel)?;
+                let challenge = dmc.input_public(challenge)?;
+                dmc.finalize(channel)?;
 
-            challenge
-        });
+                Ok(challenge)
+            },
+        )
+        .unwrap();
 
-        let rng = SwankyRng::from_seed(Default::default());
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-
-        let mut dmc: DietMacAndCheese<Verifier, V, T, _, Svole<_, _, _>> =
-            DietMacAndCheese::init(&mut channel, rng, LPN_SETUP_SMALL, LPN_EXTEND_SMALL, false)
-                .unwrap();
-
-        let challenge = dmc.random().unwrap();
-        let verifier = dmc.input_public(challenge).unwrap();
-        dmc.finalize().unwrap();
-
-        let prover = handle.join().unwrap();
-        validate(
-            prover,
-            verifier,
-            dmc.fcom.get_delta().into_inner(Witness::EQUAL_TYPES),
-        );
+        validate(prover, verifier, delta);
     }
 
     #[test]

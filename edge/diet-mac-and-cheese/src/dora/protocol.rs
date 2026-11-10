@@ -1,6 +1,6 @@
+use swanky_channel::Channel;
 use swanky_error::Result;
 
-use swanky_channel_legacy::AbstractChannel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::private::{PartyPrivate, PartyPrivateCopy};
@@ -11,6 +11,7 @@ use crate::{
     mac::Mac,
     party::{Party, Prover, WhichParty},
     svole_trait::SvoleT,
+    transcript::Transcript,
 };
 
 use super::{
@@ -20,34 +21,22 @@ use super::{
     disjunction::Disjunction,
     fiat_shamir,
     perm::permutation,
-    tx::TxChannel,
 };
 
-pub struct Dora<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> where
+pub struct Dora<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>>
+where
     F::PrimeField: IsSubFieldOf<V>,
 {
     disj: Disjunction<V>,
-    init: Vec<ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>>,
-    trace: Vec<Trace<DietMacAndCheese<P, V, F, C, SvoleF>>>,
+    init: Vec<ComittedAcc<DietMacAndCheese<P, V, F, SvoleF>>>,
+    trace: Vec<Trace<DietMacAndCheese<P, V, F, SvoleF>>>,
     max_trace: usize, // maximum trace len before compactification
-    tx: blake3::Hasher,
+    transcript: Transcript,
     calls: PartyPrivateCopy<Prover, P, usize>,
     accs: PartyPrivate<Prover, P, Vec<Accumulator<V>>>, // current state of accumulator
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> Dora<P, V, F, C, SvoleF>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>> Dora<P, V, F, SvoleF>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -64,7 +53,7 @@ where
             init: vec![],
             trace: Vec::with_capacity(max_trace),
             max_trace,
-            tx: blake3::Hasher::new(),
+            transcript: Transcript::new(),
             calls: PartyPrivateCopy::new(0),
             accs,
         }
@@ -75,14 +64,15 @@ where
     // returns commitments to the output
     pub fn mux(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, V, F, C, SvoleF>,
+        dmc: &mut DietMacAndCheese<P, V, F, SvoleF>,
         mut wit_tape: impl Iterator<Item = V>, // witness tape
         input: &[Mac<P, V, F>],
         opt: PartyPrivateCopy<Prover, P, usize>,
+        channel: &mut Channel,
     ) -> Result<Vec<Mac<P, V, F>>> {
         // check if we should compact the trace first
         if self.trace.len() >= self.max_trace {
-            self.compact(dmc)?;
+            self.compact(dmc, channel)?;
         }
 
         match P::WHICH {
@@ -108,12 +98,10 @@ where
                 let cxt = clause
                     .cross_wit_acc(&wit, &self.accs.as_ref().into_inner(ev)[opt.into_inner(ev)]);
 
-                // wrap in transcript hasher (if FS enabled)
-                let mut ch = TxChannel::new(dmc.channel.clone(), &mut self.tx);
-
                 // commit to extended witness
                 let comm_wit = CommittedWitness::commit(
-                    &mut ch,
+                    channel,
+                    &mut self.transcript,
                     dmc,
                     &self.disj,
                     input.iter().copied(),
@@ -122,12 +110,18 @@ where
                 debug_assert_eq!(comm_wit.value(ev, clause), wit);
 
                 // commit to cross terms
-                let comm_cxt =
-                    CommittedCrossTerms::commit(&mut ch, dmc, &self.disj, PartyPrivate::new(&cxt))?;
+                let comm_cxt = CommittedCrossTerms::commit(
+                    channel,
+                    &mut self.transcript,
+                    dmc,
+                    &self.disj,
+                    PartyPrivate::new(&cxt),
+                )?;
 
                 // commit to old accumulator
                 let comm_acc = ComittedAcc::commit(
-                    &mut ch,
+                    channel,
+                    &mut self.transcript,
                     dmc,
                     &self.disj,
                     &self.accs.as_ref().map(|accs| &accs[opt.into_inner(ev)]),
@@ -139,7 +133,7 @@ where
                 );
 
                 // fold extended witness, accumulator and cross terms
-                let challenge = ch.challenge();
+                let challenge = self.transcript.challenge();
                 let comm_acc_new = comm_acc.fold_witness(dmc, challenge, &comm_cxt, &comm_wit)?;
 
                 // store new accumulator
@@ -159,12 +153,10 @@ where
                 Ok(comm_wit.outputs().to_owned())
             }
             WhichParty::Verifier(ev) => {
-                // wrap channel in transcript
-                let mut ch = TxChannel::new(dmc.channel.clone(), &mut self.tx);
-
                 // commit to new extended witness
                 let wit = CommittedWitness::commit(
-                    &mut ch,
+                    channel,
+                    &mut self.transcript,
                     dmc,
                     &self.disj,
                     input.iter().copied(),
@@ -172,15 +164,25 @@ where
                 )?;
 
                 // commit to cross terms
-                let cxt =
-                    CommittedCrossTerms::commit(&mut ch, dmc, &self.disj, PartyPrivate::empty(ev))?;
+                let cxt = CommittedCrossTerms::commit(
+                    channel,
+                    &mut self.transcript,
+                    dmc,
+                    &self.disj,
+                    PartyPrivate::empty(ev),
+                )?;
 
                 // commit to old accumulator
-                let acc_old =
-                    ComittedAcc::commit(&mut ch, dmc, &self.disj, &PartyPrivate::empty(ev))?;
+                let acc_old = ComittedAcc::commit(
+                    channel,
+                    &mut self.transcript,
+                    dmc,
+                    &self.disj,
+                    &PartyPrivate::empty(ev),
+                )?;
 
                 // fold
-                let challenge = ch.challenge();
+                let challenge = self.transcript.challenge();
                 let acc_new = acc_old.fold_witness(dmc, challenge, &cxt, &wit)?;
 
                 // update trace
@@ -195,7 +197,11 @@ where
     }
 
     /// Verify all the final accumulators using MacAndCheese
-    pub fn finalize(mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SvoleF>) -> Result<()>
+    pub fn finalize(
+        mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, SvoleF>,
+        channel: &mut Channel,
+    ) -> Result<()>
     where
         F::PrimeField: IsSubFieldOf<V>,
     {
@@ -209,11 +215,11 @@ where
         }
 
         // compact trace into single set of accumulators
-        self.compact(dmc)?;
+        self.compact(dmc, channel)?;
 
         // verify accumulators
         for (acc, r1cs) in self.init.into_iter().zip(self.disj.clauses()) {
-            acc.verify(dmc, r1cs)?;
+            acc.verify(dmc, r1cs, channel)?;
         }
         Ok(())
     }
@@ -222,14 +228,18 @@ where
     //
     // Commits to all the accumulators and executes the permutation proof.
     // This reduces the trace to a single element per branch.
-    fn compact(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SvoleF>) -> Result<()> {
-        let mut ch = TxChannel::new(dmc.channel.clone(), &mut self.tx);
+    fn compact(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, SvoleF>,
+        channel: &mut Channel,
+    ) -> Result<()> {
         let mut accs = Vec::with_capacity(self.disj.clauses().len());
         match P::WHICH {
             WhichParty::Prover(ev) => {
                 for acc in self.accs.as_ref().into_inner(ev).iter() {
                     accs.push(ComittedAcc::commit(
-                        &mut ch,
+                        channel,
+                        &mut self.transcript,
                         dmc,
                         &self.disj,
                         &PartyPrivate::new(acc),
@@ -239,7 +249,8 @@ where
             WhichParty::Verifier(ev) => {
                 for _ in self.disj.clauses() {
                     accs.push(ComittedAcc::commit(
-                        &mut ch,
+                        channel,
+                        &mut self.transcript,
                         dmc,
                         &self.disj,
                         &PartyPrivate::empty(ev),
@@ -250,36 +261,22 @@ where
 
         // challenges for permutation proof
         let (chal_perm, chal_cmbn) = if fiat_shamir::<V>() {
-            (ch.challenge(), ch.challenge())
+            (self.transcript.challenge(), self.transcript.challenge())
         } else {
             match P::WHICH {
                 WhichParty::Prover(_) => {
-                    ch.flush()
+                    channel
+                        .force_flush()
                         .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
-                    (
-                        dmc.channel.read_serializable::<V>().wrap_err(
-                            ErrorKind::NetworkError,
-                            "Failed to read permutation challenge.",
-                        )?,
-                        dmc.channel.read_serializable::<V>().wrap_err(
-                            ErrorKind::NetworkError,
-                            "Failed to read combined challenge.",
-                        )?,
-                    )
+                    (channel.read::<V>()?, channel.read::<V>()?)
                 }
                 WhichParty::Verifier(_) => {
                     let chal_perm = V::random(&mut dmc.rng);
                     let chal_cmbn = V::random(&mut dmc.rng);
-                    dmc.channel.write_serializable(&chal_perm).wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to write permutation challenge.",
-                    )?;
-                    dmc.channel.write_serializable(&chal_cmbn).wrap_err(
-                        ErrorKind::NetworkError,
-                        "Failed to write combined challenge.",
-                    )?;
-                    dmc.channel
-                        .flush()
+                    channel.write(&chal_perm)?;
+                    channel.write(&chal_cmbn)?;
+                    channel
+                        .force_flush()
                         .wrap_err(ErrorKind::NetworkError, "Failed to flush channel.")?;
                     (chal_perm, chal_cmbn)
                 }
@@ -301,6 +298,6 @@ where
         // execute permutation proof
         self.trace.clear();
         self.init = accs;
-        permutation(dmc, chal_perm, &lhs, &rhs)
+        permutation(dmc, chal_perm, &lhs, &rhs, channel)
     }
 }

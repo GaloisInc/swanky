@@ -9,7 +9,7 @@ use log::info;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::panic;
-use swanky_channel_legacy::TrackChannel;
+use swanky_channel::Channel;
 use swanky_field_binary::{F2, F40b};
 use swanky_rng::SwankyRng;
 use swanky_sieve_ir_parser::ValueStreamKind;
@@ -28,7 +28,6 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     let rng = SwankyRng::new();
-    let mut channel = TrackChannel::new(ShimChannel::new());
     let mut inputs = CircInputs::default();
 
     // Loading the instances
@@ -63,26 +62,37 @@ pub fn test_web_macandcheese(instance: &[u8], relation: &[u8], witness: &[u8]) -
     alert("*** RELATION LOADING: done!");
 
     let no_batching = false;
-    let mut evaluator = EvaluatorCirc::<Prover, _, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
-        &mut channel,
-        rng,
-        inputs,
-        TypeStore::try_from(rel.header().types.clone()).unwrap(),
-        LpnSize::Medium,
-        no_batching,
-    )
-    .unwrap();
-    let tmp = evaluator.load_backends(&mut channel, LpnSize::Medium);
-    if tmp.is_err() {
-        alert("error while loading backends");
-        return false;
-    }
 
-    let relation_loaded = Cursor::new(relation);
-    let r = evaluator.evaluate_relation_text(relation_loaded);
-    if r.is_err() {
-        alert("error while zk evaluation");
-        return false;
+    let res = Channel::with(ShimChannel::new(), |c| {
+        let mut evaluator = EvaluatorCirc::<Prover, Svole<_, F2, F40b>, Svole<_, F40b, F40b>>::new(
+            c,
+            rng,
+            inputs,
+            TypeStore::try_from(rel.header().types.clone()).unwrap(),
+            LpnSize::Medium,
+            no_batching,
+        )
+        .unwrap();
+        let tmp = evaluator.load_backends(c, LpnSize::Medium);
+        if tmp.is_err() {
+            alert("error while loading backends");
+            return Ok(false);
+        }
+
+        let relation_loaded = Cursor::new(relation);
+        let r = evaluator.evaluate_relation_text(relation_loaded, c);
+        if r.is_err() {
+            alert("error while zk evaluation");
+            return Ok(false);
+        }
+        Ok(true)
+    });
+
+    match res {
+        Ok(b) => b,
+        Err(_) => {
+            alert("error while flushing the channel");
+            false
+        }
     }
-    true
 }

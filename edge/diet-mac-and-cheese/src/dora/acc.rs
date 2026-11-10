@@ -1,4 +1,4 @@
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
 use swanky_party::ty_eq::{EqualityProposition, Witness};
@@ -45,7 +45,12 @@ impl<B: BackendT> ComittedAcc<B> {
     /// The accumulator may have junk at the end (which is not verfied)
     /// for an honest prover this junk will be zero, however it is
     /// not required to enforce this for soundness.
-    pub fn verify(&self, backend: &mut B, r1cs: &R1CS<B::FieldElement>) -> Result<()> {
+    pub fn verify(
+        &self,
+        backend: &mut B,
+        r1cs: &R1CS<B::FieldElement>,
+        channel: &mut Channel,
+    ) -> Result<()> {
         ensure!(
             self.wit.len() >= r1cs.dim(),
             ErrorKind::OtherError,
@@ -61,11 +66,11 @@ impl<B: BackendT> ComittedAcc<B> {
 
         for (row, err) in r1cs.rows.iter().zip(self.err.iter()) {
             let (l, r, o) = row.eval_commit(backend, &self.wit)?;
-            let m = backend.mul(&l, &r)?;
-            let t = backend.mul(&o, u)?;
+            let m = backend.mul(&l, &r, channel)?;
+            let t = backend.mul(&o, u, channel)?;
             let m = backend.sub(&m, &t)?;
             let m = backend.sub(&m, err)?;
-            backend.assert_zero(&m)?;
+            backend.assert_zero(&m, channel)?;
         }
 
         Ok(())
@@ -115,13 +120,8 @@ impl<B: BackendT> ComittedAcc<B> {
     }
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SvoleF: SvoleT<P, V, F>,
-> ComittedAcc<DietMacAndCheese<P, V, F, C, SvoleF>>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SvoleF: SvoleT<P, V, F>>
+    ComittedAcc<DietMacAndCheese<P, V, F, SvoleF>>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {

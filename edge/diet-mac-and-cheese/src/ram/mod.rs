@@ -1,11 +1,10 @@
 mod protocol;
 mod tests;
-mod tx;
 
 use std::marker::PhantomData;
 
 use protocol::DoraRam;
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
@@ -120,27 +119,17 @@ impl<F: FiniteField> MemorySpace<F> for Arithmetic<F> {
 /// above. Use of this structure over `DoraRam` is preferred, as it provides
 /// the more familiar read/write interface and properly executes the protocol
 /// steps for these operations.
-pub struct ArithmeticRam<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, F>,
-> where
+pub struct ArithmeticRam<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SVOLE: SvoleT<P, V, F>>
+where
     F::PrimeField: IsSubFieldOf<V>,
 {
     size: usize,
     init_value: Mac<P, V, F>,
-    dora: Option<DoraRam<P, V, F, C, Arithmetic<V>, SVOLE>>,
+    dora: Option<DoraRam<P, V, F, Arithmetic<V>, SVOLE>>,
 }
 
-impl<
-    P: Party,
-    V: IsSubFieldOf<F>,
-    F: FiniteField,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, V, F>,
-> ArithmeticRam<P, V, F, C, SVOLE>
+impl<P: Party, V: IsSubFieldOf<F>, F: FiniteField, SVOLE: SvoleT<P, V, F>>
+    ArithmeticRam<P, V, F, SVOLE>
 where
     F::PrimeField: IsSubFieldOf<V>,
 {
@@ -157,24 +146,24 @@ where
     /// Read and return the value at `addr`.
     pub fn read(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        dmc: &mut DietMacAndCheese<P, V, F, SVOLE>,
         addr: &Mac<P, V, F>,
+        channel: &mut Channel,
     ) -> Result<Mac<P, V, F>> {
         match self.dora.as_mut() {
             Some(ram) => {
-                let value = ram.remove(dmc, &[*addr])?;
+                let value = ram.remove(dmc, &[*addr], channel)?;
                 ram.insert(dmc, &[*addr], &value)?;
                 Ok(value[0])
             }
             None => {
                 let ram = DoraRam::new(
-                    dmc,
                     vec![self.init_value],
                     ARITHMETIC_CHALLENGE_SIZE,
                     Arithmetic::new(self.size),
                 );
                 self.dora = Some(ram);
-                self.read(dmc, addr)
+                self.read(dmc, addr, channel)
             }
         }
     }
@@ -182,25 +171,25 @@ where
     /// Write `value` to `addr`.
     pub fn write(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>,
+        dmc: &mut DietMacAndCheese<P, V, F, SVOLE>,
         addr: &Mac<P, V, F>,
         value: &Mac<P, V, F>,
+        channel: &mut Channel,
     ) -> Result<()> {
         match self.dora.as_mut() {
             Some(ram) => {
-                ram.remove(dmc, &[*addr])?;
+                ram.remove(dmc, &[*addr], channel)?;
                 ram.insert(dmc, &[*addr], &[*value])?;
                 Ok(())
             }
             None => {
                 let ram = DoraRam::new(
-                    dmc,
                     vec![self.init_value],
                     ARITHMETIC_CHALLENGE_SIZE,
                     Arithmetic::new(self.size),
                 );
                 self.dora = Some(ram);
-                self.write(dmc, addr, value)
+                self.write(dmc, addr, value, channel)
             }
         }
     }
@@ -209,9 +198,13 @@ where
     ///
     /// This should only be called when no more reads/writes will occur on this
     /// RAM.
-    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, V, F, C, SVOLE>) -> Result<()> {
+    pub fn finalize(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, V, F, SVOLE>,
+        channel: &mut Channel,
+    ) -> Result<()> {
         match self.dora.take() {
-            Some(ram) => ram.finalize(dmc),
+            Some(ram) => ram.finalize(dmc, channel),
             None => Ok(()),
         }
     }
@@ -312,23 +305,18 @@ impl MemorySpace<F2> for Boolean {
 /// above. Use of this structure over `DoraRam` is preferred, as it provides
 /// the more familiar read/write interface and properly executes the protocol
 /// steps for these operations.
-pub struct BooleanRam<
-    P: Party,
-    T: FiniteField<PrimeField = F2>,
-    C: AbstractChannel + Clone,
-    SVOLE: SvoleT<P, F2, T>,
-> where
+pub struct BooleanRam<P: Party, T: FiniteField<PrimeField = F2>, SVOLE: SvoleT<P, F2, T>>
+where
     F2: IsSubFieldOf<T>,
 {
     addr_size: usize,
     value_size: usize,
     size: usize,
     init_value: Vec<Mac<P, F2, T>>,
-    dora: Option<DoraRam<P, F2, T, C, Boolean, SVOLE>>,
+    dora: Option<DoraRam<P, F2, T, Boolean, SVOLE>>,
 }
 
-impl<P: Party, T: FiniteField<PrimeField = F2>, C: AbstractChannel + Clone, SVOLE: SvoleT<P, F2, T>>
-    BooleanRam<P, T, C, SVOLE>
+impl<P: Party, T: FiniteField<PrimeField = F2>, SVOLE: SvoleT<P, F2, T>> BooleanRam<P, T, SVOLE>
 where
     F2: IsSubFieldOf<T>,
 {
@@ -352,26 +340,26 @@ where
     /// Read and return the value at `addr`.
     pub fn read(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
+        dmc: &mut DietMacAndCheese<P, F2, T, SVOLE>,
         addr: &[Mac<P, F2, T>],
+        channel: &mut Channel,
     ) -> Result<Vec<Mac<P, F2, T>>> {
         debug_assert_eq!(addr.len(), self.addr_size);
 
         match self.dora.as_mut() {
             Some(ram) => {
-                let value = ram.remove(dmc, addr)?;
+                let value = ram.remove(dmc, addr, channel)?;
                 ram.insert(dmc, addr, &value)?;
                 Ok(value)
             }
             None => {
                 let ram = DoraRam::new(
-                    dmc,
                     self.init_value.clone(),
                     BOOLEAN_CHALLENGE_SIZE,
                     Boolean::new(self.addr_size, self.value_size, self.size),
                 );
                 self.dora = Some(ram);
-                self.read(dmc, addr)
+                self.read(dmc, addr, channel)
             }
         }
     }
@@ -379,28 +367,28 @@ where
     /// Write `value` to `addr`.
     pub fn write(
         &mut self,
-        dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>,
+        dmc: &mut DietMacAndCheese<P, F2, T, SVOLE>,
         addr: &[Mac<P, F2, T>],
         value: &[Mac<P, F2, T>],
+        channel: &mut Channel,
     ) -> Result<()> {
         debug_assert_eq!(addr.len(), self.addr_size);
         debug_assert_eq!(value.len(), self.value_size);
 
         match self.dora.as_mut() {
             Some(ram) => {
-                ram.remove(dmc, addr)?;
+                ram.remove(dmc, addr, channel)?;
                 ram.insert(dmc, addr, value)?;
                 Ok(())
             }
             None => {
                 let ram = DoraRam::new(
-                    dmc,
                     self.init_value.clone(),
                     BOOLEAN_CHALLENGE_SIZE,
                     Boolean::new(self.addr_size, self.value_size, self.size),
                 );
                 self.dora = Some(ram);
-                self.write(dmc, addr, value)
+                self.write(dmc, addr, value, channel)
             }
         }
     }
@@ -409,9 +397,13 @@ where
     ///
     /// This should only be called when no more reads/writes will occur on this
     /// RAM.
-    pub fn finalize(&mut self, dmc: &mut DietMacAndCheese<P, F2, T, C, SVOLE>) -> Result<()> {
+    pub fn finalize(
+        &mut self,
+        dmc: &mut DietMacAndCheese<P, F2, T, SVOLE>,
+        channel: &mut Channel,
+    ) -> Result<()> {
         match self.dora.take() {
-            Some(ram) => ram.finalize(dmc),
+            Some(ram) => ram.finalize(dmc, channel),
             None => Ok(()),
         }
     }

@@ -7,7 +7,7 @@ use super::{
 };
 use hybrid_array::typenum::Unsigned;
 use rand::{CryptoRng, RngExt, SeedableRng};
-use swanky_channel_legacy::AbstractChannel;
+use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_rng::SwankyRng;
@@ -26,8 +26,8 @@ pub struct Receiver<FE: FF> {
 
 impl<FE: FF> Sender<FE> {
     /// Initalize the base vole sender
-    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
+    pub fn init<RNG: CryptoRng>(
+        channel: &mut Channel,
         pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self> {
@@ -36,9 +36,9 @@ impl<FE: FF> Sender<FE> {
     }
 
     /// Recieve `n` `(x, beta)` pairs such that $`T = \beta - x \cdot \Delta`$
-    pub fn send<C: AbstractChannel, RNG: CryptoRng>(
+    pub fn send<RNG: CryptoRng>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         n: usize,
         mut rng: &mut RNG,
     ) -> Result<Vec<(FE::PrimeField, FE)>> {
@@ -57,31 +57,25 @@ impl<FE: FF> Sender<FE> {
             x += a * *pow;
         }
         channel
-            .flush()
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
-        let seed = channel
-            .read_u8x16()
-            .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
+        let seed = channel.read()?;
         let mut rng_chi = SwankyRng::from_seed(seed);
         for (u, w) in uws.iter().copied() {
             let chi = FE::random(&mut rng_chi);
             z += chi * w;
             x += u * chi;
         }
-        channel
-            .write_serializable(&x)
-            .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
-        channel
-            .write_serializable(&z)
-            .wrap_err(ErrorKind::NetworkError, "Unable to write serializable")?;
+        channel.write(&x)?;
+        channel.write(&z)?;
         Ok(uws)
     }
 }
 
 impl<FE: FF> Receiver<FE> {
     /// Initalize the base vole receiver with a random `delta`
-    pub fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
+    pub fn init<RNG: CryptoRng>(
+        channel: &mut Channel,
         pows: Powers<FE>,
         rng: &mut RNG,
     ) -> Result<Self> {
@@ -89,8 +83,8 @@ impl<FE: FF> Receiver<FE> {
         Ok(Self { copee, pows })
     }
     /// Initalize the base vole receiver with a supplied `delta`
-    pub fn init_with_picked_delta<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
+    pub fn init_with_picked_delta<RNG: CryptoRng>(
+        channel: &mut Channel,
         pows: Powers<FE>,
         rng: &mut RNG,
         delta: FE,
@@ -103,9 +97,9 @@ impl<FE: FF> Receiver<FE> {
         self.copee.delta()
     }
     /// Recieve `len` base VOLE `T` values where $`T = \beta - x \cdot \Delta`$
-    pub fn receive<C: AbstractChannel, RNG: CryptoRng>(
+    pub fn receive<RNG: CryptoRng>(
         &mut self,
-        channel: &mut C,
+        channel: &mut Channel,
         len: usize,
         rng: &mut RNG,
     ) -> Result<Vec<FE>> {
@@ -123,18 +117,12 @@ impl<FE: FF> Receiver<FE> {
             let b = self.copee.receive(channel)?;
             y += self.pows.get()[i] * b
         }
+        channel.write(&seed)?;
         channel
-            .write_u8x16(&seed)
-            .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
-        channel
-            .flush()
+            .force_flush()
             .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
-        let x = channel
-            .read_serializable()
-            .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
-        let z: FE = channel
-            .read_serializable()
-            .wrap_err(ErrorKind::NetworkError, "Unable to read serializable")?;
+        let x = channel.read()?;
+        let z: FE = channel.read()?;
         let mut delta = self.copee.delta();
         delta *= x;
         delta += y;
@@ -150,36 +138,32 @@ impl<FE: FF> Receiver<FE> {
 #[cfg(test)]
 mod tests {
     use super::{super::utils::Powers, Receiver, Sender};
-    use std::{
-        io::{BufReader, BufWriter},
-        os::unix::net::UnixStream,
-    };
-    use swanky_channel_legacy::Channel;
+    use swanky_channel::local::local_channel_pair;
     use swanky_field::FiniteField as FF;
     use swanky_field_binary::{F40b, F128b};
     use swanky_field_f61p::F61p;
     use swanky_rng::SwankyRng;
 
     fn test_base_svole<FE: FF>(len: usize) {
-        let (sender, receiver) = UnixStream::pair().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut rng = SwankyRng::new();
-            let reader = BufReader::new(sender.try_clone().unwrap());
-            let writer = BufWriter::new(sender);
-            let mut channel = Channel::new(reader, writer);
-            let pows = <Powers<_> as Default>::default();
-            let mut vole = Sender::<FE>::init(&mut channel, pows, &mut rng).unwrap();
-            vole.send(&mut channel, len, &mut rng).unwrap()
-        });
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(receiver.try_clone().unwrap());
-        let writer = BufWriter::new(receiver);
-        let mut channel = Channel::new(reader, writer);
-        let pows = <Powers<_> as Default>::default();
-        let mut vole = Receiver::<FE>::init(&mut channel, pows, &mut rng).unwrap();
-        let vs = vole.receive(&mut channel, len, &mut rng).unwrap();
-        let delta = vole.delta();
-        let uw_s = handle.join().unwrap();
+        let (uw_s, (delta, vs)) = local_channel_pair(
+            |c| {
+                let mut rng = SwankyRng::new();
+                let pows = <Powers<_> as Default>::default();
+                let mut vole = Sender::<FE>::init(c, pows, &mut rng).unwrap();
+                let uw_s = vole.send(c, len, &mut rng).unwrap();
+                Ok(uw_s)
+            },
+            |c| {
+                let mut rng = SwankyRng::new();
+                let pows = <Powers<_> as Default>::default();
+                let mut vole = Receiver::<FE>::init(c, pows, &mut rng).unwrap();
+                let vs = vole.receive(c, len, &mut rng).unwrap();
+                let delta = vole.delta();
+                Ok((delta, vs))
+            },
+        )
+        .unwrap();
+
         for i in 0..len {
             let mut right = uw_s[i].0 * delta;
             right += vs[i];
