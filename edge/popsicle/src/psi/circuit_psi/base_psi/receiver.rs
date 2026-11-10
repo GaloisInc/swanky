@@ -4,10 +4,7 @@ use crate::{
     circuit_psi::{
         CircuitInputs, PAYLOAD_SIZE, PRIMARY_KEY_SIZE, Payload, PrimaryKey,
         base_psi::{BasePsi, NHASHES},
-        utils::{
-            bin_encode_many_block512, bin_receive_many_block512, cuckoo_place_ids,
-            cuckoo_place_payloads,
-        },
+        utils::{bin_encode_many_block512, cuckoo_place_ids, cuckoo_place_payloads},
     },
     cuckoo::CuckooHash,
     utils::compress_and_hash_inputs,
