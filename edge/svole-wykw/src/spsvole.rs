@@ -14,20 +14,21 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_field_binary::F2BitDeserializer;
-use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
-use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_kos_new::KOS;
+use swanky_ot_traits_new::{ObliviousTransfer, Receiver as OtReceiver, Sender as OtSender};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use swanky_serialization::SequenceDeserializer;
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
-pub(super) struct Sender<OT: OtReceiver + Malicious, FE: FF> {
+pub(super) struct Sender<OT: ObliviousTransfer<OtReceiver> + Malicious, FE: FF> {
     ot: OT,
     pub(super) pows: Powers<FE>,
     ggm_seeds: (Aes128EncryptOnly, Aes128EncryptOnly),
     ggm_temporary_storage: Vec<U8x16>,
 }
 
-pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF> {
+pub(super) struct Receiver<OT: ObliviousTransfer<OtSender> + Malicious, FE: FF> {
     ot: OT,
     delta: FE,
     pub(super) pows: Powers<FE>,
@@ -35,8 +36,8 @@ pub(super) struct Receiver<OT: OtSender + Malicious, FE: FF> {
     ggm_temporary_storage: Vec<U8x16>,
 }
 
-pub(super) type SpsSender<FE> = Sender<KosReceiver, FE>;
-pub(super) type SpsReceiver<FE> = Receiver<KosSender, FE>;
+pub(super) type SpsSender<FE> = Sender<KOS<OtReceiver>, FE>;
+pub(super) type SpsReceiver<FE> = Receiver<KOS<OtSender>, FE>;
 
 // Implementation of the EQ protocol functionality described in
 // <https://eprint.iacr.org/2020/925.pdf>, Page 30.
@@ -84,7 +85,7 @@ fn eq_receive<RNG: CryptoRng, FE: FF>(channel: &mut Channel, rng: &mut RNG, y: F
     Ok(x == y)
 }
 
-impl<OT: OtReceiver<Msg = U8x16> + Malicious, FE: FF> Sender<OT, FE> {
+impl<OT: ObliviousTransfer<OtReceiver> + Malicious, FE: FF> Sender<OT, FE> {
     pub(super) fn init<RNG: CryptoRng>(
         channel: &mut Channel,
         pows: Powers<FE>,
@@ -152,14 +153,23 @@ impl<OT: OtReceiver<Msg = U8x16> + Malicious, FE: FF> Sender<OT, FE> {
             alphas.push(alpha);
         }
 
-        let keys = self.ot.receive(channel, &choices, rng)?;
+        let mut keys = PartyPrivate::new(Vec::with_capacity(choices.len()));
+        self.ot.ot(
+            PartyEither::new(Witness::EQUAL_TYPES, &choices[..]),
+            PartyPrivate::empty(Witness::EQUAL_TYPES),
+            keys.as_mut(),
+            channel,
+            rng,
+        )?;
         for (i, ((_, w), (alpha, beta))) in base_uws
             .iter()
             .copied()
             .zip(alphas.iter().zip(betas))
             .enumerate()
         {
-            let ot_output = bytemuck::cast_slice(&keys[i * nbits..(i + 1) * nbits]);
+            let ot_output = bytemuck::cast_slice(
+                &keys.as_ref().into_inner(Witness::EQUAL_TYPES)[i * nbits..(i + 1) * nbits],
+            );
             self.ggm_temporary_storage.resize(
                 ggm_prime_temporary_storage_size(ot_output.len()),
                 U8x16::default(),
@@ -242,7 +252,7 @@ impl<OT: OtReceiver<Msg = U8x16> + Malicious, FE: FF> Sender<OT, FE> {
     }
 }
 
-impl<OT: OtSender<Msg = U8x16> + Malicious, FE: FF> Receiver<OT, FE> {
+impl<OT: ObliviousTransfer<OtSender> + Malicious, FE: FF> Receiver<OT, FE> {
     pub(super) fn init<RNG: CryptoRng>(
         channel: &mut Channel,
         pows: Powers<FE>,
@@ -300,7 +310,13 @@ impl<OT: OtSender<Msg = U8x16> + Malicious, FE: FF> Receiver<OT, FE> {
             );
         }
         debug_assert_eq!(keys.len(), t * nbits);
-        self.ot.send(channel, &keys, rng)?;
+        self.ot.ot::<Vec<_>>(
+            PartyEither::new(Witness::EQUAL_TYPES, keys.len()),
+            PartyPrivate::new(&keys[..]),
+            PartyPrivate::empty(Witness::EQUAL_TYPES),
+            channel,
+            rng,
+        )?;
         for (i, gamma) in gammas.into_iter().enumerate() {
             let d = gamma - result[i * n..(i + 1) * n].iter().copied().sum();
             channel.write(&d)?;

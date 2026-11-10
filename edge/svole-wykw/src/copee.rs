@@ -11,11 +11,12 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_field_binary::F2;
-use swanky_ot_alsz_kos::kos::{Receiver as KosReceiver, Sender as KosSender};
-use swanky_ot_traits::{RandomReceiver as ROTReceiver, RandomSender as ROTSender};
+use swanky_ot_kos_new::KOS;
+use swanky_ot_traits_new::{OTRandom, Receiver as OtReceiver, Sender as OtSender};
+use swanky_party::{either::PartyEither, ty_eq::Witness};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};
 
-pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
+pub(super) struct Sender<ROT: OTRandom<OtSender> + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     aes_objs: Vec<(Aes128EncryptOnly, Aes128EncryptOnly)>,
     pows: Powers<FE>,
@@ -24,7 +25,7 @@ pub(super) struct Sender<ROT: ROTSender + Malicious, FE: FF> {
     counter: u64,
 }
 
-pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
+pub(super) struct Receiver<ROT: OTRandom<OtReceiver> + Malicious, FE: FF> {
     _ot: PhantomData<ROT>,
     delta: FE,
     choices: Array<F2, FE::NumberOfBitsInBitDecomposition>,
@@ -35,8 +36,8 @@ pub(super) struct Receiver<ROT: ROTReceiver + Malicious, FE: FF> {
     counter: u64,
 }
 
-pub(super) type CopeeSender<FE> = Sender<KosSender, FE>;
-pub(super) type CopeeReceiver<FE> = Receiver<KosReceiver, FE>;
+pub(super) type CopeeSender<FE> = Sender<KOS<OtSender>, FE>;
+pub(super) type CopeeReceiver<FE> = Receiver<KOS<OtReceiver>, FE>;
 
 // Uses `Aes128EncryptOnly` as a pseudo-random function.
 fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: U8x16) -> FE::PrimeField {
@@ -44,7 +45,7 @@ fn prf<FE: FF>(aes: &Aes128EncryptOnly, pt: U8x16) -> FE::PrimeField {
     FE::PrimeField::from_uniform_bytes(&<[u8; 16]>::from(seed))
 }
 
-impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
+impl<ROT: OTRandom<OtSender> + Malicious, FE: FF> Sender<ROT, FE> {
     pub(super) fn init<RNG: CryptoRng>(
         channel: &mut Channel,
         pows: Powers<FE>,
@@ -53,10 +54,18 @@ impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
         let mut ot = ROT::init(channel, &mut rng)?;
         let nbits = <FE::PrimeField as FF>::NumberOfBitsInBitDecomposition::USIZE;
         let r = Degree::<FE>::USIZE;
-        let keys = ot.send_random(channel, nbits * r, &mut rng)?;
+        let mut keys = Vec::with_capacity(nbits * r);
+        ot.ot_random(
+            PartyEither::new(Witness::EQUAL_TYPES, nbits * r),
+            &mut keys,
+            channel,
+            rng,
+        )?;
+
         let aes_objs: Vec<(Aes128EncryptOnly, Aes128EncryptOnly)> = keys
             .iter()
-            .map(|(k0, k1)| {
+            .map(|keys| {
+                let [k0, k1] = keys.as_ref().into_inner(Witness::EQUAL_TYPES);
                 (
                     Aes128EncryptOnly::new_with_key(*k0),
                     Aes128EncryptOnly::new_with_key(*k1),
@@ -99,7 +108,7 @@ impl<ROT: ROTSender<Msg = U8x16> + Malicious, FE: FF> Sender<ROT, FE> {
     }
 }
 
-impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
+impl<ROT: OTRandom<OtReceiver> + Malicious, FE: FF> Receiver<ROT, FE> {
     pub(super) fn init_with_picked_delta<RNG: CryptoRng>(
         channel: &mut Channel,
         pows: Powers<FE>,
@@ -116,10 +125,16 @@ impl<ROT: ROTReceiver<Msg = U8x16> + Malicious, FE: FF> Receiver<ROT, FE> {
             *item = acc;
             acc *= two;
         }
-        let keys = ot.receive_random(channel, &choices, &mut rng)?;
+        let mut keys = Vec::with_capacity(choices.len());
+        ot.ot_random(
+            PartyEither::new(Witness::EQUAL_TYPES, &choices[..]),
+            &mut keys,
+            channel,
+            rng,
+        )?;
         let aes_objs = keys
             .iter()
-            .map(|k| Aes128EncryptOnly::new_with_key(*k))
+            .map(|k| Aes128EncryptOnly::new_with_key(*k.as_ref().into_inner(Witness::EQUAL_TYPES)))
             .collect();
         Ok(Self {
             _ot: PhantomData::<ROT>,
