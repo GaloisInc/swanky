@@ -24,11 +24,11 @@ fn svole_init<F: FiniteField>() -> (Arc<Mutex<Sender<F>>>, Arc<Mutex<Receiver<F>
     let (vole_sender, vole_receiver) = local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            Ok(Sender::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap())
+            Sender::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM)
         },
         |c| {
             let mut rng = SwankyRng::new();
-            Ok(Receiver::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM, None).unwrap())
+            Receiver::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM, None)
         },
     )
     .unwrap();
@@ -47,7 +47,7 @@ fn bench_svole<F: FiniteField>(
             let mut rng = SwankyRng::new();
             let mut vole_sender = vole_sender.lock().unwrap();
             let mut out: Vec<(F::PrimeField, F)> = Vec::new();
-            vole_sender.send(c, &mut rng, &mut out).unwrap();
+            vole_sender.send(c, &mut rng, &mut out)?;
             black_box(out);
             Ok(())
         },
@@ -55,9 +55,7 @@ fn bench_svole<F: FiniteField>(
             let mut rng = SwankyRng::new();
             let mut vole_receiver = vole_receiver.lock().unwrap();
             let mut out = Vec::new();
-            vole_receiver
-                .receive::<F::PrimeField>(c, &mut rng, &mut out)
-                .unwrap();
+            vole_receiver.receive::<F::PrimeField>(c, &mut rng, &mut out)?;
             black_box(out);
             Ok(())
         },
@@ -86,15 +84,23 @@ fn bench_svole_init<F: FiniteField>() {
     local_channel_pair(
         |c| {
             let mut rng = SwankyRng::new();
-            black_box(Sender::<F>::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM).unwrap());
+            black_box(Sender::<F>::init(
+                c,
+                &mut rng,
+                LPN_SETUP_MEDIUM,
+                LPN_EXTEND_MEDIUM,
+            )?);
             Ok(())
         },
         |c| {
             let mut rng = SwankyRng::new();
-            black_box(
-                Receiver::<F>::init(c, &mut rng, LPN_SETUP_MEDIUM, LPN_EXTEND_MEDIUM, None)
-                    .unwrap(),
-            );
+            black_box(Receiver::<F>::init(
+                c,
+                &mut rng,
+                LPN_SETUP_MEDIUM,
+                LPN_EXTEND_MEDIUM,
+                None,
+            )?);
             Ok(())
         },
     )
