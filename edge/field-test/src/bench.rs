@@ -76,7 +76,7 @@ macro_rules! bench_field {
                             || {
                                 (
                                     <FE>::random(&mut rand::rng()),
-                                    <FE>::random(&mut rand::rng()),
+                                    <FE>::random_nonzero(&mut rand::rng()),
                                 )
                             },
                             |(x, y)| {
@@ -102,7 +102,7 @@ macro_rules! bench_field {
                 pub fn inverse(c: &mut Criterion) {
                     c.bench_function(&format!("{}::inverse", std::any::type_name::<FE>()), |b| {
                         b.iter_batched(
-                            || <FE>::random(&mut rand::rng()),
+                            || <FE>::random_nonzero(&mut rand::rng()),
                             |x| {
                                 black_box(black_box(x).inverse());
                             },
