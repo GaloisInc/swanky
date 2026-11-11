@@ -2450,23 +2450,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-chou-orlandi"
-version = "0.6.0"
-dependencies = [
- "blake3",
- "criterion",
- "curve25519-dalek",
- "rand",
- "swanky-adversary",
- "swanky-channel-legacy",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-test",
- "swanky-ot-traits",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-ot-chou-orlandi-new"
 version = "0.6.0"
 dependencies = [
