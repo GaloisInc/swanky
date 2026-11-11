@@ -2553,19 +2553,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-test"
-version = "0.6.0"
-dependencies = [
- "criterion",
- "rand",
- "swanky-channel-legacy",
- "swanky-field-binary",
- "swanky-ot-traits",
- "swanky-rng",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-ot-test-new"
 version = "0.6.0"
 dependencies = [
