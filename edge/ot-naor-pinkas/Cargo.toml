@@ -1,5 +1,5 @@
 [package]
-name = "swanky-ot-naor-pinkas-new"
+name = "swanky-ot-naor-pinkas"
 description = "An implementation of the Naor-Pinkas OT protocol"
 authors.workspace = true
 edition.workspace = true

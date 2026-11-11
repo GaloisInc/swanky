@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use swanky_ot_naor_pinkas_new::NaorPinkas;
+use swanky_ot_naor_pinkas::NaorPinkas;
 use swanky_ot_traits_new::{Receiver, Sender};
 
 fn do_random_bench(c: &mut Criterion) {

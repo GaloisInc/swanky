@@ -2533,7 +2533,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-naor-pinkas-new"
+name = "swanky-ot-naor-pinkas"
 version = "0.6.0"
 dependencies = [
  "blake3",
