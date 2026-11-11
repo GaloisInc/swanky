@@ -13,7 +13,7 @@ workspace = true
 [dependencies]
 rand.workspace = true
 rand_core.workspace = true
+swanky-channel.workspace = true
 swanky-rng.workspace = true
-swanky-channel-legacy.workspace = true
 swanky-error.workspace = true
 vectoreyes.workspace = true
