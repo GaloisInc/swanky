@@ -5,7 +5,7 @@ use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{ObliviousTransfer, Receiver};
+use swanky_ot_traits::{ObliviousTransfer, Receiver};
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use vectoreyes::U8x16;
 

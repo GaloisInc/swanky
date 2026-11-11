@@ -16,7 +16,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
+use swanky_ot_traits::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
 use swanky_party::{
     either::PartyEither,
     private::{PartyPrivate, PartyPrivateCopy},
@@ -114,11 +114,11 @@ mod tests {
 
     #[test]
     fn test_random_functionality() {
-        swanky_ot_test_new::test_rotext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
+        swanky_ot_test::test_rotext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
     }
 
     #[test]
     fn test_standard_functionality() {
-        swanky_ot_test_new::test_otext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
+        swanky_ot_test::test_otext::<NaorPinkas<Sender>, NaorPinkas<Receiver>>(128);
     }
 }

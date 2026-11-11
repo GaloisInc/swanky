@@ -1,53 +1,64 @@
-//! Utilities to benchmark OT protocols using [`criterion`]
+//! Utilities to benchmark OT protocols using [`criterion`].
 //!
-//! WARN: the benchmarking approach employed in this module has limited accuracy due to spinning up
-//! new threads for each benchmark iteration.
-
-use std::{
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-};
+//! **WARNING**: The benchmarking approach employed in this module has
+//! limited accuracy due to spinning up new threads for each benchmark
+//! iteration.
 
 use criterion::Criterion;
-use swanky_channel_legacy::Channel;
+
+use swanky_channel::local::local_channel_pair;
 use swanky_field_binary::F2;
-use swanky_ot_traits::{
-    CorrelatedReceiver, CorrelatedSender, RandomReceiver, RandomSender, Receiver, Sender,
-};
+use swanky_ot_traits::{OTCorrelated, OTRandom, ObliviousTransfer, Receiver, Sender};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
-fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
-    (0..size).map(|_| rand::random::<U8x16>()).collect()
-}
-fn rand_f2_vec(size: usize) -> Vec<F2> {
-    (0..size).map(|_| rand::random::<F2>()).collect()
-}
+use crate::rand_vec;
 
-fn bench_block_ot_inner<OTSender: Sender<Msg = U8x16>, OTReceiver: Receiver<Msg = U8x16>>(
+fn bench_block_ot_inner<
+    OTSender: ObliviousTransfer<Sender>,
+    OTReceiver: ObliviousTransfer<Receiver>,
+>(
     bs: &[F2],
-    ms: Vec<(U8x16, U8x16)>,
+    ms: Vec<[U8x16; 2]>,
 ) {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
-        ot.send(&mut channel, &ms, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    ot.receive(&mut channel, bs, &mut rng).unwrap();
-    handle.join().unwrap();
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ot = OTSender::init(c, &mut rng).unwrap();
+
+            ot.ot::<Vec<U8x16>>(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                PartyPrivate::new(&ms),
+                PartyPrivate::empty(Witness::EQUAL_TYPES),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ot = OTReceiver::init(c, &mut rng).unwrap();
+
+            ot.ot(
+                PartyEither::new(Witness::EQUAL_TYPES, bs),
+                PartyPrivate::empty(Witness::EQUAL_TYPES),
+                PartyPrivate::new(&mut Vec::with_capacity(bs.len())),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 /// Benchmark a 1-out-of-2 OT protocol using `size` inputs.
-pub fn bench_block_ot<S: Sender<Msg = U8x16>, R: Receiver<Msg = U8x16>>(
+pub fn bench_block_ot<S: ObliviousTransfer<Sender>, R: ObliviousTransfer<Receiver>>(
     c: &mut Criterion,
     size: usize,
 ) {
@@ -58,44 +69,57 @@ pub fn bench_block_ot<S: Sender<Msg = U8x16>, R: Receiver<Msg = U8x16>>(
             std::any::type_name::<R>()
         ),
         |bench| {
-            let m0s = rand_u8x16_vec(size);
-            let m1s = rand_u8x16_vec(size);
-            let ms = m0s.into_iter().zip(m1s).collect::<Vec<(U8x16, U8x16)>>();
-            let bs = rand_f2_vec(size);
-            bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()));
+            let m0s = rand_vec::<U8x16>(size);
+            let m1s = rand_vec::<U8x16>(size);
+            let ms: Vec<[U8x16; 2]> = m0s.into_iter().zip(m1s).map(|(m0, m1)| [m0, m1]).collect();
+            let bs = rand_vec::<F2>(size);
+
+            bench.iter(move || bench_block_ot_inner::<S, R>(&bs, ms.clone()))
         },
     );
 }
 
-fn bench_block_cot_inner<
-    OTSender: CorrelatedSender<Msg = U8x16>,
-    OTReceiver: CorrelatedReceiver<Msg = U8x16>,
->(
+fn bench_block_cot_inner<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Receiver>>(
     bs: &[F2],
     delta: U8x16,
 ) {
-    let m = bs.len();
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
-        ot.send_correlated(&mut channel, m, delta, &mut rng)
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ot = OTSender::init(c, &mut rng).unwrap();
+
+            ot.ot_correlated(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                PartyPrivate::new(delta),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
             .unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    ot.receive_correlated(&mut channel, bs, &mut rng).unwrap();
-    handle.join().unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ot = OTReceiver::init(c, &mut rng).unwrap();
+
+            ot.ot_correlated(
+                PartyEither::new(Witness::EQUAL_TYPES, bs),
+                PartyPrivate::empty(Witness::EQUAL_TYPES),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 /// Benchmark a correlated OT protocol with `size` inputs.
-pub fn bench_correlated_ot<S: CorrelatedSender<Msg = U8x16>, R: CorrelatedReceiver<Msg = U8x16>>(
+pub fn bench_correlated_ot<S: OTCorrelated<Sender>, R: OTCorrelated<Receiver>>(
     c: &mut Criterion,
     size: usize,
 ) {
@@ -107,51 +131,55 @@ pub fn bench_correlated_ot<S: CorrelatedSender<Msg = U8x16>, R: CorrelatedReceiv
         ),
         move |bench| {
             let delta = rand::random::<U8x16>();
-            let bs = rand_f2_vec(size);
+            let bs = rand_vec::<F2>(size);
+
             bench.iter(|| bench_block_cot_inner::<S, R>(&bs, delta))
         },
     );
 }
 
-fn bench_block_rot_inner<
-    OTSender: RandomSender<Msg = U8x16>,
-    OTReceiver: RandomReceiver<Msg = U8x16>,
->(
-    bs: &[F2],
-) {
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let m = bs.len();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut ot = OTSender::init(&mut channel, &mut rng).unwrap();
-        ot.send_random(&mut channel, m, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut ot = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    ot.receive_random(&mut channel, bs, &mut rng).unwrap();
-    handle.join().unwrap();
+fn bench_block_rot_inner<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(bs: &[F2]) {
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ot = OTSender::init(c, &mut rng).unwrap();
+
+            ot.ot_random(
+                PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut ot = OTReceiver::init(c, &mut rng).unwrap();
+
+            ot.ot_random(
+                PartyEither::new(Witness::EQUAL_TYPES, bs),
+                &mut Vec::with_capacity(bs.len()),
+                c,
+                &mut rng,
+            )
+            .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 /// Benchmark a random OT protocol with `size` inputs.
-pub fn bench_random_ot<S: RandomSender<Msg = U8x16>, R: RandomReceiver<Msg = U8x16>>(
-    c: &mut Criterion,
-    size: usize,
-) {
+pub fn bench_random_ot<S: OTRandom<Sender>, R: OTRandom<Receiver>>(c: &mut Criterion, size: usize) {
     c.bench_function(
         &format!(
             "Random OT <{}, {}>",
             std::any::type_name::<S>(),
             std::any::type_name::<R>()
         ),
-        move |bench| {
-            let bs = rand_f2_vec(size);
-            bench.iter(|| bench_block_rot_inner::<S, R>(&bs))
-        },
+        |bench| bench.iter(|| bench_block_rot_inner::<S, R>(&rand_vec::<F2>(size))),
     );
 }

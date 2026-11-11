@@ -1,173 +1,146 @@
 #![deny(missing_docs)]
-//! Implementation of the Chou-Orlandi oblivious transfer protocol (cf.
-//! <https://eprint.iacr.org/2015/267>).
+//! Implementation of the Chou-Orlandi oblivious transfer protocol
+//! (cf. <https://eprint.iacr.org/2015/267>).
 //!
-//! This implementation uses the Ristretto prime order elliptic curve group from
-//! the `curve25519-dalek` library and works over blocks rather than arbitrary
-//! length messages.
+//! This implementation uses the Ristretto prime order elliptic curve
+//! group from the `curve25519-dalek` crate, and works over 128-bit
+//! blocks rather than arbitrary-length messages.
 //!
 //! This version fixes a bug in the current ePrint write-up
-//! (<https://eprint.iacr.org/2015/267/20180529:135402>, Page 4): if the value
-//! `x^i` produced by the receiver is not randomized, all the random-OTs
-//! produced by the protocol will be the same. We fix this by hashing in `i`
-//! during the key derivation phase.
+//! (<https://eprint.iacr.org/2015/267/20180529:135402>, Page 4): if
+//! the value `x^i` produced by the receiver is not randomized, all
+//! the random-OTs produced by the protocol will be the same.
+//! We fix this by hashing in `i` during the key derivation phase.
 
 use curve25519_dalek::{
-    constants::RISTRETTO_BASEPOINT_TABLE,
-    ristretto::{RistrettoBasepointTable, RistrettoPoint},
-    scalar::Scalar,
+    RistrettoPoint, Scalar, constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::RistrettoBasepointTable,
 };
 use rand::CryptoRng;
+use subtle::{ConditionallySelectable, ConstantTimeEq};
+
 use swanky_adversary::{Malicious, SemiHonest};
-use swanky_channel_legacy::AbstractChannel;
-use swanky_error::{ErrorKind, Result, WrapErr};
+use swanky_channel::Channel;
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_traits::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
+use swanky_party::{
+    either::PartyEither,
+    private::{PartyPrivate, PartyPrivateCopy},
+};
 use vectoreyes::U8x16;
 
+/// Compute $`H(K, T)`$, where $`K`$ is a Ristretto point and $`T`$ is
+/// a tweak value.
+///
+/// This implementation is used to fix the bug referenced in the
+/// module-level documentation.
 fn hash_pt(tweak: u128, pt: &RistrettoPoint) -> U8x16 {
     let h = blake3::keyed_hash(pt.compress().as_bytes(), &tweak.to_le_bytes());
-    U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).unwrap())
+    U8x16::from(<[u8; 16]>::try_from(&h.as_bytes()[0..16]).expect("The slice is exactly 16 bytes"))
 }
 
-/// Oblivious transfer sender.
-pub struct Sender {
-    y: Scalar,
-    s: RistrettoPoint,
+/// The Chou-Orlandi (random) OT protocol.
+///
+/// Original paper: <https://eprint.iacr.org/2015/267>
+///
+/// This protocol is based on tweaking Diffie-Hellman key exchange,
+/// which takes advantage of the symmetry in group operations (and the
+/// hardness of the computational Diffie-Hellman problem) to securely
+/// communicate shared values between two parties, without having to
+/// communicate any private data directly.
+pub struct ChouOrlandi<P: Party> {
     counter: u128,
+    y: PartyPrivateCopy<Sender, P, Scalar>,
+    ys: PartyPrivateCopy<Sender, P, RistrettoPoint>,
+    s: PartyPrivate<Receiver, P, RistrettoBasepointTable>,
+    zero: PartyPrivate<Receiver, P, RistrettoPoint>,
+    one: PartyPrivate<Receiver, P, RistrettoPoint>,
 }
 
-impl OtSender for Sender {
-    type Msg = U8x16;
+impl<P: Party> OTInit<P> for ChouOrlandi<P> {
+    fn init(channel: &mut Channel, rng: &mut impl CryptoRng) -> swanky_error::Result<Self> {
+        let y = PartyPrivateCopy::new_with(|| Scalar::random(rng));
+        let s = channel.communicate(y.map(|y| &y * RISTRETTO_BASEPOINT_TABLE))?;
+        let ys = y.map(|y| y * s);
+        let s = PartyPrivate::new_with(|| RistrettoBasepointTable::create(&s));
+        let zero = s.as_ref().map(|s| &Scalar::ZERO * s);
+        let one = s.as_ref().map(|s| &Scalar::ONE * s);
 
-    fn init<C: AbstractChannel, RNG: CryptoRng>(
-        channel: &mut C,
-        mut rng: &mut RNG,
-    ) -> Result<Self> {
-        let y = Scalar::random(&mut rng);
-        let s = &y * RISTRETTO_BASEPOINT_TABLE;
-        channel
-            .write_pt(&s)
-            .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
-        Ok(Self { y, s, counter: 0 })
+        Ok(Self {
+            counter: 0,
+            y,
+            ys,
+            s,
+            zero,
+            one,
+        })
     }
+}
 
-    fn send<C: AbstractChannel, RNG: CryptoRng>(
+impl<P: Party> OTRandom<P> for ChouOrlandi<P> {
+    fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         &mut self,
-        channel: &mut C,
-        inputs: &[(U8x16, U8x16)],
-        _: &mut RNG,
-    ) -> Result<()> {
-        let ys = self.y * self.s;
-        let ks = (0..inputs.len())
-            .map(|i| {
-                let r = channel
-                    .read_pt()
-                    .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
-                let yr = self.y * r;
-                let k0 = hash_pt(self.counter + i as u128, &yr);
-                let k1 = hash_pt(self.counter + i as u128, &(yr - ys));
-                Ok((k0, k1))
-            })
-            .collect::<Result<Vec<(U8x16, U8x16)>>>()?;
-        self.counter += inputs.len() as u128;
-        for (input, k) in inputs.iter().zip(ks) {
-            let c0 = k.0 ^ input.0;
-            let c1 = k.1 ^ input.1;
-            channel
-                .write_u8x16(&c0)
-                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
-            channel
-                .write_u8x16(&c1)
-                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
+        inputs: PartyEither<P, usize, &[F2]>,
+        outputs: &mut O,
+        channel: &mut Channel,
+        rng: &mut impl CryptoRng,
+    ) -> swanky_error::Result<()> {
+        for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter()) {
+            self.counter += 1;
+
+            let input: PartyPrivate<Receiver, P, _> = input.into();
+            let x: PartyPrivate<Receiver, P, _> = PartyPrivate::new_with(|| Scalar::random(rng));
+            let r = channel.communicate(
+                input
+                    .zip(x.as_ref())
+                    .zip(self.zero.as_ref())
+                    .zip(self.one.as_ref())
+                    .map(|(((input, x), zero), one)| {
+                        let c = ConditionallySelectable::conditional_select(
+                            one,
+                            zero,
+                            input.ct_eq(&F2::ZERO),
+                        );
+                        c + x * RISTRETTO_BASEPOINT_TABLE
+                    })
+                    .into(),
+            )?;
+
+            match P::WHICH {
+                WhichParty::Sender(ev) => {
+                    let yr = self.y.into_inner(ev) * r;
+
+                    let k0 = hash_pt(self.counter, &yr);
+                    let k1 = hash_pt(self.counter, &(yr - self.ys.into_inner(ev)));
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, [k0, k1])));
+                }
+                WhichParty::Receiver(ev) => {
+                    outputs.extend(std::iter::once(PartyEither::new(
+                        ev,
+                        hash_pt(
+                            self.counter,
+                            &(x.as_ref().into_inner(ev) * self.s.as_ref().into_inner(ev)),
+                        ),
+                    )));
+                }
+            }
         }
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
+
         Ok(())
     }
 }
 
-impl std::fmt::Display for Sender {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Chou-Orlandi Sender")
-    }
-}
-
-/// Oblivious transfer receiver.
-pub struct Receiver {
-    s: RistrettoBasepointTable,
-    counter: u128,
-}
-
-impl OtReceiver for Receiver {
-    type Msg = U8x16;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng>(channel: &mut C, _: &mut RNG) -> Result<Self> {
-        let s = channel
-            .read_pt()
-            .wrap_err(ErrorKind::NetworkError, "Unable to read point")?;
-        let s = RistrettoBasepointTable::create(&s);
-        Ok(Self { s, counter: 0 })
-    }
-
-    fn receive<C: AbstractChannel, RNG: CryptoRng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[F2],
-        mut rng: &mut RNG,
-    ) -> Result<Vec<U8x16>> {
-        let zero = &Scalar::ZERO * &self.s;
-        let one = &Scalar::ONE * &self.s;
-        let ks = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, &b)| {
-                let x = Scalar::random(&mut rng);
-                let c = if b.into() { one } else { zero };
-                let r = c + &x * RISTRETTO_BASEPOINT_TABLE;
-                channel
-                    .write_pt(&r)
-                    .wrap_err(ErrorKind::NetworkError, "Unable to write point")?;
-                Ok(hash_pt(self.counter + i as u128, &(&x * &self.s)))
-            })
-            .collect::<Result<Vec<U8x16>>>()?;
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
-        self.counter += inputs.len() as u128;
-        inputs
-            .iter()
-            .zip(ks)
-            .map(|(&b, k)| {
-                let c0 = channel
-                    .read_u8x16()
-                    .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-                let c1 = channel
-                    .read_u8x16()
-                    .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-                let c = k ^ if b.into() { c1 } else { c0 };
-                Ok(c)
-            })
-            .collect()
-    }
-}
-
-impl std::fmt::Display for Receiver {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Chou-Orlandi Receiver")
-    }
-}
-
-impl SemiHonest for Sender {}
-impl Malicious for Sender {}
-impl SemiHonest for Receiver {}
-impl Malicious for Receiver {}
+impl<P: Party> SemiHonest for ChouOrlandi<P> {}
+impl<P: Party> Malicious for ChouOrlandi<P> {}
 
 #[test]
-fn test_functionality() {
-    swanky_ot_test::test_otext::<Sender, Receiver>(128);
+fn test_random_functionality() {
+    swanky_ot_test::test_rotext::<ChouOrlandi<Sender>, ChouOrlandi<Receiver>>(128);
+}
+
+#[test]
+fn test_standard_functionality() {
+    swanky_ot_test::test_otext::<ChouOrlandi<Sender>, ChouOrlandi<Receiver>>(128);
 }

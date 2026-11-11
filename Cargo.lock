@@ -1573,7 +1573,7 @@ dependencies = [
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
  "swanky-ot-iknp",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-rng",
  "swanky-twopac",
  "vectoreyes",
@@ -2155,8 +2155,8 @@ dependencies = [
  "swanky-f-rand",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-kos-new",
- "swanky-ot-traits-new",
+ "swanky-ot-kos",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2416,7 +2416,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-oprf-traits",
  "swanky-ot-iknp",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2450,48 +2450,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-alsz-kos"
-version = "0.6.0"
-dependencies = [
- "blake3",
- "bytemuck",
- "criterion",
- "keyed_arena",
- "rand",
- "swanky-adversary",
- "swanky-bit-matrix-transpose",
- "swanky-channel-legacy",
- "swanky-cointoss",
- "swanky-cr-hash",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-chou-orlandi",
- "swanky-ot-test",
- "swanky-ot-traits",
- "swanky-rng",
- "swanky-serialization",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-ot-chou-orlandi"
-version = "0.6.0"
-dependencies = [
- "blake3",
- "criterion",
- "curve25519-dalek",
- "rand",
- "swanky-adversary",
- "swanky-channel-legacy",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-test",
- "swanky-ot-traits",
- "vectoreyes",
-]
-
-[[package]]
-name = "swanky-ot-chou-orlandi-new"
 version = "0.6.0"
 dependencies = [
  "blake3",
@@ -2504,8 +2463,8 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-test-new",
- "swanky-ot-traits-new",
+ "swanky-ot-test",
+ "swanky-ot-traits",
  "swanky-party",
  "vectoreyes",
 ]
@@ -2514,28 +2473,14 @@ dependencies = [
 name = "swanky-ot-dummy"
 version = "0.6.0"
 dependencies = [
- "criterion",
- "rand",
- "swanky-channel-legacy",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-test",
- "swanky-ot-traits",
- "vectoreyes",
-]
-
-[[package]]
-name = "swanky-ot-dummy-new"
-version = "0.6.0"
-dependencies = [
  "rand",
  "subtle",
  "swanky-channel",
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-test-new",
- "swanky-ot-traits-new",
+ "swanky-ot-test",
+ "swanky-ot-traits",
  "swanky-party",
  "vectoreyes",
 ]
@@ -2554,9 +2499,9 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
- "swanky-ot-test-new",
- "swanky-ot-traits-new",
+ "swanky-ot-chou-orlandi",
+ "swanky-ot-test",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2564,7 +2509,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-kos-new"
+name = "swanky-ot-kos"
 version = "0.6.0"
 dependencies = [
  "criterion",
@@ -2577,10 +2522,10 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
+ "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
- "swanky-ot-test-new",
- "swanky-ot-traits-new",
+ "swanky-ot-test",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2588,7 +2533,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-naor-pinkas-new"
+name = "swanky-ot-naor-pinkas"
 version = "0.6.0"
 dependencies = [
  "blake3",
@@ -2601,26 +2546,9 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-test-new",
- "swanky-ot-traits-new",
- "swanky-party",
- "vectoreyes",
-]
-
-[[package]]
-name = "swanky-ot-noar-pinkas"
-version = "0.6.0"
-dependencies = [
- "blake3",
- "criterion",
- "curve25519-dalek",
- "rand",
- "swanky-adversary",
- "swanky-channel-legacy",
- "swanky-error",
- "swanky-field-binary",
  "swanky-ot-test",
  "swanky-ot-traits",
+ "swanky-party",
  "vectoreyes",
 ]
 
@@ -2630,22 +2558,9 @@ version = "0.6.0"
 dependencies = [
  "criterion",
  "rand",
- "swanky-channel-legacy",
- "swanky-field-binary",
- "swanky-ot-traits",
- "swanky-rng",
- "vectoreyes",
-]
-
-[[package]]
-name = "swanky-ot-test-new"
-version = "0.6.0"
-dependencies = [
- "criterion",
- "rand",
  "swanky-channel",
  "swanky-field-binary",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "vectoreyes",
@@ -2653,16 +2568,6 @@ dependencies = [
 
 [[package]]
 name = "swanky-ot-traits"
-version = "0.6.0"
-dependencies = [
- "rand",
- "swanky-channel-legacy",
- "swanky-error",
- "swanky-field-binary",
-]
-
-[[package]]
-name = "swanky-ot-traits-new"
 version = "0.6.0"
 dependencies = [
  "rand",
@@ -2770,8 +2675,8 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
- "swanky-ot-kos-new",
- "swanky-ot-traits-new",
+ "swanky-ot-kos",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2795,9 +2700,9 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
+ "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "vectoreyes",

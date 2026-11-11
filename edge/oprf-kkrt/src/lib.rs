@@ -16,7 +16,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::{F2, F2BitDeserializer};
 use swanky_oprf_traits::{ObliviousPrf, Receiver as OprfReceiver, Sender as OprfSender};
-use swanky_ot_traits_new::{ObliviousTransfer, Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_traits::{ObliviousTransfer, Receiver as OtReceiver, Sender as OtSender};
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use swanky_serialization::SequenceDeserializer;
@@ -246,7 +246,7 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
     use swanky_channel::local::local_channel_pair;
-    use swanky_ot_traits_new::{Receiver as OtReceiver, Sender as OtSender};
+    use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
     use swanky_rng::SwankyRng;
 
     #[test]

@@ -1,174 +1,192 @@
 #![deny(missing_docs)]
 //! Testing utilities for oblivious transfer protocols
 
-use std::{
-    fmt::Display,
-    io::{BufReader, BufWriter},
-    os::unix::net::UnixStream,
-    sync::{Arc, Mutex},
+use rand::{
+    RngExt,
+    distr::{Distribution, StandardUniform},
 };
 
-use swanky_channel_legacy::Channel;
+use swanky_channel::local::local_channel_pair;
 use swanky_field_binary::F2;
-use swanky_ot_traits::{
-    CorrelatedReceiver, CorrelatedSender, FixedKeyInitializer, RandomReceiver, RandomSender,
-    Receiver, Sender,
-};
+use swanky_ot_traits::{OTCorrelated, OTRandom, ObliviousTransfer, Receiver, Sender};
+use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;
 
-fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
-    (0..size).map(|_| rand::random::<U8x16>()).collect()
+pub mod bench;
+
+fn rand_vec<T>(size: usize) -> Vec<T>
+where
+    StandardUniform: Distribution<T>,
+{
+    let mut rng = rand::rng();
+    (0..size).map(|_| rng.random::<T>()).collect()
 }
 
-fn rand_f2_vec(size: usize) -> Vec<F2> {
-    (0..size).map(|_| rand::random::<F2>()).collect()
-}
-
-/// Test the functionality of an OT protocol by OT-ing `ninputs` blocks.
-pub fn test_otext<OTSender: Sender<Msg = U8x16>, OTReceiver: Receiver<Msg = U8x16> + Display>(
+/// Test the functionality of an OT protocol by OT-ing `ninputs`
+/// blocks.
+pub fn test_otext<OTSender: ObliviousTransfer<Sender>, OTReceiver: ObliviousTransfer<Receiver>>(
     ninputs: usize,
 ) {
-    let m0s = rand_u8x16_vec(ninputs);
-    let m1s = rand_u8x16_vec(ninputs);
-    let bs = rand_f2_vec(ninputs);
-    let m0s_ = m0s.clone();
-    let m1s_ = m1s.clone();
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
-        let ms = m0s.into_iter().zip(m1s).collect::<Vec<(U8x16, U8x16)>>();
-        otext.send(&mut channel, &ms, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    let results = otext.receive(&mut channel, &bs, &mut rng).unwrap();
-    handle.join().unwrap();
-    for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j].into() { m1s_[j] } else { m0s_[j] })
+    let m0s = rand_vec::<U8x16>(ninputs);
+    let m1s = rand_vec::<U8x16>(ninputs);
+    let ms: Vec<[U8x16; 2]> = m0s.iter().zip(m1s.iter()).map(|(&x, &y)| [x, y]).collect();
+
+    let bs = rand_vec::<F2>(ninputs);
+
+    let mut res: Vec<U8x16> = Vec::with_capacity(ninputs);
+
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
+
+            otext
+                .ot::<Vec<U8x16>>(
+                    PartyEither::new(Witness::EQUAL_TYPES, bs.len()),
+                    PartyPrivate::new(&ms),
+                    PartyPrivate::empty(Witness::EQUAL_TYPES),
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
+
+            otext
+                .ot(
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
+                    PartyPrivate::empty(Witness::EQUAL_TYPES),
+                    PartyPrivate::new(&mut res),
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
+
+    for i in 0..ninputs {
+        assert_eq!(res[i], if bs[i].into() { m1s[i] } else { m0s[i] });
     }
 }
 
-/// Test the functionality of a Correlated OT protocol by OT-ing `ninputs` blocks.
-pub fn test_cotext<
-    OTSender: CorrelatedSender<Msg = U8x16>,
-    OTReceiver: CorrelatedReceiver<Msg = U8x16> + Display,
->(
+/// Test the functionality of a Correlated OT protocol by OT-int
+/// `ninputs` blocks.
+pub fn test_cotext<OTSender: OTCorrelated<Sender>, OTReceiver: OTCorrelated<Receiver>>(
     ninputs: usize,
 ) {
     let delta = rand::random::<U8x16>();
-    let bs = rand_f2_vec(ninputs);
-    let out = Arc::new(Mutex::new(vec![]));
-    let out_ = out.clone();
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
-        let mut out = out.lock().unwrap();
-        *out = otext
-            .send_correlated(&mut channel, ninputs, delta, &mut rng)
-            .unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    let results = otext
-        .receive_correlated(&mut channel, &bs, &mut rng)
-        .unwrap();
-    handle.join().unwrap();
-    let out_ = out_.lock().unwrap();
-    for j in 0..ninputs {
+
+    let bs = rand_vec::<F2>(ninputs);
+
+    let mut out_s: Vec<PartyEither<Sender, U8x16, U8x16>> = Vec::with_capacity(ninputs);
+    let mut out_r: Vec<PartyEither<Receiver, U8x16, U8x16>> = Vec::with_capacity(ninputs);
+
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
+
+            otext
+                .ot_correlated(
+                    PartyEither::new(Witness::EQUAL_TYPES, ninputs),
+                    PartyPrivate::new(delta),
+                    &mut out_s,
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
+
+            otext
+                .ot_correlated(
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
+                    PartyPrivate::empty(Witness::EQUAL_TYPES),
+                    &mut out_r,
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
+
+    for i in 0..ninputs {
         assert_eq!(
-            results[j],
-            if bs[j].into() {
-                out_[j] ^ delta
+            *out_r[i].as_ref().into_inner(Witness::EQUAL_TYPES),
+            if bs[i].into() {
+                *out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES) ^ delta
             } else {
-                out_[j]
+                *out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES)
             }
-        )
+        );
     }
 }
 
-/// Test the functionality of a Random OT protocol by OT-ing `ninputs` blocks.
-pub fn test_rotext<
-    OTSender: RandomSender<Msg = U8x16>,
-    OTReceiver: RandomReceiver<Msg = U8x16> + Display,
->(
-    ninputs: usize,
-) {
-    let bs = rand_f2_vec(ninputs);
-    let out = Arc::new(Mutex::new(vec![]));
-    let out_ = out.clone();
-    let (sender, receiver) = UnixStream::pair().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut otext = OTSender::init(&mut channel, &mut rng).unwrap();
-        let mut out = out.lock().unwrap();
-        *out = otext.send_random(&mut channel, ninputs, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
-    handle.join().unwrap();
-    let out_ = out_.lock().unwrap();
-    for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j].into() { out_[j].1 } else { out_[j].0 })
+/// Test the functionality of a Random OT protocol by OT-int `ninputs`
+/// blocks.
+pub fn test_rotext<OTSender: OTRandom<Sender>, OTReceiver: OTRandom<Receiver>>(ninputs: usize) {
+    let bs = rand_vec::<F2>(ninputs);
+
+    let mut out_s: Vec<PartyEither<Sender, [U8x16; 2], U8x16>> = Vec::with_capacity(ninputs);
+    let mut out_r: Vec<PartyEither<Receiver, [U8x16; 2], U8x16>> = Vec::with_capacity(ninputs);
+
+    local_channel_pair(
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut otext = OTSender::init(c, &mut rng).unwrap();
+
+            otext
+                .ot_random(
+                    PartyEither::new(Witness::EQUAL_TYPES, ninputs),
+                    &mut out_s,
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+        |c| {
+            let mut rng = SwankyRng::new();
+            let mut otext = OTReceiver::init(c, &mut rng).unwrap();
+
+            otext
+                .ot_random(
+                    PartyEither::new(Witness::EQUAL_TYPES, &bs[..]),
+                    &mut out_r,
+                    c,
+                    &mut rng,
+                )
+                .unwrap();
+
+            Ok(())
+        },
+    )
+    .unwrap();
+
+    for i in 0..ninputs {
+        assert_eq!(
+            *out_r[i].as_ref().into_inner(Witness::EQUAL_TYPES),
+            if bs[i].into() {
+                out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES)[1]
+            } else {
+                out_s[i].as_ref().into_inner(Witness::EQUAL_TYPES)[0]
+            }
+        );
     }
 }
-
-/// Test the functionality of a Random OT protocol (with a fixed key) by OT-ing `ninputs` blocks.
-pub fn test_rotext_fixed_key<
-    OTSender: RandomSender<Msg = U8x16> + FixedKeyInitializer,
-    OTReceiver: RandomReceiver<Msg = U8x16> + Display,
->(
-    ninputs: usize,
-) {
-    let bs = rand_f2_vec(ninputs);
-    let out = Arc::new(Mutex::new(vec![]));
-    let out_ = out.clone();
-    let (sender, receiver) = UnixStream::pair().unwrap();
-
-    let key = [1u8; 16];
-    let key_ = key;
-
-    let handle = std::thread::spawn(move || {
-        let mut rng = SwankyRng::new();
-        let reader = BufReader::new(sender.try_clone().unwrap());
-        let writer = BufWriter::new(sender);
-        let mut channel = Channel::new(reader, writer);
-        let mut otext = OTSender::init_fixed_key(&mut channel, key_, &mut rng).unwrap();
-        let mut out = out.lock().unwrap();
-        *out = otext.send_random(&mut channel, ninputs, &mut rng).unwrap();
-    });
-    let mut rng = SwankyRng::new();
-    let reader = BufReader::new(receiver.try_clone().unwrap());
-    let writer = BufWriter::new(receiver);
-    let mut channel = Channel::new(reader, writer);
-    let mut otext = OTReceiver::init(&mut channel, &mut rng).unwrap();
-    let results = otext.receive_random(&mut channel, &bs, &mut rng).unwrap();
-    handle.join().unwrap();
-    let out_ = out_.lock().unwrap();
-    for j in 0..ninputs {
-        assert_eq!(results[j], if bs[j].into() { out_[j].1 } else { out_[j].0 })
-    }
-}
-
-pub mod bench;

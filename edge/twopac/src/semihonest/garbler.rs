@@ -6,7 +6,7 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{ObliviousTransfer, Sender};
+use swanky_ot_traits::{ObliviousTransfer, Sender};
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use vectoreyes::U8x16;
 

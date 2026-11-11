@@ -17,7 +17,7 @@ use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
-use swanky_ot_traits_new::{
+use swanky_ot_traits::{
     OTCorrelated, OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
 };
 use swanky_party::{
@@ -42,7 +42,7 @@ const N_BASE_OTS: usize = 128;
 /// ALSZ paper: <https://eprint.iacr.org/2016/602>
 pub struct IKNP<
     P: Party,
-    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi_new::ChouOrlandi<
+    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi::ChouOrlandi<
         PartyMap<P, Receiver, Sender>,
     >,
 > {
@@ -376,31 +376,31 @@ mod tests {
 
     #[test]
     fn test_random_functionality_pow2() {
-        swanky_ot_test_new::test_rotext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
+        swanky_ot_test::test_rotext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_random_functionality_non_pow2() {
-        swanky_ot_test_new::test_rotext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
+        swanky_ot_test::test_rotext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
     }
 
     #[test]
     fn test_correlated_functionality_pow2() {
-        swanky_ot_test_new::test_cotext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
+        swanky_ot_test::test_cotext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_correlated_functionality_non_pow2() {
-        swanky_ot_test_new::test_cotext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
+        swanky_ot_test::test_cotext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
     }
 
     #[test]
     fn test_standard_functionality_pow2() {
-        swanky_ot_test_new::test_otext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
+        swanky_ot_test::test_otext::<IKNP<Sender>, IKNP<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_standard_functionality_non_pow2() {
-        swanky_ot_test_new::test_otext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
+        swanky_ot_test::test_otext::<IKNP<Sender>, IKNP<Receiver>>((1 << 10) + 1);
     }
 }

@@ -8,7 +8,7 @@ use fancy_traits::{CircuitInputMapper, FancyEncode, FancyReceive};
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::{Receiver, Sender};
+use swanky_ot_traits::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 

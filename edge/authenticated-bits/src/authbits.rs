@@ -84,8 +84,8 @@ use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer, F128b};
-use swanky_ot_kos_new::KOS;
-use swanky_ot_traits_new::{OTCorrelated, OTInit, Receiver, Sender};
+use swanky_ot_kos::KOS;
+use swanky_ot_traits::{OTCorrelated, OTInit, Receiver, Sender};
 use swanky_party::{
     GenericParty, GenericWhichParty, Party0, Party1,
     either::{PartyEither, PartyEitherCopy},

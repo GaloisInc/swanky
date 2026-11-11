@@ -96,29 +96,23 @@
 /edge/oprf-traits @amaloz @rissa
 /edge/oprf-traits/ @amaloz @rissa
 
-/edge/ot-alsz-kos @amaloz @rissa
-/edge/ot-alsz-kos/ @amaloz @rissa
+/edge/ot-chou-orlandi @amaloz @cphifer
+/edge/ot-chou-orlandi/ @amaloz @cphifer
 
-/edge/ot-chou-orlandi @amaloz @rissa
-/edge/ot-chou-orlandi/ @amaloz @rissa
+/edge/ot-dummy @amaloz @cphifer
+/edge/ot-dummy/ @amaloz @cphifer
 
-/edge/ot-dummy @amaloz @rissa
-/edge/ot-dummy/ @amaloz @rissa
+/edge/ot-kos @amaloz @cphifer
+/edge/ot-kos/ @amaloz @cphifer
 
-/edge/ot-noar-pinkas @amaloz @rissa
-/edge/ot-noar-pinkas/ @amaloz @rissa
+/edge/ot-naor-pinkas @amaloz @cphifer
+/edge/ot-naor-pinkas/ @amaloz @cphifer
 
-/edge/ot-test @amaloz @rissa
-/edge/ot-test/ @amaloz @rissa
+/edge/ot-test @amaloz @cphifer
+/edge/ot-test/ @amaloz @cphifer
 
-/edge/ot-test-new @amaloz @cphifer
-/edge/ot-test-new/ @amaloz @cphifer
-
-/edge/ot-traits @amaloz @rissa
-/edge/ot-traits/ @amaloz @rissa
-
-/edge/ot-traits-new @amaloz @cphifer
-/edge/ot-traits-new/ @amaloz @cphifer
+/edge/ot-traits @amaloz @cphifer
+/edge/ot-traits/ @amaloz @cphifer
 
 /edge/polynomial @cphifer
 /edge/polynomial/ @cphifer

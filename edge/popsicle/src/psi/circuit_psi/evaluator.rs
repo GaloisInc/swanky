@@ -13,7 +13,7 @@ use swanky_adversary::SemiHonest;
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, WrapErr};
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::Receiver;
+use swanky_ot_traits::Receiver;
 use swanky_twopac::semihonest::Evaluator;
 use vectoreyes::U8x16;
 

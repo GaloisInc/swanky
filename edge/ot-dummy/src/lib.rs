@@ -1,96 +1,77 @@
 #![deny(missing_docs)]
 //! Implementation of an insecure OT protocol for testing purposes
 
-use rand::CryptoRng;
-use swanky_channel_legacy::AbstractChannel;
-use swanky_error::{ErrorKind, Result, WrapErr};
+use std::marker::PhantomData;
+
+use rand::{CryptoRng, RngExt};
+use subtle::{ConditionallySelectable, ConstantTimeEq};
+
+use swanky_channel::Channel;
+use swanky_error::Result;
+use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_traits::{OTInit, OTRandom, Party, Receiver, WhichParty};
+use swanky_party::{either::PartyEither, private::PartyPrivate};
 use vectoreyes::U8x16;
 
-/// Oblivious transfer sender.
-pub struct Sender {}
-/// Oblivious transfer receiver.
-pub struct Receiver {}
+/// Dummy OT protocol.
+///
+/// This implementation intentionally does not have desirable
+/// properties of an OT protocol; in particular, the choice bit is
+/// revealed to the `Sender`.
+pub struct Dummy<P: Party>(PhantomData<P>);
 
-impl OtSender for Sender {
-    type Msg = U8x16;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng>(_: &mut C, _: &mut RNG) -> Result<Self> {
-        Ok(Self {})
+impl<P: Party> OTInit<P> for Dummy<P> {
+    fn init(_channel: &mut Channel, _rng: &mut impl CryptoRng) -> Result<Self> {
+        Ok(Self(PhantomData))
     }
+}
 
-    fn send<C: AbstractChannel, RNG: CryptoRng>(
+impl<P: Party> OTRandom<P> for Dummy<P> {
+    fn ot_random<O: Extend<PartyEither<P, [U8x16; 2], U8x16>>>(
         &mut self,
-        channel: &mut C,
-        inputs: &[(U8x16, U8x16)],
-        _: &mut RNG,
+        inputs: PartyEither<P, usize, &[F2]>,
+        outputs: &mut O,
+        channel: &mut Channel,
+        rng: &mut impl CryptoRng,
     ) -> Result<()> {
-        let mut bs = Vec::with_capacity(inputs.len());
-        for _ in 0..inputs.len() {
-            let b = channel
-                .read_bool()
-                .wrap_err(ErrorKind::NetworkError, "Unable to read bool")?;
-            bs.push(b);
+        for input in inputs.map(|sz| std::iter::repeat_n((), sz), |i| i.iter().copied()) {
+            let b: PartyPrivate<Receiver, P, _> = input.into();
+            let b = channel.communicate(b.into())?;
+
+            match P::WHICH {
+                WhichParty::Sender(ev) => {
+                    let (k0, k1) = (rng.random::<U8x16>(), rng.random::<U8x16>());
+
+                    let k =
+                        ConditionallySelectable::conditional_select(&k1, &k0, b.ct_eq(&F2::ZERO));
+                    channel.write(&k)?;
+
+                    outputs.extend(std::iter::once(PartyEither::new(ev, [k0, k1])));
+                }
+                WhichParty::Receiver(ev) => {
+                    let k = channel.read::<U8x16>()?;
+                    outputs.extend(std::iter::once(PartyEither::new(ev, k)));
+                }
+            }
         }
-        for (b, m) in bs.into_iter().zip(inputs.iter()) {
-            let m = if b { m.1 } else { m.0 };
-            channel
-                .write_u8x16(&m)
-                .wrap_err(ErrorKind::NetworkError, "Unable to write block")?;
-        }
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
+
         Ok(())
     }
 }
 
-impl std::fmt::Display for Sender {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Dummy Sender")
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use swanky_ot_traits::Sender;
 
-impl OtReceiver for Receiver {
-    type Msg = U8x16;
-
-    fn init<C: AbstractChannel, RNG: CryptoRng>(_: &mut C, _: &mut RNG) -> Result<Self> {
-        Ok(Self {})
+    #[test]
+    fn test_random_functionality() {
+        swanky_ot_test::test_rotext::<Dummy<Sender>, Dummy<Receiver>>(128);
     }
 
-    fn receive<C: AbstractChannel, RNG: CryptoRng>(
-        &mut self,
-        channel: &mut C,
-        inputs: &[F2],
-        _: &mut RNG,
-    ) -> Result<Vec<U8x16>> {
-        for &b in inputs.iter() {
-            channel
-                .write_bool(b.into())
-                .wrap_err(ErrorKind::NetworkError, "Unable to write bool")?;
-        }
-        channel
-            .flush()
-            .wrap_err(ErrorKind::NetworkError, "Unable to flush channel")?;
-        let mut out = Vec::with_capacity(inputs.len());
-        for _ in 0..inputs.len() {
-            let m = channel
-                .read_u8x16()
-                .wrap_err(ErrorKind::NetworkError, "Unable to read block")?;
-            out.push(m);
-        }
-        Ok(out)
+    #[test]
+    fn test_standard_functionality() {
+        swanky_ot_test::test_otext::<Dummy<Sender>, Dummy<Receiver>>(128);
     }
-}
-
-impl std::fmt::Display for Receiver {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Dummy Receiver")
-    }
-}
-
-#[test]
-fn test_functionality() {
-    swanky_ot_test::test_otext::<Sender, Receiver>(128);
 }

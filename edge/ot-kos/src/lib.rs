@@ -30,7 +30,7 @@ use swanky_error::{ErrorKind, Result, WrapErr, ensure};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::{
+use swanky_ot_traits::{
     OTCorrelated, OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
 };
 use swanky_party::{
@@ -53,7 +53,7 @@ const STATISTICAL_SECPARAM: usize = 40;
 /// Original paper: <https://eprint.iacr.org/2015/546>
 pub struct KOS<
     P: Party,
-    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious = swanky_ot_chou_orlandi_new::ChouOrlandi<
+    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious = swanky_ot_chou_orlandi::ChouOrlandi<
         PartyMap<P, Receiver, Sender>,
     >,
 >(IKNP<P, OT>);
@@ -315,31 +315,31 @@ mod tests {
 
     #[test]
     fn test_random_functionality_pow2() {
-        swanky_ot_test_new::test_rotext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
+        swanky_ot_test::test_rotext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_random_functionality_non_pow2() {
-        swanky_ot_test_new::test_rotext::<KOS<Sender>, KOS<Receiver>>((1 << 10) + 1);
+        swanky_ot_test::test_rotext::<KOS<Sender>, KOS<Receiver>>((1 << 10) + 1);
     }
 
     #[test]
     fn test_correlated_functionality_pow2() {
-        swanky_ot_test_new::test_cotext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
+        swanky_ot_test::test_cotext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_correlated_functionality_non_pow2() {
-        swanky_ot_test_new::test_cotext::<KOS<Sender>, KOS<Receiver>>((1 << 10) + 1);
+        swanky_ot_test::test_cotext::<KOS<Sender>, KOS<Receiver>>((1 << 10) + 1);
     }
 
     #[test]
     fn test_standard_functionality_pow2() {
-        swanky_ot_test_new::test_otext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
+        swanky_ot_test::test_otext::<KOS<Sender>, KOS<Receiver>>(1 << 10);
     }
 
     #[test]
     fn test_standard_functionality_non_pow2() {
-        swanky_ot_test_new::test_otext::<KOS<Sender>, KOS<Receiver>>((1 << 10) + 1);
+        swanky_ot_test::test_otext::<KOS<Sender>, KOS<Receiver>>((1 << 10) + 1);
     }
 }
