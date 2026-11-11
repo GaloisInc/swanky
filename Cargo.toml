@@ -47,7 +47,6 @@ members = [
   "edge/ot-iknp",
   "edge/ot-kos-new",
   "edge/ot-naor-pinkas-new",
-  "edge/ot-noar-pinkas",
   "edge/ot-test",
   "edge/ot-test-new",
   "edge/ot-traits",
@@ -123,7 +122,6 @@ swanky-ot-dummy-new = { path = "edge/ot-dummy-new" }
 swanky-ot-iknp = { path = "edge/ot-iknp" }
 swanky-ot-kos-new = { path = "edge/ot-kos-new" }
 swanky-ot-naor-pinkas-new = { path = "edge/ot-naor-pinkas-new" }
-swanky-ot-noar-pinkas = { path = "edge/ot-noar-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-test-new = { path = "edge/ot-test-new" }
 swanky-ot-traits = { path = "edge/ot-traits" }

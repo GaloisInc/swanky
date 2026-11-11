@@ -63,7 +63,6 @@ have a lesser stability guarantee.
 - **`swanky-ot-iknp`**: An implementation of the Ishai-Kilian-Nissim-Petrank (IKNP) semi-honest OT extension protocol
 - **`swanky-ot-kos-new`**: An implementation of the Keller-Orsini-Scholl OT protocol
 - **`swanky-ot-naor-pinkas-new`**: An implementation of the Naor-Pinkas OT protocol
-- **`swanky-ot-noar-pinkas`**: An implementation of the Noar-Pinkas OT protocol
 - **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-test-new`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits`**: Base traits for Obliivious Transfer protocols
