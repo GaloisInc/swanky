@@ -1,5 +1,5 @@
 [package]
-name = "swanky-ot-dummy-new"
+name = "swanky-ot-dummy"
 description = "Implementation of an insecure OT protocol for testing purposes"
 authors.workspace = true
 edition.workspace = true

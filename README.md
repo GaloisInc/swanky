@@ -57,7 +57,7 @@ have a lesser stability guarantee.
 - **`swanky-oprf-kmprt`**: An implementation of the KMPRT OPRF protocol
 - **`swanky-oprf-traits`**: Base traits impl-ed by all our OPRF implementations
 - **`swanky-ot-chou-orlandi`**: An implementation of the Chou-Orlandi OT protocol
-- **`swanky-ot-dummy-new`**: Implementation of an insecure OT protocol for testing purposes
+- **`swanky-ot-dummy`**: Implementation of an insecure OT protocol for testing purposes
 - **`swanky-ot-iknp`**: An implementation of the Ishai-Kilian-Nissim-Petrank (IKNP) semi-honest OT extension protocol
 - **`swanky-ot-kos-new`**: An implementation of the Keller-Orsini-Scholl OT protocol
 - **`swanky-ot-naor-pinkas-new`**: An implementation of the Naor-Pinkas OT protocol
