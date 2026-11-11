@@ -2450,30 +2450,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-alsz-kos"
-version = "0.6.0"
-dependencies = [
- "blake3",
- "bytemuck",
- "criterion",
- "keyed_arena",
- "rand",
- "swanky-adversary",
- "swanky-bit-matrix-transpose",
- "swanky-channel-legacy",
- "swanky-cointoss",
- "swanky-cr-hash",
- "swanky-error",
- "swanky-field-binary",
- "swanky-ot-chou-orlandi",
- "swanky-ot-test",
- "swanky-ot-traits",
- "swanky-rng",
- "swanky-serialization",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-ot-chou-orlandi"
 version = "0.6.0"
 dependencies = [
