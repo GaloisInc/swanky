@@ -41,7 +41,6 @@ members = [
   "edge/oprf-kmprt",
   "edge/oprf-traits",
   "edge/ot-chou-orlandi-new",
-  "edge/ot-dummy",
   "edge/ot-dummy-new",
   "edge/ot-iknp",
   "edge/ot-kos-new",
@@ -115,7 +114,6 @@ swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
 swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
 swanky-oprf-traits = { path = "edge/oprf-traits" }
 swanky-ot-chou-orlandi-new = { path = "edge/ot-chou-orlandi-new" }
-swanky-ot-dummy = { path = "edge/ot-dummy" }
 swanky-ot-dummy-new = { path = "edge/ot-dummy-new" }
 swanky-ot-iknp = { path = "edge/ot-iknp" }
 swanky-ot-kos-new = { path = "edge/ot-kos-new" }
