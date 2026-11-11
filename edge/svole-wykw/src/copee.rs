@@ -11,7 +11,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::{Degree, FiniteField as FF, FiniteRing};
 use swanky_field_binary::F2;
-use swanky_ot_kos_new::KOS;
+use swanky_ot_kos::KOS;
 use swanky_ot_traits_new::{OTRandom, Receiver as OtReceiver, Sender as OtSender};
 use swanky_party::{either::PartyEither, ty_eq::Witness};
 use vectoreyes::{Aes128EncryptOnly, AesBlockCipher, U8x16};

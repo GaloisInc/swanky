@@ -2155,7 +2155,7 @@ dependencies = [
  "swanky-f-rand",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-kos-new",
+ "swanky-ot-kos",
  "swanky-ot-traits-new",
  "swanky-party",
  "swanky-rng",
@@ -2509,7 +2509,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-kos-new"
+name = "swanky-ot-kos"
 version = "0.6.0"
 dependencies = [
  "criterion",
@@ -2675,7 +2675,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-field-f61p",
- "swanky-ot-kos-new",
+ "swanky-ot-kos",
  "swanky-ot-traits-new",
  "swanky-party",
  "swanky-rng",

@@ -1,5 +1,5 @@
 [package]
-name = "swanky-ot-kos-new"
+name = "swanky-ot-kos"
 description = "An implementation of the Keller-Orsini-Scholl OT protocol"
 authors.workspace = true
 edition.workspace = true

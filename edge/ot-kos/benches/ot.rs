@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use swanky_ot_kos_new::KOS;
+use swanky_ot_kos::KOS;
 use swanky_ot_traits_new::{Receiver, Sender};
 
 fn do_random_bench_pow_2_10(c: &mut Criterion) {
