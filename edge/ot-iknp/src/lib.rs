@@ -42,7 +42,7 @@ const N_BASE_OTS: usize = 128;
 /// ALSZ paper: <https://eprint.iacr.org/2016/602>
 pub struct IKNP<
     P: Party,
-    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi_new::ChouOrlandi<
+    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> = swanky_ot_chou_orlandi::ChouOrlandi<
         PartyMap<P, Receiver, Sender>,
     >,
 > {

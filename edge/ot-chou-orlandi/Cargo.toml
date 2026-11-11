@@ -1,5 +1,5 @@
 [package]
-name = "swanky-ot-chou-orlandi-new"
+name = "swanky-ot-chou-orlandi"
 description = "An implementation of the Chou-Orlandi OT protocol"
 authors.workspace = true
 edition.workspace = true

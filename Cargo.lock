@@ -2450,7 +2450,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-ot-chou-orlandi-new"
+name = "swanky-ot-chou-orlandi"
 version = "0.6.0"
 dependencies = [
  "blake3",
@@ -2499,7 +2499,7 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
+ "swanky-ot-chou-orlandi",
  "swanky-ot-test-new",
  "swanky-ot-traits-new",
  "swanky-party",
@@ -2522,7 +2522,7 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
+ "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
  "swanky-ot-test-new",
  "swanky-ot-traits-new",
@@ -2700,7 +2700,7 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-chou-orlandi-new",
+ "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
  "swanky-ot-traits-new",
  "swanky-party",

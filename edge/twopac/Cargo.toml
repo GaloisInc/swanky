@@ -29,7 +29,7 @@ rand.workspace = true
 fancy-analyzer.workspace = true
 fancy-circuits.workspace = true
 fancy-plaintext.workspace = true
-swanky-ot-chou-orlandi-new.workspace = true
+swanky-ot-chou-orlandi.workspace = true
 swanky-ot-iknp.workspace = true
 
 clap.workspace = true

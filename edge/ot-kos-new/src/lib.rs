@@ -53,7 +53,7 @@ const STATISTICAL_SECPARAM: usize = 40;
 /// Original paper: <https://eprint.iacr.org/2015/546>
 pub struct KOS<
     P: Party,
-    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious = swanky_ot_chou_orlandi_new::ChouOrlandi<
+    OT: ObliviousTransfer<PartyMap<P, Receiver, Sender>> + Malicious = swanky_ot_chou_orlandi::ChouOrlandi<
         PartyMap<P, Receiver, Sender>,
     >,
 >(IKNP<P, OT>);

@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use swanky_ot_chou_orlandi_new::ChouOrlandi;
+use swanky_ot_chou_orlandi::ChouOrlandi;
 use swanky_ot_traits_new::{Receiver, Sender};
 
 fn do_random_bench(c: &mut Criterion) {
