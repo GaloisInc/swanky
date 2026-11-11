@@ -1,5 +1,5 @@
 [package]
-name = "swanky-ot-traits-new"
+name = "swanky-ot-traits"
 description = "Base traits for Oblivious Transfer protocols"
 authors.workspace = true
 edition.workspace = true

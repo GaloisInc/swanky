@@ -21,7 +21,7 @@ use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_oprf_kmprt::{Receiver as KmprtReceiver, Sender as KmprtSender};
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::{Receiver as OtReceiver, Sender as OtSender};
+use swanky_ot_traits::{Receiver as OtReceiver, Sender as OtSender};
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 use vectoreyes::U8x16;
 

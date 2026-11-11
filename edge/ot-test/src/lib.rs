@@ -8,7 +8,7 @@ use rand::{
 
 use swanky_channel::local::local_channel_pair;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{OTCorrelated, OTRandom, ObliviousTransfer, Receiver, Sender};
+use swanky_ot_traits::{OTCorrelated, OTRandom, ObliviousTransfer, Receiver, Sender};
 use swanky_party::{either::PartyEither, private::PartyPrivate, ty_eq::Witness};
 use swanky_rng::SwankyRng;
 use vectoreyes::U8x16;

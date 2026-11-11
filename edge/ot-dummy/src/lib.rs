@@ -10,7 +10,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{OTInit, OTRandom, Party, Receiver, WhichParty};
+use swanky_ot_traits::{OTInit, OTRandom, Party, Receiver, WhichParty};
 use swanky_party::{either::PartyEither, private::PartyPrivate};
 use vectoreyes::U8x16;
 
@@ -63,7 +63,7 @@ impl<P: Party> OTRandom<P> for Dummy<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use swanky_ot_traits_new::Sender;
+    use swanky_ot_traits::Sender;
 
     #[test]
     fn test_random_functionality() {

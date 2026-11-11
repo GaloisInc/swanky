@@ -14,7 +14,7 @@ mod tests {
 
     use swanky_block::Block512;
     use swanky_ot_iknp::IKNP;
-    use swanky_ot_traits_new::{Receiver, Sender};
+    use swanky_ot_traits::{Receiver, Sender};
     use swanky_rng::SwankyRng;
 
     // Run Base Psi

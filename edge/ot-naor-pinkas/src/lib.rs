@@ -16,7 +16,7 @@ use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
-use swanky_ot_traits_new::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
+use swanky_ot_traits::{OTInit, OTRandom, Party, Receiver, Sender, WhichParty};
 use swanky_party::{
     either::PartyEither,
     private::{PartyPrivate, PartyPrivateCopy},

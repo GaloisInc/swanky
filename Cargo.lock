@@ -1573,7 +1573,7 @@ dependencies = [
  "swanky-oprf-kmprt",
  "swanky-oprf-traits",
  "swanky-ot-iknp",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-rng",
  "swanky-twopac",
  "vectoreyes",
@@ -2156,7 +2156,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-kos",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2416,7 +2416,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-oprf-traits",
  "swanky-ot-iknp",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2464,7 +2464,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-test",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "vectoreyes",
 ]
@@ -2480,7 +2480,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-test",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "vectoreyes",
 ]
@@ -2501,7 +2501,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-ot-chou-orlandi",
  "swanky-ot-test",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2525,7 +2525,7 @@ dependencies = [
  "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
  "swanky-ot-test",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2547,7 +2547,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-test",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "vectoreyes",
 ]
@@ -2560,14 +2560,14 @@ dependencies = [
  "rand",
  "swanky-channel",
  "swanky-field-binary",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "vectoreyes",
 ]
 
 [[package]]
-name = "swanky-ot-traits-new"
+name = "swanky-ot-traits"
 version = "0.6.0"
 dependencies = [
  "rand",
@@ -2676,7 +2676,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-field-f61p",
  "swanky-ot-kos",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "swanky-serialization",
@@ -2702,7 +2702,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
- "swanky-ot-traits-new",
+ "swanky-ot-traits",
  "swanky-party",
  "swanky-rng",
  "vectoreyes",

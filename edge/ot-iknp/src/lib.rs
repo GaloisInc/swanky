@@ -17,7 +17,7 @@ use swanky_cr_hash::CorrelationRobustHash;
 use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F2, F2BitDeserializer, F2BitSerializer};
-use swanky_ot_traits_new::{
+use swanky_ot_traits::{
     OTCorrelated, OTInit, OTRandom, ObliviousTransfer, Party, Receiver, Sender, WhichParty,
 };
 use swanky_party::{

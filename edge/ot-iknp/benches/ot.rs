@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::{Receiver, Sender};
+use swanky_ot_traits::{Receiver, Sender};
 
 fn do_random_bench(c: &mut Criterion) {
     swanky_ot_test::bench::bench_random_ot::<IKNP<Sender>, IKNP<Receiver>>(c, 128);

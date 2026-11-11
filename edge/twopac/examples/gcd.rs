@@ -7,7 +7,7 @@ use fancy_traits::{BinaryBundle, BinaryEncode, BinaryOutput, BinaryReceive, Circ
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_ot_iknp::IKNP;
-use swanky_ot_traits_new::{Receiver, Sender};
+use swanky_ot_traits::{Receiver, Sender};
 use swanky_rng::SwankyRng;
 use swanky_twopac::semihonest::{Evaluator, Garbler};
 
