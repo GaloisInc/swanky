@@ -22,4 +22,4 @@ swanky-party.workspace = true
 vectoreyes.workspace = true
 
 [dev-dependencies]
-swanky-ot-test-new.workspace = true
+swanky-ot-test.workspace = true

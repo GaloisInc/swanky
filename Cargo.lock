@@ -2463,7 +2463,7 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-test-new",
+ "swanky-ot-test",
  "swanky-ot-traits-new",
  "swanky-party",
  "vectoreyes",
@@ -2479,7 +2479,7 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-test-new",
+ "swanky-ot-test",
  "swanky-ot-traits-new",
  "swanky-party",
  "vectoreyes",
@@ -2500,7 +2500,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-ot-chou-orlandi",
- "swanky-ot-test-new",
+ "swanky-ot-test",
  "swanky-ot-traits-new",
  "swanky-party",
  "swanky-rng",
@@ -2524,7 +2524,7 @@ dependencies = [
  "swanky-field-binary",
  "swanky-ot-chou-orlandi",
  "swanky-ot-iknp",
- "swanky-ot-test-new",
+ "swanky-ot-test",
  "swanky-ot-traits-new",
  "swanky-party",
  "swanky-rng",
@@ -2546,14 +2546,14 @@ dependencies = [
  "swanky-error",
  "swanky-field",
  "swanky-field-binary",
- "swanky-ot-test-new",
+ "swanky-ot-test",
  "swanky-ot-traits-new",
  "swanky-party",
  "vectoreyes",
 ]
 
 [[package]]
-name = "swanky-ot-test-new"
+name = "swanky-ot-test"
 version = "0.6.0"
 dependencies = [
  "criterion",

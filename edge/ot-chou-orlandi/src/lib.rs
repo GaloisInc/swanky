@@ -137,10 +137,10 @@ impl<P: Party> Malicious for ChouOrlandi<P> {}
 
 #[test]
 fn test_random_functionality() {
-    swanky_ot_test_new::test_rotext::<ChouOrlandi<Sender>, ChouOrlandi<Receiver>>(128);
+    swanky_ot_test::test_rotext::<ChouOrlandi<Sender>, ChouOrlandi<Receiver>>(128);
 }
 
 #[test]
 fn test_standard_functionality() {
-    swanky_ot_test_new::test_otext::<ChouOrlandi<Sender>, ChouOrlandi<Receiver>>(128);
+    swanky_ot_test::test_otext::<ChouOrlandi<Sender>, ChouOrlandi<Receiver>>(128);
 }

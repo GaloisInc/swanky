@@ -1,5 +1,5 @@
 [package]
-name = "swanky-ot-test-new"
+name = "swanky-ot-test"
 description = "Testing utilities for oblivious transfer protocols"
 authors.workspace = true
 edition.workspace = true

@@ -61,7 +61,7 @@ have a lesser stability guarantee.
 - **`swanky-ot-iknp`**: An implementation of the Ishai-Kilian-Nissim-Petrank (IKNP) semi-honest OT extension protocol
 - **`swanky-ot-kos`**: An implementation of the Keller-Orsini-Scholl OT protocol
 - **`swanky-ot-naor-pinkas`**: An implementation of the Naor-Pinkas OT protocol
-- **`swanky-ot-test-new`**: Testing utilities for oblivious transfer protocols
+- **`swanky-ot-test`**: Testing utilities for oblivious transfer protocols
 - **`swanky-ot-traits-new`**: Base traits for Oblivious Transfer protocols
 - **`swanky-polynomial`**: Support for various representations of polynomials over finite fields
 - **`swanky-sieve-ir-api`**: A library providing a Rust API for defining zero-knowledge circuits.
