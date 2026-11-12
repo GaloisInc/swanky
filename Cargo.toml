@@ -80,15 +80,10 @@ fancy-circuits = { path = "edge/fancy-circuits" }
 fancy-garbling = { path = "edge/fancy-garbling" }
 fancy-plaintext = { path = "edge/fancy-plaintext" }
 fancy-traits = { path = "edge/fancy-traits" }
-humidor = { path = "edge/humidor" }
 inferno = { path = "edge/inferno" }
-keyed_arena = { path = "edge/keyed_arena" }
-popsicle = { path = "edge/popsicle" }
-schmivitz = { path = "edge/schmivitz" }
 simple-arith-circuit = { path = "edge/simple-arith-circuit" }
 swanky-adversary = { path = "core/adversary" }
 swanky-authenticated-bits = { path = "edge/authenticated-bits" }
-swanky-authenticated-garbling = { path = "edge/authenticated-garbling" }
 swanky-bit-matrix-transpose = { path = "edge/bit-matrix-transpose" }
 swanky-block = { path = "edge/block" }
 swanky-channel = { path = "core/channel" }
@@ -110,10 +105,8 @@ swanky-oprf-kkrt = { path = "edge/oprf-kkrt" }
 swanky-oprf-kmprt = { path = "edge/oprf-kmprt" }
 swanky-oprf-traits = { path = "edge/oprf-traits" }
 swanky-ot-chou-orlandi = { path = "edge/ot-chou-orlandi" }
-swanky-ot-dummy = { path = "edge/ot-dummy" }
 swanky-ot-iknp = { path = "edge/ot-iknp" }
 swanky-ot-kos = { path = "edge/ot-kos" }
-swanky-ot-naor-pinkas = { path = "edge/ot-naor-pinkas" }
 swanky-ot-test = { path = "edge/ot-test" }
 swanky-ot-traits = { path = "edge/ot-traits" }
 swanky-party = { path = "core/party" }
@@ -126,9 +119,6 @@ swanky-sieve-ir-parser = { path = "edge/sieve-ir-parser" }
 swanky-svole-wykw = { path = "edge/svole-wykw" }
 swanky-twopac = { path = "edge/twopac" }
 vectoreyes = { path = "core/vectoreyes" }
-web-mac-n-cheese-wasm = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/wasm" }
-web-mac-n-cheese-websocket = { path = "edge/diet-mac-and-cheese/web-mac-and-cheese/websocket" }
-zkv = { path = "edge/zkv" }
 # END OUR CRATES
 # Don't remove, or modify, the above "# END OUR CRATES" line. It's used by ./swanky new-crate
 
