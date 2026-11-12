@@ -1,13 +1,10 @@
-use rand::{CryptoRng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt};
 
 use crate::{
     circuit_psi::{
         CircuitInputs, PAYLOAD_SIZE, PRIMARY_KEY_SIZE, Payload, PrimaryKey,
         base_psi::{BasePsi, NHASHES},
-        utils::{
-            bin_encode_many_block512, bin_receive_many_block512, cuckoo_place_ids,
-            cuckoo_place_payloads,
-        },
+        utils::{bin_encode_many_block512, cuckoo_place_ids, cuckoo_place_payloads},
     },
     cuckoo::CuckooHash,
     utils::compress_and_hash_inputs,
@@ -16,7 +13,7 @@ use crate::{
 use fancy_traits::{FancyEncode, FancyReceive};
 use swanky_block::Block512;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, WrapErr};
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_oprf_kmprt::Receiver as KmprtReceiver;
 use vectoreyes::U8x16;
@@ -65,14 +62,11 @@ impl BasePsi for OpprfReceiver {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(
+    fn init<RNG: CryptoRng>(
+        has_payload: bool,
         channel: &mut Channel,
         rng: &mut RNG,
-        has_payload: bool,
-    ) -> swanky_error::Result<Self>
-    where
-        RNG: CryptoRng + SeedableRng,
-    {
+    ) -> Result<Self> {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
@@ -99,17 +93,15 @@ impl BasePsi for OpprfReceiver {
             state: Default::default(),
         })
     }
+
     /// Hash the data using cuckoo hashing
-    fn hash_data<RNG>(
+    fn hash_data<RNG: CryptoRng>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
-    where
-        RNG: CryptoRng + SeedableRng,
-    {
+    ) -> Result<()> {
         let mut hashed_inputs = compress_and_hash_inputs(primary_keys, self.key);
 
         // refresh the key until the cuckoo hash is not full
@@ -141,14 +133,11 @@ impl BasePsi for OpprfReceiver {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(
+    fn opprf_exchange<RNG: CryptoRng>(
         &mut self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
-    where
-        RNG: CryptoRng + SeedableRng,
-    {
+    ) -> Result<()> {
         // The receiver queries the opprf with their inputs if the receiver
         // and sender's inputs match, the receiver gets the same programmed
         // output as the sender, otherwise, they receive a random value.
@@ -172,14 +161,11 @@ impl BasePsi for OpprfReceiver {
         }
         Ok(())
     }
-    fn encode_circuit_inputs<F>(
+    fn encode_circuit_inputs<F: FancyEncode<F2> + FancyReceive<F2>>(
         &mut self,
-        gc_party: &mut F,
+        backend: &mut F,
         channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitInputs<F::Item>>
-    where
-        F: FancyEncode<F2> + FancyReceive<F2>,
-    {
+    ) -> Result<CircuitInputs<F::Item>> {
         // We compute the number of wires that the receivers should
         // expect from the sender by taking the size of an element in
         // bytes, turning it into bits, and then multiplying it by the
@@ -188,12 +174,11 @@ impl BasePsi for OpprfReceiver {
         let primary_keys_binary_len = PRIMARY_KEY_SIZE * 8 * self.state.opprf_primary_keys_in.len();
 
         // First receive encoded inputs from the `OpprfSender`
-        let sender_primary_keys: Vec<F::Item> =
-            bin_receive_many_block512(gc_party, primary_keys_binary_len, channel)?;
+        let sender_primary_keys = backend.receive_many(primary_keys_binary_len, channel)?;
 
         // Then send encoded inputs
-        let receiver_primary_keys: Vec<F::Item> = bin_encode_many_block512(
-            gc_party,
+        let receiver_primary_keys = bin_encode_many_block512(
+            backend,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
             channel,
@@ -215,16 +200,15 @@ impl BasePsi for OpprfReceiver {
             // Note that PSTY expects parties to have the same set sizes.
             let payloads_binary_len = PAYLOAD_SIZE * 8 * self.state.opprf_payloads_in.len();
 
-            let sender_payloads: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, payloads_binary_len, channel)?;
-            let receiver_payloads: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
+            let sender_payloads = backend.receive_many(payloads_binary_len, channel)?;
+            let receiver_payloads = bin_encode_many_block512(
+                backend,
                 &self.state.opprf_payloads_in,
                 PAYLOAD_SIZE,
                 channel,
             )?;
-            let masks: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
+            let masks = bin_encode_many_block512(
+                backend,
                 &self.state.opprf_payloads_out,
                 PAYLOAD_SIZE,
                 channel,

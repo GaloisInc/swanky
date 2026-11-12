@@ -1,13 +1,17 @@
-use fancy_traits::FancyOutput;
+use fancy_traits::{Circuit, FancyOutput};
 use popsicle::circuit_psi::{
-    CircuitPsi, PAYLOAD_SIZE,
-    circuits::fancy_payload_sum,
-    evaluator::OpprfPsiEvaluator,
-    garbler::OpprfPsiGarbler,
+    PAYLOAD_SIZE,
+    base_psi::{receiver::OpprfReceiver, sender::OpprfSender},
+    circuits::PayloadSum,
+    intersect_with_payloads,
     utils::{binary_to_u128, int_vec_block512},
 };
+use rand::SeedableRng;
 use swanky_block::Block512;
+use swanky_ot_iknp::IKNP;
+use swanky_ot_traits::{Receiver, Sender};
 use swanky_rng::SwankyRng;
+use swanky_twopac::semihonest::{Evaluator, Garbler};
 
 const SET_SIZE: usize = 1 << 8;
 
@@ -20,39 +24,54 @@ pub fn psty_payload_sum(
     let (_, result) = swanky_channel::local::local_channel_pair(
         |channel| {
             let mut rng = SwankyRng::new();
-            let mut gb_psi = OpprfPsiGarbler::new(channel, &mut rng).unwrap();
+            let mut gb = Garbler::<_, IKNP<Sender>, _>::new(channel, rng.fork())?;
 
-            let intersection_results = gb_psi
-                .intersect_with_payloads(set_a, Some(payload_a), channel)
-                .unwrap();
-            let res = fancy_payload_sum(
-                &mut gb_psi.gb,
-                &intersection_results.intersection.existence_bit_vector,
-                &intersection_results.payloads.sender_payloads,
-                &intersection_results.payloads.receiver_payloads,
+            let intersection_results = intersect_with_payloads::<_, OpprfSender, _>(
+                &mut gb,
+                set_a,
+                Some(payload_a),
                 channel,
+                &mut rng,
             )
             .unwrap();
-            gb_psi.gb.outputs(res.wires(), channel).unwrap();
+            let res = PayloadSum::default()
+                .execute(
+                    &mut gb,
+                    (
+                        &intersection_results.intersection.existence_bit_vector,
+                        &intersection_results.payloads.sender_payloads,
+                        &intersection_results.payloads.receiver_payloads,
+                    ),
+                    channel,
+                )
+                .unwrap();
+            gb.outputs(res.wires(), channel).unwrap();
             Ok(())
         },
         |channel| {
             let mut rng = SwankyRng::new();
 
-            let mut ev_psi = OpprfPsiEvaluator::<SwankyRng>::new(channel, &mut rng).unwrap();
-            let intersection_results = ev_psi
-                .intersect_with_payloads(set_b, Some(payload_b), channel)
-                .unwrap();
-            let res = fancy_payload_sum(
-                &mut ev_psi.ev,
-                &intersection_results.intersection.existence_bit_vector,
-                &intersection_results.payloads.sender_payloads,
-                &intersection_results.payloads.receiver_payloads,
+            let mut ev = Evaluator::<_, IKNP<Receiver>, _>::new(channel, rng.fork()).unwrap();
+            let intersection_results = intersect_with_payloads::<_, OpprfReceiver, _>(
+                &mut ev,
+                set_b,
+                Some(payload_b),
                 channel,
+                &mut rng,
             )
             .unwrap();
-            let res_out = ev_psi
-                .ev
+            let res = PayloadSum::default()
+                .execute(
+                    &mut ev,
+                    (
+                        &intersection_results.intersection.existence_bit_vector,
+                        &intersection_results.payloads.sender_payloads,
+                        &intersection_results.payloads.receiver_payloads,
+                    ),
+                    channel,
+                )
+                .unwrap();
+            let res_out = ev
                 .outputs(res.wires(), channel)
                 .unwrap()
                 .expect("evaluator should produce outputs");

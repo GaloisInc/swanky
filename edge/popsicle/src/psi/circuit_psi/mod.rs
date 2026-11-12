@@ -1,16 +1,23 @@
 //! Implementation of the Pinkas-Schneider-Tkachenko-Yanai "extended" private
 //! set intersection protocol (cf. <https://eprint.iacr.org/2019/241>).
-use crate::psi::circuit_psi::circuits::{fancy_unmask, wires_to_bundle};
-use fancy_garbling::WireMod2;
-use fancy_traits::{BinaryBundle, FancyBinary};
+use crate::{
+    circuit_psi::{
+        base_psi::BasePsi,
+        circuits::{BundlePayloads, IntersectionBitVector},
+    },
+    psi::circuit_psi::circuits::wires_to_bundle,
+};
+use fancy_traits::{BinaryBundle, Circuit, FancyBinary, FancyEncode, FancyReceive};
+use rand::{CryptoRng, SeedableRng};
 use swanky_block::Block512;
 use swanky_channel::Channel;
+use swanky_error::ErrorKind;
+use swanky_field_binary::F2;
 
 pub mod base_psi;
 pub mod circuits;
-pub mod evaluator;
-pub mod garbler;
-pub mod tests;
+#[cfg(test)]
+mod tests;
 pub mod utils;
 
 /// The type of set primary keys to be used
@@ -62,81 +69,104 @@ pub struct PrivateIntersection<F> {
 /// A struct defining the intersection results, i.e. the bit vector
 /// that shows whether a primary key is in the intersection and the
 /// unmasked payloads in Circuit Psi
-pub struct Intersection {
+pub struct Intersection<T> {
     /// The set of primary keys and intersection bit vector
-    pub intersection: PrivateIntersection<WireMod2>,
+    pub intersection: PrivateIntersection<T>,
     /// The unmasked payloads
-    pub payloads: PrivateIntersectionPayloads<WireMod2>,
+    pub payloads: PrivateIntersectionPayloads<T>,
 }
 
-/// A function that takes a `CircuitInputs`` (created by a BasePsi) and groups the wires of
-/// its different parts into `BinaryBundle` for ease of use in a fancy garbled circuit.
+/// Computes the Circuit PSI on the parties' inputs (with payloads).
 ///
-/// For instance, `sender_payloads`'s wires are grouped according to the set primary key size.
-/// This function allows us to reason about circuit inputs not in terms of individual wires, but
-/// rather in terms of the values that they represent.
-fn bundle_payloads<F: FancyBinary>(
-    f: &mut F,
-    circuit_inputs: &CircuitInputs<F::Item>,
+/// `primary_keys`: The parties' set primary keys that we perform the
+///               intersection operation on (see example below).
+///
+/// `payloads`: The payloads associated with primary keys of the intersection
+///             (e.g. incomes associated with id's that we are intersecting on).
+///             Payloads are optional, and this function allows computing on set
+///             primary keys alone (see example below).
+///
+/// # Example
+/// | primary key (`primary_keys`) | data (`payloads`) |
+/// |------------------------------|-------------------|
+/// | 0                            | ("ABCD", $22)     |
+/// | 1                            | ("EFGH", $47)     |
+/// | 2                            | ("IJKL", $92)     |
+/// ...
+///
+/// # Protocol Internals
+/// The protocol works as follows:
+/// 0. Check that the set of primary keys has the same size as the set of
+///    payloads if the latter is not empty.
+/// 1. Call the Base PSI to create the circuit's input. The Base PSI effectively
+///    constructs the intersection in a hidden form that only the garbled
+///    circuit can read and operate on.
+/// 2. Turn the circuit inputs into bundles that are easier to operate on.
+/// 3. Take the output of the Base PSI and turns it into an intersection
+///    bit vector which indicates the presence or abscence of a primary key.
+/// 4. Computes the user defined circuit on the parties' inputs.
+pub fn intersect_with_payloads<
+    F: FancyBinary + FancyEncode<F2> + FancyReceive<F2>,
+    B: BasePsi,
+    RNG: CryptoRng + SeedableRng,
+>(
+    backend: &mut F,
+    primary_keys: &[PrimaryKey],
+    payloads: Option<&[Payload]>,
     channel: &mut Channel,
-) -> swanky_error::Result<(
-    Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
-    Vec<BinaryBundle<F::Item, { PAYLOAD_SIZE * 8 }>>,
-)> {
-    let sender_payloads = fancy_unmask(
-        f,
-        &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.sender_payloads_masked),
-        &wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.masks),
+    rng: &mut RNG,
+) -> swanky_error::Result<Intersection<F::Item>> {
+    // (0)
+    if let Some(payloads) = payloads
+        && primary_keys.len() != payloads.len()
+    {
+        swanky_error::bail!(
+            ErrorKind::OtherError,
+            "Failed to intersect due to incomplete payload set: (#payloads := {}) != (#primary keys := {})",
+            payloads.len(),
+            primary_keys.len(),
+        );
+    }
+    // (1)
+    let circuit_inputs = B::base_psi(backend, primary_keys, payloads, channel, rng)?;
+    // (2)
+    let primary_keys =
+        wires_to_bundle::<F, { PRIMARY_KEY_SIZE * 8 }>(&circuit_inputs.sender_primary_keys);
+    let (sender_payloads, receiver_payloads) =
+        BundlePayloads::default().execute(backend, &circuit_inputs, channel)?;
+
+    // (3)
+    let existence_bit_vector = IntersectionBitVector::default().execute(
+        backend,
+        (
+            &circuit_inputs.sender_primary_keys,
+            &circuit_inputs.receiver_primary_keys,
+        ),
         channel,
     )?;
-    let receiver_payloads =
-        wires_to_bundle::<F, { PAYLOAD_SIZE * 8 }>(&circuit_inputs.receiver_payloads);
-
-    Ok((sender_payloads, receiver_payloads))
+    let intersection_results = Intersection {
+        intersection: PrivateIntersection {
+            existence_bit_vector,
+            primary_keys,
+        },
+        payloads: PrivateIntersectionPayloads {
+            sender_payloads,
+            receiver_payloads,
+        },
+    };
+    Ok(intersection_results)
 }
 
-fn bundle_primary_keys<F: FancyBinary>(
-    circuit_inputs: &CircuitInputs<F::Item>,
-) -> swanky_error::Result<Vec<BinaryBundle<F::Item, { PRIMARY_KEY_SIZE * 8 }>>> {
-    Ok(wires_to_bundle::<F, { PRIMARY_KEY_SIZE * 8 }>(
-        &circuit_inputs.sender_primary_keys,
-    ))
-}
-/// A trait which describes the parties participating in the circuit
-/// PSI protocol along with their functionality.
-///
-/// This trait is implemented by the two parties participating
-/// in the protocol,i.e the CircuitPsi Garbler and the Evaluator.
-pub trait CircuitPsi {
-    /// Computes the Circuit PSI on the parties' inputs (with payloads).
-    ///
-    /// self: The parties' internal state.
-    /// primary_keys: The parties' set primary keys that we perform the intersection
-    ///      operation on (see example below).
-    /// payloads: The payloads associated with primary keys of the intersection
-    ///           (e.g. incomes associated with id's that we are intersecting
-    ///             on).
-    ///           Payloads are optional, and this function allows computing
-    ///           on set primary keys alone (see example below).
-    ///
-    /// example:
-    /// ---------------------------------------
-    // primary key (`primary_keys`) | data (`payloads`)
-    // ---------------------------------------
-    // 0                   | ("GOOG", $22)
-    // 1                   | ("AMZN", $47)
-    // 2                   | ("META", $92)
-    // ...
-    fn intersect_with_payloads(
-        &mut self,
-        primary_keys: &[PrimaryKey],
-        payloads: Option<&[Payload]>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Intersection>;
-    /// Computes the Circuit PSI on the parties' inputs with no payloads.
-    fn intersect(
-        &mut self,
-        keys: &[PrimaryKey],
-        channel: &mut Channel,
-    ) -> swanky_error::Result<Intersection>;
+/// Computes the Circuit PSI on the parties' inputs with no payloads.
+pub fn intersect<
+    F: FancyBinary + FancyEncode<F2> + FancyReceive<F2>,
+    B: BasePsi,
+    RNG: CryptoRng + SeedableRng,
+>(
+    backend: &mut F,
+    keys: &[PrimaryKey],
+    channel: &mut Channel,
+    rng: &mut RNG,
+) -> swanky_error::Result<Intersection<F::Item>> {
+    intersect_with_payloads::<F, B, RNG>(backend, keys, None, channel, rng)
 }

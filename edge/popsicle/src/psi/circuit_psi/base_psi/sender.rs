@@ -1,13 +1,10 @@
-use rand::{CryptoRng, RngExt, SeedableRng};
+use rand::{CryptoRng, RngExt};
 
 use crate::{
     circuit_psi::{
         CircuitInputs, PAYLOAD_SIZE, PRIMARY_KEY_SIZE, Payload, PrimaryKey,
         base_psi::{BasePsi, NHASHES},
-        utils::{
-            bin_encode_many_block512, bin_receive_many_block512, flatten_bin_tags,
-            flatten_bins_payloads,
-        },
+        utils::{bin_encode_many_block512, flatten_bin_tags, flatten_bins_payloads},
     },
     cuckoo::CuckooHash,
     utils,
@@ -16,7 +13,7 @@ use crate::{
 use fancy_traits::{FancyEncode, FancyReceive};
 use swanky_block::Block512;
 use swanky_channel::Channel;
-use swanky_error::{ErrorKind, WrapErr};
+use swanky_error::{ErrorKind, Result, WrapErr};
 use swanky_field_binary::F2;
 use swanky_oprf_kmprt::Sender as KmprtSender;
 use vectoreyes::U8x16;
@@ -66,14 +63,11 @@ impl BasePsi for OpprfSender {
     ///
     /// If the payloads are not needed for the computation, `payload_existence`
     /// should be set to false.
-    fn init<RNG>(
+    fn init<RNG: CryptoRng>(
+        has_payload: bool,
         channel: &mut Channel,
         rng: &mut RNG,
-        has_payload: bool,
-    ) -> swanky_error::Result<Self>
-    where
-        RNG: CryptoRng + SeedableRng,
-    {
+    ) -> Result<Self> {
         // The key used during hashing is known to both
         // parties and allows them to hash the same inputs
         // to the same outputs.
@@ -98,17 +92,15 @@ impl BasePsi for OpprfSender {
             state: Default::default(),
         })
     }
+
     /// Hash the data using simple hashing
-    fn hash_data<RNG>(
+    fn hash_data<RNG: CryptoRng>(
         &mut self,
         primary_keys: &[PrimaryKey],
         payloads: Option<&[Payload]>,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
-    where
-        RNG: CryptoRng + SeedableRng,
-    {
+    ) -> Result<()> {
         // refresh key if cuckoo hash is full
         self.key = channel.read::<U8x16>()?;
 
@@ -167,14 +159,11 @@ impl BasePsi for OpprfSender {
         Ok(())
     }
 
-    fn opprf_exchange<RNG>(
+    fn opprf_exchange<RNG: CryptoRng>(
         &mut self,
         channel: &mut Channel,
         rng: &mut RNG,
-    ) -> swanky_error::Result<()>
-    where
-        RNG: CryptoRng + SeedableRng,
-    {
+    ) -> Result<()> {
         // The Opprf in swanky expects the programmed input and outputs
         // to be passed as pairs
 
@@ -204,23 +193,19 @@ impl BasePsi for OpprfSender {
         }
         Ok(())
     }
-    fn encode_circuit_inputs<F>(
+    fn encode_circuit_inputs<F: FancyEncode<F2> + FancyReceive<F2>>(
         &mut self,
-        gc_party: &mut F,
+        backend: &mut F,
         channel: &mut Channel,
-    ) -> swanky_error::Result<CircuitInputs<F::Item>>
-    where
-        F: FancyEncode<F2> + FancyReceive<F2>,
-    {
+    ) -> Result<CircuitInputs<F::Item>> {
         let sender_primary_keys = bin_encode_many_block512(
-            gc_party,
+            backend,
             &self.state.opprf_primary_keys_out,
             PRIMARY_KEY_SIZE,
             channel,
         )?;
 
-        let receiver_primary_keys =
-            bin_receive_many_block512(gc_party, sender_primary_keys.len(), channel)?;
+        let receiver_primary_keys = backend.receive_many(sender_primary_keys.len(), channel)?;
 
         let mut result = CircuitInputs {
             sender_primary_keys,
@@ -232,17 +217,15 @@ impl BasePsi for OpprfSender {
 
         // If payloads exist, then encode them
         if !&self.state.opprf_payloads_out.is_empty() {
-            let sender_payloads_masked: Vec<F::Item> = bin_encode_many_block512(
-                gc_party,
+            let sender_payloads_masked = bin_encode_many_block512(
+                backend,
                 &self.state.opprf_payloads_out,
                 PAYLOAD_SIZE,
                 channel,
             )?;
-            let receiver_payloads: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, sender_payloads_masked.len(), channel)?;
+            let receiver_payloads = backend.receive_many(sender_payloads_masked.len(), channel)?;
 
-            let masks: Vec<F::Item> =
-                bin_receive_many_block512(gc_party, sender_payloads_masked.len(), channel)?;
+            let masks = backend.receive_many(sender_payloads_masked.len(), channel)?;
 
             result.sender_payloads_masked = sender_payloads_masked;
             result.receiver_payloads = receiver_payloads;
