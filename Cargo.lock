@@ -771,7 +771,6 @@ dependencies = [
  "fancy-circuits",
  "fancy-plaintext",
  "fancy-traits",
- "itertools 0.15.0",
  "rand",
  "serde",
  "serde_json",
