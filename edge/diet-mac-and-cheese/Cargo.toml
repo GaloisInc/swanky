@@ -41,7 +41,6 @@ swanky-field-binary.workspace = true
 swanky-field-f61p.workspace = true
 swanky-field-ff-primes.workspace = true
 swanky-party.workspace = true
-swanky-polynomial.workspace = true
 swanky-rng.workspace = true
 swanky-serialization.workspace = true
 swanky-sieve-ir-parser.workspace = true
@@ -53,6 +52,7 @@ swanky-flatbuffer-build.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+swanky-polynomial.workspace = true
 
 [[example]]
 name = "dietmc_lib"

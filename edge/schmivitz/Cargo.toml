@@ -31,7 +31,6 @@ swanky-serialization.workspace = true
 # `fancy-traits`.
 swanky-sieve-ir-api.workspace = true
 
-env_logger.workspace = true
 hybrid-array.workspace = true
 itertools.workspace = true
 log.workspace = true
@@ -43,6 +42,7 @@ shake.workspace = true
 tempfile.workspace = true
 
 [dev-dependencies]
+env_logger.workspace = true
 fancy-circuits.workspace = true
 swanky-sieve-ir-codegen.workspace = true
 
