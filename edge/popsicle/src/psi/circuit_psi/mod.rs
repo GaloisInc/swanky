@@ -89,9 +89,9 @@ pub struct Intersection<T> {
 /// # Example
 /// | primary key (`primary_keys`) | data (`payloads`) |
 /// |------------------------------|-------------------|
-/// | 0                            | ("GOOG", $22)     |
-/// | 1                            | ("AMZN", $47)     |
-/// | 2                            | ("META", $92)     |
+/// | 0                            | ("ABCD", $22)     |
+/// | 1                            | ("EFGH", $47)     |
+/// | 2                            | ("IJKL", $92)     |
 /// ...
 ///
 /// # Protocol Internals
