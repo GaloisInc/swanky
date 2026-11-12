@@ -22,9 +22,7 @@
 //! ## Example
 //!
 //! ```
-//! use std::os::unix::net::UnixStream;
-//!
-//! use swanky_channel::Channel;
+//! use swanky_channel::{Channel, local::LocalSocket};
 //! use swanky_channel_tracking::TrackChannel;
 //! use swanky_error::Result;
 //!
@@ -40,7 +38,7 @@
 //! }
 //!
 //! fn main() {
-//!     let (sender, receiver) = UnixStream::pair().unwrap();
+//!     let (sender, receiver) = LocalSocket::pair().unwrap();
 //!     let handle = std::thread::spawn(move || {
 //!         let mut sender = TrackChannel::new(sender);
 //!         let a_res = Channel::with(&mut sender, |c| {

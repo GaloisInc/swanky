@@ -1,5 +1,5 @@
-use std::{os::unix::net::UnixStream, time::SystemTime};
-use swanky_channel::Channel;
+use std::time::SystemTime;
+use swanky_channel::{Channel, local::LocalSocket};
 use swanky_channel_tracking::TrackChannel;
 use swanky_oprf_kkrt::{Receiver as KkrtReceiver, Sender as KkrtSender};
 use swanky_oprf_traits::{Receiver as _, Sender as _};
@@ -12,7 +12,7 @@ fn rand_u8x16_vec(size: usize) -> Vec<U8x16> {
 
 fn _test_oprf(n: usize) {
     let selections = rand_u8x16_vec(n);
-    let (sender, receiver) = UnixStream::pair().unwrap();
+    let (sender, receiver) = LocalSocket::pair().unwrap();
 
     let total = SystemTime::now();
 
