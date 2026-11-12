@@ -136,12 +136,12 @@ where
         debug_assert!(self.wit.len() >= clause.dim());
         debug_assert!(self.err.len() >= clause.rows());
 
-        for i in 0..clause.dim() {
-            wit.push(self.wit[i].value().into_inner(ev.sym()));
+        for w in self.wit.iter().take(clause.dim()) {
+            wit.push(w.value().into_inner(ev.sym()));
         }
 
-        for i in 0..clause.rows() {
-            err.push(self.err[i].value().into_inner(ev.sym()));
+        for e in self.err.iter().take(clause.rows()) {
+            err.push(e.value().into_inner(ev.sym()));
         }
 
         Accumulator { wit, err }

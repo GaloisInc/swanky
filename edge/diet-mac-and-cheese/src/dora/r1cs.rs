@@ -48,13 +48,13 @@ fn merge<F: FiniteField, OP: Fn(F, F) -> F>(
     }
 
     // copy remaining terms
-    for i in i..lhs.0.len() {
-        comb.push(lhs.0[i])
+    for &t in lhs.0.iter().skip(i) {
+        comb.push(t)
     }
 
     // copy remaining terms
-    for j in j..rhs.0.len() {
-        comb.push(rhs.0[j])
+    for &t in rhs.0.iter().skip(j) {
+        comb.push(t)
     }
 
     comb.shrink_to_fit();

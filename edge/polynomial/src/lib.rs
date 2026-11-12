@@ -341,8 +341,8 @@ impl<F: FiniteField> NewtonPolynomial<F> {
     pub fn basis_polynomial(&self, point: F, polynomial: &mut Vec<F>) {
         let mut product = F::ONE;
         polynomial.push(product);
-        for i in 0..self.points.len() - 1 {
-            product *= point - self.points[i];
+        for &newton_point in self.points.iter().take(self.points.len() - 1) {
+            product *= point - newton_point;
             polynomial.push(product);
         }
     }
