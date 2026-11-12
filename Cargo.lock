@@ -2218,19 +2218,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "swanky-channel-legacy"
-version = "0.6.0"
-dependencies = [
- "curve25519-dalek",
- "hybrid-array",
- "sha2",
- "swanky-block",
- "swanky-channel",
- "swanky-serialization",
- "vectoreyes",
-]
-
-[[package]]
 name = "swanky-channel-tracking"
 version = "0.6.0"
 dependencies = [
