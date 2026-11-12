@@ -2244,7 +2244,7 @@ version = "0.6.0"
 dependencies = [
  "rand",
  "rand_core 0.10.1",
- "swanky-channel-legacy",
+ "swanky-channel",
  "swanky-error",
  "swanky-rng",
  "vectoreyes",
