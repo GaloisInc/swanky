@@ -54,7 +54,7 @@ mod tests {
             |channel| {
                 use fancy_traits::FancyOutput;
                 use swanky_ot_iknp::IKNP;
-                use swanky_ot_traits_new::Sender;
+                use swanky_ot_traits::Sender;
                 use swanky_twopac::semihonest::Garbler;
 
                 use crate::circuit_psi::base_psi::sender::OpprfSender;
@@ -78,7 +78,7 @@ mod tests {
                 use fancy_garbling::WireMod2;
                 use fancy_traits::FancyOutput;
                 use swanky_ot_iknp::IKNP;
-                use swanky_ot_traits_new::Receiver;
+                use swanky_ot_traits::Receiver;
                 use swanky_twopac::semihonest::Evaluator;
 
                 use crate::circuit_psi::base_psi::receiver::OpprfReceiver;
@@ -117,7 +117,7 @@ mod tests {
             |channel| {
                 use fancy_traits::FancyOutput;
                 use swanky_ot_iknp::IKNP;
-                use swanky_ot_traits_new::Sender;
+                use swanky_ot_traits::Sender;
                 use swanky_twopac::semihonest::Garbler;
 
                 use crate::circuit_psi::base_psi::sender::OpprfSender;
@@ -151,7 +151,7 @@ mod tests {
                 use fancy_garbling::WireMod2;
                 use fancy_traits::FancyOutput;
                 use swanky_ot_iknp::IKNP;
-                use swanky_ot_traits_new::Receiver;
+                use swanky_ot_traits::Receiver;
                 use swanky_twopac::semihonest::Evaluator;
 
                 use crate::circuit_psi::base_psi::receiver::OpprfReceiver;
