@@ -3,7 +3,7 @@
  *
  * This module provides a `Circuit` data-structure with functionalities to parse from SIEVE-IR.
  * The evaluation of a circuit requires a memory that is implemented with `CircuitMemory`.
-*/
+ */
 use crate::parameters::FieldSize;
 use diet_mac_and_cheese::fields::SieveIrDeserialize;
 use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyConstant, FancyZeroKnowledge};

@@ -13,7 +13,6 @@ version.workspace = true
 workspace = true
 
 [dependencies]
-bincode.workspace = true
 blake3.workspace = true
 hybrid-array.workspace = true
 log.workspace = true
@@ -30,6 +29,7 @@ simple-arith-circuit = { workspace = true, features = ["serde"] }
 vectoreyes.workspace = true
 
 [dev-dependencies]
+bincode.workspace = true
 clap = { workspace = true, features = ["derive"] }
 criterion.workspace = true
 proptest.workspace = true

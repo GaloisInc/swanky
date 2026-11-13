@@ -135,8 +135,8 @@ impl CuckooHash {
 
 impl Debug for CuckooHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for i in 0..self.nbins {
-            writeln!(f, "{}: {:?}", i, self.items[i])?;
+        for (i, item) in self.items.iter().enumerate().take(self.nbins) {
+            writeln!(f, "{}: {:?}", i, item)?;
         }
         Ok(())
     }

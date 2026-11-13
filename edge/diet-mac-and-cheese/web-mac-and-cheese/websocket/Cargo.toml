@@ -17,8 +17,6 @@ workspace = true
 [dependencies]
 tungstenite.workspace = true
 
-swanky-channel.workspace = true
-
 [dev-dependencies]
 clap.workspace = true
 diet-mac-and-cheese.workspace = true
@@ -26,6 +24,7 @@ log.workspace = true
 pretty_env_logger.workspace = true
 rustls.workspace = true
 rustls-pemfile.workspace = true
+swanky-channel.workspace = true
 swanky-error.workspace = true
 swanky-field-binary.workspace = true
 swanky-rng.workspace = true

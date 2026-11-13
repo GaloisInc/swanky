@@ -113,8 +113,8 @@ where
     ) -> ExtendedWitness<V> {
         let mut wit = Vec::with_capacity(clause.dim());
         debug_assert!(self.wit.len() >= clause.dim());
-        for i in 0..clause.dim() {
-            wit.push(self.wit[i].value().into_inner(ev.sym()));
+        for w in self.wit.iter().take(clause.dim()) {
+            wit.push(w.value().into_inner(ev.sym()));
         }
         ExtendedWitness {
             inputs: clause.input,

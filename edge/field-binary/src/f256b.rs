@@ -417,7 +417,7 @@ fn test_generator() {
     fn pow(x: F256b, e: &U256) -> F256b {
         let mut out = F256b::ONE;
         // Square-and-multiply, most significant bit first.
-        for i in (0..e.bits_vartime()).rev() {
+        for i in (0..e.bit_width_vartime()).rev() {
             out = out * out;
             if e.bit_vartime(i) {
                 out *= x;

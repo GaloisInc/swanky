@@ -158,10 +158,7 @@ impl<F: FiniteField, const N: usize> CorrectionSharing<F, N> {
                 return false;
             }
         }
-        if self.correction != other.correction {
-            return false;
-        }
-        true
+        self.correction == other.correction
     }
 
     /// Generate a `CorrectionSharing` from an array of RNGs and a correction

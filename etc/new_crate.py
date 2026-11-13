@@ -54,8 +54,16 @@ _LIB_RS_TEMPLATE = Template(
     default=False,
     help="Is the crate an edge crate or a core crate?",
 )
+@click.option(
+    "--add-path",
+    is_flag=True,
+    default=False,
+    help="Should the crate's path be added to the workspace dependencies?",
+)
 @click.pass_context
-def new_crate(ctx: click.Context, name: str, description: str, core: bool) -> None:
+def new_crate(
+    ctx: click.Context, name: str, description: str, core: bool, add_path: bool
+) -> None:
     """
     Create a new crate in Swanky
 
@@ -81,16 +89,19 @@ def new_crate(ctx: click.Context, name: str, description: str, core: bool) -> No
     cargo_toml_path = ROOT / "Cargo.toml"
     cargo_toml = cargo_toml_path.read_text()
     lines = cargo_toml.split("\n")
-    assert "# BEGIN OUR CRATES" in lines
-    assert "# END OUR CRATES" in lines
-    begin_idx = lines.index("# BEGIN OUR CRATES")
-    end_idx = lines.index("# END OUR CRATES")
     path = dst.relative_to(ROOT)
-    lines = (
-        lines[0 : begin_idx + 1]
-        + sorted(lines[begin_idx + 1 : end_idx] + [f'{name} = {{ path = "{path}" }}'])
-        + lines[end_idx:]
-    )
+    if add_path:
+        assert "# BEGIN OUR CRATES" in lines
+        assert "# END OUR CRATES" in lines
+        begin_idx = lines.index("# BEGIN OUR CRATES")
+        end_idx = lines.index("# END OUR CRATES")
+        lines = (
+            lines[0 : begin_idx + 1]
+            + sorted(
+                lines[begin_idx + 1 : end_idx] + [f'{name} = {{ path = "{path}" }}']
+            )
+            + lines[end_idx:]
+        )
     begin_idx = lines.index("members = [")
     end_idx = lines.index("]", begin_idx)
     lines = (
