@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
-use swanky_error::{ErrorKind, Result, bail};
+use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
 
 use crate::vole::ExtensionFieldLifter;
@@ -95,20 +95,20 @@ where
         challenge: FE,
     ) -> Result<()> {
         let max_degree = self.max_degree();
-        if max_degree == 0 || constraint.degree() > max_degree {
-            bail!(
-                ErrorKind::OtherError,
-                "Higher degree constraint has degree {}, but the accumulator is configured for maximum degree {}",
-                constraint.degree(),
-                max_degree
-            );
-        }
-        if constraint.highest_degree() != F::ZERO {
-            bail!(
-                ErrorKind::OtherError,
-                "Higher degree constraint does not evaluate to zero"
-            );
-        }
+        ensure!(
+            max_degree > 0 && constraint.degree() <= max_degree,
+            ErrorKind::OtherError,
+            "Higher degree constraint has degree {}, but the accumulator is configured for maximum degree {}",
+            constraint.degree(),
+            max_degree
+        );
+
+        ensure!(
+            constraint.highest_degree() == F::ZERO,
+            ErrorKind::OtherError,
+            "Higher degree constraint does not evaluate to zero"
+        );
+
         let shift = max_degree - constraint.degree();
         for (i, coefficient) in constraint.lower_coefficients().iter().enumerate() {
             self.aggregate[i + shift] += challenge * *coefficient;
@@ -148,21 +148,21 @@ where
         let degree = self.max_degree();
         let expected_mask_count = Self::mask_vole_count(degree);
         let mask_vole_size = Self::mask_vole_size();
-        if mask_vole_size == 0 {
-            bail!(
-                ErrorKind::OtherError,
-                "Extension field lifter must have a nonempty basis"
-            );
-        }
-        if mask_values.len() != expected_mask_count || mask_masks.len() != expected_mask_count {
-            bail!(
-                ErrorKind::OtherError,
-                "Wrong number of higher degree mask VOLEs: Expected {}, got {} values and {} masks",
-                expected_mask_count,
-                mask_values.len(),
-                mask_masks.len()
-            );
-        }
+        ensure!(
+            mask_vole_size != 0,
+            ErrorKind::OtherError,
+            "Extension field lifter must have a nonempty basis"
+        );
+
+        ensure!(
+            mask_values.len() == expected_mask_count && mask_masks.len() == expected_mask_count,
+            ErrorKind::OtherError,
+            "Wrong number of higher degree mask VOLEs: Expected {}, got {} values and {} masks",
+            expected_mask_count,
+            mask_values.len(),
+            mask_masks.len()
+        );
+
         let mut pi = self.aggregate[..degree].to_vec();
 
         // Organize the flat streams into per-mask blocks and compose each into a full-field mask.
@@ -235,14 +235,13 @@ where
         // applied after traversal using the maximum degree fixed at construction.
         let max_degree = self.max_degree();
         let degree = constraint.degree();
-        if max_degree == 0 || degree > max_degree {
-            bail!(
-                ErrorKind::OtherError,
-                "Higher degree constraint has degree {}, but the accumulator is configured for maximum degree {}",
-                degree,
-                max_degree
-            );
-        }
+        ensure!(
+            max_degree != 0 && degree <= max_degree,
+            ErrorKind::OtherError,
+            "Higher degree constraint has degree {}, but the accumulator is configured for maximum degree {}",
+            degree,
+            max_degree
+        );
 
         self.aggregates[degree] += challenge * constraint.evaluation();
         Ok(())
@@ -261,33 +260,33 @@ where
         mask_tags: &[FE],
         prover_coefficients: &ZeroPolynomialCoefficients<FE>,
     ) -> Result<()> {
-        // The degree-$d$ coefficient of $\pi(t)$ is zero and omitted, so the prover sends exactly
-        // $d$ coefficients. This also enforces the degree bound on $\pi$.
+        // The degree-$d$ coefficient of $`\pi(t)`$ is zero and omitted, so the prover sends exactly
+        // $`d`$ coefficients. This also enforces the degree bound on $`\pi`$.
         let max_higher_degree = self.max_degree();
-        if prover_coefficients.max_degree() != max_higher_degree {
-            bail!(
-                ErrorKind::OtherError,
-                "Verification failed: expected {} higher degree commitment coefficients, got {}",
-                max_higher_degree,
-                prover_coefficients.max_degree()
-            );
-        }
+        ensure!(
+            prover_coefficients.max_degree() == max_higher_degree,
+            ErrorKind::OtherError,
+            "Verification failed: expected {} higher degree commitment coefficients, got {}",
+            max_higher_degree,
+            prover_coefficients.max_degree()
+        );
+
         let mask_vole_size = Self::mask_vole_size();
-        if mask_vole_size == 0 {
-            bail!(
-                ErrorKind::OtherError,
-                "Extension field lifter must have a nonempty basis"
-            );
-        }
+        ensure!(
+            mask_vole_size != 0,
+            ErrorKind::OtherError,
+            "Extension field lifter must have a nonempty basis"
+        );
+
         let expected_mask_count = Self::mask_vole_count(max_higher_degree);
-        if mask_tags.len() != expected_mask_count {
-            bail!(
-                ErrorKind::OtherError,
-                "Wrong number of higher degree mask VOLEs: Expected {}, got {}",
-                expected_mask_count,
-                mask_tags.len()
-            );
-        }
+        ensure!(
+            mask_tags.len() == expected_mask_count,
+            ErrorKind::OtherError,
+            "Wrong number of higher degree mask VOLEs: Expected {}, got {}",
+            expected_mask_count,
+            mask_tags.len()
+        );
+
         if max_higher_degree == 0 {
             return Ok(());
         }
@@ -310,12 +309,11 @@ where
         // Evaluate the prover's $\pi(\Delta)$ and compare.
         let pi_at_delta = evaluate_poly(prover_coefficients.coefficients(), delta);
 
-        if pi_at_delta != expected {
-            bail!(
-                ErrorKind::OtherError,
-                "Verification failed: Higher degree constraint check failed"
-            );
-        }
+        ensure!(
+            pi_at_delta == expected,
+            ErrorKind::OtherError,
+            "Verification failed: Higher degree constraint check failed"
+        );
 
         Ok(())
     }
