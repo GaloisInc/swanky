@@ -234,7 +234,7 @@ impl FancyHigherDegree<F2> for ProverPreparer<'_> {
         *lhs
     }
 
-    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
+    fn h_assert_zero(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
         let degree = wire;
         self.challenge_count += 1;
         self.max_higher_degree = self.max_higher_degree.max(degree);
@@ -398,7 +398,7 @@ mod tests {
         let x01 = preparer.h_mul(&x[0], &x[1]);
         let x23 = preparer.h_mul(&x[2], &x[3]);
         let zero = preparer.h_mul(&x01, &x23);
-        preparer.assert_zero_higher_degree(zero)?;
+        preparer.h_assert_zero(zero)?;
         Ok(())
     }
 
@@ -410,7 +410,7 @@ mod tests {
         let x01 = preparer.h_mul(&x[0], &x[1]);
         let x23 = preparer.h_mul(&x[2], &x[3]);
         let zero = preparer.h_add(&x01, &x23);
-        preparer.assert_zero_higher_degree(zero)?;
+        preparer.h_assert_zero(zero)?;
         Ok(())
     }
 

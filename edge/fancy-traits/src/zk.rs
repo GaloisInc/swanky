@@ -80,5 +80,5 @@ pub trait FancyHigherDegree<FF: FiniteField>: FancyZeroKnowledge<FF> {
 
     /// Assert that the callback's higher-degree constraint is zero.
     /// The callback must be a circuit using the operations from this trait.
-    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()>;
+    fn h_assert_zero(&mut self, wire: Self::HigherDegreeWire) -> Result<()>;
 }

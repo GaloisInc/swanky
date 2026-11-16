@@ -664,12 +664,12 @@ mod tests {
             let x01 = backend.h_mul(&x[0], &x[1]);
             let x23 = backend.h_mul(&x[2], &x[3]);
             let zero = backend.h_mul(&x01, &x23);
-            backend.assert_zero_higher_degree(zero)?;
+            backend.h_assert_zero(zero)?;
             backend.assert_zero(&product, channel)?;
             let zero = backend.h_mul(&x[0], &x[2]);
-            backend.assert_zero_higher_degree(zero)?;
+            backend.h_assert_zero(zero)?;
             let zero = backend.h_mulc(&x[2], F2::ONE);
-            backend.assert_zero_higher_degree(zero)?;
+            backend.h_assert_zero(zero)?;
             Ok(())
         }
     }
@@ -720,12 +720,12 @@ mod tests {
             let x01 = backend.h_mul(&x[0], &x[1]);
             let x13 = backend.h_mul(&x[1], &x[3]);
             let zero = backend.h_mul(&x01, &x13);
-            backend.assert_zero_higher_degree(zero)?;
+            backend.h_assert_zero(zero)?;
             backend.assert_zero(&product, channel)?;
             let zero = backend.h_mul(&x[0], &x[2]);
-            backend.assert_zero_higher_degree(zero)?;
+            backend.h_assert_zero(zero)?;
             let zero = backend.h_mulc(&x[2], F2::ONE);
-            backend.assert_zero_higher_degree(zero)?;
+            backend.h_assert_zero(zero)?;
             Ok(())
         }
     }

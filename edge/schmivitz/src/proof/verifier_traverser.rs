@@ -308,7 +308,7 @@ where
         lhs.mulc(rhs)
     }
 
-    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
+    fn h_assert_zero(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
