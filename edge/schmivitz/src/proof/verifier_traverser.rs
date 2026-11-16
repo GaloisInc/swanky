@@ -282,39 +282,39 @@ where
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.add(rhs, self.verifier_key))
+    ) -> Self::HigherDegreeWire {
+        lhs.add(rhs, self.verifier_key)
     }
 
     /// Mirrors
     /// [`CommitmentPolynomialVerifier::addc`] on verifier commitments.
-    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.addc(rhs, self.verifier_key))
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
+        lhs.addc(rhs, self.verifier_key)
     }
 
     fn h_mul(
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.mul(rhs))
+    ) -> Self::HigherDegreeWire {
+        lhs.mul(rhs)
     }
 
-    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.mulc(rhs))
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
+        lhs.mulc(rhs)
     }
 
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         inputs: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Result<Self::HigherDegreeWire>,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
         _: &mut Channel,
     ) -> Result<()> {
         // Treat each masked witness as a degree-one verifier-side commitment.
         let constraint = f(
             self,
             std::array::from_fn(|i| CommitmentPolynomialVerifier::from_base_vole(inputs[i].0)),
-        )?;
+        );
 
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();

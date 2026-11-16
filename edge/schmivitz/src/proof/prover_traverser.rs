@@ -334,30 +334,30 @@ where
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.add(rhs))
+    ) -> Self::HigherDegreeWire {
+        lhs.add(rhs)
     }
 
-    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.addc(rhs))
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
+        lhs.addc(rhs)
     }
 
     fn h_mul(
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.mul(rhs))
+    ) -> Self::HigherDegreeWire {
+        lhs.mul(rhs)
     }
 
-    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
-        Ok(lhs.mulc(rhs))
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
+        lhs.mulc(rhs)
     }
 
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         inputs: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Result<Self::HigherDegreeWire>,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
         _: &mut Channel,
     ) -> Result<()> {
         // Build the input commitments and evaluate the constraint over them.
@@ -366,7 +366,7 @@ where
             std::array::from_fn(|i| {
                 CommitmentPolynomialProver::from_base_vole(inputs[i].0, inputs[i].1)
             }),
-        )?;
+        );
 
         // Consume the next shared Fiat–Shamir weight and add this constraint to the batch.
         let challenge = self.chi_challenge.next();
@@ -414,8 +414,8 @@ mod tests {
             traverser.assert_zero_higher_degree(
                 &product_wires.map(|(x, w)| Wire(x, w)),
                 |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1])?;
-                    let x23 = b.h_mul(&x[2], &x[3])?;
+                    let x01 = b.h_mul(&x[0], &x[1]);
+                    let x23 = b.h_mul(&x[2], &x[3]);
                     b.h_mul(&x01, &x23)
                 },
                 channel,
@@ -431,8 +431,8 @@ mod tests {
             traverser.assert_zero_higher_degree(
                 &sum_wires.map(|(x, w)| Wire(x, w)),
                 |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1])?;
-                    let x23 = b.h_mul(&x[2], &x[3])?;
+                    let x01 = b.h_mul(&x[0], &x[1]);
+                    let x23 = b.h_mul(&x[2], &x[3]);
                     b.h_add(&x01, &x23)
                 },
                 channel,
@@ -471,9 +471,9 @@ mod tests {
         let traverser = test_traverser(F128b::random(rng), 0);
         let poly = CommitmentPolynomialProver::from_base_vole(F2::ONE, F128b::random(rng));
 
-        let sum = traverser.h_addc(&poly, F2::ONE).unwrap();
+        let sum = traverser.h_addc(&poly, F2::ONE);
         assert_eq!(sum.highest_degree(), F2::ZERO);
-        let scaled = traverser.h_mulc(&poly, F2::ZERO).unwrap();
+        let scaled = traverser.h_mulc(&poly, F2::ZERO);
         assert_eq!(scaled.highest_degree(), F2::ZERO);
     }
 }

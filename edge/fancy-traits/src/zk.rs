@@ -60,27 +60,27 @@ pub trait FancyHigherDegree<FF: FiniteField>: FancyZeroKnowledge<FF> {
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> Result<Self::HigherDegreeWire>;
+    ) -> Self::HigherDegreeWire;
 
     /// Add a constant to a higher-degree wire.
-    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: FF) -> Result<Self::HigherDegreeWire>;
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: FF) -> Self::HigherDegreeWire;
 
     /// Multiply two higher-degree wires.
     fn h_mul(
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> Result<Self::HigherDegreeWire>;
+    ) -> Self::HigherDegreeWire;
 
     /// Multiply a higher-degree wire by a constant.
-    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: FF) -> Result<Self::HigherDegreeWire>;
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: FF) -> Self::HigherDegreeWire;
 
     /// Assert that the callback's higher-degree constraint is zero.
     /// The callback must be a circuit using the operations from this trait.
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
         inputs: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Result<Self::HigherDegreeWire>,
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
         channel: &mut Channel,
     ) -> Result<()>;
 }

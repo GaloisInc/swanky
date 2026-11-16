@@ -662,8 +662,8 @@ mod tests {
             backend.assert_zero_higher_degree(
                 &inputs,
                 |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1])?;
-                    let x23 = b.h_mul(&x[2], &x[3])?;
+                    let x01 = b.h_mul(&x[0], &x[1]);
+                    let x23 = b.h_mul(&x[2], &x[3]);
                     b.h_mul(&x01, &x23)
                 },
                 channel,
@@ -720,8 +720,8 @@ mod tests {
             backend.assert_zero_higher_degree(
                 &inputs,
                 |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1])?;
-                    let x13 = b.h_mul(&x[1], &x[3])?;
+                    let x01 = b.h_mul(&x[0], &x[1]);
+                    let x13 = b.h_mul(&x[1], &x[3]);
                     b.h_mul(&x01, &x13)
                 },
                 channel,
