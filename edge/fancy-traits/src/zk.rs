@@ -55,6 +55,9 @@ pub trait FancyHigherDegree<FF: FiniteField>: FancyZeroKnowledge<FF> {
     /// Representation of a wire inside a higher-degree constraint.
     type HigherDegreeWire;
 
+    /// Convert a [`Fancy::Item`] into a [`Self::HigherDegreeWire`].
+    fn to_higher_degree_wire(&self, wire: Self::Item) -> Self::HigherDegreeWire;
+
     /// Add two higher-degree wires.
     fn h_add(
         &self,

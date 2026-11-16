@@ -276,6 +276,10 @@ where
     /// A verifier commitment carrying its evaluation and degree.
     type HigherDegreeWire = CommitmentPolynomialVerifier<F2, P::FLambda>;
 
+    fn to_higher_degree_wire(&self, wire: Self::Item) -> Self::HigherDegreeWire {
+        CommitmentPolynomialVerifier::from_base_vole(wire.0)
+    }
+
     /// Mirrors
     /// [`CommitmentPolynomialVerifier::add`] on verifier commitments.
     fn h_add(
@@ -312,7 +316,7 @@ where
         // Treat each masked witness as a degree-one verifier-side commitment.
         let constraint = f(
             self,
-            std::array::from_fn(|i| CommitmentPolynomialVerifier::from_base_vole(inputs[i].0)),
+            std::array::from_fn(|i| self.to_higher_degree_wire(inputs[i])),
         );
 
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.

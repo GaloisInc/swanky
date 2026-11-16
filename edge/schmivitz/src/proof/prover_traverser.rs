@@ -330,6 +330,10 @@ where
 {
     type HigherDegreeWire = CommitmentPolynomialProver<F2, P::FLambda>;
 
+    fn to_higher_degree_wire(&self, wire: Self::Item) -> Self::HigherDegreeWire {
+        CommitmentPolynomialProver::from_base_vole(wire.0, wire.1)
+    }
+
     fn h_add(
         &self,
         lhs: &Self::HigherDegreeWire,
@@ -362,9 +366,7 @@ where
         // Build the input commitments and evaluate the constraint over them.
         let constraint = f(
             self,
-            std::array::from_fn(|i| {
-                CommitmentPolynomialProver::from_base_vole(inputs[i].0, inputs[i].1)
-            }),
+            std::array::from_fn(|i| self.to_higher_degree_wire(inputs[i])),
         );
 
         // Consume the next shared Fiat–Shamir weight and add this constraint to the batch.

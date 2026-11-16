@@ -206,6 +206,10 @@ impl FancyHigherDegree<F2> for ProverPreparer<'_> {
     /// degrees.
     type HigherDegreeWire = usize;
 
+    fn to_higher_degree_wire(&self, _: Self::Item) -> Self::HigherDegreeWire {
+        1
+    }
+
     fn h_add(
         &self,
         lhs: &Self::HigherDegreeWire,
