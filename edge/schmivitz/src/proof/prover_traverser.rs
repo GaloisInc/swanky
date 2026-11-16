@@ -358,21 +358,11 @@ where
         lhs.mulc(rhs)
     }
 
-    fn assert_zero_higher_degree<const INPUT_LEN: usize>(
-        &mut self,
-        inputs: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    ) -> Result<()> {
-        // Build the input commitments and evaluate the constraint over them.
-        let constraint = f(
-            self,
-            std::array::from_fn(|i| self.to_higher_degree_wire(inputs[i])),
-        );
-
+    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
         // Consume the next shared Fiat–Shamir weight and add this constraint to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
-            .push_constraint(&constraint, challenge)?;
+            .push_constraint(&wire, challenge)?;
         Ok(())
     }
 }
@@ -411,25 +401,23 @@ mod tests {
         let product_values = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
         let product_wires: [(F2, F128b); 4] =
             std::array::from_fn(|i| (product_values[i], F128b::random(rng)));
-        traverser
-            .assert_zero_higher_degree(&product_wires.map(|(x, w)| Wire(x, w)), |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]);
-                let x23 = b.h_mul(&x[2], &x[3]);
-                b.h_mul(&x01, &x23)
-            })
-            .unwrap();
+        let wires = product_wires.map(|(x, w)| Wire(x, w));
+        let x = wires.map(|wire| traverser.to_higher_degree_wire(wire));
+        let x01 = traverser.h_mul(&x[0], &x[1]);
+        let x23 = traverser.h_mul(&x[2], &x[3]);
+        let zero = traverser.h_mul(&x01, &x23);
+        traverser.assert_zero_higher_degree(zero).unwrap();
 
         // Witness satisfying x0 * x1 + x2 * x3 == 0, a degree-2 constraint.
         let sum_values = [F2::ONE; 4];
         let sum_wires: [(F2, F128b); 4] =
             std::array::from_fn(|i| (sum_values[i], F128b::random(rng)));
-        traverser
-            .assert_zero_higher_degree(&sum_wires.map(|(x, w)| Wire(x, w)), |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]);
-                let x23 = b.h_mul(&x[2], &x[3]);
-                b.h_add(&x01, &x23)
-            })
-            .unwrap();
+        let wires = sum_wires.map(|(x, w)| Wire(x, w));
+        let x = wires.map(|wire| traverser.to_higher_degree_wire(wire));
+        let x01 = traverser.h_mul(&x[0], &x[1]);
+        let x23 = traverser.h_mul(&x[2], &x[3]);
+        let zero = traverser.h_add(&x01, &x23);
+        traverser.assert_zero_higher_degree(zero).unwrap();
 
         let ProverTraverserParts {
             higher_degree_accumulator: accumulator,

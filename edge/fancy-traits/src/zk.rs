@@ -43,11 +43,11 @@ pub trait FancyZeroKnowledge<FF: FiniteField>: Fancy {
 ///
 ///     fn execute(&self, backend: &mut B, _: (), channel: &mut Channel) -> Result<()> {
 ///         let inputs = backend.witnesses::<4>(channel)?;
-///         backend.assert_zero_higher_degree(&inputs, |b, x| {
-///             let x01 = b.h_mul(&x[0], &x[1]);
-///             let x23 = b.h_mul(&x[2], &x[3]);
-///             b.h_mul(&x01, &x23)
-///         })
+///         let inputs_h = inputs.map(|wire| backend.to_higher_degree_wire(wire));
+///         let x01 = backend.h_mul(&inputs_h[0], &inputs_h[1]);
+///         let x23 = backend.h_mul(&inputs_h[2], &inputs_h[3]);
+///         let zero = backend.h_mul(&x01, &x23);
+///         backend.assert_zero_higher_degree(zero)
 ///     }
 /// }
 /// ```
@@ -80,9 +80,5 @@ pub trait FancyHigherDegree<FF: FiniteField>: FancyZeroKnowledge<FF> {
 
     /// Assert that the callback's higher-degree constraint is zero.
     /// The callback must be a circuit using the operations from this trait.
-    fn assert_zero_higher_degree<const INPUT_LEN: usize>(
-        &mut self,
-        inputs: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    ) -> Result<()>;
+    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()>;
 }

@@ -308,21 +308,11 @@ where
         lhs.mulc(rhs)
     }
 
-    fn assert_zero_higher_degree<const INPUT_LEN: usize>(
-        &mut self,
-        inputs: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    ) -> Result<()> {
-        // Treat each masked witness as a degree-one verifier-side commitment.
-        let constraint = f(
-            self,
-            std::array::from_fn(|i| self.to_higher_degree_wire(inputs[i])),
-        );
-
+    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
         let challenge = self.chi_challenge.next();
         self.higher_degree_accumulator
-            .push_constraint(&constraint, challenge)?;
+            .push_constraint(&wire, challenge)?;
         Ok(())
     }
 }

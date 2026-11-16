@@ -234,13 +234,8 @@ impl FancyHigherDegree<F2> for ProverPreparer<'_> {
         *lhs
     }
 
-    fn assert_zero_higher_degree<const INPUT_LEN: usize>(
-        &mut self,
-        _: &[Self::Item; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-    ) -> Result<()> {
-        // Each input wire starts at degree one during polynomial traversal.
-        let degree = f(self, [1; INPUT_LEN]);
+    fn assert_zero_higher_degree(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
+        let degree = wire;
         self.challenge_count += 1;
         self.max_higher_degree = self.max_higher_degree.max(degree);
         Ok(())
@@ -397,27 +392,25 @@ mod tests {
 
     fn add_degree_four_constraint(preparer: &mut ProverPreparer<'_>) -> swanky_error::Result<()> {
         let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire);
+        let x = wires.map(|wire| preparer.to_higher_degree_wire(wire));
 
         // x0 * x1 * x2 * x3, a degree-4 constraint.
-        preparer.assert_zero_higher_degree(&wires, |b, x| {
-            let x01 = b.h_mul(&x[0], &x[1]);
-            let x23 = b.h_mul(&x[2], &x[3]);
-            b.h_mul(&x01, &x23)
-        })?;
-
+        let x01 = preparer.h_mul(&x[0], &x[1]);
+        let x23 = preparer.h_mul(&x[2], &x[3]);
+        let zero = preparer.h_mul(&x01, &x23);
+        preparer.assert_zero_higher_degree(zero)?;
         Ok(())
     }
 
     fn add_degree_two_constraint(preparer: &mut ProverPreparer<'_>) -> swanky_error::Result<()> {
         let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire);
+        let x = wires.map(|wire| preparer.to_higher_degree_wire(wire));
 
         // x0 * x1 + x2 * x3, a degree-2 constraint.
-        preparer.assert_zero_higher_degree(&wires, |b, x| {
-            let x01 = b.h_mul(&x[0], &x[1]);
-            let x23 = b.h_mul(&x[2], &x[3]);
-            b.h_add(&x01, &x23)
-        })?;
-
+        let x01 = preparer.h_mul(&x[0], &x[1]);
+        let x23 = preparer.h_mul(&x[2], &x[3]);
+        let zero = preparer.h_add(&x01, &x23);
+        preparer.assert_zero_higher_degree(zero)?;
         Ok(())
     }
 
