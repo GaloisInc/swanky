@@ -47,7 +47,7 @@ pub trait FancyZeroKnowledge<FF: FiniteField>: Fancy {
 ///         let x01 = backend.h_mul(&inputs_h[0], &inputs_h[1]);
 ///         let x23 = backend.h_mul(&inputs_h[2], &inputs_h[3]);
 ///         let zero = backend.h_mul(&x01, &x23);
-///         backend.assert_zero_higher_degree(zero)
+///         backend.h_assert_zero(zero)
 ///     }
 /// }
 /// ```
