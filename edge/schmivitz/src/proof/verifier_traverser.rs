@@ -308,7 +308,6 @@ where
         &mut self,
         inputs: &[Self::Item; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-        _: &mut Channel,
     ) -> Result<()> {
         // Treat each masked witness as a degree-one verifier-side commitment.
         let constraint = f(

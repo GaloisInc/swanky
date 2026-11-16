@@ -47,7 +47,7 @@ pub trait FancyZeroKnowledge<FF: FiniteField>: Fancy {
 ///             let x01 = b.h_mul(&x[0], &x[1]);
 ///             let x23 = b.h_mul(&x[2], &x[3]);
 ///             b.h_mul(&x01, &x23)
-///         }, channel)
+///         })
 ///     }
 /// }
 /// ```
@@ -81,6 +81,5 @@ pub trait FancyHigherDegree<FF: FiniteField>: FancyZeroKnowledge<FF> {
         &mut self,
         inputs: &[Self::Item; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-        channel: &mut Channel,
     ) -> Result<()>;
 }

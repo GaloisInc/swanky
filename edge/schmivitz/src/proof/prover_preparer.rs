@@ -234,7 +234,6 @@ impl FancyHigherDegree<F2> for ProverPreparer<'_> {
         &mut self,
         _: &[Self::Item; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-        _: &mut Channel,
     ) -> Result<()> {
         // Each input wire starts at degree one during polynomial traversal.
         let degree = f(self, [1; INPUT_LEN]);
@@ -255,7 +254,6 @@ mod tests {
     use fancy_traits::FancyHigherDegree;
     use rand::rng;
     use std::io::Cursor;
-    use swanky_channel::Channel;
     use swanky_field::FiniteRing;
     use swanky_field_binary::F2;
     use swanky_sieve_ir_parser::text_parser::RelationReader;
@@ -393,42 +391,28 @@ mod tests {
         assert_eq!(preparer.h_mulc(&y, F2::ZERO), 2);
     }
 
-    fn add_degree_four_constraint(
-        preparer: &mut ProverPreparer<'_>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<()> {
+    fn add_degree_four_constraint(preparer: &mut ProverPreparer<'_>) -> swanky_error::Result<()> {
         let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire);
 
         // x0 * x1 * x2 * x3, a degree-4 constraint.
-        preparer.assert_zero_higher_degree(
-            &wires,
-            |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]);
-                let x23 = b.h_mul(&x[2], &x[3]);
-                b.h_mul(&x01, &x23)
-            },
-            channel,
-        )?;
+        preparer.assert_zero_higher_degree(&wires, |b, x| {
+            let x01 = b.h_mul(&x[0], &x[1]);
+            let x23 = b.h_mul(&x[2], &x[3]);
+            b.h_mul(&x01, &x23)
+        })?;
 
         Ok(())
     }
 
-    fn add_degree_two_constraint(
-        preparer: &mut ProverPreparer<'_>,
-        channel: &mut Channel,
-    ) -> swanky_error::Result<()> {
+    fn add_degree_two_constraint(preparer: &mut ProverPreparer<'_>) -> swanky_error::Result<()> {
         let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire);
 
         // x0 * x1 + x2 * x3, a degree-2 constraint.
-        preparer.assert_zero_higher_degree(
-            &wires,
-            |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1]);
-                let x23 = b.h_mul(&x[2], &x[3]);
-                b.h_add(&x01, &x23)
-            },
-            channel,
-        )?;
+        preparer.assert_zero_higher_degree(&wires, |b, x| {
+            let x01 = b.h_mul(&x[0], &x[1]);
+            let x23 = b.h_mul(&x[2], &x[3]);
+            b.h_add(&x01, &x23)
+        })?;
 
         Ok(())
     }
@@ -440,15 +424,11 @@ mod tests {
 
         assert_eq!(preparer.max_higher_degree(), 0);
 
-        Channel::with(std::io::empty(), |channel| {
-            add_degree_four_constraint(&mut preparer, channel)
-        })?;
+        add_degree_four_constraint(&mut preparer)?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
         // A lower-degree constraint does not lower the maximum.
-        Channel::with(std::io::empty(), |channel| {
-            add_degree_two_constraint(&mut preparer, channel)
-        })?;
+        add_degree_two_constraint(&mut preparer)?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
         let ProverPreparerParts {

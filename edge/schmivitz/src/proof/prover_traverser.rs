@@ -358,7 +358,6 @@ where
         &mut self,
         inputs: &[Self::Item; INPUT_LEN],
         f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Self::HigherDegreeWire,
-        _: &mut Channel,
     ) -> Result<()> {
         // Build the input commitments and evaluate the constraint over them.
         let constraint = f(
@@ -410,35 +409,25 @@ mod tests {
         let product_values = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
         let product_wires: [(F2, F128b); 4] =
             std::array::from_fn(|i| (product_values[i], F128b::random(rng)));
-        Channel::with(std::io::empty(), |channel| {
-            traverser.assert_zero_higher_degree(
-                &product_wires.map(|(x, w)| Wire(x, w)),
-                |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1]);
-                    let x23 = b.h_mul(&x[2], &x[3]);
-                    b.h_mul(&x01, &x23)
-                },
-                channel,
-            )
-        })
-        .unwrap();
+        traverser
+            .assert_zero_higher_degree(&product_wires.map(|(x, w)| Wire(x, w)), |b, x| {
+                let x01 = b.h_mul(&x[0], &x[1]);
+                let x23 = b.h_mul(&x[2], &x[3]);
+                b.h_mul(&x01, &x23)
+            })
+            .unwrap();
 
         // Witness satisfying x0 * x1 + x2 * x3 == 0, a degree-2 constraint.
         let sum_values = [F2::ONE; 4];
         let sum_wires: [(F2, F128b); 4] =
             std::array::from_fn(|i| (sum_values[i], F128b::random(rng)));
-        Channel::with(std::io::empty(), |channel| {
-            traverser.assert_zero_higher_degree(
-                &sum_wires.map(|(x, w)| Wire(x, w)),
-                |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1]);
-                    let x23 = b.h_mul(&x[2], &x[3]);
-                    b.h_add(&x01, &x23)
-                },
-                channel,
-            )
-        })
-        .unwrap();
+        traverser
+            .assert_zero_higher_degree(&sum_wires.map(|(x, w)| Wire(x, w)), |b, x| {
+                let x01 = b.h_mul(&x[0], &x[1]);
+                let x23 = b.h_mul(&x[2], &x[3]);
+                b.h_add(&x01, &x23)
+            })
+            .unwrap();
 
         let ProverTraverserParts {
             higher_degree_accumulator: accumulator,

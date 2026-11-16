@@ -659,19 +659,15 @@ mod tests {
             channel: &mut swanky_channel::Channel,
         ) -> Result<()> {
             let inputs = backend.witnesses::<4>(channel)?;
-            backend.assert_zero_higher_degree(
-                &inputs,
-                |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1]);
-                    let x23 = b.h_mul(&x[2], &x[3]);
-                    b.h_mul(&x01, &x23)
-                },
-                channel,
-            )?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| {
+                let x01 = b.h_mul(&x[0], &x[1]);
+                let x23 = b.h_mul(&x[2], &x[3]);
+                b.h_mul(&x01, &x23)
+            })?;
             let product = backend.and(&inputs[0], &inputs[2], channel)?;
             backend.assert_zero(&product, channel)?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]), channel)?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE), channel)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]))?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE))?;
             Ok(())
         }
     }
@@ -717,19 +713,15 @@ mod tests {
             channel: &mut swanky_channel::Channel,
         ) -> Result<()> {
             let inputs = backend.witnesses::<4>(channel)?;
-            backend.assert_zero_higher_degree(
-                &inputs,
-                |b, x| {
-                    let x01 = b.h_mul(&x[0], &x[1]);
-                    let x13 = b.h_mul(&x[1], &x[3]);
-                    b.h_mul(&x01, &x13)
-                },
-                channel,
-            )?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| {
+                let x01 = b.h_mul(&x[0], &x[1]);
+                let x13 = b.h_mul(&x[1], &x[3]);
+                b.h_mul(&x01, &x13)
+            })?;
             let product = backend.and(&inputs[0], &inputs[2], channel)?;
             backend.assert_zero(&product, channel)?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]), channel)?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE), channel)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]))?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE))?;
             Ok(())
         }
     }
