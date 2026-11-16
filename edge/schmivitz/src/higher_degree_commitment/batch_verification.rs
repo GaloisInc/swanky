@@ -25,19 +25,19 @@ fn evaluate_poly<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
 }
 
 /// The transmitted coefficients of the masked polynomial $`\pi(t)`$ (step 6).
-/// The zero coefficient at degree $d$ is omitted.
+/// The zero coefficient at degree $`d`$ is omitted.
 #[derive(Clone, Debug)]
 pub struct ZeroPolynomialCoefficients<FE: FiniteField> {
     coefficients: Vec<FE>,
 }
 
 impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
-    /// Return the batch degree $d$, equal to the number of transmitted coefficients.
+    /// Return the batch degree $`d`$, equal to the number of transmitted coefficients.
     pub fn max_degree(&self) -> usize {
         self.coefficients.len()
     }
 
-    /// Return the coefficients of $\pi(t)$ in increasing degree order.
+    /// Return the coefficients of $`\pi(t)`$ in increasing degree order.
     pub fn coefficients(&self) -> &[FE] {
         &self.coefficients
     }

@@ -39,7 +39,7 @@ where
 /// Combine field elements using successive powers of the extension field's generator.
 ///
 /// Specifically, computes
-/// $\operatorname{combine}(z_0,\ldots,z_{r-1})=\sum_{k=0}^{r-1}z_kX^k$, where $X$ is
+/// $`\operatorname{combine}(z_0,\ldots,z_{r-1})=\sum_{k=0}^{r-1}z_kX^k`$, where $`X`$ is
 /// the extension field's multiplicative generator.
 pub(crate) fn combine<V, FE>(values: &[V]) -> FE
 where
@@ -58,9 +58,7 @@ where
 }
 
 /// Power-basis lifting from `F2` to `P::FLambda`.
-pub(crate) struct ExtensionFieldLifterF2FLambda<P> {
-    _phatom: PhantomData<P>,
-}
+pub(crate) struct ExtensionFieldLifterF2FLambda<P>(PhantomData<P>);
 
 impl<P: Params> ExtensionFieldLifter<F2, P::FLambda> for ExtensionFieldLifterF2FLambda<P>
 where

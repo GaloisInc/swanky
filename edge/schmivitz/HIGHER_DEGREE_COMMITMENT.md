@@ -15,7 +15,7 @@ The construction has two main components:
 
 ## Base VOLE
 
-A call to $`\operatorname{VOLE}(n)`$ produces $n$ correlated triples.
+A call to $`\operatorname{VOLE}(n)`$ produces $`n`$ correlated triples.
 For each $`i \in \{1,\ldots,n\}`$, the prover receives a random value $`u_i \in \mathbb{F}_p`$ and a mask $`w_i \in \mathbb{F}_{p^r}`$, and the verifier receives a global key $`\Delta \in \mathbb{F}_{p^r}`$ and a tag $`v_i \in \mathbb{F}_{p^r}`$, such that
 
 ```math
@@ -70,7 +70,7 @@ Every rule preserves two invariants: the output polynomial's leading coefficient
     = \Delta^{d-d_1}\gamma_x+\Delta^{d-d_2}\gamma_y.
   ```
 
-  The powers of $t$ and $\Delta$ perform the same degree alignment on the prover and verifier sides.
+  The powers of $`t`$ and $`\Delta`$ perform the same degree alignment on the prover and verifier sides.
 
 - **Addition by a constant.**
 
@@ -160,7 +160,7 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
    ```
 
    on the prover side and by $`v_{j,k}=\sigma_{j,k}(\Delta)`$ on the verifier side.
-   Schmivitz obtains the equivalent masking material from its VOLE backend; the construction does not assume a fixed value of $r$.
+   Schmivitz obtains the equivalent masking material from its VOLE backend; the construction does not assume a fixed value of $`r`$.
 
 3. **Compose the full-field masking commitments.** Let $`\alpha\in\mathbb{F}_{p^r}`$ be such that $`(1,\alpha,\ldots,\alpha^{r-1})`$ is an $`\mathbb{F}_p`$-basis of $`\mathbb{F}_{p^r}`$. For every $`j\in\{1,\ldots,d-1\}`$, apply the same linear combination to the value, mask, and tag:
 
