@@ -44,8 +44,8 @@ pub trait FancyZeroKnowledge<FF: FiniteField>: Fancy {
 ///     fn execute(&self, backend: &mut B, _: (), channel: &mut Channel) -> Result<()> {
 ///         let inputs = backend.witnesses::<4>(channel)?;
 ///         backend.assert_zero_higher_degree(&inputs, |b, x| {
-///             let x01 = b.h_mul(&x[0], &x[1])?;
-///             let x23 = b.h_mul(&x[2], &x[3])?;
+///             let x01 = b.h_mul(&x[0], &x[1]);
+///             let x23 = b.h_mul(&x[2], &x[3]);
 ///             b.h_mul(&x01, &x23)
 ///         }, channel)
 ///     }
