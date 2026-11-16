@@ -8,8 +8,6 @@ use std::marker::PhantomData;
 
 use swanky_field::{FiniteField, IsSubFieldOf};
 
-use super::power;
-
 /// The prover's [VOLE commitment](crate::higher_degree_commitment#commitment-polynomials) to a value in `F`.
 /// The highest-degree coefficient holds that value; lower coefficients in `FE` mask it.
 #[derive(Clone, Debug)]
@@ -182,7 +180,7 @@ where
     /// See the [gate operations](crate::higher_degree_commitment#gate-by-gate-commitment-propagation).
     pub fn addc(&self, c: F, delta: FE) -> Self {
         Self {
-            evaluation: self.evaluation + c * power(delta, self.degree),
+            evaluation: self.evaluation + c * delta.pow_var_time(self.degree as u128),
             ..*self
         }
     }
@@ -192,8 +190,8 @@ where
     pub fn add(&self, other: &Self, delta: FE) -> Self {
         let degree = self.degree.max(other.degree);
         Self {
-            evaluation: power(delta, degree - self.degree) * self.evaluation
-                + power(delta, degree - other.degree) * other.evaluation,
+            evaluation: delta.pow_var_time((degree - self.degree) as u128) * self.evaluation
+                + delta.pow_var_time((degree - other.degree) as u128) * other.evaluation,
             degree,
             phantom: PhantomData,
         }

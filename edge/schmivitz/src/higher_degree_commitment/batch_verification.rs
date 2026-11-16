@@ -13,7 +13,7 @@ use swanky_field::{FiniteField, IsSubFieldOf};
 
 use crate::vole::ExtensionFieldLifter;
 
-use super::{CommitmentPolynomialProver, CommitmentPolynomialVerifier, power};
+use super::{CommitmentPolynomialProver, CommitmentPolynomialVerifier};
 
 /// Evaluate the polynomial at `point` using Horner's method.
 /// Coefficients are ordered from constant to highest degree.
@@ -295,7 +295,7 @@ where
         // Constraint contributions: $\sum_i\chi_i\Delta^{d-d_i}\gamma_i$.
         let mut expected = FE::ZERO;
         for (degree, aggregate) in self.aggregates.iter().enumerate() {
-            expected += power(delta, max_higher_degree - degree) * *aggregate;
+            expected += delta.pow_var_time((max_higher_degree - degree) as u128) * *aggregate;
         }
 
         // Mask contributions: $\sum_j\Delta^{j-1}\nu_j$, organizing the flat stream into per-mask
