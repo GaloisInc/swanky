@@ -715,12 +715,14 @@ mod tests {
             channel: &mut swanky_channel::Channel,
         ) -> Result<()> {
             let inputs = backend.witnesses::<4>(channel)?;
-            let product = backend.and(&inputs[0], &inputs[2], channel)?;
-            let x = inputs.map(|wire| backend.to_higher_degree_wire(wire));
+            let x = inputs
+                .clone()
+                .map(|wire| backend.to_higher_degree_wire(wire));
             let x01 = backend.h_mul(&x[0], &x[1]);
             let x13 = backend.h_mul(&x[1], &x[3]);
             let zero = backend.h_mul(&x01, &x13);
             backend.h_assert_zero(zero)?;
+            let product = backend.and(&inputs[0], &inputs[2], channel)?;
             backend.assert_zero(&product, channel)?;
             let zero = backend.h_mul(&x[0], &x[2]);
             backend.h_assert_zero(zero)?;
