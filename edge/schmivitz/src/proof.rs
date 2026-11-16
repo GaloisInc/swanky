@@ -16,7 +16,6 @@ use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b};
-use swanky_sieve_ir_api::HigherDegreeCircuitExecuter;
 
 use crate::vole::commit_reconstruct::l_hat;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
@@ -28,7 +27,6 @@ use crate::{
     },
     parameters::{FLambda, Params, RepetitionParam, SecurityParamBytes},
     proof::{
-        higher_degree_circuit_adapter::HigherDegreeCircuitAdapter,
         prover_preparer::{ProverPreparer, ProverPreparerParts},
         prover_traverser::{ProverTraverser, ProverTraverserParts},
         transcript::ChiGenerator,
@@ -42,7 +40,6 @@ use crate::{
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
 
-mod higher_degree_circuit_adapter;
 mod prover_preparer;
 mod prover_traverser;
 mod transcript;
@@ -260,28 +257,6 @@ where
         })
     }
 
-    /// Create a proof for a circuit using the higher degree circuit API.
-    pub fn prove_higher_degree<C, RNG>(
-        circuit: &C,
-        private_input: &[F2],
-        witness_size: Option<usize>,
-        transcript: &mut Transcript,
-        rng: &mut RNG,
-    ) -> Result<Self>
-    where
-        C: HigherDegreeCircuitExecuter<F2, FLambda<P>>,
-        RNG: CryptoRng,
-        F2: IsSubFieldOf<FLambda<P>>,
-    {
-        Self::prove(
-            &HigherDegreeCircuitAdapter::<_, FLambda<P>>::new(circuit),
-            private_input,
-            witness_size,
-            transcript,
-            rng,
-        )
-    }
-
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // Account for both witness commitments and higher-degree masking material, and require the
@@ -449,14 +424,6 @@ where
 
         Ok(())
     }
-
-    /// Verify a proof for a circuit using the higher degree circuit API.
-    pub fn verify_higher_degree<C>(&self, circuit: &C, transcript: &mut Transcript) -> Result<()>
-    where
-        C: HigherDegreeCircuitExecuter<F2, FLambda<P>>,
-    {
-        self.verify(&HigherDegreeCircuitAdapter::new(circuit), transcript)
-    }
 }
 
 /// The secret material for the prover is the extended witness.
@@ -524,15 +491,14 @@ where
 mod tests {
     use crate::parameters::{Binary128Bit, Binary256Bit, FLambda, Params};
 
+    use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyHigherDegree};
     use merlin::Transcript;
     use rand::rng;
     use std::io::Write;
-    use std::marker::PhantomData;
     use std::{fs::File, io::Cursor};
     use swanky_error::{ErrorKind, Result, WrapErr};
     use swanky_field::{FiniteRing, IsSubFieldOf};
     use swanky_field_binary::F2;
-    use swanky_sieve_ir_api::{CircuitResult, HigherDegreeBackend, HigherDegreeCircuitExecuter};
     use tempfile::tempdir;
 
     use crate::{
@@ -680,23 +646,32 @@ mod tests {
     }
 
     /// Ordinary gates interleaved with higher-degree constraints of degrees 1, 2, and 4.
-    struct HigherDegreeCircuit<P>(PhantomData<P>);
+    struct HigherDegreeCircuit;
 
-    impl<P: Params> HigherDegreeCircuitExecuter<F2, FLambda<P>> for HigherDegreeCircuit<P> {
-        fn execute<B: HigherDegreeBackend<F2, FLambda<P>>>(
+    impl<B: FancyBinary + FancyHigherDegree<F2>> FancyCircuit<B> for HigherDegreeCircuit {
+        type Input = ();
+        type Output = ();
+
+        fn execute(
             &self,
             backend: &mut B,
-        ) -> CircuitResult<()> {
-            let inputs = backend.inputs_private::<4>()?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1])?;
-                let x23 = b.h_mul(&x[2], &x[3])?;
-                b.h_mul(&x01, &x23)
-            })?;
-            let product = backend.mul(&inputs[0], &inputs[2])?;
-            backend.assert_zero(&product)?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]))?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE))?;
+            _: (),
+            channel: &mut swanky_channel::Channel,
+        ) -> Result<()> {
+            let inputs = backend.witnesses::<4>(channel)?;
+            backend.assert_zero_higher_degree(
+                &inputs,
+                |b, x| {
+                    let x01 = b.h_mul(&x[0], &x[1])?;
+                    let x23 = b.h_mul(&x[2], &x[3])?;
+                    b.h_mul(&x01, &x23)
+                },
+                channel,
+            )?;
+            let product = backend.and(&inputs[0], &inputs[2], channel)?;
+            backend.assert_zero(&product, channel)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]), channel)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE), channel)?;
             Ok(())
         }
     }
@@ -710,9 +685,9 @@ mod tests {
         let private_input = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
         let rng = &mut rng();
 
-        let circuit = HigherDegreeCircuit::<P>(PhantomData);
+        let circuit = HigherDegreeCircuit;
 
-        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_higher_degree(
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
             &circuit,
             &private_input,
             Some(5),
@@ -724,28 +699,37 @@ mod tests {
         // coefficients.
         assert_eq!(proof.higher_degree_commitment.max_degree(), 4);
 
-        proof.verify_higher_degree(&circuit, &mut transcript())
+        proof.verify(&circuit, &mut transcript())
     }
 
     /// The same shape as [`HigherDegreeCircuit`] (same witness count and constraint degree), but
     /// a different constraint: x0 * x1 * x1 * x3.
-    struct WrongHigherDegreeCircuit<P>(PhantomData<P>);
+    struct WrongHigherDegreeCircuit;
 
-    impl<P: Params> HigherDegreeCircuitExecuter<F2, FLambda<P>> for WrongHigherDegreeCircuit<P> {
-        fn execute<B: HigherDegreeBackend<F2, FLambda<P>>>(
+    impl<B: FancyBinary + FancyHigherDegree<F2>> FancyCircuit<B> for WrongHigherDegreeCircuit {
+        type Input = ();
+        type Output = ();
+
+        fn execute(
             &self,
             backend: &mut B,
-        ) -> CircuitResult<()> {
-            let inputs = backend.inputs_private::<4>()?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1])?;
-                let x13 = b.h_mul(&x[1], &x[3])?;
-                b.h_mul(&x01, &x13)
-            })?;
-            let product = backend.mul(&inputs[0], &inputs[2])?;
-            backend.assert_zero(&product)?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]))?;
-            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE))?;
+            _: (),
+            channel: &mut swanky_channel::Channel,
+        ) -> Result<()> {
+            let inputs = backend.witnesses::<4>(channel)?;
+            backend.assert_zero_higher_degree(
+                &inputs,
+                |b, x| {
+                    let x01 = b.h_mul(&x[0], &x[1])?;
+                    let x13 = b.h_mul(&x[1], &x[3])?;
+                    b.h_mul(&x01, &x13)
+                },
+                channel,
+            )?;
+            let product = backend.and(&inputs[0], &inputs[2], channel)?;
+            backend.assert_zero(&product, channel)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mul(&x[0], &x[2]), channel)?;
+            backend.assert_zero_higher_degree(&inputs, |b, x| b.h_mulc(&x[2], F2::ONE), channel)?;
             Ok(())
         }
     }
@@ -757,8 +741,8 @@ mod tests {
         let private_input = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
         let rng = &mut rng();
 
-        let circuit = HigherDegreeCircuit::<P>(PhantomData);
-        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove_higher_degree(
+        let circuit = HigherDegreeCircuit;
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
             &circuit,
             &private_input,
             Some(5),
@@ -766,14 +750,10 @@ mod tests {
             rng,
         )?;
 
-        let circuit = WrongHigherDegreeCircuit::<P>(PhantomData);
+        let circuit = WrongHigherDegreeCircuit;
         // The wrong circuit has the same transcript footprint, so only the higher degree
         // constraint check (pi(Delta) = q) catches the mismatch.
-        assert!(
-            proof
-                .verify_higher_degree(&circuit, &mut transcript())
-                .is_err()
-        );
+        assert!(proof.verify(&circuit, &mut transcript()).is_err());
 
         Ok(())
     }

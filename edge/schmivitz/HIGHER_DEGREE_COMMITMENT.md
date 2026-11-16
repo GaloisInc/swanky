@@ -243,10 +243,10 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
 
 ## Schmivitz integration
 
-The polynomial-gate API belongs in `edge/sieve-ir-api`, and the protocol implementation belongs in `edge/schmivitz`.
+The higher-degree commitment API belongs in `edge/fancy-traits`, and the protocol implementation belongs in `edge/schmivitz`.
 Schmivitz instantiates the construction with `F2` as the base field and `F128b` as the extension field.
 
-`edge/sieve-ir-api` defines the cross-crate circuit interface: `HigherDegreeBackend` adds the four polynomial gate operations and higher-degree zero assertion, while `HigherDegreeCircuitExecuter` lets a circuit execute against any such backend.
+`FancyHigherDegree<F2>` extends `FancyZeroKnowledge<F2>` with the four usual arithmetic operations and a higher-degree zero assertion. Circuits implement the existing `fancy_traits::Circuit` trait; ordinary inputs use `Fancy::Item`, while the assertion callback composes separate higher-degree wires.
 
 Unlike step 5, Schmivitz uses successive powers of one Fiat–Shamir challenge, shared across ordinary and higher-degree checks.
 The paper's independent-weight batching bound therefore needs a separate justification for this adaptation.
@@ -265,7 +265,7 @@ masks, and tags.
 `ProverTraverser` builds and batches `CommitmentPolynomialProver` values, while `VerifierTraverser` mirrors
 the same gates using `CommitmentPolynomialVerifier` values and batches the resulting constraint evaluations.
 
-`src/proof.rs` orchestrates these stages: `HigherDegreeCircuitAdapter` connects the higher-degree circuit API to the existing `FancyCircuit` pipeline, the higher-degree proof entry points reserve the extra VOLEs, and proof generation and verification finalize the accumulators and bind the masked polynomial coefficients into the transcript and proof.
+`src/proof.rs` orchestrates these stages through the existing `Proof::prove` and `Proof::verify` entry points. Proof generation reserves the extra VOLEs, and generation and verification finalize the accumulators and bind the masked polynomial coefficients into the transcript and proof.
 
 ## Reference
 

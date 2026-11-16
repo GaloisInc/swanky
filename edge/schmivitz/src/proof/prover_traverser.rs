@@ -1,9 +1,11 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyHigherDegree, FancyZeroKnowledge,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail, swanky_error};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
+use swanky_sieve_ir_api::FieldBackend;
 use swanky_sieve_ir_parser::WireId;
 
 use crate::higher_degree_commitment::{
@@ -322,8 +324,7 @@ where
     }
 }
 
-impl<Vole: RandomVoleP<Params = P>, P: Params> HigherDegreeBackend<F2, P::FLambda>
-    for ProverTraverser<Vole, P>
+impl<Vole: RandomVoleP<Params = P>, P: Params> FancyHigherDegree<F2> for ProverTraverser<Vole, P>
 where
     F2: IsSubFieldOf<P::FLambda>,
 {
@@ -333,15 +334,11 @@ where
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    ) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.add(rhs))
     }
 
-    fn h_addc(
-        &self,
-        lhs: &Self::HigherDegreeWire,
-        rhs: F2,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.addc(rhs))
     }
 
@@ -349,23 +346,20 @@ where
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    ) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.mul(rhs))
     }
 
-    fn h_mulc(
-        &self,
-        lhs: &Self::HigherDegreeWire,
-        rhs: F2,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.mulc(rhs))
     }
 
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
-        inputs: &[Self::Wire; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
-    ) -> CircuitResult<()> {
+        inputs: &[Self::Item; INPUT_LEN],
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Result<Self::HigherDegreeWire>,
+        _: &mut Channel,
+    ) -> Result<()> {
         // Build the input commitments and evaluate the constraint over them.
         let constraint = f(
             self,
@@ -416,25 +410,35 @@ mod tests {
         let product_values = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
         let product_wires: [(F2, F128b); 4] =
             std::array::from_fn(|i| (product_values[i], F128b::random(rng)));
-        traverser
-            .assert_zero_higher_degree(&product_wires, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1])?;
-                let x23 = b.h_mul(&x[2], &x[3])?;
-                b.h_mul(&x01, &x23)
-            })
-            .unwrap();
+        Channel::with(std::io::empty(), |channel| {
+            traverser.assert_zero_higher_degree(
+                &product_wires.map(|(x, w)| Wire(x, w)),
+                |b, x| {
+                    let x01 = b.h_mul(&x[0], &x[1])?;
+                    let x23 = b.h_mul(&x[2], &x[3])?;
+                    b.h_mul(&x01, &x23)
+                },
+                channel,
+            )
+        })
+        .unwrap();
 
         // Witness satisfying x0 * x1 + x2 * x3 == 0, a degree-2 constraint.
         let sum_values = [F2::ONE; 4];
         let sum_wires: [(F2, F128b); 4] =
             std::array::from_fn(|i| (sum_values[i], F128b::random(rng)));
-        traverser
-            .assert_zero_higher_degree(&sum_wires, |b, x| {
-                let x01 = b.h_mul(&x[0], &x[1])?;
-                let x23 = b.h_mul(&x[2], &x[3])?;
-                b.h_add(&x01, &x23)
-            })
-            .unwrap();
+        Channel::with(std::io::empty(), |channel| {
+            traverser.assert_zero_higher_degree(
+                &sum_wires.map(|(x, w)| Wire(x, w)),
+                |b, x| {
+                    let x01 = b.h_mul(&x[0], &x[1])?;
+                    let x23 = b.h_mul(&x[2], &x[3])?;
+                    b.h_add(&x01, &x23)
+                },
+                channel,
+            )
+        })
+        .unwrap();
 
         let ProverTraverserParts {
             higher_degree_accumulator: accumulator,

@@ -2,9 +2,7 @@ use fancy_traits::{Circuit, FancyBinary, FancyZeroKnowledge};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{
-    CircuitExecuter, CircuitResult, FieldBackend, HigherDegreeBackend, HigherDegreeCircuitExecuter,
-};
+use swanky_sieve_ir_api::{CircuitExecuter, CircuitResult, FieldBackend};
 
 pub struct ExampleCircuit<const N: usize>;
 
@@ -32,14 +30,6 @@ impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for Exa
         // backend.assert_zero(&v2)?;
 
         Ok(())
-    }
-}
-
-// This circuit has no higher degree constraints, so executing it on a `HigherDegreeBackend` only
-// exercises the `FieldBackend` gates.
-impl<FE, const N: usize> HigherDegreeCircuitExecuter<F2, FE> for ExampleCircuit<N> {
-    fn execute<B: HigherDegreeBackend<F2, FE>>(&self, backend: &mut B) -> CircuitResult<()> {
-        <Self as CircuitExecuter<F2>>::execute(self, backend)
     }
 }
 

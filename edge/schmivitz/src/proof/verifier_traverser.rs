@@ -1,9 +1,11 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyHigherDegree, FancyZeroKnowledge,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
-use swanky_sieve_ir_api::{CircuitResult, FieldBackend, HigherDegreeBackend};
+use swanky_sieve_ir_api::FieldBackend;
 
 use crate::higher_degree_commitment::{
     BatchVerifierAccumulatorF2FLambda, CommitmentPolynomialVerifier,
@@ -267,7 +269,7 @@ where
         Ok(())
     }
 }
-impl<P: Params> HigherDegreeBackend<F2, P::FLambda> for VerifierTraverser<P>
+impl<P: Params> FancyHigherDegree<F2> for VerifierTraverser<P>
 where
     F2: IsSubFieldOf<P::FLambda>,
 {
@@ -280,17 +282,13 @@ where
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    ) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.add(rhs, self.verifier_key))
     }
 
     /// Mirrors
     /// [`CommitmentPolynomialVerifier::addc`] on verifier commitments.
-    fn h_addc(
-        &self,
-        lhs: &Self::HigherDegreeWire,
-        rhs: F2,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.addc(rhs, self.verifier_key))
     }
 
@@ -298,27 +296,24 @@ where
         &self,
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    ) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.mul(rhs))
     }
 
-    fn h_mulc(
-        &self,
-        lhs: &Self::HigherDegreeWire,
-        rhs: F2,
-    ) -> CircuitResult<Self::HigherDegreeWire> {
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Result<Self::HigherDegreeWire> {
         Ok(lhs.mulc(rhs))
     }
 
     fn assert_zero_higher_degree<const INPUT_LEN: usize>(
         &mut self,
-        inputs: &[Self::Wire; INPUT_LEN],
-        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> CircuitResult<Self::HigherDegreeWire>,
-    ) -> CircuitResult<()> {
+        inputs: &[Self::Item; INPUT_LEN],
+        f: impl Fn(&Self, [Self::HigherDegreeWire; INPUT_LEN]) -> Result<Self::HigherDegreeWire>,
+        _: &mut Channel,
+    ) -> Result<()> {
         // Treat each masked witness as a degree-one verifier-side commitment.
         let constraint = f(
             self,
-            std::array::from_fn(|i| CommitmentPolynomialVerifier::from_base_vole(inputs[i])),
+            std::array::from_fn(|i| CommitmentPolynomialVerifier::from_base_vole(inputs[i].0)),
         )?;
 
         // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
