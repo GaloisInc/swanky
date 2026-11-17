@@ -114,11 +114,14 @@ where
         Ok(self.masked_witnesses[next_index])
     }
 
-    /// Decomposes into the aggregate components (a partial construction of `c~` and the higher
-    /// degree aggregates) that were built during full circuit traversal.
-    ///
-    /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<VerifierTraverserParts<P>> {
+    /// Run `circuit` and return its aggregates, checking that all masked witnesses were used.
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(
+        mut self,
+        circuit: &C,
+    ) -> Result<VerifierTraverserParts<P>> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(&mut self, (), channel)
+        })?;
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -131,14 +134,6 @@ where
             validation_aggregate: self.aggregate,
             aggregate_assert_zero: self.aggregate_assert_zero,
             higher_degree_accumulator: self.higher_degree_accumulator,
-        })
-    }
-
-    /// Run `circuit` using [`VerifierTraverser`].
-    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(self, (), channel)?;
-            Ok(())
         })
     }
 }

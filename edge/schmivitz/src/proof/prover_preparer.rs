@@ -64,11 +64,6 @@ impl<'a> ProverPreparer<'a> {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn count(&self) -> usize {
-        self.witness.len()
-    }
-
     /// Get the maximum degree among the higher-degree constraint polynomials seen during
     /// traversal (0 if there were none).
     #[cfg(test)]
@@ -76,22 +71,18 @@ impl<'a> ProverPreparer<'a> {
         self.max_higher_degree
     }
 
-    /// Decompose the preparer into the values computed during circuit traversal.
-    ///
-    /// The values will be null if the circuit has not been traversed.
-    pub(crate) fn into_parts(self) -> ProverPreparerParts {
-        ProverPreparerParts {
+    /// Run `circuit` and return the prepared witness and circuit statistics.
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(
+        mut self,
+        circuit: &C,
+    ) -> Result<ProverPreparerParts> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(&mut self, (), channel)
+        })?;
+        Ok(ProverPreparerParts {
             witness: self.witness,
             challenge_count: self.challenge_count,
             max_higher_degree: self.max_higher_degree,
-        }
-    }
-
-    /// Run `circuit` using [`ProverPreparer`].
-    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(self, (), channel)?;
-            Ok(())
         })
     }
 }
@@ -272,15 +263,10 @@ mod tests {
         Ok(circuit_loaded)
     }
 
-    fn prepare_circuit<'a>(
-        circuit_loaded: &'a Circuit,
-    ) -> swanky_error::Result<ProverPreparer<'a>> {
+    fn prepare_circuit(circuit_loaded: &Circuit) -> swanky_error::Result<ProverPreparerParts> {
         let (circuit, private_input, max_wire_id) = circuit_loaded.to_interpreter();
 
-        let mut counter: ProverPreparer =
-            ProverPreparer::new(private_input, Some(max_wire_id as usize))?;
-        counter.execute(&circuit)?;
-        Ok(counter)
+        ProverPreparer::new(private_input, Some(max_wire_id as usize))?.execute(&circuit)
     }
 
     #[test]
@@ -295,7 +281,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(private_input_only)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 3);
+        assert_eq!(counter.witness.len(), 3);
 
         let private_input_range = "version 2.0.0;
             circuit;
@@ -305,7 +291,7 @@ mod tests {
             @end";
         let circuit = load_circuit(private_input_range)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 4);
+        assert_eq!(counter.witness.len(), 4);
         Ok(())
     }
 
@@ -320,7 +306,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 2);
+        assert_eq!(counter.witness.len(), 2);
 
         let many_mul = "version 2.0.0;
             circuit;
@@ -336,7 +322,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(many_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 7);
+        assert_eq!(counter.witness.len(), 7);
         Ok(())
     }
 
@@ -354,7 +340,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 2);
+        assert_eq!(counter.witness.len(), 2);
 
         let many_mul = "version 2.0.0;
             circuit;
@@ -371,7 +357,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(many_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 7);
+        assert_eq!(counter.witness.len(), 7);
         Ok(())
     }
 
@@ -428,11 +414,12 @@ mod tests {
         add_degree_two_constraint(&mut preparer)?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
-        let ProverPreparerParts {
+        let ProverPreparer {
             witness,
             challenge_count,
             max_higher_degree,
-        } = preparer.into_parts();
+            ..
+        } = preparer;
 
         assert!(witness.is_empty());
         assert_eq!(challenge_count, 2);

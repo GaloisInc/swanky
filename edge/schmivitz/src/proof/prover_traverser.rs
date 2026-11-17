@@ -130,33 +130,6 @@ where
         self.voles.vole_mask(next_index)
     }
 
-    /// Decomposes into the aggregate components that we constructed during the
-    /// full circuit traversal.
-    ///
-    /// The components that were passed to [`Self::new()`] are returned unchanged.
-    ///
-    /// This will fail if there are witness values without a corresponding VOLE. Note that the
-    /// VOLEs may contain more correlations than the witness requires; the trailing ones are
-    /// reserved for masking the higher degree aggregate (see
-    /// [`Proof::prove()`](crate::proof::Proof::prove)).
-    pub(crate) fn into_parts(self) -> Result<ProverTraverserParts<Vole, P>> {
-        if self.vole_assignment_count != self.extended_witness.len() {
-            bail!(
-                ErrorKind::OtherError,
-                "Traversal did not use exactly one VOLE per extended witness value! Had {}, used {}",
-                self.extended_witness.len(),
-                self.vole_assignment_count
-            );
-        }
-        Ok(ProverTraverserParts {
-            degree_0_aggregation: self.aggregate_degree_0,
-            degree_1_aggregation: self.aggregate_degree_1,
-            assert_zero_commitment: self.aggregate_assert_zero,
-            higher_degree_accumulator: self.higher_degree_accumulator,
-            voles: self.voles,
-        })
-    }
-
     /// Get the next extended witness value.
     pub(crate) fn next_witness_value(&mut self) -> Result<F2> {
         let wid = self.wire_values_pos;
@@ -177,11 +150,28 @@ where
             .copied()
     }
 
-    /// Run `circuit` using [`ProverTraverser`].
-    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
+    /// Run `circuit` and return its aggregates, checking that every witness value used a VOLE.
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(
+        mut self,
+        circuit: &C,
+    ) -> Result<ProverTraverserParts<Vole, P>> {
         Channel::with(std::io::empty(), |channel| {
-            circuit.execute(self, (), channel)?;
-            Ok(())
+            circuit.execute(&mut self, (), channel)
+        })?;
+        if self.vole_assignment_count != self.extended_witness.len() {
+            bail!(
+                ErrorKind::OtherError,
+                "Traversal did not use exactly one VOLE per extended witness value! Had {}, used {}",
+                self.extended_witness.len(),
+                self.vole_assignment_count
+            );
+        }
+        Ok(ProverTraverserParts {
+            degree_0_aggregation: self.aggregate_degree_0,
+            degree_1_aggregation: self.aggregate_degree_1,
+            assert_zero_commitment: self.aggregate_assert_zero,
+            higher_degree_accumulator: self.higher_degree_accumulator,
+            voles: self.voles,
         })
     }
 }
@@ -419,10 +409,10 @@ mod tests {
         let zero = traverser.h_add(&x01, &x23);
         traverser.h_assert_zero(zero).unwrap();
 
-        let ProverTraverserParts {
+        let ProverTraverser {
             higher_degree_accumulator: accumulator,
             ..
-        } = traverser.into_parts().unwrap();
+        } = traverser;
 
         // The aggregate is aligned to the maximum constraint degree (4), and its highest-degree
         // coefficient still commits to zero.

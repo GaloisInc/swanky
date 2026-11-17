@@ -144,14 +144,13 @@ where
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
-        let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
-        circuit_preparer.execute(circuit)?;
+        let circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
 
         let ProverPreparerParts {
             witness,
             challenge_count: _challenge_count,
             max_higher_degree,
-        } = circuit_preparer.into_parts();
+        } = circuit_preparer.execute(circuit)?;
 
         // Reserve the VOLEs needed to mask the higher-degree batch after the witness VOLEs.
         let mask_vole_count =
@@ -195,9 +194,8 @@ where
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
-        let mut circuit_traverser =
+        let circuit_traverser =
             ProverTraverser::new(witness, chi_challenge, voles, max_higher_degree)?;
-        circuit_traverser.execute(circuit)?;
 
         let ProverTraverserParts {
             degree_0_aggregation,
@@ -205,9 +203,9 @@ where
             assert_zero_commitment,
             higher_degree_accumulator,
             voles,
-        } = circuit_traverser.into_parts()?;
+        } = circuit_traverser.execute(circuit)?;
 
-        log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
+        log::info!("4: circuit traverser: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
@@ -357,19 +355,18 @@ where
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let max_higher_degree = self.higher_degree_commitment.max_degree();
-        let mut verifier_traverser = VerifierTraverser::new(
+        let verifier_traverser = VerifierTraverser::new(
             chi_challenge,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
             max_higher_degree,
         )?;
-        verifier_traverser.execute(circuit)?;
 
         let VerifierTraverserParts {
             validation_aggregate,
             aggregate_assert_zero,
             higher_degree_accumulator,
-        } = verifier_traverser.into_parts()?;
+        } = verifier_traverser.execute(circuit)?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
