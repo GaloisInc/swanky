@@ -131,8 +131,8 @@ fn _bench_opprf(points: Vec<(U8x16, Block512)>, inputs: Vec<U8x16>) {
 }
 
 fn bench_opprf(c: &mut Criterion) {
-    c.bench_function("opprf::kmprt (t = 1, n = 2^2)", move |bench| {
-        let inputs = rand_u8x16_vec(1);
+    c.bench_function("opprf::kmprt (t = 2^2, n = 2^2)", move |bench| {
+        let inputs = rand_u8x16_vec(1 << 2);
         let points = rand_point_vec(1 << 2);
         bench.iter(|| {
             _bench_opprf(points.clone(), inputs.clone());
