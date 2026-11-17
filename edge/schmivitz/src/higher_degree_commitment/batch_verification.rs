@@ -113,10 +113,11 @@ where
         for (i, coefficient) in constraint.lower_coefficients().iter().enumerate() {
             self.aggregate[i + shift] += challenge * *coefficient;
         }
-        // The committed (highest-degree) coefficient is scaled by the challenge too.
-        // TODO: check that shift + constraint.degree() == max_degree and replace
-        // TODO: the constraint.highest_degree is zero, so we should drop that altogether.
-        self.aggregate[shift + constraint.degree()] += constraint.highest_degree() * challenge;
+
+        // NOTE: the highest coefficient is checked to be zero above, so we omit adding
+        // the highest-degree coefficient multiplied by the challenge:
+        // `self.aggregate[shift + constraint.degree()] += constraint.highest_degree() * challenge;`
+
         Ok(())
     }
 
