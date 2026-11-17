@@ -64,6 +64,9 @@ where
 
     /// Streamed accumulator for the higher-degree constraint batch, grouped by degree.
     higher_degree_accumulator: BatchVerifierAccumulatorF2FLambda<P>,
+
+    /// Powers of the verifier's key through the maximum higher-degree constraint degree.
+    delta_powers: Vec<FLambda<P>>,
 }
 
 impl<P: Params> VerifierTraverser<P>
@@ -77,6 +80,10 @@ where
         max_higher_degree: usize,
     ) -> Result<Self> {
         // TODO: Add additional asserts here?
+        let mut delta_powers = vec![FLambda::<P>::ONE; max_higher_degree + 1];
+        for degree in 1..=max_higher_degree {
+            delta_powers[degree] = delta_powers[degree - 1] * verifier_key;
+        }
         Ok(Self {
             chi_challenge,
             verifier_key,
@@ -85,6 +92,7 @@ where
             aggregate: FLambda::<P>::ZERO,
             aggregate_assert_zero: FLambda::<P>::ZERO,
             higher_degree_accumulator: BatchVerifierAccumulatorF2FLambda::new(max_higher_degree),
+            delta_powers,
         })
     }
 
@@ -282,13 +290,13 @@ where
         lhs: &Self::HigherDegreeWire,
         rhs: &Self::HigherDegreeWire,
     ) -> Self::HigherDegreeWire {
-        lhs.add(rhs, self.verifier_key)
+        lhs.add(rhs, &self.delta_powers)
     }
 
     /// Mirrors
     /// [`CommitmentPolynomialVerifier::addc`] on verifier commitments.
     fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
-        lhs.addc(rhs, self.verifier_key)
+        lhs.addc(rhs, &self.delta_powers)
     }
 
     fn h_mul(
@@ -309,5 +317,28 @@ where
         self.higher_degree_accumulator
             .push_constraint(&wire, challenge)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::rng;
+    use swanky_field_binary::F128b;
+
+    use super::*;
+    use crate::parameters::Binary128Bit;
+
+    #[test]
+    fn delta_powers_are_precomputed() {
+        let delta = F128b::random(&mut rng());
+        let traverser = VerifierTraverser::<Binary128Bit>::new(
+            ChiGenerator::new(F128b::ONE),
+            delta,
+            Vec::new(),
+            4,
+        )
+        .unwrap();
+        let expected: Vec<_> = (0..=4).map(|degree| delta.pow(degree)).collect();
+        assert_eq!(traverser.delta_powers, expected);
     }
 }

@@ -176,22 +176,22 @@ where
         self.evaluation
     }
 
-    /// Add a constant, using `delta` to update the committed value's contribution.
+    /// Add a constant, using precomputed powers of `delta` to update the committed value's contribution.
     /// See the [gate operations](crate::higher_degree_commitment#gate-by-gate-commitment-propagation).
-    pub fn addc(&self, c: F, delta: FE) -> Self {
+    pub fn addc(&self, c: F, delta_powers: &[FE]) -> Self {
         Self {
-            evaluation: self.evaluation + c * delta.pow_var_time(self.degree as u128),
+            evaluation: self.evaluation + c * delta_powers[self.degree],
             ..*self
         }
     }
 
-    /// Add two commitment evaluations, aligning to the maximum degree using `delta`.
+    /// Add two commitment evaluations, aligning their degrees using precomputed powers through the degree difference.
     /// See the [gate operations](crate::higher_degree_commitment#gate-by-gate-commitment-propagation).
-    pub fn add(&self, other: &Self, delta: FE) -> Self {
+    pub fn add(&self, other: &Self, delta_powers: &[FE]) -> Self {
         let degree = self.degree.max(other.degree);
         Self {
-            evaluation: delta.pow_var_time((degree - self.degree) as u128) * self.evaluation
-                + delta.pow_var_time((degree - other.degree) as u128) * other.evaluation,
+            evaluation: delta_powers[degree - self.degree] * self.evaluation
+                + delta_powers[degree - other.degree] * other.evaluation,
             degree,
             phantom: PhantomData,
         }
@@ -226,14 +226,6 @@ mod tests {
     use swanky_field::{FiniteField, IsSubFieldOf};
     use swanky_field_binary::{F2, F8b, F128b};
     use swanky_rng::SwankyRng;
-
-    fn pow_fe<FE: FiniteField>(base: FE, exp: usize) -> FE {
-        let mut result = FE::ONE;
-        for _ in 0..exp {
-            result *= base;
-        }
-        result
-    }
 
     /// Reference polynomial evaluation independent of `evaluate_at_point`'s Horner
     /// implementation: cross-checks correctness by recomputing the sum directly.
@@ -355,13 +347,14 @@ mod tests {
         prop_assert_eq!(result.degree(), degree);
         prop_assert_eq!(
             result.evaluate_at_point(point),
-            poly.evaluate_at_point(point) + c * pow_fe(point, degree),
+            poly.evaluate_at_point(point) + c * point.pow(degree as u128),
         );
+        let delta_powers: Vec<_> = (0..=degree).map(|d| point.pow(d as u128)).collect();
         let verifier = CommitmentPolynomialVerifier::<F, FE>::from_parts(
             poly.evaluate_at_point(point),
             degree,
         )
-        .addc(c, point);
+        .addc(c, &delta_powers);
         prop_assert_eq!(verifier.degree(), result.degree());
         prop_assert_eq!(verifier.evaluation(), result.evaluate_at_point(point));
         Ok(())
@@ -396,7 +389,7 @@ mod tests {
             CommitmentPolynomialVerifier::<F128b, F128b>::from_base_vole(w_x + val_x * point);
         let verifier_y =
             CommitmentPolynomialVerifier::<F128b, F128b>::from_base_vole(w_y + val_y * point);
-        let verifier_sum = verifier_x.add(&verifier_y, point);
+        let verifier_sum = verifier_x.add(&verifier_y, &[F128b::ONE, point]);
         assert_eq!(sum.degree(), 1);
         assert_eq!(sum.highest_degree(), val_x + val_y);
         assert_eq!(verifier_sum.degree(), sum.degree());
@@ -429,6 +422,7 @@ mod tests {
         let sum = poly_a.add(&poly_b);
 
         for point in points {
+            let delta_powers: Vec<_> = (0..=degree).map(|d| point.pow(d as u128)).collect();
             let verifier_a = CommitmentPolynomialVerifier::<F, FE>::from_parts(
                 poly_a.evaluate_at_point(point),
                 degree_a,
@@ -437,11 +431,12 @@ mod tests {
                 poly_b.evaluate_at_point(point),
                 degree_b,
             );
-            let verifier_sum = verifier_a.add(&verifier_b, point);
+            let verifier_sum = verifier_a.add(&verifier_b, &delta_powers);
             // ρ_sum(t) = t^(d-d_a) ρ_a(t) + t^(d-d_b) ρ_b(t).
             prop_assert_eq!(
-                poly_a.evaluate_at_point(point) * pow_fe(point, degree - poly_a.degree())
-                    + poly_b.evaluate_at_point(point) * pow_fe(point, degree - poly_b.degree()),
+                poly_a.evaluate_at_point(point) * point.pow((degree - poly_a.degree()) as u128)
+                    + poly_b.evaluate_at_point(point)
+                        * point.pow((degree - poly_b.degree()) as u128),
                 sum.evaluate_at_point(point),
                 "degrees = ({}, {}), point = {:?}",
                 poly_a.degree(),
