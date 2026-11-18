@@ -45,7 +45,7 @@ impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
 
 /// Accumulate prover constraints and form the masked polynomial $`\pi(t)`$ (step 6).
 /// Constraints are aligned to the maximum degree fixed at construction.
-pub struct BatchProverAccumulator<F, FE>
+pub(crate) struct BatchProverAccumulator<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
@@ -62,7 +62,7 @@ where
 {
     /// Create a prover accumulator with `max_degree` as the batch degree $`d`$ (step 1).
     /// A maximum degree of zero represents a batch with no higher degree constraints.
-    pub fn new(max_degree: usize) -> Self {
+    pub(crate) fn new(max_degree: usize) -> Self {
         Self {
             aggregate: if max_degree == 0 {
                 Vec::new()
@@ -75,14 +75,14 @@ where
 
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
     /// No masks are needed when `max_degree` is zero or one.
-    pub fn mask_vole_count(max_degree: usize) -> usize {
+    pub(crate) fn mask_vole_count(max_degree: usize) -> usize {
         max_degree.saturating_sub(1) * F::DegreeModulo::USIZE
     }
 
     /// Add a constraint to $`A(t)`$, weighting it by `challenge` and aligning its degree (step 6).
     /// Return an error if the batch degree is zero, the constraint exceeds it, or its committed
     /// value is nonzero.
-    pub fn push_constraint(
+    pub(crate) fn push_constraint(
         &mut self,
         constraint: &CommitmentPolynomialProver<F, FE>,
         challenge: FE,
@@ -115,25 +115,26 @@ where
     }
 
     /// Return the maximum constraint degree $`d`$ fixed at construction (step 1).
-    pub fn max_degree(&self) -> usize {
+    pub(crate) fn max_degree(&self) -> usize {
         self.aggregate.len().saturating_sub(1)
     }
 
     /// Return the degree-$`d`$ coefficient of $`A(t)`$, which is zero for accepted constraints (step 6).
     /// An empty batch returns zero.
-    pub fn top_coefficient(&self) -> FE {
+    pub(crate) fn top_coefficient(&self) -> FE {
         // TODO: revisit the default value once the proof path activates selectively the higher-degree polynomial only when needed.
         self.aggregate.last().copied().unwrap_or(FE::ZERO)
     }
 
     /// Evaluate the aggregate $`A(t)`$ at `point`, before adding the masks (step 6).
-    pub fn evaluate_at(&self, point: FE) -> FE {
+    #[cfg(test)]
+    pub(crate) fn evaluate_at(&self, point: FE) -> FE {
         evaluate_poly(&self.aggregate, point)
     }
 
     /// Mask the aggregate and return the transmitted coefficients of $`\pi(t)`$ (step 6).
     /// Both input streams must have the length returned by [`Self::mask_vole_count`].
-    pub fn finish(
+    pub(crate) fn finish(
         self,
         mask_values: &[F],
         mask_masks: &[FE],
@@ -171,7 +172,7 @@ where
 
 /// Accumulate constraint evaluations and check $`\pi(\Delta)=q`$ (step 7).
 /// Constraints are aligned to the maximum degree fixed at construction.
-pub struct BatchVerifierAccumulator<F, FE>
+pub(crate) struct BatchVerifierAccumulator<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
@@ -188,7 +189,7 @@ where
 {
     /// Create a verifier accumulator with `max_degree` as the batch degree $`d`$ (step 1).
     /// A maximum degree of zero represents a batch with no higher degree constraints.
-    pub fn new(max_degree: usize) -> Self {
+    pub(crate) fn new(max_degree: usize) -> Self {
         Self {
             aggregates: if max_degree == 0 {
                 Vec::new()
@@ -201,13 +202,13 @@ where
 
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
     /// No masks are needed when `max_degree` is zero or one.
-    pub fn mask_vole_count(max_degree: usize) -> usize {
+    pub(crate) fn mask_vole_count(max_degree: usize) -> usize {
         max_degree.saturating_sub(1) * F::DegreeModulo::USIZE
     }
 
     /// Add a verifier commitment, weighted by `challenge`, for degree alignment (step 7).
     /// Return an error if the batch degree is zero or the commitment exceeds it.
-    pub fn push_constraint(
+    pub(crate) fn push_constraint(
         &mut self,
         constraint: &CommitmentPolynomialVerifier<F, FE>,
         challenge: FE,
@@ -229,13 +230,13 @@ where
     }
 
     /// Return the maximum constraint degree $`d`$ fixed at construction (step 1).
-    pub fn max_degree(&self) -> usize {
+    pub(crate) fn max_degree(&self) -> usize {
         self.aggregates.len().saturating_sub(1)
     }
 
     /// Check the coefficient count and verify $`\pi(\Delta)=q`$ using the mask tags (step 7).
     /// Return an error if verification fails or the tag count differs from [`Self::mask_vole_count`].
-    pub fn finish(
+    pub(crate) fn finish(
         &self,
         delta: FE,
         mask_tags: &[FE],
