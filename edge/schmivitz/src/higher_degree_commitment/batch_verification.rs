@@ -73,15 +73,10 @@ where
         }
     }
 
-    /// Return the number of base VOLEs composed into one extension-field mask (step 3).
-    pub fn mask_vole_size() -> usize {
-        F::DegreeModulo::USIZE
-    }
-
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
     /// No masks are needed when `max_degree` is zero or one.
     pub fn mask_vole_count(max_degree: usize) -> usize {
-        max_degree.saturating_sub(1) * Self::mask_vole_size()
+        max_degree.saturating_sub(1) * F::DegreeModulo::USIZE
     }
 
     /// Add a constraint to $`A(t)`$, weighting it by `challenge` and aligning its degree (step 6).
@@ -146,12 +141,6 @@ where
         debug_assert_eq!(self.top_coefficient(), FE::ZERO);
         let degree = self.max_degree();
         let expected_mask_count = Self::mask_vole_count(degree);
-        let mask_vole_size = Self::mask_vole_size();
-        ensure!(
-            mask_vole_size != 0,
-            ErrorKind::OtherError,
-            "Extension field lifter must have a nonempty basis"
-        );
 
         ensure!(
             mask_values.len() == expected_mask_count && mask_masks.len() == expected_mask_count,
@@ -210,15 +199,10 @@ where
         }
     }
 
-    /// Return the number of base VOLEs composed into one extension-field mask (step 3).
-    pub fn mask_vole_size() -> usize {
-        F::DegreeModulo::USIZE
-    }
-
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
     /// No masks are needed when `max_degree` is zero or one.
     pub fn mask_vole_count(max_degree: usize) -> usize {
-        max_degree.saturating_sub(1) * Self::mask_vole_size()
+        max_degree.saturating_sub(1) * F::DegreeModulo::USIZE
     }
 
     /// Add a verifier commitment, weighted by `challenge`, for degree alignment (step 7).
@@ -266,13 +250,6 @@ where
             "Verification failed: expected {} higher degree commitment coefficients, got {}",
             max_higher_degree,
             prover_coefficients.max_degree()
-        );
-
-        let mask_vole_size = Self::mask_vole_size();
-        ensure!(
-            mask_vole_size != 0,
-            ErrorKind::OtherError,
-            "Extension field lifter must have a nonempty basis"
         );
 
         let expected_mask_count = Self::mask_vole_count(max_higher_degree);
