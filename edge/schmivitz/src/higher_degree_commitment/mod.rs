@@ -2,8 +2,7 @@
 
 mod commitment_polynomial;
 
-pub mod batch_verification;
-
+pub(crate) mod batch_verification;
 pub(crate) use batch_verification::{BatchProverAccumulator, BatchVerifierAccumulator};
 
-pub use commitment_polynomial::{CommitmentPolynomialProver, CommitmentPolynomialVerifier};
+pub(crate) use commitment_polynomial::{CommitmentPolynomialProver, CommitmentPolynomialVerifier};

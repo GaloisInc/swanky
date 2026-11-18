@@ -27,7 +27,7 @@ fn evaluate_poly<FE: FiniteField>(coefficients: &[FE], point: FE) -> FE {
 /// The transmitted coefficients of the masked polynomial $`\pi(t)`$ (step 6).
 /// The zero coefficient at degree $`d`$ is omitted.
 #[derive(Clone, Debug)]
-pub struct ZeroPolynomialCoefficients<FE: FiniteField> {
+pub(crate) struct ZeroPolynomialCoefficients<FE: FiniteField> {
     coefficients: Vec<FE>,
 }
 
