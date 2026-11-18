@@ -17,14 +17,13 @@ use swanky_error::{ErrorKind, Result, bail};
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b};
 
+use crate::higher_degree_commitment::{BatchProverAccumulator, BatchVerifierAccumulator};
+use crate::vole::combine;
 use crate::vole::commit_reconstruct::l_hat;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    higher_degree_commitment::{
-        BatchProverAccumulatorF2FLambda, BatchVerifierAccumulatorF2FLambda,
-        batch_verification::ZeroPolynomialCoefficients,
-    },
+    higher_degree_commitment::batch_verification::ZeroPolynomialCoefficients,
     parameters::{FLambda, Params, RepetitionParam, SecurityParamBytes},
     proof::{
         prover_preparer::{ProverPreparer, ProverPreparerParts},
@@ -32,10 +31,7 @@ use crate::{
         transcript::ChiGenerator,
         verifier_traverser::{VerifierTraverser, VerifierTraverserParts},
     },
-    vole::{
-        AsSecretBytes, ExtensionFieldLifter, ExtensionFieldLifterF2FLambda, RandomVoleP,
-        RandomVoleV,
-    },
+    vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
@@ -97,7 +93,7 @@ where
     /// higher degree masks determined by the maximum constraint degree,
     /// aggregate commitment masks, and consistency-check padding.
     pub fn num_voles(&self) -> usize {
-        let mask_vole_count = BatchProverAccumulatorF2FLambda::<VoleP::Params>::mask_vole_count(
+        let mask_vole_count = BatchProverAccumulator::<F2, _>::mask_vole_count(
             self.higher_degree_commitment.max_degree(),
         );
         let extended_witness_length = self.witness_commitment.len() + mask_vole_count;
@@ -153,8 +149,7 @@ where
         } = circuit_preparer.execute(circuit)?;
 
         // Reserve the VOLEs needed to mask the higher-degree batch after the witness VOLEs.
-        let mask_vole_count =
-            BatchProverAccumulatorF2FLambda::<P>::mask_vole_count(max_higher_degree);
+        let mask_vole_count = BatchProverAccumulator::<F2, _>::mask_vole_count(max_higher_degree);
 
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
@@ -209,12 +204,8 @@ where
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
-        let degree_0_mask = ExtensionFieldLifterF2FLambda::<P>::combine_extension(
-            &voles.aggregate_commitment_masks(),
-        );
-        let degree_1_mask = ExtensionFieldLifterF2FLambda::<P>::combine_extension(
-            &voles.aggregate_commitment_values(),
-        );
+        let degree_0_mask = combine(&voles.aggregate_commitment_masks());
+        let degree_1_mask = combine(&voles.aggregate_commitment_values());
 
         // Finish computing aggregated responses (`a~`, `b~` in the paper)
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
@@ -259,7 +250,7 @@ where
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
         // Account for both witness commitments and higher-degree masking material, and require the
         // proof and decommitted VOLEs to agree on the resulting size.
-        let mask_vole_count = BatchProverAccumulatorF2FLambda::<P>::mask_vole_count(
+        let mask_vole_count = BatchProverAccumulator::<F2, _>::mask_vole_count(
             self.higher_degree_commitment.max_degree(),
         );
         if self.witness_commitment.len() + mask_vole_count != voles.extended_witness_length() {
@@ -349,9 +340,7 @@ where
 
         let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
-        let validation_mask = ExtensionFieldLifterF2FLambda::<P>::combine_extension(
-            &reconstructed_voles.mask_voles(),
-        );
+        let validation_mask = combine(&reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
         let max_higher_degree = self.higher_degree_commitment.max_degree();
@@ -405,8 +394,7 @@ where
         // The accumulator owns mask composition and the final protocol checks.
         let witness_voles = reconstructed_voles.witness_voles();
         let witness_len = self.witness_commitment.len();
-        let mask_vole_len =
-            BatchVerifierAccumulatorF2FLambda::<P>::mask_vole_count(max_higher_degree);
+        let mask_vole_len = BatchVerifierAccumulator::<F2, _>::mask_vole_count(max_higher_degree);
         let mask_tags: Vec<P::FLambda> = witness_voles[witness_len..witness_len + mask_vole_len]
             .iter()
             .map(P::f8_linear_bijection)

@@ -8,9 +8,8 @@ use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
 use swanky_sieve_ir_parser::WireId;
 
-use crate::higher_degree_commitment::{
-    BatchProverAccumulatorF2FLambda, CommitmentPolynomialProver,
-};
+use crate::higher_degree_commitment::CommitmentPolynomialProver;
+use crate::higher_degree_commitment::batch_verification::BatchProverAccumulator;
 use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 use crate::vole::RandomVoleP;
@@ -27,7 +26,7 @@ where
     /// Aggregated assert-zero commitment.
     pub(crate) assert_zero_commitment: FLambda<P>,
     /// Accumulator for the higher-degree constraint polynomials.
-    pub(crate) higher_degree_accumulator: BatchProverAccumulatorF2FLambda<P>,
+    pub(crate) higher_degree_accumulator: BatchProverAccumulator<F2, FLambda<P>>,
     /// Random VOLE values supplied to the traverser.
     pub(crate) voles: Vole,
 }
@@ -69,7 +68,7 @@ where
     aggregate_assert_zero: FLambda<P>,
 
     /// Streamed accumulator for the higher-degree constraint batch.
-    higher_degree_accumulator: BatchProverAccumulatorF2FLambda<P>,
+    higher_degree_accumulator: BatchProverAccumulator<F2, FLambda<P>>,
 }
 
 impl<Vole: RandomVoleP<Params = P>, P: Params> ProverTraverser<Vole, P>
@@ -108,7 +107,7 @@ where
 
             aggregate_assert_zero: FLambda::<P>::ZERO,
 
-            higher_degree_accumulator: BatchProverAccumulatorF2FLambda::new(max_higher_degree),
+            higher_degree_accumulator: BatchProverAccumulator::new(max_higher_degree),
         })
     }
 

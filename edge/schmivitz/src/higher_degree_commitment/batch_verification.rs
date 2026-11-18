@@ -11,7 +11,7 @@ use hybrid_array::typenum::Unsigned;
 use swanky_error::{ErrorKind, Result, ensure};
 use swanky_field::{FiniteField, IsSubFieldOf};
 
-use crate::vole::ExtensionFieldLifter;
+use crate::vole::combine;
 
 use super::{CommitmentPolynomialProver, CommitmentPolynomialVerifier};
 
@@ -45,22 +45,20 @@ impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
 
 /// Accumulate prover constraints and form the masked polynomial $`\pi(t)`$ (step 6).
 /// Constraints are aligned to the maximum degree fixed at construction.
-pub struct BatchProverAccumulator<F, FE, L>
+pub struct BatchProverAccumulator<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
-    L: ExtensionFieldLifter<F, FE>,
 {
     /// Coefficients of the aggregate $`A(t)`$ in increasing degree order.
     aggregate: Vec<FE>,
-    phantom: PhantomData<(F, L)>,
+    phantom: PhantomData<F>,
 }
 
-impl<F, FE, L> BatchProverAccumulator<F, FE, L>
+impl<F, FE> BatchProverAccumulator<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
-    L: ExtensionFieldLifter<F, FE>,
 {
     /// Create a prover accumulator with `max_degree` as the batch degree $`d`$ (step 1).
     /// A maximum degree of zero represents a batch with no higher degree constraints.
@@ -77,7 +75,7 @@ where
 
     /// Return the number of base VOLEs composed into one extension-field mask (step 3).
     pub fn mask_vole_size() -> usize {
-        L::BasisSize::USIZE
+        F::DegreeModulo::USIZE
     }
 
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
@@ -167,13 +165,13 @@ where
         let mut pi = self.aggregate[..degree].to_vec();
 
         // Organize the flat streams into per-mask blocks and compose each into a full-field mask.
-        let (values_blocks, _) = Array::<F, L::BasisSize>::slice_as_chunks(mask_values);
-        let (masks_blocks, _) = Array::<FE, L::BasisSize>::slice_as_chunks(mask_masks);
+        let (values_blocks, _) = Array::<F, F::DegreeModulo>::slice_as_chunks(mask_values);
+        let (masks_blocks, _) = Array::<FE, F::DegreeModulo>::slice_as_chunks(mask_masks);
         for (j, (values, masks)) in values_blocks.iter().zip(masks_blocks).enumerate() {
             // Compose the base-VOLE blocks into $\sigma_j(t)=w_j+s_jt$, then add
             // $t^{j-1}\sigma_j(t)$; `j` here is 0-based, corresponding to $j+1$ in the document.
-            let s_j = L::combine_base(values);
-            let w_j = L::combine_extension(masks);
+            let s_j = F::form_superfield(values);
+            let w_j = combine(masks);
             pi[j] += w_j;
             pi[j + 1] += s_j;
         }
@@ -184,22 +182,20 @@ where
 
 /// Accumulate constraint evaluations and check $`\pi(\Delta)=q`$ (step 7).
 /// Constraints are aligned to the maximum degree fixed at construction.
-pub struct BatchVerifierAccumulator<F, FE, L>
+pub struct BatchVerifierAccumulator<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
-    L: ExtensionFieldLifter<F, FE>,
 {
     /// Constraint evaluations weighted by their challenges and grouped by degree.
     aggregates: Vec<FE>,
-    phantom: PhantomData<(F, L)>,
+    phantom: PhantomData<F>,
 }
 
-impl<F, FE, L> BatchVerifierAccumulator<F, FE, L>
+impl<F, FE> BatchVerifierAccumulator<F, FE>
 where
     F: FiniteField + IsSubFieldOf<FE>,
     FE: FiniteField,
-    L: ExtensionFieldLifter<F, FE>,
 {
     /// Create a verifier accumulator with `max_degree` as the batch degree $`d`$ (step 1).
     /// A maximum degree of zero represents a batch with no higher degree constraints.
@@ -216,7 +212,7 @@ where
 
     /// Return the number of base VOLEs composed into one extension-field mask (step 3).
     pub fn mask_vole_size() -> usize {
-        L::BasisSize::USIZE
+        F::DegreeModulo::USIZE
     }
 
     /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
@@ -301,9 +297,9 @@ where
         // Mask contributions: $\sum_j\Delta^{j-1}\nu_j$, organizing the flat stream into per-mask
         // blocks and composing each into nu_j.
         let mut delta_power = FE::ONE;
-        let (tag_blocks, _) = Array::<FE, L::BasisSize>::slice_as_chunks(mask_tags);
+        let (tag_blocks, _) = Array::<FE, F::DegreeModulo>::slice_as_chunks(mask_tags);
         for block in tag_blocks {
-            expected += delta_power * L::combine_extension(block);
+            expected += delta_power * combine(block);
             delta_power *= delta;
         }
 
@@ -323,42 +319,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        parameters::Binary128Bit,
-        vole::{ExtensionFieldLifterF2FLambda, combine},
-    };
-    use hybrid_array::typenum::{U1, U16, U64};
+    use crate::vole::combine;
     use proptest::{collection::vec, prelude::*, test_runner::TestCaseResult};
     use rand::{RngExt, SeedableRng};
     use swanky_field_binary::{F2, F8b, F64b, F128b};
     use swanky_rng::SwankyRng;
-
-    struct ExtensionFieldLifterF2F64b;
-
-    impl ExtensionFieldLifter<F2, F64b> for ExtensionFieldLifterF2F64b {
-        type BasisSize = U64;
-
-        fn combine_base(values: &Array<F2, Self::BasisSize>) -> F64b {
-            combine::<F2, F64b>(values)
-        }
-
-        fn combine_extension(values: &Array<F64b, Self::BasisSize>) -> F64b {
-            combine::<F64b, F64b>(values)
-        }
-    }
-
-    struct ExtensionFieldLifterF8bF128b;
-    impl ExtensionFieldLifter<F8b, F128b> for ExtensionFieldLifterF8bF128b {
-        type BasisSize = U16;
-
-        fn combine_base(values: &Array<F8b, Self::BasisSize>) -> F128b {
-            combine::<F8b, F128b>(values)
-        }
-
-        fn combine_extension(values: &Array<F128b, Self::BasisSize>) -> F128b {
-            combine::<F128b, F128b>(values)
-        }
-    }
 
     fn vole_streams<F, FE>(
         rng: &mut SwankyRng,
@@ -373,17 +338,6 @@ mod tests {
         let masks: Vec<FE> = (0..count).map(|_| FE::random(rng)).collect();
         let tags = (0..count).map(|k| values[k] * delta + masks[k]).collect();
         (values, masks, tags)
-    }
-
-    struct IdentityLifter;
-    impl ExtensionFieldLifter<F128b, F128b> for IdentityLifter {
-        type BasisSize = U1;
-        fn combine_base(values: &Array<F128b, Self::BasisSize>) -> F128b {
-            values[0]
-        }
-        fn combine_extension(values: &Array<F128b, Self::BasisSize>) -> F128b {
-            values[0]
-        }
     }
 
     // Strategy to generate pairs `(d, degrees)` where `d` is a maximum degree
@@ -420,7 +374,7 @@ mod tests {
     // test1: Degree bounds and coefficient count.
     // Both accumulators accept constraints within the configured maximum degree and reject larger ones.
     // The prover sends exactly max_degree coefficients, and the verifier accepts the resulting proof.
-    fn degree_bounds_and_coefficient_count<F, FE, L>(
+    fn degree_bounds_and_coefficient_count<F, FE>(
         seed: [u8; 16],
         d: usize,
         num_polynomials: usize,
@@ -429,12 +383,11 @@ mod tests {
     where
         F: FiniteField + IsSubFieldOf<FE>,
         FE: FiniteField,
-        L: ExtensionFieldLifter<F, FE>,
     {
         let rng = &mut SwankyRng::from_seed(seed.into());
         let delta = FE::random(rng);
-        let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
-        let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+        let mut prover = BatchProverAccumulator::<F, FE>::new(d);
+        let mut verifier = BatchVerifierAccumulator::<F, FE>::new(d);
         for _ in 0..num_polynomials {
             let degree = rng.random_range(0..=d);
             let poly = random_polynomial_constraint::<F, FE>(rng, degree);
@@ -461,7 +414,7 @@ mod tests {
                 .contains("but the accumulator is configured for maximum degree")
         );
         let (values, masks, tags) =
-            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
+            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * F::DegreeModulo::USIZE);
         let pi = prover.finish(&values, &masks).unwrap();
         prop_assert_eq!(pi.coefficients().len(), d);
         prop_assert_eq!(pi.max_degree(), d);
@@ -477,16 +430,16 @@ mod tests {
             num_polynomials in 0usize..=20,
             excess in 1usize..=4,
         ) {
-            degree_bounds_and_coefficient_count::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
+            degree_bounds_and_coefficient_count::<F2, F128b>(
                 seed, d, num_polynomials, excess,
             )?;
-            degree_bounds_and_coefficient_count::<F2, F64b, ExtensionFieldLifterF2F64b>(
+            degree_bounds_and_coefficient_count::<F2, F64b>(
                 seed, d, num_polynomials, excess,
             )?;
-            degree_bounds_and_coefficient_count::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+            degree_bounds_and_coefficient_count::<F8b, F128b>(
                 seed, d, num_polynomials, excess,
             )?;
-            degree_bounds_and_coefficient_count::<F128b, F128b, IdentityLifter>(
+            degree_bounds_and_coefficient_count::<F128b, F128b>(
                 seed, d, num_polynomials, excess,
             )?;
         }
@@ -496,7 +449,7 @@ mod tests {
     // After each constraint is pushed, the prover’s aggregate evaluation matches an independent reference
     // sum with challenge scaling and degree alignment.
     // The verifier is checked against that reference too, using delta = 0, 1, and a random value.
-    fn incremental_aggregation_matches_reference<F, FE, L>(
+    fn incremental_aggregation_matches_reference<F, FE>(
         seed: [u8; 16],
         d: usize,
         degrees: &[usize],
@@ -504,19 +457,18 @@ mod tests {
     where
         F: FiniteField + IsSubFieldOf<FE>,
         FE: FiniteField,
-        L: ExtensionFieldLifter<F, FE>,
     {
         let rng = &mut SwankyRng::from_seed(seed.into());
         for delta in [FE::ZERO, FE::ONE, FE::random(rng)] {
-            let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
-            let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+            let mut prover = BatchProverAccumulator::<F, FE>::new(d);
+            let mut verifier = BatchVerifierAccumulator::<F, FE>::new(d);
             let (_, _, tags) =
-                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
-            let (tag_blocks, _) = Array::<FE, L::BasisSize>::slice_as_chunks(&tags);
+                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * F::DegreeModulo::USIZE);
+            let (tag_blocks, _) = Array::<FE, F::DegreeModulo>::slice_as_chunks(&tags);
             let mask: FE = tag_blocks
                 .iter()
                 .enumerate()
-                .map(|(j, block)| spec_power(delta, j) * L::combine_extension(block))
+                .map(|(j, block)| spec_power(delta, j) * combine(block))
                 .sum();
             let mut oracle = ZeroPolynomialCoefficients {
                 coefficients: vec![FE::ZERO; d],
@@ -552,16 +504,16 @@ mod tests {
             seed in any::<[u8; 16]>(),
             (d, degrees) in strategy_degrees(0),
         ) {
-            incremental_aggregation_matches_reference::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
+            incremental_aggregation_matches_reference::<F2, F128b>(
                 seed, d, &degrees,
             )?;
-            incremental_aggregation_matches_reference::<F2, F64b, ExtensionFieldLifterF2F64b>(
+            incremental_aggregation_matches_reference::<F2, F64b>(
                 seed, d, &degrees,
             )?;
-            incremental_aggregation_matches_reference::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+            incremental_aggregation_matches_reference::<F8b, F128b>(
                 seed, d, &degrees,
             )?;
-            incremental_aggregation_matches_reference::<F128b, F128b, IdentityLifter>(
+            incremental_aggregation_matches_reference::<F128b, F128b>(
                 seed, d, &degrees,
             )?;
         }
@@ -570,7 +522,7 @@ mod tests {
     // test3: Coefficient tampering.
     // An honest proof passes. Changing one transmitted coefficient by a nonzero amount causes rejection.
     // A nonzero delta ensures the change affects the evaluation.
-    fn tampering_coefficient<F, FE, L>(
+    fn tampering_coefficient<F, FE>(
         seed: [u8; 16],
         d: usize,
         degrees: &[usize],
@@ -579,12 +531,11 @@ mod tests {
     where
         F: FiniteField + IsSubFieldOf<FE>,
         FE: FiniteField,
-        L: ExtensionFieldLifter<F, FE>,
     {
         let rng = &mut SwankyRng::from_seed(seed.into());
         let delta = FE::random_nonzero(rng);
-        let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
-        let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+        let mut prover = BatchProverAccumulator::<F, FE>::new(d);
+        let mut verifier = BatchVerifierAccumulator::<F, FE>::new(d);
         for &degree in degrees {
             let rho = random_polynomial_constraint::<F, FE>(rng, degree);
             let chi = FE::random(rng);
@@ -594,7 +545,7 @@ mod tests {
             verifier.push_constraint(&commitment, chi).unwrap();
         }
         let (values, masks, tags) =
-            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
+            vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * F::DegreeModulo::USIZE);
         let mut pi = prover.finish(&values, &masks).unwrap();
         prop_assert!(verifier.finish(delta, &tags, &pi).is_ok());
         pi.coefficients[coefficient % d] += FE::random_nonzero(rng);
@@ -614,16 +565,16 @@ mod tests {
             (d, degrees) in strategy_degrees(1),
             coefficient in 0usize..20,
         ) {
-            tampering_coefficient::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
+            tampering_coefficient::<F2, F128b>(
                 seed, d, &degrees, coefficient,
             )?;
-            tampering_coefficient::<F2, F64b, ExtensionFieldLifterF2F64b>(
+            tampering_coefficient::<F2, F64b>(
                 seed, d, &degrees, coefficient,
             )?;
-            tampering_coefficient::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+            tampering_coefficient::<F8b, F128b>(
                 seed, d, &degrees, coefficient,
             )?;
-            tampering_coefficient::<F128b, F128b, IdentityLifter>(
+            tampering_coefficient::<F128b, F128b>(
                 seed, d, &degrees, coefficient,
             )?;
         }
@@ -632,7 +583,7 @@ mod tests {
     // test4: Nonzero committed values.
     // The prover rejects a constraint whose highest coefficient is non-zero (the committed value),
     // including when its challenge is zero.
-    fn nonzero_committed_value_is_rejected<F, FE, L>(
+    fn nonzero_committed_value_is_rejected<F, FE>(
         seed: [u8; 16],
         d: usize,
         degree: usize,
@@ -640,13 +591,12 @@ mod tests {
     where
         F: FiniteField + IsSubFieldOf<FE>,
         FE: FiniteField,
-        L: ExtensionFieldLifter<F, FE>,
     {
         let rng = &mut SwankyRng::from_seed(seed.into());
         let rho = random_polynomial_constraint::<F, FE>(rng, degree % (d + 1))
             .addc(F::random_nonzero(rng));
         for chi in [FE::ZERO, FE::ONE, FE::random(rng)] {
-            let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
+            let mut prover = BatchProverAccumulator::<F, FE>::new(d);
 
             let err = prover.push_constraint(&rho, chi).unwrap_err();
             prop_assert!(
@@ -664,37 +614,36 @@ mod tests {
             d in 1usize..=20,
             degree in 0usize..=20,
         ) {
-            nonzero_committed_value_is_rejected::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
+            nonzero_committed_value_is_rejected::<F2, F128b>(
                 seed, d, degree,
             )?;
-            nonzero_committed_value_is_rejected::<F2, F64b, ExtensionFieldLifterF2F64b>(
+            nonzero_committed_value_is_rejected::<F2, F64b>(
                 seed, d, degree,
             )?;
-            nonzero_committed_value_is_rejected::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+            nonzero_committed_value_is_rejected::<F8b, F128b>(
                 seed, d, degree,
             )?;
-            nonzero_committed_value_is_rejected::<F128b, F128b, IdentityLifter>(seed, d, degree)?;
+            nonzero_committed_value_is_rejected::<F128b, F128b>(seed, d, degree)?;
         }
     }
 
     // test5: Mask stream lengths.
     // Both sides accept correctly sized mask streams and reject streams that are too short or too long.
     // This includes degrees zero and one, which require no masks.
-    fn malformed_mask_streams_are_rejected<F, FE, L>(d: usize) -> TestCaseResult
+    fn malformed_mask_streams_are_rejected<F, FE>(d: usize) -> TestCaseResult
     where
         F: FiniteField + IsSubFieldOf<FE>,
         FE: FiniteField,
-        L: ExtensionFieldLifter<F, FE>,
     {
         for d in [0, 1, d] {
-            let n = d.saturating_sub(1) * L::BasisSize::USIZE;
+            let n = d.saturating_sub(1) * F::DegreeModulo::USIZE;
             let values = vec![F::ZERO; n + 1];
             let masks = vec![FE::ZERO; n + 1];
             let pi = ZeroPolynomialCoefficients {
                 coefficients: vec![FE::ZERO; d],
             };
-            let prover = || BatchProverAccumulator::<F, FE, L>::new(d);
-            let verifier = || BatchVerifierAccumulator::<F, FE, L>::new(d);
+            let prover = || BatchProverAccumulator::<F, FE>::new(d);
+            let verifier = || BatchVerifierAccumulator::<F, FE>::new(d);
             prop_assert!(prover().finish(&values[..n], &masks[..n]).is_ok());
             prop_assert!(verifier().finish(FE::ONE, &masks[..n], &pi).is_ok());
             for length in [n.saturating_sub(1), n + 1] {
@@ -729,10 +678,10 @@ mod tests {
     proptest! {
         #[test]
         fn test5_malformed_mask_streams_are_rejected(d in 0usize..=20) {
-            malformed_mask_streams_are_rejected::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(d)?;
-            malformed_mask_streams_are_rejected::<F2, F64b, ExtensionFieldLifterF2F64b>(d)?;
-            malformed_mask_streams_are_rejected::<F8b, F128b, ExtensionFieldLifterF8bF128b>(d)?;
-            malformed_mask_streams_are_rejected::<F128b, F128b, IdentityLifter>(d)?;
+            malformed_mask_streams_are_rejected::<F2, F128b>(d)?;
+            malformed_mask_streams_are_rejected::<F2, F64b>(d)?;
+            malformed_mask_streams_are_rejected::<F8b, F128b>(d)?;
+            malformed_mask_streams_are_rejected::<F128b, F128b>(d)?;
         }
     }
 
@@ -741,7 +690,7 @@ mod tests {
     // and shifted VOLE masks.
     // It checks a random evaluation point, checks delta = 0, 1, and a random value, verifies
     // the lifted VOLE correlation, and confirms verifier acceptance.
-    fn masking_arithmetic_matches_reference<F, FE, L>(
+    fn masking_arithmetic_matches_reference<F, FE>(
         seed: [u8; 16],
         d: usize,
         degrees: &[usize],
@@ -749,13 +698,12 @@ mod tests {
     where
         F: FiniteField + IsSubFieldOf<FE>,
         FE: FiniteField,
-        L: ExtensionFieldLifter<F, FE>,
     {
         let rng = &mut SwankyRng::from_seed(seed.into());
         for delta in [FE::ZERO, FE::ONE, FE::random(rng)] {
             let point = FE::random(rng);
-            let mut prover = BatchProverAccumulator::<F, FE, L>::new(d);
-            let mut verifier = BatchVerifierAccumulator::<F, FE, L>::new(d);
+            let mut prover = BatchProverAccumulator::<F, FE>::new(d);
+            let mut verifier = BatchVerifierAccumulator::<F, FE>::new(d);
             let (mut expected, mut expected_delta) = (FE::ZERO, FE::ZERO);
             for &degree in degrees {
                 let rho = random_polynomial_constraint::<F, FE>(rng, degree);
@@ -772,15 +720,12 @@ mod tests {
                     * spec_polynomial_evaluation(rho.lower_coefficients(), delta);
             }
             let (values, masks, tags) =
-                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * L::BasisSize::USIZE);
+                vole_streams::<F, FE>(rng, delta, d.saturating_sub(1) * F::DegreeModulo::USIZE);
             for j in 0..d.saturating_sub(1) {
-                let block = j * L::BasisSize::USIZE..(j + 1) * L::BasisSize::USIZE;
-                let s = L::combine_base((&values[block.clone()]).try_into().unwrap());
-                let w = L::combine_extension((&masks[block.clone()]).try_into().unwrap());
-                prop_assert_eq!(
-                    L::combine_extension((&tags[block]).try_into().unwrap()),
-                    w + s * delta
-                );
+                let block = j * F::DegreeModulo::USIZE..(j + 1) * F::DegreeModulo::USIZE;
+                let s = F::form_superfield((&values[block.clone()]).try_into().unwrap());
+                let w = combine(&masks[block.clone()]);
+                prop_assert_eq!(combine(&tags[block]), w + s * delta);
                 expected += spec_power(point, j) * (w + s * point);
                 expected_delta += spec_power(delta, j) * (w + s * delta);
             }
@@ -804,16 +749,16 @@ mod tests {
             seed in any::<[u8; 16]>(),
             (d, degrees) in strategy_degrees(0),
         ) {
-            masking_arithmetic_matches_reference::<F2, F128b, ExtensionFieldLifterF2FLambda<Binary128Bit>>(
+            masking_arithmetic_matches_reference::<F2, F128b>(
                 seed, d, &degrees,
             )?;
-            masking_arithmetic_matches_reference::<F2, F64b, ExtensionFieldLifterF2F64b>(
+            masking_arithmetic_matches_reference::<F2, F64b>(
                 seed, d, &degrees,
             )?;
-            masking_arithmetic_matches_reference::<F8b, F128b, ExtensionFieldLifterF8bF128b>(
+            masking_arithmetic_matches_reference::<F8b, F128b>(
                 seed, d, &degrees,
             )?;
-            masking_arithmetic_matches_reference::<F128b, F128b, IdentityLifter>(seed, d, &degrees)?;
+            masking_arithmetic_matches_reference::<F128b, F128b>(seed, d, &degrees)?;
         }
     }
 }

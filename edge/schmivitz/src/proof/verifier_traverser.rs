@@ -7,9 +7,7 @@ use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
 
-use crate::higher_degree_commitment::{
-    BatchVerifierAccumulatorF2FLambda, CommitmentPolynomialVerifier,
-};
+use crate::higher_degree_commitment::{BatchVerifierAccumulator, CommitmentPolynomialVerifier};
 use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
 
@@ -23,7 +21,7 @@ where
     /// Aggregated assert-zero value.
     pub(crate) aggregate_assert_zero: FLambda<P>,
     /// Accumulator for the higher-degree constraint evaluations.
-    pub(crate) higher_degree_accumulator: BatchVerifierAccumulatorF2FLambda<P>,
+    pub(crate) higher_degree_accumulator: BatchVerifierAccumulator<F2, FLambda<P>>,
 }
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
@@ -63,7 +61,7 @@ where
     aggregate_assert_zero: FLambda<P>,
 
     /// Streamed accumulator for the higher-degree constraint batch, grouped by degree.
-    higher_degree_accumulator: BatchVerifierAccumulatorF2FLambda<P>,
+    higher_degree_accumulator: BatchVerifierAccumulator<F2, FLambda<P>>,
 
     /// Powers of the verifier's key through the maximum higher-degree constraint degree.
     delta_powers: Vec<FLambda<P>>,
@@ -91,7 +89,7 @@ where
             assigned_witness_count: 0,
             aggregate: FLambda::<P>::ZERO,
             aggregate_assert_zero: FLambda::<P>::ZERO,
-            higher_degree_accumulator: BatchVerifierAccumulatorF2FLambda::new(max_higher_degree),
+            higher_degree_accumulator: BatchVerifierAccumulator::new(max_higher_degree),
             delta_powers,
         })
     }
