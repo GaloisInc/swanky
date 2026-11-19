@@ -203,6 +203,9 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
 
 5. **Choose challenge weights.** The verifier sends a challenge
    $`(\chi_1,\ldots,\chi_m)\leftarrow\mathbb{F}_{p^r}^m`$.
+   In the implementation these values come from the stream of Fiat–Shamir challenges,
+   a sequence of powers from one random field value, shared across ordinary gates
+   (multiplication and assert zero) and higher-degree zero checks.
 
 6. **Compute and send the prover polynomial.** First align each of the $`m`$ constraint polynomials to the maximum degree $`d`$ and combine them into one challenge-weighted polynomial:
 
@@ -247,9 +250,6 @@ The higher-degree commitment API belongs in `edge/fancy-traits`, and the protoco
 Schmivitz instantiates the construction with `F2` as the base field and `F128b` as the extension field.
 
 `FancyHigherDegree<F2>` extends `FancyZeroKnowledge<F2>` with the four usual arithmetic operations and a higher-degree zero assertion. Circuits implement the existing `fancy_traits::Circuit` trait; ordinary inputs use `Fancy::Item`, while the assertion callback composes separate higher-degree wires.
-
-Unlike step 5, Schmivitz uses successive powers of one Fiat–Shamir challenge, shared across ordinary and higher-degree checks.
-The paper's independent-weight batching bound therefore needs a separate justification for this adaptation.
 
 `src/higher_degree_commitment` contains the protocol primitives: `CommitmentPolynomialProver` stores the
 prover's coefficients, while `CommitmentPolynomialVerifier` stores the verifier's evaluation and
