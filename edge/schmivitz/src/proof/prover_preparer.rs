@@ -237,6 +237,7 @@ impl FancyHigherDegree<F2> for ProverPreparer<'_> {
 mod tests {
     use super::Wire;
     use crate::circuit::CircuitIngestor;
+    use crate::proof::tests::{add_degree_four_constraint, add_degree_two_constraint};
     use crate::proof::{
         Circuit,
         prover_preparer::{ProverPreparer, ProverPreparerParts},
@@ -363,7 +364,7 @@ mod tests {
 
     #[test]
     fn higher_degree_operations_compute_correct_degrees() {
-        let private_input: Vec<F2> = Vec::new();
+        let private_input = Vec::new();
         let preparer = ProverPreparer::new(&private_input, None).unwrap();
         let x = 3;
         let y = 2;
@@ -376,54 +377,29 @@ mod tests {
         assert_eq!(preparer.h_mulc(&y, F2::ZERO), 2);
     }
 
-    fn add_degree_four_constraint(preparer: &mut ProverPreparer<'_>) -> swanky_error::Result<()> {
-        let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire);
-        let x = wires.map(|wire| preparer.to_higher_degree_wire(wire));
-
-        // x0 * x1 * x2 * x3, a degree-4 constraint.
-        let x01 = preparer.h_mul(&x[0], &x[1]);
-        let x23 = preparer.h_mul(&x[2], &x[3]);
-        let zero = preparer.h_mul(&x01, &x23);
-        preparer.h_assert_zero(zero)?;
-        Ok(())
-    }
-
-    fn add_degree_two_constraint(preparer: &mut ProverPreparer<'_>) -> swanky_error::Result<()> {
-        let wires = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire);
-        let x = wires.map(|wire| preparer.to_higher_degree_wire(wire));
-
-        // x0 * x1 + x2 * x3, a degree-2 constraint.
-        let x01 = preparer.h_mul(&x[0], &x[1]);
-        let x23 = preparer.h_mul(&x[2], &x[3]);
-        let zero = preparer.h_add(&x01, &x23);
-        preparer.h_assert_zero(zero)?;
-        Ok(())
-    }
-
     #[test]
     fn higher_degree_constraints_track_max_degree() -> swanky_error::Result<()> {
-        let private_input: Vec<F2> = Vec::new();
+        let private_input = Vec::new();
         let mut preparer = ProverPreparer::new(&private_input, None)?;
 
         assert_eq!(preparer.max_higher_degree(), 0);
 
-        add_degree_four_constraint(&mut preparer)?;
+        add_degree_four_constraint(
+            &mut preparer,
+            [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire),
+        )?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
         // A lower-degree constraint does not lower the maximum.
-        add_degree_two_constraint(&mut preparer)?;
+        add_degree_two_constraint(
+            &mut preparer,
+            [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire),
+        )?;
         assert_eq!(preparer.max_higher_degree(), 4);
 
-        let ProverPreparer {
-            witness,
-            challenge_count,
-            max_higher_degree,
-            ..
-        } = preparer;
-
-        assert!(witness.is_empty());
-        assert_eq!(challenge_count, 2);
-        assert_eq!(max_higher_degree, 4);
+        assert!(preparer.witness.is_empty());
+        assert_eq!(preparer.challenge_count, 2);
+        assert_eq!(preparer.max_higher_degree, 4);
 
         Ok(())
     }
@@ -439,13 +415,9 @@ mod tests {
               $2 <- @mul(0: $0, $1);
             @end ";
 
-        // This evaluates on a random input; over time we'll check them all
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(
-            counter.witness.first().unwrap() * counter.witness.get(1).unwrap(),
-            *counter.witness.get(2).unwrap()
-        );
+        assert_eq!(counter.witness[0] * counter.witness[1], counter.witness[2]);
 
         Ok(())
     }

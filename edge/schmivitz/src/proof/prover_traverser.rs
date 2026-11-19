@@ -359,7 +359,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parameters::Binary128Bit;
+    use crate::{
+        parameters::Binary128Bit,
+        proof::tests::{add_degree_four_constraint, add_degree_two_constraint},
+    };
     use merlin::Transcript;
     use rand::rng;
 
@@ -369,10 +372,10 @@ mod tests {
     type Traverser = ProverTraverser<InsecureVole<Binary128Bit>, Binary128Bit>;
 
     fn test_traverser(chi: F128b, max_higher_degree: usize) -> Traverser {
-        let rng = &mut rng();
-        let transcript = &mut Transcript::new(b"higher degree tests");
+        let mut rng = rng();
+        let mut transcript = Transcript::new(b"higher degree tests");
         let secret: Vec<F2> = Vec::new();
-        let (voles, _challenge) = InsecureVole::create(0, transcript, &secret, rng);
+        let (voles, _) = InsecureVole::create(0, &mut transcript, &secret, &mut rng);
 
         ProverTraverser::new(Vec::new(), ChiGenerator::new(chi), voles, max_higher_degree).unwrap()
     }
@@ -382,52 +385,35 @@ mod tests {
     /// computed homomorphically over the wire tags q_i = w_i + x_i·Δ.
     #[test]
     fn higher_degree_aggregate_matches_homomorphic_evaluation() {
-        let rng = &mut rng();
-        let chi = F128b::random(rng);
+        let mut rng = rng();
+        let chi = F128b::random(&mut rng);
         let mut traverser = test_traverser(chi, 4);
 
-        // Witness satisfying x0 * x1 * x2 * x3 == 0, a degree-4 constraint.
         let product_values = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
-        let product_wires: [(F2, F128b); 4] =
-            std::array::from_fn(|i| (product_values[i], F128b::random(rng)));
-        let wires = product_wires.map(|(x, w)| Wire(x, w));
-        let x = wires.map(|wire| traverser.to_higher_degree_wire(wire));
-        let x01 = traverser.h_mul(&x[0], &x[1]);
-        let x23 = traverser.h_mul(&x[2], &x[3]);
-        let zero = traverser.h_mul(&x01, &x23);
-        traverser.h_assert_zero(zero).unwrap();
+        let product_wires = product_values.map(|v| Wire(v, F128b::random(&mut rng)));
+        add_degree_four_constraint(&mut traverser, product_wires).unwrap();
 
-        // Witness satisfying x0 * x1 + x2 * x3 == 0, a degree-2 constraint.
         let sum_values = [F2::ONE; 4];
-        let sum_wires: [(F2, F128b); 4] =
-            std::array::from_fn(|i| (sum_values[i], F128b::random(rng)));
-        let wires = sum_wires.map(|(x, w)| Wire(x, w));
-        let x = wires.map(|wire| traverser.to_higher_degree_wire(wire));
-        let x01 = traverser.h_mul(&x[0], &x[1]);
-        let x23 = traverser.h_mul(&x[2], &x[3]);
-        let zero = traverser.h_add(&x01, &x23);
-        traverser.h_assert_zero(zero).unwrap();
+        let sum_wires = sum_values.map(|v| Wire(v, F128b::random(&mut rng)));
+        add_degree_two_constraint(&mut traverser, sum_wires).unwrap();
 
-        let ProverTraverser {
-            higher_degree_accumulator: accumulator,
-            ..
-        } = traverser;
-
-        // The aggregate is aligned to the maximum constraint degree (4), and its highest-degree
-        // coefficient still commits to zero.
-        assert_eq!(accumulator.max_degree(), 4);
-        assert_eq!(accumulator.top_coefficient(), F128b::ZERO);
+        // Check that the accumulator is aligned to the maximum constraint degree
+        // (4), and its highest-degree coefficient still commits to zero.
+        assert_eq!(traverser.higher_degree_accumulator.max_degree(), 4);
+        assert_eq!(
+            traverser.higher_degree_accumulator.top_coefficient(),
+            F128b::ZERO
+        );
 
         // Evaluate at a random Δ and compare against the verifier's computation
-        // sum_i chi_i * Δ^(d - d_i) * γ_i, with γ_i derived from the tags q_i = w_i + x_i·Δ.
-        let delta = F128b::random(rng);
-        let tag = |(x, w): (F2, F128b)| w + x * delta;
+        let delta = F128b::random(&mut rng);
+        let tag = |wire: Wire<Binary128Bit>| wire.1 + wire.0 * delta;
 
-        let gamma_product = product_wires.map(tag).iter().fold(F128b::ONE, |a, q| a * q);
+        let gamma_product = product_wires.map(tag).into_iter().product::<F128b>();
         let sum_tags = sum_wires.map(tag);
         let gamma_sum = sum_tags[0] * sum_tags[1] + sum_tags[2] * sum_tags[3];
 
-        let evaluated = accumulator.evaluate_at(delta);
+        let evaluated = traverser.higher_degree_accumulator.evaluate_at(delta);
         let expected = chi * gamma_product + chi * chi * delta * delta * gamma_sum;
         assert_eq!(evaluated, expected);
     }

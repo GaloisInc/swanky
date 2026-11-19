@@ -630,6 +630,32 @@ mod tests {
         Ok(())
     }
 
+    /// `x0 * x1 * x2 * x3`, a degree-4 constraint.
+    pub(crate) fn add_degree_four_constraint<F: FancyHigherDegree<F2>>(
+        backend: &mut F,
+        input: [F::Item; 4],
+    ) -> swanky_error::Result<()> {
+        let x = input.map(|wire| backend.to_higher_degree_wire(wire));
+
+        let x01 = backend.h_mul(&x[0], &x[1]);
+        let x23 = backend.h_mul(&x[2], &x[3]);
+        let zero = backend.h_mul(&x01, &x23);
+        backend.h_assert_zero(zero)
+    }
+
+    /// `x0 * x1 + x2 * x3`, a degree-2 constraint.
+    pub(crate) fn add_degree_two_constraint<F: FancyHigherDegree<F2>>(
+        backend: &mut F,
+        input: [F::Item; 4],
+    ) -> swanky_error::Result<()> {
+        let x = input.map(|wire| backend.to_higher_degree_wire(wire));
+
+        let x01 = backend.h_mul(&x[0], &x[1]);
+        let x23 = backend.h_mul(&x[2], &x[3]);
+        let zero = backend.h_add(&x01, &x23);
+        backend.h_assert_zero(zero)
+    }
+
     /// Ordinary gates interleaved with higher-degree constraints of degrees 1, 2, and 4.
     struct HigherDegreeCircuit;
 
@@ -659,7 +685,7 @@ mod tests {
         }
     }
 
-    fn higher_degree_proof_round_trips<P>() -> Result<()>
+    fn higher_degree_proof_works<P>() -> Result<()>
     where
         P: Params,
         F2: IsSubFieldOf<FLambda<P>>,
@@ -828,8 +854,8 @@ mod tests {
                 }
 
                 #[test]
-                fn higher_degree_proof_round_trips() -> Result<()> {
-                    super::higher_degree_proof_round_trips::<$params>()
+                fn higher_degree_proof_works() -> Result<()> {
+                    super::higher_degree_proof_works::<$params>()
                 }
 
                 #[test]
