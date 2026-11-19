@@ -45,21 +45,13 @@ impl<FE: FiniteField> ZeroPolynomialCoefficients<FE> {
 
 /// Accumulate prover constraints and form the masked polynomial $`\pi(t)`$ (step 6).
 /// Constraints are aligned to the maximum degree fixed at construction.
-pub(crate) struct BatchProverAccumulator<F, FE>
-where
-    F: FiniteField + IsSubFieldOf<FE>,
-    FE: FiniteField,
-{
+pub(crate) struct BatchProverAccumulator<F: IsSubFieldOf<FE>, FE: FiniteField> {
     /// Coefficients of the aggregate $`A(t)`$ in increasing degree order.
     aggregate: Vec<FE>,
     phantom: PhantomData<F>,
 }
 
-impl<F, FE> BatchProverAccumulator<F, FE>
-where
-    F: FiniteField + IsSubFieldOf<FE>,
-    FE: FiniteField,
-{
+impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchProverAccumulator<F, FE> {
     /// Create a prover accumulator with `max_degree` as the batch degree $`d`$ (step 1).
     /// A maximum degree of zero represents a batch with no higher degree constraints.
     pub(crate) fn new(max_degree: usize) -> Self {
@@ -172,21 +164,13 @@ where
 
 /// Accumulate constraint evaluations and check $`\pi(\Delta)=q`$ (step 7).
 /// Constraints are aligned to the maximum degree fixed at construction.
-pub(crate) struct BatchVerifierAccumulator<F, FE>
-where
-    F: FiniteField + IsSubFieldOf<FE>,
-    FE: FiniteField,
-{
+pub(crate) struct BatchVerifierAccumulator<F: IsSubFieldOf<FE>, FE: FiniteField> {
     /// Constraint evaluations weighted by their challenges and grouped by degree.
     aggregates: Vec<FE>,
     phantom: PhantomData<F>,
 }
 
-impl<F, FE> BatchVerifierAccumulator<F, FE>
-where
-    F: FiniteField + IsSubFieldOf<FE>,
-    FE: FiniteField,
-{
+impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchVerifierAccumulator<F, FE> {
     /// Create a verifier accumulator with `max_degree` as the batch degree $`d`$ (step 1).
     /// A maximum degree of zero represents a batch with no higher degree constraints.
     pub(crate) fn new(max_degree: usize) -> Self {
@@ -303,15 +287,11 @@ mod tests {
     use swanky_field_binary::{F2, F8b, F64b, F128b};
     use swanky_rng::SwankyRng;
 
-    fn vole_streams<F, FE>(
+    fn vole_streams<F: IsSubFieldOf<FE>, FE: FiniteField>(
         rng: &mut SwankyRng,
         delta: FE,
         count: usize,
-    ) -> (Vec<F>, Vec<FE>, Vec<FE>)
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    ) -> (Vec<F>, Vec<FE>, Vec<FE>) {
         let values: Vec<F> = (0..count).map(|_| F::random(rng)).collect();
         let masks: Vec<FE> = (0..count).map(|_| FE::random(rng)).collect();
         let tags = (0..count).map(|k| values[k] * delta + masks[k]).collect();
@@ -325,7 +305,7 @@ mod tests {
     }
 
     /// Generate a random polynomial committing to zero with the given `degree` (step 4).
-    fn random_polynomial_constraint<F: FiniteField + IsSubFieldOf<FE>, FE: FiniteField>(
+    fn random_polynomial_constraint<F: IsSubFieldOf<FE>, FE: FiniteField>(
         rng: &mut SwankyRng,
         degree: usize,
     ) -> CommitmentPolynomialProver<F, FE> {
@@ -352,16 +332,12 @@ mod tests {
     // test1: Degree bounds and coefficient count.
     // Both accumulators accept constraints within the configured maximum degree and reject larger ones.
     // The prover sends exactly max_degree coefficients, and the verifier accepts the resulting proof.
-    fn degree_bounds_and_coefficient_count<F, FE>(
+    fn degree_bounds_and_coefficient_count<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         d: usize,
         num_polynomials: usize,
         excess: usize,
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    ) -> TestCaseResult {
         let rng = &mut SwankyRng::from_seed(seed.into());
         let delta = FE::random(rng);
         let mut prover = BatchProverAccumulator::<F, FE>::new(d);
@@ -427,15 +403,11 @@ mod tests {
     // After each constraint is pushed, the prover’s aggregate evaluation matches an independent reference
     // sum with challenge scaling and degree alignment.
     // The verifier is checked against that reference too, using delta = 0, 1, and a random value.
-    fn incremental_aggregation_matches_reference<F, FE>(
+    fn incremental_aggregation_matches_reference<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         d: usize,
         degrees: &[usize],
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    ) -> TestCaseResult {
         let rng = &mut SwankyRng::from_seed(seed.into());
         for delta in [FE::ZERO, FE::ONE, FE::random(rng)] {
             let mut prover = BatchProverAccumulator::<F, FE>::new(d);
@@ -500,16 +472,12 @@ mod tests {
     // test3: Coefficient tampering.
     // An honest proof passes. Changing one transmitted coefficient by a nonzero amount causes rejection.
     // A nonzero delta ensures the change affects the evaluation.
-    fn tampering_coefficient<F, FE>(
+    fn tampering_coefficient<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         d: usize,
         degrees: &[usize],
         coefficient: usize,
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    ) -> TestCaseResult {
         let rng = &mut SwankyRng::from_seed(seed.into());
         let delta = FE::random_nonzero(rng);
         let mut prover = BatchProverAccumulator::<F, FE>::new(d);
@@ -561,15 +529,11 @@ mod tests {
     // test4: Nonzero committed values.
     // The prover rejects a constraint whose highest coefficient is non-zero (the committed value),
     // including when its challenge is zero.
-    fn nonzero_committed_value_is_rejected<F, FE>(
+    fn nonzero_committed_value_is_rejected<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         d: usize,
         degree: usize,
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    ) -> TestCaseResult {
         let rng = &mut SwankyRng::from_seed(seed.into());
         let rho = random_polynomial_constraint::<F, FE>(rng, degree % (d + 1))
             .addc(F::random_nonzero(rng));
@@ -608,11 +572,9 @@ mod tests {
     // test5: Mask stream lengths.
     // Both sides accept correctly sized mask streams and reject streams that are too short or too long.
     // This includes degrees zero and one, which require no masks.
-    fn malformed_mask_streams_are_rejected<F, FE>(d: usize) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    fn malformed_mask_streams_are_rejected<F: IsSubFieldOf<FE>, FE: FiniteField>(
+        d: usize,
+    ) -> TestCaseResult {
         for d in [0, 1, d] {
             let n = d.saturating_sub(1) * F::DegreeModulo::USIZE;
             let values = vec![F::ZERO; n + 1];
@@ -668,15 +630,11 @@ mod tests {
     // and shifted VOLE masks.
     // It checks a random evaluation point, checks delta = 0, 1, and a random value, verifies
     // the lifted VOLE correlation, and confirms verifier acceptance.
-    fn masking_arithmetic_matches_reference<F, FE>(
+    fn masking_arithmetic_matches_reference<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         d: usize,
         degrees: &[usize],
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-        FE: FiniteField,
-    {
+    ) -> TestCaseResult {
         let rng = &mut SwankyRng::from_seed(seed.into());
         for delta in [FE::ZERO, FE::ONE, FE::random(rng)] {
             let point = FE::random(rng);

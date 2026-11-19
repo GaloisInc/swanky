@@ -11,18 +11,12 @@ use swanky_field::{FiniteField, IsSubFieldOf};
 /// The prover's [VOLE commitment](crate::higher_degree_commitment#commitment-polynomials) to a value in `F`.
 /// The highest-degree coefficient holds that value; lower coefficients in `FE` mask it.
 #[derive(Clone, Debug)]
-pub struct CommitmentPolynomialProver<F: FiniteField, FE: FiniteField>
-where
-    F: IsSubFieldOf<FE>,
-{
+pub struct CommitmentPolynomialProver<F: IsSubFieldOf<FE>, FE: FiniteField> {
     lower_coefficients: Vec<FE>,
     highest_degree: F,
 }
 
-impl<F: FiniteField, FE: FiniteField> CommitmentPolynomialProver<F, FE>
-where
-    F: IsSubFieldOf<FE>,
-{
+impl<F: IsSubFieldOf<FE>, FE: FiniteField> CommitmentPolynomialProver<F, FE> {
     /// Create a commitment polynomial from a base VOLE.
     pub fn from_base_vole(value: F, mask: FE) -> Self {
         Self {
@@ -134,19 +128,13 @@ where
 /// The verifier's [VOLE commitment](crate::higher_degree_commitment#commitment-polynomials).
 /// Stores the evaluation at the verifier's key and the commitment degree.
 #[derive(Clone, Copy, Debug)]
-pub struct CommitmentPolynomialVerifier<F: FiniteField, FE: FiniteField>
-where
-    F: IsSubFieldOf<FE>,
-{
+pub struct CommitmentPolynomialVerifier<F: IsSubFieldOf<FE>, FE: FiniteField> {
     evaluation: FE,
     degree: usize,
     phantom: PhantomData<F>,
 }
 
-impl<F: FiniteField, FE: FiniteField> CommitmentPolynomialVerifier<F, FE>
-where
-    F: IsSubFieldOf<FE>,
-{
+impl<F: IsSubFieldOf<FE>, FE: FiniteField> CommitmentPolynomialVerifier<F, FE> {
     /// Create a degree-one commitment from a [base VOLE](crate::higher_degree_commitment#base-vole) tag.
     pub fn from_base_vole(tag: FE) -> Self {
         Self {
@@ -229,10 +217,10 @@ mod tests {
 
     /// Reference polynomial evaluation independent of `evaluate_at_point`'s Horner
     /// implementation: cross-checks correctness by recomputing the sum directly.
-    fn eval_reference<F, FE: FiniteField>(poly: &CommitmentPolynomialProver<F, FE>, point: FE) -> FE
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    fn eval_reference<F: IsSubFieldOf<FE>, FE: FiniteField>(
+        poly: &CommitmentPolynomialProver<F, FE>,
+        point: FE,
+    ) -> FE {
         let mut acc = FE::ZERO;
         let mut p = FE::ONE;
         for c in poly.lower_coefficients() {
@@ -269,10 +257,9 @@ mod tests {
         assert_eq!(poly.degree(), 2);
     }
 
-    fn evaluate_at_point_horner<F, FE: FiniteField>(seed: [u8; 16]) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    fn evaluate_at_point_horner<F: IsSubFieldOf<FE>, FE: FiniteField>(
+        seed: [u8; 16],
+    ) -> TestCaseResult {
         let mut rng = SwankyRng::from_seed(seed.into());
         let value = F::random(&mut rng);
         let mask = FE::random(&mut rng);
@@ -295,13 +282,10 @@ mod tests {
         }
     }
 
-    fn evaluate_at_point_matches_reference<F, FE: FiniteField>(
+    fn evaluate_at_point_matches_reference<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         degree: usize,
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    ) -> TestCaseResult {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
         let highest = F::random(&mut rng);
@@ -331,10 +315,10 @@ mod tests {
         }
     }
 
-    fn addc_correctness<F, FE: FiniteField>(seed: [u8; 16], degree: usize) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    fn addc_correctness<F: IsSubFieldOf<FE>, FE: FiniteField>(
+        seed: [u8; 16],
+        degree: usize,
+    ) -> TestCaseResult {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
         let highest = F::random(&mut rng);
@@ -400,14 +384,11 @@ mod tests {
         );
     }
 
-    fn add_correctness<F, FE: FiniteField>(
+    fn add_correctness<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         degree_a: usize,
         degree_b: usize,
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    ) -> TestCaseResult {
         prop_assume!(degree_a != degree_b);
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();
@@ -462,10 +443,10 @@ mod tests {
         }
     }
 
-    fn mulc_correctness<F, FE: FiniteField>(seed: [u8; 16], degree: usize) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    fn mulc_correctness<F: IsSubFieldOf<FE>, FE: FiniteField>(
+        seed: [u8; 16],
+        degree: usize,
+    ) -> TestCaseResult {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower = (0..degree).map(|_| FE::random(&mut rng)).collect();
         let highest = F::random(&mut rng);
@@ -507,14 +488,11 @@ mod tests {
         }
     }
 
-    fn mul_correctness<F, FE: FiniteField>(
+    fn mul_correctness<F: IsSubFieldOf<FE>, FE: FiniteField>(
         seed: [u8; 16],
         degree_a: usize,
         degree_b: usize,
-    ) -> TestCaseResult
-    where
-        F: FiniteField + IsSubFieldOf<FE>,
-    {
+    ) -> TestCaseResult {
         let mut rng = SwankyRng::from_seed(seed.into());
         let lower_a = (0..degree_a).map(|_| FE::random(&mut rng)).collect();
         let highest_a = F::random(&mut rng);
