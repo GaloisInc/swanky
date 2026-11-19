@@ -134,7 +134,7 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
    d=\max\{d_1,\ldots,d_m\}.
    ```
 
-   Thus, $`d`$ is the maximum degree among the $m$ input commitment polynomials. Step 6 aligns every input polynomial to degree $`d`$ before combining them into one polynomial.
+   Thus, $`d`$ is the maximum degree among the $`m`$ input commitment polynomials. Step 6 aligns every input polynomial to degree $`d`$ before combining them into one polynomial.
 
 2. **Generate masking commitments.** For every $`j\in\{1,\ldots,d-1\}`$, the paper invokes sVOLE to obtain degree-one commitments to base-field coordinates $`s_{j,0},\ldots,s_{j,r-1}\in\mathbb{F}_p`$.
    For each $`k\in\{0,\ldots,r-1\}`$, name the three correlated values as follows:
@@ -256,9 +256,8 @@ prover's coefficients, while `CommitmentPolynomialVerifier` stores the verifier'
 commitment degree. Both types implement the gate algebra.
 `batch_verification` implements generic streamed prover and verifier accumulators for mixed-degree
 alignment, masking, and the final batch check; each accumulator accepts its corresponding commitment type.
-The accumulators are parameterized by the base field, extension field, and an `ExtensionFieldLifter`.
-The batch protocol uses the operations provided by the `ExtensionFieldLifter` trait to compose values,
-masks, and tags.
+The batch protocol uses the `IsSubfieldOf::form_superfield` and `combine` to compose values, masks, and tags
+for the full-field mask commitments.
 
 `ProverPreparer` performs the initial cleartext traversal with polynomial degrees as its higher-degree wire representation, determining the circuit's maximum constraint degree and therefore the amount of masking VOLE material to reserve.
 

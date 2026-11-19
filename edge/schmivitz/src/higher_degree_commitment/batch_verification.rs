@@ -253,6 +253,10 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchVerifierAccumulator<F, FE> {
         // Constraint contributions: $\sum_i\chi_i\Delta^{d-d_i}\gamma_i$.
         let mut expected = FE::ZERO;
         for (degree, aggregate) in self.aggregates.iter().enumerate() {
+            // TODO: optimization, use the precomputed powers of delta here.
+            // Benefits may be marginal for circuits using many higher-degree polynomial commitments,
+            // since recomputation only happens at the final step of the protocol and are
+            // independent from the number of higher-degree polynomial commmitments.
             expected += delta.pow_var_time((max_higher_degree - degree) as u128) * *aggregate;
         }
 

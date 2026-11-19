@@ -78,7 +78,6 @@ pub trait FancyHigherDegree<FF: FiniteField>: FancyZeroKnowledge<FF> {
     /// Multiply a higher-degree wire by a constant.
     fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: FF) -> Self::HigherDegreeWire;
 
-    /// Assert that the callback's higher-degree constraint is zero.
-    /// The callback must be a circuit using the operations from this trait.
+    /// Assert the wire is zero.
     fn h_assert_zero(&mut self, wire: Self::HigherDegreeWire) -> Result<()>;
 }
