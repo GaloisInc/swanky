@@ -65,7 +65,7 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchProverAccumulator<F, FE> {
         }
     }
 
-    /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
+    /// Return the number of VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
     /// No masks are needed when `max_degree` is zero or one.
     pub(crate) fn mask_vole_count(max_degree: usize) -> usize {
         max_degree.saturating_sub(1) * F::DegreeModulo::USIZE
@@ -124,7 +124,7 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchProverAccumulator<F, FE> {
         evaluate_poly(&self.aggregate, point)
     }
 
-    /// Mask the aggregate and return the transmitted coefficients of $`\pi(t)`$ (step 6).
+    /// Mask the aggregate with VOLEs (step3) and return the transmitted coefficients of $`\pi(t)`$ (step 6).
     /// Both input streams must have the length returned by [`Self::mask_vole_count`].
     pub(crate) fn finish(
         self,
@@ -144,16 +144,20 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchProverAccumulator<F, FE> {
             mask_masks.len()
         );
 
+        // Let's start setting $`\pi(t)`$ as $`A(t)`$.
         let mut pi = self.aggregate[..degree].to_vec();
 
         // Organize the flat streams into per-mask blocks and compose each into a full-field mask.
         let (values_blocks, _) = Array::<F, F::DegreeModulo>::slice_as_chunks(mask_values);
         let (masks_blocks, _) = Array::<FE, F::DegreeModulo>::slice_as_chunks(mask_masks);
         for (j, (values, masks)) in values_blocks.iter().zip(masks_blocks).enumerate() {
-            // Compose the base-VOLE blocks into $\sigma_j(t)=w_j+s_jt$, then add
-            // $t^{j-1}\sigma_j(t)$; `j` here is 0-based, corresponding to $j+1$ in the document.
+            // First, compose the sVOLE blocks into the mask $`\sigma_j(t)=w_j+s_jt`$,
+            // this is step 3.
             let s_j = F::form_superfield(values);
             let w_j = combine(masks);
+
+            // Second, add $`\sum_{j=1}^{d-1}t^{j-1}\sigma_{s_j}(t)`$ to $`A(t)`$,
+            // this is step 6.
             pi[j] += w_j;
             pi[j + 1] += s_j;
         }
@@ -184,7 +188,7 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchVerifierAccumulator<F, FE> {
         }
     }
 
-    /// Return the number of base VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
+    /// Return the number of VOLEs needed to mask a batch of degree `max_degree` (steps 2–3).
     /// No masks are needed when `max_degree` is zero or one.
     pub(crate) fn mask_vole_count(max_degree: usize) -> usize {
         max_degree.saturating_sub(1) * F::DegreeModulo::USIZE
@@ -250,6 +254,10 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchVerifierAccumulator<F, FE> {
             return Ok(());
         }
 
+        // The value $`q`$ in step 7 for the verifier is the sum of
+        // constraint contributions and mask contributions, each part
+        // computed and added to the expected $`q`$ below.
+
         // Constraint contributions: $\sum_i\chi_i\Delta^{d-d_i}\gamma_i$.
         let mut expected = FE::ZERO;
         for (degree, aggregate) in self.aggregates.iter().enumerate() {
@@ -260,16 +268,20 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchVerifierAccumulator<F, FE> {
             expected += delta.pow_var_time((max_higher_degree - degree) as u128) * *aggregate;
         }
 
-        // Mask contributions: $\sum_j\Delta^{j-1}\nu_j$, organizing the flat stream into per-mask
-        // blocks and composing each into nu_j.
+        // Mask contributions: $`\sum_j\Delta^{j-1}\nu_j`$, organizing the flat stream into per-mask
+        // blocks and composing each into $`nu_j`$.
         let mut delta_power = FE::ONE;
         let (tag_blocks, _) = Array::<FE, F::DegreeModulo>::slice_as_chunks(mask_tags);
         for block in tag_blocks {
-            expected += delta_power * combine(block);
+            // step 3.
+            let nu_j = combine(block);
+
+            // step 7 adding the mask multiplied by $\Delta^{j-1}$.
+            expected += delta_power * nu_j;
             delta_power *= delta;
         }
 
-        // Evaluate the prover's $\pi(\Delta)$ and compare.
+        // Evaluate the prover's $`\pi(\Delta)`$ and compare.
         let pi_at_delta = evaluate_poly(prover_coefficients.coefficients(), delta);
 
         ensure!(

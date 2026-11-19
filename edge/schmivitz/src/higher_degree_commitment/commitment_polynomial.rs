@@ -17,8 +17,8 @@ pub struct CommitmentPolynomialProver<F: IsSubFieldOf<FE>, FE: FiniteField> {
 }
 
 impl<F: IsSubFieldOf<FE>, FE: FiniteField> CommitmentPolynomialProver<F, FE> {
-    /// Create a commitment polynomial from a base VOLE.
-    pub fn from_base_vole(value: F, mask: FE) -> Self {
+    /// Create a commitment polynomial from a VOLE.
+    pub fn from_vole(value: F, mask: FE) -> Self {
         Self {
             lower_coefficients: vec![mask],
             highest_degree: value,
@@ -135,8 +135,8 @@ pub struct CommitmentPolynomialVerifier<F: IsSubFieldOf<FE>, FE: FiniteField> {
 }
 
 impl<F: IsSubFieldOf<FE>, FE: FiniteField> CommitmentPolynomialVerifier<F, FE> {
-    /// Create a degree-one commitment from a [base VOLE](crate::higher_degree_commitment#base-vole) tag.
-    pub fn from_base_vole(tag: FE) -> Self {
+    /// Create a degree-one commitment from a VOLE(crate::higher_degree_commitment#svole) tag.
+    pub fn from_vole(tag: FE) -> Self {
         Self {
             evaluation: tag,
             degree: 1,
@@ -231,14 +231,13 @@ mod tests {
     }
 
     #[test]
-    fn from_base_vole_creates_degree_one() {
+    fn from_vole_creates_degree_one() {
         let mut rng = rng();
         let value = F2::random(&mut rng);
         let mask = F128b::random(&mut rng);
         let delta = F128b::random(&mut rng);
-        let poly = CommitmentPolynomialProver::<F2, F128b>::from_base_vole(value, mask);
-        let verifier =
-            CommitmentPolynomialVerifier::<F2, F128b>::from_base_vole(mask + value * delta);
+        let poly = CommitmentPolynomialProver::<F2, F128b>::from_vole(value, mask);
+        let verifier = CommitmentPolynomialVerifier::<F2, F128b>::from_vole(mask + value * delta);
         assert_eq!(poly.degree(), 1);
         assert_eq!(poly.lower_coefficients(), &[mask]);
         assert_eq!(poly.highest_degree(), value);
@@ -264,8 +263,8 @@ mod tests {
         let value = F::random(&mut rng);
         let mask = FE::random(&mut rng);
         let point = FE::random(&mut rng);
-        let poly = CommitmentPolynomialProver::<F, FE>::from_base_vole(value, mask);
-        let verifier = CommitmentPolynomialVerifier::<F, FE>::from_base_vole(mask + value * point);
+        let poly = CommitmentPolynomialProver::<F, FE>::from_vole(value, mask);
+        let verifier = CommitmentPolynomialVerifier::<F, FE>::from_vole(mask + value * point);
         // ρ(t) = mask + value·t
         prop_assert_eq!(poly.evaluate_at_point(point), mask + value * point);
         prop_assert_eq!(verifier.degree(), poly.degree());
@@ -365,14 +364,14 @@ mod tests {
         let w_y = F128b::random(&mut rng);
         let point = F128b::random(&mut rng);
 
-        let poly_x = CommitmentPolynomialProver::<F128b, F128b>::from_base_vole(val_x, w_x);
-        let poly_y = CommitmentPolynomialProver::<F128b, F128b>::from_base_vole(val_y, w_y);
+        let poly_x = CommitmentPolynomialProver::<F128b, F128b>::from_vole(val_x, w_x);
+        let poly_y = CommitmentPolynomialProver::<F128b, F128b>::from_vole(val_y, w_y);
 
         let sum = poly_x.add(&poly_y);
         let verifier_x =
-            CommitmentPolynomialVerifier::<F128b, F128b>::from_base_vole(w_x + val_x * point);
+            CommitmentPolynomialVerifier::<F128b, F128b>::from_vole(w_x + val_x * point);
         let verifier_y =
-            CommitmentPolynomialVerifier::<F128b, F128b>::from_base_vole(w_y + val_y * point);
+            CommitmentPolynomialVerifier::<F128b, F128b>::from_vole(w_y + val_y * point);
         let verifier_sum = verifier_x.add(&verifier_y, &[F128b::ONE, point]);
         assert_eq!(sum.degree(), 1);
         assert_eq!(sum.highest_degree(), val_x + val_y);

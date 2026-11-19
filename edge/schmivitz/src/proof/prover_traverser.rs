@@ -320,7 +320,7 @@ where
     type HigherDegreeWire = CommitmentPolynomialProver<F2, P::FLambda>;
 
     fn to_higher_degree_wire(&self, wire: Self::Item) -> Self::HigherDegreeWire {
-        CommitmentPolynomialProver::from_base_vole(wire.0, wire.1)
+        CommitmentPolynomialProver::from_vole(wire.0, wire.1)
     }
 
     fn h_add(
@@ -437,7 +437,7 @@ mod tests {
     fn constant_operations_apply_to_the_committed_value() {
         let rng = &mut rng();
         let traverser = test_traverser(F128b::random(rng), 0);
-        let poly = CommitmentPolynomialProver::from_base_vole(F2::ONE, F128b::random(rng));
+        let poly = CommitmentPolynomialProver::from_vole(F2::ONE, F128b::random(rng));
 
         let sum = traverser.h_addc(&poly, F2::ONE);
         assert_eq!(sum.highest_degree(), F2::ZERO);

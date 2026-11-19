@@ -278,7 +278,7 @@ where
     type HigherDegreeWire = CommitmentPolynomialVerifier<F2, P::FLambda>;
 
     fn to_higher_degree_wire(&self, wire: Self::Item) -> Self::HigherDegreeWire {
-        CommitmentPolynomialVerifier::from_base_vole(wire.0)
+        CommitmentPolynomialVerifier::from_vole(wire.0)
     }
 
     /// Mirrors

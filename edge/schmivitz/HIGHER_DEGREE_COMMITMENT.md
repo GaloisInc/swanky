@@ -13,9 +13,9 @@ The construction has two main components:
 1. commitment polynomials that support the circuit's gate operations; and
 2. a batch protocol that checks many commitment polynomials of different degrees at once.
 
-## Base VOLE
+## sVOLE
 
-A call to $`\operatorname{VOLE}(n)`$ produces $`n`$ correlated triples.
+A call to $`\operatorname{sVOLE}(n)`$ produces $`n`$ correlated triples.
 For each $`i \in \{1,\ldots,n\}`$, the prover receives a random value $`u_i \in \mathbb{F}_p`$ and a mask $`w_i \in \mathbb{F}_{p^r}`$, and the verifier receives a global key $`\Delta \in \mathbb{F}_{p^r}`$ and a tag $`v_i \in \mathbb{F}_{p^r}`$, such that
 
 ```math
@@ -42,7 +42,7 @@ The verifier holds a global key $`\Delta \in \mathbb{F}_{p^r}`$ that is unknown 
 \gamma_x = \rho_x(\Delta).
 ```
 
-Degree one recovers the base VOLE relation: $`\rho_x(t)=w+xt`$ and $`\gamma_x=w+x\Delta`$.
+Degree one recovers the sVOLE relation: $`\rho_x(t)=w+xt`$ and $`\gamma_x=w+x\Delta`$.
 Let $`\llbracket x \rrbracket_d`$ denote a degree-$`d`$ commitment represented by $`\rho_x`$ on the prover side and $`\gamma_x`$ on the verifier side.
 
 ## Gate-by-gate commitment propagation
@@ -160,7 +160,7 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
    ```
 
    on the prover side and by $`v_{j,k}=\sigma_{j,k}(\Delta)`$ on the verifier side.
-   Schmivitz obtains the equivalent masking material from its VOLE backend; the construction does not assume a fixed value of $`r`$.
+   Schmivitz obtains the equivalent masking material from its sVOLE backend; the construction does not assume a fixed value of $`r`$.
 
 3. **Compose the full-field masking commitments.** Let $`\alpha\in\mathbb{F}_{p^r}`$ be such that $`(1,\alpha,\ldots,\alpha^{r-1})`$ is an $`\mathbb{F}_p`$-basis of $`\mathbb{F}_{p^r}`$. For every $`j\in\{1,\ldots,d-1\}`$, apply the same linear combination to the value, mask, and tag:
 
