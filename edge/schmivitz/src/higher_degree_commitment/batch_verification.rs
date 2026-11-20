@@ -113,7 +113,6 @@ impl<F: IsSubFieldOf<FE>, FE: FiniteField> BatchProverAccumulator<F, FE> {
 
     /// Return the degree-$`d`$ coefficient of $`A(t)`$, which is zero for accepted constraints (step 6).
     /// An empty batch returns zero.
-    #[cfg(debug_assertions)]
     pub(crate) fn top_coefficient(&self) -> FE {
         self.aggregate.last().copied().unwrap_or(FE::ZERO)
     }
