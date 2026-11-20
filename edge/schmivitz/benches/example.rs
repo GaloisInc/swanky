@@ -16,7 +16,6 @@ impl<F: FancyBinary + FancyZeroKnowledge<F2>, const N: usize> Circuit<F> for Exa
         channel: &mut Channel,
     ) -> Result<Self::Output> {
         let mut v = backend.witness(channel)?;
-
         // N additions
         for _ in 0..N {
             v = backend.xor(&v, &v);

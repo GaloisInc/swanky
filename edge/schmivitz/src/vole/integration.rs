@@ -23,7 +23,7 @@ impl<P: Params> RandomVoleP for VoleProver<P> {
         extended_witness_length: usize,
         transcript: &mut Transcript,
         secret: &Secret,
-        _rng: &mut impl CryptoRng,
+        _rng: &mut impl CryptoRng, // TODO: remove `rng` parameter from this interface since its unused.
     ) -> (Self, Self::VoleChallenge) {
         log::info!("NB VOLES {:?}", extended_witness_length);
         // FIXME(hamlinb): This appears to use `SECURITY_PARAM` *bytes* of entropy, rather than

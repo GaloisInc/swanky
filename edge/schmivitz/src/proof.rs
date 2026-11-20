@@ -14,23 +14,27 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use std::time::Instant;
 use std::{iter::zip, marker::PhantomData};
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::{FiniteField, FiniteRing};
+use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F2, F8b};
 
+use crate::higher_degree_commitment::{BatchProverAccumulator, BatchVerifierAccumulator};
+use crate::vole::combine;
+use crate::vole::commit_reconstruct::l_hat;
 use crate::vole::functionality::{VoleProver, VoleVerifier};
 use crate::{circuit::Circuit, vole::DecommitmentSerde};
 use crate::{
-    parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes},
+    higher_degree_commitment::batch_verification::ZeroPolynomialCoefficients,
+    parameters::{FLambda, Params, RepetitionParam, SecurityParamBytes},
     proof::{
-        prover_preparer::ProverPreparer, prover_traverser::ProverTraverser,
+        prover_preparer::{ProverPreparer, ProverPreparerParts},
+        prover_traverser::{ProverTraverser, ProverTraverserParts},
         transcript::ChiGenerator,
+        verifier_traverser::{VerifierTraverser, VerifierTraverserParts},
     },
     vole::{AsSecretBytes, RandomVoleP, RandomVoleV},
 };
 use hybrid_array::Array;
 use hybrid_array::typenum::Unsigned;
-
-use self::verifier_traverser::VerifierTraverser;
 
 mod prover_preparer;
 mod prover_traverser;
@@ -47,6 +51,8 @@ pub struct Proof<Vole: RandomVoleP, VoleV: RandomVoleV> {
     degree_1_commitment: FLambda<Vole::Params>,
     /// Aggregated commitment to the assert_zero gates.
     assert_zero_commitment: FLambda<Vole::Params>,
+    /// Coefficients of the masked higher-degree batch commitment.
+    higher_degree_commitment: ZeroPolynomialCoefficients<FLambda<Vole::Params>>,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
     decommitment_challenge: Array<u8, SecurityParamBytes<Vole::Params>>,
     /// Partial decommitment of the VOLEs.
@@ -61,20 +67,38 @@ where
     P: Params,
     VoleP: RandomVoleP<Params = P>,
     VoleV: RandomVoleV<Params = P, Decommitment = VoleP::Decommitment>,
+    F2: IsSubFieldOf<FLambda<P>>,
 {
     /// An estimate of the proof size, in bytes.
     pub fn proof_size_estimate(&self) -> usize {
         // This is only a part of the proof size, it does not include the partial decommitment part because this is abstracted with traits.
         let witness_commitment_bytes = self.witness_commitment.len() / 8;
         let degree_1_commitment_bytes = SecurityParamBytes::<P>::USIZE;
+        let higher_degree_commitment_bytes =
+            self.higher_degree_commitment.max_degree() * SecurityParamBytes::<P>::USIZE;
         let decommitment_challenge_bytes = SecurityParamBytes::<P>::USIZE;
 
         let partial_decommitment_size = self.partial_decommitment.proof_size_estimate();
 
         witness_commitment_bytes
             + degree_1_commitment_bytes
+            + higher_degree_commitment_bytes
             + decommitment_challenge_bytes
             + partial_decommitment_size
+    }
+
+    /// Number of VOLE correlations.
+    ///
+    /// It counts for the extended witness (private inputs and multiplication gate outputs),
+    /// higher degree masks determined by the maximum constraint degree,
+    /// aggregate commitment masks, and consistency-check padding.
+    pub fn num_voles(&self) -> usize {
+        let mask_vole_count = BatchProverAccumulator::<F2, _>::mask_vole_count(
+            self.higher_degree_commitment.max_degree(),
+        );
+        let extended_witness_length = self.witness_commitment.len() + mask_vole_count;
+        // get the aggregate commitment masks, and consistency-check padding with `l_hat`
+        l_hat::<P>(extended_witness_length)
     }
 
     /// Create a proof of knowledge of a witness that satisfies the given circuit.
@@ -102,7 +126,7 @@ where
         private_input: &'a [F2],
         witness_size: Option<usize>,
         transcript: &mut Transcript,
-        rng: &mut RNG,
+        rng: &mut RNG, // TODO: this `rng` parameter is not used
     ) -> Result<Self>
     // TODO: Get rid of max_wire_id
     where
@@ -116,19 +140,30 @@ where
 
         // Evaluate the circuit in the clear to get the full witness and all wire values
         let t = std::time::Instant::now();
-        let mut circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
-        circuit_preparer.execute(circuit)?;
+        let circuit_preparer = ProverPreparer::new(private_input, witness_size)?;
 
-        let (witness, _challenge_count) = circuit_preparer.into_parts();
+        let ProverPreparerParts {
+            witness,
+            challenge_count: _challenge_count,
+            max_higher_degree,
+        } = circuit_preparer.execute(circuit)?;
+
+        // Reserve the VOLEs needed to mask the higher-degree batch after the witness VOLEs.
+        let mask_vole_count = BatchProverAccumulator::<F2, _>::mask_vole_count(max_higher_degree);
+
         log::info!("1: circuit preparer: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
         // Update transcript with general public information
         transcript.append_public_values::<P>();
 
-        // Get a set of (l + SECURITY_PARAM) random VOLEs
-        let (voles, _vole_challenge) =
-            VoleP::create(witness.len(), transcript.as_mut(), &witness, rng);
+        // Get a set of (l + mask count + SECURITY_PARAM) random VOLEs
+        let (voles, _vole_challenge) = VoleP::create(
+            witness.len() + mask_vole_count,
+            transcript.as_mut(),
+            &witness,
+            rng,
+        );
         log::info!("2: VoleP::create: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -154,22 +189,37 @@ where
         // Traverse circuit to compute the coefficients for the degree 0 and 1 terms for each
         // gate / polynomial (`A_i0` and `A_i1` in the paper) and start to aggregate these with
         // the challenges.
-        let mut circuit_traverser = ProverTraverser::new(witness, chi_challenge, voles)?;
-        circuit_traverser.execute(circuit)?;
+        let circuit_traverser =
+            ProverTraverser::new(witness, chi_challenge, voles, max_higher_degree)?;
 
-        let (degree_0_aggregation, degree_1_aggregation, assert_zero_commitment, voles) =
-            circuit_traverser.into_parts()?;
+        let ProverTraverserParts {
+            degree_0_aggregation,
+            degree_1_aggregation,
+            assert_zero_commitment,
+            higher_degree_accumulator,
+            voles,
+        } = circuit_traverser.execute(circuit)?;
 
-        log::info!("4: circuit_traverser.into_parts: {:?}", t.elapsed());
+        log::info!("4: circuit traverser: {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
         // Compute masks for the aggregated coefficients (`v*`, `u*` in the paper)
-        let degree_0_mask = combine::<P>(voles.aggregate_commitment_masks());
-        let degree_1_mask = combine::<P>(voles.aggregate_commitment_values());
+        let degree_0_mask = combine(&voles.aggregate_commitment_masks());
+        let degree_1_mask = combine(&voles.aggregate_commitment_values());
 
         // Finish computing aggregated responses (`a~`, `b~` in the paper)
         let degree_0_commitment = degree_0_aggregation + degree_0_mask;
         let degree_1_commitment = degree_1_aggregation + degree_1_mask;
+
+        // Finalize the higher-degree batch with the mask VOLEs that follow the witness VOLEs.
+        // The accumulator owns their organization and composition.
+        let witness_len = witness_commitment.len();
+        let mask_values = &voles.witness_mask()[witness_len..witness_len + mask_vole_count];
+        let mask_masks: Vec<P::FLambda> = (witness_len..witness_len + mask_vole_count)
+            .map(|i| voles.vole_mask(i))
+            .collect::<Result<Vec<_>>>()?;
+        let higher_degree_commitment =
+            higher_degree_accumulator.finish(mask_values, &mask_masks)?;
 
         // Add aggregated responses to transcript
         transcript.append_polynomial_commitments::<P>(
@@ -177,6 +227,7 @@ where
             &degree_1_commitment,
             &assert_zero_commitment,
         );
+        transcript.append_higher_degree_commitment::<P>(higher_degree_commitment.coefficients());
         let decommitment_challenge = transcript.extract_decommitment_challenge::<P>();
 
         // Decommit the VOLEs
@@ -188,6 +239,7 @@ where
             witness_commitment,
             degree_1_commitment,
             assert_zero_commitment,
+            higher_degree_commitment,
             decommitment_challenge,
             partial_decommitment,
             vole: PhantomData,
@@ -196,13 +248,17 @@ where
 
     /// This makes sure the proof is correctly formed e.g. everything is the right length.
     fn validate_proof(&self, voles: &VoleV) -> Result<()> {
-        // There should be one witness commitment for every element in the extended witness
-        // The proof and the decommitted VOLEs should agree on what this size is
-        if self.witness_commitment.len() != voles.extended_witness_length() {
+        // Account for both witness commitments and higher-degree masking material, and require the
+        // proof and decommitted VOLEs to agree on the resulting size.
+        let mask_vole_count = BatchProverAccumulator::<F2, _>::mask_vole_count(
+            self.higher_degree_commitment.max_degree(),
+        );
+        if self.witness_commitment.len() + mask_vole_count != voles.extended_witness_length() {
             bail!(
                 ErrorKind::OtherError,
-                "Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
+                "Invalid proof: Did not commit to the same number of witnesses {} (plus {} higher degree mask VOLEs) as there are VOLEs {}",
                 self.witness_commitment.len(),
+                mask_vole_count,
                 voles.extended_witness_length()
             )
         }
@@ -284,17 +340,22 @@ where
 
         let t = std::time::Instant::now();
         // Combine mask VOLEs to get q*
-        let validation_mask = combine::<P>(reconstructed_voles.mask_voles());
+        let validation_mask = combine(&reconstructed_voles.mask_voles());
 
         // Run circuit traversal and get the aggregate value (part of c~)
-        let mut verifier_traverser = VerifierTraverser::new(
+        let max_higher_degree = self.higher_degree_commitment.max_degree();
+        let verifier_traverser = VerifierTraverser::new(
             chi_challenge,
             reconstructed_voles.verifier_key(),
             masked_witnesses,
+            max_higher_degree,
         )?;
-        verifier_traverser.execute(circuit)?;
 
-        let (validation_aggregate, aggregate_assert_zero) = verifier_traverser.into_parts()?;
+        let VerifierTraverserParts {
+            validation_aggregate,
+            aggregate_assert_zero,
+            higher_degree_accumulator,
+        } = verifier_traverser.execute(circuit)?;
         log::info!("5: circuit traverser {:?}", t.elapsed());
 
         let t = std::time::Instant::now();
@@ -309,6 +370,8 @@ where
             &self.degree_1_commitment,
             &self.assert_zero_commitment,
         );
+        transcript
+            .append_higher_degree_commitment::<P>(self.higher_degree_commitment.coefficients());
 
         // Get the VOLE decommitment challenge and make sure it's valid
         let decommitment_challenge = transcript.extract_decommitment_challenge::<P>();
@@ -327,27 +390,25 @@ where
             );
         }
 
+        // Verify the higher-degree batch using the mask tags that follow the witness VOLEs.
+        // The accumulator owns mask composition and the final protocol checks.
+        let witness_voles = reconstructed_voles.witness_voles();
+        let witness_len = self.witness_commitment.len();
+        let mask_vole_len = BatchVerifierAccumulator::<F2, _>::mask_vole_count(max_higher_degree);
+        let mask_tags: Vec<P::FLambda> = witness_voles[witness_len..witness_len + mask_vole_len]
+            .iter()
+            .map(P::f8_linear_bijection)
+            .collect();
+        higher_degree_accumulator.finish(
+            reconstructed_voles.verifier_key(),
+            &mask_tags,
+            &self.higher_degree_commitment,
+        )?;
+
         log::info!("6: last check {:?}", t.elapsed());
 
         Ok(())
     }
-}
-
-/// Convert a list of field elements into a single 128-bit value.
-///
-/// Specifically, we compute
-/// $` \sum_{i = 0}^{128} v_i X^i`$,
-/// where $`X`$ is the generator for the field.
-fn combine<P: Params>(values: Array<FLambda<P>, MaskLength<P>>) -> FLambda<P> {
-    // Start with `X^0 = 1`
-    let mut power = FLambda::<P>::ONE;
-    let mut acc = FLambda::<P>::ZERO;
-
-    for vi in values {
-        acc += vi * power;
-        power *= FLambda::<P>::GENERATOR;
-    }
-    acc
 }
 
 /// The secret material for the prover is the extended witness.
@@ -358,7 +419,10 @@ impl AsSecretBytes for Vec<F2> {
 }
 
 /// Test proof generation and verification of a given [`Circuit`].
-pub fn test_sieveir<P: Params>(circuit: &Circuit) -> Result<()> {
+pub fn test_sieveir<P: Params>(circuit: &Circuit) -> Result<()>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     let rng = &mut rng();
 
     let t = std::time::Instant::now();
@@ -388,6 +452,7 @@ where
     C: FancyCircuit<ProverPreparer<'a>, Input = ()>
         + FancyCircuit<ProverTraverser<VoleProver<P>, P>, Input = ()>
         + FancyCircuit<VerifierTraverser<P>, Input = ()>,
+    F2: IsSubFieldOf<FLambda<P>>,
 {
     let rng = &mut rng();
     let t = Instant::now();
@@ -409,17 +474,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::{Binary128Bit, Binary256Bit, Params};
+    use crate::parameters::{Binary128Bit, Binary256Bit, FLambda, Params};
 
+    use fancy_traits::{Circuit as FancyCircuit, FancyBinary, FancyHigherDegree};
     use merlin::Transcript;
     use rand::rng;
     use std::io::Write;
     use std::{fs::File, io::Cursor};
     use swanky_error::{ErrorKind, Result, WrapErr};
+    use swanky_field::{FiniteRing, IsSubFieldOf};
+    use swanky_field_binary::F2;
     use tempfile::tempdir;
 
     use crate::{
         circuit::load_circuit_prover,
+        vole::functionality::{VoleProver, VoleVerifier},
         vole::insecure::{InsecureCommitments, InsecureVole},
     };
 
@@ -437,7 +506,10 @@ mod tests {
     ) -> Result<(
         Result<Proof<InsecureVole<P>, InsecureCommitments<P>>>,
         Circuit,
-    )> {
+    )>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mut circuit_cursor = Cursor::new(circuit_bytes.as_bytes());
 
         let dir = tempdir().unwrap();
@@ -456,7 +528,10 @@ mod tests {
         Ok((proof, circuit))
     }
 
-    fn prove_doesnt_explode<P: Params>() -> Result<()> {
+    fn prove_doesnt_explode<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let mini_circuit_bytes = "version 2.0.0;
             circuit;
             @type field 2;
@@ -499,7 +574,10 @@ mod tests {
           $14 <- @mul(0: $0, $9);
         @end ";
 
-    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()> {
+    fn prove_works_on_slightly_larger_circuit<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let private_input_bytes = "version 2.0.0;
             private_input;
             @type field 2;
@@ -521,7 +599,10 @@ mod tests {
         Ok(())
     }
 
-    fn prover_and_verifier_must_input_the_same_transcript<P: Params>() -> Result<()> {
+    fn prover_and_verifier_must_input_the_same_transcript<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
@@ -549,7 +630,147 @@ mod tests {
         Ok(())
     }
 
-    fn proof_requires_exact_number_of_challenges<P: Params>() -> Result<()> {
+    /// `x0 * x1 * x2 * x3`, a degree-4 constraint.
+    pub(crate) fn add_degree_four_constraint<F: FancyHigherDegree<F2>>(
+        backend: &mut F,
+        input: [F::Item; 4],
+    ) -> swanky_error::Result<()> {
+        let x = input.map(|wire| backend.to_higher_degree_wire(wire));
+
+        let x01 = backend.h_mul(&x[0], &x[1]);
+        let x23 = backend.h_mul(&x[2], &x[3]);
+        let zero = backend.h_mul(&x01, &x23);
+        backend.h_assert_zero(zero)
+    }
+
+    /// `x0 * x1 + x2 * x3`, a degree-2 constraint.
+    pub(crate) fn add_degree_two_constraint<F: FancyHigherDegree<F2>>(
+        backend: &mut F,
+        input: [F::Item; 4],
+    ) -> swanky_error::Result<()> {
+        let x = input.map(|wire| backend.to_higher_degree_wire(wire));
+
+        let x01 = backend.h_mul(&x[0], &x[1]);
+        let x23 = backend.h_mul(&x[2], &x[3]);
+        let zero = backend.h_add(&x01, &x23);
+        backend.h_assert_zero(zero)
+    }
+
+    /// Ordinary gates interleaved with higher-degree constraints of degrees 1, 2, and 4.
+    struct HigherDegreeCircuit;
+
+    impl<B: FancyBinary + FancyHigherDegree<F2>> FancyCircuit<B> for HigherDegreeCircuit {
+        type Input = ();
+        type Output = ();
+
+        fn execute(
+            &self,
+            backend: &mut B,
+            _: (),
+            channel: &mut swanky_channel::Channel,
+        ) -> Result<()> {
+            let inputs = backend.witnesses::<4>(channel)?;
+            let product = backend.and(&inputs[0], &inputs[2], channel)?;
+            let x = inputs.map(|wire| backend.to_higher_degree_wire(wire));
+            let x01 = backend.h_mul(&x[0], &x[1]);
+            let x23 = backend.h_mul(&x[2], &x[3]);
+            let zero = backend.h_mul(&x01, &x23);
+            backend.h_assert_zero(zero)?;
+            backend.assert_zero(&product, channel)?;
+            let zero = backend.h_mul(&x[0], &x[2]);
+            backend.h_assert_zero(zero)?;
+            let zero = backend.h_mulc(&x[2], F2::ONE);
+            backend.h_assert_zero(zero)?;
+            Ok(())
+        }
+    }
+
+    fn higher_degree_proof_works<P>() -> Result<()>
+    where
+        P: Params,
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
+        // Witness satisfying x0 * x1 * x2 * x3 == 0.
+        let private_input = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
+        let rng = &mut rng();
+
+        let circuit = HigherDegreeCircuit;
+
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
+            &circuit,
+            &private_input,
+            Some(5),
+            &mut transcript(),
+            rng,
+        )?;
+
+        // The maximum constraint degree is 4, so pi(t) has degree at most 3 and is sent as 4
+        // coefficients.
+        assert_eq!(proof.higher_degree_commitment.max_degree(), 4);
+
+        proof.verify(&circuit, &mut transcript())
+    }
+
+    /// The same shape as [`HigherDegreeCircuit`] (same witness count and constraint degree), but
+    /// a different constraint: x0 * x1 * x1 * x3.
+    struct WrongHigherDegreeCircuit;
+
+    impl<B: FancyBinary + FancyHigherDegree<F2>> FancyCircuit<B> for WrongHigherDegreeCircuit {
+        type Input = ();
+        type Output = ();
+
+        fn execute(
+            &self,
+            backend: &mut B,
+            _: (),
+            channel: &mut swanky_channel::Channel,
+        ) -> Result<()> {
+            let inputs = backend.witnesses::<4>(channel)?;
+            let x = inputs
+                .clone()
+                .map(|wire| backend.to_higher_degree_wire(wire));
+            let x01 = backend.h_mul(&x[0], &x[1]);
+            let x13 = backend.h_mul(&x[1], &x[3]);
+            let zero = backend.h_mul(&x01, &x13);
+            backend.h_assert_zero(zero)?;
+            let product = backend.and(&inputs[0], &inputs[2], channel)?;
+            backend.assert_zero(&product, channel)?;
+            let zero = backend.h_mul(&x[0], &x[2]);
+            backend.h_assert_zero(zero)?;
+            let zero = backend.h_mulc(&x[2], F2::ONE);
+            backend.h_assert_zero(zero)?;
+            Ok(())
+        }
+    }
+
+    fn higher_degree_proof_fails_against_a_different_constraint<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
+        let private_input = [F2::ONE, F2::ONE, F2::ZERO, F2::ONE];
+        let rng = &mut rng();
+
+        let circuit = HigherDegreeCircuit;
+        let proof = Proof::<VoleProver<P>, VoleVerifier<P>>::prove(
+            &circuit,
+            &private_input,
+            Some(5),
+            &mut transcript(),
+            rng,
+        )?;
+
+        let circuit = WrongHigherDegreeCircuit;
+        // The wrong circuit has the same transcript footprint, so only the higher degree
+        // constraint check (pi(Delta) = q) catches the mismatch.
+        assert!(proof.verify(&circuit, &mut transcript()).is_err());
+
+        Ok(())
+    }
+
+    fn proof_requires_exact_number_of_challenges<P: Params>() -> Result<()>
+    where
+        F2: IsSubFieldOf<FLambda<P>>,
+    {
         // Create a valid proof
         let small_circuit_bytes = "version 2.0.0;
             circuit;
@@ -630,6 +851,16 @@ mod tests {
                 #[test]
                 fn proof_requires_exact_number_of_challenges() -> Result<()> {
                     super::proof_requires_exact_number_of_challenges::<$params>()
+                }
+
+                #[test]
+                fn higher_degree_proof_works() -> Result<()> {
+                    super::higher_degree_proof_works::<$params>()
+                }
+
+                #[test]
+                fn higher_degree_proof_fails_against_a_different_constraint() -> Result<()> {
+                    super::higher_degree_proof_fails_against_a_different_constraint::<$params>()
                 }
             }
         };

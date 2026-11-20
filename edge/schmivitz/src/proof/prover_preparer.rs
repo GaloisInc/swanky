@@ -1,9 +1,21 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyHigherDegree, FancyZeroKnowledge,
+};
 use swanky_channel::Channel;
 use swanky_error::Result;
 use swanky_field::FiniteRing;
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
+
+/// Values produced by a completed prover preparation.
+pub(crate) struct ProverPreparerParts {
+    /// Extended witness values collected during traversal.
+    pub(crate) witness: Vec<F2>,
+    /// Number of Fiat-Shamir challenges required by the circuit.
+    pub(crate) challenge_count: usize,
+    /// Maximum degree among the circuit's higher-degree constraints.
+    pub(crate) max_higher_degree: usize,
+}
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -31,6 +43,9 @@ pub struct ProverPreparer<'a> {
 
     /// Number of polynomials that will need challenges.
     challenge_count: usize,
+
+    /// Maximum degree among the higher-degree constraint polynomials.
+    max_higher_degree: usize,
 }
 
 impl<'a> ProverPreparer<'a> {
@@ -45,26 +60,29 @@ impl<'a> ProverPreparer<'a> {
             priv_input_pos: 0,
             witness: Vec::with_capacity(witness_size.unwrap_or(0)),
             challenge_count: 0,
+            max_higher_degree: 0,
         })
     }
 
+    /// Get the maximum degree among the higher-degree constraint polynomials seen during
+    /// traversal (0 if there were none).
     #[cfg(test)]
-    pub(crate) fn count(&self) -> usize {
-        self.witness.len()
+    pub(crate) fn max_higher_degree(&self) -> usize {
+        self.max_higher_degree
     }
 
-    /// Get the witness and number of challenges required.
-    ///
-    /// These values will be empty if the circuit has not yet been traversed.
-    pub(crate) fn into_parts(self) -> (Vec<F2>, usize) {
-        (self.witness, self.challenge_count)
-    }
-
-    /// Run `circuit` using [`ProverPreparer`].
-    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
+    /// Run `circuit` and return the prepared witness and circuit statistics.
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(
+        mut self,
+        circuit: &C,
+    ) -> Result<ProverPreparerParts> {
         Channel::with(std::io::empty(), |channel| {
-            circuit.execute(self, (), channel)?;
-            Ok(())
+            circuit.execute(&mut self, (), channel)
+        })?;
+        Ok(ProverPreparerParts {
+            witness: self.witness,
+            challenge_count: self.challenge_count,
+            max_higher_degree: self.max_higher_degree,
         })
     }
 }
@@ -169,10 +187,62 @@ impl<'a> FancyZeroKnowledge<F2> for ProverPreparer<'a> {
     }
 }
 
+impl FancyHigherDegree<F2> for ProverPreparer<'_> {
+    /// The degree of the commitment polynomial that the
+    /// [`ProverTraverser`](crate::proof::prover_traverser::ProverTraverser) will build for the
+    /// wire.
+    ///
+    /// The degree rules mirror [`crate::higher_degree_commitment::CommitmentPolynomialProver`]: input
+    /// wires have degree 1, addition aligns to the larger degree, and multiplication sums the
+    /// degrees.
+    type HigherDegreeWire = usize;
+
+    fn to_higher_degree_wire(&self, _: Self::Item) -> Self::HigherDegreeWire {
+        1
+    }
+
+    fn h_add(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> Self::HigherDegreeWire {
+        *lhs.max(rhs)
+    }
+
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, _: F2) -> Self::HigherDegreeWire {
+        *lhs
+    }
+
+    fn h_mul(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> Self::HigherDegreeWire {
+        lhs + rhs
+    }
+
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, _: F2) -> Self::HigherDegreeWire {
+        *lhs
+    }
+
+    fn h_assert_zero(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
+        let degree = wire;
+        self.challenge_count += 1;
+        self.max_higher_degree = self.max_higher_degree.max(degree);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::Wire;
     use crate::circuit::CircuitIngestor;
-    use crate::proof::{Circuit, prover_preparer::ProverPreparer};
+    use crate::proof::tests::{add_degree_four_constraint, add_degree_two_constraint};
+    use crate::proof::{
+        Circuit,
+        prover_preparer::{ProverPreparer, ProverPreparerParts},
+    };
+    use fancy_traits::FancyHigherDegree;
     use rand::rng;
     use std::io::Cursor;
     use swanky_field::FiniteRing;
@@ -194,15 +264,10 @@ mod tests {
         Ok(circuit_loaded)
     }
 
-    fn prepare_circuit<'a>(
-        circuit_loaded: &'a Circuit,
-    ) -> swanky_error::Result<ProverPreparer<'a>> {
+    fn prepare_circuit(circuit_loaded: &Circuit) -> swanky_error::Result<ProverPreparerParts> {
         let (circuit, private_input, max_wire_id) = circuit_loaded.to_interpreter();
 
-        let mut counter: ProverPreparer =
-            ProverPreparer::new(private_input, Some(max_wire_id as usize))?;
-        counter.execute(&circuit)?;
-        Ok(counter)
+        ProverPreparer::new(private_input, Some(max_wire_id as usize))?.execute(&circuit)
     }
 
     #[test]
@@ -217,7 +282,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(private_input_only)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 3);
+        assert_eq!(counter.witness.len(), 3);
 
         let private_input_range = "version 2.0.0;
             circuit;
@@ -227,7 +292,7 @@ mod tests {
             @end";
         let circuit = load_circuit(private_input_range)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 4);
+        assert_eq!(counter.witness.len(), 4);
         Ok(())
     }
 
@@ -242,7 +307,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 2);
+        assert_eq!(counter.witness.len(), 2);
 
         let many_mul = "version 2.0.0;
             circuit;
@@ -258,7 +323,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(many_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 7);
+        assert_eq!(counter.witness.len(), 7);
         Ok(())
     }
 
@@ -276,7 +341,7 @@ mod tests {
             @end ";
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 2);
+        assert_eq!(counter.witness.len(), 2);
 
         let many_mul = "version 2.0.0;
             circuit;
@@ -293,7 +358,49 @@ mod tests {
             @end ";
         let circuit = load_circuit(many_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(counter.count(), 7);
+        assert_eq!(counter.witness.len(), 7);
+        Ok(())
+    }
+
+    #[test]
+    fn higher_degree_operations_compute_correct_degrees() {
+        let private_input = Vec::new();
+        let preparer = ProverPreparer::new(&private_input, None).unwrap();
+        let x = 3;
+        let y = 2;
+
+        // Addition aligns to the larger degree, multiplication sums the degrees, and constant
+        // operations leave the degree unchanged.
+        assert_eq!(preparer.h_add(&x, &y), 3);
+        assert_eq!(preparer.h_mul(&x, &y), 5);
+        assert_eq!(preparer.h_addc(&y, F2::ONE), 2);
+        assert_eq!(preparer.h_mulc(&y, F2::ZERO), 2);
+    }
+
+    #[test]
+    fn higher_degree_constraints_track_max_degree() -> swanky_error::Result<()> {
+        let private_input = Vec::new();
+        let mut preparer = ProverPreparer::new(&private_input, None)?;
+
+        assert_eq!(preparer.max_higher_degree(), 0);
+
+        add_degree_four_constraint(
+            &mut preparer,
+            [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire),
+        )?;
+        assert_eq!(preparer.max_higher_degree(), 4);
+
+        // A lower-degree constraint does not lower the maximum.
+        add_degree_two_constraint(
+            &mut preparer,
+            [F2::ONE, F2::ONE, F2::ZERO, F2::ONE].map(Wire),
+        )?;
+        assert_eq!(preparer.max_higher_degree(), 4);
+
+        assert!(preparer.witness.is_empty());
+        assert_eq!(preparer.challenge_count, 2);
+        assert_eq!(preparer.max_higher_degree, 4);
+
         Ok(())
     }
 
@@ -308,13 +415,9 @@ mod tests {
               $2 <- @mul(0: $0, $1);
             @end ";
 
-        // This evaluates on a random input; over time we'll check them all
         let circuit = load_circuit(one_mul)?;
         let counter = prepare_circuit(&circuit)?;
-        assert_eq!(
-            counter.witness.first().unwrap() * counter.witness.get(1).unwrap(),
-            *counter.witness.get(2).unwrap()
-        );
+        assert_eq!(counter.witness[0] * counter.witness[1], counter.witness[2]);
 
         Ok(())
     }

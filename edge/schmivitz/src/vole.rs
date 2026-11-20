@@ -12,9 +12,27 @@ use hybrid_array::Array;
 use merlin::Transcript;
 use rand::CryptoRng;
 use swanky_error::Result;
+use swanky_field::FiniteField;
 use swanky_field_binary::{F2, F8b};
 
 use crate::parameters::{FLambda, MaskLength, Params, RepetitionParam, SecurityParamBytes};
+
+/// Combine field elements using successive powers of the extension field's generator.
+///
+/// Specifically, computes
+/// $`\operatorname{combine}(z_0,\ldots,z_{r-1})=\sum_{k=0}^{r-1}z_kX^k`$, where $`X`$ is
+/// the extension field's multiplicative generator.
+pub(crate) fn combine<FE: FiniteField>(values: &[FE]) -> FE {
+    // Start with `X^0 = 1`
+    let mut power = FE::ONE;
+    let mut acc = FE::ZERO;
+
+    for vi in values {
+        acc += *vi * power;
+        power *= FE::GENERATOR;
+    }
+    acc
+}
 
 // Exposing these modules for benchmarking at the moment.
 pub(crate) mod all_but_one_vc;

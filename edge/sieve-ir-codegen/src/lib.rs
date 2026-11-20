@@ -157,7 +157,6 @@ fn codegen_impls<T: Read + Seek>(
                 #main
                 Ok(())
             }
-
         }
     }
 }

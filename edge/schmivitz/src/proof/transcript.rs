@@ -100,6 +100,19 @@ impl Transcript<'_> {
         );
     }
 
+    /// Adds the masked higher-degree batch commitment to the transcript.
+    pub(crate) fn append_higher_degree_commitment<P: Params>(
+        &mut self,
+        coefficients: &[FLambda<P>],
+    ) {
+        let bytes = coefficients
+            .iter()
+            .flat_map(|coefficient| coefficient.to_bytes())
+            .collect::<Vec<_>>();
+        self.0
+            .append_message(b"pi: higher degree commitment", bytes.as_slice());
+    }
+
     pub(crate) fn extract_decommitment_challenge<P: Params>(
         &mut self,
     ) -> Array<u8, SecurityParamBytes<P>> {
@@ -110,7 +123,8 @@ impl Transcript<'_> {
     }
 }
 
-/// Iterator that generates powers of chi challenges.
+/// Derives successive powers of one Fiat–Shamir challenge, shared across constraint checks.
+/// These weights are correlated; the independent-weight batching bound does not apply unchanged.
 pub(crate) struct ChiGenerator<P: Params> {
     chi: FLambda<P>,
     power_of_chi: FLambda<P>,

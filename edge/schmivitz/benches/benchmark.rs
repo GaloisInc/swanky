@@ -5,7 +5,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 use merlin::Transcript;
 use rand::rng as thread_rng;
-use schmivitz::parameters::{Binary128Bit, Binary256Bit, Params};
+use schmivitz::parameters::{Binary128Bit, Binary256Bit, FLambda, Params};
 use schmivitz::{
     Proof,
     circuit::load_circuit_from_strings_prover,
@@ -13,6 +13,8 @@ use schmivitz::{
     vole::functionality::{VoleProver, VoleVerifier},
 };
 use std::hint::black_box;
+use swanky_field::IsSubFieldOf;
+use swanky_field_binary::F2;
 
 // use crate::aes::AES256;
 use crate::example::ExampleCircuit;
@@ -22,7 +24,10 @@ fn transcript() -> Transcript {
     Transcript::new(b"basic happy test transcript")
 }
 
-pub fn benchmark_aes256<P: Params>(prefix: &str, c: &mut Criterion) {
+pub fn benchmark_aes256<P: Params>(prefix: &str, c: &mut Criterion)
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     let mini_circuit_bytes = include_str!("../circuits/aes_256_conv.sieve");
     let private_input_bytes = include_str!("../circuits/aes_256_conv_private.sieve");
 
@@ -90,7 +95,10 @@ pub fn benchmark_aes256<P: Params>(prefix: &str, c: &mut Criterion) {
     // });
 }
 
-pub fn benchmark_example_10000<P: Params>(prefix: &str, c: &mut Criterion) {
+pub fn benchmark_example_10000<P: Params>(prefix: &str, c: &mut Criterion)
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     let mini_circuit_bytes = include_str!("../circuits/example_10000.sieve");
     let private_input_bytes = include_str!("../circuits/example_10000_private.sieve");
 
@@ -157,7 +165,10 @@ pub fn benchmark_example_10000<P: Params>(prefix: &str, c: &mut Criterion) {
     });
 }
 
-pub fn benchmark_example_100000<P: Params>(prefix: &str, c: &mut Criterion) {
+pub fn benchmark_example_100000<P: Params>(prefix: &str, c: &mut Criterion)
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     let mini_circuit_bytes = include_str!("../circuits/example_100000.sieve");
     let private_input_bytes = include_str!("../circuits/example_10000_private.sieve");
 
@@ -233,7 +244,10 @@ pub fn benchmark_example_100000<P: Params>(prefix: &str, c: &mut Criterion) {
     });
 }
 
-pub fn benchmark_sha256<P: Params>(prefix: &str, c: &mut Criterion) {
+pub fn benchmark_sha256<P: Params>(prefix: &str, c: &mut Criterion)
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     let mini_circuit_bytes = include_str!("../circuits/sha256_conv.sieve");
     let private_input_bytes = include_str!("../circuits/sha256_conv_private.sieve");
 

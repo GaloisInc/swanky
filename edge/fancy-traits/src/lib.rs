@@ -49,7 +49,7 @@ pub use bundle::{u128_from_bits, u128_to_bits};
 mod circuit;
 pub use circuit::{Circuit, CircuitInputMapper, CircuitOutputMapper};
 mod zk;
-pub use zk::FancyZeroKnowledge;
+pub use zk::{FancyHigherDegree, FancyZeroKnowledge};
 
 /// The `Fancy` trait is the core trait for writing circuits.
 ///

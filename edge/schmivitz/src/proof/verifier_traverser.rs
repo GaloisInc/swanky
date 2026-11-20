@@ -1,12 +1,28 @@
-use fancy_traits::{Circuit, Fancy, FancyBinary, FancyConstant, FancyZeroKnowledge};
+use fancy_traits::{
+    Circuit, Fancy, FancyBinary, FancyConstant, FancyHigherDegree, FancyZeroKnowledge,
+};
 use swanky_channel::Channel;
 use swanky_error::{ErrorKind, Result, bail};
-use swanky_field::FiniteRing;
+use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::F2;
 use swanky_sieve_ir_api::FieldBackend;
 
+use crate::higher_degree_commitment::{BatchVerifierAccumulator, CommitmentPolynomialVerifier};
 use crate::parameters::{FLambda, Params};
 use crate::proof::ChiGenerator;
+
+/// Values produced by a completed verifier circuit traversal.
+pub(crate) struct VerifierTraverserParts<P: Params>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
+    /// Partial construction of the verifier's aggregated commitment.
+    pub(crate) validation_aggregate: FLambda<P>,
+    /// Aggregated assert-zero value.
+    pub(crate) aggregate_assert_zero: FLambda<P>,
+    /// Accumulator for the higher-degree constraint evaluations.
+    pub(crate) higher_degree_accumulator: BatchVerifierAccumulator<F2, FLambda<P>>,
+}
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
@@ -14,7 +30,10 @@ use crate::proof::ChiGenerator;
 /// The primary steps in circuit traversal are assigning masked witnesses to each
 /// wire (either using provided witnesses from the proof or evaluating expected witnesses for
 /// linear gates) and computing the aggregate value used to verify the proof.
-pub struct VerifierTraverser<P: Params> {
+pub struct VerifierTraverser<P: Params>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     /// Fiat-Shamir challenges as powers of chi. There should be one for each polynomial (e.g. non-linear gate) and assert zero.
     chi_challenge: ChiGenerator<P>,
 
@@ -40,15 +59,29 @@ pub struct VerifierTraverser<P: Params> {
     /// Partial aggregation of the assert zero check.
     /// TODO: Add this to the specification and reference it.
     aggregate_assert_zero: FLambda<P>,
+
+    /// Streamed accumulator for the higher-degree constraint batch, grouped by degree.
+    higher_degree_accumulator: BatchVerifierAccumulator<F2, FLambda<P>>,
+
+    /// Powers of the verifier's key through the maximum higher-degree constraint degree.
+    delta_powers: Vec<FLambda<P>>,
 }
 
-impl<P: Params> VerifierTraverser<P> {
+impl<P: Params> VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     pub(crate) fn new(
         chi_challenge: ChiGenerator<P>,
         verifier_key: FLambda<P>,
         masked_witnesses: Vec<FLambda<P>>,
+        max_higher_degree: usize,
     ) -> Result<Self> {
         // TODO: Add additional asserts here?
+        let mut delta_powers = vec![FLambda::<P>::ONE; max_higher_degree + 1];
+        for degree in 1..=max_higher_degree {
+            delta_powers[degree] = delta_powers[degree - 1] * verifier_key;
+        }
         Ok(Self {
             chi_challenge,
             verifier_key,
@@ -56,6 +89,8 @@ impl<P: Params> VerifierTraverser<P> {
             assigned_witness_count: 0,
             aggregate: FLambda::<P>::ZERO,
             aggregate_assert_zero: FLambda::<P>::ZERO,
+            higher_degree_accumulator: BatchVerifierAccumulator::new(max_higher_degree),
+            delta_powers,
         })
     }
 
@@ -85,11 +120,14 @@ impl<P: Params> VerifierTraverser<P> {
         Ok(self.masked_witnesses[next_index])
     }
 
-    /// Decomposes into the aggregate component (a partial construction of `c~`) that was built
-    /// during full circuit traversal.
-    ///
-    /// This will fail if there were unused challenges or masked witnesses.
-    pub(crate) fn into_parts(self) -> Result<(FLambda<P>, FLambda<P>)> {
+    /// Run `circuit` and return its aggregates, checking that all masked witnesses were used.
+    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(
+        mut self,
+        circuit: &C,
+    ) -> Result<VerifierTraverserParts<P>> {
+        Channel::with(std::io::empty(), |channel| {
+            circuit.execute(&mut self, (), channel)
+        })?;
         if self.assigned_witness_count != self.masked_witnesses.len() {
             bail!(
                 ErrorKind::OtherError,
@@ -98,14 +136,10 @@ impl<P: Params> VerifierTraverser<P> {
                 self.assigned_witness_count
             );
         }
-        Ok((self.aggregate, self.aggregate_assert_zero))
-    }
-
-    /// Run `circuit` using [`VerifierTraverser`].
-    pub(crate) fn execute<C: Circuit<Self, Input = ()>>(&mut self, circuit: &C) -> Result<()> {
-        Channel::with(std::io::empty(), |channel| {
-            circuit.execute(self, (), channel)?;
-            Ok(())
+        Ok(VerifierTraverserParts {
+            validation_aggregate: self.aggregate,
+            aggregate_assert_zero: self.aggregate_assert_zero,
+            higher_degree_accumulator: self.higher_degree_accumulator,
         })
     }
 }
@@ -116,7 +150,10 @@ pub struct Wire<P: Params>(FLambda<P>);
 
 // TODO: Remove! This API has been replaced with the `fancy-traits::Circuit`
 // API. We're keeping this around for now for backwards compatibility.
-impl<P: Params> FieldBackend<F2> for VerifierTraverser<P> {
+impl<P: Params> FieldBackend<F2> for VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     type Wire = FLambda<P>;
 
     fn input_public(&mut self) -> Result<Self::Wire> {
@@ -166,13 +203,19 @@ impl<P: Params> FieldBackend<F2> for VerifierTraverser<P> {
     }
 }
 
-impl<P: Params> Fancy for VerifierTraverser<P> {
+impl<P: Params> Fancy for VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     type Item = Wire<P>;
 }
 
-impl<P: Params> FancyConstant<F2> for VerifierTraverser<P> {
+impl<P: Params> FancyConstant<F2> for VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     fn constant(&mut self, constant: F2) -> Self::Item {
-        let value = if constant.into() {
+        let value = if constant == F2::ONE {
             FLambda::<P>::ONE
         } else {
             FLambda::<P>::ZERO
@@ -181,7 +224,10 @@ impl<P: Params> FancyConstant<F2> for VerifierTraverser<P> {
     }
 }
 
-impl<P: Params> FancyBinary for VerifierTraverser<P> {
+impl<P: Params> FancyBinary for VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     fn xor(&mut self, x: &Self::Item, y: &Self::Item) -> Self::Item {
         Wire(x.0 + y.0)
     }
@@ -204,7 +250,10 @@ impl<P: Params> FancyBinary for VerifierTraverser<P> {
     }
 }
 
-impl<P: Params> FancyZeroKnowledge<F2> for VerifierTraverser<P> {
+impl<P: Params> FancyZeroKnowledge<F2> for VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     fn witness(&mut self, _: &mut Channel) -> Result<Self::Item> {
         // Assign a fresh masked witness to the wire
         let res = self.next_masked_witness()?;
@@ -219,5 +268,75 @@ impl<P: Params> FancyZeroKnowledge<F2> for VerifierTraverser<P> {
 
         self.aggregate_assert_zero += challenge * value.0;
         Ok(())
+    }
+}
+impl<P: Params> FancyHigherDegree<F2> for VerifierTraverser<P>
+where
+    F2: IsSubFieldOf<P::FLambda>,
+{
+    /// A verifier commitment carrying its evaluation and degree.
+    type HigherDegreeWire = CommitmentPolynomialVerifier<F2, P::FLambda>;
+
+    fn to_higher_degree_wire(&self, wire: Self::Item) -> Self::HigherDegreeWire {
+        CommitmentPolynomialVerifier::from_vole(wire.0)
+    }
+
+    /// Mirrors
+    /// [`CommitmentPolynomialVerifier::add`] on verifier commitments.
+    fn h_add(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> Self::HigherDegreeWire {
+        lhs.add(rhs, &self.delta_powers)
+    }
+
+    /// Mirrors
+    /// [`CommitmentPolynomialVerifier::addc`] on verifier commitments.
+    fn h_addc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
+        lhs.addc(rhs, &self.delta_powers)
+    }
+
+    fn h_mul(
+        &self,
+        lhs: &Self::HigherDegreeWire,
+        rhs: &Self::HigherDegreeWire,
+    ) -> Self::HigherDegreeWire {
+        lhs.mul(rhs)
+    }
+
+    fn h_mulc(&self, lhs: &Self::HigherDegreeWire, rhs: F2) -> Self::HigherDegreeWire {
+        lhs.mulc(rhs)
+    }
+
+    fn h_assert_zero(&mut self, wire: Self::HigherDegreeWire) -> Result<()> {
+        // Consume the next shared Fiat–Shamir weight and add this evaluation to the batch.
+        let challenge = self.chi_challenge.next();
+        self.higher_degree_accumulator
+            .push_constraint(&wire, challenge)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::rng;
+    use swanky_field_binary::F128b;
+
+    use super::*;
+    use crate::parameters::Binary128Bit;
+
+    #[test]
+    fn delta_powers_are_precomputed() {
+        let delta = F128b::random(&mut rng());
+        let traverser = VerifierTraverser::<Binary128Bit>::new(
+            ChiGenerator::new(F128b::ONE),
+            delta,
+            Vec::new(),
+            4,
+        )
+        .unwrap();
+        let expected: Vec<_> = (0..=4).map(|degree| delta.pow(degree)).collect();
+        assert_eq!(traverser.delta_powers, expected);
     }
 }

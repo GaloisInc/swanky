@@ -12,10 +12,12 @@ use schmivitz::{
     circuit::load_circuit_from_strings_prover,
     circuit_validator::validate_circuit,
     parameters::{
-        Binary128Bit, Binary256Bit, Params, RepetitionParam, SecurityParam, SmallVoleSize,
+        Binary128Bit, Binary256Bit, FLambda, Params, RepetitionParam, SecurityParam, SmallVoleSize,
     },
     vole::functionality::{VoleProver, VoleVerifier},
 };
+use swanky_field::IsSubFieldOf;
+use swanky_field_binary::F2;
 
 use std::time::Instant;
 
@@ -31,7 +33,10 @@ fn transcript() -> Transcript {
     Transcript::new(b"schmivitz aes_proof_size example")
 }
 
-fn run<P: Params>() -> swanky_error::Result<()> {
+fn run<P: Params>() -> swanky_error::Result<()>
+where
+    F2: IsSubFieldOf<FLambda<P>>,
+{
     let security_param = <SecurityParam<P> as Unsigned>::USIZE;
     let vole_size_param = <SmallVoleSize as Unsigned>::USIZE;
     let repetition_param = <RepetitionParam<P> as Unsigned>::USIZE;
