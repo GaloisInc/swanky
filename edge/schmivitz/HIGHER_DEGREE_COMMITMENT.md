@@ -247,17 +247,17 @@ This section follows `VOLE-ZK.BatchVer` in Figure 3 of [2026-Agarwal-Baum-Braun-
 ## Schmivitz integration
 
 The higher-degree commitment API belongs in `edge/fancy-traits`, and the protocol implementation belongs in `edge/schmivitz`.
-Schmivitz instantiates the construction with `F2` as the base field and `F128b` as the extension field.
 
-`FancyHigherDegree<F2>` extends `FancyZeroKnowledge<F2>` with the four usual arithmetic operations and a higher-degree zero assertion. Circuits implement the existing `fancy_traits::Circuit` trait; ordinary inputs use `Fancy::Item`, while the assertion callback composes separate higher-degree wires.
+`FancyHigherDegree<F2>` extends `FancyZeroKnowledge<F2>` with the four usual arithmetic operations and a higher-degree zero assertion.
+Circuits implement the existing `fancy_traits::Circuit` trait; ordinary inputs use `Fancy::Item`,
+while values computed using the arithmetic operations and the higher-degree zero
+assertion are using `FancyHigherDegree::HigherDegreeWire`.
 
 `src/higher_degree_commitment` contains the protocol primitives: `CommitmentPolynomialProver` stores the
 prover's coefficients, while `CommitmentPolynomialVerifier` stores the verifier's evaluation and
 commitment degree. Both types implement the gate algebra.
 `batch_verification` implements generic streamed prover and verifier accumulators for mixed-degree
 alignment, masking, and the final batch check; each accumulator accepts its corresponding commitment type.
-The batch protocol uses the `IsSubfieldOf::form_superfield` and `combine` to compose values, masks, and tags
-for the full-field mask commitments.
 
 `ProverPreparer` performs the initial cleartext traversal with polynomial degrees as its higher-degree wire representation, determining the circuit's maximum constraint degree and therefore the amount of masking VOLE material to reserve.
 
